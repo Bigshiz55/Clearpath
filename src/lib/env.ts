@@ -20,6 +20,14 @@ export { ConfigError };
 
 function required(name: string, hint?: string): string {
   const value = process.env[name];
+  return requireValue(value, name, hint);
+}
+
+function requireValue(
+  value: string | undefined,
+  name: string,
+  hint?: string,
+): string {
   if (!value || value.trim() === '') {
     throw new ConfigError(
       `Missing required configuration: ${name}.${hint ? ' ' + hint : ''}`,
@@ -34,21 +42,29 @@ function optional(name: string): string | undefined {
 }
 
 export const publicEnv = {
+  // IMPORTANT: these must reference `process.env.NEXT_PUBLIC_*` as *static*
+  // literals (not `process.env[name]`). Next.js only inlines public env vars
+  // into the client bundle when it can see the literal key at build time. A
+  // dynamic lookup would be `undefined` in the browser even when the value is
+  // configured, which surfaces as a bogus "Missing required configuration".
   supabaseUrl(): string {
-    return required(
+    return requireValue(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
       'NEXT_PUBLIC_SUPABASE_URL',
       'Set it to your Supabase project URL.',
     );
   },
   supabasePublishableKey(): string {
-    return required(
+    return requireValue(
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
       'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
       'Set it to your Supabase publishable (anon) key.',
     );
   },
   siteUrl(): string {
     // Falls back to localhost in dev; safe non-secret default.
-    return optional('NEXT_PUBLIC_SITE_URL') ?? 'http://localhost:3000';
+    const value = process.env.NEXT_PUBLIC_SITE_URL;
+    return value && value.trim() !== '' ? value : 'http://localhost:3000';
   },
 };
 
