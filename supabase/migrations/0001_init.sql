@@ -6,6 +6,25 @@
 -- Postgres 13+ provides gen_random_uuid() natively.
 
 -- ---------------------------------------------------------------------
+-- Clean slate (initial setup only)
+-- ---------------------------------------------------------------------
+-- Drops any pre-existing versions of these app tables so the schema below is
+-- applied cleanly, even if an earlier/partial schema exists in the project.
+-- SAFE for initial setup (no live data yet). CASCADE removes dependent policies
+-- and constraints. If you ever have real data you want to keep, remove this
+-- block and reconcile the schema manually instead.
+drop table if exists public.feedback        cascade;
+drop table if exists public.watchlist_items cascade;
+drop table if exists public.watchlists      cascade;
+drop table if exists public.shares          cascade;
+drop table if exists public.verdicts        cascade;
+drop table if exists public.preference_rules cascade;
+drop table if exists public.profiles        cascade;
+drop function if exists public.get_public_share(text);
+drop function if exists public.username_available(text);
+drop function if exists public.set_updated_at() cascade;
+
+-- ---------------------------------------------------------------------
 -- updated_at helper
 -- ---------------------------------------------------------------------
 create or replace function public.set_updated_at()
