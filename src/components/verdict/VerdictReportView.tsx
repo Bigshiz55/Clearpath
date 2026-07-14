@@ -1,0 +1,263 @@
+import type { VerdictReport, ContentSignal, WatchlistStatus } from '@/lib/types';
+import { ScoreRing } from '@/components/ScoreRing';
+import { VerdictBadge, DispositionChip } from '@/components/VerdictBadge';
+import { ProviderRow } from '@/components/ProviderRow';
+import { Poster } from '@/components/PosterCard';
+import { tmdbImage } from '@/lib/tmdb/client';
+import { VerdictActions } from './VerdictActions';
+
+const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
+  none: 'bg-white/10 text-slate-400',
+  low: 'bg-emerald-500/15 text-emerald-200',
+  moderate: 'bg-yellow-500/15 text-yellow-100',
+  high: 'bg-red-500/15 text-red-200',
+  unknown: 'bg-white/5 text-slate-500',
+};
+
+function confidenceLabel(c: 'high' | 'medium' | 'low'): string {
+  return c === 'high' ? 'High confidence' : c === 'medium' ? 'Moderate confidence' : 'Low confidence — limited data';
+}
+
+function Bar({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="text-slate-400">{label}</span>
+        <span className="tabular-nums text-slate-300">{value}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-white/5">
+        <div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-300" style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
+}
+
+export interface WatchState {
+  itemId: string | null;
+  status: WatchlistStatus | null;
+  rating: number | null;
+  notes: string | null;
+}
+
+export function VerdictReportView({
+  report,
+  watchState,
+}: {
+  report: VerdictReport;
+  watchState?: WatchState;
+}) {
+  const t = report.title;
+  const backdrop = tmdbImage(t.backdropPath, 'w780');
+  const poster = tmdbImage(t.posterPath, 'w342');
+  const runtime =
+    t.mediaType === 'movie'
+      ? t.runtimeMinutes
+        ? `${t.runtimeMinutes} min`
+        : null
+      : t.numberOfSeasons
+        ? `${t.numberOfSeasons} season${t.numberOfSeasons === 1 ? '' : 's'}`
+        : t.episodeRuntimeMinutes
+          ? `~${t.episodeRuntimeMinutes} min/ep`
+          : null;
+
+  const audienceSource = report.general.sources[0];
+
+  return (
+    <article className="space-y-6">
+      {/* Header */}
+      <header className="card relative overflow-hidden">
+        {backdrop && (
+          <div className="absolute inset-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={backdrop} alt="" className="h-full w-full object-cover opacity-25" />
+            <div className="absolute inset-0 bg-gradient-to-t from-ink-850 via-ink-850/80 to-ink-850/40" />
+          </div>
+        )}
+        <div className="relative flex flex-col gap-5 p-5 sm:flex-row sm:p-6">
+          <div className="h-48 w-32 flex-shrink-0 overflow-hidden rounded-xl shadow-card sm:h-56 sm:w-40">
+            <Poster posterUrl={poster} title={t.title} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="chip">{t.mediaType === 'movie' ? 'Movie' : 'TV Series'}</span>
+              {t.contentRating && <span className="chip">{t.contentRating}</span>}
+              {runtime && <span className="chip">{runtime}</span>}
+              {t.status && t.mediaType === 'tv' && <span className="chip">{t.status}</span>}
+            </div>
+            <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
+              {t.title} {t.year ? <span className="font-normal text-slate-400">({t.year})</span> : null}
+            </h1>
+            {t.genres.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {t.genres.map((g) => (
+                  <span key={g} className="rounded-md bg-white/5 px-2 py-0.5 text-xs text-slate-300">
+                    {g}
+                  </span>
+                ))}
+              </div>
+            )}
+            {t.overview && <p className="mt-3 max-w-2xl text-sm text-slate-300">{t.overview}</p>}
+            {t.trailerUrl && (
+              <a href={t.trailerUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary mt-4 inline-flex">
+                ▶ Watch trailer
+              </a>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Score summary */}
+      <section className="card p-5 sm:p-6">
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-around">
+          <ScoreRing score={report.general.score} label="WatchVerdict Score" sublabel={confidenceLabel(report.general.confidence)} accent="brand" size={128} />
+          <div className="hidden h-24 w-px bg-white/10 sm:block" />
+          <ScoreRing score={report.personal.score} label={report.personal.label} sublabel={`base ${report.personal.baseScore} → ${report.personal.score}`} accent="gold" size={128} />
+        </div>
+        <div className="mt-5 flex flex-col items-center gap-3 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <VerdictBadge tier={report.tier} size="lg" />
+            <DispositionChip disposition={report.watchlistDisposition} />
+          </div>
+          <p className="max-w-xl text-slate-200">{report.oneLiner}</p>
+        </div>
+      </section>
+
+      {/* Actions */}
+      <VerdictActions
+        tmdbId={t.id}
+        mediaType={t.mediaType}
+        title={t.title}
+        year={t.year}
+        posterPath={t.posterPath}
+        personalLabel={report.personal.label}
+        initialItemId={watchState?.itemId ?? null}
+        initialStatus={watchState?.status ?? null}
+        initialRating={watchState?.rating ?? null}
+        initialNotes={watchState?.notes ?? null}
+      />
+
+      {/* Score explanation */}
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-lg font-semibold text-white">How this score was built</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="space-y-3">
+            <Bar label="General quality" value={report.general.breakdown.quality} />
+            <Bar label="Audience reception" value={report.general.breakdown.audience} />
+            <Bar label="Watchability" value={report.general.breakdown.watchability} />
+            <Bar label="Engagement" value={report.general.breakdown.engagement} />
+          </div>
+          <div className="space-y-3">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <div className="text-sm font-semibold text-white">Ratings used</div>
+              <div className="mt-2 space-y-1 text-sm">
+                {audienceSource && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">{audienceSource.name}</span>
+                    <span className="text-slate-200">
+                      {audienceSource.available ? audienceSource.raw : 'Not available'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Quality, execution, and production reception are estimated from audience data
+                (shrunk toward neutral when few votes exist). Estimated values are labeled, never
+                presented as official critic scores.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {report.personal.adjustments.length > 0 && (
+          <div className="mt-5">
+            <div className="text-sm font-semibold text-white">
+              {report.personal.label} adjustments
+            </div>
+            <ul className="mt-2 space-y-2">
+              {report.personal.adjustments.map((a, i) => (
+                <li key={i} className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
+                  <span
+                    className={`mt-0.5 rounded-md px-2 py-0.5 text-xs font-bold tabular-nums ${
+                      a.points < 0 ? 'bg-red-500/20 text-red-200' : 'bg-emerald-500/20 text-emerald-200'
+                    }`}
+                  >
+                    {a.points > 0 ? `+${a.points}` : a.points}
+                  </span>
+                  <div>
+                    <div className="text-sm font-medium text-white">{a.label}</div>
+                    <div className="text-xs text-slate-400">{a.reason}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      {/* Why it may / may not work */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <div className="card p-5">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-emerald-200">Why it may work</h3>
+          <ul className="mt-3 space-y-2 text-sm text-slate-300">
+            {report.reasonsFor.map((r, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-emerald-400">+</span>
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="card p-5">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-red-200">Why it may not</h3>
+          <ul className="mt-3 space-y-2 text-sm text-slate-300">
+            {report.reasonsAgainst.map((r, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-red-400">–</span>
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* Content & tone */}
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-lg font-semibold text-white">Content &amp; tone</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Signals inferred from genre, keywords, and rating. Where we can’t responsibly determine a
+          level, it’s marked unknown rather than guessed.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {report.contentSignals.map((s) => (
+            <div key={s.label} className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <div className="text-sm font-medium text-white">{s.label}</div>
+              <span className={`mt-1 inline-block rounded px-2 py-0.5 text-xs capitalize ${LEVEL_COLOR[s.level]}`}>
+                {s.note ?? s.level}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Where to watch */}
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-lg font-semibold text-white">Where to watch</h2>
+        <p className="mt-1 text-xs text-slate-500">Legal options for your region. We link out — we never host or stream content.</p>
+        <div className="mt-4">
+          <ProviderRow providers={report.providers} />
+        </div>
+      </section>
+
+      {/* Final verdict */}
+      <section className="card bg-cinema-radial p-6 text-center">
+        <div className="text-xs uppercase tracking-wider text-slate-400">Final verdict</div>
+        <div className="mt-2 flex flex-col items-center gap-2">
+          <VerdictBadge tier={report.tier} size="lg" />
+          <div className="text-sm text-slate-300">
+            Watchlist call: <DispositionChip disposition={report.watchlistDisposition} />
+          </div>
+        </div>
+      </section>
+    </article>
+  );
+}

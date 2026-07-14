@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-ink-950 text-slate-100 antialiased;
+  background-image:
+    radial-gradient(1100px 560px at 82% -12%, rgba(47, 107, 255, 0.16), transparent),
+    radial-gradient(820px 460px at -8% 4%, rgba(230, 173, 51, 0.07), transparent);
+  background-attachment: fixed;
+  min-height: 100dvh;
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+  }
+
+  .card {
+    @apply rounded-2xl border border-white/10 bg-ink-850/70 shadow-card backdrop-blur;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+           transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50
+           min-h-[44px];
+  }
+  .btn-primary {
+    @apply btn bg-brand-500 text-white hover:bg-brand-400 shadow-glow;
+  }
+  .btn-secondary {
+    @apply btn border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10;
+  }
+  .btn-ghost {
+    @apply btn text-slate-300 hover:bg-white/5 hover:text-white;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5
+           px-3 py-1 text-xs font-medium text-slate-200;
+  }
+  .chip-active {
+    @apply border-brand-400/60 bg-brand-500/20 text-brand-100;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-white/10 bg-ink-900/80 px-4 py-3 text-base text-slate-100
+           placeholder:text-slate-500 outline-none transition
+           focus:border-brand-400/70 focus:ring-2 focus:ring-brand-500/30 min-h-[44px];
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-slate-300;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden rounded-xl bg-white/5;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r
+           from-transparent via-white/10 to-transparent;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
