@@ -219,6 +219,41 @@ export async function discoverRecent(region = 'US', days = 21, perType = 20): Pr
   return [...mapItems(movies.results, 'movie'), ...mapItems(tv.results, 'tv')];
 }
 
+/**
+ * Popular, well-rated titles in the given genres — used to seed recommendations
+ * from a taste profile alone (before the user has any watch history). Genres are
+ * OR-matched so the pool stays broad; profile scoring narrows it down after.
+ */
+export async function discoverByGenres(
+  mediaType: MediaType,
+  genreIds: number[],
+  region = 'US',
+): Promise<DiscoverItem[]> {
+  if (genreIds.length === 0) return [];
+  const data = await tmdbFetch<TmdbMultiResult>(`/discover/${mediaType}`, {
+    language: 'en-US',
+    include_adult: 'false',
+    sort_by: 'popularity.desc',
+    watch_region: region,
+    with_genres: genreIds.join('|'),
+    'vote_count.gte': '200',
+    'vote_average.gte': '6.4',
+    page: '1',
+  }).catch(() => ({ page: 1, results: [] as TmdbMultiResult['results'] }));
+
+  return data.results.slice(0, 20).map((r) => {
+    const mt = mediaType;
+    return {
+      id: r.id,
+      mediaType: mt,
+      title: (mt === 'movie' ? r.title : r.name) ?? 'Untitled',
+      year: yearFrom(mt === 'movie' ? r.release_date : r.first_air_date),
+      posterPath: r.poster_path ?? null,
+      releaseDate: (mt === 'movie' ? r.release_date : r.first_air_date) ?? null,
+    };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Details
 // ---------------------------------------------------------------------------

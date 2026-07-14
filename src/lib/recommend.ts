@@ -1,9 +1,22 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MediaType, PrimaryCall, VerdictTier } from '@/lib/types';
-import { getSimilar, getTitle } from '@/lib/tmdb/client';
+import { getSimilar, getTitle, discoverByGenres } from '@/lib/tmdb/client';
 import { buildVerdict } from '@/lib/scoring';
+import type { PersonalContext } from '@/lib/scoring/personal';
 import { getProfile, getPersonalContext, regionFor } from '@/lib/profile';
+
+// Map each positive taste trait to TMDB genres, per media type, so the cold-start
+// pool reflects whatever profile the user has (Scott, Heather, Amy, …).
+const TRAIT_GENRES: Record<string, { movie: number[]; tv: number[] }> = {
+  grounded_crime: { movie: [80], tv: [80] },
+  serial_killer: { movie: [80, 53], tv: [80, 9648] },
+  psychological_thriller: { movie: [53], tv: [9648] },
+  domestic_thriller: { movie: [53], tv: [18] },
+  detective_mystery: { movie: [9648], tv: [9648] },
+};
+const DEFAULT_MOVIE_GENRES = [18, 53, 9648, 80]; // drama, thriller, mystery, crime
+const DEFAULT_TV_GENRES = [18, 80, 9648];
 
 const SEED_LIMIT = 6;
 const CANDIDATES_TO_SCORE = 18;
@@ -81,7 +94,8 @@ export async function getRecommendations(
   const watched = (watchedFavs.data ?? []) as SeedRow[];
   let seeds = watched.filter((s) => (s.rating ?? 0) >= 8).slice(0, SEED_LIMIT);
   if (seeds.length === 0) seeds = watched.slice(0, SEED_LIMIT);
-  if (seeds.length === 0) return [];
+  // No watch history yet: recommend straight from the taste profile.
+  if (seeds.length === 0) return coldStartFromProfile(personal, region, exclude);
 
   const seedResults = await Promise.all(
     seeds.map(async (s) => ({
@@ -119,31 +133,97 @@ export async function getRecommendations(
   if (candidates.length === 0) return [];
 
   const scored = await Promise.all(
-    candidates.map(async (c): Promise<Recommendation | null> => {
-      try {
-        const meta = await getTitle(c.mediaType, c.id, region);
-        const report = buildVerdict({ meta, providers: null, personal });
-        const topPos = report.personal.adjustments.find((a) => a.points > 0);
-        return {
-          id: c.id,
-          mediaType: c.mediaType,
-          title: meta.title,
-          year: meta.year,
-          posterPath: meta.posterPath ?? c.posterPath,
-          personalScore: report.personal.score,
-          tier: report.tier,
-          primaryCall: report.primaryCall,
-          because: c.seedTitle,
-          matchReason: topPos ? topPos.label : null,
-        };
-      } catch {
-        return null;
-      }
-    }),
+    candidates.map((c) =>
+      scoreCandidate(c.id, c.mediaType, c.posterPath, region, personal, c.seedTitle),
+    ),
   );
 
+  return finalize(scored);
+}
+
+/** Fetch a candidate's metadata, score it against the profile, shape the result. */
+async function scoreCandidate(
+  id: number,
+  mediaType: MediaType,
+  fallbackPoster: string | null,
+  region: string,
+  personal: PersonalContext,
+  because: string | null,
+): Promise<Recommendation | null> {
+  try {
+    const meta = await getTitle(mediaType, id, region);
+    const report = buildVerdict({ meta, providers: null, personal });
+    const topPos = report.personal.adjustments.find((a) => a.points > 0);
+    return {
+      id,
+      mediaType,
+      title: meta.title,
+      year: meta.year,
+      posterPath: meta.posterPath ?? fallbackPoster,
+      personalScore: report.personal.score,
+      tier: report.tier,
+      primaryCall: report.primaryCall,
+      because,
+      matchReason: topPos ? topPos.label : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function finalize(scored: (Recommendation | null)[]): Recommendation[] {
   return scored
     .filter((r): r is Recommendation => r !== null && r.personalScore >= MIN_SCORE)
     .sort((a, b) => b.personalScore - a.personalScore)
     .slice(0, RESULT_LIMIT);
+}
+
+/** Genre pool derived from the profile's positive traits (per media type). */
+function genresFromRules(personal: PersonalContext): { movie: number[]; tv: number[] } {
+  const movie = new Set<number>();
+  const tv = new Set<number>();
+  for (const rule of personal.rules) {
+    if (rule.weight <= 0) continue;
+    const g = TRAIT_GENRES[rule.trait];
+    if (!g) continue;
+    g.movie.forEach((m) => movie.add(m));
+    g.tv.forEach((t) => tv.add(t));
+  }
+  return {
+    movie: movie.size > 0 ? [...movie] : DEFAULT_MOVIE_GENRES,
+    tv: tv.size > 0 ? [...tv] : DEFAULT_TV_GENRES,
+  };
+}
+
+/**
+ * Recommendations with no watch history: pull popular, well-rated titles in the
+ * profile's genres and score them. Lets a freshly-onboarded profile (e.g. the
+ * Scott preset) get real, poster-backed suggestions immediately.
+ */
+async function coldStartFromProfile(
+  personal: PersonalContext,
+  region: string,
+  exclude: Set<string>,
+): Promise<Recommendation[]> {
+  const genres = genresFromRules(personal);
+  const [movies, shows] = await Promise.all([
+    discoverByGenres('movie', genres.movie, region).catch(() => []),
+    discoverByGenres('tv', genres.tv, region).catch(() => []),
+  ]);
+
+  const seen = new Set<string>();
+  const pool = [...movies, ...shows].filter((d) => {
+    const key = `${d.mediaType}-${d.id}`;
+    if (!d.posterPath || exclude.has(key) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (pool.length === 0) return [];
+
+  const scored = await Promise.all(
+    pool
+      .slice(0, CANDIDATES_TO_SCORE)
+      .map((d) => scoreCandidate(d.id, d.mediaType, d.posterPath, region, personal, null)),
+  );
+  return finalize(scored);
 }
