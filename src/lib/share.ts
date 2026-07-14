@@ -1,6 +1,6 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
-import type { VerdictTier, WatchlistDisposition, WatchProviders } from '@/lib/types';
+import type { PrimaryCall, VerdictTier, WatchlistDisposition, WatchProviders } from '@/lib/types';
 
 export interface PublicVerdictSnapshot {
   kind: 'verdict';
@@ -12,6 +12,7 @@ export interface PublicVerdictSnapshot {
   backdropUrl: string | null;
   generalScore: number;
   generalConfidence: 'high' | 'medium' | 'low';
+  primaryCall: PrimaryCall;
   tier: VerdictTier;
   disposition: WatchlistDisposition;
   oneLiner: string;

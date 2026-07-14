@@ -44,6 +44,7 @@ function verdictSnapshot(report: VerdictReport, includePersonal: boolean) {
     backdropUrl: tmdbImage(report.title.backdropPath, 'w780'),
     generalScore: report.general.score,
     generalConfidence: report.general.confidence,
+    primaryCall: report.primaryCall,
     tier: report.tier,
     disposition: report.watchlistDisposition,
     oneLiner: report.oneLiner,

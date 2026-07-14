@@ -1,6 +1,7 @@
 import type { VerdictReport, ContentSignal, WatchlistStatus } from '@/lib/types';
+import Link from 'next/link';
 import { ScoreRing } from '@/components/ScoreRing';
-import { VerdictBadge, DispositionChip } from '@/components/VerdictBadge';
+import { VerdictBadge, DispositionChip, PrimaryCallBanner } from '@/components/VerdictBadge';
 import { ProviderRow } from '@/components/ProviderRow';
 import { Poster } from '@/components/PosterCard';
 import { tmdbImage } from '@/lib/tmdb/client';
@@ -60,10 +61,11 @@ export function VerdictReportView({
           ? `~${t.episodeRuntimeMinutes} min/ep`
           : null;
 
-  const audienceSource = report.general.sources[0];
-
   return (
     <article className="space-y-6">
+      {/* Headline verdict — always first */}
+      <PrimaryCallBanner call={report.primaryCall} oneLiner={report.oneLiner} />
+
       {/* Header */}
       <header className="card relative overflow-hidden">
         {backdrop && (
@@ -150,19 +152,19 @@ export function VerdictReportView({
             <div className="rounded-xl border border-white/10 bg-white/5 p-4">
               <div className="text-sm font-semibold text-white">Ratings used</div>
               <div className="mt-2 space-y-1 text-sm">
-                {audienceSource && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">{audienceSource.name}</span>
-                    <span className="text-slate-200">
-                      {audienceSource.available ? audienceSource.raw : 'Not available'}
+                {report.general.sources.map((s) => (
+                  <div key={s.name} className="flex items-center justify-between">
+                    <span className="text-slate-400">{s.name}</span>
+                    <span className={s.available ? 'text-slate-200' : 'text-slate-500'}>
+                      {s.available ? s.raw : 'Not available'}
                     </span>
                   </div>
-                )}
+                ))}
               </div>
               <p className="mt-2 text-xs text-slate-500">
-                Quality, execution, and production reception are estimated from audience data
-                (shrunk toward neutral when few votes exist). Estimated values are labeled, never
-                presented as official critic scores.
+                Audience & critic scores shown as reported. When critic aggregators are
+                unavailable, quality is estimated from audience data (shrunk toward neutral when
+                few votes exist) and labeled as such — never presented as an official critic score.
               </p>
             </div>
           </div>
@@ -247,6 +249,23 @@ export function VerdictReportView({
           <ProviderRow providers={report.providers} />
         </div>
       </section>
+
+      {/* More like this */}
+      {report.similar.length > 0 && (
+        <section className="card p-5 sm:p-6">
+          <h2 className="text-lg font-semibold text-white">More like this</h2>
+          <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
+            {report.similar.map((s) => (
+              <Link key={`${s.mediaType}-${s.id}`} href={`/app/title/${s.mediaType}/${s.id}`} className="group block">
+                <div className="aspect-[2/3] overflow-hidden rounded-lg border border-white/10">
+                  <Poster posterUrl={tmdbImage(s.posterPath, 'w185')} title={s.title} className="transition group-hover:scale-105" />
+                </div>
+                <div className="mt-1 line-clamp-1 text-xs text-slate-300">{s.title}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Final verdict */}
       <section className="card bg-cinema-radial p-6 text-center">

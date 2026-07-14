@@ -22,8 +22,48 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [listening, setListening] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
+
+  const voiceSupported =
+    typeof window !== 'undefined' &&
+    ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+
+  function startVoice() {
+    if (typeof window === 'undefined') return;
+    const w = window as unknown as { webkitSpeechRecognition?: new () => never; SpeechRecognition?: new () => never };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) return;
+    const rec = new (Ctor as unknown as new () => Record<string, unknown>)() as Record<string, unknown> & {
+      lang: string;
+      interimResults: boolean;
+      maxAlternatives: number;
+      onresult: (e: { results: Array<Array<{ transcript: string }>> }) => void;
+      onend: () => void;
+      onerror: () => void;
+      start: () => void;
+      stop: () => void;
+    };
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e: { results: Array<Array<{ transcript: string }>> }) => {
+      const said = e.results?.[0]?.[0]?.transcript ?? '';
+      if (said) setQ(said);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    setListening(true);
+    rec.start();
+  }
+
+  function stopVoice() {
+    recognitionRef.current?.stop();
+    setListening(false);
+  }
 
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current);
@@ -84,7 +124,23 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
           aria-label="Search for a movie or TV show"
         />
         {loading && (
-          <span className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
+          <span className="absolute right-12 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
+        )}
+        {voiceSupported && (
+          <button
+            type="button"
+            onClick={listening ? stopVoice : startVoice}
+            className={`absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg transition ${
+              listening ? 'bg-red-500/20 text-red-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+            aria-label={listening ? 'Stop voice search' : 'Search by voice'}
+            title={listening ? 'Listening… tap to stop' : 'Search by voice'}
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+              <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M5 11a7 7 0 0 0 14 0M12 18v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
         )}
       </div>
 

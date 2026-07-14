@@ -1,10 +1,11 @@
 import 'server-only';
 import type { MediaType, VerdictReport } from '@/lib/types';
-import { getTitle, getWatchProviders, getCollectionId } from '@/lib/tmdb/client';
+import { getTitle, getWatchProviders, getCollectionId, getSimilar } from '@/lib/tmdb/client';
 import { buildVerdict } from '@/lib/scoring';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, getPersonalContext, regionFor } from '@/lib/profile';
 import { enhanceOneLiner } from '@/lib/ai';
+import { getCriticRatings } from '@/lib/omdb';
 
 export interface ReportResult {
   report: VerdictReport;
@@ -29,15 +30,24 @@ export async function buildReportForCurrentUser(
   const profile = await getProfile(supabase, user.id);
   const region = regionFor(profile);
 
-  // Fetch metadata + providers + franchise in parallel.
-  const [meta, providers, collectionId] = await Promise.all([
+  // Fetch metadata + providers + franchise + similar in parallel.
+  const [meta, providers, collectionId, similar] = await Promise.all([
     getTitle(mediaType, id, region),
     getWatchProviders(mediaType, id, region).catch(() => null),
     getCollectionId(mediaType, id).catch(() => null),
+    getSimilar(mediaType, id).catch(() => []),
   ]);
 
+  // Enrich with critic aggregator ratings (optional OMDb; graceful when absent).
+  const critics = await getCriticRatings(meta.imdbId).catch(() => null);
+  if (critics) {
+    meta.imdbRating = critics.imdbRating;
+    meta.rottenTomatoes = critics.rottenTomatoes;
+    meta.metascore = critics.metascore;
+  }
+
   const personal = await getPersonalContext(supabase, user.id, collectionId);
-  const report = buildVerdict({ meta, providers, personal });
+  const report = buildVerdict({ meta, providers, personal, similar });
 
   // Optional AI prose (no-op unless OPENAI_API_KEY is set). Never alters scores.
   try {

@@ -27,6 +27,11 @@ function makeTitle(overrides: Partial<TitleMetadata> = {}): TitleMetadata {
     trailerUrl: null,
     originalLanguage: 'en',
     spokenLanguages: ['English'],
+    originCountries: ['US'],
+    imdbId: null,
+    imdbRating: null,
+    rottenTomatoes: null,
+    metascore: null,
     ...overrides,
   };
 }
@@ -214,6 +219,50 @@ describe('score clamping and tiers', () => {
     expect(dispositionFromScore(80)).toBe('Strict Watchlist');
     expect(dispositionFromScore(60)).toBe('Possible Watchlist');
     expect(dispositionFromScore(30)).toBe('Skip');
+  });
+});
+
+describe('primary call (WATCH IT / MAYBE / SKIP IT)', () => {
+  it('maps a strong personal match to WATCH IT', () => {
+    const meta = makeTitle({
+      genres: ['Crime', 'Drama', 'Thriller'],
+      keywords: ['detective', 'serial killer', 'investigation'],
+      voteAverage: 8.6, voteCount: 8000,
+    });
+    const r = buildVerdict({ meta, providers: null, personal: scottCtx() });
+    expect(r.primaryCall).toBe('WATCH IT');
+  });
+
+  it('maps a defining-supernatural title to SKIP IT for Scott', () => {
+    const meta = makeTitle({
+      genres: ['Horror'],
+      keywords: ['supernatural', 'ghost', 'haunting'],
+      voteAverage: 5.5, voteCount: 800,
+    });
+    const r = buildVerdict({ meta, providers: null, personal: scottCtx() });
+    expect(r.primaryCall).toBe('SKIP IT');
+  });
+});
+
+describe('critic ratings (OMDb) integration', () => {
+  it('surfaces IMDb / Rotten Tomatoes / Metacritic as rating sources when present', () => {
+    const meta = makeTitle({
+      genres: ['Crime', 'Drama'],
+      voteAverage: 8.0, voteCount: 5000,
+      imdbRating: 8.6, rottenTomatoes: 91, metascore: 88,
+    });
+    const r = buildVerdict({ meta, providers: null, personal: scottCtx() });
+    const names = r.general.sources.filter((s) => s.available).map((s) => s.name);
+    expect(names).toContain('IMDb');
+    expect(names).toContain('Rotten Tomatoes');
+    expect(names).toContain('Metacritic');
+  });
+
+  it('works honestly when no critic data is available (no fabricated sources)', () => {
+    const meta = makeTitle({ voteAverage: 7.0, voteCount: 1000 });
+    const r = buildVerdict({ meta, providers: null, personal: scottCtx() });
+    const critics = r.general.sources.filter((s) => s.available && s.name !== 'TMDB Audience');
+    expect(critics.length).toBe(0);
   });
 });
 

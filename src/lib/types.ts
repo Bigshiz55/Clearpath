@@ -10,6 +10,9 @@ export type VerdictTier =
   | 'Low Priority'
   | 'Skip';
 
+/** The headline, at-a-glance call shown above everything else. */
+export type PrimaryCall = 'WATCH IT' | 'MAYBE' | 'SKIP IT';
+
 export type WatchlistDisposition =
   | 'Strict Watchlist'
   | 'Possible Watchlist'
@@ -48,6 +51,22 @@ export interface TitleMetadata {
   trailerUrl: string | null;
   originalLanguage: string | null;
   spokenLanguages: string[];
+  originCountries: string[];
+  imdbId: string | null;
+  /** Critic/aggregator ratings from OMDb (optional provider). null when absent. */
+  imdbRating: number | null; // 0..10
+  rottenTomatoes: number | null; // 0..100
+  metascore: number | null; // 0..100
+}
+
+/** A lightweight "more like this" suggestion. */
+export interface SimilarTitle {
+  id: number;
+  mediaType: MediaType;
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+  voteAverage: number | null;
 }
 
 /** A single streaming/rental/purchase option for a region. */
@@ -140,6 +159,7 @@ export interface VerdictReport {
   title: TitleMetadata;
   general: WatchVerdictScore;
   personal: PersonalMatch;
+  primaryCall: PrimaryCall;
   tier: VerdictTier;
   watchlistDisposition: WatchlistDisposition;
   oneLiner: string;
@@ -147,6 +167,7 @@ export interface VerdictReport {
   reasonsAgainst: string[];
   contentSignals: ContentSignal[];
   providers: WatchProviders | null;
+  similar: SimilarTitle[];
   generatedAt: string;
 }
 

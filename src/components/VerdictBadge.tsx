@@ -1,4 +1,20 @@
-import type { VerdictTier, WatchlistDisposition } from '@/lib/types';
+import type { PrimaryCall, VerdictTier, WatchlistDisposition } from '@/lib/types';
+
+const PRIMARY_STYLES: Record<PrimaryCall, string> = {
+  'WATCH IT': 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100',
+  MAYBE: 'border-yellow-400/50 bg-yellow-500/15 text-yellow-100',
+  'SKIP IT': 'border-red-400/50 bg-red-500/15 text-red-100',
+};
+
+export function PrimaryCallBanner({ call, oneLiner }: { call: PrimaryCall; oneLiner?: string }) {
+  return (
+    <div className={`card flex flex-col items-center gap-1 border px-6 py-6 text-center ${PRIMARY_STYLES[call]}`}>
+      <div className="text-xs font-semibold uppercase tracking-[0.2em] opacity-70">The verdict</div>
+      <div className="text-4xl font-extrabold tracking-tight sm:text-5xl">{call}</div>
+      {oneLiner && <p className="mt-1 max-w-xl text-sm opacity-90">{oneLiner}</p>}
+    </div>
+  );
+}
 
 const TIER_STYLES: Record<VerdictTier, string> = {
   'Must Watch': 'border-verdict-must/50 bg-verdict-must/15 text-emerald-200',

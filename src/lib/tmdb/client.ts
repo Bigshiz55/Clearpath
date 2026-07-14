@@ -2,6 +2,7 @@ import 'server-only';
 import { serverEnv, ConfigError } from '@/lib/env';
 import type {
   MediaType,
+  SimilarTitle,
   TitleMetadata,
   WatchProvider,
   WatchProviders,
@@ -114,32 +115,52 @@ function yearFrom(date?: string): number | null {
   return Number.isFinite(y) ? y : null;
 }
 
+type MultiRow = TmdbMultiResult['results'][number];
+
+function toResult(r: MultiRow, forced?: MediaType): SearchResultItem | null {
+  const mediaType = (forced ?? r.media_type) as MediaType;
+  if (mediaType !== 'movie' && mediaType !== 'tv') return null;
+  return {
+    id: r.id,
+    mediaType,
+    title: (mediaType === 'movie' ? r.title : r.name) ?? 'Untitled',
+    year: yearFrom(mediaType === 'movie' ? r.release_date : r.first_air_date),
+    overview: r.overview ?? '',
+    posterPath: r.poster_path ?? null,
+    voteAverage: typeof r.vote_average === 'number' ? r.vote_average : null,
+    popularity: typeof r.popularity === 'number' ? r.popularity : null,
+  };
+}
+
 export async function searchTitles(query: string): Promise<SearchResultItem[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  const data = await tmdbFetch<TmdbMultiResult>('/search/multi', {
-    query: trimmed,
-    include_adult: 'false',
-    language: 'en-US',
-    page: '1',
-  });
-  return data.results
-    .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
-    .map((r): SearchResultItem => {
-      const mediaType = r.media_type as MediaType;
-      return {
-        id: r.id,
-        mediaType,
-        title: (mediaType === 'movie' ? r.title : r.name) ?? 'Untitled',
-        year: yearFrom(mediaType === 'movie' ? r.release_date : r.first_air_date),
-        overview: r.overview ?? '',
-        posterPath: r.poster_path ?? null,
-        voteAverage: typeof r.vote_average === 'number' ? r.vote_average : null,
-        popularity: typeof r.popularity === 'number' ? r.popularity : null,
-      };
-    })
-    .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))
-    .slice(0, 20);
+
+  const params = { query: trimmed, include_adult: 'false', language: 'en-US', page: '1' };
+  const data = await tmdbFetch<TmdbMultiResult>('/search/multi', params);
+  let results = data.results
+    .map((r) => toResult(r))
+    .filter((r): r is SearchResultItem => r !== null);
+
+  // Fallback: if multi-search finds nothing, try the dedicated movie and TV
+  // endpoints (they sometimes match where multi doesn't) so we never dead-end.
+  if (results.length === 0) {
+    const [movies, tv] = await Promise.all([
+      tmdbFetch<TmdbMultiResult>('/search/movie', params).catch(() => ({ page: 1, results: [] })),
+      tmdbFetch<TmdbMultiResult>('/search/tv', params).catch(() => ({ page: 1, results: [] })),
+    ]);
+    const merged = [
+      ...movies.results.map((r) => toResult(r, 'movie')),
+      ...tv.results.map((r) => toResult(r, 'tv')),
+    ].filter((r): r is SearchResultItem => r !== null);
+    const seen = new Set<string>();
+    results = merged.filter((r) => {
+      const k = `${r.mediaType}-${r.id}`;
+      return seen.has(k) ? false : (seen.add(k), true);
+    });
+  }
+
+  return results.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0)).slice(0, 20);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +198,10 @@ interface TmdbDetail {
   keywords?: { keywords?: TmdbKeyword[]; results?: TmdbKeyword[] };
   release_dates?: { results: Array<{ iso_3166_1: string; release_dates: Array<{ certification: string }> }> };
   content_ratings?: { results: Array<{ iso_3166_1: string; rating: string }> };
+  external_ids?: { imdb_id?: string | null };
+  imdb_id?: string | null;
+  origin_country?: string[];
+  production_countries?: Array<{ iso_3166_1: string }>;
 }
 
 function pickTrailer(videos?: { results: TmdbVideo[] }): string | null {
@@ -209,8 +234,8 @@ export async function getTitle(
 ): Promise<TitleMetadata> {
   const append =
     mediaType === 'movie'
-      ? 'videos,keywords,release_dates'
-      : 'videos,keywords,content_ratings';
+      ? 'videos,keywords,release_dates,external_ids'
+      : 'videos,keywords,content_ratings,external_ids';
   const detail = await tmdbFetch<TmdbDetail>(`/${mediaType}/${id}`, {
     language: 'en-US',
     append_to_response: append,
@@ -248,7 +273,58 @@ export async function getTitle(
     trailerUrl: pickTrailer(detail.videos),
     originalLanguage: detail.original_language ?? null,
     spokenLanguages: (detail.spoken_languages ?? []).map((l) => l.english_name ?? l.name ?? '').filter(Boolean),
+    originCountries:
+      mediaType === 'tv'
+        ? detail.origin_country ?? []
+        : (detail.production_countries ?? []).map((c) => c.iso_3166_1),
+    imdbId: detail.external_ids?.imdb_id ?? detail.imdb_id ?? null,
+    imdbRating: null,
+    rottenTomatoes: null,
+    metascore: null,
   };
+}
+
+/** "More like this" — TMDB recommendations, falling back to similar titles. */
+export async function getSimilar(mediaType: MediaType, id: number): Promise<SimilarTitle[]> {
+  interface Row {
+    id: number;
+    title?: string;
+    name?: string;
+    release_date?: string;
+    first_air_date?: string;
+    poster_path?: string | null;
+    vote_average?: number;
+  }
+  const map = (r: Row): SimilarTitle => ({
+    id: r.id,
+    mediaType,
+    title: (mediaType === 'movie' ? r.title : r.name) ?? 'Untitled',
+    year: yearFrom(mediaType === 'movie' ? r.release_date : r.first_air_date),
+    posterPath: r.poster_path ?? null,
+    voteAverage: typeof r.vote_average === 'number' && r.vote_average > 0 ? r.vote_average : null,
+  });
+  try {
+    const rec = await tmdbFetch<{ results: Row[] }>(`/${mediaType}/${id}/recommendations`, {
+      language: 'en-US',
+      page: '1',
+    });
+    let rows = rec.results ?? [];
+    if (rows.length < 4) {
+      const sim = await tmdbFetch<{ results: Row[] }>(`/${mediaType}/${id}/similar`, {
+        language: 'en-US',
+        page: '1',
+      });
+      rows = [...rows, ...(sim.results ?? [])];
+    }
+    const seen = new Set<number>();
+    return rows
+      .filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)))
+      .map(map)
+      .filter((r) => r.posterPath)
+      .slice(0, 12);
+  } catch {
+    return [];
+  }
 }
 
 /** Returns the belongs_to_collection id (franchise) for a movie, if any. */

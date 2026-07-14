@@ -3,10 +3,11 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Logo } from '@/components/Logo';
 import { ScoreRing } from '@/components/ScoreRing';
-import { VerdictBadge, DispositionChip } from '@/components/VerdictBadge';
+import { VerdictBadge, DispositionChip, PrimaryCallBanner } from '@/components/VerdictBadge';
 import { ProviderRow } from '@/components/ProviderRow';
 import { Poster } from '@/components/PosterCard';
 import { getPublicShare } from '@/lib/share';
+import { primaryCallFromTier } from '@/lib/scoring/verdict';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +42,8 @@ export default async function SharePage({ params }: { params: { token: string } 
 
       <main className="container-page max-w-3xl py-6">
         <article className="space-y-5">
+          <PrimaryCallBanner call={snap.primaryCall ?? primaryCallFromTier(snap.tier)} oneLiner={snap.oneLiner} />
+
           <div className="card relative overflow-hidden">
             {snap.backdropUrl && (
               <div className="absolute inset-0">

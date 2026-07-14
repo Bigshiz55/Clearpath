@@ -70,17 +70,30 @@ function watchabilityScore(
   return clamp(s);
 }
 
+/** Average the available critic aggregator scores (0..100), or null if none. */
+function criticScore(meta: TitleMetadata): number | null {
+  const parts: number[] = [];
+  if (meta.rottenTomatoes != null) parts.push(clamp(meta.rottenTomatoes));
+  if (meta.metascore != null) parts.push(clamp(meta.metascore));
+  if (meta.imdbRating != null) parts.push(clamp(meta.imdbRating * 10));
+  if (parts.length === 0) return null;
+  return clamp(parts.reduce((a, b) => a + b, 0) / parts.length);
+}
+
 export function computeGeneralScore(
   meta: TitleMetadata,
   providers: WatchProviders | null,
 ): WatchVerdictScore {
   const hasVote = meta.voteAverage != null && meta.voteCount > 0;
   const audience = hasVote ? clamp(meta.voteAverage! * 10) : NEUTRAL;
-  const quality = shrinkAudience(meta.voteAverage, meta.voteCount);
+  const shrunk = shrinkAudience(meta.voteAverage, meta.voteCount);
+  const critic = criticScore(meta);
+  // Quality blends audience reception with critic aggregators when available.
+  const quality = critic != null ? clamp(shrunk * 0.6 + critic * 0.4) : shrunk;
   const engagement = engagementScore(meta.popularity);
   const watchability = watchabilityScore(meta, providers);
-  // With only TMDB data, execution/production reception are proxied by the
-  // shrunk audience quality signal. This is labeled as a data limitation.
+  // Execution/production reception are proxied by the blended quality signal
+  // (labeled as a data limitation when no critic data is present).
   const execution = quality;
   const production = quality;
 
@@ -123,6 +136,24 @@ export function computeGeneralScore(
       value: hasVote ? round(clamp(meta.voteAverage! * 10)) : null,
       raw: hasVote ? `${meta.voteAverage!.toFixed(1)}/10 (${meta.voteCount.toLocaleString()} votes)` : null,
       available: hasVote,
+    },
+    {
+      name: 'IMDb',
+      value: meta.imdbRating != null ? round(clamp(meta.imdbRating * 10)) : null,
+      raw: meta.imdbRating != null ? `${meta.imdbRating.toFixed(1)}/10` : null,
+      available: meta.imdbRating != null,
+    },
+    {
+      name: 'Rotten Tomatoes',
+      value: meta.rottenTomatoes,
+      raw: meta.rottenTomatoes != null ? `${meta.rottenTomatoes}%` : null,
+      available: meta.rottenTomatoes != null,
+    },
+    {
+      name: 'Metacritic',
+      value: meta.metascore,
+      raw: meta.metascore != null ? `${meta.metascore}/100` : null,
+      available: meta.metascore != null,
     },
   ];
 

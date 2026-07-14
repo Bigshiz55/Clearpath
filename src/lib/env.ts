@@ -71,6 +71,9 @@ export const serverEnv = {
   openaiKey(): string | undefined {
     return optional('OPENAI_API_KEY');
   },
+  omdbKey(): string | undefined {
+    return optional('OMDB_API_KEY');
+  },
 };
 
 /**
@@ -86,6 +89,7 @@ export function envHealth() {
     tmdbKey: Boolean(optional('TMDB_API_KEY')),
     serviceRoleKey: Boolean(optional('SUPABASE_SERVICE_ROLE_KEY')),
     openaiKey: Boolean(optional('OPENAI_API_KEY')),
+    omdbKey: Boolean(optional('OMDB_API_KEY')),
     siteUrl: publicEnv.siteUrl(),
   };
 }

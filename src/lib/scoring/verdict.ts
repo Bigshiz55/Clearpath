@@ -1,6 +1,8 @@
 import type {
   ContentSignal,
   PersonalMatch,
+  PrimaryCall,
+  SimilarTitle,
   TitleMetadata,
   VerdictReport,
   VerdictTier,
@@ -16,8 +18,25 @@ export interface BuildVerdictInput {
   meta: TitleMetadata;
   providers: WatchProviders | null;
   personal: PersonalContext;
+  similar?: SimilarTitle[];
   /** ISO timestamp; injected for determinism/testability. */
   now?: string;
+}
+
+/** The headline call, derived from the personalized tier. */
+export function primaryCallFromTier(tier: VerdictTier): PrimaryCall {
+  switch (tier) {
+    case 'Must Watch':
+    case 'Strong Watch':
+      return 'WATCH IT';
+    case 'Worth Watching':
+    case 'Possible Watch':
+      return 'MAYBE';
+    case 'Low Priority':
+    case 'Skip':
+    default:
+      return 'SKIP IT';
+  }
 }
 
 export function tierFromScore(score: number): VerdictTier {
@@ -240,6 +259,7 @@ export function buildVerdict(input: BuildVerdictInput): VerdictReport {
     title: meta,
     general,
     personal: match,
+    primaryCall: primaryCallFromTier(tier),
     tier,
     watchlistDisposition: disposition,
     oneLiner: buildOneLiner(tier, match),
@@ -247,6 +267,7 @@ export function buildVerdict(input: BuildVerdictInput): VerdictReport {
     reasonsAgainst: buildReasonsAgainst(meta, general, match, providers),
     contentSignals: buildContentSignals(meta),
     providers,
+    similar: input.similar ?? [],
     generatedAt: input.now ?? new Date().toISOString(),
   };
 }
