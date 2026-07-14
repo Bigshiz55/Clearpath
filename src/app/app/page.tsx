@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictBadge } from '@/components/VerdictBadge';
 import { NewForYou, type DigestItem } from '@/components/NewForYou';
+import { RecommendedForYou } from '@/components/RecommendedForYou';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -62,6 +63,8 @@ export default async function DiscoverPage() {
 
       {digestItems.length > 0 && <NewForYou items={digestItems} label={label} />}
 
+      <RecommendedForYou label={label} />
+
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Your recent verdicts</h2>
@@ -73,8 +76,13 @@ export default async function DiscoverPage() {
         {verdicts.length === 0 ? (
           <EmptyState
             title="No verdicts yet"
-            description="Search for something above to generate your first verdict. It’ll show up here."
+            description="Search above to generate your first verdict — or import everything you’ve already watched and rated in one go."
             icon={<span className="text-2xl">🍿</span>}
+            action={
+              <Link href="/app/import" className="btn-primary">
+                Import your history
+              </Link>
+            }
           />
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
