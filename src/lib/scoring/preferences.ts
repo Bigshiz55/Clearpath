@@ -13,12 +13,18 @@ export const SCOTT_RULES: PreferenceRule[] = [
   { trait: 'slow_burn', weight: -20, requiresDefining: true, label: 'Slow burn pacing' },
   { trait: 'science_fiction', weight: -20, requiresDefining: true, label: 'Science fiction (major)' },
   { trait: 'fantasy', weight: -20, requiresDefining: true, label: 'Fantasy (major)' },
-  { trait: 'grounded_crime', weight: 14, requiresDefining: false, label: 'Grounded crime drama' },
-  { trait: 'psychological_thriller', weight: 12, requiresDefining: false, label: 'Psychological thriller' },
-  { trait: 'serial_killer', weight: 14, requiresDefining: false, label: 'Serial-killer investigation' },
-  { trait: 'detective_mystery', weight: 14, requiresDefining: false, label: 'Clever detective mystery' },
-  { trait: 'domestic_thriller', weight: 10, requiresDefining: false, label: 'Grounded domestic thriller' },
-  { trait: 'franchise_favorite', weight: 12, requiresDefining: false, label: 'Sequel in a franchise you enjoyed' },
+  // Positive weights follow Scott's documented profile (spec §3).
+  { trait: 'grounded_crime', weight: 12, requiresDefining: false, label: 'Grounded crime drama' },
+  { trait: 'psychological_thriller', weight: 10, requiresDefining: false, label: 'Psychological thriller' },
+  { trait: 'serial_killer', weight: 12, requiresDefining: false, label: 'Serial-killer investigation' },
+  { trait: 'detective_mystery', weight: 12, requiresDefining: false, label: 'Clever / Sherlock-style detective mystery' },
+  { trait: 'domestic_thriller', weight: 6, requiresDefining: false, label: 'Grounded Lifetime-style thriller' },
+  { trait: 'franchise_favorite', weight: 10, requiresDefining: false, label: 'Sequel in a franchise you enjoyed' },
+];
+
+/** TMDB collection ids of franchises Scott has enjoyed (seeds the sequel boost). */
+export const SCOTT_LIKED_FRANCHISE_IDS = [
+  760161, // Enola Holmes Collection
 ];
 
 /**

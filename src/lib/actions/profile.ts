@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PreferenceTrait, PreferenceRule } from '@/lib/types';
-import { avoidRule, loveRule, SCOTT_RULES, normalizeRule } from '@/lib/scoring/preferences';
+import { avoidRule, loveRule, SCOTT_RULES, SCOTT_LIKED_FRANCHISE_IDS, normalizeRule } from '@/lib/scoring/preferences';
 
 export interface ActionResult {
   ok: boolean;
@@ -81,6 +81,8 @@ export async function saveOnboarding(input: z.infer<typeof onboardingSchema>): P
       region: v.region.toUpperCase(),
       personal_label: personalLabel,
       onboarding_complete: true,
+      // Seed enjoyed franchises for the Scott preset so its sequels auto-boost.
+      liked_franchise_ids: v.usePreset === 'scott' ? SCOTT_LIKED_FRANCHISE_IDS : [],
     });
     if (profileError) return { ok: false, error: profileError.message };
 
