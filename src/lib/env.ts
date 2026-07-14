@@ -28,17 +28,21 @@ function requireValue(
   name: string,
   hint?: string,
 ): string {
-  if (!value || value.trim() === '') {
+  const cleaned = value?.trim();
+  if (!cleaned) {
     throw new ConfigError(
       `Missing required configuration: ${name}.${hint ? ' ' + hint : ''}`,
     );
   }
-  return value;
+  return cleaned;
 }
 
 function optional(name: string): string | undefined {
-  const value = process.env[name];
-  return value && value.trim() !== '' ? value : undefined;
+  // Trim defensively: pasted keys often carry a trailing newline or spaces,
+  // which corrupt request URLs/headers (e.g. a newline in a Bearer token makes
+  // fetch throw before the request is even sent).
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
 }
 
 export const publicEnv = {
