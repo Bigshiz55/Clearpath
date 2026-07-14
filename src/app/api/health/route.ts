@@ -4,10 +4,67 @@ import { envHealth } from '@/lib/env';
 export const dynamic = 'force-dynamic';
 
 /**
- * Health endpoint. Reports readiness of each dependency by *presence* of
- * configuration only — never returns secret values.
+ * Live TMDB connectivity probe. Never returns the key — only its shape and the
+ * outcome of one real request, so we can diagnose "could not reach" failures.
  */
-export async function GET() {
+async function probeTmdb() {
+  const raw = process.env.TMDB_API_KEY ?? '';
+  const key = raw.trim();
+  const shape = {
+    rawLength: raw.length,
+    trimmedLength: key.length,
+    trailingWhitespace: raw.length !== key.length,
+    internalWhitespace: /\s/.test(key),
+    looksLikeV4Token: key.startsWith('ey'),
+  };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  const url = new URL('https://api.themoviedb.org/3/search/movie');
+  url.searchParams.set('query', 'prisoners');
+  if (key.startsWith('ey')) headers.Authorization = `Bearer ${key}`;
+  else url.searchParams.set('api_key', key);
+
+  try {
+    const res = await fetch(url, { headers, signal: controller.signal });
+    const body = (await res.json().catch(() => ({}))) as {
+      total_results?: number;
+      status_message?: string;
+    };
+    return {
+      shape,
+      reachable: true,
+      httpStatus: res.status,
+      totalResults: body.total_results ?? null,
+      tmdbMessage: body.status_message ?? null,
+    };
+  } catch (e) {
+    return {
+      shape,
+      reachable: false,
+      errorName: e instanceof Error ? e.name : 'Unknown',
+      errorMessage: e instanceof Error ? e.message : String(e),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Health endpoint. Reports readiness of each dependency by *presence* of
+ * configuration only — never returns secret values. `?probe=tmdb` additionally
+ * runs a live TMDB request and reports the outcome (no secrets).
+ */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  if (searchParams.get('probe') === 'tmdb') {
+    return NextResponse.json(
+      { probe: 'tmdb', result: await probeTmdb() },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
+
   const cfg = envHealth();
   const ready = cfg.supabaseUrl && cfg.supabasePublishableKey && cfg.tmdbKey;
 
