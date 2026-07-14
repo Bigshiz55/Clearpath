@@ -7,6 +7,7 @@ import type {
   WatchProvider,
   WatchProviders,
 } from '@/lib/types';
+import { computeEnglishAvailability } from './meta-helpers';
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 export { TMDB_IMAGE_BASE, tmdbImage } from './image';
@@ -164,6 +165,61 @@ export async function searchTitles(query: string): Promise<SearchResultItem[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Discovery (recent releases) — used by the daily digest scan
+// ---------------------------------------------------------------------------
+
+export interface DiscoverItem {
+  id: number;
+  mediaType: MediaType;
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+  releaseDate: string | null;
+}
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/** Recently released movies and TV shows in the last `days` days. */
+export async function discoverRecent(region = 'US', days = 21, perType = 20): Promise<DiscoverItem[]> {
+  const to = new Date();
+  const from = new Date(to.getTime() - days * 86_400_000);
+  const common = {
+    language: 'en-US',
+    include_adult: 'false',
+    sort_by: 'popularity.desc',
+    watch_region: region,
+    'vote_count.gte': '20',
+    page: '1',
+  };
+  const [movies, tv] = await Promise.all([
+    tmdbFetch<TmdbMultiResult>('/discover/movie', {
+      ...common,
+      'primary_release_date.gte': isoDate(from),
+      'primary_release_date.lte': isoDate(to),
+    }).catch(() => ({ page: 1, results: [] })),
+    tmdbFetch<TmdbMultiResult>('/discover/tv', {
+      ...common,
+      'first_air_date.gte': isoDate(from),
+      'first_air_date.lte': isoDate(to),
+    }).catch(() => ({ page: 1, results: [] })),
+  ]);
+
+  const mapItems = (rows: TmdbMultiResult['results'], mt: MediaType): DiscoverItem[] =>
+    rows.slice(0, perType).map((r) => ({
+      id: r.id,
+      mediaType: mt,
+      title: (mt === 'movie' ? r.title : r.name) ?? 'Untitled',
+      year: yearFrom(mt === 'movie' ? r.release_date : r.first_air_date),
+      posterPath: r.poster_path ?? null,
+      releaseDate: (mt === 'movie' ? r.release_date : r.first_air_date) ?? null,
+    }));
+
+  return [...mapItems(movies.results, 'movie'), ...mapItems(tv.results, 'tv')];
+}
+
+// ---------------------------------------------------------------------------
 // Details
 // ---------------------------------------------------------------------------
 
@@ -202,6 +258,8 @@ interface TmdbDetail {
   imdb_id?: string | null;
   origin_country?: string[];
   production_countries?: Array<{ iso_3166_1: string }>;
+  next_episode_to_air?: { air_date?: string | null } | null;
+  translations?: { translations?: Array<{ iso_639_1: string }> };
 }
 
 function pickTrailer(videos?: { results: TmdbVideo[] }): string | null {
@@ -234,8 +292,8 @@ export async function getTitle(
 ): Promise<TitleMetadata> {
   const append =
     mediaType === 'movie'
-      ? 'videos,keywords,release_dates,external_ids'
-      : 'videos,keywords,content_ratings,external_ids';
+      ? 'videos,keywords,release_dates,external_ids,translations'
+      : 'videos,keywords,content_ratings,external_ids,translations';
   const detail = await tmdbFetch<TmdbDetail>(`/${mediaType}/${id}`, {
     language: 'en-US',
     append_to_response: append,
@@ -281,6 +339,19 @@ export async function getTitle(
     imdbRating: null,
     rottenTomatoes: null,
     metascore: null,
+    episodesAired: mediaType === 'tv' ? detail.number_of_episodes ?? null : null,
+    episodesTotal:
+      mediaType === 'tv'
+        ? detail.next_episode_to_air?.air_date
+          ? null // still airing — total unknown
+          : detail.number_of_episodes ?? null
+        : null,
+    nextEpisodeDate: mediaType === 'tv' ? detail.next_episode_to_air?.air_date ?? null : null,
+    englishAvailability: computeEnglishAvailability(
+      detail.original_language ?? null,
+      (detail.spoken_languages ?? []).map((l) => l.english_name ?? l.name ?? '').filter(Boolean),
+      (detail.translations?.translations ?? []).map((t) => t.iso_639_1),
+    ),
   };
 }
 

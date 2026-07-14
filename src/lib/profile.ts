@@ -12,6 +12,8 @@ export interface Profile {
   personal_label: string | null;
   onboarding_complete: boolean;
   liked_franchise_ids: number[];
+  daily_digest: boolean;
+  digest_min_score: number;
 }
 
 export function personalLabelFor(profile: Pick<Profile, 'personal_label' | 'display_name'>): string {
@@ -24,11 +26,23 @@ export async function getProfile(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<Profile | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, display_name, region, personal_label, onboarding_complete, liked_franchise_ids')
+    .select('id, username, display_name, region, personal_label, onboarding_complete, liked_franchise_ids, daily_digest, digest_min_score')
     .eq('id', userId)
     .maybeSingle();
+
+  if (error) {
+    // Migration 0002 (digest columns) may not be applied yet — fall back to the
+    // base columns so the app keeps working, with sensible digest defaults.
+    const { data: base } = await supabase
+      .from('profiles')
+      .select('id, username, display_name, region, personal_label, onboarding_complete, liked_franchise_ids')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!base) return null;
+    return { ...(base as Omit<Profile, 'daily_digest' | 'digest_min_score'>), daily_digest: true, digest_min_score: 72 };
+  }
   return (data as Profile | null) ?? null;
 }
 

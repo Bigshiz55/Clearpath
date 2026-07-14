@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased] — completion pass 3 (2026-07-14)
+### Added
+- **Rating icons**: IMDb / 🍅 Tomatometer / 🍿-style audience / Metacritic / TMDB
+  shown as branded pills on each verdict.
+- **Recommendation consensus**: WatchVerdict call + a one-tap **Decider** "Stream
+  It or Skip It" link-out + real Critics (RT) & Audience (TMDB) rows.
+- **Language & episodes**: English-availability signal (native / dub available /
+  subtitles) and TV episode progress ("6 of 6 released" / "4 out · ongoing").
+- **Daily new-release digest**: a Vercel Cron scan (`/api/cron/daily-scan`,
+  `CRON_SECRET`-protected) scores fresh releases against each user's taste and
+  fills a **"New for you"** home section; Settings toggle + match threshold;
+  optional email via `RESEND_API_KEY`. Migration `0002_digest.sql`.
+### Notes
+- No fabricated data: RT audience/Decider have no free API, so audience uses TMDB
+  (labeled) and Decider is a link-out, not an invented verdict.
+### Tests
+- 33 passing (added English-availability, Decider URL, episode-summary helpers).
+
 ## [Unreleased] — completion pass 2 (2026-07-14)
 ### Added
 - **Headline verdict**: prominent `WATCH IT / MAYBE / SKIP IT` banner at the top

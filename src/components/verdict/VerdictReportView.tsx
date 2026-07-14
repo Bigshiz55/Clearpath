@@ -6,6 +6,7 @@ import { ProviderRow } from '@/components/ProviderRow';
 import { Poster } from '@/components/PosterCard';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
+import { RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
 
 const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   none: 'bg-white/10 text-slate-400',
@@ -137,6 +138,28 @@ export function VerdictReportView({
         initialRating={watchState?.rating ?? null}
         initialNotes={watchState?.notes ?? null}
       />
+
+      {/* Ratings (icons) + language & episodes */}
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-lg font-semibold text-white">Ratings</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Critic scores from IMDb / Rotten Tomatoes / Metacritic (when available); audience from TMDB.
+        </p>
+        <div className="mt-4">
+          <RatingIcons sources={report.general.sources} />
+        </div>
+        <div className="mt-5 border-t border-white/10 pt-5">
+          <LanguageEpisodes meta={t} />
+        </div>
+      </section>
+
+      {/* Recommendation consensus */}
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-lg font-semibold text-white">Recommendation consensus</h2>
+        <div className="mt-4">
+          <RecommendationConsensus meta={t} primaryCall={report.primaryCall} sources={report.general.sources} />
+        </div>
+      </section>
 
       {/* Score explanation */}
       <section className="card p-5 sm:p-6">

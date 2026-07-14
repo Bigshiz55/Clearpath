@@ -57,6 +57,18 @@ export interface TitleMetadata {
   imdbRating: number | null; // 0..10
   rottenTomatoes: number | null; // 0..100
   metascore: number | null; // 0..100
+  /** TV episode counts. episodesTotal is null when the run is ongoing/unknown. */
+  episodesAired: number | null;
+  episodesTotal: number | null;
+  nextEpisodeDate: string | null;
+  /**
+   * How reachable this is in English:
+   * - native: originally in English
+   * - available: an English version/track exists per TMDB (dub or sub; varies by provider)
+   * - subtitles: non-English; expect subtitles
+   * - unknown: not enough data
+   */
+  englishAvailability: 'native' | 'available' | 'subtitles' | 'unknown';
 }
 
 /** A lightweight "more like this" suggestion. */

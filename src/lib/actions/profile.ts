@@ -144,6 +144,36 @@ export async function updateProfile(input: z.infer<typeof profileSchema>): Promi
   }
 }
 
+const digestSchema = z.object({
+  dailyDigest: z.boolean(),
+  digestMinScore: z.number().int().min(40).max(95),
+});
+
+export async function updateDigestPrefs(input: z.infer<typeof digestSchema>): Promise<ActionResult> {
+  const parsed = digestSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'Invalid settings.' };
+  try {
+    const supabase = createClient();
+    const user = await requireUser(supabase);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ daily_digest: parsed.data.dailyDigest, digest_min_score: parsed.data.digestMinScore })
+      .eq('id', user.id);
+    if (error) {
+      return {
+        ok: false,
+        error:
+          'Digest settings need the digest migration (0002_digest.sql) applied to the database first.',
+      };
+    }
+    revalidatePath('/app');
+    revalidatePath('/app/settings');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed.' };
+  }
+}
+
 const rulesSchema = z.object({
   rules: z
     .array(

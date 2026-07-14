@@ -38,6 +38,8 @@ export default async function SettingsPage() {
       username={profile?.username ?? ''}
       region={profile?.region ?? 'US'}
       personalLabel={profile ? personalLabelFor(profile) : 'My Match'}
+      dailyDigest={profile?.daily_digest ?? true}
+      digestMinScore={profile?.digest_min_score ?? 72}
       rules={rules}
       shares={shares}
     />

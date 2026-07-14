@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { PreferenceRule, PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
 import { avoidRule, loveRule, SCOTT_RULES } from '@/lib/scoring/preferences';
-import { updateProfile, replacePreferenceRules } from '@/lib/actions/profile';
+import { updateProfile, replacePreferenceRules, updateDigestPrefs } from '@/lib/actions/profile';
 import { deactivateShare } from '@/lib/actions/share';
 import { deleteAccount } from '@/lib/actions/account';
 import { useToast } from '@/components/Toast';
@@ -30,6 +30,8 @@ export function SettingsView(props: {
   username: string;
   region: string;
   personalLabel: string;
+  dailyDigest: boolean;
+  digestMinScore: number;
   rules: PreferenceRule[];
   shares: ShareRow[];
 }) {
@@ -46,6 +48,10 @@ export function SettingsView(props: {
   const [avoid, setAvoid] = useState<Set<PreferenceTrait>>(initialAvoid);
   const [love, setLove] = useState<Set<PreferenceTrait>>(initialLove);
   const [savingRules, setSavingRules] = useState(false);
+
+  const [dailyDigest, setDailyDigest] = useState(props.dailyDigest);
+  const [minScore, setMinScore] = useState(props.digestMinScore);
+  const [savingDigest, setSavingDigest] = useState(false);
 
   const [shares, setShares] = useState(props.shares);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -84,6 +90,14 @@ export function SettingsView(props: {
     setAvoid(new Set(SCOTT_RULES.filter((r) => r.weight < 0).map((r) => r.trait)));
     setLove(new Set(SCOTT_RULES.filter((r) => r.weight > 0).map((r) => r.trait)));
     toast.show('Scott preset loaded — remember to save.', 'info');
+  }
+
+  async function saveDigest() {
+    setSavingDigest(true);
+    const res = await updateDigestPrefs({ dailyDigest, digestMinScore: minScore });
+    setSavingDigest(false);
+    toast.show(res.ok ? 'Digest settings saved.' : res.error ?? 'Failed.', res.ok ? 'success' : 'error');
+    if (res.ok) router.refresh();
   }
 
   async function revoke(token: string) {
@@ -173,6 +187,51 @@ export function SettingsView(props: {
           </div>
           <button onClick={saveRules} disabled={savingRules} className="btn-primary">
             {savingRules ? 'Saving…' : 'Save preferences'}
+          </button>
+        </div>
+      </section>
+
+      {/* Daily digest */}
+      <section className="card p-5">
+        <h2 className="text-lg font-semibold text-white">Daily new-release digest</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Each morning we scan new movie &amp; TV releases and surface the ones that match your taste
+          under “New for you”.
+        </p>
+        <div className="mt-4 space-y-4">
+          <label className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
+            <span className="text-sm text-slate-200">
+              Scan new releases daily
+              <span className="block text-xs text-slate-500">Turn off to stop building your “New for you” list.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={dailyDigest}
+              onChange={(e) => setDailyDigest(e.target.checked)}
+              className="h-5 w-5 accent-brand-500"
+            />
+          </label>
+          <div>
+            <label className="label" htmlFor="min">
+              Only show matches at or above <span className="font-bold text-brand-200">{minScore}%</span>
+            </label>
+            <input
+              id="min"
+              type="range"
+              min={40}
+              max={95}
+              step={1}
+              value={minScore}
+              onChange={(e) => setMinScore(Number(e.target.value))}
+              className="w-full accent-brand-500"
+            />
+            <div className="flex justify-between text-[11px] text-slate-500">
+              <span>More titles (40%)</span>
+              <span>Only the best (95%)</span>
+            </div>
+          </div>
+          <button onClick={saveDigest} disabled={savingDigest} className="btn-primary">
+            {savingDigest ? 'Saving…' : 'Save digest settings'}
           </button>
         </div>
       </section>

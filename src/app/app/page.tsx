@@ -6,6 +6,7 @@ import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictBadge } from '@/components/VerdictBadge';
+import { NewForYou, type DigestItem } from '@/components/NewForYou';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -36,6 +37,15 @@ export default async function DiscoverPage() {
 
   const verdicts = (recent as RecentVerdict[] | null) ?? [];
 
+  const { data: digest } = await supabase
+    .from('digest_items')
+    .select('id, tmdb_id, media_type, title, year, poster_path, personal_score, primary_call, reason')
+    .eq('dismissed', false)
+    .order('personal_score', { ascending: false })
+    .limit(8);
+
+  const digestItems = (digest as DigestItem[] | null) ?? [];
+
   return (
     <div className="space-y-8">
       <section className="animate-fade-up">
@@ -49,6 +59,8 @@ export default async function DiscoverPage() {
           <SearchBar autoFocus />
         </div>
       </section>
+
+      {digestItems.length > 0 && <NewForYou items={digestItems} label={label} />}
 
       <section>
         <div className="mb-3 flex items-center justify-between">

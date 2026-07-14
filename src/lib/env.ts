@@ -74,6 +74,12 @@ export const serverEnv = {
   omdbKey(): string | undefined {
     return optional('OMDB_API_KEY');
   },
+  cronSecret(): string | undefined {
+    return optional('CRON_SECRET');
+  },
+  resendKey(): string | undefined {
+    return optional('RESEND_API_KEY');
+  },
 };
 
 /**
@@ -90,6 +96,8 @@ export function envHealth() {
     serviceRoleKey: Boolean(optional('SUPABASE_SERVICE_ROLE_KEY')),
     openaiKey: Boolean(optional('OPENAI_API_KEY')),
     omdbKey: Boolean(optional('OMDB_API_KEY')),
+    cronSecret: Boolean(optional('CRON_SECRET')),
+    resendKey: Boolean(optional('RESEND_API_KEY')),
     siteUrl: publicEnv.siteUrl(),
   };
 }

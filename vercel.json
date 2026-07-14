@@ -3,5 +3,8 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "installCommand": "npm ci",
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "crons": [
+    { "path": "/api/cron/daily-scan", "schedule": "0 13 * * *" }
+  ]
 }

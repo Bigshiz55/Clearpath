@@ -12,7 +12,8 @@ function meta(o: Partial<TitleMetadata> = {}): TitleMetadata {
     voteAverage: 7, voteCount: 100, popularity: 10, trailerUrl: null,
     originalLanguage: 'en', spokenLanguages: ['English'],
     originCountries: ['US'], imdbId: null, imdbRating: null,
-    rottenTomatoes: null, metascore: null, ...o,
+    rottenTomatoes: null, metascore: null, episodesAired: null,
+    episodesTotal: null, nextEpisodeDate: null, englishAvailability: 'native', ...o,
   };
 }
 

@@ -32,6 +32,10 @@ function makeTitle(overrides: Partial<TitleMetadata> = {}): TitleMetadata {
     imdbRating: null,
     rottenTomatoes: null,
     metascore: null,
+    episodesAired: null,
+    episodesTotal: null,
+    nextEpisodeDate: null,
+    englishAvailability: 'native',
     ...overrides,
   };
 }
