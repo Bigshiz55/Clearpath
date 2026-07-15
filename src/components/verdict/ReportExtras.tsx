@@ -1,5 +1,5 @@
 import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier } from '@/lib/types';
-import { deciderSearchUrl, episodeSummary } from '@/lib/tmdb/meta-helpers';
+import { episodeSummary } from '@/lib/tmdb/meta-helpers';
 
 function callStyleFor(call: PrimaryCall): string {
   return call === 'WATCH IT'
@@ -35,7 +35,6 @@ export function AtAGlance({
   matchScore,
   matchLabel,
   sources,
-  deciderUrl,
 }: {
   primaryCall: PrimaryCall;
   tier: VerdictTier;
@@ -44,7 +43,6 @@ export function AtAGlance({
   matchScore: number;
   matchLabel: string;
   sources: RatingSource[];
-  deciderUrl: string;
 }) {
   const available = sources.filter((s) => s.available);
   return (
@@ -74,18 +72,6 @@ export function AtAGlance({
             </div>
           );
         })}
-        <a
-          href={deciderUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-brand-400/30 bg-brand-500/10 px-3 py-2 text-brand-100"
-        >
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-white/5 text-sm">📺</span>
-          <span className="flex flex-col leading-tight">
-            <span className="text-sm font-bold">Decider ↗</span>
-            <span className="text-[9px] uppercase tracking-wide text-slate-500">Stream/Skip</span>
-          </span>
-        </a>
       </div>
     </section>
   );
@@ -180,23 +166,22 @@ export function LanguageEpisodes({ meta }: { meta: TitleMetadata }) {
   );
 }
 
+const SOURCE_META: Record<string, { icon: string; kind: string }> = {
+  IMDb: { icon: '⭐', kind: 'IMDb' },
+  'Rotten Tomatoes': { icon: '🍅', kind: 'Critics · Rotten Tomatoes' },
+  Metacritic: { icon: 'Ⓜ️', kind: 'Critics · Metacritic' },
+  'TMDB Audience': { icon: '👥', kind: 'Audience · TMDB' },
+};
+
 export function RecommendationConsensus({
-  meta,
   primaryCall,
   sources,
 }: {
-  meta: TitleMetadata;
   primaryCall: PrimaryCall;
   sources: RatingSource[];
 }) {
-  const rt = sources.find((s) => s.name === 'Rotten Tomatoes' && s.available);
-  const tmdb = sources.find((s) => s.name === 'TMDB Audience' && s.available);
-  const callStyle =
-    primaryCall === 'WATCH IT'
-      ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'
-      : primaryCall === 'MAYBE'
-        ? 'border-yellow-400/40 bg-yellow-500/15 text-yellow-100'
-        : 'border-red-400/40 bg-red-500/15 text-red-100';
+  const available = sources.filter((s) => s.available);
+  const callStyle = callStyleFor(primaryCall);
 
   const Row = ({ icon, name, value, right }: { icon: string; name: string; value: string; right?: React.ReactNode }) => (
     <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
@@ -217,27 +202,19 @@ export function RecommendationConsensus({
         value="Our personalized call"
         right={<span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${callStyle}`}>{primaryCall}</span>}
       />
-      <Row
-        icon="📺"
-        name="Decider"
-        value="Stream It or Skip It review"
-        right={
-          <a
-            href={deciderSearchUrl(meta.title, meta.year)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full border border-brand-400/40 bg-brand-500/15 px-2.5 py-1 text-xs font-semibold text-brand-100"
-          >
-            See Decider ↗
-          </a>
-        }
-      />
-      {rt && <Row icon="🍅" name="Critics" value={`Rotten Tomatoes · ${rt.raw}`} />}
-      {tmdb && <Row icon="👥" name="Audience" value={`TMDB · ${tmdb.raw}`} />}
-      <p className="text-[11px] text-slate-500">
-        Decider has no public feed, so we link to their review rather than guess their verdict. Critic
-        &amp; audience rows show only real, available data.
-      </p>
+      {available.map((s) => {
+        const m = SOURCE_META[s.name] ?? { icon: '★', kind: s.name };
+        return (
+          <Row
+            key={s.name}
+            icon={m.icon}
+            name={s.name}
+            value={m.kind}
+            right={<span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-sm font-bold tabular-nums text-white">{s.raw}</span>}
+          />
+        );
+      })}
+      <p className="text-[11px] text-slate-500">Every row shows only real, available data — nothing is guessed.</p>
     </div>
   );
 }

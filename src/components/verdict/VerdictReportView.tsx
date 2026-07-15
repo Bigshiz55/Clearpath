@@ -7,7 +7,6 @@ import { Poster } from '@/components/PosterCard';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
 import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
-import { deciderSearchUrl } from '@/lib/tmdb/meta-helpers';
 
 const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   none: 'bg-white/10 text-slate-400',
@@ -74,7 +73,6 @@ export function VerdictReportView({
         matchScore={report.personal.score}
         matchLabel={report.personal.label}
         sources={report.general.sources}
-        deciderUrl={deciderSearchUrl(t.title, t.year)}
       />
 
       {/* Header */}
@@ -167,7 +165,7 @@ export function VerdictReportView({
       <section className="card p-5 sm:p-6">
         <h2 className="text-lg font-semibold text-white">Recommendation consensus</h2>
         <div className="mt-4">
-          <RecommendationConsensus meta={t} primaryCall={report.primaryCall} sources={report.general.sources} />
+          <RecommendationConsensus primaryCall={report.primaryCall} sources={report.general.sources} />
         </div>
       </section>
 
