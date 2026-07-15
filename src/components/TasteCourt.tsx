@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { PreferenceTrait } from '@/lib/types';
+import { ShareCard, CourtCardArt } from './ShareCards';
 
 export interface CourtMember {
   name: string;
@@ -49,6 +50,7 @@ export function TasteCourt({
   const [clock, setClock] = useState(CLOCK);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [logged, setLogged] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   async function deliberate(finalMoods: string[]) {
     setPhase('loading');
@@ -269,8 +271,24 @@ export function TasteCourt({
               ) : logged ? (
                 <div className="text-center text-xs text-slate-400">Logged to your crew’s DNA ✓</div>
               ) : null}
-              <button onClick={onClose} className="btn-primary mt-4 w-full">Done — let’s watch</button>
+              <button onClick={() => setShowShare(true)} className="btn-secondary mt-3 w-full">📸 Share this verdict</button>
+              <button onClick={onClose} className="btn-primary mt-2 w-full">Done — let’s watch</button>
             </div>
+
+            {showShare && (
+              <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" onClick={() => setShowShare(false)}>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <ShareCard filename="watchverdict-court">
+                    <CourtCardArt
+                      title={finalists[winnerIdx]!.title}
+                      oneLiner={judgeLines()[0] ?? finalists[winnerIdx]!.attributes.slice(0, 3).join(' · ')}
+                      members={finalists[winnerIdx]!.perMember.map((pm) => ({ name: pm.name, score: pm.score }))}
+                    />
+                  </ShareCard>
+                  <button onClick={() => setShowShare(false)} className="btn-ghost mt-2 w-full text-sm">Close</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

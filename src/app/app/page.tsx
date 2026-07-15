@@ -88,6 +88,12 @@ export default async function DiscoverPage() {
           >
             📸 Add from a photo
           </Link>
+          <Link
+            href="/app/cards"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            ✨ Share cards
+          </Link>
         </div>
       </section>
 

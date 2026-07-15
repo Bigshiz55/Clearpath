@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { resolveTitleFromText } from '@/lib/quickResolve';
+import { resolveTitleFromText, resolveCandidatesFromText } from '@/lib/quickResolve';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface ActionResult {
@@ -133,6 +133,45 @@ export async function removeWatchlistItem(itemId: string): Promise<ActionResult>
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Failed to remove.' };
+  }
+}
+
+export interface PhotoMatch {
+  tmdbId: number;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+}
+
+/**
+ * Ranked candidate titles from OCR/free text — for a pick-list when a photo
+ * shows several titles (a cable guide, a row of posters). Session-based.
+ */
+export async function photoMatches(
+  text: string,
+): Promise<ActionResult & { matches?: PhotoMatch[] }> {
+  const q = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!q) return { ok: false, error: 'Nothing to read.' };
+  try {
+    const supabase = createClient();
+    await requireUser(supabase);
+    let list;
+    try {
+      list = await resolveCandidatesFromText(q, 6);
+    } catch {
+      return { ok: false, error: 'Couldn’t reach the movie database.' };
+    }
+    const matches: PhotoMatch[] = list.map((m) => ({
+      tmdbId: m.id,
+      mediaType: m.mediaType,
+      title: m.title,
+      year: m.year,
+      posterPath: m.posterPath,
+    }));
+    return { ok: true, matches };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed to read.' };
   }
 }
 
