@@ -63,6 +63,12 @@ export default async function DiscoverPage() {
         <div className="mt-5 max-w-2xl">
           <SearchBar autoFocus />
         </div>
+        <Link
+          href="/app/quiz"
+          className="mt-3 inline-flex items-center gap-2 rounded-xl border border-brand-400/30 bg-brand-500/10 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/20"
+        >
+          🍿 Take the 1-minute Taste Quiz — build your profile fast
+        </Link>
       </section>
 
       {digestItems.length > 0 && <NewForYou items={digestItems} label={label} />}

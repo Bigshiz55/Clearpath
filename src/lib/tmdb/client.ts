@@ -254,6 +254,36 @@ export async function discoverByGenres(
   });
 }
 
+/**
+ * Popular, widely-recognized titles for the taste quiz — high vote counts so
+ * people are likely to have an opinion. Broad across genres.
+ */
+export async function getPopular(
+  mediaType: MediaType,
+  region = 'US',
+  page = 1,
+): Promise<DiscoverItem[]> {
+  const data = await tmdbFetch<TmdbMultiResult>(`/discover/${mediaType}`, {
+    language: 'en-US',
+    include_adult: 'false',
+    sort_by: 'popularity.desc',
+    watch_region: region,
+    'vote_count.gte': mediaType === 'movie' ? '800' : '400',
+    page: String(page),
+  }).catch(() => ({ page: 1, results: [] as TmdbMultiResult['results'] }));
+
+  return data.results
+    .filter((r) => r.poster_path)
+    .map((r) => ({
+      id: r.id,
+      mediaType,
+      title: (mediaType === 'movie' ? r.title : r.name) ?? 'Untitled',
+      year: yearFrom(mediaType === 'movie' ? r.release_date : r.first_air_date),
+      posterPath: r.poster_path ?? null,
+      releaseDate: (mediaType === 'movie' ? r.release_date : r.first_air_date) ?? null,
+    }));
+}
+
 // ---------------------------------------------------------------------------
 // Details
 // ---------------------------------------------------------------------------
