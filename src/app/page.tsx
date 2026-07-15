@@ -16,7 +16,7 @@ const FEATURES = [
   },
   {
     title: 'Share the call',
-    body: 'Send a friend a polished verdict page. No account needed to open it.',
+    body: 'Send a friend a verdict page. No account needed to open it.',
   },
 ];
 

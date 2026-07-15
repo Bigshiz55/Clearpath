@@ -68,6 +68,15 @@ export function AtAGlance({
       </div>
 
       <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
+        <div className={`flex flex-shrink-0 items-center gap-2 rounded-xl border px-3 py-2 ${callStyleFor(primaryCall)}`}>
+          <span aria-hidden>📺</span>
+          <span className="flex flex-col leading-tight">
+            <span className="text-sm font-extrabold">
+              {primaryCall === 'WATCH IT' ? 'STREAM IT' : primaryCall}
+            </span>
+            <span className="text-[9px] uppercase tracking-wide opacity-70">Stream / Skip</span>
+          </span>
+        </div>
         <ScoreChip icon="🍿" tint="bg-brand-500/25" value={`${watchVerdictScore}`} label="WatchVerdict" />
         <ScoreChip icon="🎯" tint="bg-amber-500/25" value={`${matchScore}`} label={matchLabel} />
         {available.map((s) => {

@@ -3,7 +3,7 @@
 Personalized movie & TV verdicts. Search any title and get a clear
 recommendation, a **WatchVerdict Score** (general) plus a **Personal Match
 Score** tuned to your taste, honest content signals, and where to watch it
-legally — then save it to a watchlist or share a polished verdict page.
+legally — then save it to a watchlist or share a verdict page.
 
 > **New here? To go live, follow [`DEPLOYMENT.md`](./DEPLOYMENT.md).**
 > It's ~15 minutes and the only steps that need your private keys.
