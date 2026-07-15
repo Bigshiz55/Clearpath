@@ -1,8 +1,12 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { importWatchedHistory, type ImportSummary } from '@/lib/actions/import';
+import { importParsedTitles, type ImportRowResult } from '@/lib/actions/import';
+import { parseImportText, type ParsedTitle } from '@/lib/importParse';
+
+const BATCH = 20;
+const MAX_TITLES = 800;
 
 const STATUS_STYLE: Record<string, string> = {
   imported: 'text-emerald-300',
@@ -10,7 +14,6 @@ const STATUS_STYLE: Record<string, string> = {
   unmatched: 'text-amber-300',
   error: 'text-red-300',
 };
-
 const STATUS_LABEL: Record<string, string> = {
   imported: 'Added',
   skipped: 'Already there',
@@ -20,87 +23,168 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ImportForm() {
   const [text, setText] = useState('');
-  const [summary, setSummary] = useState<ImportSummary | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [imported, setImported] = useState(0);
+  const [rows, setRows] = useState<ImportRowResult[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [finished, setFinished] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  function submit() {
-    setSummary(null);
-    startTransition(async () => {
-      const res = await importWatchedHistory(text);
-      setSummary(res);
-    });
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => setText(String(reader.result ?? ''));
+    reader.readAsText(file);
   }
 
-  const lineCount = text.split(/\r?\n/).filter((l) => l.trim().length > 0).length;
+  async function run() {
+    setError(null);
+    setFinished(false);
+    setRows([]);
+    setImported(0);
+    setDone(0);
+
+    let titles: ParsedTitle[] = parseImportText(text);
+    if (titles.length === 0) {
+      setError('No titles found. Paste a list or choose your Netflix CSV file.');
+      return;
+    }
+    if (titles.length > MAX_TITLES) titles = titles.slice(0, MAX_TITLES);
+    setTotal(titles.length);
+    setRunning(true);
+
+    const allRows: ImportRowResult[] = [];
+    let imp = 0;
+    try {
+      for (let i = 0; i < titles.length; i += BATCH) {
+        const batch = titles.slice(i, i + BATCH);
+        const res = await importParsedTitles(batch);
+        if (res.ok) {
+          imp += res.imported;
+          allRows.push(...res.rows);
+        } else if (res.error) {
+          setError(res.error);
+          break;
+        }
+        setDone(Math.min(i + BATCH, titles.length));
+        setImported(imp);
+        setRows([...allRows]);
+      }
+    } finally {
+      setRunning(false);
+      setFinished(true);
+    }
+  }
+
+  const previewCount = text.trim() ? parseImportText(text).length : 0;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const unmatchedRows = rows.filter((r) => r.status === 'unmatched');
 
   return (
     <div className="mt-5">
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={10}
-        placeholder={
-          'Prisoners (2013) - 9\nMare of Easttown 9\nWisting: 8\nThe Fall\nZodiac 8'
-        }
-        className="input min-h-[220px] w-full resize-y font-mono text-sm leading-relaxed"
-        aria-label="Paste your watched titles, one per line"
-      />
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="btn-secondary"
+          disabled={running}
+        >
+          Choose Netflix CSV…
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,.txt,text/csv,text/plain"
+          onChange={onFile}
+          className="hidden"
+        />
+        {fileName && <span className="text-xs text-slate-400">{fileName}</span>}
+      </div>
+
+      <div className="mt-3">
+        <p className="mb-1 text-xs text-slate-500">…or paste titles below:</p>
+        <textarea
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setFileName(null);
+          }}
+          rows={8}
+          placeholder={'Prisoners (2013) - 9\nMare of Easttown 9\nZodiac 8'}
+          className="input min-h-[160px] w-full resize-y font-mono text-sm leading-relaxed"
+          aria-label="Paste your watched titles"
+        />
+      </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <span className="text-xs text-slate-500">
-          {lineCount > 0 ? `${lineCount} ${lineCount === 1 ? 'title' : 'titles'}` : 'One title per line · rating out of 10 is optional'}
+          {previewCount > 0
+            ? `${previewCount} unique ${previewCount === 1 ? 'title' : 'titles'} ready`
+            : 'Netflix CSV or one title per line'}
         </span>
         <button
           type="button"
-          onClick={submit}
-          disabled={pending || lineCount === 0}
+          onClick={run}
+          disabled={running || previewCount === 0}
           className="btn-primary"
         >
-          {pending ? 'Importing…' : 'Import titles'}
+          {running ? 'Importing…' : 'Import history'}
         </button>
       </div>
 
-      {summary && !summary.ok && summary.error && (
+      {(running || finished) && total > 0 && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>
+              {done} / {total} processed · {imported} added
+            </span>
+            <span>{pct}%</span>
+          </div>
+          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-brand-400 transition-all"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {error && (
         <p className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
-          {summary.error}
+          {error}
         </p>
       )}
 
-      {summary && summary.ok && (
-        <div className="mt-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm font-semibold text-white">
-              Added {summary.imported} to your watched list
-              {summary.unmatched > 0 ? ` · ${summary.unmatched} need a look` : ''}
-            </p>
-            <Link href="/app/watchlist" className="btn-secondary text-sm">
-              View watchlist →
-            </Link>
-          </div>
+      {finished && !error && (
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <p className="text-sm font-semibold text-white">
+            Done — added {imported} to your watched list
+            {unmatchedRows.length > 0 ? ` · ${unmatchedRows.length} couldn’t be matched` : ''}.
+          </p>
+          <Link href="/app/watchlist" className="btn-secondary text-sm">
+            View watchlist →
+          </Link>
+          <Link href="/app" className="btn-secondary text-sm">
+            See recommendations →
+          </Link>
+        </div>
+      )}
 
-          <ul className="mt-4 divide-y divide-white/5 rounded-2xl border border-white/10 bg-white/[0.02]">
-            {summary.rows.map((r, i) => (
-              <li key={i} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span className="min-w-0 truncate text-slate-200">
-                  {r.title ?? r.raw}
-                  {r.year ? <span className="text-slate-500"> ({r.year})</span> : null}
-                  {r.rating ? <span className="ml-2 text-slate-400">★ {r.rating}/10</span> : null}
-                </span>
-                <span className={`flex-shrink-0 text-xs ${STATUS_STYLE[r.status]}`}>
-                  {STATUS_LABEL[r.status]}
-                </span>
+      {finished && unmatchedRows.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs text-slate-500">Couldn’t match these (title may differ on TMDB):</p>
+          <ul className="flex flex-wrap gap-2">
+            {unmatchedRows.slice(0, 40).map((r, i) => (
+              <li key={i} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300">
+                {r.title}
               </li>
             ))}
           </ul>
-
-          {summary.unmatched > 0 && (
-            <p className="mt-3 text-xs text-slate-500">
-              For titles we couldn&apos;t match, try adding the year in parentheses (e.g.
-              {' '}
-              <span className="text-slate-400">Wisting (2019)</span>) and import again, or search for
-              them manually from Discover.
-            </p>
-          )}
         </div>
       )}
     </div>
