@@ -7,7 +7,7 @@ import { GENRE_IDS } from '@/lib/finderGenres';
 export const EMPTY_QUERY: FinderQuery = {
   mediaType: 'any',
   genreIds: [],
-  maxRuntime: null,
+  maxRuntime: 150, // default cap ~2.5h; drag right to "Any length"
   sinceMonths: null,
   minAudience: null,
   englishAudioOnly: false,
@@ -36,11 +36,14 @@ export function naiveParseQuery(input: string): FinderQuery {
   }
   q.genreIds = Array.from(ids);
 
-  // Max runtime — "under 140 minutes" / "less than 2 hours".
+  // Max runtime — "under 140 minutes" / "less than 2 hours". An explicit
+  // request overrides the default cap; minutes take priority over hours.
   const minMatchStr = t.match(/(?:under|less than|below|shorter than|max)\s+(\d{2,3})\s*(?:min|minutes|mins|m)\b/);
   if (minMatchStr) q.maxRuntime = Number(minMatchStr[1]);
-  const hrMatch = t.match(/(?:under|less than|below|max)\s+(\d(?:\.\d)?)\s*(?:hours?|hrs?|h)\b/);
-  if (hrMatch && q.maxRuntime == null) q.maxRuntime = Math.round(Number(hrMatch[1]) * 60);
+  else {
+    const hrMatch = t.match(/(?:under|less than|below|max)\s+(\d(?:\.\d)?)\s*(?:hours?|hrs?|h)\b/);
+    if (hrMatch) q.maxRuntime = Math.round(Number(hrMatch[1]) * 60);
+  }
 
   // Recency.
   const mo = t.match(/(?:last|past|within|in the last)\s+(\d{1,3})\s*months?/);

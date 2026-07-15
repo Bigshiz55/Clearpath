@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { claimSettlement } from '@/lib/actions/sponsors';
+import { RobedPortrait } from '@/components/RobedPortrait';
+import { HOUSE_JUDGES, HOUSE_KEY, houseByKey, readHousePick, type HousePick } from '@/lib/houseJudges';
 import type { Judge } from '@/lib/sponsors';
 
 function safeAccent(hex: string | null | undefined): string {
@@ -12,12 +14,24 @@ function safeAccent(hex: string | null | undefined): string {
 export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null }) {
   const [open, setOpen] = useState(false);
   const [judge, setJudge] = useState<Judge | null>(initialJudge);
+  const [pick, setPick] = useState<HousePick>('annie');
   const [claim, setClaim] = useState<{ code?: string; url?: string } | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [locating, setLocating] = useState(false);
 
-  const accent = safeAccent(judge?.accent);
-  const emoji = judge?.emoji ?? '⚖️';
+  useEffect(() => setPick(readHousePick()), []);
+
+  const showVendor = pick === 'vendor' && !!judge;
+  const accent = showVendor ? safeAccent(judge!.accent) : '#f5c65a';
+  const dog = houseByKey(pick === 'vendor' ? 'annie' : pick);
+  const name = showVendor ? judge!.judgeName : dog.name;
+
+  function choose(p: HousePick) {
+    setPick(p);
+    setClaim(null);
+    try { localStorage.setItem(HOUSE_KEY, p); } catch { /* ignore */ }
+    if (p === 'vendor') findLocal();
+  }
 
   function findLocal() {
     if (!('geolocation' in navigator)) return;
@@ -58,44 +72,35 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
   return (
     <div className="select-none">
       <div
-        className="relative h-72 overflow-hidden rounded-3xl border"
+        className="relative h-80 overflow-hidden rounded-3xl border"
         style={{ borderColor: `${accent}44`, perspective: '1100px', background: 'radial-gradient(120% 90% at 50% 0%, #16203a 0%, #0b0e17 70%)' }}
       >
         {/* ---------- Interior: the bench + the judge ---------- */}
         <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
-          {/* The judge (your dog by default; the sponsor's graphic when one presides) */}
-          <div
-            className="h-16 w-16 overflow-hidden rounded-full shadow-lg transition"
-            style={{ border: `2px solid ${accent}66`, background: judge ? `radial-gradient(circle at 50% 35%, ${accent}44, ${accent}18)` : '#0b0e17' }}
-          >
-            {judge ? (
-              <div className="grid h-full w-full place-items-center text-3xl" aria-hidden>{emoji}</div>
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src="/judge-dog.png" alt="The presiding judge" className="h-full w-full object-cover" />
-            )}
-          </div>
+          {/* The presiding judge — a robed portrait of your dog (or the sponsor). */}
+          <RobedPortrait src={showVendor ? undefined : dog.src} emoji={showVendor ? judge!.emoji ?? '⚖️' : undefined} size={104} accent={accent} />
+
           {/* The judge's table / bench */}
           <div
-            className="relative mt-2 w-52 rounded-t-lg pb-3 pt-2"
+            className="relative -mt-1 w-56 rounded-t-lg pb-2.5 pt-2"
             style={{ background: 'linear-gradient(180deg,#2a2016,#171009)', borderTop: `2px solid ${accent}55`, boxShadow: '0 -4px 18px rgba(0,0,0,.4)' }}
           >
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              {judge ? 'Presiding · Sponsored' : 'The bench'}
+              {showVendor ? 'Presiding · Sponsored' : 'Now presiding'}
             </div>
-            <div className="truncate px-2 text-sm font-bold text-white">{judge?.judgeName ?? 'WatchVerdict'}</div>
+            <div className="truncate px-2 text-sm font-bold text-white">{name}</div>
           </div>
 
-          {judge?.discountLabel && (
+          {showVendor && judge!.discountLabel && (
             <div className="mt-2 flex items-center gap-2 text-xs">
               {claim ? (
                 <>
                   {claim.code && <span className="rounded-md border border-white/15 bg-white/10 px-2 py-0.5 font-mono font-bold text-white">{claim.code}</span>}
-                  {claim.url && <a href={claim.url} target="_blank" rel="noopener noreferrer" style={{ color: accent }} className="font-semibold">{judge.ctaLabel ?? 'Redeem'} →</a>}
+                  {claim.url && <a href={claim.url} target="_blank" rel="noopener noreferrer" style={{ color: accent }} className="font-semibold">{judge!.ctaLabel ?? 'Redeem'} →</a>}
                 </>
               ) : (
                 <>
-                  <span style={{ color: accent }}>⚖️ {judge.discountLabel}</span>
+                  <span style={{ color: accent }}>⚖️ {judge!.discountLabel}</span>
                   <button onClick={doClaim} disabled={claiming} className="rounded-md px-2 py-0.5 font-semibold text-white" style={{ background: accent }}>
                     {claiming ? '…' : 'Claim'}
                   </button>
@@ -128,7 +133,7 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
             {/* brass handle */}
             <div
               className="absolute top-1/2 h-6 w-2 -translate-y-1/2 rounded-full"
-              style={{ [side === 'left' ? 'right' : 'left']: 10, background: safeAccent(judge?.accent) } as React.CSSProperties}
+              style={{ [side === 'left' ? 'right' : 'left']: 10, background: accent } as React.CSSProperties}
             />
             {/* scales emblem on the seam side */}
             {side === 'left' && (
@@ -148,18 +153,33 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
         </div>
       </div>
 
+      {/* Judge picker */}
+      <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+        {HOUSE_JUDGES.map((h) => (
+          <button
+            key={h.key}
+            onClick={() => choose(h.key)}
+            className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${pick === h.key ? 'border-gold-400/60 bg-gold-500/15 text-amber-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+          >
+            🐶 {h.name}
+          </button>
+        ))}
+        <button
+          onClick={() => choose('vendor')}
+          disabled={locating}
+          className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${pick === 'vendor' ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+        >
+          {locating ? '…' : '💵 Local vendor'}
+        </button>
+      </div>
+
       {/* Caption / actions under the box */}
       <div className="mt-2 flex items-center justify-between px-1">
         <button onClick={() => setOpen((v) => !v)} className="text-sm font-semibold text-white">
           {open ? '‹ Close the doors' : 'Try your case — enter the court ›'}
         </button>
-        {judge && (
-          <button onClick={findLocal} disabled={locating} className="text-xs text-slate-400 hover:text-white">
-            {locating ? 'Locating…' : '📍 Local judge'}
-          </button>
-        )}
       </div>
-      {judge && <p className="mt-1 px-1 text-[10px] text-slate-500">Sponsored — presence and an offer only; never changes your verdict.</p>}
+      {showVendor && <p className="mt-1 px-1 text-[10px] text-slate-500">Sponsored — presence and an offer only; never changes your verdict.</p>}
     </div>
   );
 }

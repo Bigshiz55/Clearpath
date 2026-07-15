@@ -158,8 +158,39 @@ export function FinderUI({
 
   return (
     <div className="space-y-5">
-      {/* The judge presides — the ruling (a list of movies) lands right beneath */}
-      <JudgeBench initialJudge={initialJudge} />
+      {/* Hero — the judge & the bench on the left, your plain-English ask on the right */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <JudgeBench initialJudge={initialJudge} big />
+
+        <div className="card flex flex-col gap-3 p-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
+            ⚖️ Try your case
+          </div>
+          <textarea
+            value={text}
+            onChange={(e) => onText(e.target.value)}
+            rows={3}
+            placeholder="Tell me exactly what you want… “a crime thriller under 140 min, out in the last 2 years, 80+ match”"
+            className="input min-h-[96px] w-full flex-1 resize-none"
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {EXAMPLES.map((ex) => (
+              <button key={ex} onClick={() => onText(ex)} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 hover:bg-white/10">
+                {ex}
+              </button>
+            ))}
+          </div>
+          <button onClick={find} disabled={loading} className="btn-primary w-full py-3">
+            {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
+          </button>
+          <button
+            onClick={() => document.getElementById('evidence')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className="text-xs font-semibold text-slate-400 hover:text-white"
+          >
+            … or make your selections below ↓
+          </button>
+        </div>
+      </div>
 
       {loading && (
         <div className="card p-6 text-center">
@@ -224,23 +255,6 @@ export function FinderUI({
           )}
         </div>
       )}
-
-      <div>
-        <textarea
-          value={text}
-          onChange={(e) => onText(e.target.value)}
-          rows={2}
-          placeholder="Tell me exactly what you want… “a crime thriller under 140 min, out in the last 2 years, 80+ match”"
-          className="input min-h-[64px] w-full resize-none"
-        />
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {EXAMPLES.map((ex) => (
-            <button key={ex} onClick={() => onText(ex)} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 hover:bg-white/10">
-              {ex}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Prepare your evidence — transparent, editable, no black box. */}
       <div id="evidence" className="card space-y-4 p-4 scroll-mt-20">
