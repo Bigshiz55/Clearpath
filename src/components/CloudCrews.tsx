@@ -14,6 +14,7 @@ import {
   getCrewInvite,
   type Crew,
 } from '@/lib/actions/crews';
+import { TasteCourt } from './TasteCourt';
 
 const AVOIDABLE: PreferenceTrait[] = ['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn'];
 const LOVABLE: PreferenceTrait[] = ['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer'];
@@ -44,6 +45,7 @@ export function CloudCrews() {
 
   // Invite modal
   const [invite, setInvite] = useState<{ url: string; qrSvg: string } | null>(null);
+  const [courtOpen, setCourtOpen] = useState(false);
 
   // Pick
   const [mediaType, setMediaType] = useState<'any' | 'movie' | 'tv'>('any');
@@ -234,6 +236,9 @@ export function CloudCrews() {
           <button onClick={findPick} disabled={picking || selected.people.length === 0} className="btn-primary mt-3 w-full py-3">
             {picking ? 'Finding your pick…' : `🍿 Find our pick (${selected.people.length})`}
           </button>
+          <button onClick={() => setCourtOpen(true)} disabled={selected.people.length < 2} className="btn-secondary mt-2 w-full">
+            ⚖️ Hold a 90-Second Taste Court
+          </button>
 
           {picks && picks.length > 0 && (
             <div className="mt-4 space-y-3">
@@ -277,6 +282,20 @@ export function CloudCrews() {
             </div>
           )}
         </div>
+      )}
+
+      {courtOpen && selected && (
+        <TasteCourt
+          members={selected.people.map((p) => ({ name: p.name, love: p.love, avoid: p.avoid }))}
+          mediaType={mediaType}
+          boostGenres={Object.entries(selected.dna.lovedGenres).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([g]) => g)}
+          excludeKeys={selected.dna.dislikedKeys}
+          onClose={() => setCourtOpen(false)}
+          onWinnerLogged={async (f, outcome) => {
+            await logCrewOutcome({ crewId: selected.id, key: `${f.mediaType}-${f.id}`, title: f.title, genres: f.genres, perMember: f.perMember, outcome });
+            await reload();
+          }}
+        />
       )}
 
       {/* Invite modal */}

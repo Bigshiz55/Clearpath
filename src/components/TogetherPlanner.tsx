@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
+import { TasteCourt } from './TasteCourt';
 
 const AVOIDABLE: PreferenceTrait[] = ['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn'];
 const LOVABLE: PreferenceTrait[] = ['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer'];
@@ -91,6 +92,7 @@ export function TogetherPlanner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logged, setLogged] = useState<Set<string>>(new Set());
+  const [courtOpen, setCourtOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -394,7 +396,29 @@ export function TogetherPlanner() {
         <button onClick={findPick} disabled={loading || tonight.length === 0} className="btn-primary w-full py-3 text-base">
           {loading ? 'Finding your pick…' : `🍿 Find our pick (${tonight.length} watching)`}
         </button>
+        <button onClick={() => setCourtOpen(true)} disabled={tonight.length < 2} className="btn-secondary mt-2 w-full">
+          ⚖️ Hold a 90-Second Taste Court
+        </button>
       </div>
+
+      {courtOpen && (
+        <TasteCourt
+          members={tonight.map((m) => ({ name: m.name, love: m.love, avoid: m.avoid }))}
+          mediaType={mediaType}
+          boostGenres={activeGroup ? Object.entries(activeGroup.dna.lovedGenres).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([g]) => g) : []}
+          excludeKeys={activeGroup ? activeGroup.dna.dislikedKeys : []}
+          onClose={() => setCourtOpen(false)}
+          onWinnerLogged={
+            activeGroup
+              ? (f, outcome) =>
+                  logOutcome(
+                    { id: f.id, mediaType: f.mediaType, title: f.title, year: f.year, posterUrl: f.posterUrl, minScore: f.minScore, anyVeto: false, verdict: '', perMember: f.perMember, genres: f.genres, dnaMatch: false, streaming: f.streaming },
+                    outcome,
+                  )
+              : undefined
+          }
+        />
+      )}
 
       {error && <p className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
 
