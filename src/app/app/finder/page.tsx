@@ -4,7 +4,7 @@ import { getMyServices, getProfile, regionFor } from '@/lib/profile';
 import { listCrews } from '@/lib/actions/crews';
 import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
-import { SponsoredJudge } from '@/components/SponsoredJudge';
+import { JudgeBench } from '@/components/JudgeBench';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Find it · WatchVerdict' };
@@ -53,11 +53,9 @@ export default async function FinderPage() {
         services. You get a <span className="font-semibold text-slate-200">ranked set</span> of real titles, each
         scored for you and showing exactly which of your rules it met. No black box, no “one guess,” no credits.
       </p>
-      {judge && (
-        <div className="mt-6">
-          <SponsoredJudge initialJudge={judge} />
-        </div>
-      )}
+      <div className="mt-6">
+        <JudgeBench initialJudge={judge} />
+      </div>
 
       <div className="mt-6">
         <FinderUI hasServices={services.length > 0} watchers={watchers} />
