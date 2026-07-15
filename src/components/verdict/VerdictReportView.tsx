@@ -13,8 +13,10 @@ import { TitleBriefing } from './TitleBriefing';
 import { CriticsTable } from './CriticsTable';
 import { TheaterMode } from '@/components/TheaterMode';
 import { PostWatchInterview } from './PostWatchInterview';
+import { FinishCheck } from './FinishCheck';
 import { buildPanel } from '@/lib/swarm';
 import type { InterviewQuestion, Disposition } from '@/lib/interview';
+import type { RiskAssessment } from '@/lib/finish';
 import type { Briefing } from '@/lib/briefing';
 import { originSummary } from '@/lib/origin';
 
@@ -57,12 +59,14 @@ export function VerdictReportView({
   myServices = [],
   briefing,
   interview,
+  finishCheck,
 }: {
   report: VerdictReport;
   watchState?: WatchState;
   myServices?: number[];
   briefing?: Briefing;
   interview?: { disposition: Disposition; questions: InterviewQuestion[] } | null;
+  finishCheck?: RiskAssessment | null;
 }) {
   const t = report.title;
   const origin = originSummary(t);
@@ -162,6 +166,9 @@ export function VerdictReportView({
           <p className="max-w-xl text-slate-200">{report.oneLiner}</p>
         </div>
       </section>
+
+      {/* Will you finish it? — honest, from your own history */}
+      {finishCheck && <FinishCheck assessment={finishCheck} />}
 
       {/* Actions */}
       <VerdictActions

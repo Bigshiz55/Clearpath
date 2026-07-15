@@ -9,6 +9,7 @@ import { TmdbError } from '@/lib/tmdb/client';
 import { ConfigError } from '@/lib/env';
 import { getMyServices } from '@/lib/profile';
 import { buildInterview, type Disposition } from '@/lib/interview';
+import { getFinishProfile, assessTitleRisk } from '@/lib/finish';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +65,19 @@ async function getMyServicesForCurrentUser(): Promise<number[]> {
   }
 }
 
+async function getFinishProfileForCurrentUser() {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+    return await getFinishProfile(supabase, user.id);
+  } catch {
+    return null;
+  }
+}
+
 /** Has the user already done the post-watch interview? Errors (e.g. migration
  *  0009 not applied) resolve to "done" so we never show a broken prompt. */
 async function getFeedbackDone(tmdbId: number, mediaType: MediaType): Promise<boolean> {
@@ -104,12 +118,27 @@ export default async function TitlePage({ params }: { params: { type: string; id
   if (!parsed) notFound();
 
   try {
-    const [{ report, briefing }, watchState, myServices, feedbackDone] = await Promise.all([
+    const [{ report, briefing }, watchState, myServices, feedbackDone, finishProfile] = await Promise.all([
       buildReportForCurrentUser(parsed.mediaType, parsed.id),
       getWatchState(parsed.id, parsed.mediaType),
       getMyServicesForCurrentUser(),
       getFeedbackDone(parsed.id, parsed.mediaType),
+      getFinishProfileForCurrentUser(),
     ]);
+
+    const t = report.title;
+    const finishCheck = finishProfile
+      ? assessTitleRisk(
+          {
+            long: t.mediaType === 'movie' && (t.runtimeMinutes ?? 0) >= 140,
+            longRunningTv: t.mediaType === 'tv' && (t.numberOfSeasons ?? 0) >= 4,
+            subtitleOnly: t.englishAvailability === 'subtitles',
+            runtimeMinutes: t.runtimeMinutes,
+            seasons: t.numberOfSeasons ?? null,
+          },
+          finishProfile,
+        )
+      : null;
 
     const status = watchState?.status;
     const disposition: Disposition | null =
@@ -137,6 +166,7 @@ export default async function TitlePage({ params }: { params: { type: string; id
         myServices={myServices}
         briefing={briefing}
         interview={interview}
+        finishCheck={finishCheck}
       />
     );
   } catch (e) {
