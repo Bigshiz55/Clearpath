@@ -24,7 +24,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-dvh">
       <header className="container-page flex h-16 items-center justify-between">
-        <Logo />
+        <Logo size="lg" />
         <div className="flex items-center gap-2">
           <Link href="/login" className="btn-ghost">
             Sign in

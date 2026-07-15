@@ -14,7 +14,7 @@ export function Nav({ personalLabel }: { personalLabel?: string | null }) {
     <header className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 backdrop-blur">
       <div className="container-page flex h-16 items-center justify-between gap-4">
         <div className="flex items-center gap-6">
-          <Logo href="/app" />
+          <Logo href="/app" size="lg" />
           <nav className="hidden items-center gap-1 sm:flex">
             {LINKS.map((l) => (
               <Link key={l.href} href={l.href} className="btn-ghost px-3 py-2 text-sm">

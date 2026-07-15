@@ -50,13 +50,13 @@ export default async function DiscoverPage() {
   return (
     <div className="space-y-8">
       <section className="animate-fade-up">
-        <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-5xl">
+        <h1 className="text-5xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-7xl">
           Stop scrolling.{' '}
           <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">
             Get rolling.
           </span>
         </h1>
-        <p className="mt-3 text-sm text-slate-400 sm:text-base">
+        <p className="mt-4 text-base text-slate-400 sm:text-lg">
           Search any movie or show and get a verdict, scored for {label.toLowerCase()}.
         </p>
         <div className="mt-5 max-w-2xl">

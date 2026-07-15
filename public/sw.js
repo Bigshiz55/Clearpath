@@ -3,7 +3,7 @@
  * HTML, API responses, auth flows, or anything carrying credentials. Provides
  * an offline fallback page for navigations.
  */
-const CACHE = 'wv-static-v2';
+const CACHE = 'wv-static-v3';
 const OFFLINE_URL = '/offline';
 const PRECACHE = ['/offline', '/icons/icon.svg', '/manifest.webmanifest'];
 
