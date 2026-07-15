@@ -10,6 +10,7 @@ import { ConfigError } from '@/lib/env';
 import { getMyServices } from '@/lib/profile';
 import { buildInterview, type Disposition } from '@/lib/interview';
 import { getFinishProfile, assessTitleRisk } from '@/lib/finish';
+import { getContentDna, type ContentDna } from '@/lib/contentDna';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +79,14 @@ async function getFinishProfileForCurrentUser() {
   }
 }
 
+async function getContentDnaSafe(mediaType: MediaType, id: number): Promise<ContentDna | null> {
+  try {
+    return await getContentDna(createClient(), mediaType, id);
+  } catch {
+    return null;
+  }
+}
+
 /** Has the user already done the post-watch interview? Errors (e.g. migration
  *  0009 not applied) resolve to "done" so we never show a broken prompt. */
 async function getFeedbackDone(tmdbId: number, mediaType: MediaType): Promise<boolean> {
@@ -118,12 +127,13 @@ export default async function TitlePage({ params }: { params: { type: string; id
   if (!parsed) notFound();
 
   try {
-    const [{ report, briefing }, watchState, myServices, feedbackDone, finishProfile] = await Promise.all([
+    const [{ report, briefing }, watchState, myServices, feedbackDone, finishProfile, contentDna] = await Promise.all([
       buildReportForCurrentUser(parsed.mediaType, parsed.id),
       getWatchState(parsed.id, parsed.mediaType),
       getMyServicesForCurrentUser(),
       getFeedbackDone(parsed.id, parsed.mediaType),
       getFinishProfileForCurrentUser(),
+      getContentDnaSafe(parsed.mediaType, parsed.id),
     ]);
 
     const t = report.title;
@@ -167,6 +177,7 @@ export default async function TitlePage({ params }: { params: { type: string; id
         briefing={briefing}
         interview={interview}
         finishCheck={finishCheck}
+        contentDna={contentDna}
       />
     );
   } catch (e) {

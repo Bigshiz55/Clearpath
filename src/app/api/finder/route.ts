@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { runFinder, type FinderQuery } from '@/lib/finder';
+import { runFinder, type FinderQuery, type Watcher } from '@/lib/finder';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
-    let body: { query?: unknown; text?: string } = {};
+    let body: { query?: unknown; text?: string; watcher?: unknown } = {};
     try {
       body = await req.json();
     } catch {
@@ -42,7 +42,17 @@ export async function POST(req: Request) {
         ? naiveParseQuery(body.text)
         : { ...EMPTY_QUERY };
 
-    const result = await runFinder(supabase, user.id, query);
+    let watcher: Watcher | null = null;
+    const w = body.watcher as Partial<Watcher> | undefined;
+    if (w && typeof w.name === 'string' && Array.isArray(w.love) && Array.isArray(w.avoid)) {
+      watcher = {
+        name: w.name.slice(0, 40),
+        love: w.love.map(String).slice(0, 12),
+        avoid: w.avoid.map(String).slice(0, 12),
+      };
+    }
+
+    const result = await runFinder(supabase, user.id, query, watcher);
     return NextResponse.json({
       query,
       scoredFor: result.scoredFor,

@@ -14,9 +14,11 @@ import { CriticsTable } from './CriticsTable';
 import { TheaterMode } from '@/components/TheaterMode';
 import { PostWatchInterview } from './PostWatchInterview';
 import { FinishCheck } from './FinishCheck';
+import { ContentDnaView } from './ContentDnaView';
 import { buildPanel } from '@/lib/swarm';
 import type { InterviewQuestion, Disposition } from '@/lib/interview';
 import type { RiskAssessment } from '@/lib/finish';
+import type { ContentDna } from '@/lib/contentDna';
 import type { Briefing } from '@/lib/briefing';
 import { originSummary } from '@/lib/origin';
 
@@ -60,6 +62,7 @@ export function VerdictReportView({
   briefing,
   interview,
   finishCheck,
+  contentDna,
 }: {
   report: VerdictReport;
   watchState?: WatchState;
@@ -67,6 +70,7 @@ export function VerdictReportView({
   briefing?: Briefing;
   interview?: { disposition: Disposition; questions: InterviewQuestion[] } | null;
   finishCheck?: RiskAssessment | null;
+  contentDna?: ContentDna | null;
 }) {
   const t = report.title;
   const origin = originSummary(t);
@@ -315,6 +319,9 @@ export function VerdictReportView({
           </ul>
         </div>
       </section>
+
+      {/* Content DNA — aggregated from real viewer check-ins */}
+      {contentDna && <ContentDnaView dna={contentDna} />}
 
       {/* Content & tone */}
       <section className="card p-5 sm:p-6">

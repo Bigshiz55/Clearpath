@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getMyServices } from '@/lib/profile';
-import { FinderUI } from '@/components/FinderUI';
+import { listCrews } from '@/lib/actions/crews';
+import { FinderUI, type WatcherOption } from '@/components/FinderUI';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Find it · WatchVerdict' };
@@ -13,6 +14,24 @@ export default async function FinderPage() {
   } = await supabase.auth.getUser();
   const services = user ? await getMyServices(supabase, user.id) : [];
 
+  // Offer crew members as "who's watching" — dedup by name, need real taste.
+  const watchers: WatcherOption[] = [];
+  try {
+    const { crews } = await listCrews();
+    const seen = new Set<string>();
+    for (const c of crews ?? []) {
+      for (const p of c.people) {
+        const key = p.name.toLowerCase();
+        if (seen.has(key)) continue;
+        if (p.love.length === 0 && p.avoid.length === 0) continue;
+        seen.add(key);
+        watchers.push({ name: p.name, love: p.love, avoid: p.avoid });
+      }
+    }
+  } catch {
+    /* crews optional */
+  }
+
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-bold text-white sm:text-3xl">🔎 Find exactly what to watch</h1>
@@ -22,7 +41,7 @@ export default async function FinderPage() {
         scored for you and showing exactly which of your rules it met. No black box, no “one guess,” no credits.
       </p>
       <div className="mt-6">
-        <FinderUI hasServices={services.length > 0} />
+        <FinderUI hasServices={services.length > 0} watchers={watchers} />
       </div>
     </div>
   );

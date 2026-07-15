@@ -7,6 +7,12 @@ import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { SaveButton } from '@/components/SaveButton';
 import type { FinderQuery } from '@/lib/finder';
 
+export interface WatcherOption {
+  name: string;
+  love: string[];
+  avoid: string[];
+}
+
 interface ResultItem {
   id: number;
   mediaType: 'movie' | 'tv';
@@ -54,9 +60,10 @@ function Seg<T extends string | number>({
   );
 }
 
-export function FinderUI({ hasServices }: { hasServices: boolean }) {
+export function FinderUI({ hasServices, watchers = [] }: { hasServices: boolean; watchers?: WatcherOption[] }) {
   const [text, setText] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
+  const [watcherIdx, setWatcherIdx] = useState(-1); // -1 = You
   const [items, setItems] = useState<ResultItem[] | null>(null);
   const [scoredFor, setScoredFor] = useState('Your match');
   const [relaxed, setRelaxed] = useState<string | null>(null);
@@ -81,10 +88,11 @@ export function FinderUI({ hasServices }: { hasServices: boolean }) {
     setLoading(true);
     setError(null);
     try {
+      const watcher = watcherIdx >= 0 ? watchers[watcherIdx] : null;
       const res = await fetch('/api/finder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q }),
+        body: JSON.stringify({ query: q, watcher }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed');
@@ -121,6 +129,30 @@ export function FinderUI({ hasServices }: { hasServices: boolean }) {
       {/* Transparent, editable parse — no black box. */}
       <div className="card space-y-4 p-4">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Here’s how I read that — tweak anything</div>
+
+        {watchers.length > 0 && (
+          <div>
+            <div className="label">Who’s watching</div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setWatcherIdx(-1)}
+                className={`rounded-lg border px-3 py-1.5 text-sm transition ${watcherIdx === -1 ? 'border-gold-400/60 bg-gold-500/15 text-gold-400' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+              >
+                You
+              </button>
+              {watchers.map((w, i) => (
+                <button
+                  key={w.name}
+                  onClick={() => setWatcherIdx(i)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm transition ${watcherIdx === i ? 'border-gold-400/60 bg-gold-500/15 text-gold-400' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                >
+                  {w.name}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Scores every result against their taste — “{(watcherIdx >= 0 ? watchers[watcherIdx]!.name : 'You')} match”.</p>
+          </div>
+        )}
 
         <div>
           <div className="label">Type</div>

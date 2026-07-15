@@ -1,11 +1,20 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MediaType } from '@/lib/types';
+import type { PreferenceTrait } from '@/lib/types';
 import { discoverTitles } from '@/lib/tmdb/client';
 import { getScoringData } from '@/lib/titleData';
-import { buildVerdict } from '@/lib/scoring';
+import { buildVerdict, avoidRule, loveRule } from '@/lib/scoring';
 import { getProfile, getPersonalContext, regionFor, getMyServices, personalLabelFor } from '@/lib/profile';
 import { includedServiceNames, streamingNames } from '@/lib/services';
+import type { PersonalContext } from '@/lib/scoring/personal';
+
+/** A specific person to score for (a crew member / guest), instead of "you". */
+export interface Watcher {
+  name: string;
+  love: string[];
+  avoid: string[];
+}
 
 export interface FinderQuery {
   mediaType: 'any' | 'movie' | 'tv';
@@ -59,12 +68,29 @@ export async function runFinder(
   supabase: SupabaseClient,
   userId: string,
   q: FinderQuery,
+  watcher?: Watcher | null,
 ): Promise<FinderResult> {
   const profile = await getProfile(supabase, userId);
   const region = regionFor(profile);
-  const scoredFor = profile ? personalLabelFor(profile) : 'Your match';
   const services = q.onMyServices ? await getMyServices(supabase, userId) : [];
-  const basePersonal = await getPersonalContext(supabase, userId, null);
+
+  let basePersonal: PersonalContext;
+  let scoredFor: string;
+  if (watcher) {
+    basePersonal = {
+      label: `${watcher.name} match`,
+      rules: [
+        ...watcher.avoid.map((t) => avoidRule(t as PreferenceTrait)),
+        ...watcher.love.map((t) => loveRule(t as PreferenceTrait)),
+      ],
+      likedFranchiseIds: [],
+      collectionId: null,
+    };
+    scoredFor = `${watcher.name} match`;
+  } else {
+    basePersonal = await getPersonalContext(supabase, userId, null);
+    scoredFor = profile ? personalLabelFor(profile) : 'Your match';
+  }
 
   const types: MediaType[] = q.mediaType === 'any' ? ['movie', 'tv'] : [q.mediaType];
   const sinceDays = q.sinceMonths ? q.sinceMonths * 30 : undefined;
@@ -185,7 +211,7 @@ export async function runFinder(
     relaxed = q.onMyServices
       ? 'Nothing matched all of that on your services — here are the closest picks anywhere.'
       : 'Nothing cleared your match bar — here are the closest, honestly labeled.';
-    const r = await runFinder(supabase, userId, relaxedQ);
+    const r = await runFinder(supabase, userId, relaxedQ, watcher);
     items = r.items;
   }
 
