@@ -1,5 +1,6 @@
 import type { WatchProviders, WatchProvider } from '@/lib/types';
 import { TMDB_IMAGE_BASE } from '@/lib/tmdb/client';
+import { isProviderMine } from '@/lib/services';
 
 const TYPE_LABELS: Record<WatchProvider['type'], string> = {
   flatrate: 'Stream',
@@ -11,10 +12,14 @@ const TYPE_LABELS: Record<WatchProvider['type'], string> = {
 
 const TYPE_ORDER: WatchProvider['type'][] = ['flatrate', 'free', 'ads', 'rent', 'buy'];
 
-function ProviderLogo({ p }: { p: WatchProvider }) {
+function ProviderLogo({ p, mine }: { p: WatchProvider; mine: boolean }) {
   const src = p.logoPath ? `${TMDB_IMAGE_BASE}/w92${p.logoPath}` : null;
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5">
+    <div
+      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${
+        mine ? 'border-emerald-400/50 bg-emerald-500/10' : 'border-white/10 bg-white/5'
+      }`}
+    >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="" className="h-6 w-6 rounded" loading="lazy" />
@@ -23,12 +28,19 @@ function ProviderLogo({ p }: { p: WatchProvider }) {
           {p.providerName.slice(0, 2)}
         </div>
       )}
-      <span className="text-xs font-medium text-slate-200">{p.providerName}</span>
+      <span className={`text-xs font-medium ${mine ? 'text-emerald-100' : 'text-slate-200'}`}>{p.providerName}</span>
+      {mine && <span className="text-[10px] font-bold text-emerald-300">✓ yours</span>}
     </div>
   );
 }
 
-export function ProviderRow({ providers }: { providers: WatchProviders | null }) {
+export function ProviderRow({
+  providers,
+  myServices = [],
+}: {
+  providers: WatchProviders | null;
+  myServices?: number[];
+}) {
   if (!providers) {
     return (
       <p className="text-sm text-slate-400">
@@ -60,7 +72,11 @@ export function ProviderRow({ providers }: { providers: WatchProviders | null })
           </div>
           <div className="flex flex-wrap gap-2">
             {g.items.map((p) => (
-              <ProviderLogo key={`${g.type}-${p.providerId}`} p={p} />
+              <ProviderLogo
+                key={`${g.type}-${p.providerId}`}
+                p={p}
+                mine={(g.type === 'flatrate' || g.type === 'free' || g.type === 'ads') && isProviderMine(p.providerId, myServices)}
+              />
             ))}
           </div>
         </div>

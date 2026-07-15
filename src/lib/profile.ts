@@ -128,3 +128,24 @@ export async function getPersonalContext(
 export function regionFor(profile: Profile | null): string {
   return profile?.region ?? 'US';
 }
+
+/**
+ * The user's chosen streaming services (TMDB provider ids). Read via its own
+ * guarded query so the app keeps working before migration 0006 is applied —
+ * a missing column simply yields an empty list.
+ */
+export async function getMyServices(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<number[]> {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('my_services')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error || !data) return [];
+  const raw = (data as { my_services?: unknown }).my_services;
+  if (!Array.isArray(raw)) return [];
+  return raw.map((n) => Number(n)).filter((n) => Number.isFinite(n));
+}

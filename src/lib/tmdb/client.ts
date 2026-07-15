@@ -471,6 +471,160 @@ export async function getCollectionId(mediaType: MediaType, id: number): Promise
 }
 
 // ---------------------------------------------------------------------------
+// Credits, people & collections (the honest "Briefing")
+// ---------------------------------------------------------------------------
+
+export interface CastCredit {
+  id: number;
+  name: string;
+  character: string | null;
+  profilePath: string | null;
+}
+
+export interface TitleCredits {
+  cast: CastCredit[];
+  /** Movie directors (crew job === Director). */
+  directors: Array<{ id: number; name: string }>;
+  /** TV creators (created_by). */
+  creators: Array<{ id: number; name: string }>;
+}
+
+interface TmdbCreditsDetail extends TmdbDetail {
+  created_by?: Array<{ id: number; name: string }>;
+  credits?: {
+    cast?: Array<{ id: number; name: string; character?: string; profile_path?: string | null; order?: number }>;
+    crew?: Array<{ id: number; name: string; job?: string; department?: string }>;
+  };
+}
+
+/** Cast + directors/creators for a title (one TMDB call). */
+export async function getCredits(mediaType: MediaType, id: number): Promise<TitleCredits> {
+  const detail = await tmdbFetch<TmdbCreditsDetail>(`/${mediaType}/${id}`, {
+    language: 'en-US',
+    append_to_response: 'credits',
+  });
+  const cast = (detail.credits?.cast ?? [])
+    .slice()
+    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+    .slice(0, 8)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      character: c.character && c.character.trim() !== '' ? c.character : null,
+      profilePath: c.profile_path ?? null,
+    }));
+  const directors =
+    mediaType === 'movie'
+      ? (detail.credits?.crew ?? [])
+          .filter((c) => c.job === 'Director')
+          .map((c) => ({ id: c.id, name: c.name }))
+      : [];
+  const creators = (detail.created_by ?? []).map((c) => ({ id: c.id, name: c.name }));
+  return { cast, directors, creators };
+}
+
+export interface NotableCredit {
+  id: number;
+  mediaType: MediaType;
+  title: string;
+  year: number | null;
+}
+
+interface TmdbPersonCredits {
+  cast?: Array<PersonCreditRow>;
+  crew?: Array<PersonCreditRow & { job?: string }>;
+}
+interface PersonCreditRow {
+  id: number;
+  media_type?: string;
+  title?: string;
+  name?: string;
+  release_date?: string;
+  first_air_date?: string;
+  vote_count?: number;
+  popularity?: number;
+  poster_path?: string | null;
+}
+
+/**
+ * A person's best-known other titles (by popularity/vote_count), excluding the
+ * current one. `role` picks cast vs. directing work. One TMDB call.
+ */
+export async function getPersonNotable(
+  personId: number,
+  role: 'cast' | 'directing',
+  excludeId: number,
+  limit = 3,
+): Promise<NotableCredit[]> {
+  const data = await tmdbFetch<TmdbPersonCredits>(`/person/${personId}/combined_credits`, {
+    language: 'en-US',
+  }).catch(() => ({} as TmdbPersonCredits));
+
+  const rows: PersonCreditRow[] =
+    role === 'directing'
+      ? (data.crew ?? []).filter((c) => (c as { job?: string }).job === 'Director')
+      : data.cast ?? [];
+
+  const seen = new Set<number>();
+  return rows
+    .filter((r) => {
+      const mt = r.media_type;
+      return (mt === 'movie' || mt === 'tv') && r.id !== excludeId && (r.poster_path ?? null) !== null;
+    })
+    .filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)))
+    .sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0) || (b.popularity ?? 0) - (a.popularity ?? 0))
+    .slice(0, limit)
+    .map((r) => {
+      const mt = r.media_type as MediaType;
+      return {
+        id: r.id,
+        mediaType: mt,
+        title: (mt === 'movie' ? r.title : r.name) ?? 'Untitled',
+        year: yearFrom(mt === 'movie' ? r.release_date : r.first_air_date),
+      };
+    });
+}
+
+export interface CollectionPart {
+  id: number;
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+}
+
+export interface Collection {
+  id: number;
+  name: string;
+  parts: CollectionPart[];
+}
+
+/** The films in a movie's franchise/collection, in release order (one call). */
+export async function getCollection(collectionId: number): Promise<Collection | null> {
+  interface Row {
+    id: number;
+    title?: string;
+    name?: string;
+    release_date?: string;
+    poster_path?: string | null;
+  }
+  const data = await tmdbFetch<{ id: number; name?: string; parts?: Row[] }>(
+    `/collection/${collectionId}`,
+    { language: 'en-US' },
+  ).catch(() => null);
+  if (!data) return null;
+  const parts: CollectionPart[] = (data.parts ?? [])
+    .slice()
+    .sort((a, b) => (a.release_date ?? '').localeCompare(b.release_date ?? ''))
+    .map((r) => ({
+      id: r.id,
+      title: r.title ?? r.name ?? 'Untitled',
+      year: yearFrom(r.release_date),
+      posterPath: r.poster_path ?? null,
+    }));
+  return { id: data.id, name: data.name ?? 'Collection', parts };
+}
+
+// ---------------------------------------------------------------------------
 // Watch providers
 // ---------------------------------------------------------------------------
 

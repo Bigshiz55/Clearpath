@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import type { PreferenceRule, PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
 import { avoidRule, loveRule, SCOTT_RULES } from '@/lib/scoring/preferences';
-import { updateProfile, replacePreferenceRules, updateDigestPrefs } from '@/lib/actions/profile';
+import { updateProfile, replacePreferenceRules, updateDigestPrefs, updateMyServices } from '@/lib/actions/profile';
 import { deactivateShare } from '@/lib/actions/share';
 import { deleteAccount } from '@/lib/actions/account';
 import { useToast } from '@/components/Toast';
+import { STREAMING_SERVICES } from '@/lib/services';
 
 export interface ShareRow {
   token: string;
@@ -34,9 +35,30 @@ export function SettingsView(props: {
   digestMinScore: number;
   rules: PreferenceRule[];
   shares: ShareRow[];
+  myServices: number[];
 }) {
   const router = useRouter();
   const toast = useToast();
+
+  const [services, setServices] = useState<Set<number>>(new Set(props.myServices));
+  const [savingServices, setSavingServices] = useState(false);
+
+  function toggleService(id: number) {
+    setServices((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function saveServices() {
+    setSavingServices(true);
+    const res = await updateMyServices({ services: Array.from(services) });
+    setSavingServices(false);
+    toast.show(res.ok ? 'Services saved.' : res.error ?? 'Failed.', res.ok ? 'success' : 'error');
+    if (res.ok) router.refresh();
+  }
 
   const [displayName, setDisplayName] = useState(props.displayName);
   const [region, setRegion] = useState(props.region);
@@ -189,6 +211,36 @@ export function SettingsView(props: {
             {savingRules ? 'Saving…' : 'Save preferences'}
           </button>
         </div>
+      </section>
+
+      {/* My streaming services */}
+      <section className="card p-5">
+        <h2 className="text-lg font-semibold text-white">My streaming services</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Pick what you subscribe to. Every verdict will flag what’s{' '}
+          <span className="font-semibold text-emerald-300">✓ free on a plan you have</span> vs. what needs a rental —
+          so you can tell at a glance what you can actually watch tonight.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {STREAMING_SERVICES.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => toggleService(s.id)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition ${
+                services.has(s.id)
+                  ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100'
+                  : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              <span aria-hidden>{s.emoji}</span>
+              {s.name}
+              {services.has(s.id) && <span className="text-xs font-bold text-emerald-300">✓</span>}
+            </button>
+          ))}
+        </div>
+        <button onClick={saveServices} disabled={savingServices} className="btn-primary mt-4">
+          {savingServices ? 'Saving…' : 'Save services'}
+        </button>
       </section>
 
       {/* Daily digest */}

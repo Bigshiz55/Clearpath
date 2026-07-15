@@ -7,6 +7,8 @@ import { VerdictReportView, type WatchState } from '@/components/verdict/Verdict
 import { createClient } from '@/lib/supabase/server';
 import { TmdbError } from '@/lib/tmdb/client';
 import { ConfigError } from '@/lib/env';
+import { getMyServices } from '@/lib/profile';
+import { getBriefing, type Briefing } from '@/lib/briefing';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +51,19 @@ async function getWatchState(tmdbId: number, mediaType: MediaType): Promise<Watc
   }
 }
 
+async function getMyServicesForCurrentUser(): Promise<number[]> {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+    return await getMyServices(supabase, user.id);
+  } catch {
+    return [];
+  }
+}
+
 function ErrorCard({ title, message }: { title: string; message: string }) {
   return (
     <div className="card mx-auto max-w-lg p-8 text-center">
@@ -66,11 +81,20 @@ export default async function TitlePage({ params }: { params: { type: string; id
   if (!parsed) notFound();
 
   try {
-    const [{ report }, watchState] = await Promise.all([
+    const [{ report }, watchState, myServices, briefing] = await Promise.all([
       buildReportForCurrentUser(parsed.mediaType, parsed.id),
       getWatchState(parsed.id, parsed.mediaType),
+      getMyServicesForCurrentUser(),
+      getBriefing(parsed.mediaType, parsed.id).catch((): Briefing | undefined => undefined),
     ]);
-    return <VerdictReportView report={report} watchState={watchState} />;
+    return (
+      <VerdictReportView
+        report={report}
+        watchState={watchState}
+        myServices={myServices}
+        briefing={briefing}
+      />
+    );
   } catch (e) {
     if (e instanceof ConfigError) {
       return <ErrorCard title="Not configured yet" message={e.userMessage} />;

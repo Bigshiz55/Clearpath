@@ -263,6 +263,33 @@ export async function getMyTaste(): Promise<MyTaste> {
   }
 }
 
+const servicesSchema = z.object({
+  services: z.array(z.number().int().positive()).max(40),
+});
+
+/** Save the user's streaming subscriptions (TMDB provider ids). */
+export async function updateMyServices(input: z.infer<typeof servicesSchema>): Promise<ActionResult> {
+  const parsed = servicesSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'Invalid services.' };
+  try {
+    const supabase = createClient();
+    const user = await requireUser(supabase);
+    const unique = Array.from(new Set(parsed.data.services));
+    const { error } = await supabase.from('profiles').update({ my_services: unique }).eq('id', user.id);
+    if (error) {
+      if (error.code === '42703' || /my_services/.test(error.message)) {
+        return { ok: false, error: 'My Services needs migration 0006 applied to the database first.' };
+      }
+      return { ok: false, error: error.message };
+    }
+    revalidatePath('/app/settings');
+    revalidatePath('/app');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed.' };
+  }
+}
+
 /** Get (or create) the user's personal Quick-Add key for phone shortcuts. */
 export async function getQuickAddToken(): Promise<{ ok: boolean; token?: string; error?: string }> {
   try {

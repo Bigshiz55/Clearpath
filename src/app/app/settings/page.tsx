@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { getProfile, getPreferenceRules, personalLabelFor } from '@/lib/profile';
+import { getProfile, getPreferenceRules, personalLabelFor, getMyServices } from '@/lib/profile';
 import { SettingsView, type ShareRow } from '@/components/settings/SettingsView';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
   const uid = user?.id ?? '';
 
-  const [profile, rules, sharesRes] = await Promise.all([
+  const [profile, rules, sharesRes, myServices] = await Promise.all([
     getProfile(supabase, uid),
     getPreferenceRules(supabase, uid),
     supabase
@@ -20,6 +20,7 @@ export default async function SettingsPage() {
       .select('token, kind, is_active, expires_at, created_at, snapshot')
       .eq('user_id', uid)
       .order('created_at', { ascending: false }),
+    getMyServices(supabase, uid),
   ]);
 
   const shares: ShareRow[] = ((sharesRes.data as Array<Record<string, unknown>> | null) ?? []).map((s) => ({
@@ -42,6 +43,7 @@ export default async function SettingsPage() {
       digestMinScore={profile?.digest_min_score ?? 72}
       rules={rules}
       shares={shares}
+      myServices={myServices}
     />
   );
 }

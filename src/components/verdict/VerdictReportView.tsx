@@ -8,6 +8,9 @@ import { SaveButton } from '@/components/SaveButton';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
 import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
+import { TonightBanner } from './TonightBanner';
+import { TitleBriefing } from './TitleBriefing';
+import type { Briefing } from '@/lib/briefing';
 
 const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   none: 'bg-white/10 text-slate-400',
@@ -45,9 +48,13 @@ export interface WatchState {
 export function VerdictReportView({
   report,
   watchState,
+  myServices = [],
+  briefing,
 }: {
   report: VerdictReport;
   watchState?: WatchState;
+  myServices?: number[];
+  briefing?: Briefing;
 }) {
   const t = report.title;
   const backdrop = tmdbImage(t.backdropPath, 'w780');
@@ -76,6 +83,9 @@ export function VerdictReportView({
         sources={report.general.sources}
         providers={report.providers}
       />
+
+      {/* Can I watch it tonight on a plan I have? */}
+      <TonightBanner providers={report.providers} myServices={myServices} />
 
       {/* Header */}
       <header className="card relative overflow-hidden">
@@ -279,9 +289,12 @@ export function VerdictReportView({
         <h2 className="text-lg font-semibold text-white">Where to watch</h2>
         <p className="mt-1 text-xs text-slate-500">Legal options for your region. We link out — we never host or stream content.</p>
         <div className="mt-4">
-          <ProviderRow providers={report.providers} />
+          <ProviderRow providers={report.providers} myServices={myServices} />
         </div>
       </section>
+
+      {/* The Briefing — real credits, franchise */}
+      {briefing && <TitleBriefing briefing={briefing} />}
 
       {/* More like this */}
       {report.similar.length > 0 && (
