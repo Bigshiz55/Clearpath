@@ -11,6 +11,9 @@ import { RecommendedForYou } from '@/components/RecommendedForYou';
 import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { getTonight } from '@/lib/tonight';
+import { CourtroomHero } from '@/components/CourtroomHero';
+import { getActiveJudge, type Judge } from '@/lib/sponsors';
+import { regionFor } from '@/lib/profile';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -34,6 +37,15 @@ export default async function DiscoverPage() {
   const label = profile ? personalLabelFor(profile) : 'Your match';
   const tonight = await getTonight(supabase, user?.id ?? '', new Date());
   const isGuest = user?.is_anonymous === true;
+
+  let judge: Judge | null = null;
+  if (user) {
+    try {
+      judge = await getActiveJudge(supabase, { region: regionFor(profile), nowMs: Date.now() });
+    } catch {
+      /* sponsors optional / pre-migration */
+    }
+  }
 
   const { data: recent } = await supabase
     .from('verdicts')
@@ -130,6 +142,8 @@ export default async function DiscoverPage() {
           </Link>
         </div>
       </section>
+
+      <CourtroomHero initialJudge={judge} />
 
       <TonightHome tonight={tonight} isGuest={isGuest} />
 
