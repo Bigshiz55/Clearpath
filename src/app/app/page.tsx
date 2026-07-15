@@ -50,16 +50,16 @@ export default async function DiscoverPage() {
   return (
     <div className="space-y-8">
       <section className="animate-fade-up">
-        <p className="text-sm font-semibold uppercase tracking-wide text-brand-300">
-          🍿 Stop scrolling. Start watching.
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-white sm:text-3xl">
-          What are you thinking of watching?
+        <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-5xl">
+          Stop scrolling.{' '}
+          <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">
+            Get rolling.
+          </span>
         </h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-3 text-sm text-slate-400 sm:text-base">
           Search any movie or show and get a verdict, scored for {label.toLowerCase()}.
         </p>
-        <div className="mt-4 max-w-2xl">
+        <div className="mt-5 max-w-2xl">
           <SearchBar autoFocus />
         </div>
       </section>
