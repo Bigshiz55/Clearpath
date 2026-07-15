@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { searchTitles } from '@/lib/tmdb/client';
+import { resolveTitleFromText } from '@/lib/quickResolve';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface ActionResult {
@@ -143,15 +143,13 @@ export async function quickAddByText(text: string): Promise<ActionResult & { add
   try {
     const supabase = createClient();
     const user = await requireUser(supabase);
-    let results;
+    let m;
     try {
-      results = await searchTitles(q);
+      m = await resolveTitleFromText(q);
     } catch {
       return { ok: false, error: 'Couldn’t reach the movie database.' };
     }
-    const lc = q.toLowerCase();
-    const m = results.find((r) => r.title.toLowerCase() === lc) ?? results[0];
-    if (!m) return { ok: false, error: `No match for “${q}”.` };
+    if (!m) return { ok: false, error: 'Couldn’t find a matching title.' };
     const watchlistId = await getOrCreateDefaultWatchlist(supabase, user.id);
     const { error } = await supabase.from('watchlist_items').upsert(
       {

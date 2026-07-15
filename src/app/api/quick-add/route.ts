@@ -1,14 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { searchTitles, type SearchResultItem } from '@/lib/tmdb/client';
+import { resolveTitleFromText } from '@/lib/quickResolve';
 
 export const dynamic = 'force-dynamic';
-
-function pick(results: SearchResultItem[], q: string): SearchResultItem | null {
-  if (results.length === 0) return null;
-  const lc = q.trim().toLowerCase();
-  return results.find((r) => r.title.toLowerCase() === lc) ?? results[0]!;
-}
 
 async function handle(token: string | null, q: string | null) {
   if (!token) return NextResponse.json({ ok: false, error: 'Missing key.' }, { status: 401 });
@@ -29,18 +23,13 @@ async function handle(token: string | null, q: string | null) {
   if (!profile) return NextResponse.json({ ok: false, error: 'Invalid key.' }, { status: 401 });
   const userId = profile.id as string;
 
-  // Clean a shared/dictated string down to a likely title (drop "add ... to my
-  // watchlist", trailing years/punctuation help but TMDB search is forgiving).
-  const cleaned = q.replace(/\b(add|to|my|the)?\s*watch\s*list\b/gi, '').replace(/\s+/g, ' ').trim() || q.trim();
-
-  let results: SearchResultItem[];
+  let m;
   try {
-    results = await searchTitles(cleaned);
+    m = await resolveTitleFromText(q);
   } catch {
     return NextResponse.json({ ok: false, error: 'Couldn’t reach the movie database.' }, { status: 502 });
   }
-  const m = pick(results, cleaned);
-  if (!m) return NextResponse.json({ ok: false, error: `No match for “${cleaned}”.` }, { status: 404 });
+  if (!m) return NextResponse.json({ ok: false, error: 'Couldn’t find a matching title.' }, { status: 404 });
 
   // Default watchlist for this user.
   let watchlistId: string;
