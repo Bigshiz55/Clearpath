@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, personalLabelFor } from '@/lib/profile';
 import { SearchBar } from '@/components/SearchBar';
+import { HomeGreeter } from '@/components/HomeGreeter';
 import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
 import { tmdbImage } from '@/lib/tmdb/client';
@@ -37,6 +38,8 @@ export default async function DiscoverPage() {
   const label = profile ? personalLabelFor(profile) : 'Your match';
   const tonight = await getTonight(supabase, user?.id ?? '', new Date());
   const isGuest = user?.is_anonymous === true;
+  const firstName = profile?.display_name?.trim().split(/\s+/)[0] || null;
+  const greeterName = isGuest ? null : firstName;
 
   let judge: Judge | null = null;
   if (user) {
@@ -75,19 +78,16 @@ export default async function DiscoverPage() {
           </span>
         </h1>
         <p className="mt-4 text-base text-slate-400 sm:text-lg">
-          Search any movie or show and get a verdict, scored for {label.toLowerCase()}.
+          Tell the judge what you feel like — get a verdict, scored for {label.toLowerCase()}.
         </p>
-        <div className="mt-5 max-w-2xl">
-          <SearchBar autoFocus />
+        {/* The personal AI: your dog judge greets you and takes your case. */}
+        <HomeGreeter name={greeterName} className="mt-5 max-w-2xl" />
+        <div className="mt-3 max-w-2xl">
+          <div className="mb-1.5 text-xs font-medium text-slate-500">Or look up a specific title</div>
+          <SearchBar />
         </div>
         {/* Three primary decisions — start a decision, don't browse a menu. */}
         <div className="mt-5 grid gap-2 sm:grid-cols-3">
-          <Link
-            href="/app/ask"
-            className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
-          >
-            ⚖️ Ask the Judge
-          </Link>
           <Link
             href="/app/together"
             className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
@@ -99,6 +99,12 @@ export default async function DiscoverPage() {
             className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
           >
             🎭 By mood
+          </Link>
+          <Link
+            href="/app/finder"
+            className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
+          >
+            🔎 The Finder
           </Link>
         </div>
         </div>
