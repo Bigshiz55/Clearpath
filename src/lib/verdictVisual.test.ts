@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { verdictVisualForTier, verdictVisualForCall, verdictVisual } from './verdictVisual';
+import { verdictVisualForTier, verdictVisualForCall, verdictVisual, isTopTier } from './verdictVisual';
 
 describe('Verdict visual language', () => {
   it('collapses the two top tiers into one green "watch" signal', () => {
@@ -29,5 +29,12 @@ describe('Verdict visual language', () => {
   it('exposes a stable palette for each key', () => {
     expect(verdictVisual('wildcard').label).toBe('Wildcard');
     expect(verdictVisual('watch').hex).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(verdictVisual('watch').solid).not.toBe(verdictVisual('watch').badge);
+  });
+
+  it('marks only the single strongest tier as the top pick', () => {
+    expect(isTopTier('Must Watch')).toBe(true);
+    expect(isTopTier('Strong Watch')).toBe(false);
+    expect(isTopTier('Skip')).toBe(false);
   });
 });

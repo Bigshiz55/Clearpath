@@ -36,30 +36,35 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
 }
 
 export function PosterCard({ href, title, year, mediaType, posterUrl, meta, children, overlay }: PosterCardProps) {
-  const body = (
+  const poster = (
+    <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04]" />
+  );
+  const heading = (
+    <>
+      <div className="line-clamp-2 text-sm font-semibold text-white">{title}</div>
+      <div className="mt-0.5 text-xs text-slate-400">
+        {year ?? '—'}
+        {meta ? ` · ${meta}` : ''}
+      </div>
+    </>
+  );
+
+  // The poster and title link out; `overlay` and `children` are siblings of the
+  // link (never nested inside it) so they may contain their own interactive
+  // controls — a save button, a tap-to-expand reason — as valid markup.
+  return (
     <div className="card group h-full overflow-hidden transition hover:border-white/20 hover:shadow-glow">
       <div className="relative aspect-[2/3] overflow-hidden">
-        <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04]" />
-        <span className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 backdrop-blur">
+        {href ? <Link href={href} className="block h-full">{poster}</Link> : poster}
+        <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 backdrop-blur">
           {mediaType === 'movie' ? 'Movie' : 'TV'}
         </span>
         {overlay && <div className="absolute right-2 top-2 z-10">{overlay}</div>}
       </div>
       <div className="p-3">
-        <div className="line-clamp-2 text-sm font-semibold text-white">{title}</div>
-        <div className="mt-0.5 text-xs text-slate-400">
-          {year ?? '—'}
-          {meta ? ` · ${meta}` : ''}
-        </div>
+        {href ? <Link href={href} className="block">{heading}</Link> : heading}
         {children}
       </div>
     </div>
-  );
-  return href ? (
-    <Link href={href} className="block h-full">
-      {body}
-    </Link>
-  ) : (
-    body
   );
 }

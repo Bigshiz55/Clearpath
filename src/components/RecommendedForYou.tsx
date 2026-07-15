@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { PosterCard } from './PosterCard';
 import { SaveButton } from './SaveButton';
-import { verdictVisualForTier } from '@/lib/verdictVisual';
+import { ReasonText } from './ReasonText';
+import { verdictVisualForTier, isTopTier } from '@/lib/verdictVisual';
 
 interface Rec {
   id: number;
@@ -90,17 +91,16 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
             >
               {(() => {
                 const v = verdictVisualForTier(r.tier);
+                const top = isTopTier(r.tier);
                 const reason = fullReason(r);
                 return (
                   <div className="mt-2 space-y-1.5">
-                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${v.badge}`}>
-                      {r.personalScore}% · {r.tier}
+                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${top ? v.solid : v.badge}`}>
+                      {top ? '★ ' : ''}{r.personalScore}% · {r.tier}
                     </span>
                     {reason && (
-                      // One complete sentence (up to two lines); full text on hover.
-                      <p className="line-clamp-2 text-[11px] leading-snug text-slate-400" title={reason}>
-                        {reason}
-                      </p>
+                      // One complete sentence; tap/click to expand the full text.
+                      <ReasonText text={reason} className="text-[11px] text-slate-400" />
                     )}
                   </div>
                 );

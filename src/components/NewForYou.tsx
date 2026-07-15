@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Poster } from '@/components/PosterCard';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { dismissDigestItem } from '@/lib/actions/digest';
+import { ReasonText } from '@/components/ReasonText';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import type { MediaType } from '@/lib/types';
 
@@ -56,18 +57,18 @@ export function NewForYou({ items, label }: { items: DigestItem[]; label: string
                     {item.personal_score}%
                   </span>
                 </div>
-                <div className="p-2.5">
+                <div className="px-2.5 pt-2.5">
                   <div className="line-clamp-1 text-sm font-semibold text-white">{item.title}</div>
                   <div className="text-xs text-slate-400">
                     {item.year ?? '—'} · <span className={`font-semibold ${v.text}`}>{item.primary_call}</span>
                   </div>
-                  {item.reason && (
-                    <div className="mt-0.5 line-clamp-2 leading-snug text-[11px] text-slate-500" title={item.reason}>
-                      {item.reason}
-                    </div>
-                  )}
                 </div>
               </Link>
+              {item.reason && (
+                <div className="px-2.5 pb-2.5 pt-0.5">
+                  <ReasonText text={item.reason} className="text-[11px] text-slate-500" />
+                </div>
+              )}
             </div>
           );
         })}
