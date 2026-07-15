@@ -169,8 +169,14 @@ export function FinderUI({
           <textarea
             value={text}
             onChange={(e) => onText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void find();
+              }
+            }}
             rows={3}
-            placeholder="Tell me exactly what you want… “a crime thriller under 140 min, out in the last 2 years, 80+ match”"
+            placeholder="Tell me exactly what you want, then hit Enter… “a crime thriller under 140 min, out in the last 2 years, 80+ match”"
             className="input min-h-[96px] w-full flex-1 resize-none"
           />
           <div className="flex flex-wrap gap-1.5">
