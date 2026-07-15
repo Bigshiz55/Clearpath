@@ -4,6 +4,7 @@ import { ScoreRing } from '@/components/ScoreRing';
 import { VerdictBadge, DispositionChip } from '@/components/VerdictBadge';
 import { ProviderRow } from '@/components/ProviderRow';
 import { Poster } from '@/components/PosterCard';
+import { SaveButton } from '@/components/SaveButton';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
 import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
@@ -289,8 +290,17 @@ export function VerdictReportView({
           <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
             {report.similar.map((s) => (
               <Link key={`${s.mediaType}-${s.id}`} href={`/app/title/${s.mediaType}/${s.id}`} className="group block">
-                <div className="aspect-[2/3] overflow-hidden rounded-lg border border-white/10">
+                <div className="relative aspect-[2/3] overflow-hidden rounded-lg border border-white/10">
                   <Poster posterUrl={tmdbImage(s.posterPath, 'w185')} title={s.title} className="transition group-hover:scale-105" />
+                  <div className="absolute right-1.5 top-1.5 z-10">
+                    <SaveButton
+                      tmdbId={s.id}
+                      mediaType={s.mediaType}
+                      title={s.title}
+                      year={s.year}
+                      posterPath={s.posterPath}
+                    />
+                  </div>
                 </div>
                 <div className="mt-1 line-clamp-1 text-xs text-slate-300">{s.title}</div>
               </Link>
