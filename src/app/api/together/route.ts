@@ -34,8 +34,12 @@ const bodySchema = z.object({
       }),
     )
     .min(1)
-    .max(6),
+    .max(8),
   mediaType: z.enum(['any', 'movie', 'tv']).default('any'),
+  // Group DNA: genres this group has loved together (get a ranking bump) and
+  // `${mediaType}-${tmdbId}` keys the group has thumbed-down (never resurface).
+  boostGenres: z.array(z.string().max(40)).max(20).default([]),
+  excludeKeys: z.array(z.string().max(40)).max(400).default([]),
 });
 
 function groupVerdict(minScore: number, anyVeto: boolean): string {
@@ -69,7 +73,11 @@ export async function POST(request: Request) {
       wantMovie ? getPopular('movie', region, 1) : Promise.resolve([]),
       wantTv ? getPopular('tv', region, 1) : Promise.resolve([]),
     ]);
-    const pool = [...movies, ...shows].filter((d) => d.posterPath).slice(0, 20);
+    const exclude = new Set(body.excludeKeys);
+    const boost = new Set(body.boostGenres.map((g) => g.toLowerCase()));
+    const pool = [...movies, ...shows]
+      .filter((d) => d.posterPath && !exclude.has(`${d.mediaType}-${d.id}`))
+      .slice(0, 20);
     if (pool.length === 0) {
       return NextResponse.json({ error: 'Couldn’t load candidates. Try again.' }, { status: 502 });
     }
@@ -102,7 +110,10 @@ export async function POST(request: Request) {
           const scores = perMember.map((p) => p.score);
           const minScore = Math.min(...scores);
           const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-          return { c, meta, perMember, anyVeto, minScore, avgScore };
+          // Group DNA bump: this crew has loved these genres together before.
+          const genres = meta.genres;
+          const groupBonus = boost.size > 0 && genres.some((g) => boost.has(g.toLowerCase())) ? 8 : 0;
+          return { c, meta, genres, perMember, anyVeto, minScore, avgScore, groupBonus };
         } catch {
           return null;
         }
@@ -110,11 +121,11 @@ export async function POST(request: Request) {
     );
 
     const valid = scored.filter((s): s is NonNullable<typeof s> => s !== null);
-    // Non-vetoed first, then maximize the worst-off person, then the average.
+    // Non-vetoed first, then the group's own history, then the worst-off person.
     valid.sort(
       (a, b) =>
         Number(a.anyVeto) - Number(b.anyVeto) ||
-        b.minScore - a.minScore ||
+        b.minScore + b.groupBonus - (a.minScore + a.groupBonus) ||
         b.avgScore - a.avgScore,
     );
     const top = valid.slice(0, 3);
@@ -142,6 +153,8 @@ export async function POST(request: Request) {
           tier: tierFromScore(t.minScore),
           verdict: groupVerdict(t.minScore, t.anyVeto),
           perMember: t.perMember,
+          genres: t.genres,
+          dnaMatch: t.groupBonus > 0,
           streaming,
         };
       }),
