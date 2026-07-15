@@ -29,8 +29,8 @@ export default function LandingPage() {
           <Link href="/login" className="btn-ghost">
             Sign in
           </Link>
-          <Link href="/login" className="btn-primary">
-            Get started
+          <Link href="/app" className="btn-primary">
+            Start watching
           </Link>
         </div>
       </header>
@@ -50,14 +50,14 @@ export default function LandingPage() {
               tuned to <em>your</em> taste — then tells you exactly where to watch it.
             </p>
             <div className="mt-8 flex animate-fade-up items-center justify-center gap-3">
-              <Link href="/login" className="btn-primary px-6 py-3 text-base">
-                Create your account
+              <Link href="/app" className="btn-primary px-6 py-3 text-base">
+                Start watching — no signup
               </Link>
               <a href="#how" className="btn-secondary px-6 py-3 text-base">
                 How it works
               </a>
             </div>
-            <p className="mt-4 text-xs text-slate-500">Free to use · Works on your phone · Install as an app</p>
+            <p className="mt-4 text-xs text-slate-500">No account needed · Works on your phone · Install as an app</p>
           </div>
         </section>
 

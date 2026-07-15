@@ -54,10 +54,16 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   } = await supabase.auth.getUser();
 
   if (isProtected && !user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/login';
-    redirectUrl.searchParams.set('next', pathname);
-    return NextResponse.redirect(redirectUrl);
+    // No account required: mint an anonymous "guest" session on the fly so
+    // anyone with the link can use the app. Requires "Anonymous sign-ins"
+    // enabled in Supabase; if it's disabled, fall back to the login page.
+    const { error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = '/login';
+      redirectUrl.searchParams.set('next', pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
   }
 
   return response;

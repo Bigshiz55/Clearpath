@@ -46,6 +46,41 @@ export async function getProfile(
   return (data as Profile | null) ?? null;
 }
 
+/**
+ * Ensure an anonymous "guest" user has a usable profile so they skip onboarding
+ * and land straight in the app. Uses neutral defaults (default preference rules
+ * apply automatically since no preference_rules rows are inserted).
+ */
+export async function ensureGuestProfile(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Profile> {
+  await supabase.from('profiles').upsert(
+    {
+      id: userId,
+      onboarding_complete: true,
+      region: 'US',
+      display_name: 'Guest',
+      personal_label: 'Your Match',
+    },
+    { onConflict: 'id' },
+  );
+  const profile = await getProfile(supabase, userId);
+  return (
+    profile ?? {
+      id: userId,
+      username: null,
+      display_name: 'Guest',
+      region: 'US',
+      personal_label: 'Your Match',
+      onboarding_complete: true,
+      liked_franchise_ids: [],
+      daily_digest: false,
+      digest_min_score: 72,
+    }
+  );
+}
+
 export async function getPreferenceRules(
   supabase: SupabaseClient,
   userId: string,

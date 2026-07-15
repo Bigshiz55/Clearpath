@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getProfile, personalLabelFor } from '@/lib/profile';
+import { getProfile, ensureGuestProfile, personalLabelFor } from '@/lib/profile';
 import { Nav } from '@/components/Nav';
 
 export const dynamic = 'force-dynamic';
@@ -22,8 +22,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!user || !supabase) redirect('/login?next=/app');
 
-  const profile = await getProfile(supabase, user.id);
-  if (!profile || !profile.onboarding_complete) {
+  const isGuest = user.is_anonymous === true;
+  let profile = await getProfile(supabase, user.id);
+  if (!profile && isGuest) {
+    // Guests get a default profile and skip onboarding entirely.
+    profile = await ensureGuestProfile(supabase, user.id);
+  }
+  if (!profile || (!profile.onboarding_complete && !isGuest)) {
     redirect('/onboarding');
   }
 
