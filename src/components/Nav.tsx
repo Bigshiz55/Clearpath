@@ -10,6 +10,7 @@ const LINKS = [
   { href: '/app/together', label: 'Together' },
   { href: '/app/watchlist', label: 'Watchlist' },
   { href: '/app/friends', label: 'Friends' },
+  { href: '/app/chambers', label: 'Chambers' },
   { href: '/app/settings', label: 'Settings' },
 ];
 
