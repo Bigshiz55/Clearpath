@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Poster } from '@/components/PosterCard';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { dismissDigestItem } from '@/lib/actions/digest';
+import { verdictVisualForCall } from '@/lib/verdictVisual';
 import type { MediaType } from '@/lib/types';
 
 export interface DigestItem {
@@ -18,13 +19,6 @@ export interface DigestItem {
   primary_call: string;
   reason: string | null;
 }
-
-const callColor = (c: string) =>
-  c === 'WATCH IT'
-    ? 'text-emerald-300'
-    : c === 'MAYBE'
-      ? 'text-yellow-300'
-      : 'text-red-300';
 
 export function NewForYou({ items, label }: { items: DigestItem[]; label: string }) {
   const [list, setList] = useState(items);
@@ -44,32 +38,39 @@ export function NewForYou({ items, label }: { items: DigestItem[]; label: string
         <span className="text-xs text-slate-400">Fresh releases matched to {label.toLowerCase()}</span>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {list.map((item) => (
-          <div key={item.id} className="card group relative overflow-hidden">
-            <button
-              onClick={() => dismiss(item.id)}
-              className="absolute right-1.5 top-1.5 z-10 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-slate-300 backdrop-blur transition hover:bg-black/80 hover:text-white"
-              aria-label={`Dismiss ${item.title}`}
-            >
-              ✕
-            </button>
-            <Link href={`/app/title/${item.media_type}/${item.tmdb_id}`} className="block">
-              <div className="relative aspect-[2/3] overflow-hidden">
-                <Poster posterUrl={tmdbImage(item.poster_path, 'w342')} title={item.title} className="transition group-hover:scale-105" />
-                <span className="absolute left-2 top-2 rounded-full border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-100">
-                  {item.personal_score}%
-                </span>
-              </div>
-              <div className="p-2.5">
-                <div className="line-clamp-1 text-sm font-semibold text-white">{item.title}</div>
-                <div className="text-xs text-slate-400">
-                  {item.year ?? '—'} · <span className={callColor(item.primary_call)}>{item.primary_call}</span>
+        {list.map((item) => {
+          const v = verdictVisualForCall(item.primary_call);
+          return (
+            <div key={item.id} className={`card group relative overflow-hidden border ${v.border}`}>
+              <button
+                onClick={() => dismiss(item.id)}
+                className="absolute right-1.5 top-1.5 z-10 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-slate-300 backdrop-blur transition hover:bg-black/80 hover:text-white"
+                aria-label={`Dismiss ${item.title}`}
+              >
+                ✕
+              </button>
+              <Link href={`/app/title/${item.media_type}/${item.tmdb_id}`} className="block">
+                <div className="relative aspect-[2/3] overflow-hidden">
+                  <Poster posterUrl={tmdbImage(item.poster_path, 'w342')} title={item.title} className="transition group-hover:scale-105" />
+                  <span className={`absolute left-2 top-2 rounded-full border px-2 py-0.5 text-xs font-bold tabular-nums ${v.badge}`}>
+                    {item.personal_score}%
+                  </span>
                 </div>
-                {item.reason && <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-500">{item.reason}</div>}
-              </div>
-            </Link>
-          </div>
-        ))}
+                <div className="p-2.5">
+                  <div className="line-clamp-1 text-sm font-semibold text-white">{item.title}</div>
+                  <div className="text-xs text-slate-400">
+                    {item.year ?? '—'} · <span className={`font-semibold ${v.text}`}>{item.primary_call}</span>
+                  </div>
+                  {item.reason && (
+                    <div className="mt-0.5 line-clamp-2 leading-snug text-[11px] text-slate-500" title={item.reason}>
+                      {item.reason}
+                    </div>
+                  )}
+                </div>
+              </Link>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

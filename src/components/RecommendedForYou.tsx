@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PosterCard } from './PosterCard';
 import { SaveButton } from './SaveButton';
+import { verdictVisualForTier } from '@/lib/verdictVisual';
 
 interface Rec {
   id: number;
@@ -18,12 +19,13 @@ interface Rec {
   matchReason: string | null;
 }
 
-const TIER_STYLE: Record<string, string> = {
-  'Must Watch': 'text-emerald-300 border-emerald-400/30 bg-emerald-400/10',
-  'Strong Watch': 'text-emerald-300 border-emerald-400/30 bg-emerald-400/10',
-  'Worth Watching': 'text-brand-300 border-brand-400/30 bg-brand-400/10',
-  'Possible Watch': 'text-amber-300 border-amber-400/30 bg-amber-400/10',
-};
+/** One complete reason — never two half-lines. Joins the "because you liked X"
+ *  seed and the match rationale into a single sentence. */
+function fullReason(r: Rec): string | null {
+  const because = r.because ? `Because you liked ${r.because}` : null;
+  if (because && r.matchReason) return `${because} — ${r.matchReason}`;
+  return because ?? r.matchReason ?? null;
+}
 
 export function RecommendedForYou({ label }: { label?: string | null }) {
   const [recs, setRecs] = useState<Rec[] | null>(null);
@@ -86,23 +88,23 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
                 />
               }
             >
-              <div className="mt-2 space-y-1.5">
-                <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                    TIER_STYLE[r.tier] ?? 'border-white/10 bg-white/5 text-slate-300'
-                  }`}
-                >
-                  {r.personalScore}% · {r.tier}
-                </span>
-                {r.because && (
-                  <p className="line-clamp-1 text-[11px] text-slate-400">
-                    Because you liked <span className="text-slate-300">{r.because}</span>
-                  </p>
-                )}
-                {r.matchReason && (
-                  <p className="line-clamp-1 text-[11px] text-brand-300/80">{r.matchReason}</p>
-                )}
-              </div>
+              {(() => {
+                const v = verdictVisualForTier(r.tier);
+                const reason = fullReason(r);
+                return (
+                  <div className="mt-2 space-y-1.5">
+                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${v.badge}`}>
+                      {r.personalScore}% · {r.tier}
+                    </span>
+                    {reason && (
+                      // One complete sentence (up to two lines); full text on hover.
+                      <p className="line-clamp-2 text-[11px] leading-snug text-slate-400" title={reason}>
+                        {reason}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </PosterCard>
           ))}
         </div>

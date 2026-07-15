@@ -80,68 +80,53 @@ export default async function DiscoverPage() {
         <div className="mt-5 max-w-2xl">
           <SearchBar autoFocus />
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
+        {/* Three primary decisions — everything else lives in More tools so the
+            page reads like a decision, not a control panel. */}
+        <div className="mt-5 grid gap-2 sm:grid-cols-3">
           <Link
             href="/app/finder"
-            className="inline-flex items-center gap-2 rounded-xl border border-brand-400/40 bg-brand-500/15 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/25"
+            className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
           >
-            🔎 Find exactly what to watch
+            🔎 Find something for me
           </Link>
           <Link
             href="/app/together"
-            className="inline-flex items-center gap-2 rounded-xl border border-brand-400/40 bg-brand-500/15 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/25"
+            className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
           >
-            👪 Tonight, Together — one pick for the whole room
+            👪 Pick for us tonight
           </Link>
           <Link
             href="/app/mood"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+            className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
           >
             🎭 By mood
           </Link>
-          <Link
-            href="/app/new"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-          >
-            🆕 New for your plans
-          </Link>
-          <Link
-            href="/app/friends"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-          >
-            👥 Friends
-          </Link>
-          <Link
-            href="/app/docket"
-            className="inline-flex items-center gap-2 rounded-xl border border-gold-400/40 bg-gold-500/10 px-4 py-2 text-sm font-semibold text-gold-400 transition hover:bg-gold-500/20"
-          >
-            🗂️ The Docket
-          </Link>
-          <Link
-            href="/app/quiz"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-          >
-            🍿 Taste Quiz
-          </Link>
-          <Link
-            href="/app/import"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-          >
-            ⬆ Import history
-          </Link>
-          <Link
-            href="/app/connect"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-          >
-            📸 Add from a photo
-          </Link>
-          <Link
-            href="/app/cards"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-          >
-            ✨ Share cards
-          </Link>
         </div>
+        <details className="group mt-3">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-slate-400 transition hover:text-white">
+            <span className="transition group-open:rotate-90">›</span> More tools
+          </summary>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {[
+              { href: '/app/new', label: '🆕 New for your plans' },
+              { href: '/app/chambers', label: '⚖️ Your Chambers' },
+              { href: '/app/docket', label: '🗂️ The Docket' },
+              { href: '/app/friends', label: '👥 Friends' },
+              { href: '/app/quiz', label: '🍿 Taste Quiz' },
+              { href: '/app/import', label: '⬆ Import history' },
+              { href: '/app/connect', label: '📸 Add from a photo' },
+              { href: '/app/cards', label: '✨ Share cards' },
+            ].map((t) => (
+              <Link
+                key={t.href}
+                href={t.href}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+              >
+                {t.label}
+              </Link>
+            ))}
+          </div>
+        </details>
         </div>
 
         {/* The courtroom — a box off to the side; doors open to reveal the judge */}

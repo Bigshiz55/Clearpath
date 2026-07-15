@@ -1,0 +1,33 @@
+import { describe, it, expect } from 'vitest';
+import { verdictVisualForTier, verdictVisualForCall, verdictVisual } from './verdictVisual';
+
+describe('Verdict visual language', () => {
+  it('collapses the two top tiers into one green "watch" signal', () => {
+    expect(verdictVisualForTier('Must Watch').key).toBe('watch');
+    expect(verdictVisualForTier('Strong Watch').key).toBe('watch');
+    expect(verdictVisualForTier('Must Watch').badge).toBe(verdictVisualForTier('Strong Watch').badge);
+  });
+
+  it('maps the middle tiers to gold and the floor to gray/red', () => {
+    expect(verdictVisualForTier('Worth Watching').key).toBe('worth');
+    expect(verdictVisualForTier('Possible Watch').key).toBe('worth');
+    expect(verdictVisualForTier('Low Priority').key).toBe('uncertain');
+    expect(verdictVisualForTier('Skip').key).toBe('skip');
+  });
+
+  it('maps primary calls consistently', () => {
+    expect(verdictVisualForCall('WATCH IT').key).toBe('watch');
+    expect(verdictVisualForCall('MAYBE').key).toBe('worth');
+    expect(verdictVisualForCall('SKIP IT').key).toBe('skip');
+  });
+
+  it('falls back to uncertain for anything unrecognized', () => {
+    expect(verdictVisualForTier('Nonsense').key).toBe('uncertain');
+    expect(verdictVisualForCall('???').key).toBe('uncertain');
+  });
+
+  it('exposes a stable palette for each key', () => {
+    expect(verdictVisual('wildcard').label).toBe('Wildcard');
+    expect(verdictVisual('watch').hex).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+});
