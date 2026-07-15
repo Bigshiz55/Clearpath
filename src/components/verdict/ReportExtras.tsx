@@ -1,4 +1,4 @@
-import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier } from '@/lib/types';
+import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier, WatchProviders } from '@/lib/types';
 import { episodeSummary } from '@/lib/tmdb/meta-helpers';
 
 function callStyleFor(call: PrimaryCall): string {
@@ -35,6 +35,7 @@ export function AtAGlance({
   matchScore,
   matchLabel,
   sources,
+  providers,
 }: {
   primaryCall: PrimaryCall;
   tier: VerdictTier;
@@ -43,8 +44,17 @@ export function AtAGlance({
   matchScore: number;
   matchLabel: string;
   sources: RatingSource[];
+  providers: WatchProviders | null;
 }) {
   const available = sources.filter((s) => s.available);
+  const streamNames = Array.from(
+    new Set(
+      (providers?.options ?? [])
+        .filter((o) => o.type === 'flatrate' || o.type === 'free' || o.type === 'ads')
+        .map((o) => o.providerName),
+    ),
+  );
+  const rentBuy = (providers?.options ?? []).some((o) => o.type === 'rent' || o.type === 'buy');
   return (
     <section className="card p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -72,6 +82,19 @@ export function AtAGlance({
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-3 flex items-start gap-2 text-sm">
+        <span aria-hidden>📺</span>
+        {streamNames.length > 0 ? (
+          <span className="text-slate-200">
+            <span className="font-semibold text-white">Streaming:</span> {streamNames.join(', ')}
+          </span>
+        ) : (
+          <span className="text-slate-400">
+            No subscription stream found in your region{rentBuy ? ' — rent or buy available below' : ' yet'}.
+          </span>
+        )}
       </div>
     </section>
   );

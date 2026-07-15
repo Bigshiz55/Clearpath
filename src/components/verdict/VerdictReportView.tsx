@@ -73,6 +73,7 @@ export function VerdictReportView({
         matchScore={report.personal.score}
         matchLabel={report.personal.label}
         sources={report.general.sources}
+        providers={report.providers}
       />
 
       {/* Header */}
