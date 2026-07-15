@@ -9,6 +9,8 @@ import { VerdictBadge } from '@/components/VerdictBadge';
 import { NewForYou, type DigestItem } from '@/components/NewForYou';
 import { RecommendedForYou } from '@/components/RecommendedForYou';
 import { SaveButton } from '@/components/SaveButton';
+import { TonightHome } from '@/components/TonightHome';
+import { getTonight } from '@/lib/tonight';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +32,8 @@ export default async function DiscoverPage() {
   } = await supabase.auth.getUser();
   const profile = user ? await getProfile(supabase, user.id) : null;
   const label = profile ? personalLabelFor(profile) : 'Your match';
+  const tonight = await getTonight(supabase, user?.id ?? '', new Date());
+  const isGuest = user?.is_anonymous === true;
 
   const { data: recent } = await supabase
     .from('verdicts')
@@ -120,6 +124,8 @@ export default async function DiscoverPage() {
           </Link>
         </div>
       </section>
+
+      <TonightHome tonight={tonight} isGuest={isGuest} />
 
       {digestItems.length > 0 && <NewForYou items={digestItems} label={label} />}
 

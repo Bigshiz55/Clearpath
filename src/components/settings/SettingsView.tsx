@@ -11,6 +11,7 @@ import { deactivateShare } from '@/lib/actions/share';
 import { deleteAccount } from '@/lib/actions/account';
 import { useToast } from '@/components/Toast';
 import { STREAMING_SERVICES } from '@/lib/services';
+import { EnableNotifications } from '@/components/EnableNotifications';
 
 export interface ShareRow {
   token: string;
@@ -290,6 +291,18 @@ export function SettingsView(props: {
             className="h-5 w-5 accent-brand-500"
           />
         </label>
+      </section>
+
+      {/* Notifications */}
+      <section className="card p-5">
+        <h2 className="text-lg font-semibold text-white">Notifications</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Get a ping when something’s actually worth opening the app for — a new pick that fits you, a show you’re
+          watching drops an episode, or your Docket’s about to reset. Off until you turn it on, per device.
+        </p>
+        <div className="mt-4">
+          <EnableNotifications />
+        </div>
       </section>
 
       {/* Daily digest */}

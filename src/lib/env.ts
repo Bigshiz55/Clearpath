@@ -80,6 +80,10 @@ export const publicEnv = {
     const value = process.env.NEXT_PUBLIC_SITE_URL;
     return value && value.trim() !== '' ? value : 'http://localhost:3000';
   },
+  vapidPublicKey(): string | undefined {
+    const v = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    return v && v.trim() !== '' ? v.trim() : undefined;
+  },
 };
 
 export const serverEnv = {
@@ -110,6 +114,12 @@ export const serverEnv = {
   resendKey(): string | undefined {
     return optional('RESEND_API_KEY');
   },
+  vapidPrivateKey(): string | undefined {
+    return optional('VAPID_PRIVATE_KEY');
+  },
+  vapidSubject(): string {
+    return optional('VAPID_SUBJECT') ?? 'mailto:notifications@watchverdict.app';
+  },
 };
 
 /**
@@ -128,6 +138,7 @@ export function envHealth() {
     omdbKey: Boolean(optional('OMDB_API_KEY')),
     cronSecret: Boolean(optional('CRON_SECRET')),
     resendKey: Boolean(optional('RESEND_API_KEY')),
+    push: Boolean(optional('NEXT_PUBLIC_VAPID_PUBLIC_KEY') && optional('VAPID_PRIVATE_KEY')),
     siteUrl: publicEnv.siteUrl(),
   };
 }

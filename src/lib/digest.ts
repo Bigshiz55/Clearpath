@@ -5,6 +5,7 @@ import { discoverRecent, getTitle } from '@/lib/tmdb/client';
 import { buildVerdict } from '@/lib/scoring';
 import { normalizeRule, DEFAULT_NEW_USER_RULES } from '@/lib/scoring/preferences';
 import { personalLabelFor } from '@/lib/profile';
+import { sendPushToUser } from '@/lib/push';
 import type { PreferenceRule } from '@/lib/types';
 
 const CANDIDATE_LIMIT = 30;
@@ -51,6 +52,8 @@ async function rulesFor(supabase: SupabaseClient, userId: string): Promise<Prefe
 export interface ScanUserResult {
   userId: string;
   matches: number;
+  /** Matches that weren't already in the user's digest — what's worth notifying. */
+  newMatches: number;
 }
 
 /** Score shared candidates against one user's preferences and store matches. */
@@ -71,6 +74,14 @@ export async function scanUser(
     .eq('user_id', profile.id)
     .eq('dismissed', true);
   const dismissed = new Set((dismissedRows ?? []).map((r) => `${r.media_type}-${r.tmdb_id}`));
+
+  // Already-surfaced (non-dismissed) items, so we only count what's genuinely new.
+  const { data: existingRows } = await admin
+    .from('digest_items')
+    .select('tmdb_id, media_type')
+    .eq('user_id', profile.id)
+    .eq('dismissed', false);
+  const existing = new Set((existingRows ?? []).map((r) => `${r.media_type}-${r.tmdb_id}`));
 
   const rows: Array<Record<string, unknown>> = [];
   for (const meta of candidates) {
@@ -99,16 +110,18 @@ export async function scanUser(
 
   rows.sort((a, b) => (b.personal_score as number) - (a.personal_score as number));
   const top = rows.slice(0, PER_USER_LIMIT);
+  const newMatches = top.filter((t) => !existing.has(`${t.media_type}-${t.tmdb_id}`)).length;
   if (top.length > 0) {
     await admin.from('digest_items').upsert(top, { onConflict: 'user_id,tmdb_id,media_type' });
   }
-  return { userId: profile.id, matches: top.length };
+  return { userId: profile.id, matches: top.length, newMatches };
 }
 
 export interface DailyScanSummary {
   candidates: number;
   usersScanned: number;
   totalMatches: number;
+  notified?: number;
 }
 
 /** Full daily scan across all opted-in users. Uses the admin (service-role) client. */
@@ -133,13 +146,25 @@ export async function runDailyScan(admin: SupabaseClient): Promise<DailyScanSumm
 
   let total = 0;
   let candidateCount = 0;
+  let notified = 0;
   byRegion.forEach((c) => (candidateCount += c.length));
   for (const profile of list) {
     const candidates = byRegion.get(profile.region || 'US') ?? [];
     if (candidates.length === 0) continue;
     const res = await scanUser(admin, profile, candidates);
     total += res.matches;
+    // Push only when there's something genuinely new — never daily spam.
+    if (res.newMatches > 0) {
+      const n = res.newMatches;
+      const sent = await sendPushToUser(admin, profile.id, {
+        title: 'New for you on WatchVerdict',
+        body: `${n} new pick${n === 1 ? '' : 's'} that fit your taste just landed.`,
+        url: '/app',
+        tag: 'wv-digest',
+      }).catch(() => 0);
+      if (sent > 0) notified += 1;
+    }
   }
 
-  return { candidates: candidateCount, usersScanned: list.length, totalMatches: total };
+  return { candidates: candidateCount, usersScanned: list.length, totalMatches: total, notified };
 }
