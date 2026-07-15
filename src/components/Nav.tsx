@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Logo } from './Logo';
 import { SignOutButton } from './SignOutButton';
+import { GuestSaveButton } from './GuestSaveButton';
 
 const LINKS = [
   { href: '/app', label: 'Discover' },
@@ -10,7 +11,7 @@ const LINKS = [
   { href: '/app/settings', label: 'Settings' },
 ];
 
-export function Nav({ personalLabel }: { personalLabel?: string | null }) {
+export function Nav({ personalLabel, isGuest = false }: { personalLabel?: string | null; isGuest?: boolean }) {
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 backdrop-blur">
       <div className="container-page flex h-16 items-center justify-between gap-4">
@@ -25,12 +26,16 @@ export function Nav({ personalLabel }: { personalLabel?: string | null }) {
           </nav>
         </div>
         <div className="flex items-center gap-2">
-          {personalLabel && (
+          {personalLabel && !isGuest && (
             <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 md:inline">
               {personalLabel}
             </span>
           )}
-          <SignOutButton className="btn-secondary hidden sm:inline-flex" />
+          {isGuest ? (
+            <GuestSaveButton className="btn-primary hidden sm:inline-flex" />
+          ) : (
+            <SignOutButton className="btn-secondary hidden sm:inline-flex" />
+          )}
         </div>
       </div>
       {/* Mobile bottom nav */}

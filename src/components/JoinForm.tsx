@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
 import { joinCrew } from '@/lib/actions/crews';
+import { getMyTaste, type MyTaste } from '@/lib/actions/profile';
 
 const AVOIDABLE: PreferenceTrait[] = ['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn'];
 const LOVABLE: PreferenceTrait[] = ['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer'];
@@ -25,6 +26,20 @@ export function JoinForm({ code, crewName }: { code: string; crewName: string })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [mine, setMine] = useState<MyTaste | null>(null);
+  const [prefilled, setPrefilled] = useState(false);
+
+  useEffect(() => {
+    getMyTaste().then(setMine).catch(() => {});
+  }, []);
+
+  function useMyTaste() {
+    if (!mine) return;
+    if (mine.name) setName(mine.name);
+    setLove(mine.love as PreferenceTrait[]);
+    setAvoid(mine.avoid as PreferenceTrait[]);
+    setPrefilled(true);
+  }
 
   function toggle(list: PreferenceTrait[], set: (v: PreferenceTrait[]) => void, t: PreferenceTrait) {
     set(list.includes(t) ? list.filter((x) => x !== t) : [...list, t]);
@@ -57,6 +72,11 @@ export function JoinForm({ code, crewName }: { code: string; crewName: string })
 
   return (
     <div className="card p-5">
+      {mine?.signedIn && !prefilled && (mine.name || mine.love.length > 0 || mine.avoid.length > 0) && (
+        <button onClick={useMyTaste} className="mb-3 w-full rounded-xl border border-brand-400/40 bg-brand-500/15 px-3 py-2 text-sm font-semibold text-brand-100">
+          ✨ Use my WatchVerdict taste{mine.name ? ` (${mine.name})` : ''}
+        </button>
+      )}
       <label className="label" htmlFor="jn">Your name</label>
       <input id="jn" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex" className="input" maxLength={40} />
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { qrForUrl } from '@/lib/actions/qr';
+import { getMyTaste, type MyTaste } from '@/lib/actions/profile';
 import type { PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
 
@@ -37,6 +38,8 @@ export function LiveCourt({ code }: { code: string }) {
   const [love, setLove] = useState<PreferenceTrait[]>([]);
   const [avoid, setAvoid] = useState<PreferenceTrait[]>([]);
   const [joining, setJoining] = useState(false);
+  const [mine, setMine] = useState<MyTaste | null>(null);
+  const [prefilled, setPrefilled] = useState(false);
 
   // Veto
   const [pendingVeto, setPendingVeto] = useState<number | null>(null);
@@ -56,7 +59,16 @@ export function LiveCourt({ code }: { code: string }) {
       setHostToken(localStorage.getItem(`court_host_${code}`));
       setParticipantId(localStorage.getItem(`court_part_${code}`));
     } catch { /* ignore */ }
+    getMyTaste().then(setMine).catch(() => {});
   }, [code]);
+
+  function useMyTaste() {
+    if (!mine) return;
+    if (mine.name) setName(mine.name);
+    setLove(mine.love as PreferenceTrait[]);
+    setAvoid(mine.avoid as PreferenceTrait[]);
+    setPrefilled(true);
+  }
 
   async function refresh() {
     const { data, error } = await supabase.rpc('court_state', { p_code: code });
@@ -120,6 +132,11 @@ export function LiveCourt({ code }: { code: string }) {
       <Shell>
         <div className="card p-5">
           <div className="text-sm font-semibold text-white">Join the Court — quick taste calibration</div>
+          {mine?.signedIn && !prefilled && (mine.name || mine.love.length > 0 || mine.avoid.length > 0) && (
+            <button onClick={useMyTaste} className="mt-3 w-full rounded-xl border border-brand-400/40 bg-brand-500/15 px-3 py-2 text-sm font-semibold text-brand-100">
+              ✨ Use my WatchVerdict taste{mine.name ? ` (${mine.name})` : ''}
+            </button>
+          )}
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="input mt-3" maxLength={40} />
           <div className="mt-3 text-xs font-semibold text-slate-300">Your mood tonight</div>
           <div className="mt-1 grid grid-cols-3 gap-2">

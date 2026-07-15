@@ -206,3 +206,59 @@ export async function replacePreferenceRules(input: z.infer<typeof rulesSchema>)
     return { ok: false, error: e instanceof Error ? e.message : 'Failed.' };
   }
 }
+
+const LOVABLE_SET = new Set(['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer']);
+const AVOIDABLE_SET = new Set(['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn']);
+
+export interface MyTaste {
+  signedIn: boolean;
+  isGuest: boolean;
+  name: string | null;
+  love: string[];
+  avoid: string[];
+}
+
+/**
+ * The current user's taste as crew/court traits, so joining pre-fills from their
+ * WatchVerdict account. Only returns real, chosen rules (not defaults), and
+ * treats anonymous guests as not-really-signed-in for pre-fill purposes.
+ */
+export async function getMyTaste(): Promise<MyTaste> {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { signedIn: false, isGuest: false, name: null, love: [], avoid: [] };
+    const isGuest = user.is_anonymous === true;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .maybeSingle();
+    const { data: rows } = await supabase
+      .from('preference_rules')
+      .select('trait, weight, requires_defining')
+      .eq('user_id', user.id);
+
+    const love: string[] = [];
+    const avoid: string[] = [];
+    for (const r of rows ?? []) {
+      const trait = r.trait as string;
+      const weight = r.weight as number;
+      const defining = r.requires_defining as boolean;
+      if (weight > 0 && LOVABLE_SET.has(trait)) love.push(trait);
+      else if ((weight < 0 || defining) && AVOIDABLE_SET.has(trait)) avoid.push(trait);
+    }
+    return {
+      signedIn: !isGuest,
+      isGuest,
+      name: (profile?.display_name as string | null) ?? null,
+      love,
+      avoid,
+    };
+  } catch {
+    return { signedIn: false, isGuest: false, name: null, love: [], avoid: [] };
+  }
+}

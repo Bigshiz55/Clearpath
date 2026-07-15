@@ -34,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-dvh pb-20 sm:pb-0">
-      <Nav personalLabel={personalLabelFor(profile)} />
+      <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} />
       <main className="container-page py-6">{children}</main>
     </div>
   );
