@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { naiveParseQuery } from './finderParse';
+import { naiveParseQuery, describeQuery } from './finderParse';
 
 describe('Finder natural-language parsing (no AI needed)', () => {
   it('parses the flagship example correctly', () => {
@@ -11,6 +11,19 @@ describe('Finder natural-language parsing (no AI needed)', () => {
     expect(q.maxRuntime).toBe(140);
     expect(q.sinceMonths).toBe(24);
     expect(q.minMatch).toBe(80);
+  });
+
+  it('reads a parsed case back in plain English', () => {
+    const q = naiveParseQuery('a crime thriller movie under 140 minutes, last 24 months, 80+ match');
+    const said = describeQuery(q);
+    expect(said).toContain('movies');
+    expect(said.toLowerCase()).toContain('crime');
+    expect(said).toContain('under 2h20m');
+    expect(said).toContain('80+ match');
+  });
+
+  it('admits when it pinned down no constraints', () => {
+    expect(describeQuery(naiveParseQuery('hello there'))).toContain('anything');
   });
 
   it('handles the competitor prompt that beat their app', () => {

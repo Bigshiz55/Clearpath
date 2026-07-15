@@ -2,7 +2,7 @@
 // deterministically, no AI required (an optional AI pass can refine it server-
 // side). Pure + client-safe so the UI can show the parse live as you type.
 import type { FinderQuery } from '@/lib/finder';
-import { GENRE_IDS } from '@/lib/finderGenres';
+import { GENRE_IDS, genreLabel } from '@/lib/finderGenres';
 
 export const EMPTY_QUERY: FinderQuery = {
   mediaType: 'any',
@@ -17,6 +17,33 @@ export const EMPTY_QUERY: FinderQuery = {
   bingeableOnly: false,
   pace: null,
 };
+
+/** Plain-English read-back of the constraints the parser extracted — the judge
+ *  says "here's how I read your case" so the parse is never a black box. Pure. */
+export function describeQuery(q: FinderQuery): string {
+  const parts: string[] = [];
+  if (q.mediaType === 'movie') parts.push('movies');
+  else if (q.mediaType === 'tv') parts.push('shows');
+  for (const id of q.genreIds) parts.push(genreLabel(id).toLowerCase());
+  // Only announce a length the user actually asked for — not the silent default cap.
+  if (q.maxRuntime != null && q.maxRuntime !== EMPTY_QUERY.maxRuntime) {
+    const h = Math.floor(q.maxRuntime / 60);
+    const m = q.maxRuntime % 60;
+    parts.push(h > 0 ? `under ${h}${m ? `h${m}m` : 'h'}` : `under ${m}m`);
+  }
+  if (q.sinceMonths != null) {
+    const y = Math.round(q.sinceMonths / 12);
+    parts.push(y >= 1 ? `from the last ${y} year${y > 1 ? 's' : ''}` : `from the last ${q.sinceMonths} months`);
+  }
+  if (q.minAudience != null) parts.push(`${q.minAudience}%+ audience`);
+  if (q.minMatch != null) parts.push(`${q.minMatch}+ match`);
+  if (q.englishAudioOnly) parts.push('English audio');
+  if (q.streamItOnly) parts.push('“watch it” calls only');
+  if (q.bingeableOnly) parts.push('fully bingeable');
+  if (q.onMyServices) parts.push('on your services');
+  if (q.pace != null) parts.push(q.pace <= 33 ? 'a slow burn' : q.pace >= 67 ? 'high-adrenaline' : 'balanced pace');
+  return parts.length ? parts.join(' · ') : 'anything — you didn’t pin down a single rule yet';
+}
 
 export function naiveParseQuery(input: string): FinderQuery {
   const t = ` ${input.toLowerCase()} `;

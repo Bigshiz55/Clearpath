@@ -80,14 +80,13 @@ export default async function DiscoverPage() {
         <div className="mt-5 max-w-2xl">
           <SearchBar autoFocus />
         </div>
-        {/* Three primary decisions — everything else lives in More tools so the
-            page reads like a decision, not a control panel. */}
+        {/* Three primary decisions — start a decision, don't browse a menu. */}
         <div className="mt-5 grid gap-2 sm:grid-cols-3">
           <Link
-            href="/app/finder"
+            href="/app/ask"
             className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
           >
-            🔎 Find something for me
+            ⚖️ Ask the Judge
           </Link>
           <Link
             href="/app/together"
@@ -102,17 +101,44 @@ export default async function DiscoverPage() {
             🎭 By mood
           </Link>
         </div>
-        <details className="group mt-3">
+        </div>
+
+        {/* The courtroom — a box off to the side; doors open to reveal the judge */}
+        <div className="lg:pl-2">
+          <CourtroomDoors initialJudge={judge} />
+        </div>
+      </section>
+
+      {/* Quick access — the destinations people come back to, up top where they
+          can reach them, not buried in a drawer. */}
+      <section>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            { href: '/app/finder', emoji: '🔎', label: 'Finder', sub: 'Sliders & filters' },
+            { href: '/app/chambers', emoji: '⚖️', label: 'Your Chambers', sub: 'Rank & badges' },
+            { href: '/app/docket', emoji: '🗂️', label: 'The Docket', sub: 'This month' },
+            { href: '/app/new', emoji: '🆕', label: 'New for you', sub: 'Fresh & matched' },
+            { href: '/app/watchlist', emoji: '📺', label: 'Watchlist', sub: 'Your queue' },
+            { href: '/app/quiz', emoji: '🍿', label: 'Taste Quiz', sub: 'Sharpen picks' },
+          ].map((t) => (
+            <Link
+              key={t.href}
+              href={t.href}
+              className="card group flex flex-col gap-0.5 p-3 transition hover:border-white/20 hover:bg-white/[0.06]"
+            >
+              <span className="text-xl">{t.emoji}</span>
+              <span className="text-sm font-semibold text-white">{t.label}</span>
+              <span className="text-[11px] text-slate-400">{t.sub}</span>
+            </Link>
+          ))}
+        </div>
+        <details className="group mt-2.5">
           <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-slate-400 transition hover:text-white">
             <span className="transition group-open:rotate-90">›</span> More tools
           </summary>
           <div className="mt-2 flex flex-wrap gap-2">
             {[
-              { href: '/app/new', label: '🆕 New for your plans' },
-              { href: '/app/chambers', label: '⚖️ Your Chambers' },
-              { href: '/app/docket', label: '🗂️ The Docket' },
               { href: '/app/friends', label: '👥 Friends' },
-              { href: '/app/quiz', label: '🍿 Taste Quiz' },
               { href: '/app/import', label: '⬆ Import history' },
               { href: '/app/connect', label: '📸 Add from a photo' },
               { href: '/app/cards', label: '✨ Share cards' },
@@ -127,12 +153,6 @@ export default async function DiscoverPage() {
             ))}
           </div>
         </details>
-        </div>
-
-        {/* The courtroom — a box off to the side; doors open to reveal the judge */}
-        <div className="lg:pl-2">
-          <CourtroomDoors initialJudge={judge} />
-        </div>
       </section>
 
       <TonightHome tonight={tonight} isGuest={isGuest} />

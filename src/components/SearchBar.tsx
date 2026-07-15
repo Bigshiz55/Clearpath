@@ -33,6 +33,18 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
     typeof window !== 'undefined' &&
     ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
 
+  // A spoken/typed *request* ("give me a crime thriller under 2 hours") isn't a
+  // title lookup — hand it to the judge, who actually runs it. A short phrase is
+  // treated as a title search as before.
+  function looksLikeRequest(text: string): boolean {
+    const t = text.toLowerCase();
+    if (/\b(find|recommend|something|anything|give me|show me|what should|in the mood|tonight|binge|under|over|less than|minutes|hours|recent|new|funny|scary|match|audience|episodes?)\b/.test(t)) return true;
+    return text.trim().split(/\s+/).length >= 5;
+  }
+  function fileWithJudge(text: string) {
+    router.push(`/app/ask?q=${encodeURIComponent(text.trim())}`);
+  }
+
   function startVoice() {
     if (typeof window === 'undefined') return;
     const w = window as unknown as { webkitSpeechRecognition?: new () => never; SpeechRecognition?: new () => never };
@@ -53,7 +65,11 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
     rec.maxAlternatives = 1;
     rec.onresult = (e: { results: Array<Array<{ transcript: string }>> }) => {
       const said = e.results?.[0]?.[0]?.transcript ?? '';
-      if (said) setQ(said);
+      if (!said) return;
+      // The fix for "I said it but nothing happened": a spoken request is filed
+      // with the judge and actually executed, not left sitting in the box.
+      if (looksLikeRequest(said)) fileWithJudge(said);
+      else setQ(said);
     };
     rec.onend = () => setListening(false);
     rec.onerror = () => setListening(false);
@@ -121,9 +137,15 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => results.length && setOpen(true)}
-          placeholder="Search a movie or TV show…"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && looksLikeRequest(q)) {
+              e.preventDefault();
+              fileWithJudge(q);
+            }
+          }}
+          placeholder="Search a title — or ask for what you want…"
           className="input pl-11 pr-10"
-          aria-label="Search for a movie or TV show"
+          aria-label="Search for a movie or TV show, or describe what you want"
         />
         {loading && (
           <span className="absolute right-12 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
