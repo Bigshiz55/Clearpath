@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Poster } from './PosterCard';
 import { SaveButton } from './SaveButton';
+import { CardRatings } from './CardRatings';
 
 interface Result {
   id: number;
@@ -189,10 +190,8 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
                     {r.mediaType === 'movie' ? 'Movie' : 'TV'}
                   </span>
                 </div>
-                <div className="text-xs text-slate-400">
-                  {r.year ?? '—'}
-                  {r.voteAverage ? ` · ★ ${r.voteAverage.toFixed(1)}` : ''}
-                </div>
+                <div className="text-xs text-slate-400">{r.year ?? '—'}</div>
+                <CardRatings mediaType={r.mediaType} tmdbId={r.id} title={r.title} year={r.year} className="mt-0.5" />
                 <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{r.overview}</p>
               </div>
               <div className="flex-shrink-0 self-center">

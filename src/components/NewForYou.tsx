@@ -6,6 +6,7 @@ import { Poster } from '@/components/PosterCard';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { dismissDigestItem } from '@/lib/actions/digest';
 import { ReasonText } from '@/components/ReasonText';
+import { CardRatings } from '@/components/CardRatings';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import type { MediaType } from '@/lib/types';
 
@@ -64,11 +65,10 @@ export function NewForYou({ items, label }: { items: DigestItem[]; label: string
                   </div>
                 </div>
               </Link>
-              {item.reason && (
-                <div className="px-2.5 pb-2.5 pt-0.5">
-                  <ReasonText text={item.reason} className="text-[11px] text-slate-500" />
-                </div>
-              )}
+              <div className="px-2.5 pb-2.5 pt-0.5">
+                <CardRatings mediaType={item.media_type} tmdbId={item.tmdb_id} title={item.title} year={item.year} />
+                {item.reason && <ReasonText text={item.reason} className="mt-1 text-[11px] text-slate-500" />}
+              </div>
             </div>
           );
         })}

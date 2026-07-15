@@ -1,7 +1,8 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MediaType, PrimaryCall, VerdictTier } from '@/lib/types';
-import { getSimilar, getTitle, discoverByGenres } from '@/lib/tmdb/client';
+import { getSimilar, discoverByGenres } from '@/lib/tmdb/client';
+import { getScoringData } from '@/lib/titleData';
 import { buildVerdict } from '@/lib/scoring';
 import type { PersonalContext } from '@/lib/scoring/personal';
 import { getProfile, getPersonalContext, regionFor } from '@/lib/profile';
@@ -154,8 +155,8 @@ async function scoreCandidate(
   because: string | null,
 ): Promise<Recommendation | null> {
   try {
-    const meta = await getTitle(mediaType, id, region);
-    const report = buildVerdict({ meta, providers: null, personal });
+    const { meta, providers } = await getScoringData(mediaType, id, region);
+    const report = buildVerdict({ meta, providers, personal });
     const topPos = report.personal.adjustments.find((a) => a.points > 0);
     return {
       id,

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { MediaType } from '@/lib/types';
+import { CardRatings } from './CardRatings';
 
 interface PosterCardProps {
   href?: string;
@@ -63,6 +64,13 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, meta, chil
       </div>
       <div className="p-3">
         {href ? <Link href={href} className="block">{heading}</Link> : heading}
+        {(() => {
+          // Every card that links to a title shows its real ratings, no matter
+          // which list rendered it — hydrated from the id in the href.
+          const m = href?.match(/\/app\/title\/(movie|tv)\/(\d+)/);
+          if (!m) return null;
+          return <CardRatings mediaType={m[1] as MediaType} tmdbId={Number(m[2])} title={title} year={year} className="mt-1.5" />;
+        })()}
         {children}
       </div>
     </div>

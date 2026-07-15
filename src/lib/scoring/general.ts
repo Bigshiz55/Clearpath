@@ -23,7 +23,7 @@ function reliability(voteCount: number, hasVote: boolean): Confidence {
 }
 
 /** Assemble the rating-source readings the Standard Score blends. */
-function standardReadings(meta: TitleMetadata): SourceReading[] {
+export function standardReadings(meta: TitleMetadata): SourceReading[] {
   const readings: SourceReading[] = [];
   if (meta.voteAverage != null && meta.voteCount > 0) {
     readings.push({ key: 'tmdbAudience', value: clamp(meta.voteAverage * 10), sampleSize: meta.voteCount });

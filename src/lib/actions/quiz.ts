@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { recordScoreSample } from '@/lib/scoreSamples';
 
 const schema = z.object({
   tmdbId: z.number().int().positive(),
@@ -66,6 +67,9 @@ export async function rateQuizTitle(
       { onConflict: 'watchlist_id,tmdb_id,media_type' },
     );
     if (error) return { ok: false, error: error.message };
+
+    // Snapshot a calibration training row (best-effort; never blocks the rating).
+    await recordScoreSample(supabase, user.id, v.tmdbId, v.mediaType, 'US', v.rating);
 
     revalidatePath('/app');
     revalidatePath('/app/watchlist');
