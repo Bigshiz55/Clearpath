@@ -264,6 +264,8 @@ export interface DiscoverOptions {
   minRating?: number;
   /** Restrict to titles first released/aired within this many days. */
   sinceDays?: number;
+  /** Movie runtime ceiling in minutes (with_runtime.lte). */
+  maxRuntime?: number;
   page?: number;
 }
 
@@ -291,6 +293,7 @@ export async function discoverTitles(
   }
   if (opts.minVotes != null) params['vote_count.gte'] = String(opts.minVotes);
   if (opts.minRating != null) params['vote_average.gte'] = String(opts.minRating);
+  if (opts.maxRuntime != null && mediaType === 'movie') params['with_runtime.lte'] = String(opts.maxRuntime);
   if (opts.sinceDays != null) {
     const from = isoDate(new Date(Date.now() - opts.sinceDays * 86_400_000));
     const to = isoDate(new Date());

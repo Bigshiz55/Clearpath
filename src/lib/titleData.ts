@@ -56,3 +56,34 @@ export function getSharedTitleData(
     tags: [`title:${mediaType}:${id}`],
   })();
 }
+
+export interface ScoringData {
+  meta: TitleMetadata;
+  providers: WatchProviders | null;
+}
+
+async function hydrateScoring(mediaType: MediaType, id: number, region: string): Promise<ScoringData> {
+  const [meta, providers] = await Promise.all([
+    getTitle(mediaType, id, region),
+    getWatchProviders(mediaType, id, region).catch(() => null),
+  ]);
+  const critics = await getCriticRatings(meta.imdbId).catch(() => null);
+  if (critics) {
+    meta.imdbRating = critics.imdbRating;
+    meta.rottenTomatoes = critics.rottenTomatoes;
+    meta.metascore = critics.metascore;
+  }
+  return { meta, providers };
+}
+
+/**
+ * A lean, cached hydration for scoring many candidates (the Finder, recs) —
+ * metadata + critic ratings + providers only, skipping the Dossier's expensive
+ * person lookups. 12h shared cache like getSharedTitleData.
+ */
+export function getScoringData(mediaType: MediaType, id: number, region: string): Promise<ScoringData> {
+  return unstable_cache(() => hydrateScoring(mediaType, id, region), ['scoring-data', mediaType, String(id), region], {
+    revalidate: TTL_SECONDS,
+    tags: [`title:${mediaType}:${id}`],
+  })();
+}

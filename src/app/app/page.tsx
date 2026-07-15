@@ -69,6 +69,12 @@ export default async function DiscoverPage() {
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link
+            href="/app/finder"
+            className="inline-flex items-center gap-2 rounded-xl border border-brand-400/40 bg-brand-500/15 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/25"
+          >
+            🔎 Find exactly what to watch
+          </Link>
+          <Link
             href="/app/together"
             className="inline-flex items-center gap-2 rounded-xl border border-brand-400/40 bg-brand-500/15 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/25"
           >
