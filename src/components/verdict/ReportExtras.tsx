@@ -1,5 +1,95 @@
-import type { RatingSource, TitleMetadata, PrimaryCall } from '@/lib/types';
+import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier } from '@/lib/types';
 import { deciderSearchUrl, episodeSummary } from '@/lib/tmdb/meta-helpers';
+
+function callStyleFor(call: PrimaryCall): string {
+  return call === 'WATCH IT'
+    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'
+    : call === 'MAYBE'
+      ? 'border-yellow-400/40 bg-yellow-500/15 text-yellow-100'
+      : 'border-red-400/40 bg-red-500/15 text-red-100';
+}
+
+function ScoreChip({ icon, tint, value, label }: { icon: string; tint: string; value: string; label: string }) {
+  return (
+    <div className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+      <span className={`grid h-7 w-7 place-items-center rounded-md text-sm ${tint}`}>{icon}</span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-sm font-extrabold tabular-nums text-white">{value}</span>
+        <span className="text-[9px] uppercase tracking-wide text-slate-500">{label}</span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Top-of-page summary: the headline call plus every score in one glanceable
+ * strip — WatchVerdict score, personal match, and all *available* external
+ * ratings (IMDb, Rotten Tomatoes, Metacritic, TMDB). Missing sources are simply
+ * omitted; nothing is fabricated.
+ */
+export function AtAGlance({
+  primaryCall,
+  tier,
+  oneLiner,
+  watchVerdictScore,
+  matchScore,
+  matchLabel,
+  sources,
+  deciderUrl,
+}: {
+  primaryCall: PrimaryCall;
+  tier: VerdictTier;
+  oneLiner: string;
+  watchVerdictScore: number;
+  matchScore: number;
+  matchLabel: string;
+  sources: RatingSource[];
+  deciderUrl: string;
+}) {
+  const available = sources.filter((s) => s.available);
+  return (
+    <section className="card p-4 sm:p-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className={`rounded-xl border px-4 py-2 text-lg font-black tracking-tight ${callStyleFor(primaryCall)}`}>
+          {primaryCall}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-white">{tier}</div>
+          <p className="line-clamp-2 text-xs text-slate-300 sm:text-sm">{oneLiner}</p>
+        </div>
+      </div>
+
+      <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
+        <ScoreChip icon="🍿" tint="bg-brand-500/25" value={`${watchVerdictScore}`} label="WatchVerdict" />
+        <ScoreChip icon="🎯" tint="bg-amber-500/25" value={`${matchScore}`} label={matchLabel} />
+        {available.map((s) => {
+          const { node, label } = iconFor(s.name);
+          return (
+            <div key={s.name} className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+              {node}
+              <span className="flex flex-col leading-tight">
+                <span className="text-sm font-extrabold tabular-nums text-white">{s.raw}</span>
+                <span className="text-[9px] uppercase tracking-wide text-slate-500">{label}</span>
+              </span>
+            </div>
+          );
+        })}
+        <a
+          href={deciderUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-brand-400/30 bg-brand-500/10 px-3 py-2 text-brand-100"
+        >
+          <span className="grid h-7 w-7 place-items-center rounded-md bg-white/5 text-sm">📺</span>
+          <span className="flex flex-col leading-tight">
+            <span className="text-sm font-bold">Decider ↗</span>
+            <span className="text-[9px] uppercase tracking-wide text-slate-500">Stream/Skip</span>
+          </span>
+        </a>
+      </div>
+    </section>
+  );
+}
 
 /** Icon + style per known rating source. */
 function iconFor(name: string): { node: React.ReactNode; label: string } {

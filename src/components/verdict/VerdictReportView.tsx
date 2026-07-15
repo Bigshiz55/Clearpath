@@ -1,12 +1,13 @@
 import type { VerdictReport, ContentSignal, WatchlistStatus } from '@/lib/types';
 import Link from 'next/link';
 import { ScoreRing } from '@/components/ScoreRing';
-import { VerdictBadge, DispositionChip, PrimaryCallBanner } from '@/components/VerdictBadge';
+import { VerdictBadge, DispositionChip } from '@/components/VerdictBadge';
 import { ProviderRow } from '@/components/ProviderRow';
 import { Poster } from '@/components/PosterCard';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
-import { RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
+import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
+import { deciderSearchUrl } from '@/lib/tmdb/meta-helpers';
 
 const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   none: 'bg-white/10 text-slate-400',
@@ -64,8 +65,17 @@ export function VerdictReportView({
 
   return (
     <article className="space-y-6">
-      {/* Headline verdict — always first */}
-      <PrimaryCallBanner call={report.primaryCall} oneLiner={report.oneLiner} />
+      {/* At-a-glance summary — call + every score/rating in one strip, always first */}
+      <AtAGlance
+        primaryCall={report.primaryCall}
+        tier={report.tier}
+        oneLiner={report.oneLiner}
+        watchVerdictScore={report.general.score}
+        matchScore={report.personal.score}
+        matchLabel={report.personal.label}
+        sources={report.general.sources}
+        deciderUrl={deciderSearchUrl(t.title, t.year)}
+      />
 
       {/* Header */}
       <header className="card relative overflow-hidden">
