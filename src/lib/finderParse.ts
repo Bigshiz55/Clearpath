@@ -13,6 +13,9 @@ export const EMPTY_QUERY: FinderQuery = {
   englishAudioOnly: false,
   onMyServices: false,
   minMatch: null,
+  streamItOnly: false,
+  bingeableOnly: false,
+  pace: null,
 };
 
 export function naiveParseQuery(input: string): FinderQuery {
@@ -65,6 +68,18 @@ export function naiveParseQuery(input: string): FinderQuery {
     t.match(/(?:match|verdict|watch ?meter|watch ?verdict|score for [a-z]+)\D{0,12}(\d{2})\+?/) ||
     t.match(/\b(\d{2})\+/);
   if (match) q.minMatch = Number(match[1]);
+
+  // Stream It only (our WATCH IT verdict).
+  if (/\bstream[- ]?it\b|\bmust[- ]?watch\b|only (?:great|the best)\b/.test(t)) q.streamItOnly = true;
+
+  // Bingeable — all episodes out.
+  if (/\bbinge\w*\b|all (?:the )?episodes? (?:are )?out\b|finished (?:series|show)\b|complete (?:series|season)\b/.test(t)) {
+    q.bingeableOnly = true;
+  }
+
+  // Pace.
+  if (/\bslow[- ]?burn\b|\bslow[- ]?paced?\b|\bdeliberate\b/.test(t)) q.pace = 15;
+  else if (/\badrenaline\b|\bfast[- ]?paced?\b|\bhigh[- ]?octane\b|\bnon[- ]?stop\b|\bedge of (?:my|your) seat\b/.test(t)) q.pace = 90;
 
   return q;
 }

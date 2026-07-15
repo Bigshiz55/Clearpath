@@ -21,6 +21,13 @@ describe('Finder natural-language parsing (no AI needed)', () => {
     expect(q.minAudience).toBe(80);
     expect(q.englishAudioOnly).toBe(true);
     expect(q.onMyServices).toBe(true);
+    expect(q.bingeableOnly).toBe(true);
+  });
+
+  it('reads pace and stream-it intent', () => {
+    expect(naiveParseQuery('a slow burn drama').pace).toBe(15);
+    expect(naiveParseQuery('an adrenaline rush, non-stop action').pace).toBe(90);
+    expect(naiveParseQuery('only stream-it worthy picks').streamItOnly).toBe(true);
   });
 
   it('reads hours and years too', () => {

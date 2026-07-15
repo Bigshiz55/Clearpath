@@ -7,7 +7,35 @@ import { getScoringData } from '@/lib/titleData';
 import { buildVerdict, avoidRule, loveRule } from '@/lib/scoring';
 import { getProfile, getPersonalContext, regionFor, getMyServices, personalLabelFor } from '@/lib/profile';
 import { includedServiceNames, streamingNames } from '@/lib/services';
+import { deciderSearchUrl } from '@/lib/tmdb/meta-helpers';
 import type { PersonalContext } from '@/lib/scoring/personal';
+import type { TitleMetadata } from '@/lib/types';
+
+const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
+const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
+
+/** Rough pace estimate (0 slow-burn .. 100 adrenaline) from genre + runtime. Heuristic, labeled as such in the UI. */
+export function paceScore(meta: TitleMetadata): number {
+  const g = meta.genres.map((x) => x.toLowerCase());
+  let s = 50;
+  for (const x of g) {
+    if (FAST_GENRES.includes(x)) s += 14;
+    if (SLOW_GENRES.includes(x)) s -= 12;
+  }
+  if (meta.mediaType === 'movie' && meta.runtimeMinutes) {
+    if (meta.runtimeMinutes >= 150) s -= 10;
+    else if (meta.runtimeMinutes <= 95) s += 8;
+  }
+  return Math.max(0, Math.min(100, Math.round(s)));
+}
+
+/** TV: is every episode of the current season out (no imminent next episode)? Movies are always "bingeable". */
+function isBingeable(meta: TitleMetadata): boolean {
+  if (meta.mediaType !== 'tv') return true;
+  const status = (meta.status ?? '').toLowerCase();
+  if (status.includes('ended') || status.includes('cancel')) return true;
+  return !meta.nextEpisodeDate;
+}
 
 /** A specific person to score for (a crew member / guest), instead of "you". */
 export interface Watcher {
@@ -25,6 +53,12 @@ export interface FinderQuery {
   englishAudioOnly: boolean;
   onMyServices: boolean;
   minMatch: number | null; // 0..100
+  /** Only titles our verdict rules WATCH IT ("Stream It"). */
+  streamItOnly: boolean;
+  /** TV only: every episode of the latest season is out (bingeable now). */
+  bingeableOnly: boolean;
+  /** Desired pace 0 (slow burn) .. 100 (adrenaline); null = any. */
+  pace: number | null;
 }
 
 export interface FinderItem {
@@ -39,6 +73,7 @@ export interface FinderItem {
   reason: string;
   where: string | null;
   receipts: string[];
+  deciderUrl: string;
 }
 
 export interface FinderResult {
@@ -176,6 +211,20 @@ export async function runFinder(
           if (included.length === 0) return null;
           receipts.push(`on ${included[0]}`);
         }
+        // Stream It only (our WATCH IT verdict).
+        if (q.streamItOnly && report.primaryCall !== 'WATCH IT') return null;
+        if (q.streamItOnly) receipts.push('Stream It');
+        // Bingeable now (TV, all episodes of the current season out).
+        if (q.bingeableOnly && meta.mediaType === 'tv') {
+          if (!isBingeable(meta)) return null;
+          receipts.push('all episodes out');
+        }
+        // Pace band.
+        if (q.pace != null) {
+          const p = paceScore(meta);
+          if (Math.abs(p - q.pace) > 35) return null;
+          receipts.push(p >= 66 ? 'fast-paced' : p <= 33 ? 'slow burn' : 'balanced pace');
+        }
         // Match threshold.
         if (q.minMatch != null && report.personal.score < q.minMatch) return null;
         receipts.unshift(`${scoredFor.split(' ')[0]} ${report.personal.score}`);
@@ -195,6 +244,7 @@ export async function runFinder(
           reason: report.oneLiner,
           where,
           receipts,
+          deciderUrl: deciderSearchUrl(meta.title, meta.year),
         } as FinderItem;
       } catch {
         return null;

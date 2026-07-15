@@ -18,6 +18,9 @@ function coerceQuery(raw: unknown): FinderQuery {
     englishAudioOnly: Boolean(q.englishAudioOnly),
     onMyServices: Boolean(q.onMyServices),
     minMatch: typeof q.minMatch === 'number' ? q.minMatch : null,
+    streamItOnly: Boolean(q.streamItOnly),
+    bingeableOnly: Boolean(q.bingeableOnly),
+    pace: typeof q.pace === 'number' ? Math.max(0, Math.min(100, q.pace)) : null,
   };
 }
 

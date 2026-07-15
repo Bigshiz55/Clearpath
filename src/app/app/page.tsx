@@ -11,7 +11,7 @@ import { RecommendedForYou } from '@/components/RecommendedForYou';
 import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { getTonight } from '@/lib/tonight';
-import { CourtroomHero } from '@/components/CourtroomHero';
+import { CourtroomDoors } from '@/components/CourtroomDoors';
 import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import { regionFor } from '@/lib/profile';
 import type { VerdictTier } from '@/lib/types';
@@ -66,7 +66,8 @@ export default async function DiscoverPage() {
 
   return (
     <div className="space-y-8">
-      <section className="animate-fade-up">
+      <section className="animate-fade-up grid items-center gap-6 lg:grid-cols-[1.7fr_1fr]">
+        <div className="min-w-0">
         <h1 className="text-5xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-7xl">
           Stop scrolling.{' '}
           <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">
@@ -141,9 +142,13 @@ export default async function DiscoverPage() {
             ✨ Share cards
           </Link>
         </div>
-      </section>
+        </div>
 
-      <CourtroomHero initialJudge={judge} />
+        {/* The courtroom — a box off to the side; doors open to reveal the judge */}
+        <div className="lg:pl-2">
+          <CourtroomDoors initialJudge={judge} />
+        </div>
+      </section>
 
       <TonightHome tonight={tonight} isGuest={isGuest} />
 

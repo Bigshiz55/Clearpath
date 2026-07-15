@@ -26,6 +26,7 @@ interface ResultItem {
   reason: string;
   where: string | null;
   receipts: string[];
+  deciderUrl: string;
 }
 
 const CALL_STYLE: Record<string, string> = {
@@ -58,6 +59,45 @@ function Seg<T extends string | number>({
       ))}
     </div>
   );
+}
+
+function Slider({
+  label, readout, min, max, step, value, onChange, accent = false,
+}: {
+  label: string; readout: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void; accent?: boolean;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="label mb-0">{label}</span>
+        <span className={`text-xs font-semibold tabular-nums ${accent ? 'text-gold-400' : 'text-brand-200'}`}>{readout}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={`w-full ${accent ? 'accent-gold-400' : 'accent-brand-500'}`}
+      />
+    </div>
+  );
+}
+
+function runtimeReadout(v: number): string {
+  if (v >= 240) return 'Any length';
+  const h = Math.floor(v / 60);
+  const m = v % 60;
+  return h > 0 ? `≤ ${h}h ${m ? `${m}m` : ''}`.trim() : `≤ ${m}m`;
+}
+function monthsReadout(v: number): string {
+  if (v <= 0) return 'Any time';
+  if (v % 12 === 0) return `Last ${v / 12} yr`;
+  return `Last ${v} mo`;
+}
+function paceReadout(v: number): string {
+  return v <= 33 ? '🐢 Slow burn' : v >= 67 ? '⚡ Adrenaline' : '🎬 Balanced';
 }
 
 export function FinderUI({ hasServices, watchers = [] }: { hasServices: boolean; watchers?: WatcherOption[] }) {
@@ -126,9 +166,11 @@ export function FinderUI({ hasServices, watchers = [] }: { hasServices: boolean;
         </div>
       </div>
 
-      {/* Transparent, editable parse — no black box. */}
+      {/* Prepare your evidence — transparent, editable, no black box. */}
       <div className="card space-y-4 p-4">
-        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Here’s how I read that — tweak anything</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
+          ⚖️ Prepare your evidence
+        </div>
 
         {watchers.length > 0 && (
           <div>
@@ -171,21 +213,40 @@ export function FinderUI({ hasServices, watchers = [] }: { hasServices: boolean;
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <div className="label">Max length</div>
-            <Seg value={q.maxRuntime ?? 0} onChange={(v) => set('maxRuntime', v === 0 ? null : v)} options={[{ v: 0, label: 'Any' }, { v: 90, label: '≤90m' }, { v: 120, label: '≤2h' }, { v: 140, label: '≤140m' }]} />
+          <Slider label="Max length" readout={runtimeReadout(q.maxRuntime ?? 240)} min={60} max={240} step={10}
+            value={q.maxRuntime ?? 240} onChange={(v) => set('maxRuntime', v >= 240 ? null : v)} />
+          <Slider label="Released" readout={monthsReadout(q.sinceMonths ?? 0)} min={0} max={120} step={6}
+            value={q.sinceMonths ?? 0} onChange={(v) => set('sinceMonths', v === 0 ? null : v)} />
+          <Slider label="Audience at least" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
+            value={q.minAudience ?? 0} onChange={(v) => set('minAudience', v === 0 ? null : v)} />
+          <Slider label={`${scoredFor} at least`} readout={q.minMatch ? `${q.minMatch}+` : 'Any'} min={0} max={95} step={5}
+            value={q.minMatch ?? 0} onChange={(v) => set('minMatch', v === 0 ? null : v)} accent />
+        </div>
+
+        {/* Pace meter */}
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="label mb-0">Pace</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-brand-200">{q.pace == null ? 'Any' : paceReadout(q.pace)}</span>
+              <button
+                onClick={() => set('pace', q.pace == null ? 50 : null)}
+                className={`rounded-md border px-2 py-0.5 text-[11px] transition ${q.pace == null ? 'border-white/12 bg-white/5 text-slate-400' : 'border-brand-400/60 bg-brand-500/20 text-brand-100'}`}
+              >
+                {q.pace == null ? 'Set pace' : 'On'}
+              </button>
+            </div>
           </div>
-          <div>
-            <div className="label">Released</div>
-            <Seg value={q.sinceMonths ?? 0} onChange={(v) => set('sinceMonths', v === 0 ? null : v)} options={[{ v: 0, label: 'Any time' }, { v: 12, label: '1 year' }, { v: 24, label: '2 years' }, { v: 60, label: '5 years' }]} />
-          </div>
-          <div>
-            <div className="label">Audience at least</div>
-            <Seg value={q.minAudience ?? 0} onChange={(v) => set('minAudience', v === 0 ? null : v)} options={[{ v: 0, label: 'Any' }, { v: 70, label: '70%' }, { v: 80, label: '80%' }, { v: 90, label: '90%' }]} />
-          </div>
-          <div>
-            <div className="label">{scoredFor} at least</div>
-            <Seg value={q.minMatch ?? 0} onChange={(v) => set('minMatch', v === 0 ? null : v)} options={[{ v: 0, label: 'Any' }, { v: 70, label: '70' }, { v: 80, label: '80' }, { v: 90, label: '90' }]} />
+          <input
+            type="range" min={0} max={100} step={5}
+            value={q.pace ?? 50}
+            disabled={q.pace == null}
+            onChange={(e) => set('pace', Number(e.target.value))}
+            className="w-full accent-brand-500 disabled:opacity-40"
+          />
+          <div className="mt-0.5 flex justify-between text-[10px] text-slate-500">
+            <span>🐢 Slow burn</span>
+            <span>⚡ Adrenaline rush</span>
           </div>
         </div>
 
@@ -193,6 +254,14 @@ export function FinderUI({ hasServices, watchers = [] }: { hasServices: boolean;
           <button onClick={() => set('englishAudioOnly', !q.englishAudioOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.englishAudioOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
             {q.englishAudioOnly ? '✓ ' : ''}English audio only
           </button>
+          <button onClick={() => set('streamItOnly', !q.streamItOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
+            {q.streamItOnly ? '✓ ' : ''}🍿 Stream It only
+          </button>
+          {q.mediaType !== 'movie' && (
+            <button onClick={() => set('bingeableOnly', !q.bingeableOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.bingeableOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
+              {q.bingeableOnly ? '✓ ' : ''}📺 Bingeable (all episodes out)
+            </button>
+          )}
           <button
             onClick={() => set('onMyServices', !q.onMyServices)}
             disabled={!hasServices}
@@ -246,6 +315,9 @@ export function FinderUI({ hasServices, watchers = [] }: { hasServices: boolean;
                         <span key={r} className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">✓ {r}</span>
                       ))}
                       {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
+                      <a href={it.deciderUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-brand-300 hover:bg-white/10">
+                        Decider: Stream It or Skip It? ↗
+                      </a>
                     </div>
                   </div>
                 </div>
