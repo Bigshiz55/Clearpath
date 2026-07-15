@@ -89,6 +89,12 @@ export default async function DiscoverPage() {
             👥 Friends
           </Link>
           <Link
+            href="/app/docket"
+            className="inline-flex items-center gap-2 rounded-xl border border-gold-400/40 bg-gold-500/10 px-4 py-2 text-sm font-semibold text-gold-400 transition hover:bg-gold-500/20"
+          >
+            🗂️ The Docket
+          </Link>
+          <Link
             href="/app/quiz"
             className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
           >

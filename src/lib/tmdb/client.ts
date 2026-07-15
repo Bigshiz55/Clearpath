@@ -677,6 +677,26 @@ export async function getPersonNotable(
     });
 }
 
+export interface FilmographyItem {
+  id: number;
+  title: string;
+  year: number | null;
+}
+
+/** A director's notable feature films (vote_count-gated so it's actually closeable). */
+export async function getDirectorFilmography(personId: number): Promise<FilmographyItem[]> {
+  const data = await tmdbFetch<TmdbPersonCredits>(`/person/${personId}/movie_credits`, {
+    language: 'en-US',
+  }).catch(() => ({} as TmdbPersonCredits));
+  const seen = new Set<number>();
+  return (data.crew ?? [])
+    .filter((c) => (c as { job?: string }).job === 'Director')
+    .filter((r) => (r.vote_count ?? 0) >= 50 && (seen.has(r.id) ? false : (seen.add(r.id), true)))
+    .sort((a, b) => (a.release_date ?? '').localeCompare(b.release_date ?? ''))
+    .map((r) => ({ id: r.id, title: r.title ?? 'Untitled', year: yearFrom(r.release_date) }))
+    .slice(0, 12);
+}
+
 export interface CollectionPart {
   id: number;
   title: string;
