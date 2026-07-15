@@ -6,6 +6,8 @@ import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { SaveButton } from '@/components/SaveButton';
 import { JudgeBench } from '@/components/JudgeBench';
+import { RatingsStrip } from '@/components/RatingsStrip';
+import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 import type { FinderQuery } from '@/lib/finder';
 import type { Judge } from '@/lib/sponsors';
 
@@ -29,6 +31,7 @@ interface ResultItem {
   where: string | null;
   receipts: string[];
   deciderUrl: string;
+  ratings?: TileRatings;
 }
 
 const CALL_STYLE: Record<string, string> = {
@@ -245,6 +248,7 @@ export function FinderUI({
                       <span className="text-xs text-slate-500">match · {it.generalScore} overall</span>
                     </div>
                     <p className="mt-1 line-clamp-2 text-xs text-slate-300">{it.reason}</p>
+                    <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} decider={false} className="mt-1.5" />
                     <div className="mt-2 flex flex-wrap gap-1">
                       {it.receipts.map((r) => (
                         <span key={r} className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">✓ {r}</span>

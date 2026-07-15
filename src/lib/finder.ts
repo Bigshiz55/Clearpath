@@ -8,6 +8,7 @@ import { buildVerdict, avoidRule, loveRule } from '@/lib/scoring';
 import { getProfile, getPersonalContext, regionFor, getMyServices, personalLabelFor } from '@/lib/profile';
 import { includedServiceNames, streamingNames } from '@/lib/services';
 import { deciderSearchUrl } from '@/lib/tmdb/meta-helpers';
+import { tileRatingsFromScore, type TileRatings } from '@/lib/ratings';
 import type { PersonalContext } from '@/lib/scoring/personal';
 import type { TitleMetadata } from '@/lib/types';
 
@@ -74,6 +75,7 @@ export interface FinderItem {
   where: string | null;
   receipts: string[];
   deciderUrl: string;
+  ratings: TileRatings;
 }
 
 export interface FinderResult {
@@ -245,6 +247,7 @@ export async function runFinder(
           where,
           receipts,
           deciderUrl: deciderSearchUrl(meta.title, meta.year),
+          ratings: tileRatingsFromScore(report.general),
         } as FinderItem;
       } catch {
         return null;

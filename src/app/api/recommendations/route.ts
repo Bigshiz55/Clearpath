@@ -29,6 +29,7 @@ export async function GET() {
         primaryCall: r.primaryCall,
         because: r.because,
         matchReason: r.matchReason,
+        ratings: r.ratings,
       })),
     });
   } catch {

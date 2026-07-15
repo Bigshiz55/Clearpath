@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { PosterCard } from './PosterCard';
 import { SaveButton } from './SaveButton';
 import { ReasonText } from './ReasonText';
+import { RatingsStrip } from './RatingsStrip';
 import { verdictVisualForTier, isTopTier } from '@/lib/verdictVisual';
+import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 
 interface Rec {
   id: number;
@@ -18,6 +20,7 @@ interface Rec {
   primaryCall: string;
   because: string | null;
   matchReason: string | null;
+  ratings?: TileRatings;
 }
 
 /** One complete reason — never two half-lines. Joins the "because you liked X"
@@ -98,6 +101,7 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
                     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${top ? v.solid : v.badge}`}>
                       {top ? '★ ' : ''}{r.personalScore}% · {r.tier}
                     </span>
+                    <RatingsStrip ratings={r.ratings ?? EMPTY_TILE_RATINGS} title={r.title} year={r.year} />
                     {reason && (
                       // One complete sentence; tap/click to expand the full text.
                       <ReasonText text={reason} className="text-[11px] text-slate-400" />

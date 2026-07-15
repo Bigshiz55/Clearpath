@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { RobedPortrait } from '@/components/RobedPortrait';
 import { ReasonText } from '@/components/ReasonText';
 import { SaveButton } from '@/components/SaveButton';
+import { RatingsStrip } from '@/components/RatingsStrip';
+import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 import { houseByKey, readHousePick } from '@/lib/houseJudges';
 import { naiveParseQuery, describeQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
@@ -23,6 +25,7 @@ interface ResultItem {
   reason: string;
   where: string | null;
   deciderUrl: string;
+  ratings?: TileRatings;
 }
 
 interface Msg {
@@ -318,6 +321,7 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
                                   <span className="text-[11px] text-slate-500">match</span>
                                 </div>
                                 {it.reason && <ReasonText text={it.reason} className="mt-1 text-[11px] text-slate-300" />}
+                                <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} decider={false} className="mt-1" />
                                 <div className="mt-1.5 flex flex-wrap gap-1">
                                   {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-300">📺 {it.where}</span>}
                                   <a href={it.deciderUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-brand-300 hover:bg-white/10">

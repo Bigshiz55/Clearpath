@@ -5,6 +5,7 @@ import { getSimilar, getTitle, discoverByGenres } from '@/lib/tmdb/client';
 import { buildVerdict } from '@/lib/scoring';
 import type { PersonalContext } from '@/lib/scoring/personal';
 import { getProfile, getPersonalContext, regionFor } from '@/lib/profile';
+import { tileRatingsFromScore, type TileRatings } from '@/lib/ratings';
 
 // Map each positive taste trait to TMDB genres, per media type, so the cold-start
 // pool reflects whatever profile the user has (Scott, Heather, Amy, …).
@@ -37,6 +38,8 @@ export interface Recommendation {
   because: string | null;
   /** Top positive preference trait that fired ("Grounded crime drama"). */
   matchReason: string | null;
+  /** Real ratings for the tile plaque (only what we actually have). */
+  ratings: TileRatings;
 }
 
 interface SeedRow {
@@ -165,6 +168,7 @@ async function scoreCandidate(
       primaryCall: report.primaryCall,
       because,
       matchReason: topPos ? topPos.label : null,
+      ratings: tileRatingsFromScore(report.general),
     };
   } catch {
     return null;
