@@ -71,6 +71,24 @@ export default async function DiscoverPage() {
             👪 Tonight, Together — one pick for the whole room
           </Link>
           <Link
+            href="/app/mood"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            🎭 By mood
+          </Link>
+          <Link
+            href="/app/new"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            🆕 New for your plans
+          </Link>
+          <Link
+            href="/app/friends"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            👥 Friends
+          </Link>
+          <Link
             href="/app/quiz"
             className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
           >

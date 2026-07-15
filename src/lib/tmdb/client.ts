@@ -254,6 +254,95 @@ export async function discoverByGenres(
   });
 }
 
+export interface DiscoverOptions {
+  genreIds?: number[];
+  /** TMDB watch-provider ids (subscription/flatrate). */
+  providerIds?: number[];
+  region?: string;
+  sortBy?: string;
+  minVotes?: number;
+  minRating?: number;
+  /** Restrict to titles first released/aired within this many days. */
+  sinceDays?: number;
+  page?: number;
+}
+
+/**
+ * General-purpose discovery — genre and/or streaming-provider filtered. Used by
+ * the mood finder and the "new on your services" feed. Returns only real TMDB
+ * rows; on any error yields an empty list so callers degrade gracefully.
+ */
+export async function discoverTitles(
+  mediaType: MediaType,
+  opts: DiscoverOptions = {},
+): Promise<DiscoverItem[]> {
+  const region = opts.region ?? 'US';
+  const params: Record<string, string> = {
+    language: 'en-US',
+    include_adult: 'false',
+    sort_by: opts.sortBy ?? 'popularity.desc',
+    watch_region: region,
+    page: String(opts.page ?? 1),
+  };
+  if (opts.genreIds && opts.genreIds.length > 0) params.with_genres = opts.genreIds.join('|');
+  if (opts.providerIds && opts.providerIds.length > 0) {
+    params.with_watch_providers = opts.providerIds.join('|');
+    params.with_watch_monetization_types = 'flatrate|free|ads';
+  }
+  if (opts.minVotes != null) params['vote_count.gte'] = String(opts.minVotes);
+  if (opts.minRating != null) params['vote_average.gte'] = String(opts.minRating);
+  if (opts.sinceDays != null) {
+    const from = isoDate(new Date(Date.now() - opts.sinceDays * 86_400_000));
+    const to = isoDate(new Date());
+    if (mediaType === 'movie') {
+      params['primary_release_date.gte'] = from;
+      params['primary_release_date.lte'] = to;
+    } else {
+      params['first_air_date.gte'] = from;
+      params['first_air_date.lte'] = to;
+    }
+  }
+
+  const data = await tmdbFetch<TmdbMultiResult>(`/discover/${mediaType}`, params).catch(
+    () => ({ page: 1, results: [] as TmdbMultiResult['results'] }),
+  );
+  return data.results
+    .filter((r) => r.poster_path)
+    .map((r) => ({
+      id: r.id,
+      mediaType,
+      title: (mediaType === 'movie' ? r.title : r.name) ?? 'Untitled',
+      year: yearFrom(mediaType === 'movie' ? r.release_date : r.first_air_date),
+      posterPath: r.poster_path ?? null,
+      releaseDate: (mediaType === 'movie' ? r.release_date : r.first_air_date) ?? null,
+    }));
+}
+
+export interface TvFreshness {
+  status: string | null;
+  lastAirDate: string | null;
+  nextAirDate: string | null;
+  name: string;
+}
+
+/** Minimal TV status/air-date lookup for the "new episodes" feed (one light call). */
+export async function getTvFreshness(id: number): Promise<TvFreshness | null> {
+  interface TvLite {
+    name?: string;
+    status?: string;
+    last_air_date?: string | null;
+    next_episode_to_air?: { air_date?: string | null } | null;
+  }
+  const d = await tmdbFetch<TvLite>(`/tv/${id}`, { language: 'en-US' }).catch(() => null);
+  if (!d) return null;
+  return {
+    status: d.status ?? null,
+    lastAirDate: d.last_air_date ?? null,
+    nextAirDate: d.next_episode_to_air?.air_date ?? null,
+    name: d.name ?? 'Untitled',
+  };
+}
+
 /**
  * Popular, widely-recognized titles for the taste quiz — high vote counts so
  * people are likely to have an opinion. Broad across genres.

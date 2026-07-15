@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { getProfile, getPreferenceRules, personalLabelFor, getMyServices } from '@/lib/profile';
+import { getProfile, getPreferenceRules, personalLabelFor, getMyServices, getPublicActivity } from '@/lib/profile';
 import { SettingsView, type ShareRow } from '@/components/settings/SettingsView';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
   const uid = user?.id ?? '';
 
-  const [profile, rules, sharesRes, myServices] = await Promise.all([
+  const [profile, rules, sharesRes, myServices, publicActivity] = await Promise.all([
     getProfile(supabase, uid),
     getPreferenceRules(supabase, uid),
     supabase
@@ -21,6 +21,7 @@ export default async function SettingsPage() {
       .eq('user_id', uid)
       .order('created_at', { ascending: false }),
     getMyServices(supabase, uid),
+    getPublicActivity(supabase, uid),
   ]);
 
   const shares: ShareRow[] = ((sharesRes.data as Array<Record<string, unknown>> | null) ?? []).map((s) => ({
@@ -44,6 +45,7 @@ export default async function SettingsPage() {
       rules={rules}
       shares={shares}
       myServices={myServices}
+      publicActivity={publicActivity}
     />
   );
 }

@@ -6,6 +6,7 @@ import type { PreferenceRule, PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
 import { avoidRule, loveRule, SCOTT_RULES } from '@/lib/scoring/preferences';
 import { updateProfile, replacePreferenceRules, updateDigestPrefs, updateMyServices } from '@/lib/actions/profile';
+import { setPublicActivity } from '@/lib/actions/social';
 import { deactivateShare } from '@/lib/actions/share';
 import { deleteAccount } from '@/lib/actions/account';
 import { useToast } from '@/components/Toast';
@@ -36,12 +37,30 @@ export function SettingsView(props: {
   rules: PreferenceRule[];
   shares: ShareRow[];
   myServices: number[];
+  publicActivity: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
 
   const [services, setServices] = useState<Set<number>>(new Set(props.myServices));
   const [savingServices, setSavingServices] = useState(false);
+
+  const [publicOn, setPublicOn] = useState(props.publicActivity);
+  const [savingPublic, setSavingPublic] = useState(false);
+
+  async function togglePublic(on: boolean) {
+    setPublicOn(on);
+    setSavingPublic(true);
+    const res = await setPublicActivity({ on });
+    setSavingPublic(false);
+    if (res.ok) {
+      toast.show(on ? 'Your verdicts are now visible to followers.' : 'Your activity is private again.', 'success');
+      router.refresh();
+    } else {
+      setPublicOn(!on);
+      toast.show(res.error ?? 'Failed.', 'error');
+    }
+  }
 
   function toggleService(id: number) {
     setServices((prev) => {
@@ -241,6 +260,36 @@ export function SettingsView(props: {
         <button onClick={saveServices} disabled={savingServices} className="btn-primary mt-4">
           {savingServices ? 'Saving…' : 'Save services'}
         </button>
+      </section>
+
+      {/* Friends / public activity */}
+      <section className="card p-5">
+        <h2 className="text-lg font-semibold text-white">Friends &amp; public profile</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          {props.username ? (
+            <>
+              Your handle is <span className="font-semibold text-slate-200">@{props.username}</span> — share it so
+              friends can follow you.
+            </>
+          ) : (
+            <>Set a username above so friends can find and follow you.</>
+          )}
+        </p>
+        <label className="mt-4 flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
+          <span className="text-sm text-slate-200">
+            Share my verdicts publicly
+            <span className="block text-xs text-slate-500">
+              People who follow you (and anyone who opens your profile) can see your recent verdicts. Off by default.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={publicOn}
+            disabled={savingPublic}
+            onChange={(e) => togglePublic(e.target.checked)}
+            className="h-5 w-5 accent-brand-500"
+          />
+        </label>
       </section>
 
       {/* Daily digest */}

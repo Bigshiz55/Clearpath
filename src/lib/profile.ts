@@ -149,3 +149,18 @@ export async function getMyServices(
   if (!Array.isArray(raw)) return [];
   return raw.map((n) => Number(n)).filter((n) => Number.isFinite(n));
 }
+
+/** Whether the user shares their verdicts on a public profile (guarded read). */
+export async function getPublicActivity(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  if (!userId) return false;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('public_activity')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error || !data) return false;
+  return Boolean((data as { public_activity?: unknown }).public_activity);
+}
