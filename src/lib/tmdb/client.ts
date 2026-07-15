@@ -617,6 +617,7 @@ export interface NotableCredit {
   mediaType: MediaType;
   title: string;
   year: number | null;
+  voteAverage: number | null;
 }
 
 interface TmdbPersonCredits {
@@ -631,6 +632,7 @@ interface PersonCreditRow {
   release_date?: string;
   first_air_date?: string;
   vote_count?: number;
+  vote_average?: number;
   popularity?: number;
   poster_path?: string | null;
 }
@@ -670,6 +672,7 @@ export async function getPersonNotable(
         mediaType: mt,
         title: (mt === 'movie' ? r.title : r.name) ?? 'Untitled',
         year: yearFrom(mt === 'movie' ? r.release_date : r.first_air_date),
+        voteAverage: typeof r.vote_average === 'number' && r.vote_average > 0 ? r.vote_average : null,
       };
     });
 }

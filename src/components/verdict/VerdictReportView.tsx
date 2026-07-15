@@ -10,6 +10,9 @@ import { VerdictActions } from './VerdictActions';
 import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
 import { TonightBanner } from './TonightBanner';
 import { TitleBriefing } from './TitleBriefing';
+import { CriticsTable } from './CriticsTable';
+import { TheaterMode } from '@/components/TheaterMode';
+import { buildPanel } from '@/lib/swarm';
 import type { Briefing } from '@/lib/briefing';
 import { originSummary } from '@/lib/origin';
 
@@ -59,6 +62,7 @@ export function VerdictReportView({
 }) {
   const t = report.title;
   const origin = originSummary(t);
+  const panel = buildPanel(report);
   const backdrop = tmdbImage(t.backdropPath, 'w780');
   const poster = tmdbImage(t.posterPath, 'w342');
   const runtime =
@@ -167,6 +171,22 @@ export function VerdictReportView({
         initialStatus={watchState?.status ?? null}
         initialRating={watchState?.rating ?? null}
         initialNotes={watchState?.notes ?? null}
+      />
+
+      {/* Theater Mode — dim the lights, hush notifications, tell the group */}
+      <TheaterMode
+        tmdbId={t.id}
+        mediaType={t.mediaType}
+        title={t.title}
+        year={t.year}
+        posterPath={t.posterPath}
+        runtimeMinutes={t.runtimeMinutes ?? t.episodeRuntimeMinutes}
+      />
+
+      {/* The Critics' Table — grounded multi-perspective panel */}
+      <CriticsTable
+        panel={panel}
+        facts={{ title: t.title, year: t.year, watchVerdictScore: report.general.score, tier: report.tier }}
       />
 
       {/* Ratings (icons) + language & episodes */}
@@ -303,8 +323,8 @@ export function VerdictReportView({
         </div>
       </section>
 
-      {/* The Briefing — real credits, franchise */}
-      {briefing && <TitleBriefing briefing={briefing} />}
+      {/* The Dossier — real credits, themes, franchise */}
+      {briefing && <TitleBriefing briefing={briefing} keywords={t.keywords} />}
 
       {/* More like this */}
       {report.similar.length > 0 && (

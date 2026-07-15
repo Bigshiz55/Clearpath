@@ -14,6 +14,7 @@ function NotableList({ person }: { person: BriefingPerson }) {
             {n.title}
             {n.year ? ` (${n.year})` : ''}
           </Link>
+          {n.voteAverage != null && <span className="text-gold-400"> ★{n.voteAverage.toFixed(1)}</span>}
         </span>
       ))}
     </div>
@@ -32,15 +33,17 @@ function PersonAvatar({ person }: { person: BriefingPerson }) {
   );
 }
 
-export function TitleBriefing({ briefing }: { briefing: Briefing }) {
-  const hasAnything = briefing.leads.length > 0 || briefing.cast.length > 0 || briefing.franchise;
+export function TitleBriefing({ briefing, keywords = [] }: { briefing: Briefing; keywords?: string[] }) {
+  const themes = keywords.filter((k) => k && k.length <= 24).slice(0, 10);
+  const hasAnything = briefing.leads.length > 0 || briefing.cast.length > 0 || briefing.franchise || themes.length > 0;
   if (!hasAnything) return null;
 
   return (
     <section className="card p-5 sm:p-6">
-      <h2 className="text-lg font-semibold text-white">The Briefing</h2>
+      <h2 className="text-lg font-semibold text-white">The Dossier</h2>
       <p className="mt-1 text-xs text-slate-500">
-        Who made it and who’s in it — every name and credit is real TMDB data, nothing invented.
+        Who made it, who’s in it, and what it’s really about — every name, rating, and tag is real TMDB data,
+        nothing invented.
       </p>
 
       {briefing.leads.length > 0 && (
@@ -81,6 +84,17 @@ export function TitleBriefing({ briefing }: { briefing: Briefing }) {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {themes.length > 0 && (
+        <div className="mt-5">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Themes &amp; motifs</div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {themes.map((t) => (
+              <span key={t} className="rounded-md bg-white/5 px-2 py-0.5 text-xs capitalize text-slate-300">{t}</span>
+            ))}
+          </div>
         </div>
       )}
 
