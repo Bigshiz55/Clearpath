@@ -109,50 +109,44 @@ export default async function DiscoverPage() {
         </div>
       </section>
 
-      {/* Quick access — the destinations people come back to, up top where they
-          can reach them, not buried in a drawer. */}
+      {/* Explore — big, inviting tiles for the places people come back to. */}
       <section>
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+        <h2 className="mb-3 text-lg font-semibold text-white">Explore</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {[
-            { href: '/app/finder', emoji: '🔎', label: 'Finder', sub: 'Sliders & filters' },
-            { href: '/app/chambers', emoji: '⚖️', label: 'Your Chambers', sub: 'Rank & badges' },
-            { href: '/app/docket', emoji: '🗂️', label: 'The Docket', sub: 'This month' },
-            { href: '/app/new', emoji: '🆕', label: 'New for you', sub: 'Fresh & matched' },
-            { href: '/app/watchlist', emoji: '📺', label: 'Watchlist', sub: 'Your queue' },
-            { href: '/app/quiz', emoji: '🍿', label: 'Taste Quiz', sub: 'Sharpen picks' },
+            { href: '/app/finder', emoji: '🔎', label: 'The Finder', sub: 'Dial in exactly what to watch', accent: '#4f86ff' },
+            { href: '/app/chambers', emoji: '⚖️', label: 'Your Chambers', sub: 'Your rank, badges & Watch DNA', accent: '#f5c65a' },
+            { href: '/app/quiz', emoji: '🍿', label: 'Taste Quiz', sub: 'Rate fast, sharpen your picks', accent: '#f59e0b' },
+            { href: '/app/docket', emoji: '🗂️', label: 'The Docket', sub: 'This month’s viewing cases', accent: '#f5c65a' },
+            { href: '/app/new', emoji: '🆕', label: 'New for you', sub: 'Fresh releases, matched to you', accent: '#34d399' },
+            { href: '/app/watchlist', emoji: '📺', label: 'Watchlist', sub: 'Everything you’ve lined up', accent: '#7aa8ff' },
+            { href: '/app/connect', emoji: '📸', label: 'Add from a photo', sub: 'Snap a guide → instant verdicts', accent: '#a78bfa' },
+            { href: '/app/cards', emoji: '✨', label: 'Share cards', sub: 'Turn a verdict into a shareable card', accent: '#f472b6' },
           ].map((t) => (
             <Link
               key={t.href}
               href={t.href}
-              className="card group flex flex-col gap-0.5 p-3 transition hover:border-white/20 hover:bg-white/[0.06]"
+              className="card group relative flex flex-col gap-3 overflow-hidden p-4 transition hover:-translate-y-0.5 hover:border-white/25 hover:shadow-glow"
             >
-              <span className="text-xl">{t.emoji}</span>
-              <span className="text-sm font-semibold text-white">{t.label}</span>
-              <span className="text-[11px] text-slate-400">{t.sub}</span>
+              <span
+                aria-hidden
+                className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-20 blur-xl transition group-hover:opacity-40"
+                style={{ background: t.accent }}
+              />
+              <span
+                className="grid h-12 w-12 place-items-center rounded-2xl text-2xl transition group-hover:scale-105"
+                style={{ background: `${t.accent}1f`, border: `1px solid ${t.accent}55` }}
+              >
+                {t.emoji}
+              </span>
+              <div className="relative">
+                <div className="text-base font-bold text-white">{t.label}</div>
+                <div className="mt-0.5 text-xs leading-snug text-slate-400">{t.sub}</div>
+              </div>
+              <span className="relative text-sm font-semibold text-slate-500 transition group-hover:text-white">Open →</span>
             </Link>
           ))}
         </div>
-        <details className="group mt-2.5">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-slate-400 transition hover:text-white">
-            <span className="transition group-open:rotate-90">›</span> More tools
-          </summary>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {[
-              { href: '/app/friends', label: '👥 Friends' },
-              { href: '/app/import', label: '⬆ Import history' },
-              { href: '/app/connect', label: '📸 Add from a photo' },
-              { href: '/app/cards', label: '✨ Share cards' },
-            ].map((t) => (
-              <Link
-                key={t.href}
-                href={t.href}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-              >
-                {t.label}
-              </Link>
-            ))}
-          </div>
-        </details>
       </section>
 
       <TonightHome tonight={tonight} isGuest={isGuest} />
