@@ -51,7 +51,7 @@ export default async function DiscoverPage() {
     <div className="space-y-8">
       <section className="animate-fade-up">
         <p className="text-sm font-semibold uppercase tracking-wide text-brand-300">
-          🍿 Stop guessing. Get the verdict.
+          🍿 Stop scrolling. Start watching.
         </p>
         <h1 className="mt-1 text-2xl font-bold text-white sm:text-3xl">
           What are you thinking of watching?
