@@ -11,6 +11,7 @@ import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } fro
 import { TonightBanner } from './TonightBanner';
 import { TitleBriefing } from './TitleBriefing';
 import type { Briefing } from '@/lib/briefing';
+import { originSummary } from '@/lib/origin';
 
 const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   none: 'bg-white/10 text-slate-400',
@@ -57,6 +58,7 @@ export function VerdictReportView({
   briefing?: Briefing;
 }) {
   const t = report.title;
+  const origin = originSummary(t);
   const backdrop = tmdbImage(t.backdropPath, 'w780');
   const poster = tmdbImage(t.posterPath, 'w342');
   const runtime =
@@ -106,6 +108,14 @@ export function VerdictReportView({
               {t.contentRating && <span className="chip">{t.contentRating}</span>}
               {runtime && <span className="chip">{runtime}</span>}
               {t.status && t.mediaType === 'tv' && <span className="chip">{t.status}</span>}
+              {origin?.chip && (
+                <span
+                  className={`chip ${origin.good ? 'border-emerald-400/40 text-emerald-100' : 'border-amber-400/40 text-amber-100'}`}
+                  title={origin.note}
+                >
+                  {origin.chip}
+                </span>
+              )}
             </div>
             <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
               {t.title} {t.year ? <span className="font-normal text-slate-400">({t.year})</span> : null}

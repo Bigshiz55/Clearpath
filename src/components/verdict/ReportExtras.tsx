@@ -1,5 +1,6 @@
 import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier, WatchProviders } from '@/lib/types';
 import { episodeSummary } from '@/lib/tmdb/meta-helpers';
+import { originSummary } from '@/lib/origin';
 
 function callStyleFor(call: PrimaryCall): string {
   return call === 'WATCH IT'
@@ -151,28 +152,39 @@ export function RatingIcons({ sources }: { sources: RatingSource[] }) {
   );
 }
 
-const ENGLISH_COPY: Record<TitleMetadata['englishAvailability'], { label: string; note: string; good: boolean }> = {
-  native: { label: 'In English', note: 'Originally in English.', good: true },
-  available: { label: 'English dub available', note: 'An English version exists (dub and/or subtitles). Availability can vary by streaming provider.', good: true },
-  subtitles: { label: 'Subtitles', note: 'Not available in English audio — expect subtitles.', good: false },
-  unknown: { label: 'Language info limited', note: 'We couldn’t confirm English audio for this title.', good: false },
-};
-
 export function LanguageEpisodes({ meta }: { meta: TitleMetadata }) {
-  const eng = ENGLISH_COPY[meta.englishAvailability];
+  const origin = originSummary(meta);
   const eps = episodeSummary(meta.mediaType, meta.episodesAired, meta.episodesTotal, meta.nextEpisodeDate);
-  const origLang = meta.spokenLanguages[0] ?? (meta.originalLanguage ? meta.originalLanguage.toUpperCase() : null);
 
   return (
     <div className="space-y-3">
       <div className="flex items-start gap-3">
-        <span className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5">🗣️</span>
+        <span className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-base">
+          {origin?.flag || '🗣️'}
+        </span>
         <div>
           <div className="text-sm font-semibold text-white">
-            <span className={eng.good ? 'text-emerald-300' : 'text-amber-300'}>{eng.label}</span>
-            {origLang && meta.englishAvailability !== 'native' ? <span className="text-slate-400"> · original {origLang}</span> : null}
+            {origin ? (
+              <>
+                <span>{origin.headline}</span>
+                <span className={origin.good ? 'text-emerald-300' : 'text-amber-300'}>
+                  {' · '}
+                  {origin.english === 'native'
+                    ? 'in English'
+                    : origin.english === 'available'
+                      ? 'English dub available'
+                      : origin.english === 'subtitles'
+                        ? 'subtitled'
+                        : 'language unconfirmed'}
+                </span>
+              </>
+            ) : (
+              <span className="text-slate-300">Origin &amp; language not available</span>
+            )}
           </div>
-          <div className="mt-0.5 text-xs text-slate-400">{eng.note}</div>
+          <div className="mt-0.5 text-xs text-slate-400">
+            {origin?.note ?? 'We couldn’t confirm where this title is from or its original language.'}
+          </div>
         </div>
       </div>
       {eps && (
