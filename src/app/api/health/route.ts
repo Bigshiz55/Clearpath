@@ -52,16 +52,54 @@ async function probeTmdb() {
   }
 }
 
+/** Live OMDb probe — confirms the deployment's key is clean and activated. */
+async function probeOmdb() {
+  const raw = process.env.OMDB_API_KEY ?? '';
+  // eslint-disable-next-line no-control-regex
+  const key = raw.trim().replace(/[^\x20-\x7E]/g, '');
+  const shape = { rawLength: raw.length, cleanedLength: key.length, strippedChars: raw.trim().length - key.length };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?apikey=${encodeURIComponent(key)}&i=tt1392214`, {
+      signal: controller.signal,
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      Response?: string;
+      Error?: string;
+      imdbRating?: string;
+      Ratings?: { Source: string; Value: string }[];
+    };
+    return {
+      shape,
+      ok: body.Response === 'True',
+      imdbRating: body.imdbRating ?? null,
+      ratings: body.Ratings ?? null,
+      omdbError: body.Error ?? null,
+    };
+  } catch (e) {
+    return { shape, ok: false, error: e instanceof Error ? e.message : String(e) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Health endpoint. Reports readiness of each dependency by *presence* of
- * configuration only — never returns secret values. `?probe=tmdb` additionally
- * runs a live TMDB request and reports the outcome (no secrets).
+ * configuration only — never returns secret values. `?probe=tmdb` / `?probe=omdb`
+ * additionally run a live request and report the outcome (no secrets).
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   if (searchParams.get('probe') === 'tmdb') {
     return NextResponse.json(
       { probe: 'tmdb', result: await probeTmdb() },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
+  if (searchParams.get('probe') === 'omdb') {
+    return NextResponse.json(
+      { probe: 'omdb', result: await probeOmdb() },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   }
