@@ -13,23 +13,40 @@ function normalizeLine(raw: string): string {
     .trim();
 }
 
-/** Candidate title phrases from noisy OCR: cleaned lines + short word-windows. */
+/**
+ * Candidate title phrases from noisy OCR. Whole cleaned LINES come first (each
+ * guide row is usually a title), then short word-windows fill any leftover
+ * budget — so a long title's fragments can never starve later rows.
+ */
 function candidates(text: string): string[] {
-  const set = new Set<string>();
+  const lines: string[] = [];
+  const windows: string[] = [];
+  const seen = new Set<string>();
+  const push = (arr: string[], s: string) => {
+    const key = s.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      arr.push(s);
+    }
+  };
+
   for (const rawLine of text.split(/[\n\r]+/)) {
     const line = normalizeLine(rawLine);
     if (line.length < 2) continue;
-    if (line.length >= 2 && line.length <= 70 && !JUNK.test(line)) set.add(line);
+    if (line.length <= 80 && !JUNK.test(line)) push(lines, line);
     const words = line.split(' ').filter(Boolean);
     // Sliding windows (2–6 words) catch a title embedded in a busy line.
-    for (let n = Math.min(6, words.length); n >= 2; n--) {
-      for (let i = 0; i + n <= words.length && i < 5; i++) {
-        const w = words.slice(i, i + n).join(' ');
-        if (w.length >= 4 && w.length <= 50 && !JUNK.test(w)) set.add(w);
+    if (words.length >= 3) {
+      for (let n = Math.min(6, words.length); n >= 2; n--) {
+        for (let i = 0; i + n <= words.length && i < 6; i++) {
+          const w = words.slice(i, i + n).join(' ');
+          if (w.length >= 4 && w.length <= 60 && !JUNK.test(w)) push(windows, w);
+        }
       }
     }
   }
-  return Array.from(set).slice(0, 16);
+  // Every real row gets searched before any fragment does.
+  return [...lines, ...windows].slice(0, 36);
 }
 
 function score(cand: string, r: SearchResultItem): number {
