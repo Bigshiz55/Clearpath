@@ -52,6 +52,15 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Apply Simple (Senior) view before paint to avoid a flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('wv_simple')==='1')document.documentElement.setAttribute('data-simple','1');}catch(e){}",
+          }}
+        />
+      </head>
       <body>
         <ToastProvider>{children}</ToastProvider>
         <ServiceWorker />

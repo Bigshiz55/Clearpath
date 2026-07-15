@@ -81,3 +81,53 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Simple (Senior) view — one tap, everything bigger and calmer.
+   Scales the rem base so all Tailwind text/spacing grows together, enlarges
+   tap targets, raises contrast, and quiets low-priority chrome.
+--------------------------------------------------------------------------- */
+:root[data-simple='1'] {
+  font-size: 20px; /* base is 16px; ~1.25x everything sized in rem */
+}
+:root[data-simple='1'] body {
+  line-height: 1.65;
+  letter-spacing: 0.01em;
+}
+/* Bigger, easier-to-hit controls. */
+:root[data-simple='1'] .btn,
+:root[data-simple='1'] button,
+:root[data-simple='1'] .input,
+:root[data-simple='1'] select,
+:root[data-simple='1'] a.btn-primary,
+:root[data-simple='1'] a.btn-secondary {
+  min-height: 56px;
+}
+:root[data-simple='1'] .btn-primary,
+:root[data-simple='1'] .btn-secondary,
+:root[data-simple='1'] .btn-ghost {
+  padding-top: 0.9rem;
+  padding-bottom: 0.9rem;
+  font-size: 1.05rem;
+}
+/* Larger, higher-contrast body text. */
+:root[data-simple='1'] .text-slate-400,
+:root[data-simple='1'] .text-slate-500 {
+  color: #cdd5e6 !important;
+}
+:root[data-simple='1'] .text-xs {
+  font-size: 0.85rem;
+}
+:root[data-simple='1'] .text-\[11px\],
+:root[data-simple='1'] .text-\[10px\],
+:root[data-simple='1'] .text-\[9px\] {
+  font-size: 0.8rem;
+}
+/* More breathing room between cards/sections. */
+:root[data-simple='1'] .card {
+  border-radius: 1.25rem;
+}
+/* Opt-out hook: hide flourish-only elements in simple view. */
+:root[data-simple='1'] [data-simple-hide] {
+  display: none !important;
+}

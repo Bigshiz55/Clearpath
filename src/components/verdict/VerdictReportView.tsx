@@ -12,7 +12,9 @@ import { TonightBanner } from './TonightBanner';
 import { TitleBriefing } from './TitleBriefing';
 import { CriticsTable } from './CriticsTable';
 import { TheaterMode } from '@/components/TheaterMode';
+import { PostWatchInterview } from './PostWatchInterview';
 import { buildPanel } from '@/lib/swarm';
+import type { InterviewQuestion, Disposition } from '@/lib/interview';
 import type { Briefing } from '@/lib/briefing';
 import { originSummary } from '@/lib/origin';
 
@@ -54,11 +56,13 @@ export function VerdictReportView({
   watchState,
   myServices = [],
   briefing,
+  interview,
 }: {
   report: VerdictReport;
   watchState?: WatchState;
   myServices?: number[];
   briefing?: Briefing;
+  interview?: { disposition: Disposition; questions: InterviewQuestion[] } | null;
 }) {
   const t = report.title;
   const origin = originSummary(t);
@@ -172,6 +176,16 @@ export function VerdictReportView({
         initialRating={watchState?.rating ?? null}
         initialNotes={watchState?.notes ?? null}
       />
+
+      {/* Post-watch interview — appears once you've marked it watched/dropped */}
+      {interview && interview.questions.length > 0 && (
+        <PostWatchInterview
+          tmdbId={t.id}
+          mediaType={t.mediaType}
+          disposition={interview.disposition}
+          questions={interview.questions}
+        />
+      )}
 
       {/* Theater Mode — dim the lights, hush notifications, tell the group */}
       <TheaterMode

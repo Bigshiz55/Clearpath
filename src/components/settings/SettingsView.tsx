@@ -12,6 +12,7 @@ import { deleteAccount } from '@/lib/actions/account';
 import { useToast } from '@/components/Toast';
 import { STREAMING_SERVICES } from '@/lib/services';
 import { EnableNotifications } from '@/components/EnableNotifications';
+import { SimpleModeToggle } from '@/components/SimpleModeToggle';
 
 export interface ShareRow {
   token: string;
@@ -291,6 +292,18 @@ export function SettingsView(props: {
             className="h-5 w-5 accent-brand-500"
           />
         </label>
+      </section>
+
+      {/* Accessibility / Simple view */}
+      <section className="card p-5">
+        <h2 className="text-lg font-semibold text-white">Display</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Simple view makes everything bigger and easier to read and tap — great for older eyes or a TV across the
+          room. It’s saved on this device and toggles off just as easily.
+        </p>
+        <div className="mt-4">
+          <SimpleModeToggle variant="full" />
+        </div>
       </section>
 
       {/* Notifications */}

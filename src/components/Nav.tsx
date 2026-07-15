@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Logo } from './Logo';
 import { SignOutButton } from './SignOutButton';
 import { GuestSaveButton } from './GuestSaveButton';
+import { SimpleModeToggle } from './SimpleModeToggle';
 
 const LINKS = [
   { href: '/app', label: 'Discover' },
@@ -28,6 +29,7 @@ export function Nav({ personalLabel, isGuest = false }: { personalLabel?: string
             </nav>
           </div>
           <div className="flex items-center gap-2">
+            <SimpleModeToggle />
             {personalLabel && !isGuest && (
               <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 md:inline">
                 {personalLabel}

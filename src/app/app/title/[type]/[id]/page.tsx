@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server';
 import { TmdbError } from '@/lib/tmdb/client';
 import { ConfigError } from '@/lib/env';
 import { getMyServices } from '@/lib/profile';
+import { buildInterview, type Disposition } from '@/lib/interview';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,29 @@ async function getMyServicesForCurrentUser(): Promise<number[]> {
   }
 }
 
+/** Has the user already done the post-watch interview? Errors (e.g. migration
+ *  0009 not applied) resolve to "done" so we never show a broken prompt. */
+async function getFeedbackDone(tmdbId: number, mediaType: MediaType): Promise<boolean> {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return true;
+    const { data, error } = await supabase
+      .from('title_feedback')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('tmdb_id', tmdbId)
+      .eq('media_type', mediaType)
+      .maybeSingle();
+    if (error) return true;
+    return Boolean(data);
+  } catch {
+    return true;
+  }
+}
+
 function ErrorCard({ title, message }: { title: string; message: string }) {
   return (
     <div className="card mx-auto max-w-lg p-8 text-center">
@@ -80,17 +104,39 @@ export default async function TitlePage({ params }: { params: { type: string; id
   if (!parsed) notFound();
 
   try {
-    const [{ report, briefing }, watchState, myServices] = await Promise.all([
+    const [{ report, briefing }, watchState, myServices, feedbackDone] = await Promise.all([
       buildReportForCurrentUser(parsed.mediaType, parsed.id),
       getWatchState(parsed.id, parsed.mediaType),
       getMyServicesForCurrentUser(),
+      getFeedbackDone(parsed.id, parsed.mediaType),
     ]);
+
+    const status = watchState?.status;
+    const disposition: Disposition | null =
+      status === 'watched' ? 'finished' : status === 'dropped' ? 'abandoned' : null;
+    const interview =
+      disposition && !feedbackDone
+        ? {
+            disposition,
+            questions: buildInterview(
+              {
+                mediaType: report.title.mediaType,
+                genres: report.title.genres,
+                runtimeMinutes: report.title.runtimeMinutes,
+                numberOfSeasons: report.title.numberOfSeasons ?? null,
+              },
+              disposition,
+            ),
+          }
+        : null;
+
     return (
       <VerdictReportView
         report={report}
         watchState={watchState}
         myServices={myServices}
         briefing={briefing}
+        interview={interview}
       />
     );
   } catch (e) {
