@@ -211,14 +211,26 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
           style={{ background: `linear-gradient(180deg, transparent, ${accent}, #fff8e6, ${accent}, transparent)`, boxShadow: `0 0 24px ${accent}, 0 0 60px ${accent}88` }}
         />
 
-        {/* Closed-door invitation */}
-        <div className={`pointer-events-none absolute inset-x-0 top-4 flex flex-col items-center gap-1 transition-opacity duration-300 ${open ? 'opacity-0' : 'opacity-100'}`}>
+        {/* Closed-door invitation — a mounted medallion of who's presiding today */}
+        <div className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 transition-opacity duration-300 ${open ? 'opacity-0' : 'opacity-100'}`}>
           <div className="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap" style={{ borderColor: `${accent}77`, color: accent, background: 'rgba(0,0,0,.5)', boxShadow: `0 0 22px ${accent}44`, fontFamily: 'Georgia, serif' }}>
             ⚖️ In session
           </div>
-        </div>
-        <div className={`pointer-events-none absolute inset-x-0 bottom-5 flex justify-center transition-opacity duration-300 ${open ? 'opacity-0' : 'opacity-100'}`}>
-          <span className="rounded-full bg-black/50 px-3 py-1 text-xs font-semibold text-amber-100 backdrop-blur">Tap to enter the court ⚖️</span>
+          <div
+            className="grid h-24 w-24 place-items-center overflow-hidden rounded-full border-2"
+            style={{ borderColor: accent, boxShadow: `0 0 28px ${accent}77, inset 0 0 0 4px rgba(0,0,0,.4)`, background: showVendor ? `radial-gradient(circle at 50% 35%, ${accent}44, ${accent}18)` : '#0b0e17' }}
+          >
+            {showVendor ? (
+              <span className="text-4xl" aria-hidden>{judge!.emoji ?? '⚖️'}</span>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={dog.src} alt={`${name}, presiding`} className="h-full w-full object-cover" />
+            )}
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span className="rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-white backdrop-blur" style={{ fontFamily: 'Georgia, serif' }}>{name} will hear your case</span>
+            <span className="rounded-full bg-black/45 px-3 py-0.5 text-[11px] font-semibold text-amber-100 backdrop-blur">Tap to enter the court ⚖️</span>
+          </div>
         </div>
       </div>
 
