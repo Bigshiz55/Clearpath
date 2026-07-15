@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Poster } from './PosterCard';
+import { SaveButton } from './SaveButton';
 
 interface Result {
   id: number;
@@ -11,6 +12,7 @@ interface Result {
   title: string;
   year: number | null;
   overview: string;
+  posterPath: string | null;
   posterUrl: string | null;
   voteAverage: number | null;
 }
@@ -158,7 +160,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
               <div className="h-16 w-11 flex-shrink-0 overflow-hidden rounded-md">
                 <Poster posterUrl={r.posterUrl} title={r.title} />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-semibold text-white">{r.title}</span>
                   <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase text-slate-300">
@@ -170,6 +172,16 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
                   {r.voteAverage ? ` · ★ ${r.voteAverage.toFixed(1)}` : ''}
                 </div>
                 <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{r.overview}</p>
+              </div>
+              <div className="flex-shrink-0 self-center">
+                <SaveButton
+                  tmdbId={r.id}
+                  mediaType={r.mediaType}
+                  title={r.title}
+                  year={r.year}
+                  posterPath={r.posterPath}
+                  variant="inline"
+                />
               </div>
             </Link>
           ))}

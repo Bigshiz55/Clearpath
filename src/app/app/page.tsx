@@ -8,6 +8,7 @@ import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictBadge } from '@/components/VerdictBadge';
 import { NewForYou, type DigestItem } from '@/components/NewForYou';
 import { RecommendedForYou } from '@/components/RecommendedForYou';
+import { SaveButton } from '@/components/SaveButton';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -97,6 +98,15 @@ export default async function DiscoverPage() {
                 year={v.year}
                 mediaType={v.media_type}
                 posterUrl={tmdbImage(v.poster_path, 'w342')}
+                overlay={
+                  <SaveButton
+                    tmdbId={v.tmdb_id}
+                    mediaType={v.media_type}
+                    title={v.title}
+                    year={v.year}
+                    posterPath={v.poster_path}
+                  />
+                }
               >
                 <div className="mt-2 flex items-center justify-between">
                   <VerdictBadge tier={v.tier as VerdictTier} size="sm" />

@@ -9,6 +9,8 @@ interface PosterCardProps {
   posterUrl?: string | null;
   meta?: string;
   children?: React.ReactNode;
+  /** Rendered in the top-right corner of the poster (e.g. a save button). */
+  overlay?: React.ReactNode;
 }
 
 export function Poster({ posterUrl, title, className = '' }: { posterUrl?: string | null; title: string; className?: string }) {
@@ -33,7 +35,7 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
   );
 }
 
-export function PosterCard({ href, title, year, mediaType, posterUrl, meta, children }: PosterCardProps) {
+export function PosterCard({ href, title, year, mediaType, posterUrl, meta, children, overlay }: PosterCardProps) {
   const body = (
     <div className="card group h-full overflow-hidden transition hover:border-white/20 hover:shadow-glow">
       <div className="relative aspect-[2/3] overflow-hidden">
@@ -41,6 +43,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, meta, chil
         <span className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 backdrop-blur">
           {mediaType === 'movie' ? 'Movie' : 'TV'}
         </span>
+        {overlay && <div className="absolute right-2 top-2 z-10">{overlay}</div>}
       </div>
       <div className="p-3">
         <div className="line-clamp-2 text-sm font-semibold text-white">{title}</div>

@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { PosterCard } from './PosterCard';
+import { SaveButton } from './SaveButton';
 
 interface Rec {
   id: number;
   mediaType: 'movie' | 'tv';
   title: string;
   year: number | null;
+  posterPath: string | null;
   posterUrl: string | null;
   personalScore: number;
   tier: string;
@@ -74,6 +76,15 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
               year={r.year}
               mediaType={r.mediaType}
               posterUrl={r.posterUrl}
+              overlay={
+                <SaveButton
+                  tmdbId={r.id}
+                  mediaType={r.mediaType}
+                  title={r.title}
+                  year={r.year}
+                  posterPath={r.posterPath}
+                />
+              }
             >
               <div className="mt-2 space-y-1.5">
                 <span

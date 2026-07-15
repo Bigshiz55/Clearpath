@@ -22,6 +22,7 @@ export async function GET() {
         mediaType: r.mediaType,
         title: r.title,
         year: r.year,
+        posterPath: r.posterPath,
         posterUrl: tmdbImage(r.posterPath, 'w342'),
         personalScore: r.personalScore,
         tier: r.tier,

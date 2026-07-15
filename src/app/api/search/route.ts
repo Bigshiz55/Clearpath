@@ -24,6 +24,7 @@ export async function GET(request: Request) {
         title: r.title,
         year: r.year,
         overview: r.overview.slice(0, 220),
+        posterPath: r.posterPath,
         posterUrl: tmdbImage(r.posterPath, 'w185'),
         voteAverage: r.voteAverage,
       })),
