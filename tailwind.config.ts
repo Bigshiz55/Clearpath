@@ -64,10 +64,25 @@ const config: Config = {
         shimmer: {
           '100%': { transform: 'translateX(100%)' },
         },
+        'seam-glow': {
+          '0%, 100%': { opacity: '0.5', transform: 'scaleY(0.96)' },
+          '50%': { opacity: '1', transform: 'scaleY(1)' },
+        },
+        'spot-breathe': {
+          '0%, 100%': { opacity: '0.72', transform: 'scale(1)' },
+          '50%': { opacity: '1', transform: 'scale(1.03)' },
+        },
+        'reveal-in': {
+          '0%': { opacity: '0', transform: 'translateY(12px) scale(0.92)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 0.4s ease-out both',
         shimmer: 'shimmer 1.6s infinite',
+        'seam-glow': 'seam-glow 2.2s ease-in-out infinite',
+        'spot-breathe': 'spot-breathe 4.5s ease-in-out infinite',
+        'reveal-in': 'reveal-in 0.55s ease-out both',
       },
     },
   },
