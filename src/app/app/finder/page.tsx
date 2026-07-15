@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
-import { getMyServices } from '@/lib/profile';
+import { getMyServices, getProfile, regionFor } from '@/lib/profile';
 import { listCrews } from '@/lib/actions/crews';
+import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
+import { SponsoredJudge } from '@/components/SponsoredJudge';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Find it · WatchVerdict' };
@@ -13,6 +15,17 @@ export default async function FinderPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const services = user ? await getMyServices(supabase, user.id) : [];
+
+  // Presiding judge (region/national default; local resolves client-side via GPS).
+  let judge: Judge | null = null;
+  if (user) {
+    try {
+      const profile = await getProfile(supabase, user.id);
+      judge = await getActiveJudge(supabase, { region: regionFor(profile), nowMs: Date.now() });
+    } catch {
+      /* sponsors optional / pre-migration */
+    }
+  }
 
   // Offer crew members as "who's watching" — dedup by name, need real taste.
   const watchers: WatcherOption[] = [];
@@ -40,6 +53,12 @@ export default async function FinderPage() {
         services. You get a <span className="font-semibold text-slate-200">ranked set</span> of real titles, each
         scored for you and showing exactly which of your rules it met. No black box, no “one guess,” no credits.
       </p>
+      {judge && (
+        <div className="mt-6">
+          <SponsoredJudge initialJudge={judge} />
+        </div>
+      )}
+
       <div className="mt-6">
         <FinderUI hasServices={services.length > 0} watchers={watchers} />
       </div>
