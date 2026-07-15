@@ -23,12 +23,25 @@ function required(name: string, hint?: string): string {
   return requireValue(value, name, hint);
 }
 
+/**
+ * Clean a configuration value. Trims surrounding whitespace and strips any
+ * non-printable / non-ASCII characters. Pasted secrets frequently pick up junk
+ * — a trailing newline, a smart quote, or a mask "bullet" (•, U+2022) copied
+ * from a field that hides the value behind dots. Any character above code point
+ * 255 makes an HTTP header throw a ByteString error, taking down the whole
+ * request; our URLs and keys are always plain ASCII, so this is safe.
+ */
+function clean(value: string | undefined): string {
+  // eslint-disable-next-line no-control-regex
+  return (value ?? '').trim().replace(/[^\x20-\x7E]/g, '');
+}
+
 function requireValue(
   value: string | undefined,
   name: string,
   hint?: string,
 ): string {
-  const cleaned = value?.trim();
+  const cleaned = clean(value);
   if (!cleaned) {
     throw new ConfigError(
       `Missing required configuration: ${name}.${hint ? ' ' + hint : ''}`,
@@ -38,10 +51,7 @@ function requireValue(
 }
 
 function optional(name: string): string | undefined {
-  // Trim defensively: pasted keys often carry a trailing newline or spaces,
-  // which corrupt request URLs/headers (e.g. a newline in a Bearer token makes
-  // fetch throw before the request is even sent).
-  const value = process.env[name]?.trim();
+  const value = clean(process.env[name]);
   return value ? value : undefined;
 }
 

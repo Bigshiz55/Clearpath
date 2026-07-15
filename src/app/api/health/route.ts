@@ -9,12 +9,13 @@ export const dynamic = 'force-dynamic';
  */
 async function probeTmdb() {
   const raw = process.env.TMDB_API_KEY ?? '';
-  const key = raw.trim();
+  // Mirror env.ts cleaning: strip whitespace and non-ASCII (e.g. mask bullets).
+  // eslint-disable-next-line no-control-regex
+  const key = raw.trim().replace(/[^\x20-\x7E]/g, '');
   const shape = {
     rawLength: raw.length,
-    trimmedLength: key.length,
-    trailingWhitespace: raw.length !== key.length,
-    internalWhitespace: /\s/.test(key),
+    cleanedLength: key.length,
+    strippedChars: raw.trim().length - key.length,
     looksLikeV4Token: key.startsWith('ey'),
   };
 
