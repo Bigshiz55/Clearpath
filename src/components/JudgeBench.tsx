@@ -75,22 +75,28 @@ export function JudgeBench({ initialJudge, big = false }: { initialJudge: Judge 
 
   return (
     <section
-      className="flex h-full flex-col overflow-hidden rounded-2xl border"
-      style={{ borderColor: `${accent}44`, background: 'radial-gradient(120% 120% at 50% -20%, #16203a 0%, #0f1320 65%)' }}
+      className="relative flex h-full flex-col overflow-hidden rounded-2xl border"
+      style={{ borderColor: `${accent}55`, background: 'radial-gradient(120% 90% at 50% 4%, #2a1f10 0%, #1a1206 45%, #0a0703 100%)' }}
     >
-      <div className={big ? 'flex flex-col items-center gap-2 px-5 pt-5 text-center' : 'flex items-center gap-4 px-4 pt-4 sm:px-5'}>
-        <RobedPortrait src={showVendor ? undefined : dog.src} emoji={showVendor ? judge!.emoji ?? '⚖️' : undefined} size={size} accent={accent} />
+      {/* Spotlight beam + faint seal — the same lit chamber as the courtroom doors. */}
+      <div className="pointer-events-none absolute inset-0 animate-spot-breathe" style={{ background: `radial-gradient(60% 72% at 50% -8%, ${accent}33 0%, ${accent}10 34%, transparent 66%)` }} />
+      <div className="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 leading-none" style={{ color: accent, opacity: 0.07, fontSize: big ? 108 : 76 }} aria-hidden>⚖️</div>
+
+      <div className={`relative ${big ? 'flex flex-col items-center gap-2 px-5 pt-5 text-center' : 'flex items-center gap-4 px-4 pt-4 sm:px-5'}`}>
+        <div style={{ filter: `drop-shadow(0 8px 22px ${accent}44)` }}>
+          <RobedPortrait src={showVendor ? undefined : dog.src} emoji={showVendor ? judge!.emoji ?? '⚖️' : undefined} size={size} accent={accent} />
+        </div>
         <div className={big ? 'min-w-0' : 'min-w-0 flex-1'}>
           <div className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: accent, fontFamily: 'Georgia, serif' }}>
             ⚖️ Now presiding{showVendor ? ' · Sponsored' : ''}
           </div>
-          <div className={`${big ? 'text-lg' : 'truncate text-base'} font-bold text-white`}>{name}</div>
+          <div className={`${big ? 'text-lg' : 'truncate text-base'} font-bold text-white`} style={{ fontFamily: 'Georgia, serif' }}>{name}</div>
           <div className={`text-xs text-slate-400 ${big ? '' : 'truncate'}`}>{tagline}</div>
         </div>
       </div>
 
       {/* Judge picker */}
-      <div className="flex flex-wrap justify-center gap-1.5 px-4 pt-3 sm:px-5">
+      <div className="relative flex flex-wrap justify-center gap-1.5 px-4 pt-3 sm:px-5">
         {HOUSE_JUDGES.map((h) => (
           <button
             key={h.key}
@@ -109,8 +115,8 @@ export function JudgeBench({ initialJudge, big = false }: { initialJudge: Judge 
         </button>
       </div>
 
-      {/* the bench bar */}
-      <div className="mt-3 h-2.5" style={{ background: 'linear-gradient(180deg,#2a2016,#171009)', borderTop: `2px solid ${accent}55` }} />
+      {/* the bench — a wooden desk edge with a warm gold lip */}
+      <div className="relative mt-3 h-7 w-full" style={{ background: 'linear-gradient(180deg,#3a2a17 0%,#241914 45%,#140d07 100%)', borderTop: `2px solid ${accent}66`, boxShadow: `0 -8px 24px rgba(0,0,0,.5), inset 0 2px 0 ${accent}22` }} />
 
       {showVendor && judge!.discountLabel && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" style={{ background: `${accent}0f` }}>
