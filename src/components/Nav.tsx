@@ -4,9 +4,9 @@ import { SignOutButton } from './SignOutButton';
 
 const LINKS = [
   { href: '/app', label: 'Discover' },
+  { href: '/app/together', label: 'Together' },
   { href: '/app/quiz', label: 'Quiz' },
   { href: '/app/watchlist', label: 'Watchlist' },
-  { href: '/app/import', label: 'Import' },
   { href: '/app/settings', label: 'Settings' },
 ];
 

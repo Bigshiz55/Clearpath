@@ -63,12 +63,26 @@ export default async function DiscoverPage() {
         <div className="mt-5 max-w-2xl">
           <SearchBar autoFocus />
         </div>
-        <Link
-          href="/app/quiz"
-          className="mt-3 inline-flex items-center gap-2 rounded-xl border border-brand-400/30 bg-brand-500/10 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/20"
-        >
-          🍿 Take the 1-minute Taste Quiz — build your profile fast
-        </Link>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href="/app/together"
+            className="inline-flex items-center gap-2 rounded-xl border border-brand-400/40 bg-brand-500/15 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/25"
+          >
+            👪 Tonight, Together — one pick for the whole room
+          </Link>
+          <Link
+            href="/app/quiz"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            🍿 Taste Quiz
+          </Link>
+          <Link
+            href="/app/import"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            ⬆ Import history
+          </Link>
+        </div>
       </section>
 
       {digestItems.length > 0 && <NewForYou items={digestItems} label={label} />}
