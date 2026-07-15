@@ -176,7 +176,15 @@ export function FinderUI({
             <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and submit again.</p>
           ) : (
             <div className="space-y-3">
-              <div className="text-sm font-semibold text-white">⚖️ The verdict — {items.length} match{items.length === 1 ? '' : 'es'}, ranked by {scoredFor}:</div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-white">⚖️ The verdict — {items.length} match{items.length === 1 ? '' : 'es'}, ranked by {scoredFor}:</div>
+                <button
+                  onClick={() => document.getElementById('evidence')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+                >
+                  ⚖️ Present new evidence ↓
+                </button>
+              </div>
               {items.map((it) => (
                 <div key={`${it.mediaType}-${it.id}`} className="card flex gap-3 p-3">
                   <Link href={`/app/title/${it.mediaType}/${it.id}`} className="h-28 w-20 flex-none overflow-hidden rounded-lg border border-white/10">
@@ -235,7 +243,7 @@ export function FinderUI({
       </div>
 
       {/* Prepare your evidence — transparent, editable, no black box. */}
-      <div className="card space-y-4 p-4">
+      <div id="evidence" className="card space-y-4 p-4 scroll-mt-20">
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
           ⚖️ Prepare your evidence
         </div>
