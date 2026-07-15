@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { publicEnv } from '@/lib/env';
 import { useToast } from '@/components/Toast';
 
 type Mode = 'signin' | 'signup' | 'magic';
@@ -18,14 +17,16 @@ export function LoginForm({ next }: { next: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const redirectTo = `${publicEnv.siteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
-
   async function handle(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setNotice(null);
     setLoading(true);
     try {
+      // Build the auth redirect from the actual site the user is on — never a
+      // build-time env var — so a missing NEXT_PUBLIC_SITE_URL can't send the
+      // confirmation email to localhost.
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
       const supabase = createClient();
       if (mode === 'magic') {
         const { error } = await supabase.auth.signInWithOtp({
