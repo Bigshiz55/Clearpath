@@ -81,8 +81,8 @@ function syntheticSamples(): CalibrationSample[] {
 describe('Calibration brain', () => {
   it('precision@K rewards weights that rank liked titles on top', () => {
     const samples = syntheticSamples();
-    const rtHeavy = precisionAtK(samples, { rottenTomatoes: 0.9, imdb: 0, tmdbAudience: 0.1, metacritic: 0 });
-    const tmdbHeavy = precisionAtK(samples, { rottenTomatoes: 0.1, imdb: 0, tmdbAudience: 0.9, metacritic: 0 });
+    const rtHeavy = precisionAtK(samples, { rottenTomatoes: 0.9, imdb: 0, rtAudience: 0, tmdbAudience: 0.1, metacritic: 0 });
+    const tmdbHeavy = precisionAtK(samples, { rottenTomatoes: 0.1, imdb: 0, rtAudience: 0, tmdbAudience: 0.9, metacritic: 0 });
     expect(rtHeavy).toBeGreaterThan(tmdbHeavy);
   });
 

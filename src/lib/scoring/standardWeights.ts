@@ -22,10 +22,11 @@ export interface StandardWeightsMeta {
  * renormalizes over present sources anyway).
  */
 export const STANDARD_WEIGHTS: StandardWeights = {
-  rottenTomatoes: 0.3,
-  imdb: 0.27,
-  tmdbAudience: 0.23,
-  metacritic: 0.2,
+  rottenTomatoes: 0.26, // RT critics (Tomatometer)
+  imdb: 0.24,
+  rtAudience: 0.2, // RT audience (Popcorn) — via MDBList
+  tmdbAudience: 0.15,
+  metacritic: 0.15,
 };
 
 export const STANDARD_WEIGHTS_META: StandardWeightsMeta = {

@@ -3,7 +3,19 @@ import { unstable_cache } from 'next/cache';
 import type { MediaType, TitleMetadata, WatchProviders, SimilarTitle } from '@/lib/types';
 import { getTitle, getWatchProviders, getCollectionId, getSimilar } from '@/lib/tmdb/client';
 import { getCriticRatings } from '@/lib/omdb';
+import { getMdbRatings } from '@/lib/mdblist';
 import { getBriefing, type Briefing } from '@/lib/briefing';
+
+/** Adds the Rotten Tomatoes audience (Popcorn) score from MDBList, and backfills
+ *  any critic value OMDb didn't return. No-op without MDBLIST_API_KEY. */
+async function mergeMdbRatings(meta: TitleMetadata): Promise<void> {
+  const mdb = await getMdbRatings(meta.id, meta.mediaType, meta.imdbId).catch(() => null);
+  if (!mdb) return;
+  if (mdb.rtAudience != null) meta.rtAudience = mdb.rtAudience;
+  if (meta.rottenTomatoes == null && mdb.rtCritic != null) meta.rottenTomatoes = mdb.rtCritic;
+  if (meta.imdbRating == null && mdb.imdb != null) meta.imdbRating = mdb.imdb;
+  if (meta.metascore == null && mdb.metacritic != null) meta.metascore = mdb.metacritic;
+}
 
 export interface SharedTitleData {
   meta: TitleMetadata;
@@ -34,6 +46,7 @@ async function hydrate(mediaType: MediaType, id: number, region: string): Promis
     meta.rottenTomatoes = critics.rottenTomatoes;
     meta.metascore = critics.metascore;
   }
+  await mergeMdbRatings(meta);
   return { meta, providers, collectionId, similar, briefing };
 }
 

@@ -7,6 +7,7 @@ import type { WatchVerdictScore } from '@/lib/types';
 export interface TileRatings {
   standardScore: number | null; // our blended 0..100
   audience: number | null; // TMDB audience %
+  rtAudience: number | null; // Rotten Tomatoes audience / Popcorn %
   tomatometer: number | null; // Rotten Tomatoes critics %
   imdb: number | null; // 0..10
   metacritic: number | null; // 0..100
@@ -15,6 +16,7 @@ export interface TileRatings {
 export const EMPTY_TILE_RATINGS: TileRatings = {
   standardScore: null,
   audience: null,
+  rtAudience: null,
   tomatometer: null,
   imdb: null,
   metacritic: null,
@@ -27,6 +29,7 @@ export function tileRatingsFromScore(general: WatchVerdictScore): TileRatings {
   return {
     standardScore: general.standardScore ?? general.score ?? null,
     audience: find('TMDB Audience')?.value ?? null,
+    rtAudience: find('RT Audience')?.value ?? null,
     tomatometer: find('Rotten Tomatoes')?.value ?? null,
     imdb: imdb?.value != null ? Math.round(imdb.value) / 10 : null,
     metacritic: find('Metacritic')?.value ?? null,
@@ -34,7 +37,14 @@ export function tileRatingsFromScore(general: WatchVerdictScore): TileRatings {
 }
 
 export function hasAnyRating(r: TileRatings): boolean {
-  return r.standardScore != null || r.audience != null || r.tomatometer != null || r.imdb != null || r.metacritic != null;
+  return (
+    r.standardScore != null ||
+    r.audience != null ||
+    r.rtAudience != null ||
+    r.tomatometer != null ||
+    r.imdb != null ||
+    r.metacritic != null
+  );
 }
 
 /** An honest outbound link to Decider's coverage of a title (a search — they

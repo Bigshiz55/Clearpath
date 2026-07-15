@@ -23,7 +23,7 @@ function decodeReadings(raw: unknown): SourceReading[] {
   for (const r of raw as { key?: string; value?: number; sampleSize?: number }[]) {
     if (!r || typeof r.value !== 'number') continue;
     const key = r.key as SourceReading['key'];
-    if (key !== 'tmdbAudience' && key !== 'imdb' && key !== 'rottenTomatoes' && key !== 'metacritic') continue;
+    if (key !== 'tmdbAudience' && key !== 'imdb' && key !== 'rottenTomatoes' && key !== 'rtAudience' && key !== 'metacritic') continue;
     out.push({ key, value: r.value, sampleSize: r.sampleSize != null && r.sampleSize >= 0 ? r.sampleSize : Number.POSITIVE_INFINITY });
   }
   return out;

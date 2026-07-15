@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { runCalibration, type CalibrationReport } from '@/lib/actions/adminCalibration';
 
 const KEYS = [
-  ['rottenTomatoes', 'Rotten Tomatoes'],
+  ['rottenTomatoes', 'Rotten Tomatoes (critics)'],
+  ['rtAudience', 'RT audience (Popcorn)'],
   ['imdb', 'IMDb'],
   ['tmdbAudience', 'TMDB audience'],
   ['metacritic', 'Metacritic'],
@@ -29,7 +30,7 @@ export function CalibrationAdmin() {
 
   const snippet =
     report && report.ok
-      ? `export const STANDARD_WEIGHTS: StandardWeights = {\n  rottenTomatoes: ${w(report.fitted.rottenTomatoes)},\n  imdb: ${w(report.fitted.imdb)},\n  tmdbAudience: ${w(report.fitted.tmdbAudience)},\n  metacritic: ${w(report.fitted.metacritic)},\n};`
+      ? `export const STANDARD_WEIGHTS: StandardWeights = {\n  rottenTomatoes: ${w(report.fitted.rottenTomatoes)},\n  rtAudience: ${w(report.fitted.rtAudience)},\n  imdb: ${w(report.fitted.imdb)},\n  tmdbAudience: ${w(report.fitted.tmdbAudience)},\n  metacritic: ${w(report.fitted.metacritic)},\n};`
       : '';
 
   return (

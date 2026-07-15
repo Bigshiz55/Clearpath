@@ -55,7 +55,8 @@ export interface TitleMetadata {
   imdbId: string | null;
   /** Critic/aggregator ratings from OMDb (optional provider). null when absent. */
   imdbRating: number | null; // 0..10
-  rottenTomatoes: number | null; // 0..100
+  rottenTomatoes: number | null; // 0..100 — Tomatometer (critics)
+  rtAudience?: number | null; // 0..100 — Rotten Tomatoes audience / Popcorn (MDBList)
   metascore: number | null; // 0..100
   /** TV episode counts. episodesTotal is null when the run is ongoing/unknown. */
   episodesAired: number | null;

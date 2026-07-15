@@ -43,9 +43,12 @@ export function RatingsStrip({
           🍅 {ratings.tomatometer}%
         </span>
       )}
-      {ratings.audience != null && (
-        <span className="inline-flex items-center gap-0.5 text-amber-200" title="Audience score (from TMDB — Rotten Tomatoes' own audience score isn't in our data feed)">
-          🍿 {ratings.audience}%
+      {(ratings.rtAudience ?? ratings.audience) != null && (
+        <span
+          className="inline-flex items-center gap-0.5 text-amber-200"
+          title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience score (TMDB — no Rotten Tomatoes audience score available for this title)'}
+        >
+          🍿 {ratings.rtAudience ?? ratings.audience}%
         </span>
       )}
       {ratings.imdb != null && (

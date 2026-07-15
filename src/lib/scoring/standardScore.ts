@@ -11,12 +11,13 @@
 // calibration brain (`calibrateStandardScore.ts`) against real user ratings.
 import type { Confidence } from '@/lib/types';
 
-export type StandardSourceKey = 'tmdbAudience' | 'imdb' | 'rottenTomatoes' | 'metacritic';
+export type StandardSourceKey = 'tmdbAudience' | 'imdb' | 'rottenTomatoes' | 'rtAudience' | 'metacritic';
 
 export interface StandardWeights {
   tmdbAudience: number;
   imdb: number;
   rottenTomatoes: number;
+  rtAudience: number;
   metacritic: number;
 }
 
@@ -53,6 +54,7 @@ const CONF_K: Record<StandardSourceKey, number> = {
   tmdbAudience: 250,
   imdb: 250,
   rottenTomatoes: 1,
+  rtAudience: 1,
   metacritic: 1,
 };
 
@@ -85,7 +87,7 @@ export function computeStandardScore(readings: SourceReading[], weights: Standar
   // Evidence-weighted mean of the sources we actually have.
   const raw = sumEff > 0 ? parts.reduce((a, p) => a + p.value * p.eff, 0) / sumEff : NEUTRAL;
   // Trust = average confidence of the present sources (weighted by base weight).
-  const trust = clamp(sumEff / presentBase, 0, 1);
+  const trust = presentBase > 0 ? clamp(sumEff / presentBase, 0, 1) : 0;
   // Thin evidence → shrink toward neutral so we never over-claim.
   const score = clamp(raw * trust + NEUTRAL * (1 - trust));
 

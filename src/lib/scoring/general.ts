@@ -30,6 +30,7 @@ export function standardReadings(meta: TitleMetadata): SourceReading[] {
   }
   if (meta.imdbRating != null) readings.push({ key: 'imdb', value: clamp(meta.imdbRating * 10), sampleSize: Number.POSITIVE_INFINITY });
   if (meta.rottenTomatoes != null) readings.push({ key: 'rottenTomatoes', value: clamp(meta.rottenTomatoes), sampleSize: Number.POSITIVE_INFINITY });
+  if (meta.rtAudience != null) readings.push({ key: 'rtAudience', value: clamp(meta.rtAudience), sampleSize: Number.POSITIVE_INFINITY });
   if (meta.metascore != null) readings.push({ key: 'metacritic', value: clamp(meta.metascore), sampleSize: Number.POSITIVE_INFINITY });
   return readings;
 }
@@ -148,6 +149,13 @@ export function computeGeneralScore(
       raw: meta.rottenTomatoes != null ? `${meta.rottenTomatoes}%` : null,
       available: meta.rottenTomatoes != null,
       weight: weightOf('rottenTomatoes'),
+    },
+    {
+      name: 'RT Audience',
+      value: meta.rtAudience ?? null,
+      raw: meta.rtAudience != null ? `${meta.rtAudience}%` : null,
+      available: meta.rtAudience != null,
+      weight: weightOf('rtAudience'),
     },
     {
       name: 'Metacritic',

@@ -23,7 +23,7 @@ export interface CalibrationResult {
   k: number;
 }
 
-const UNIFORM: StandardWeights = { tmdbAudience: 0.25, imdb: 0.25, rottenTomatoes: 0.25, metacritic: 0.25 };
+const UNIFORM: StandardWeights = { tmdbAudience: 0.2, imdb: 0.2, rottenTomatoes: 0.2, rtAudience: 0.2, metacritic: 0.2 };
 
 /**
  * Precision@K: rank the samples by predicted Standard Score, take the top K
@@ -68,20 +68,23 @@ export function fitWeights(samples: CalibrationSample[], k = 0.3): CalibrationRe
 
   for (const rottenTomatoes of GRID) {
     for (const imdb of GRID) {
-      for (const tmdbAudience of GRID) {
-        for (const metacritic of GRID) {
-          const sum = rottenTomatoes + imdb + tmdbAudience + metacritic;
-          if (sum <= 0) continue;
-          const w: StandardWeights = {
-            rottenTomatoes: rottenTomatoes / sum,
-            imdb: imdb / sum,
-            tmdbAudience: tmdbAudience / sum,
-            metacritic: metacritic / sum,
-          };
-          const p = precisionAtK(trainSet, w, k);
-          if (p > bestScore) {
-            bestScore = p;
-            best = w;
+      for (const rtAudience of GRID) {
+        for (const tmdbAudience of GRID) {
+          for (const metacritic of GRID) {
+            const sum = rottenTomatoes + imdb + rtAudience + tmdbAudience + metacritic;
+            if (sum <= 0) continue;
+            const w: StandardWeights = {
+              rottenTomatoes: rottenTomatoes / sum,
+              imdb: imdb / sum,
+              rtAudience: rtAudience / sum,
+              tmdbAudience: tmdbAudience / sum,
+              metacritic: metacritic / sum,
+            };
+            const p = precisionAtK(trainSet, w, k);
+            if (p > bestScore) {
+              bestScore = p;
+              best = w;
+            }
           }
         }
       }
