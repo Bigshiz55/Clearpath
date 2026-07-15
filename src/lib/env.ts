@@ -120,6 +120,13 @@ export const serverEnv = {
   vapidSubject(): string {
     return optional('VAPID_SUBJECT') ?? 'mailto:notifications@watchverdict.app';
   },
+  /** Comma/space-separated allowlist of admin emails (ADMIN_EMAILS). */
+  adminEmails(): string[] {
+    return (optional('ADMIN_EMAILS') ?? '')
+      .split(/[,\s]+/)
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+  },
 };
 
 /**

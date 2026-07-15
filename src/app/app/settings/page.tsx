@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, getPreferenceRules, personalLabelFor, getMyServices, getPublicActivity } from '@/lib/profile';
+import { isAdminEmail } from '@/lib/admin';
 import { SettingsView, type ShareRow } from '@/components/settings/SettingsView';
 
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,7 @@ export default async function SettingsPage() {
       shares={shares}
       myServices={myServices}
       publicActivity={publicActivity}
+      isAdmin={isAdminEmail(user?.email)}
     />
   );
 }
