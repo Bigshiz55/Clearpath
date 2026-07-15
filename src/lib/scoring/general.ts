@@ -6,6 +6,8 @@ import type {
   WatchProviders,
   WatchVerdictScore,
 } from '@/lib/types';
+import { computeStandardScore, type SourceReading } from './standardScore';
+import { STANDARD_WEIGHTS } from './standardWeights';
 
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 const round = (n: number) => Math.round(n);
@@ -13,23 +15,23 @@ const round = (n: number) => Math.round(n);
 /** Neutral prior used when audience data is missing. */
 const NEUTRAL = 55;
 
-/**
- * Bayesian shrinkage of an audience average toward the neutral prior based on
- * how many votes back it. Few votes => pulled toward neutral (less trust).
- */
-function shrinkAudience(voteAverage: number | null, voteCount: number): number {
-  if (voteAverage == null) return NEUTRAL;
-  const raw = clamp(voteAverage * 10);
-  const m = 250; // prior strength in "equivalent votes"
-  const weighted = (voteCount * raw + m * NEUTRAL) / (voteCount + m);
-  return clamp(weighted);
-}
-
 function reliability(voteCount: number, hasVote: boolean): Confidence {
   if (!hasVote) return 'low';
   if (voteCount >= 1000) return 'high';
   if (voteCount >= 200) return 'medium';
   return 'low';
+}
+
+/** Assemble the rating-source readings the Standard Score blends. */
+function standardReadings(meta: TitleMetadata): SourceReading[] {
+  const readings: SourceReading[] = [];
+  if (meta.voteAverage != null && meta.voteCount > 0) {
+    readings.push({ key: 'tmdbAudience', value: clamp(meta.voteAverage * 10), sampleSize: meta.voteCount });
+  }
+  if (meta.imdbRating != null) readings.push({ key: 'imdb', value: clamp(meta.imdbRating * 10), sampleSize: Number.POSITIVE_INFINITY });
+  if (meta.rottenTomatoes != null) readings.push({ key: 'rottenTomatoes', value: clamp(meta.rottenTomatoes), sampleSize: Number.POSITIVE_INFINITY });
+  if (meta.metascore != null) readings.push({ key: 'metacritic', value: clamp(meta.metascore), sampleSize: Number.POSITIVE_INFINITY });
+  return readings;
 }
 
 /** Log-scaled engagement from TMDB popularity. */
@@ -70,26 +72,16 @@ function watchabilityScore(
   return clamp(s);
 }
 
-/** Average the available critic aggregator scores (0..100), or null if none. */
-function criticScore(meta: TitleMetadata): number | null {
-  const parts: number[] = [];
-  if (meta.rottenTomatoes != null) parts.push(clamp(meta.rottenTomatoes));
-  if (meta.metascore != null) parts.push(clamp(meta.metascore));
-  if (meta.imdbRating != null) parts.push(clamp(meta.imdbRating * 10));
-  if (parts.length === 0) return null;
-  return clamp(parts.reduce((a, b) => a + b, 0) / parts.length);
-}
-
 export function computeGeneralScore(
   meta: TitleMetadata,
   providers: WatchProviders | null,
 ): WatchVerdictScore {
   const hasVote = meta.voteAverage != null && meta.voteCount > 0;
   const audience = hasVote ? clamp(meta.voteAverage! * 10) : NEUTRAL;
-  const shrunk = shrinkAudience(meta.voteAverage, meta.voteCount);
-  const critic = criticScore(meta);
-  // Quality blends audience reception with critic aggregators when available.
-  const quality = critic != null ? clamp(shrunk * 0.6 + critic * 0.4) : shrunk;
+  // The Standard Score — one confidence-weighted number across every rating
+  // source we actually have. It IS the quality signal now.
+  const standard = computeStandardScore(standardReadings(meta), STANDARD_WEIGHTS);
+  const quality = standard.score;
   const engagement = engagementScore(meta.popularity);
   const watchability = watchabilityScore(meta, providers);
   // Execution/production reception are proxied by the blended quality signal
@@ -130,34 +122,43 @@ export function computeGeneralScore(
 
   const confidence = overallConfidence(meta, providers, dataReliability);
 
+  const weightOf = (key: string) => {
+    const c = standard.contributions.find((x) => x.key === key);
+    return c ? Math.round(c.weight * 100) / 100 : undefined;
+  };
+
   const sources: RatingSource[] = [
     {
       name: 'TMDB Audience',
       value: hasVote ? round(clamp(meta.voteAverage! * 10)) : null,
       raw: hasVote ? `${meta.voteAverage!.toFixed(1)}/10 (${meta.voteCount.toLocaleString()} votes)` : null,
       available: hasVote,
+      weight: weightOf('tmdbAudience'),
     },
     {
       name: 'IMDb',
       value: meta.imdbRating != null ? round(clamp(meta.imdbRating * 10)) : null,
       raw: meta.imdbRating != null ? `${meta.imdbRating.toFixed(1)}/10` : null,
       available: meta.imdbRating != null,
+      weight: weightOf('imdb'),
     },
     {
       name: 'Rotten Tomatoes',
       value: meta.rottenTomatoes,
       raw: meta.rottenTomatoes != null ? `${meta.rottenTomatoes}%` : null,
       available: meta.rottenTomatoes != null,
+      weight: weightOf('rottenTomatoes'),
     },
     {
       name: 'Metacritic',
       value: meta.metascore,
       raw: meta.metascore != null ? `${meta.metascore}/100` : null,
       available: meta.metascore != null,
+      weight: weightOf('metacritic'),
     },
   ];
 
-  return { score, breakdown, confidence, sources };
+  return { score, breakdown, confidence, sources, standardScore: standard.score, standardConfidence: standard.confidence };
 }
 
 function overallConfidence(

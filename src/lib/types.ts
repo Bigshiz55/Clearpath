@@ -151,6 +151,10 @@ export interface WatchVerdictScore {
   breakdown: ScoreBreakdown;
   confidence: Confidence;
   sources: RatingSource[];
+  /** The blended, confidence-weighted quality number across all rating
+   *  sources (0..100). Its own confidence travels alongside. */
+  standardScore?: number;
+  standardConfidence?: Confidence;
 }
 
 export interface RatingSource {
@@ -158,6 +162,8 @@ export interface RatingSource {
   value: number | null; // normalized 0..100, null if unavailable
   raw: string | null; // human display, e.g. "7.8/10"
   available: boolean;
+  /** Effective share of the Standard Score blend, 0..1 (present sources only). */
+  weight?: number;
 }
 
 export interface PersonalMatch {
