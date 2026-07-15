@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { SaveButton } from '@/components/SaveButton';
+import { JudgeBench } from '@/components/JudgeBench';
 import type { FinderQuery } from '@/lib/finder';
+import type { Judge } from '@/lib/sponsors';
 
 export interface WatcherOption {
   name: string;
@@ -91,16 +93,23 @@ function runtimeReadout(v: number): string {
   const m = v % 60;
   return h > 0 ? `≤ ${h}h ${m ? `${m}m` : ''}`.trim() : `≤ ${m}m`;
 }
-function monthsReadout(v: number): string {
-  if (v <= 0) return 'Any time';
-  if (v % 12 === 0) return `Last ${v / 12} yr`;
-  return `Last ${v} mo`;
+function yearsReadout(years: number): string {
+  if (years <= 0) return 'Any time';
+  return `Last ${years} year${years > 1 ? 's' : ''}`;
 }
 function paceReadout(v: number): string {
   return v <= 33 ? '🐢 Slow burn' : v >= 67 ? '⚡ Adrenaline' : '🎬 Balanced';
 }
 
-export function FinderUI({ hasServices, watchers = [] }: { hasServices: boolean; watchers?: WatcherOption[] }) {
+export function FinderUI({
+  hasServices,
+  watchers = [],
+  initialJudge = null,
+}: {
+  hasServices: boolean;
+  watchers?: WatcherOption[];
+  initialJudge?: Judge | null;
+}) {
   const [text, setText] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
   const [watcherIdx, setWatcherIdx] = useState(-1); // -1 = You
@@ -149,6 +158,65 @@ export function FinderUI({ hasServices, watchers = [] }: { hasServices: boolean;
 
   return (
     <div className="space-y-5">
+      {/* The judge presides — the ruling (a list of movies) lands right beneath */}
+      <JudgeBench initialJudge={initialJudge} />
+
+      {loading && (
+        <div className="card p-6 text-center">
+          <div className="text-sm font-semibold text-white">⚖️ The court is deliberating…</div>
+          <div className="mt-1 text-xs text-slate-400">Weighing your evidence against every candidate.</div>
+        </div>
+      )}
+      {error && <p className="text-sm text-amber-300">{error}</p>}
+
+      {items && !loading && (
+        <div>
+          {relaxed && <p className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{relaxed}</p>}
+          {items.length === 0 ? (
+            <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and submit again.</p>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-sm font-semibold text-white">⚖️ The verdict — {items.length} match{items.length === 1 ? '' : 'es'}, ranked by {scoredFor}:</div>
+              {items.map((it) => (
+                <div key={`${it.mediaType}-${it.id}`} className="card flex gap-3 p-3">
+                  <Link href={`/app/title/${it.mediaType}/${it.id}`} className="h-28 w-20 flex-none overflow-hidden rounded-lg border border-white/10">
+                    {it.posterUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={it.posterUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center bg-white/5 p-1 text-center text-[10px] text-slate-400">{it.title}</div>
+                    )}
+                  </Link>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link href={`/app/title/${it.mediaType}/${it.id}`} className="line-clamp-1 font-semibold text-white hover:underline">
+                        {it.title} {it.year ? <span className="font-normal text-slate-400">({it.year})</span> : null}
+                      </Link>
+                      <SaveButton tmdbId={it.id} mediaType={it.mediaType} title={it.title} year={it.year} posterPath={it.posterPath} />
+                    </div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className={`rounded-md border px-2 py-0.5 text-[11px] font-black ${CALL_STYLE[it.primaryCall] ?? 'border-white/15 text-slate-200'}`}>{it.primaryCall}</span>
+                      <span className="text-sm font-bold tabular-nums text-gold-400">{it.matchScore}</span>
+                      <span className="text-xs text-slate-500">match · {it.generalScore} overall</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-slate-300">{it.reason}</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {it.receipts.map((r) => (
+                        <span key={r} className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">✓ {r}</span>
+                      ))}
+                      {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
+                      <a href={it.deciderUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-brand-300 hover:bg-white/10">
+                        Decider: Stream It or Skip It? ↗
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div>
         <textarea
           value={text}
@@ -215,8 +283,8 @@ export function FinderUI({ hasServices, watchers = [] }: { hasServices: boolean;
         <div className="grid gap-4 sm:grid-cols-2">
           <Slider label="Max length" readout={runtimeReadout(q.maxRuntime ?? 240)} min={60} max={240} step={10}
             value={q.maxRuntime ?? 240} onChange={(v) => set('maxRuntime', v >= 240 ? null : v)} />
-          <Slider label="Released" readout={monthsReadout(q.sinceMonths ?? 0)} min={0} max={120} step={6}
-            value={q.sinceMonths ?? 0} onChange={(v) => set('sinceMonths', v === 0 ? null : v)} />
+          <Slider label="Released" readout={yearsReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0)} min={0} max={15} step={1}
+            value={q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0} onChange={(years) => set('sinceMonths', years === 0 ? null : years * 12)} />
           <Slider label="Audience at least" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
             value={q.minAudience ?? 0} onChange={(v) => set('minAudience', v === 0 ? null : v)} />
           <Slider label={`${scoredFor} at least`} readout={q.minMatch ? `${q.minMatch}+` : 'Any'} min={0} max={95} step={5}
@@ -273,59 +341,9 @@ export function FinderUI({ hasServices, watchers = [] }: { hasServices: boolean;
         </div>
 
         <button onClick={find} disabled={loading} className="btn-primary w-full py-3">
-          {loading ? 'Finding your matches…' : '🔎 Find it'}
+          {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
         </button>
       </div>
-
-      {error && <p className="text-sm text-amber-300">{error}</p>}
-
-      {items && !loading && (
-        <div>
-          {relaxed && <p className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{relaxed}</p>}
-          {items.length === 0 ? (
-            <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and try again.</p>
-          ) : (
-            <div className="space-y-3">
-              <div className="text-sm text-slate-400">{items.length} real matches, ranked by {scoredFor} — each shows what it satisfied.</div>
-              {items.map((it) => (
-                <div key={`${it.mediaType}-${it.id}`} className="card flex gap-3 p-3">
-                  <Link href={`/app/title/${it.mediaType}/${it.id}`} className="h-28 w-20 flex-none overflow-hidden rounded-lg border border-white/10">
-                    {it.posterUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={it.posterUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="grid h-full w-full place-items-center bg-white/5 p-1 text-center text-[10px] text-slate-400">{it.title}</div>
-                    )}
-                  </Link>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <Link href={`/app/title/${it.mediaType}/${it.id}`} className="line-clamp-1 font-semibold text-white hover:underline">
-                        {it.title} {it.year ? <span className="font-normal text-slate-400">({it.year})</span> : null}
-                      </Link>
-                      <SaveButton tmdbId={it.id} mediaType={it.mediaType} title={it.title} year={it.year} posterPath={it.posterPath} />
-                    </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className={`rounded-md border px-2 py-0.5 text-[11px] font-black ${CALL_STYLE[it.primaryCall] ?? 'border-white/15 text-slate-200'}`}>{it.primaryCall}</span>
-                      <span className="text-sm font-bold tabular-nums text-gold-400">{it.matchScore}</span>
-                      <span className="text-xs text-slate-500">match · {it.generalScore} overall</span>
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-300">{it.reason}</p>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {it.receipts.map((r) => (
-                        <span key={r} className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">✓ {r}</span>
-                      ))}
-                      {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
-                      <a href={it.deciderUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-brand-300 hover:bg-white/10">
-                        Decider: Stream It or Skip It? ↗
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

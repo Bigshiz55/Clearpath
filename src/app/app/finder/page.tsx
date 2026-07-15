@@ -4,7 +4,6 @@ import { getMyServices, getProfile, regionFor } from '@/lib/profile';
 import { listCrews } from '@/lib/actions/crews';
 import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
-import { JudgeBench } from '@/components/JudgeBench';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Find it · WatchVerdict' };
@@ -54,11 +53,7 @@ export default async function FinderPage() {
         scored for you and showing exactly which of your rules it met. No black box, no “one guess,” no credits.
       </p>
       <div className="mt-6">
-        <JudgeBench initialJudge={judge} />
-      </div>
-
-      <div className="mt-6">
-        <FinderUI hasServices={services.length > 0} watchers={watchers} />
+        <FinderUI hasServices={services.length > 0} watchers={watchers} initialJudge={judge} />
       </div>
     </div>
   );

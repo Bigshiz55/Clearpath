@@ -68,7 +68,7 @@ export function JudgeBench({ initialJudge }: { initialJudge: Judge | null }) {
             <div className="grid h-full w-full place-items-center text-3xl" aria-hidden>{judge.emoji ?? '⚖️'}</div>
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src="/judge-face.png" alt="The presiding judge" className="h-full w-full object-cover" />
+            <img src="/judge-dog.png" alt="The presiding judge" className="h-full w-full object-cover" />
           )}
         </div>
         <div className="min-w-0 flex-1">
