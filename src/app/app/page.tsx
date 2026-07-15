@@ -82,6 +82,12 @@ export default async function DiscoverPage() {
           >
             ⬆ Import history
           </Link>
+          <Link
+            href="/app/connect"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            📱 Add from phone (Siri)
+          </Link>
         </div>
       </section>
 

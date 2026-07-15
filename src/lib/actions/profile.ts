@@ -262,3 +262,43 @@ export async function getMyTaste(): Promise<MyTaste> {
     return { signedIn: false, isGuest: false, name: null, love: [], avoid: [] };
   }
 }
+
+/** Get (or create) the user's personal Quick-Add key for phone shortcuts. */
+export async function getQuickAddToken(): Promise<{ ok: boolean; token?: string; error?: string }> {
+  try {
+    const supabase = createClient();
+    const user = await requireUser(supabase);
+    const { data, error } = await supabase.from('profiles').select('quick_add_token').eq('id', user.id).maybeSingle();
+    if (error) {
+      if (error.code === '42P01' || /quick_add_token/.test(error.message)) {
+        return { ok: false, error: 'Quick Add needs migration 0005 applied first.' };
+      }
+      return { ok: false, error: error.message };
+    }
+    let token = (data?.quick_add_token as string | null) ?? null;
+    if (!token) {
+      const { randomBytes } = await import('crypto');
+      token = randomBytes(18).toString('base64url');
+      const { error: upErr } = await supabase.from('profiles').update({ quick_add_token: token }).eq('id', user.id);
+      if (upErr) return { ok: false, error: upErr.message };
+    }
+    return { ok: true, token };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed.' };
+  }
+}
+
+/** Roll a new Quick-Add key (invalidates the old one). */
+export async function regenerateQuickAddToken(): Promise<{ ok: boolean; token?: string; error?: string }> {
+  try {
+    const supabase = createClient();
+    const user = await requireUser(supabase);
+    const { randomBytes } = await import('crypto');
+    const token = randomBytes(18).toString('base64url');
+    const { error } = await supabase.from('profiles').update({ quick_add_token: token }).eq('id', user.id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, token };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed.' };
+  }
+}

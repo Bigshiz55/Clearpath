@@ -3,6 +3,8 @@ import type { MetadataRoute } from 'next';
 export const dynamic = 'force-static';
 
 export default function manifest(): MetadataRoute.Manifest {
+  // `share_target` follows the Web Share Target spec (params as an object).
+  // Next's Manifest type models params as an array, so we cast past it.
   return {
     name: 'WatchVerdict',
     short_name: 'WatchVerdict',
@@ -20,5 +22,11 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
       { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
-  };
+    // Android: appear in the system Share sheet; shared text/URL lands on /app/share-target.
+    share_target: {
+      action: '/app/share-target',
+      method: 'get',
+      params: { title: 'title', text: 'text', url: 'url' },
+    },
+  } as unknown as MetadataRoute.Manifest;
 }

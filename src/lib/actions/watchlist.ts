@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { searchTitles } from '@/lib/tmdb/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface ActionResult {
@@ -132,5 +133,43 @@ export async function removeWatchlistItem(itemId: string): Promise<ActionResult>
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Failed to remove.' };
+  }
+}
+
+/** Session-based quick add by free text (used by the Android share target). */
+export async function quickAddByText(text: string): Promise<ActionResult & { added?: string }> {
+  const q = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!q) return { ok: false, error: 'Nothing to add.' };
+  try {
+    const supabase = createClient();
+    const user = await requireUser(supabase);
+    let results;
+    try {
+      results = await searchTitles(q);
+    } catch {
+      return { ok: false, error: 'Couldn’t reach the movie database.' };
+    }
+    const lc = q.toLowerCase();
+    const m = results.find((r) => r.title.toLowerCase() === lc) ?? results[0];
+    if (!m) return { ok: false, error: `No match for “${q}”.` };
+    const watchlistId = await getOrCreateDefaultWatchlist(supabase, user.id);
+    const { error } = await supabase.from('watchlist_items').upsert(
+      {
+        watchlist_id: watchlistId,
+        user_id: user.id,
+        tmdb_id: m.id,
+        media_type: m.mediaType,
+        title: m.title,
+        year: m.year,
+        poster_path: m.posterPath,
+        status: 'possible',
+      },
+      { onConflict: 'watchlist_id,tmdb_id,media_type' },
+    );
+    if (error) return { ok: false, error: error.message };
+    revalidatePath('/app/watchlist');
+    return { ok: true, added: `${m.title}${m.year ? ` (${m.year})` : ''}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed to add.' };
   }
 }
