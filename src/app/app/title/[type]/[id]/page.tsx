@@ -8,7 +8,6 @@ import { createClient } from '@/lib/supabase/server';
 import { TmdbError } from '@/lib/tmdb/client';
 import { ConfigError } from '@/lib/env';
 import { getMyServices } from '@/lib/profile';
-import { getBriefing, type Briefing } from '@/lib/briefing';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,11 +80,10 @@ export default async function TitlePage({ params }: { params: { type: string; id
   if (!parsed) notFound();
 
   try {
-    const [{ report }, watchState, myServices, briefing] = await Promise.all([
+    const [{ report, briefing }, watchState, myServices] = await Promise.all([
       buildReportForCurrentUser(parsed.mediaType, parsed.id),
       getWatchState(parsed.id, parsed.mediaType),
       getMyServicesForCurrentUser(),
-      getBriefing(parsed.mediaType, parsed.id).catch((): Briefing | undefined => undefined),
     ]);
     return (
       <VerdictReportView

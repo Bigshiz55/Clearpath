@@ -1,21 +1,25 @@
 import 'server-only';
 import type { MediaType, VerdictReport } from '@/lib/types';
-import { getTitle, getWatchProviders, getCollectionId, getSimilar } from '@/lib/tmdb/client';
 import { buildVerdict } from '@/lib/scoring';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, getPersonalContext, regionFor } from '@/lib/profile';
 import { enhanceOneLiner } from '@/lib/ai';
-import { getCriticRatings } from '@/lib/omdb';
+import { getSharedTitleData } from '@/lib/titleData';
+import type { Briefing } from '@/lib/briefing';
 
 export interface ReportResult {
   report: VerdictReport;
   region: string;
+  /** The Dossier, hydrated from the shared cache — so the page doesn't refetch. */
+  briefing: Briefing;
 }
 
 /**
  * Build a full verdict report for the current user and persist it to their
- * verdict history (best-effort). Throws TmdbError/ConfigError on data problems
- * so callers can render a precise error.
+ * verdict history (best-effort). The expensive, user-agnostic hydration
+ * (metadata, ratings, providers, franchise, similar, dossier) comes from a
+ * shared 12h cache; only the deterministic personal scoring runs per user.
+ * Throws TmdbError/ConfigError on data problems so callers can render precisely.
  */
 export async function buildReportForCurrentUser(
   mediaType: MediaType,
@@ -30,22 +34,10 @@ export async function buildReportForCurrentUser(
   const profile = await getProfile(supabase, user.id);
   const region = regionFor(profile);
 
-  // Fetch metadata + providers + franchise + similar in parallel.
-  const [meta, providers, collectionId, similar] = await Promise.all([
-    getTitle(mediaType, id, region),
-    getWatchProviders(mediaType, id, region).catch(() => null),
-    getCollectionId(mediaType, id).catch(() => null),
-    getSimilar(mediaType, id).catch(() => []),
-  ]);
+  // One cached hydration serves every user who opens this title.
+  const { meta, providers, collectionId, similar, briefing } = await getSharedTitleData(mediaType, id, region);
 
-  // Enrich with critic aggregator ratings (optional OMDb; graceful when absent).
-  const critics = await getCriticRatings(meta.imdbId).catch(() => null);
-  if (critics) {
-    meta.imdbRating = critics.imdbRating;
-    meta.rottenTomatoes = critics.rottenTomatoes;
-    meta.metascore = critics.metascore;
-  }
-
+  // Per-user scoring layer (cheap, deterministic, not cached).
   const personal = await getPersonalContext(supabase, user.id, collectionId);
   const report = buildVerdict({ meta, providers, personal, similar });
 
@@ -78,5 +70,5 @@ export async function buildReportForCurrentUser(
     /* history persistence is non-critical */
   }
 
-  return { report, region };
+  return { report, region, briefing };
 }
