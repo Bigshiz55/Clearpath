@@ -6,6 +6,8 @@ import { RobedPortrait } from '@/components/RobedPortrait';
 import { ReasonText } from '@/components/ReasonText';
 import { SaveButton } from '@/components/SaveButton';
 import { RatingsStrip } from '@/components/RatingsStrip';
+import { JudgeVerdictCard } from '@/components/JudgeVerdictCard';
+import type { TitleVerdict } from '@/lib/askTypes';
 import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 import { houseByKey, readHousePick } from '@/lib/houseJudges';
 import { naiveParseQuery, describeQuery, EMPTY_QUERY } from '@/lib/finderParse';
@@ -33,6 +35,7 @@ interface Msg {
   role: 'you' | 'judge';
   text: string;
   items?: ResultItem[];
+  verdict?: TitleVerdict; // a named title put on trial
 }
 
 const EXAMPLES = [
@@ -72,8 +75,8 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
   const voiceSupported =
     typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
 
-  function say(text: string, items?: ResultItem[], role: 'you' | 'judge' = 'judge') {
-    setMsgs((m) => [...m, { id: nextId.current++, role, text, items }]);
+  function say(text: string, items?: ResultItem[], role: 'you' | 'judge' = 'judge', verdict?: TitleVerdict) {
+    setMsgs((m) => [...m, { id: nextId.current++, role, text, items, verdict }]);
   }
 
   function speakLine(text: string) {
@@ -127,13 +130,27 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
     say(text || `Filed my case — ${describeQuery(query)}.`, undefined, 'you');
     setLoading(true);
     try {
-      const res = await fetch('/api/finder', {
+      const res = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, text: text || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'failed');
+
+      // A specifically-named title got put on trial — show the full ruling.
+      if (data.kind === 'title' && data.verdict) {
+        const v = data.verdict as TitleVerdict;
+        const alts = (data.alternatives ?? []) as ResultItem[];
+        const skip = v.primaryCall === 'SKIP IT';
+        const ruling =
+          `${v.title}${v.year ? ` (${v.year})` : ''} — my ruling: ${v.primaryCall} at ${v.matchScore} for you. ${v.oneLiner}` +
+          (alts.length > 0 ? (skip ? ' Here’s why, and better picks below.' : ' Here’s the case — and a few more in the same lane.') : '');
+        say(ruling, alts, 'judge', v);
+        speakLine(`${v.primaryCall} at ${v.matchScore}. ${v.title}.`);
+        return;
+      }
+
       const items: ResultItem[] = data.items ?? [];
       const read = describeQuery(query);
       let ruling: string;
@@ -294,8 +311,16 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
                 {m.role === 'judge' ? (
                   <div className="rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-slate-100">
                     {m.text}
+                    {m.verdict && (
+                      <div className="mt-3">
+                        <JudgeVerdictCard v={m.verdict} />
+                      </div>
+                    )}
                     {m.items && m.items.length > 0 && (
                       <div className="mt-3 space-y-2">
+                        {m.verdict && (
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-400">Better for you</div>
+                        )}
                         {m.items.map((it) => {
                           const v = verdictVisualForCall(it.primaryCall);
                           return (
