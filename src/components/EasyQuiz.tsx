@@ -118,40 +118,45 @@ export function EasyQuiz({ onDone, onCancel }: { onDone: (r: QuizResult) => void
   const cols = q.options.length === 3 ? 'grid-cols-3' : 'grid-cols-2';
 
   return (
-    <div className="mx-auto max-w-2xl px-2">
-      {/* Progress */}
-      <div className="flex items-center justify-center gap-1.5">
+    // Full-viewport overlay so the quiz never scrolls the page: header + footer
+    // are fixed and the answers flex to fill (scrolling only inside if truly tiny).
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-ink-950 px-3 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+      {/* Progress (fixed) */}
+      <div className="flex flex-none items-center justify-center gap-1.5">
         {QUESTIONS.map((_, i) => (
           <span key={i} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-6 bg-brand-400' : i < step ? 'w-1.5 bg-brand-500' : 'w-1.5 bg-white/15'}`} />
         ))}
       </div>
 
-      <div className="mt-2.5 text-center">
+      <div className="mt-2.5 flex-none text-center">
         <div className="text-xs font-semibold text-slate-400">Question {step + 1} of {QUESTIONS.length}</div>
         <h1 className="mx-auto mt-0.5 max-w-xl text-xl font-black leading-tight text-white sm:text-2xl">{q.prompt}</h1>
       </div>
 
-      <div className={`mt-3 grid ${cols} gap-2`}>
-        {q.options.map((o) => {
-          // Movies are rarely under an hour — gray out the short options.
-          const isMovie = answers.mediaType === 'movie';
-          const disabled = q.key === 'maxRuntime' && isMovie && (o.value === 30 || o.value === 60);
-          return (
-            <button
-              key={o.label}
-              onClick={() => !disabled && choose(o.value)}
-              disabled={disabled}
-              title={disabled ? 'Movies are almost never under an hour' : undefined}
-              className={`flex min-h-[62px] flex-col items-center justify-center gap-0.5 rounded-xl border-2 px-2 py-2 text-center text-sm font-bold leading-tight transition ${disabled ? 'cursor-not-allowed border-white/10 bg-white/[0.02] text-slate-600' : 'border-white/15 bg-white/[0.04] text-white hover:border-brand-400 hover:bg-brand-500/15 active:scale-[0.98]'}`}
-            >
-              <span className="text-2xl" aria-hidden>{o.emoji}</span>
-              <span>{o.label}{disabled ? ' (TV)' : ''}</span>
-            </button>
-          );
-        })}
+      {/* Answers flex to fill; only this area scrolls if a phone is extremely short */}
+      <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto py-3">
+        <div className={`grid ${cols} gap-2`}>
+          {q.options.map((o) => {
+            // Movies are rarely under an hour — gray out the short options.
+            const isMovie = answers.mediaType === 'movie';
+            const disabled = q.key === 'maxRuntime' && isMovie && (o.value === 30 || o.value === 60);
+            return (
+              <button
+                key={o.label}
+                onClick={() => !disabled && choose(o.value)}
+                disabled={disabled}
+                title={disabled ? 'Movies are almost never under an hour' : undefined}
+                className={`flex min-h-[62px] flex-col items-center justify-center gap-0.5 rounded-xl border-2 px-2 py-2 text-center text-sm font-bold leading-tight transition ${disabled ? 'cursor-not-allowed border-white/10 bg-white/[0.02] text-slate-600' : 'border-white/15 bg-white/[0.04] text-white hover:border-brand-400 hover:bg-brand-500/15 active:scale-[0.98]'}`}
+              >
+                <span className="text-2xl" aria-hidden>{o.emoji}</span>
+                <span>{o.label}{disabled ? ' (TV)' : ''}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between">
+      <div className="flex flex-none items-center justify-between">
         <button
           onClick={() => (step === 0 ? onCancel() : setStep(step - 1))}
           className="text-sm font-semibold text-slate-400 underline hover:text-white"

@@ -82,9 +82,11 @@ export function TasteGame({ onDone }: { onDone: (ruledCount: number) => void }) 
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-2">
-      {/* Header — compact, with the Adjourn (stop) button always reachable up top */}
-      <div className="flex items-center justify-between gap-2">
+    // Full-viewport overlay (covers the app shell) so nothing scrolls: header +
+    // rulings are fixed height and the poster flexes to fill whatever is left.
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-ink-950 px-3 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+      {/* Header (fixed) */}
+      <div className="flex flex-none items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-black text-white sm:text-xl">⚖️ The Docket</h1>
           {!failed && current && <div className="text-xs font-semibold text-slate-400">Case #{ruled + 1} · {ruled} ruled</div>}
@@ -95,33 +97,34 @@ export function TasteGame({ onDone }: { onDone: (ruledCount: number) => void }) 
       </div>
 
       {failed ? (
-        <div className="mt-8 rounded-2xl border-2 border-white/15 bg-white/5 p-6 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-slate-300">
           <p className="text-xl text-slate-200">The docket couldn’t be loaded right now.</p>
-          <button onClick={() => onDone(ruled)} className="btn-primary mt-4 px-6 py-3 text-lg">Back to my picks</button>
+          <button onClick={() => onDone(ruled)} className="btn-primary px-6 py-3 text-lg">Back to my picks</button>
         </div>
       ) : !current ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-300">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-slate-300">
           <span className="h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
           <span className="text-lg">Calling the next case…</span>
         </div>
       ) : (
         <>
-          {/* Poster + title — small so the rulings stay on-screen */}
-          <div className="mt-2 flex flex-col items-center text-center">
-            <div className="aspect-[2/3] h-[22vh] max-h-52 min-h-[120px] overflow-hidden rounded-xl border-2 border-white/10 shadow-card">
+          {/* Poster flexes to fill the space between header and rulings */}
+          <div className="flex min-h-0 flex-1 items-center justify-center py-2">
+            <div className="aspect-[2/3] h-full max-h-full overflow-hidden rounded-xl border-2 border-white/10 shadow-card">
               <Poster posterUrl={current.posterUrl} title={current.title} />
-            </div>
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase text-slate-300">{current.mediaType === 'movie' ? 'Movie' : 'TV'}</span>
-              <h2 className="text-base font-black leading-tight text-white sm:text-lg">
-                {current.title}{current.year ? <span className="font-semibold text-slate-400"> ({current.year})</span> : null}
-              </h2>
             </div>
           </div>
 
-          {/* Rulings — compact 2×2 */}
-          <div className="mt-3">
-            <div className="mb-1.5 text-center text-sm font-semibold text-slate-200">Your ruling?</div>
+          {/* Title (fixed) */}
+          <div className="flex flex-none items-center justify-center gap-2 text-center">
+            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase text-slate-300">{current.mediaType === 'movie' ? 'Movie' : 'TV'}</span>
+            <h2 className="line-clamp-1 text-base font-black leading-tight text-white sm:text-lg">
+              {current.title}{current.year ? <span className="font-semibold text-slate-400"> ({current.year})</span> : null}
+            </h2>
+          </div>
+
+          {/* Rulings (fixed) */}
+          <div className="flex-none pt-2">
             <div className="grid grid-cols-2 gap-2">
               {RULINGS.map((r) => (
                 <button key={r.label} onClick={() => rule(r.rating)} className={`flex items-center justify-center gap-1.5 rounded-xl border-2 px-2 py-2.5 text-sm font-bold transition active:scale-[0.98] ${r.style}`}>
