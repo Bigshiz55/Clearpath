@@ -5,7 +5,7 @@ import { GuestSaveButton } from './GuestSaveButton';
 import { SimpleModeToggle } from './SimpleModeToggle';
 
 const LINKS = [
-  { href: '/app', label: 'Discover' },
+  { href: '/app', label: 'Home' },
   { href: '/app/new', label: 'New' },
   { href: '/app/together', label: 'Together' },
   { href: '/app/watchlist', label: 'Watchlist' },

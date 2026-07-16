@@ -57,6 +57,46 @@ export async function getNewOnServices(
   return { services, items: items.slice(0, 18) };
 }
 
+/**
+ * The New Release Wall — the freshest, most-talked-about movies & shows from the
+ * last few months, region-aware and NOT gated by the user's services. This is
+ * what makes the New page always full: everyone sees a wall of real new releases,
+ * and the "on your services" feed layers on top when services are set.
+ */
+export async function getNewReleaseWall(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<FeedItem[]> {
+  const profile = await getProfile(supabase, userId);
+  const region = regionFor(profile);
+
+  const [movies, tv, wl] = await Promise.all([
+    discoverTitles('movie', { region, sinceDays: 90, minVotes: 40, sortBy: 'popularity.desc' }),
+    discoverTitles('tv', { region, sinceDays: 90, minVotes: 20, sortBy: 'popularity.desc' }),
+    userId ? supabase.from('watchlist_items').select('tmdb_id, media_type').eq('user_id', userId) : Promise.resolve({ data: [] }),
+  ]);
+
+  const exclude = new Set<string>();
+  for (const r of (wl as { data: { tmdb_id: number; media_type: string }[] | null }).data ?? []) {
+    exclude.add(`${r.media_type}-${r.tmdb_id}`);
+  }
+
+  const seen = new Set<string>();
+  const items: FeedItem[] = [];
+  const max = Math.max(movies.length, tv.length);
+  for (let i = 0; i < max; i++) {
+    for (const arr of [movies, tv]) {
+      const t = arr[i];
+      if (!t) continue;
+      const key = `${t.mediaType}-${t.id}`;
+      if (exclude.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      items.push({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath });
+    }
+  }
+  return items.slice(0, 24);
+}
+
 export interface WaitingShow {
   id: number;
   title: string;
