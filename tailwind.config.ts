@@ -24,6 +24,7 @@ const config: Config = {
           700: '#1a41b4',
         },
         gold: {
+          300: '#ffd873', // brighter, cleaner luminous yellow for labels
           400: '#f5c65a',
           500: '#e6ad33',
         },

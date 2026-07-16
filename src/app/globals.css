@@ -64,11 +64,11 @@ body {
   /* Section "eyebrow" label — modern, bright, legible. Replaces the old small
      gold serif treatment. Bright brand-blue, larger, and set in the UI sans. */
   .eyebrow {
-    @apply inline-flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-[0.12em] text-brand-100;
+    @apply inline-flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-[0.12em] text-gold-300;
   }
   /* A slightly larger hero variant for the top of a page/card. */
   .eyebrow-lg {
-    @apply inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.1em] text-brand-100;
+    @apply inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.1em] text-gold-300;
   }
   /* Small helper/caption text with enough contrast to actually read on dark. */
   .helper {
