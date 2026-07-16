@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
 import type { Airing } from '@/lib/onTv';
 
 type TimeFilter = 'all' | 'primetime' | 'nownext';
@@ -44,13 +45,48 @@ export function OnTvGuide({
   dateLabel,
   country,
   mode = 'broadcast',
+  remindedIds = [],
 }: {
   airings: Airing[];
   dateLabel: string;
   country: string;
   mode?: GuideMode;
+  remindedIds?: number[];
 }) {
   const streaming = mode === 'streaming';
+  const [reminded, setReminded] = useState<Set<number>>(new Set(remindedIds));
+  const [busy, setBusy] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function toggleReminder(a: Airing) {
+    setBusy(a.id);
+    try {
+      if (reminded.has(a.id)) {
+        await removeTvReminder(a.id);
+        setReminded((s) => {
+          const n = new Set(s);
+          n.delete(a.id);
+          return n;
+        });
+      } else {
+        const res = await setTvReminder({ airingId: a.id, showName: a.showName, network: a.network, airstamp: a.airstamp, url: '/app/tv' });
+        if (!res.ok) {
+          setNotice(res.error ?? 'Could not set the reminder.');
+          return;
+        }
+        setReminded((s) => new Set(s).add(a.id));
+        setNotice(
+          res.needsNotifications
+            ? 'Reminder set! Turn on notifications in Settings so we can ping you 1 hour and 5 minutes before.'
+            : 'Reminder set — we’ll ping you 1 hour and 5 minutes before it starts. ⏰',
+        );
+      }
+    } catch {
+      setNotice('Something went wrong. Please try again.');
+    } finally {
+      setBusy(null);
+    }
+  }
   const [time, setTime] = useState<TimeFilter>(streaming ? 'all' : 'primetime');
   const [sort, setSort] = useState<SortFilter>(streaming ? 'rating' : 'time');
   const [network, setNetwork] = useState<string | null>(null);
@@ -113,6 +149,15 @@ export function OnTvGuide({
 
   return (
     <div className="space-y-5">
+      {notice && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-brand-400/40 bg-brand-500/10 px-4 py-3 text-sm text-brand-100">
+          <span>{notice}</span>
+          <span className="flex flex-none items-center gap-3">
+            {notice.includes('Settings') && <Link href="/app/settings" className="font-bold underline">Turn on</Link>}
+            <button onClick={() => setNotice(null)} aria-label="Dismiss" className="text-lg leading-none text-slate-300 hover:text-white">×</button>
+          </span>
+        </div>
+      )}
       {/* Highlights */}
       {highlights.length > 0 && (
         <section>
@@ -225,12 +270,17 @@ export function OnTvGuide({
                   </div>
                 </div>
                 <div className="flex flex-none items-center gap-1.5">
-                  <a href={calendarUrl(a)} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/12 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10" title="Add to Google Calendar so you can record or tune in">
-                    ＋ Remind me
+                  <button
+                    onClick={() => toggleReminder(a)}
+                    disabled={busy === a.id}
+                    className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${reminded.has(a.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+                    title="Get a phone/PC notification 1 hour and 5 minutes before it airs"
+                  >
+                    {reminded.has(a.id) ? '🔔 Reminder on' : '🔔 Remind me'}
+                  </button>
+                  <a href={calendarUrl(a)} target="_blank" rel="noopener noreferrer" className="hidden rounded-lg border border-white/12 bg-white/5 px-2 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 sm:inline-flex" title="Or add it to your calendar">
+                    📅
                   </a>
-                  <Link href={`/app/ask?q=${encodeURIComponent(a.showName)}`} className="hidden rounded-lg border border-white/12 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-brand-300 transition hover:bg-white/10 sm:inline-flex" title="See WatchVerdict's take">
-                    ⚖️ Verdict
-                  </Link>
                 </div>
               </div>
             );

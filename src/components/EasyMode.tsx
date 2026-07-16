@@ -55,18 +55,23 @@ function callWords(call: string): string {
   return 'Maybe';
 }
 
-function BigChoice<T extends string | number | null>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { v: T; label: string }[] }) {
+function BigChoice<T extends string | number | null>({ value, onChange, options, disabledValues }: { value: T; onChange: (v: T) => void; options: { v: T; label: string }[]; disabledValues?: T[] }) {
   return (
     <div className="flex flex-wrap gap-2">
-      {options.map((o) => (
-        <button
-          key={String(o.v)}
-          onClick={() => onChange(o.v)}
-          className={`rounded-xl border-2 px-4 py-2.5 text-base font-bold transition ${value === o.v ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}
-        >
-          {o.label}
-        </button>
-      ))}
+      {options.map((o) => {
+        const disabled = disabledValues?.includes(o.v) ?? false;
+        return (
+          <button
+            key={String(o.v)}
+            onClick={() => !disabled && onChange(o.v)}
+            disabled={disabled}
+            title={disabled ? 'Movies are almost never this short' : undefined}
+            className={`rounded-xl border-2 px-4 py-2.5 text-base font-bold transition ${disabled ? 'cursor-not-allowed border-white/10 bg-white/[0.02] text-slate-600' : value === o.v ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

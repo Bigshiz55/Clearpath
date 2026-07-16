@@ -10,11 +10,13 @@ export function OnTvTabs({
   streaming,
   dateLabel,
   country,
+  remindedIds = [],
 }: {
   broadcast: Airing[];
   streaming: Airing[];
   dateLabel: string;
   country: string;
+  remindedIds?: number[];
 }) {
   const [tab, setTab] = useState<'broadcast' | 'streaming'>('broadcast');
 
@@ -36,9 +38,9 @@ export function OnTvTabs({
       </div>
 
       {tab === 'broadcast' ? (
-        <OnTvGuide airings={broadcast} dateLabel={dateLabel} country={country} mode="broadcast" />
+        <OnTvGuide airings={broadcast} dateLabel={dateLabel} country={country} mode="broadcast" remindedIds={remindedIds} />
       ) : (
-        <OnTvGuide airings={streaming} dateLabel={dateLabel} country={country} mode="streaming" />
+        <OnTvGuide airings={streaming} dateLabel={dateLabel} country={country} mode="streaming" remindedIds={remindedIds} />
       )}
     </div>
   );
