@@ -7,6 +7,7 @@ import { SimpleModeToggle } from './SimpleModeToggle';
 const LINKS = [
   { href: '/app', label: 'Home' },
   { href: '/app/new', label: 'New' },
+  { href: '/app/tv', label: 'On TV' },
   { href: '/app/together', label: 'Together' },
   { href: '/app/watchlist', label: 'Watchlist' },
   { href: '/app/friends', label: 'Friends' },
