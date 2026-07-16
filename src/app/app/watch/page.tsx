@@ -1,0 +1,103 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import { getReadyToWatch, getFreeToWatch } from '@/lib/watchNow';
+import { getMyServices } from '@/lib/profile';
+import { WatchNowGrid } from '@/components/WatchNowGrid';
+import { PosterCard } from '@/components/PosterCard';
+import { SaveButton } from '@/components/SaveButton';
+import { tmdbImage } from '@/lib/tmdb/image';
+
+export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Watch now · WatchVerdict' };
+
+export default async function WatchNowPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const uid = user?.id ?? '';
+
+  const [ready, free, services] = await Promise.all([
+    getReadyToWatch(supabase, uid),
+    getFreeToWatch(supabase, uid),
+    getMyServices(supabase, uid),
+  ]);
+
+  const onMine = ready.filter((r) => r.kind === 'mine');
+  const onFree = ready.filter((r) => r.kind === 'free');
+
+  return (
+    <div className="space-y-8">
+      <section>
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">▶ Watch now</h1>
+        <p className="mt-2 text-sm text-slate-300">
+          Everything on your list you can start <span className="font-semibold text-white">right now</span> — on a
+          service you already pay for or free — ranked by how well it matches you. No dead ends, no rentals unless
+          you want them.
+        </p>
+      </section>
+
+      {/* On your services */}
+      {onMine.length > 0 && (
+        <section>
+          <h2 className="mb-1 text-lg font-semibold text-white">✅ On your services</h2>
+          <p className="mb-3 text-xs text-slate-400">From your watchlist, included in a plan you already have.</p>
+          <WatchNowGrid items={onMine} />
+        </section>
+      )}
+
+      {/* Free right now */}
+      {onFree.length > 0 && (
+        <section>
+          <h2 className="mb-1 text-lg font-semibold text-white">🆓 Free right now</h2>
+          <p className="mb-3 text-xs text-slate-400">From your watchlist, streaming free (with ads) today.</p>
+          <WatchNowGrid items={onFree} />
+        </section>
+      )}
+
+      {/* Nothing from the list is watchable → guide the user honestly. */}
+      {ready.length === 0 && (
+        <section className="card p-6 text-center">
+          <div className="text-3xl">🎬</div>
+          <h2 className="mt-3 text-lg font-semibold text-white">Nothing on your list is streaming free right now</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-400">
+            {services.length === 0
+              ? 'Add your streaming services so we can spotlight what you can already watch — then anything on your watchlist that’s on your plans shows up here.'
+              : 'Nothing on your watchlist is on your services or free at the moment. Availability changes constantly — check back, or browse free picks below.'}
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {services.length === 0 && <Link href="/app/settings" className="btn-primary">Pick my services</Link>}
+            <Link href="/app/watchlist" className="btn-secondary">Go to my watchlist</Link>
+          </div>
+        </section>
+      )}
+
+      {/* Free discovery — real, ad-supported services (Tubi, Pluto, Roku, Freevee). */}
+      {free.length > 0 && (
+        <section>
+          <h2 className="mb-1 text-lg font-semibold text-white">🍿 Free to watch tonight</h2>
+          <p className="mb-3 text-xs text-slate-400">Popular right now on the free, ad-supported services — no subscription needed.</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            {free.map((t) => (
+              <PosterCard
+                key={`${t.mediaType}-${t.id}`}
+                href={`/app/title/${t.mediaType}/${t.id}`}
+                title={t.title}
+                year={t.year}
+                mediaType={t.mediaType}
+                posterUrl={tmdbImage(t.posterPath, 'w342')}
+                overlay={<SaveButton tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <p className="text-[11px] text-slate-500">
+        Availability from TMDB / JustWatch for your region — real data, refreshed periodically, never guaranteed
+        current. We only show titles we can confirm are watchable.
+      </p>
+    </div>
+  );
+}

@@ -10,12 +10,13 @@ import { MobileNav } from './nav/MobileNav';
 // the desktop bar nor the mobile tab bar gets overcrowded.
 const PRIMARY: NavLink[] = [
   { href: '/app', label: 'Home' },
+  { href: '/app/watch', label: 'Watch Now' },
   { href: '/app/new', label: 'New' },
   { href: '/app/tv', label: 'On TV' },
-  { href: '/app/together', label: 'Together' },
   { href: '/app/watchlist', label: 'Watchlist' },
 ];
 const SECONDARY: NavLink[] = [
+  { href: '/app/together', label: 'Together' },
   { href: '/app/friends', label: 'Friends' },
   { href: '/app/chambers', label: 'Chambers' },
   { href: '/app/settings', label: 'Settings' },
