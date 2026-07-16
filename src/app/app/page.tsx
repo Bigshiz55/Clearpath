@@ -69,6 +69,22 @@ export default async function DiscoverPage() {
 
   return (
     <div className="space-y-8">
+      {/* Easy Mode entry — big, simple, three picks. Front-and-center so the
+          audience that needs it most finds it first; anyone can use it. */}
+      <Link
+        href="/app/easy"
+        className="flex items-center justify-between gap-4 rounded-2xl border border-brand-400/40 bg-gradient-to-r from-brand-500/20 to-brand-500/5 px-5 py-4 transition hover:border-brand-400/70 hover:from-brand-500/25"
+      >
+        <span className="flex items-center gap-3">
+          <span className="text-3xl" aria-hidden>🛋️</span>
+          <span>
+            <span className="block text-lg font-bold text-white">Want it big and simple?</span>
+            <span className="block text-sm text-slate-300">Easy Mode: three great picks for tonight, big text, one tap to watch.</span>
+          </span>
+        </span>
+        <span className="flex-none rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-bold text-white shadow-glow">Open Easy Mode →</span>
+      </Link>
+
       <section className="animate-fade-up grid items-center gap-6 lg:grid-cols-[1.7fr_1fr]">
         <div className="min-w-0">
         <h1 className="text-5xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-7xl">
