@@ -31,7 +31,7 @@ export function CriticsTable({
   const [debate, setDebate] = useState<Turn[] | null>(null);
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'none'>('idle');
 
-  async function hearThemOut() {
+  async function loadDebate() {
     setState('loading');
     try {
       const res = await fetch('/api/swarm', {
@@ -87,12 +87,12 @@ export function CriticsTable({
 
       {state !== 'done' && (
         <div className="mt-4">
-          <button onClick={hearThemOut} disabled={state === 'loading'} className="btn-secondary">
-            {state === 'loading' ? 'They’re arguing…' : '🔥 Hear them argue'}
+          <button onClick={loadDebate} disabled={state === 'loading'} className="btn-secondary">
+            {state === 'loading' ? 'Writing the debate…' : '⚖️ See the full debate'}
           </button>
           {state === 'none' && (
             <span className="ml-3 text-xs text-slate-500">
-              The live debate needs an AI key configured — the takes above are the real read.
+              The written debate needs an AI key configured — the takes above are the real read.
             </span>
           )}
         </div>
@@ -100,7 +100,7 @@ export function CriticsTable({
 
       {debate && (
         <div className="mt-5 space-y-3 rounded-xl border border-white/10 bg-ink-900/50 p-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-brand-200">The panel, live</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-brand-200">The debate ⚖️</div>
           {debate.map((t, i) => (
             <div key={i} className="flex gap-2.5">
               <span className="text-base" aria-hidden>{EMOJI[t.name] ?? '💬'}</span>
