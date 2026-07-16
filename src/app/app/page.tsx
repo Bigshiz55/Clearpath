@@ -70,22 +70,6 @@ export default async function DiscoverPage() {
 
   return (
     <div className="space-y-8">
-      {/* Easy Mode entry — big, simple, three picks. Front-and-center so the
-          audience that needs it most finds it first; anyone can use it. */}
-      <Link
-        href="/app/easy"
-        className="flex items-center justify-between gap-4 rounded-2xl border border-brand-400/40 bg-gradient-to-r from-brand-500/20 to-brand-500/5 px-5 py-4 transition hover:border-brand-400/70 hover:from-brand-500/25"
-      >
-        <span className="flex items-center gap-3">
-          <span className="text-3xl" aria-hidden>🛋️</span>
-          <span>
-            <span className="block text-lg font-bold text-white">Want it big and simple?</span>
-            <span className="block text-sm text-slate-300">Easy Mode: three great picks for tonight, big text, one tap to watch.</span>
-          </span>
-        </span>
-        <span className="flex-none rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-bold text-white shadow-glow">Open Easy Mode →</span>
-      </Link>
-
       <section className="animate-fade-up grid items-center gap-6 lg:grid-cols-[1.7fr_1fr]">
         <div className="min-w-0">
         <h1 className="text-5xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-7xl">
@@ -95,22 +79,18 @@ export default async function DiscoverPage() {
           </span>
         </h1>
         <p className="mt-4 text-base text-slate-400 sm:text-lg">
-          Search for something you have in mind — or tell the judge the vibe and get a verdict, scored
-          for {label.toLowerCase()}.
+          Tell the judge what you feel like — get a verdict, scored for {label.toLowerCase()}.
         </p>
-        {/* Search first: anyone who just wants to look something up can do it the
-            moment they land, before any of the fancier flows. */}
-        <div className="mt-5 max-w-2xl">
-          <label className="mb-2 flex items-center gap-2 text-base font-semibold text-white">
-            <span aria-hidden>🔎</span> Search for a movie or show
+        {/* The main event: talk to the judge. Big prompt, big input — this is the
+            first and largest thing on the page. */}
+        <HomeGreeter name={greeterName} size="lg" className="mt-6 max-w-2xl" />
+        {/* Or just look something up. */}
+        <div className="mt-6 max-w-2xl">
+          <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <span aria-hidden>🔎</span> Or search for a specific movie or show
           </label>
           <SearchBar />
-          <p className="mt-1.5 text-xs text-slate-500">
-            Type a title — or describe what you feel like (“a funny movie under 2 hours”) and the judge takes it.
-          </p>
         </div>
-        {/* Or let the personal AI dog judge greet you and take your case. */}
-        <HomeGreeter name={greeterName} className="mt-6 max-w-2xl" />
         {/* Three primary decisions — start a decision, don't browse a menu. */}
         <div className="mt-5 grid gap-2 sm:grid-cols-3">
           <Link

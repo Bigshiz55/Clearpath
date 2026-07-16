@@ -28,7 +28,16 @@ function timeGreeting(hour: number): string {
   return 'Late night';
 }
 
-export function HomeGreeter({ name, className = '' }: { name?: string | null; className?: string }) {
+export function HomeGreeter({
+  name,
+  className = '',
+  size = 'md',
+}: {
+  name?: string | null;
+  className?: string;
+  size?: 'md' | 'lg';
+}) {
+  const lg = size === 'lg';
   const router = useRouter();
   const [q, setQ] = useState('');
   const [judge, setJudge] = useState({ name: 'Judge Annie', src: '/judge-annie.png' });
@@ -87,7 +96,7 @@ export function HomeGreeter({ name, className = '' }: { name?: string | null; cl
       {/* Mascot + speech bubble */}
       <div className="flex items-end gap-3">
         <div className="relative flex-none">
-          <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-gold-400/60 shadow-lg" style={{ boxShadow: '0 0 22px rgba(245,198,90,.35)' }}>
+          <div className={`${lg ? 'h-20 w-20' : 'h-16 w-16'} overflow-hidden rounded-full border-2 border-gold-400/60 shadow-lg`} style={{ boxShadow: '0 0 22px rgba(245,198,90,.35)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={judge.src} alt={judge.name} className="h-full w-full object-cover" />
           </div>
@@ -99,15 +108,15 @@ export function HomeGreeter({ name, className = '' }: { name?: string | null; cl
         </div>
         <div className="relative mb-1 max-w-lg rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.06] px-4 py-2.5 backdrop-blur">
           <div className="eyebrow">⚖️ {judge.name}</div>
-          <p className="mt-1 text-base text-slate-50 sm:text-lg">
+          <p className={`mt-1 text-slate-50 ${lg ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'}`}>
             {greeting ?? 'The court is in session. What are we watching tonight?'}
           </p>
         </div>
       </div>
 
-      {/* Talk to the judge */}
-      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/12 bg-ink-850/70 p-1.5 shadow-card focus-within:border-brand-400/60">
-        <span className="pl-2 text-lg" aria-hidden>💬</span>
+      {/* Talk to the judge — the primary action, sized to match. */}
+      <div className={`mt-3 flex items-center gap-2 rounded-2xl border border-white/12 bg-ink-850/70 shadow-card focus-within:border-brand-400/60 ${lg ? 'p-2' : 'p-1.5'}`}>
+        <span className={`pl-2 ${lg ? 'text-2xl' : 'text-lg'}`} aria-hidden>💬</span>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -118,18 +127,18 @@ export function HomeGreeter({ name, className = '' }: { name?: string | null; cl
             }
           }}
           placeholder="Tell the judge what you feel like watching…"
-          className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-white outline-none placeholder:text-slate-500 sm:text-base"
+          className={`min-w-0 flex-1 bg-transparent px-1 text-white outline-none placeholder:text-slate-500 ${lg ? 'py-3.5 text-lg sm:text-xl' : 'py-2 text-sm sm:text-base'}`}
           aria-label="Tell the judge what you want to watch"
         />
         {voiceSupported && (
           <button
             type="button"
             onClick={listening ? stopVoice : startVoice}
-            className={`grid h-10 w-10 flex-none place-items-center rounded-xl transition ${listening ? 'bg-red-500/20 text-red-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+            className={`grid flex-none place-items-center rounded-xl transition ${lg ? 'h-12 w-12' : 'h-10 w-10'} ${listening ? 'bg-red-500/20 text-red-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
             aria-label={listening ? 'Stop listening' : 'Speak to the judge'}
             title={listening ? 'Listening… tap to stop' : 'Speak to the judge'}
           >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+            <svg viewBox="0 0 24 24" className={lg ? 'h-6 w-6' : 'h-5 w-5'} fill="none" aria-hidden>
               <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="1.6" />
               <path d="M5 11a7 7 0 0 0 14 0M12 18v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
@@ -138,7 +147,7 @@ export function HomeGreeter({ name, className = '' }: { name?: string | null; cl
         <button
           type="button"
           onClick={() => ask(q)}
-          className="btn-primary flex-none rounded-xl px-4 py-2 text-sm"
+          className={`btn-primary flex-none rounded-xl font-bold ${lg ? 'px-6 py-3.5 text-lg' : 'px-4 py-2 text-sm'}`}
         >
           Ask ⚖️
         </button>
@@ -150,7 +159,7 @@ export function HomeGreeter({ name, className = '' }: { name?: string | null; cl
           <button
             key={c.label}
             onClick={() => ask(c.q)}
-            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+            className={`rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:border-white/20 hover:bg-white/10 hover:text-white ${lg ? 'px-3.5 py-1.5 text-sm' : 'px-3 py-1 text-xs'}`}
           >
             {c.label}
           </button>
