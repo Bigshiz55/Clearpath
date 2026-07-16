@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { SaveButton } from './SaveButton';
 import { EasyQuiz, type QuizResult } from './EasyQuiz';
 import { TasteGame } from './TasteGame';
+import { EasyOnTv } from './EasyOnTv';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import { providerWatchUrl } from '@/lib/watchLinks';
 import { EASY_ERAS, EASY_CONTENT, type EasyAudience, type EasyEra, type EasyContent, type EasyPick } from '@/lib/easyTypes';
@@ -88,6 +89,7 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
   const [quizOpen, setQuizOpen] = useState(false);
   const [gameOpen, setGameOpen] = useState(false);
   const [ratedNonce, setRatedNonce] = useState(0);
+  const [view, setView] = useState<'picks' | 'tv'>('picks');
   const loaded = useRef(false);
 
   // Actor search
@@ -244,6 +246,20 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
         </div>
       </div>
 
+      {/* Pick a source: personalized picks, or what's coming up on live TV */}
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={() => setView('picks')} className={`rounded-2xl border-2 px-4 py-4 text-lg font-bold transition ${view === 'picks' ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}>
+          🍿 What to watch
+        </button>
+        <button onClick={() => setView('tv')} className={`rounded-2xl border-2 px-4 py-4 text-lg font-bold transition ${view === 'tv' ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}>
+          📡 On TV soon
+        </button>
+      </div>
+
+      {view === 'tv' ? (
+        <EasyOnTv />
+      ) : (
+      <>
       {/* Who's watching */}
       <div>
         <div className="mb-3 text-center text-lg font-semibold text-slate-200">Who’s watching?</div>
@@ -384,6 +400,8 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
         <p className="mt-1 text-lg text-slate-300">Tell us in your own words — type or talk.</p>
         <Link href="/app/ask" className="btn-secondary mt-3 inline-flex px-6 py-3 text-lg">🎙️ Ask for a movie</Link>
       </div>
+      </>
+      )}
 
       <div className="text-center">
         <button onClick={useFullApp} className="text-lg font-semibold text-slate-400 underline hover:text-white">Switch to the full app</button>

@@ -147,6 +147,36 @@ export function getOnTvToday(country: string, date: string): Promise<Airing[]> {
   })();
 }
 
+const NOISE_TYPES = new Set(['News', 'Talk Show', 'Variety']);
+const DAY_MS = 86_400_000;
+
+function isoDate(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+/**
+ * "Coming up on TV" for Easy Mode — the best-reviewed real airings still ahead
+ * of `nowMs`, across today and the next couple of days. Skips news/talk noise,
+ * favors well-rated shows, and returns them in time order so it reads like a
+ * short, friendly what's-on list. Real TVmaze data only.
+ */
+export async function getUpcomingTv(country: string, nowMs: number, daysAhead = 3): Promise<Airing[]> {
+  const dates = Array.from({ length: daysAhead }, (_, i) => isoDate(nowMs + i * DAY_MS));
+  const perDay = await Promise.all(dates.map((d) => getOnTvToday(country, d)));
+
+  const upcoming = perDay
+    .flat()
+    .filter((a) => !NOISE_TYPES.has(a.showType) && Date.parse(a.airstamp) >= nowMs);
+
+  // Rank by rating (unrated last), keep a healthy set, then show in time order.
+  const ranked = [...upcoming].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 20);
+  const seen = new Set<number>();
+  return ranked
+    .filter((a) => (seen.has(a.showId) ? false : (seen.add(a.showId), true)))
+    .sort((a, b) => Date.parse(a.airstamp) - Date.parse(b.airstamp));
+}
+
 /** Cached daily streaming premieres (major services), keyed by date. */
 export function getStreamingToday(date: string): Promise<Airing[]> {
   return unstable_cache(() => fetchStreaming(date), ['streaming-today', date], {
