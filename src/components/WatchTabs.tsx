@@ -5,8 +5,16 @@ import { useState } from 'react';
 /** Switches the Watch Now page between the personalized "Ready to watch" view
  *  and the full JustWatch-style "Browse everything" catalog. Both are rendered
  *  on the server and passed in; this only toggles which is shown. */
-export function WatchTabs({ ready, browse }: { ready: React.ReactNode; browse: React.ReactNode }) {
-  const [tab, setTab] = useState<'ready' | 'browse'>('ready');
+export function WatchTabs({
+  ready,
+  browse,
+  initialTab = 'ready',
+}: {
+  ready: React.ReactNode;
+  browse: React.ReactNode;
+  initialTab?: 'ready' | 'browse';
+}) {
+  const [tab, setTab] = useState<'ready' | 'browse'>(initialTab);
   return (
     <div className="space-y-5">
       <div className="inline-flex rounded-xl border border-white/12 bg-white/5 p-1">

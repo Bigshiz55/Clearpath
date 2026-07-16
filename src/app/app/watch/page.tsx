@@ -14,7 +14,10 @@ import { tmdbImage } from '@/lib/tmdb/image';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Watch now · WatchVerdict' };
 
-export default async function WatchNowPage() {
+export default async function WatchNowPage({ searchParams }: { searchParams?: { type?: string } }) {
+  // Deep link from the simple version: /app/watch?type=tv opens straight into the
+  // Browse tab filtered to the chosen media type.
+  const wantType = searchParams?.type === 'tv' ? 'tv' : searchParams?.type === 'movie' ? 'movie' : null;
   const supabase = createClient();
   const {
     data: { user },
@@ -99,7 +102,8 @@ export default async function WatchNowPage() {
 
       <WatchTabs
         ready={readyContent}
-        browse={<BrowseCatalog providers={providers.map((p) => ({ id: p.id, name: p.name, logoPath: p.logoPath }))} myServiceIds={services} />}
+        initialTab={wantType ? 'browse' : 'ready'}
+        browse={<BrowseCatalog providers={providers.map((p) => ({ id: p.id, name: p.name, logoPath: p.logoPath }))} myServiceIds={services} initialType={wantType ?? 'movie'} />}
       />
 
       <p className="text-[11px] text-slate-500">

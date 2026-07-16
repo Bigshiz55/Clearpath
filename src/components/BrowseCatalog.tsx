@@ -44,8 +44,16 @@ function Seg<T extends string>({ value, onChange, options }: { value: T; onChang
   );
 }
 
-export function BrowseCatalog({ providers, myServiceIds }: { providers: CatalogProvider[]; myServiceIds: number[] }) {
-  const [mediaType, setMediaType] = useState<MediaType>('movie');
+export function BrowseCatalog({
+  providers,
+  myServiceIds,
+  initialType = 'movie',
+}: {
+  providers: CatalogProvider[];
+  myServiceIds: number[];
+  initialType?: MediaType;
+}) {
+  const [mediaType, setMediaType] = useState<MediaType>(initialType);
   const [providerIds, setProviderIds] = useState<number[]>([]);
   const [genreIds, setGenreIds] = useState<number[]>([]);
   const [monetization, setMonetization] = useState<BrowseMonetization>('all');

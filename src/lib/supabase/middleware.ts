@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { publicEnv } from '@/lib/env';
 
-const PROTECTED_PREFIXES = ['/app'];
+const PROTECTED_PREFIXES = ['/app', '/lite'];
 
 /**
  * Refreshes the Supabase session cookie on every request and guards protected
