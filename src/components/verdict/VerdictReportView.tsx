@@ -284,7 +284,10 @@ export function VerdictReportView({
                     {a.points > 0 ? `+${a.points}` : a.points}
                   </span>
                   <div>
-                    <div className="text-sm font-medium text-white">{a.label}</div>
+                    <div className="flex items-center gap-2 text-sm font-medium text-white">
+                      {a.label}
+                      {a.defining && <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">hard rule</span>}
+                    </div>
                     <div className="text-xs text-slate-400">{a.reason}</div>
                   </div>
                 </li>
@@ -319,6 +322,22 @@ export function VerdictReportView({
           </ul>
         </div>
       </section>
+
+      {/* Not a fit? Send it to the Judge for better-for-you alternatives. */}
+      {report.primaryCall !== 'WATCH IT' && (
+        <section>
+          <Link
+            href={`/app/ask?q=${encodeURIComponent(t.title)}`}
+            className="card flex items-center justify-between gap-3 p-4 transition hover:border-white/25 hover:bg-white/[0.05]"
+          >
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-white">Not feeling this one?</div>
+              <div className="text-xs text-slate-400">Let the Judge put it on trial and show better-for-you picks in the same lane.</div>
+            </div>
+            <span className="btn-primary flex-none">Ask the Judge →</span>
+          </Link>
+        </section>
+      )}
 
       {/* Content DNA — aggregated from real viewer check-ins */}
       {contentDna && <ContentDnaView dna={contentDna} />}
