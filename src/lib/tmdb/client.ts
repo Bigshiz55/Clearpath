@@ -270,6 +270,10 @@ export interface DiscoverOptions {
   maxRuntime?: number;
   /** TMDB monetization filter, e.g. 'flatrate|free|ads', 'free', 'rent', 'buy'. */
   monetization?: string;
+  /** Bias toward titles featuring these TMDB person ids (with_cast). */
+  castIds?: number[];
+  /** Only titles released up to and including this year. */
+  maxYear?: number;
   page?: number;
 }
 
@@ -299,6 +303,7 @@ export async function discoverTitles(
   if (opts.minVotes != null) params['vote_count.gte'] = String(opts.minVotes);
   if (opts.minRating != null) params['vote_average.gte'] = String(opts.minRating);
   if (opts.maxRuntime != null && mediaType === 'movie') params['with_runtime.lte'] = String(opts.maxRuntime);
+  if (opts.castIds && opts.castIds.length > 0 && mediaType === 'movie') params.with_cast = opts.castIds.join('|'); // OR — any favorite actor
   if (opts.sinceDays != null) {
     const from = isoDate(new Date(Date.now() - opts.sinceDays * 86_400_000));
     const to = isoDate(new Date());
@@ -321,6 +326,11 @@ export async function discoverTitles(
       params['first_air_date.gte'] = from;
       params['first_air_date.lte'] = to;
     }
+  }
+  if (opts.maxYear != null) {
+    const to = `${opts.maxYear}-12-31`;
+    if (mediaType === 'movie') params['primary_release_date.lte'] = to;
+    else params['first_air_date.lte'] = to;
   }
 
   const data = await tmdbFetch<TmdbMultiResult>(`/discover/${mediaType}`, params).catch(
@@ -807,6 +817,31 @@ export async function getWatchProviders(
     options,
     available: options.length > 0,
   };
+}
+
+export interface PersonHit {
+  id: number;
+  name: string;
+  profilePath: string | null;
+  knownFor: string; // a couple of recognizable titles, for disambiguation
+}
+
+/** Search TMDB people (actors/directors) by name — for the "favorite actors"
+ *  preference. Returns the most recognizable matches first. */
+export async function searchPeople(query: string): Promise<PersonHit[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  interface KnownFor { title?: string; name?: string }
+  interface Row { id: number; name?: string; profile_path?: string | null; popularity?: number; known_for?: KnownFor[] }
+  const data = await tmdbFetch<{ results?: Row[] }>('/search/person', { query: q, include_adult: 'false' }).catch(() => ({ results: [] as Row[] }));
+  return (data.results ?? [])
+    .slice(0, 8)
+    .map((r) => ({
+      id: r.id,
+      name: r.name ?? 'Unknown',
+      profilePath: r.profile_path ?? null,
+      knownFor: (r.known_for ?? []).map((k) => k.title ?? k.name).filter(Boolean).slice(0, 2).join(', '),
+    }));
 }
 
 export interface ProviderCatalogEntry {

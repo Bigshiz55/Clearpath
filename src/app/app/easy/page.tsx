@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile } from '@/lib/profile';
-import { getEasyPicks } from '@/lib/easyPicks';
+import { getEasyPicks, DEFAULT_PREFS } from '@/lib/easyPicks';
 import { EasyMode } from '@/components/EasyMode';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,7 @@ export default async function EasyModePage() {
   const profile = user ? await getProfile(supabase, uid) : null;
   const name = profile?.display_name?.trim().split(/\s+/)[0] || null;
 
-  const picks = await getEasyPicks(supabase, uid, 'me');
+  const picks = await getEasyPicks(supabase, uid, DEFAULT_PREFS);
 
   return <EasyMode initialPicks={picks} name={name} />;
 }

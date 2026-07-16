@@ -61,6 +61,10 @@ export interface FinderQuery {
   bingeableOnly: boolean;
   /** Desired pace 0 (slow burn) .. 100 (adrenaline); null = any. */
   pace: number | null;
+  /** Bias candidates toward titles featuring these TMDB people (with_cast). */
+  castIds?: number[];
+  /** Only titles released no later than this year (for "classics"). */
+  maxYear?: number | null;
 }
 
 export interface FinderItem {
@@ -154,9 +158,11 @@ export async function runFinder(
           providerIds: q.onMyServices && services.length > 0 ? services : undefined,
           region,
           minRating,
-          minVotes: 80,
+          minVotes: q.castIds && q.castIds.length > 0 ? 20 : 80, // actor pools are smaller
           sinceDays,
           maxRuntime: q.maxRuntime ?? undefined,
+          castIds: q.castIds,
+          maxYear: q.maxYear ?? undefined,
           sortBy: 'popularity.desc',
           page,
         }),
@@ -196,6 +202,8 @@ export async function runFinder(
           const cutoff = new Date().getUTCFullYear() - Math.ceil(q.sinceMonths / 12);
           if (meta.year < cutoff) return null;
         }
+        // Era ceiling ("classics").
+        if (q.maxYear != null && meta.year != null && meta.year > q.maxYear) return null;
         if (meta.year != null) receipts.push(String(meta.year));
         // Audience (TMDB crowd score).
         if (q.minAudience != null) {

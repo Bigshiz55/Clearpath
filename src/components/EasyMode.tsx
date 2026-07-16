@@ -1,12 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SaveButton } from './SaveButton';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import { providerWatchUrl } from '@/lib/watchLinks';
-import type { EasyAudience, EasyPick } from '@/lib/easyPicks';
+import type { EasyAudience, EasyEra, EasyPick } from '@/lib/easyPicks';
+
+interface Favorite { id: number; name: string }
+interface StoredPrefs {
+  maxRuntime: number | null;
+  familySafe: boolean;
+  era: EasyEra;
+  favorites: Favorite[];
+  dismissed: string[];
+}
+
+const PREFS_KEY = 'wv_easy_prefs';
+const DEFAULTS: StoredPrefs = { maxRuntime: null, familySafe: false, era: 'any', favorites: [], dismissed: [] };
 
 const AUDIENCES: { v: EasyAudience; label: string; emoji: string }[] = [
   { v: 'me', label: 'Just me', emoji: '🙂' },
@@ -14,7 +26,6 @@ const AUDIENCES: { v: EasyAudience; label: string; emoji: string }[] = [
   { v: 'family', label: 'The whole family', emoji: '👨‍👩‍👧' },
 ];
 
-/** Plain, non-jargon wording for the call. */
 function callWords(call: string): string {
   const c = call.toUpperCase();
   if (c.includes('WATCH') || c.includes('MUST')) return 'Watch it';
@@ -22,29 +33,73 @@ function callWords(call: string): string {
   return 'Maybe';
 }
 
+function BigChoice<T extends string | number | null>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { v: T; label: string }[] }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => (
+        <button
+          key={String(o.v)}
+          onClick={() => onChange(o.v)}
+          className={`rounded-xl border-2 px-4 py-2.5 text-base font-bold transition ${value === o.v ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; name: string | null }) {
   const router = useRouter();
   const [audience, setAudience] = useState<EasyAudience>('me');
+  const [prefs, setPrefs] = useState<StoredPrefs>(DEFAULTS);
   const [picks, setPicks] = useState<EasyPick[]>(initialPicks);
   const [loading, setLoading] = useState(false);
-  const [firstRender, setFirstRender] = useState(true);
+  const [customize, setCustomize] = useState(false);
+  const [sessionSkips, setSessionSkips] = useState<string[]>([]);
+  const loaded = useRef(false);
 
-  // Easy Mode is always big & high-contrast, regardless of the global toggle.
+  // Actor search
+  const [actorQuery, setActorQuery] = useState('');
+  const [actorHits, setActorHits] = useState<{ id: number; name: string; knownFor: string; profileUrl: string | null }[]>([]);
+
   useEffect(() => {
     document.documentElement.setAttribute('data-simple', '1');
+    try {
+      const raw = localStorage.getItem(PREFS_KEY);
+      if (raw) setPrefs({ ...DEFAULTS, ...JSON.parse(raw) });
+    } catch {
+      /* ignore */
+    }
+    loaded.current = true;
   }, []);
 
-  useEffect(() => {
-    if (firstRender) {
-      setFirstRender(false);
-      return;
+  const savePrefs = useCallback((next: StoredPrefs) => {
+    setPrefs(next);
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
     }
+  }, []);
+
+  const reqKey = `${audience}|${prefs.maxRuntime}|${prefs.familySafe}|${prefs.era}|${prefs.favorites.map((f) => f.id).join(',')}|${prefs.dismissed.join(',')}|${sessionSkips.join(',')}`;
+
+  useEffect(() => {
+    if (!loaded.current) return;
     let active = true;
     setLoading(true);
     fetch('/api/easy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ audience }),
+      body: JSON.stringify({
+        audience,
+        maxRuntime: prefs.maxRuntime,
+        familySafe: prefs.familySafe,
+        era: prefs.era,
+        actorIds: prefs.favorites.map((f) => f.id),
+        excludeKeys: [...prefs.dismissed, ...sessionSkips],
+      }),
     })
       .then((r) => r.json())
       .then((d) => active && setPicks((d.picks ?? []) as EasyPick[]))
@@ -54,8 +109,43 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audience]);
+  }, [reqKey]);
 
+  // Actor search (debounced-ish by length).
+  useEffect(() => {
+    const q = actorQuery.trim();
+    if (q.length < 2) {
+      setActorHits([]);
+      return;
+    }
+    let active = true;
+    const t = setTimeout(() => {
+      fetch(`/api/person-search?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => active && setActorHits(d.people ?? []))
+        .catch(() => active && setActorHits([]));
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [actorQuery]);
+
+  function addFavorite(f: Favorite) {
+    if (prefs.favorites.some((x) => x.id === f.id)) return;
+    savePrefs({ ...prefs, favorites: [...prefs.favorites, f].slice(0, 8) });
+    setActorQuery('');
+    setActorHits([]);
+  }
+  function removeFavorite(id: number) {
+    savePrefs({ ...prefs, favorites: prefs.favorites.filter((f) => f.id !== id) });
+  }
+  function dismiss(key: string) {
+    savePrefs({ ...prefs, dismissed: [...new Set([...prefs.dismissed, key])].slice(-200) });
+  }
+  function showDifferent() {
+    setSessionSkips((s) => [...new Set([...s, ...picks.map((p) => `${p.mediaType}-${p.id}`)])]);
+  }
   function useFullApp() {
     document.documentElement.removeAttribute('data-simple');
     try {
@@ -68,11 +158,8 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 px-1 pb-16">
-      {/* Greeting */}
       <div className="pt-2 text-center">
-        <h1 className="text-3xl font-black text-white sm:text-4xl">
-          {name ? `Hello, ${name}.` : 'Hello.'}
-        </h1>
+        <h1 className="text-3xl font-black text-white sm:text-4xl">{name ? `Hello, ${name}.` : 'Hello.'}</h1>
         <p className="mt-2 text-xl text-slate-200">Let’s find something good to watch tonight.</p>
       </div>
 
@@ -81,13 +168,7 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
         <div className="mb-3 text-center text-lg font-semibold text-slate-200">Who’s watching?</div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {AUDIENCES.map((a) => (
-            <button
-              key={a.v}
-              onClick={() => setAudience(a.v)}
-              className={`rounded-2xl border-2 px-4 py-5 text-center text-xl font-bold transition ${
-                audience === a.v ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'
-              }`}
-            >
+            <button key={a.v} onClick={() => setAudience(a.v)} className={`rounded-2xl border-2 px-4 py-5 text-center text-xl font-bold transition ${audience === a.v ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}>
               <span className="mb-1 block text-3xl" aria-hidden>{a.emoji}</span>
               {a.label}
             </button>
@@ -95,17 +176,71 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
         </div>
       </div>
 
-      {/* The three picks */}
-      <div>
-        <div className="mb-3 text-center text-2xl font-black text-white">Tonight’s 3 picks for you</div>
-        {loading ? (
-          <div className="space-y-4">
-            {[0, 1, 2].map((i) => <div key={i} className="h-40 animate-pulse rounded-2xl bg-white/5" />)}
+      {/* Customize — big and simple, learns your taste */}
+      <div className="rounded-2xl border-2 border-white/15 bg-white/[0.04]">
+        <button onClick={() => setCustomize((v) => !v)} className="flex w-full items-center justify-between px-5 py-4 text-left">
+          <span className="text-xl font-bold text-white">⚙️ Tell us what you like</span>
+          <span className="text-lg font-semibold text-brand-200">{customize ? 'Hide' : 'Set it up'}</span>
+        </button>
+        {customize && (
+          <div className="space-y-6 border-t-2 border-white/10 p-5">
+            <div>
+              <div className="mb-2 text-lg font-semibold text-slate-100">How long?</div>
+              <BigChoice value={prefs.maxRuntime} onChange={(v) => savePrefs({ ...prefs, maxRuntime: v })} options={[{ v: null, label: 'Any length' }, { v: 100, label: 'Short (under 1¾ h)' }, { v: 130, label: 'Medium (under 2¼ h)' }]} />
+            </div>
+            <div>
+              <div className="mb-2 text-lg font-semibold text-slate-100">Newer or older?</div>
+              <BigChoice value={prefs.era} onChange={(v) => savePrefs({ ...prefs, era: v })} options={[{ v: 'any', label: 'Any era' }, { v: 'recent', label: 'Newer' }, { v: 'classic', label: 'Classics (pre-2000)' }]} />
+            </div>
+            <div>
+              <div className="mb-2 text-lg font-semibold text-slate-100">Keep it clean?</div>
+              <button onClick={() => savePrefs({ ...prefs, familySafe: !prefs.familySafe })} className={`rounded-xl border-2 px-4 py-2.5 text-base font-bold transition ${prefs.familySafe ? 'border-emerald-400 bg-emerald-500/20 text-emerald-100' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}>
+                {prefs.familySafe ? '✓ No mature content' : 'No strong violence or adult content'}
+              </button>
+            </div>
+            <div>
+              <div className="mb-2 text-lg font-semibold text-slate-100">Actors you love</div>
+              {prefs.favorites.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {prefs.favorites.map((f) => (
+                    <span key={f.id} className="inline-flex items-center gap-2 rounded-full border-2 border-brand-400/60 bg-brand-500/20 px-3 py-1.5 text-base font-semibold text-brand-100">
+                      {f.name}
+                      <button onClick={() => removeFavorite(f.id)} aria-label={`Remove ${f.name}`} className="text-lg leading-none text-slate-300 hover:text-white">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <input value={actorQuery} onChange={(e) => setActorQuery(e.target.value)} placeholder="Type an actor’s name…" className="w-full rounded-xl border-2 border-white/15 bg-ink-900/70 px-4 py-3 text-lg text-white placeholder:text-slate-500 outline-none focus:border-brand-400/70" />
+              {actorHits.length > 0 && (
+                <div className="mt-2 overflow-hidden rounded-xl border-2 border-white/10 bg-ink-850">
+                  {actorHits.map((h) => (
+                    <button key={h.id} onClick={() => addFavorite({ id: h.id, name: h.name })} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-lg hover:bg-white/10">
+                      <span className="font-semibold text-white">{h.name}</span>
+                      {h.knownFor && <span className="truncate text-sm text-slate-400">{h.knownFor}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="mt-1.5 text-sm text-slate-400">We’ll favor movies starring the actors you add — and remember them next time.</p>
+            </div>
           </div>
+        )}
+      </div>
+
+      {/* Three picks */}
+      <div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-2xl font-black text-white">Tonight’s 3 picks for you</div>
+          {picks.length > 0 && (
+            <button onClick={showDifferent} className="rounded-xl border-2 border-white/20 bg-white/5 px-4 py-2 text-base font-bold text-slate-100 hover:bg-white/10">🔄 Show me different ones</button>
+          )}
+        </div>
+        {loading ? (
+          <div className="space-y-4">{[0, 1, 2].map((i) => <div key={i} className="h-40 animate-pulse rounded-2xl bg-white/5" />)}</div>
         ) : picks.length === 0 ? (
           <div className="rounded-2xl border-2 border-white/15 bg-white/5 p-6 text-center">
-            <p className="text-xl text-slate-200">We couldn’t find three right now.</p>
-            <p className="mt-1 text-lg text-slate-400">Tell us a few movies you love and we’ll learn your taste.</p>
+            <p className="text-xl text-slate-200">We couldn’t find three with those settings.</p>
+            <p className="mt-1 text-lg text-slate-400">Try loosening a setting above, or tell us a few movies you love.</p>
             <Link href="/app/onboarding" className="btn-primary mt-4 inline-flex px-6 py-3 text-lg">Tell us your taste</Link>
           </div>
         ) : (
@@ -113,8 +248,9 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
             {picks.map((p) => {
               const v = verdictVisualForCall(p.primaryCall);
               const watch = providerWatchUrl(p.where, p.title, p.year);
+              const key = `${p.mediaType}-${p.id}`;
               return (
-                <div key={`${p.mediaType}-${p.id}`} className="overflow-hidden rounded-2xl border-2 border-white/15 bg-white/[0.04]">
+                <div key={key} className="overflow-hidden rounded-2xl border-2 border-white/15 bg-white/[0.04]">
                   <div className="flex flex-col gap-4 p-4 sm:flex-row">
                     <Link href={`/app/title/${p.mediaType}/${p.id}`} className="mx-auto w-40 flex-none overflow-hidden rounded-xl border border-white/10 sm:mx-0">
                       {p.posterUrl ? (
@@ -130,18 +266,15 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <span className={`rounded-full border-2 px-4 py-1 text-xl font-black ${v.solid}`}>{callWords(p.primaryCall)}</span>
-                        <span className="text-lg text-slate-300">for {audience === 'family' ? 'the family' : audience === 'partner' ? 'you both' : 'you'}</span>
+                        {p.featuresFavorite && <span className="rounded-full border-2 border-gold-400/60 bg-gold-500/15 px-3 py-1 text-base font-bold text-amber-100">⭐ An actor you love</span>}
                       </div>
                       <p className="mt-3 text-lg leading-relaxed text-slate-100">{p.reason}</p>
                       {p.where && <p className="mt-2 text-lg font-semibold text-emerald-300">▶ On {p.where}</p>}
 
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        <a href={watch.url} target="_blank" rel="noopener noreferrer" className="btn-primary px-6 py-3 text-lg">
-                          {watch.label} →
-                        </a>
-                        <Link href={`/app/title/${p.mediaType}/${p.id}`} className="rounded-xl border-2 border-white/20 bg-white/5 px-5 py-3 text-lg font-semibold text-slate-100 hover:bg-white/10">
-                          More about it
-                        </Link>
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <a href={watch.url} target="_blank" rel="noopener noreferrer" className="btn-primary px-6 py-3 text-lg">{watch.label} →</a>
+                        <Link href={`/app/title/${p.mediaType}/${p.id}`} className="rounded-xl border-2 border-white/20 bg-white/5 px-5 py-3 text-lg font-semibold text-slate-100 hover:bg-white/10">More about it</Link>
+                        <button onClick={() => dismiss(key)} className="rounded-xl border-2 border-white/20 bg-white/5 px-5 py-3 text-lg font-semibold text-slate-300 hover:bg-white/10" title="We won’t show this again">👎 Not for me</button>
                         <SaveButton tmdbId={p.id} mediaType={p.mediaType} title={p.title} year={p.year} posterPath={null} variant="inline" />
                       </div>
                     </div>
@@ -153,18 +286,14 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
         )}
       </div>
 
-      {/* Ask for something else — big, friendly, voice-capable */}
       <div className="rounded-2xl border-2 border-white/15 bg-white/5 p-5 text-center">
         <div className="text-xl font-semibold text-white">Want something different?</div>
         <p className="mt-1 text-lg text-slate-300">Tell us in your own words — type or talk.</p>
         <Link href="/app/ask" className="btn-secondary mt-3 inline-flex px-6 py-3 text-lg">🎙️ Ask for a movie</Link>
       </div>
 
-      {/* Back to the full app */}
       <div className="text-center">
-        <button onClick={useFullApp} className="text-lg font-semibold text-slate-400 underline hover:text-white">
-          Switch to the full app
-        </button>
+        <button onClick={useFullApp} className="text-lg font-semibold text-slate-400 underline hover:text-white">Switch to the full app</button>
       </div>
     </div>
   );
