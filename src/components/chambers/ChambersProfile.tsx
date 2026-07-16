@@ -110,7 +110,7 @@ export function ChambersProfile(props: ChambersProfileProps) {
           </div>
           <h1 className="mt-2 text-2xl font-black text-white">{name}</h1>
           {username && <div className="text-sm text-slate-400">@{username}</div>}
-          <div className="mt-1 text-sm font-semibold text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
+          <div className="mt-1 text-base font-semibold text-gold-400">
             {title ? `“${title}”` : 'Rate a few titles to earn your courtroom title'}
           </div>
         </div>
@@ -128,7 +128,7 @@ export function ChambersProfile(props: ChambersProfileProps) {
       {/* ---------------- Court Standing progress ---------------- */}
       <section className="card p-4">
         <div className="flex items-center justify-between">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
+          <div className="eyebrow-lg">
             ⚖️ Court Standing
           </div>
           <div className="text-xs text-slate-400">{standing.points} pts</div>
@@ -145,10 +145,10 @@ export function ChambersProfile(props: ChambersProfileProps) {
 
       {/* ---------------- Watch DNA ---------------- */}
       <section className="card p-4">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
+        <div className="eyebrow-lg">
           🧬 Watch DNA
         </div>
-        <p className="mt-1 text-xs text-slate-500">Computed only from your own ratings, verdicts and reviews — never guessed.</p>
+        <p className="mt-1 text-xs text-slate-400">Computed only from your own ratings, verdicts and reviews — never guessed.</p>
         {dna.length === 0 && loves.length === 0 && avoids.length === 0 ? (
           <p className="mt-3 text-sm text-slate-400">Rate titles and answer a few post-watch questions and your DNA fills in here.</p>
         ) : (
@@ -162,7 +162,7 @@ export function ChambersProfile(props: ChambersProfileProps) {
                 <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10">
                   <div className="h-full rounded-full bg-brand-400" style={{ width: `${d.value}%` }} />
                 </div>
-                <div className="mt-0.5 text-[11px] text-slate-500">{d.caption}</div>
+                <div className="mt-0.5 text-[11px] text-slate-400">{d.caption}</div>
               </div>
             ))}
             {(loves.length > 0 || avoids.length > 0) && (
@@ -182,7 +182,7 @@ export function ChambersProfile(props: ChambersProfileProps) {
       {/* ---------------- Badge shelf ---------------- */}
       <section className="card p-4">
         <div className="flex items-center justify-between">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
+          <div className="eyebrow-lg">
             🏅 The Badge Shelf
           </div>
           <div className="text-xs text-slate-400">{earned.length}/{badges.length} earned</div>
@@ -199,11 +199,11 @@ export function ChambersProfile(props: ChambersProfileProps) {
             <div key={b.key} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
               <div className="text-2xl opacity-40 grayscale">{b.emoji}</div>
               <div className="mt-1 text-sm font-semibold text-slate-300">{b.label}</div>
-              <div className="text-[11px] text-slate-500">{b.description}</div>
+              <div className="text-[11px] text-slate-400">{b.description}</div>
               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                 <div className="h-full rounded-full bg-slate-500" style={{ width: `${Math.min(100, Math.round((b.have / b.need) * 100))}%` }} />
               </div>
-              <div className="mt-0.5 text-[10px] tabular-nums text-slate-500">{Math.min(b.have, b.need)}/{b.need}</div>
+              <div className="mt-0.5 text-[11px] tabular-nums text-slate-400">{Math.min(b.have, b.need)}/{b.need}</div>
             </div>
           ))}
         </div>

@@ -98,10 +98,8 @@ export function HomeGreeter({ name, className = '' }: { name?: string | null; cl
           </span>
         </div>
         <div className="relative mb-1 max-w-lg rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.06] px-4 py-2.5 backdrop-blur">
-          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
-            ⚖️ {judge.name}
-          </div>
-          <p className="mt-0.5 text-sm text-slate-100 sm:text-base">
+          <div className="eyebrow">⚖️ {judge.name}</div>
+          <p className="mt-1 text-base text-slate-50 sm:text-lg">
             {greeting ?? 'The court is in session. What are we watching tonight?'}
           </p>
         </div>

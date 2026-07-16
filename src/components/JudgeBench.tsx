@@ -87,11 +87,11 @@ export function JudgeBench({ initialJudge, big = false }: { initialJudge: Judge 
           <RobedPortrait src={showVendor ? undefined : dog.src} emoji={showVendor ? judge!.emoji ?? '⚖️' : undefined} size={size} accent={accent} />
         </div>
         <div className={big ? 'min-w-0' : 'min-w-0 flex-1'}>
-          <div className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: accent, fontFamily: 'Georgia, serif' }}>
+          <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em]" style={{ color: accent }}>
             ⚖️ Now presiding{showVendor ? ' · Sponsored' : ''}
           </div>
-          <div className={`${big ? 'text-lg' : 'truncate text-base'} font-bold text-white`} style={{ fontFamily: 'Georgia, serif' }}>{name}</div>
-          <div className={`text-xs text-slate-400 ${big ? '' : 'truncate'}`}>{tagline}</div>
+          <div className={`${big ? 'text-xl' : 'truncate text-lg'} font-bold tracking-tight text-white`}>{name}</div>
+          <div className={`text-sm text-slate-300 ${big ? '' : 'truncate'}`}>{tagline}</div>
         </div>
       </div>
 

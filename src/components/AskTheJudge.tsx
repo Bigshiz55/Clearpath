@@ -231,12 +231,10 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
       {/* ============ Constraints — on by default; the first thing you decide ============ */}
       <div className="card p-4">
         <button onClick={() => setShowFilters((s) => !s)} className="flex w-full items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
-            ⚖️ Your constraints
-          </span>
-          <span className="text-xs text-slate-400">{showFilters ? 'Hide ▲' : 'Show ▼'}</span>
+          <span className="eyebrow-lg">⚖️ Your constraints</span>
+          <span className="text-sm font-semibold text-brand-200">{showFilters ? 'Hide ▲' : 'Show ▼'}</span>
         </button>
-        <p className="mt-1 text-xs text-slate-500">Set the ground rules — or just tell the judge and these follow along. On by default; ignore them if you like.</p>
+        <p className="mt-1.5 text-sm text-slate-300">Set the ground rules — or just tell the judge and these follow along. On by default; ignore them if you like.</p>
 
         {showFilters && (
           <div className="mt-3 space-y-3">
@@ -264,17 +262,17 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
               <div>
                 <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Released since</span><span className="font-semibold text-brand-200">{releasedReadout(sinceYears)}</span></div>
                 <input type="range" min={0} max={75} step={1} value={sinceYears} onChange={(e) => { const y = Number(e.target.value); set('sinceMonths', y === 0 ? null : y * 12); }} className="w-full accent-brand-500" />
-                <p className="mt-0.5 text-[10px] text-slate-500">Drag left to reach classics — decades back, not just recent.</p>
+                <p className="mt-1 text-[11px] leading-snug text-slate-400">Drag left to reach classics — decades back, not just recent.</p>
               </div>
               <div>
                 <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Audience score</span><span className="font-semibold text-brand-200">{q.minAudience ? `${q.minAudience}%+` : 'Any'}</span></div>
                 <input type="range" min={0} max={95} step={5} value={q.minAudience ?? 0} onChange={(e) => set('minAudience', Number(e.target.value) === 0 ? null : Number(e.target.value))} className="w-full accent-brand-500" />
-                <p className="mt-0.5 text-[10px] text-slate-500">The crowd score (TMDB) — the open stand-in for RT’s audience/Popcorn.</p>
+                <p className="mt-1 text-[11px] leading-snug text-slate-400">The crowd score (TMDB) — the open stand-in for RT’s audience/Popcorn.</p>
               </div>
               <div>
                 <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">IMDb rating</span><span className="font-semibold text-gold-400">{q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'}</span></div>
                 <input type="range" min={0} max={9} step={0.5} value={q.minImdb ?? 0} onChange={(e) => set('minImdb', Number(e.target.value) === 0 ? null : Number(e.target.value))} className="w-full accent-gold-400" />
-                <p className="mt-0.5 text-[10px] text-slate-500">IMDb’s 0–10 star rating, when we have it.</p>
+                <p className="mt-1 text-[11px] leading-snug text-slate-400">IMDb’s 0–10 star rating, when we have it.</p>
               </div>
               <div>
                 <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Your match at least</span><span className="font-semibold text-gold-400">{q.minMatch ? `${q.minMatch}+` : 'Any'}</span></div>
@@ -315,8 +313,8 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
           <RobedPortrait src={judgeSrc} size={44} />
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>⚖️ The bench</div>
-            <div className="truncate text-sm font-bold text-white">{judgeName}</div>
+            <div className="eyebrow">⚖️ The bench</div>
+            <div className="truncate text-base font-bold text-white">{judgeName}</div>
           </div>
           <button
             onClick={() => { setSpeak((s) => !s); if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel(); }}
@@ -342,7 +340,7 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
                     {m.items && m.items.length > 0 && (
                       <div className="mt-3 space-y-2">
                         {m.verdict && (
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-400">Better for you</div>
+                          <div className="eyebrow text-[11px]">Better for you</div>
                         )}
                         {m.items.map((it) => {
                           const v = verdictVisualForCall(it.primaryCall);
@@ -366,13 +364,13 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
                                 <div className="mt-1 flex items-center gap-2">
                                   <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${v.badge}`}>{it.primaryCall}</span>
                                   <span className="text-sm font-bold tabular-nums text-gold-400">{it.matchScore}</span>
-                                  <span className="text-[11px] text-slate-500">match</span>
+                                  <span className="text-[11px] text-slate-400">match</span>
                                 </div>
                                 {it.reason && <ReasonText text={it.reason} className="mt-1 text-[11px] text-slate-300" />}
                                 <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} decider={false} className="mt-1" />
                                 <div className="mt-1.5 flex flex-wrap gap-1">
-                                  {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-300">📺 {it.where}</span>}
-                                  <a href={it.deciderUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-brand-300 hover:bg-white/10">
+                                  {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
+                                  <a href={it.deciderUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-brand-300 hover:bg-white/10">
                                     Stream It or Skip It? ↗
                                   </a>
                                 </div>

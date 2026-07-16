@@ -167,7 +167,7 @@ export function FinderUI({
         <JudgeBench initialJudge={initialJudge} big />
 
         <div className="card flex flex-col gap-3 p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
+          <div className="eyebrow-lg">
             ⚖️ Try your case
           </div>
           <textarea
@@ -246,7 +246,7 @@ export function FinderUI({
                     <div className="mt-1 flex items-center gap-2">
                       <span className={`rounded-md border px-2 py-0.5 text-[11px] font-black ${CALL_STYLE[it.primaryCall] ?? 'border-white/15 text-slate-200'}`}>{it.primaryCall}</span>
                       <span className="text-sm font-bold tabular-nums text-gold-400">{it.matchScore}</span>
-                      <span className="text-xs text-slate-500">match · {it.generalScore} overall</span>
+                      <span className="text-xs text-slate-400">match · {it.generalScore} overall</span>
                     </div>
                     <p className="mt-1 line-clamp-2 text-xs text-slate-300">{it.reason}</p>
                     <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} decider={false} className="mt-1.5" />
@@ -269,7 +269,7 @@ export function FinderUI({
 
       {/* Prepare your evidence — transparent, editable, no black box. */}
       <div id="evidence" className="card space-y-4 p-4 scroll-mt-20">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-400" style={{ fontFamily: 'Georgia, serif' }}>
+        <div className="eyebrow-lg">
           ⚖️ Prepare your evidence
         </div>
 
@@ -293,7 +293,7 @@ export function FinderUI({
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-slate-500">Scores every result against their taste — “{(watcherIdx >= 0 ? watchers[watcherIdx]!.name : 'You')} match”.</p>
+            <p className="mt-1 text-xs text-slate-400">Scores every result against their taste — “{(watcherIdx >= 0 ? watchers[watcherIdx]!.name : 'You')} match”.</p>
           </div>
         )}
 
@@ -325,7 +325,7 @@ export function FinderUI({
           <Slider label={`${scoredFor} at least`} readout={q.minMatch ? `${q.minMatch}+` : 'Any'} min={0} max={95} step={5}
             value={q.minMatch ?? 0} onChange={(v) => set('minMatch', v === 0 ? null : v)} accent />
         </div>
-        <p className="-mt-1 text-[11px] text-slate-500">
+        <p className="-mt-1 text-[11px] leading-relaxed text-slate-400">
           “Audience score” is the crowd rating from TMDB — the open stand-in for Rotten Tomatoes’ audience/Popcorn score. Drag “Released since” left to reach classics from decades back.
         </p>
 
@@ -350,7 +350,7 @@ export function FinderUI({
             onChange={(e) => set('pace', Number(e.target.value))}
             className="w-full accent-brand-500 disabled:opacity-40"
           />
-          <div className="mt-0.5 flex justify-between text-[10px] text-slate-500">
+          <div className="mt-0.5 flex justify-between text-[11px] text-slate-400">
             <span>🐢 Slow burn</span>
             <span>⚡ Adrenaline rush</span>
           </div>
