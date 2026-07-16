@@ -249,23 +249,23 @@ export function OnTvGuide({
           {filtered.map((a) => {
             const t = fmtTime(a.time);
             return (
-              <div key={a.id} className="card flex items-center gap-3 p-3">
-                <div className="w-24 flex-none text-center">
+              <div key={a.id} className="card flex items-center gap-3 p-3.5">
+                <div className="w-[6.5rem] flex-none text-center sm:w-32">
                   {(() => {
                     const dl = dayLabel(a.airstamp);
                     if (t && a.minutes > 0) {
                       return (
                         <>
-                          <div className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white">{t}</div>
-                          {dl !== 'Today' && <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">{dl}</div>}
+                          <div className="whitespace-nowrap text-2xl font-black tabular-nums leading-none text-white sm:text-3xl">{t}</div>
+                          {dl !== 'Today' && <div className="mt-1 text-xs font-bold uppercase tracking-wide text-amber-300">{dl}</div>}
                         </>
                       );
                     }
-                    return <div className="rounded-md bg-emerald-500/20 px-1 py-1 text-xs font-black uppercase tracking-wide text-emerald-200">{streaming ? dl : 'New'}</div>;
+                    return <div className="rounded-md bg-emerald-500/20 px-1.5 py-1.5 text-base font-black uppercase tracking-wide text-emerald-200">{streaming ? dl : 'New'}</div>;
                   })()}
-                  <div className="mt-1.5 line-clamp-2 rounded-md border border-brand-400/30 bg-brand-500/15 px-1.5 py-1 text-xs font-bold leading-tight text-brand-100">{a.network}</div>
+                  <div className="mt-2 line-clamp-2 rounded-lg border border-brand-400/30 bg-brand-500/15 px-2 py-1.5 text-sm font-bold leading-tight text-brand-100 sm:text-base">{a.network}</div>
                 </div>
-                <div className="h-16 w-11 flex-none overflow-hidden rounded-md border border-white/10 bg-ink-800">
+                <div className="h-20 w-14 flex-none overflow-hidden rounded-md border border-white/10 bg-ink-800">
                   {a.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={a.image} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -275,10 +275,10 @@ export function OnTvGuide({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="line-clamp-1 text-sm font-semibold text-white">{a.showName}</span>
-                    {a.rating != null && <span className={`flex-none text-xs font-semibold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
+                    <span className="line-clamp-2 text-base font-bold text-white sm:text-lg">{a.showName}</span>
+                    {a.rating != null && <span className={`flex-none text-sm font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
                   </div>
-                  <div className="truncate text-[11px] text-slate-400">
+                  <div className="truncate text-xs text-slate-400">
                     {a.showType}
                     {a.episodeName ? ` · ${a.episodeName}` : ''}
                     {a.season && a.number ? ` (S${a.season}E${a.number})` : ''}
@@ -289,10 +289,10 @@ export function OnTvGuide({
                   <button
                     onClick={() => toggleReminder(a)}
                     disabled={busy === a.id}
-                    className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${reminded.has(a.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 ${reminded.has(a.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10'}`}
                     title="Get a phone/PC notification 1 hour and 5 minutes before it airs"
                   >
-                    {reminded.has(a.id) ? '🔔 Reminder on' : '🔔 Remind me'}
+                    {reminded.has(a.id) ? '🔔 On' : '🔔 Remind'}
                   </button>
                   <a href={calendarUrl(a)} target="_blank" rel="noopener noreferrer" className="hidden rounded-lg border border-white/12 bg-white/5 px-2 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 sm:inline-flex" title="Or add it to your calendar">
                     📅
