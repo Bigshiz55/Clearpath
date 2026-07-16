@@ -36,6 +36,8 @@ function withApiKey(url: URL, key: string): URL {
   return url;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   let key: string;
   try {
@@ -48,35 +50,49 @@ async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): 
   const url = withApiKey(new URL(`${TMDB_BASE}${path}`), key);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      headers: authHeaders(key),
-      signal: controller.signal,
-      // TMDB metadata is fine to cache briefly at the edge/runtime.
-      next: { revalidate: 60 * 60 },
-    });
-  } catch {
-    throw new TmdbError(504, 'Could not reach the movie database. Please try again.');
-  } finally {
+  // A single network blip or a transient 5xx/429 shouldn't surface as a hard
+  // "couldn't load" — the symptom users hit most. Retry a few times with a short
+  // backoff; only give up (and show the friendly error) after all attempts fail.
+  const MAX_ATTEMPTS = 3;
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: authHeaders(key),
+        signal: controller.signal,
+        next: { revalidate: 60 * 60 },
+      });
+    } catch (e) {
+      lastErr = e; // network error / timeout — retryable
+      clearTimeout(timeout);
+      if (attempt < MAX_ATTEMPTS) {
+        await sleep(300 * attempt);
+        continue;
+      }
+      throw new TmdbError(504, 'Could not reach the movie database. Please try again.');
+    }
     clearTimeout(timeout);
-  }
 
-  if (res.status === 401) {
-    throw new TmdbError(401, 'The TMDB API key is invalid. Check your configuration.');
+    if (res.status === 401) throw new TmdbError(401, 'The TMDB API key is invalid. Check your configuration.');
+    if (res.status === 404) throw new TmdbError(404, 'That title could not be found.');
+    // Rate limits and 5xx are transient — back off and retry before giving up.
+    if (res.status === 429 || res.status >= 500) {
+      lastErr = res.status;
+      if (attempt < MAX_ATTEMPTS) {
+        await sleep(res.status === 429 ? 700 * attempt : 300 * attempt);
+        continue;
+      }
+      if (res.status === 429) throw new TmdbError(429, 'The movie database is rate-limiting requests. Please try again shortly.');
+      throw new TmdbError(res.status, 'The movie database returned an unexpected error.');
+    }
+    if (!res.ok) throw new TmdbError(res.status, 'The movie database returned an unexpected error.');
+    return (await res.json()) as T;
   }
-  if (res.status === 404) {
-    throw new TmdbError(404, 'That title could not be found.');
-  }
-  if (res.status === 429) {
-    throw new TmdbError(429, 'The movie database is rate-limiting requests. Please try again shortly.');
-  }
-  if (!res.ok) {
-    throw new TmdbError(res.status, 'The movie database returned an unexpected error.');
-  }
-  return (await res.json()) as T;
+  // Unreachable, but satisfies the type checker.
+  throw new TmdbError(504, lastErr instanceof Error ? 'Could not reach the movie database. Please try again.' : 'Could not reach the movie database. Please try again.');
 }
 
 // ---------------------------------------------------------------------------

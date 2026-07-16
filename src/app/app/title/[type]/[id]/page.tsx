@@ -110,14 +110,21 @@ async function getFeedbackDone(tmdbId: number, mediaType: MediaType): Promise<bo
   }
 }
 
-function ErrorCard({ title, message }: { title: string; message: string }) {
+function ErrorCard({ title, message, retryHref }: { title: string; message: string; retryHref?: string }) {
   return (
     <div className="card mx-auto max-w-lg p-8 text-center">
       <h1 className="text-xl font-semibold text-white">{title}</h1>
       <p className="mt-2 text-sm text-slate-400">{message}</p>
-      <Link href="/app" className="btn-secondary mt-6 inline-flex">
-        ← Back to search
-      </Link>
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
+        {retryHref && (
+          <Link href={retryHref} prefetch={false} className="btn-primary inline-flex">
+            ↻ Try again
+          </Link>
+        )}
+        <Link href="/app" className="btn-secondary inline-flex">
+          ← Back to search
+        </Link>
+      </div>
     </div>
   );
 }
@@ -184,14 +191,16 @@ export default async function TitlePage({ params }: { params: { type: string; id
     if (e instanceof ConfigError) {
       return <ErrorCard title="Not configured yet" message={e.userMessage} />;
     }
+    const retryHref = `/app/title/${parsed.mediaType}/${parsed.id}`;
     if (e instanceof TmdbError) {
       if (e.status === 404) notFound();
-      return <ErrorCard title="Couldn’t load this title" message={e.userMessage} />;
+      return <ErrorCard title="Couldn’t load this title" message={e.userMessage} retryHref={retryHref} />;
     }
     return (
       <ErrorCard
         title="Something went wrong"
         message="We couldn’t generate this verdict right now. Please try again in a moment."
+        retryHref={retryHref}
       />
     );
   }

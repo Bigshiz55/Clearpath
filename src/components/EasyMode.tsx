@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SaveButton } from './SaveButton';
+import { EasyQuiz, type QuizResult } from './EasyQuiz';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import { providerWatchUrl } from '@/lib/watchLinks';
 import type { EasyAudience, EasyEra, EasyPick } from '@/lib/easyPicks';
@@ -15,10 +16,11 @@ interface StoredPrefs {
   era: EasyEra;
   favorites: Favorite[];
   dismissed: string[];
+  quizTaken: boolean;
 }
 
 const PREFS_KEY = 'wv_easy_prefs';
-const DEFAULTS: StoredPrefs = { maxRuntime: null, familySafe: false, era: 'any', favorites: [], dismissed: [] };
+const DEFAULTS: StoredPrefs = { maxRuntime: null, familySafe: false, era: 'any', favorites: [], dismissed: [], quizTaken: false };
 
 const AUDIENCES: { v: EasyAudience; label: string; emoji: string }[] = [
   { v: 'me', label: 'Just me', emoji: '🙂' },
@@ -57,6 +59,8 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
   const [loading, setLoading] = useState(false);
   const [customize, setCustomize] = useState(false);
   const [sessionSkips, setSessionSkips] = useState<string[]>([]);
+  const [mood, setMood] = useState<number[]>([]);
+  const [quizOpen, setQuizOpen] = useState(false);
   const loaded = useRef(false);
 
   // Actor search
@@ -65,12 +69,18 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
 
   useEffect(() => {
     document.documentElement.setAttribute('data-simple', '1');
+    let taken = false;
     try {
       const raw = localStorage.getItem(PREFS_KEY);
-      if (raw) setPrefs({ ...DEFAULTS, ...JSON.parse(raw) });
+      if (raw) {
+        const p = { ...DEFAULTS, ...JSON.parse(raw) } as StoredPrefs;
+        setPrefs(p);
+        taken = p.quizTaken;
+      }
     } catch {
       /* ignore */
     }
+    if (!taken) setQuizOpen(true); // first visit → offer the quick quiz
     loaded.current = true;
   }, []);
 
@@ -83,10 +93,10 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
     }
   }, []);
 
-  const reqKey = `${audience}|${prefs.maxRuntime}|${prefs.familySafe}|${prefs.era}|${prefs.favorites.map((f) => f.id).join(',')}|${prefs.dismissed.join(',')}|${sessionSkips.join(',')}`;
+  const reqKey = `${audience}|${prefs.maxRuntime}|${prefs.familySafe}|${prefs.era}|${prefs.favorites.map((f) => f.id).join(',')}|${mood.join(',')}|${prefs.dismissed.join(',')}|${sessionSkips.join(',')}|${quizOpen}`;
 
   useEffect(() => {
-    if (!loaded.current) return;
+    if (!loaded.current || quizOpen) return; // don't fetch while the quiz is up
     let active = true;
     setLoading(true);
     fetch('/api/easy', {
@@ -98,6 +108,7 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
         familySafe: prefs.familySafe,
         era: prefs.era,
         actorIds: prefs.favorites.map((f) => f.id),
+        moodGenres: mood,
         excludeKeys: [...prefs.dismissed, ...sessionSkips],
       }),
     })
@@ -146,6 +157,16 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
   function showDifferent() {
     setSessionSkips((s) => [...new Set([...s, ...picks.map((p) => `${p.mediaType}-${p.id}`)])]);
   }
+  function finishQuiz(r: QuizResult) {
+    setAudience(r.audience);
+    setMood(r.moodGenres);
+    savePrefs({ ...prefs, era: r.era, familySafe: r.familySafe, maxRuntime: r.maxRuntime, quizTaken: true });
+    setQuizOpen(false);
+  }
+  function skipQuiz() {
+    savePrefs({ ...prefs, quizTaken: true });
+    setQuizOpen(false);
+  }
   function useFullApp() {
     document.documentElement.removeAttribute('data-simple');
     try {
@@ -156,11 +177,18 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
     router.push('/app');
   }
 
+  if (quizOpen) {
+    return <EasyQuiz onDone={finishQuiz} onCancel={skipQuiz} />;
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-8 px-1 pb-16">
       <div className="pt-2 text-center">
         <h1 className="text-3xl font-black text-white sm:text-4xl">{name ? `Hello, ${name}.` : 'Hello.'}</h1>
         <p className="mt-2 text-xl text-slate-200">Let’s find something good to watch tonight.</p>
+        <button onClick={() => setQuizOpen(true)} className="mt-4 inline-flex rounded-xl border-2 border-brand-400/50 bg-brand-500/15 px-5 py-3 text-lg font-bold text-brand-100 transition hover:bg-brand-500/25">
+          📝 Take the 1-minute quiz
+        </button>
       </div>
 
       {/* Who's watching */}

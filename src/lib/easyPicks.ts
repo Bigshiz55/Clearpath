@@ -19,6 +19,8 @@ export interface EasyPrefs {
   era: EasyEra;
   /** TMDB person ids the user loves — biases picks toward their films. */
   actorIds: number[];
+  /** Tonight's mood — TMDB genre ids from the quiz (not saved long-term). */
+  moodGenres?: number[];
   /** "type-id" keys the user waved off — never show these again. */
   excludeKeys: string[];
 }
@@ -46,6 +48,7 @@ export const DEFAULT_PREFS: EasyPrefs = {
   familySafe: false,
   era: 'any',
   actorIds: [],
+  moodGenres: [],
   excludeKeys: [],
 };
 
@@ -60,9 +63,11 @@ export async function getEasyPicks(supabase: SupabaseClient, userId: string, pre
   const services = await getMyServices(supabase, userId);
   const familySafe = prefs.familySafe || prefs.audience === 'family';
 
+  // Family-safe wins on genre; otherwise tonight's mood (from the quiz) leads.
+  const genreIds = familySafe ? FAMILY_GENRES : prefs.moodGenres ?? [];
   const query: FinderQuery = {
     ...EMPTY_QUERY,
-    genreIds: familySafe ? FAMILY_GENRES : [],
+    genreIds,
     maxRuntime: prefs.maxRuntime,
     sinceMonths: prefs.era === 'recent' ? 120 : null,
     maxYear: prefs.era === 'classic' ? 1999 : null,

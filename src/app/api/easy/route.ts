@@ -16,6 +16,7 @@ function coerce(raw: unknown): EasyPrefs {
     familySafe: Boolean(b.familySafe),
     era: ERA.has(b.era as EasyEra) ? (b.era as EasyEra) : 'any',
     actorIds: Array.isArray(b.actorIds) ? b.actorIds.map(Number).filter((n) => Number.isFinite(n)).slice(0, 8) : [],
+    moodGenres: Array.isArray(b.moodGenres) ? b.moodGenres.map(Number).filter((n) => Number.isFinite(n)).slice(0, 4) : [],
     excludeKeys: Array.isArray(b.excludeKeys) ? b.excludeKeys.map(String).slice(0, 100) : [],
   };
 }
