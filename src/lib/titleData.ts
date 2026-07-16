@@ -15,6 +15,11 @@ async function mergeMdbRatings(meta: TitleMetadata): Promise<void> {
   if (meta.rottenTomatoes == null && mdb.rtCritic != null) meta.rottenTomatoes = mdb.rtCritic;
   if (meta.imdbRating == null && mdb.imdb != null) meta.imdbRating = mdb.imdb;
   if (meta.metascore == null && mdb.metacritic != null) meta.metascore = mdb.metacritic;
+  // Extra community/critic feeds — display-only, so always take what MDBList has.
+  if (mdb.metacriticUser != null) meta.metacriticUser = mdb.metacriticUser;
+  if (mdb.trakt != null) meta.trakt = mdb.trakt;
+  if (mdb.letterboxd != null) meta.letterboxd = mdb.letterboxd;
+  if (mdb.rogerEbert != null) meta.rogerEbert = mdb.rogerEbert;
 }
 
 export interface SharedTitleData {

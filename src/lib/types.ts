@@ -57,7 +57,13 @@ export interface TitleMetadata {
   imdbRating: number | null; // 0..10
   rottenTomatoes: number | null; // 0..100 — Tomatometer (critics)
   rtAudience?: number | null; // 0..100 — Rotten Tomatoes audience / Popcorn (MDBList)
-  metascore: number | null; // 0..100
+  metascore: number | null; // 0..100 — Metacritic critics (Metascore)
+  /** Extra community/critic ratings from MDBList — display-only, never blended
+   *  into the authoritative Standard Score. null when absent (never faked). */
+  metacriticUser?: number | null; // 0..10 — Metacritic user score
+  trakt?: number | null; // 0..100 — Trakt community rating
+  letterboxd?: number | null; // 0..5 — Letterboxd community average
+  rogerEbert?: number | null; // 0..4 — RogerEbert.com star rating
   /** TV episode counts. episodesTotal is null when the run is ongoing/unknown. */
   episodesAired: number | null;
   episodesTotal: number | null;

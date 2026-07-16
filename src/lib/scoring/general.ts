@@ -164,6 +164,33 @@ export function computeGeneralScore(
       available: meta.metascore != null,
       weight: weightOf('metacritic'),
     },
+    // Extra community/critic feeds from MDBList. These are shown for context in
+    // the consensus but are NOT blended into the Standard Score — that number
+    // stays deterministic and calibrated. No weight; display-only.
+    {
+      name: 'Metacritic Users',
+      value: meta.metacriticUser != null ? round(clamp(meta.metacriticUser * 10)) : null,
+      raw: meta.metacriticUser != null ? `${meta.metacriticUser.toFixed(1)}/10` : null,
+      available: meta.metacriticUser != null,
+    },
+    {
+      name: 'Trakt',
+      value: meta.trakt ?? null,
+      raw: meta.trakt != null ? `${meta.trakt}%` : null,
+      available: meta.trakt != null,
+    },
+    {
+      name: 'Letterboxd',
+      value: meta.letterboxd != null ? round(clamp(meta.letterboxd * 20)) : null,
+      raw: meta.letterboxd != null ? `${meta.letterboxd.toFixed(1)}/5` : null,
+      available: meta.letterboxd != null,
+    },
+    {
+      name: 'Roger Ebert',
+      value: meta.rogerEbert != null ? round(clamp(meta.rogerEbert * 25)) : null,
+      raw: meta.rogerEbert != null ? `${meta.rogerEbert.toFixed(1)}/4` : null,
+      available: meta.rogerEbert != null,
+    },
   ];
 
   return { score, breakdown, confidence, sources, standardScore: standard.score, standardConfidence: standard.confidence };

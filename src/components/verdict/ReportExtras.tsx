@@ -213,8 +213,13 @@ export function LanguageEpisodes({ meta }: { meta: TitleMetadata }) {
 const SOURCE_META: Record<string, { icon: string; kind: string }> = {
   IMDb: { icon: '⭐', kind: 'IMDb' },
   'Rotten Tomatoes': { icon: '🍅', kind: 'Critics · Rotten Tomatoes' },
+  'RT Audience': { icon: '🍿', kind: 'Audience · Rotten Tomatoes' },
   Metacritic: { icon: 'Ⓜ️', kind: 'Critics · Metacritic' },
+  'Metacritic Users': { icon: '🄼', kind: 'Audience · Metacritic' },
   'TMDB Audience': { icon: '👥', kind: 'Audience · TMDB' },
+  Trakt: { icon: '📺', kind: 'Community · Trakt' },
+  Letterboxd: { icon: '📓', kind: 'Community · Letterboxd' },
+  'Roger Ebert': { icon: '🎞️', kind: 'Critic · RogerEbert.com' },
 };
 
 export function RecommendationConsensus({
