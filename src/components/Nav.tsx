@@ -3,13 +3,19 @@ import { Logo } from './Logo';
 import { SignOutButton } from './SignOutButton';
 import { GuestSaveButton } from './GuestSaveButton';
 import { SimpleModeToggle } from './SimpleModeToggle';
+import { MoreMenu, type NavLink } from './nav/MoreMenu';
+import { MobileNav } from './nav/MobileNav';
 
-const LINKS = [
+// Primary destinations stay inline; secondary ones live under "More" so neither
+// the desktop bar nor the mobile tab bar gets overcrowded.
+const PRIMARY: NavLink[] = [
   { href: '/app', label: 'Home' },
   { href: '/app/new', label: 'New' },
   { href: '/app/tv', label: 'On TV' },
   { href: '/app/together', label: 'Together' },
   { href: '/app/watchlist', label: 'Watchlist' },
+];
+const SECONDARY: NavLink[] = [
   { href: '/app/friends', label: 'Friends' },
   { href: '/app/chambers', label: 'Chambers' },
   { href: '/app/settings', label: 'Settings' },
@@ -23,11 +29,12 @@ export function Nav({ personalLabel, isGuest = false }: { personalLabel?: string
           <div className="flex items-center gap-6">
             <Logo href="/app" size="lg" />
             <nav className="hidden items-center gap-1 sm:flex">
-              {LINKS.map((l) => (
+              {PRIMARY.map((l) => (
                 <Link key={l.href} href={l.href} className="btn-ghost px-3 py-2 text-sm">
                   {l.label}
                 </Link>
               ))}
+              <MoreMenu links={SECONDARY} />
             </nav>
           </div>
           <div className="flex items-center gap-2">
@@ -49,13 +56,7 @@ export function Nav({ personalLabel, isGuest = false }: { personalLabel?: string
       {/* Mobile bottom nav — sibling of the header (NOT inside it): the header's
           backdrop-filter would otherwise become the containing block for this
           `fixed` element and pin it to the top of the screen. */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-ink-950/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
-        {LINKS.map((l) => (
-          <Link key={l.href} href={l.href} className="flex flex-1 flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-xs text-slate-300">
-            {l.label}
-          </Link>
-        ))}
-      </nav>
+      <MobileNav primary={PRIMARY} secondary={SECONDARY} />
     </>
   );
 }

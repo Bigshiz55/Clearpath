@@ -28,6 +28,18 @@ export interface Airing {
   imdb: string | null;
 }
 
+interface TvmazeShow {
+  id: number;
+  name?: string;
+  type?: string;
+  genres?: string[];
+  rating?: { average?: number | null };
+  image?: { medium?: string; original?: string } | null;
+  summary?: string | null;
+  network?: { name?: string } | null;
+  webChannel?: { name?: string } | null;
+  externals?: { imdb?: string | null } | null;
+}
 interface TvmazeAiring {
   id: number;
   airtime?: string;
@@ -36,18 +48,19 @@ interface TvmazeAiring {
   name?: string | null; // episode name
   season?: number | null;
   number?: number | null;
-  show?: {
-    id: number;
-    name?: string;
-    type?: string;
-    genres?: string[];
-    rating?: { average?: number | null };
-    image?: { medium?: string; original?: string } | null;
-    summary?: string | null;
-    network?: { name?: string } | null;
-    webChannel?: { name?: string } | null;
-    externals?: { imdb?: string | null } | null;
-  } | null;
+  show?: TvmazeShow | null; // broadcast schedule
+  _embedded?: { show?: TvmazeShow | null }; // web (streaming) schedule
+}
+
+// Major streaming platforms we surface on the "Streaming today" tab. The web
+// feed is global and lists many regional services; this keeps it recognizable.
+const MAJOR_STREAMERS = [
+  'netflix', 'prime video', 'disney+', 'hulu', 'max', 'hbo', 'apple tv+', 'apple tv',
+  'peacock', 'paramount+', 'amc+', 'starz', 'showtime', 'youtube', 'tubi', 'crunchyroll',
+];
+function isMajorStreamer(name: string): boolean {
+  const n = name.toLowerCase();
+  return MAJOR_STREAMERS.some((s) => n === s || n.includes(s));
 }
 
 function stripHtml(html: string | null | undefined): string | null {
@@ -63,47 +76,81 @@ function minutesOf(airtime: string | undefined): number {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
-async function fetchSchedule(country: string, date: string): Promise<Airing[]> {
-  const url = `https://api.tvmaze.com/schedule?country=${encodeURIComponent(country)}&date=${date}`;
+function toAiring(a: TvmazeAiring, show: TvmazeShow, network: string, requireTime: boolean): Airing | null {
+  if (!a.airstamp) return null;
+  if (requireTime && !a.airtime) return null;
+  return {
+    id: a.id,
+    time: a.airtime ?? '',
+    minutes: minutesOf(a.airtime),
+    airstamp: a.airstamp,
+    runtime: a.runtime ?? null,
+    network,
+    showName: show.name ?? 'Untitled',
+    showId: show.id,
+    episodeName: a.name ?? null,
+    season: a.season ?? null,
+    number: a.number ?? null,
+    showType: show.type ?? 'Show',
+    genres: show.genres ?? [],
+    rating: typeof show.rating?.average === 'number' ? show.rating.average : null,
+    image: show.image?.medium ?? show.image?.original ?? null,
+    summary: stripHtml(show.summary),
+    imdb: show.externals?.imdb ?? null,
+  };
+}
+
+async function fetchJson(url: string): Promise<TvmazeAiring[]> {
   const res = await fetch(url, { next: { revalidate: 3600 } }).catch(() => null);
   if (!res || !res.ok) return [];
   const data = (await res.json().catch(() => [])) as TvmazeAiring[];
-  if (!Array.isArray(data)) return [];
+  return Array.isArray(data) ? data : [];
+}
 
+/** Broadcast (over-the-air / cable) schedule for a country. */
+async function fetchBroadcast(country: string, date: string): Promise<Airing[]> {
+  const data = await fetchJson(`https://api.tvmaze.com/schedule?country=${encodeURIComponent(country)}&date=${date}`);
   const out: Airing[] = [];
   for (const a of data) {
     const show = a.show;
-    if (!show) continue;
-    const network = show.network?.name ?? show.webChannel?.name ?? null;
-    if (!network || !a.airtime || !a.airstamp) continue; // only real, scheduled broadcasts
-    out.push({
-      id: a.id,
-      time: a.airtime,
-      minutes: minutesOf(a.airtime),
-      airstamp: a.airstamp,
-      runtime: a.runtime ?? null,
-      network,
-      showName: show.name ?? 'Untitled',
-      showId: show.id,
-      episodeName: a.name ?? null,
-      season: a.season ?? null,
-      number: a.number ?? null,
-      showType: show.type ?? 'Show',
-      genres: show.genres ?? [],
-      rating: typeof show.rating?.average === 'number' ? show.rating.average : null,
-      image: show.image?.medium ?? show.image?.original ?? null,
-      summary: stripHtml(show.summary),
-      imdb: show.externals?.imdb ?? null,
-    });
+    const network = show?.network?.name ?? show?.webChannel?.name ?? null;
+    if (!show || !network) continue;
+    const item = toAiring(a, show, network, true); // broadcasts have a real airtime
+    if (item) out.push(item);
   }
-  // Sort by broadcast time.
   return out.sort((x, y) => x.minutes - y.minutes);
+}
+
+/** Streaming premieres for the day (global web feed), curated to major services. */
+async function fetchStreaming(date: string): Promise<Airing[]> {
+  const data = await fetchJson(`https://api.tvmaze.com/schedule/web?date=${date}`);
+  const out: Airing[] = [];
+  const seen = new Set<number>();
+  for (const a of data) {
+    const show = a._embedded?.show ?? a.show ?? null;
+    const platform = show?.webChannel?.name ?? show?.network?.name ?? null;
+    if (!show || !platform || !isMajorStreamer(platform)) continue;
+    if (seen.has(show.id)) continue; // one row per show (season drops list every episode)
+    seen.add(show.id);
+    const item = toAiring(a, show, platform, false); // streaming often has no set time
+    if (item) out.push(item);
+  }
+  // Best-known first (rating desc), then by name for stability.
+  return out.sort((x, y) => (y.rating ?? -1) - (x.rating ?? -1) || x.showName.localeCompare(y.showName));
 }
 
 /** Cached daily broadcast schedule for a country (ISO date, e.g. 2026-07-16). */
 export function getOnTvToday(country: string, date: string): Promise<Airing[]> {
-  return unstable_cache(() => fetchSchedule(country, date), ['on-tv', country, date], {
+  return unstable_cache(() => fetchBroadcast(country, date), ['on-tv', country, date], {
     revalidate: 3600,
     tags: [`on-tv:${country}:${date}`],
+  })();
+}
+
+/** Cached daily streaming premieres (major services), keyed by date. */
+export function getStreamingToday(date: string): Promise<Airing[]> {
+  return unstable_cache(() => fetchStreaming(date), ['streaming-today', date], {
+    revalidate: 3600,
+    tags: [`streaming-today:${date}`],
   })();
 }

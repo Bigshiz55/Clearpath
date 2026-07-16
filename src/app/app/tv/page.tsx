@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
-import { getOnTvToday } from '@/lib/onTv';
-import { OnTvGuide } from '@/components/OnTvGuide';
+import { getOnTvToday, getStreamingToday } from '@/lib/onTv';
+import { OnTvTabs } from '@/components/OnTvTabs';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'On TV today · WatchVerdict' };
@@ -23,20 +23,20 @@ export default async function OnTvPage() {
 
   const now = new Date();
   const date = isoDate(now);
-  const airings = await getOnTvToday(region, date);
+  const [airings, streaming] = await Promise.all([getOnTvToday(region, date), getStreamingToday(date)]);
 
   return (
     <div className="space-y-6">
       <section>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">📺 On TV today</h1>
         <p className="mt-2 text-sm text-slate-300">
-          Live broadcast listings for {region} — what’s on, which channel, and when. Filter to prime time or a
-          channel, sort by rating, and hit <span className="font-semibold text-white">Remind me</span> to drop it
-          on your calendar so you can record it or tune in.
+          What’s on live in {region} and what just dropped on streaming — channel, time, and rating. Filter to prime
+          time or a platform, sort by rating, and hit <span className="font-semibold text-white">Remind me</span> to
+          drop it on your calendar so you can record it or tune in.
         </p>
       </section>
 
-      <OnTvGuide airings={airings} dateLabel={friendlyDate(now)} country={region} />
+      <OnTvTabs broadcast={airings} streaming={streaming} dateLabel={friendlyDate(now)} country={region} />
 
       <p className="text-[11px] text-slate-500">
         Listings from TVmaze’s community broadcast guide — real schedules, refreshed hourly. Coverage is best for
