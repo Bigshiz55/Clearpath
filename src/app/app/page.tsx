@@ -95,14 +95,22 @@ export default async function DiscoverPage() {
           </span>
         </h1>
         <p className="mt-4 text-base text-slate-400 sm:text-lg">
-          Tell the judge what you feel like — get a verdict, scored for {label.toLowerCase()}.
+          Search for something you have in mind — or tell the judge the vibe and get a verdict, scored
+          for {label.toLowerCase()}.
         </p>
-        {/* The personal AI: your dog judge greets you and takes your case. */}
-        <HomeGreeter name={greeterName} className="mt-5 max-w-2xl" />
-        <div className="mt-3 max-w-2xl">
-          <div className="mb-1.5 text-xs font-medium text-slate-500">Or look up a specific title</div>
+        {/* Search first: anyone who just wants to look something up can do it the
+            moment they land, before any of the fancier flows. */}
+        <div className="mt-5 max-w-2xl">
+          <label className="mb-2 flex items-center gap-2 text-base font-semibold text-white">
+            <span aria-hidden>🔎</span> Search for a movie or show
+          </label>
           <SearchBar />
+          <p className="mt-1.5 text-xs text-slate-500">
+            Type a title — or describe what you feel like (“a funny movie under 2 hours”) and the judge takes it.
+          </p>
         </div>
+        {/* Or let the personal AI dog judge greet you and take your case. */}
+        <HomeGreeter name={greeterName} className="mt-6 max-w-2xl" />
         {/* Three primary decisions — start a decision, don't browse a menu. */}
         <div className="mt-5 grid gap-2 sm:grid-cols-3">
           <Link
