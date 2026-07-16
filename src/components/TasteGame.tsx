@@ -86,14 +86,9 @@ export function TasteGame({ onDone, build = 'dev' }: { onDone: (ruledCount: numb
     // rulings are fixed height and the poster flexes to fill whatever is left.
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-ink-950 px-3 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
       {/* Header (fixed) */}
-      <div className="flex flex-none items-center justify-between gap-2">
-        <div>
-          <h1 className="text-lg font-black text-white sm:text-xl">⚖️ The Docket <span className="align-middle text-[10px] font-normal text-slate-600">v3·{build}</span></h1>
-          {!failed && current && <div className="text-xs font-semibold text-slate-400">Case #{ruled + 1} · {ruled} ruled</div>}
-        </div>
-        <button onClick={() => onDone(ruled)} className="flex-none rounded-lg border-2 border-gold-400/50 bg-gold-500/10 px-3 py-2 text-sm font-bold text-amber-100 hover:bg-gold-500/20">
-          ⚖️ Adjourn{ruled > 0 ? ` (${ruled})` : ''}
-        </button>
+      <div className="flex-none text-center">
+        <h1 className="text-lg font-black text-white sm:text-xl">⚖️ The Docket <span className="align-middle text-[10px] font-normal text-slate-600">v3·{build}</span></h1>
+        {!failed && current && <div className="text-xs font-semibold text-slate-400">Case #{ruled + 1} · {ruled} ruled</div>}
       </div>
 
       {failed ? (
@@ -105,13 +100,22 @@ export function TasteGame({ onDone, build = 'dev' }: { onDone: (ruledCount: numb
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-slate-300">
           <span className="h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
           <span className="text-lg">Calling the next case…</span>
+          <button onClick={() => onDone(ruled)} className="mt-2 text-sm font-semibold text-amber-100 underline">⚖️ Adjourn whenever you like</button>
         </div>
       ) : (
         <>
-          {/* Poster flexes to fill the space between header and rulings */}
+          {/* Poster flexes to fill the space between header and rulings, with a
+              gentle "leave whenever" Adjourn floating over its lower edge. */}
           <div className="flex min-h-0 flex-1 items-center justify-center py-2">
-            <div className="aspect-[2/3] h-full max-h-full overflow-hidden rounded-xl border-2 border-white/10 shadow-card">
+            <div className="relative aspect-[2/3] h-full max-h-full overflow-hidden rounded-xl border-2 border-white/10 shadow-card">
               <Poster posterUrl={current.posterUrl} title={current.title} />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+              <button
+                onClick={() => onDone(ruled)}
+                className="absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-2 border-gold-400/60 bg-black/70 px-4 py-2 text-sm font-bold text-amber-100 backdrop-blur transition hover:bg-black/85"
+              >
+                ⚖️ Adjourn whenever you like{ruled > 0 ? ` · ${ruled} ruled` : ''}
+              </button>
             </div>
           </div>
 
