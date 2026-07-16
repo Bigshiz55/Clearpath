@@ -318,7 +318,7 @@ export async function discoverTitles(
   if (monetization) params.with_watch_monetization_types = monetization;
   if (opts.minVotes != null) params['vote_count.gte'] = String(opts.minVotes);
   if (opts.minRating != null) params['vote_average.gte'] = String(opts.minRating);
-  if (opts.maxRuntime != null && mediaType === 'movie') params['with_runtime.lte'] = String(opts.maxRuntime);
+  if (opts.maxRuntime != null) params['with_runtime.lte'] = String(opts.maxRuntime); // movies: feature length · tv: per-episode
   if (opts.castIds && opts.castIds.length > 0 && mediaType === 'movie') params.with_cast = opts.castIds.join('|'); // OR — any favorite actor
   if (opts.sinceDays != null) {
     const from = isoDate(new Date(Date.now() - opts.sinceDays * 86_400_000));

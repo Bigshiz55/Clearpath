@@ -12,6 +12,8 @@ export type EasyEra = 'any' | 'recent' | 'classic';
 
 export interface EasyPrefs {
   audience: EasyAudience;
+  /** Movies only, shows only, or both. */
+  mediaType: 'any' | 'movie' | 'tv';
   /** Max runtime in minutes, or null for any length. */
   maxRuntime: number | null;
   /** Keep it family-safe (no mature content) regardless of audience. */
@@ -44,6 +46,7 @@ const FAMILY_GENRES = [10751, 16, 12];
 
 export const DEFAULT_PREFS: EasyPrefs = {
   audience: 'me',
+  mediaType: 'any',
   maxRuntime: null,
   familySafe: false,
   era: 'any',
@@ -67,6 +70,7 @@ export async function getEasyPicks(supabase: SupabaseClient, userId: string, pre
   const genreIds = familySafe ? FAMILY_GENRES : prefs.moodGenres ?? [];
   const query: FinderQuery = {
     ...EMPTY_QUERY,
+    mediaType: prefs.mediaType,
     genreIds,
     maxRuntime: prefs.maxRuntime,
     sinceMonths: prefs.era === 'recent' ? 120 : null,

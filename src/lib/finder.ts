@@ -191,11 +191,16 @@ export async function runFinder(
         });
 
         const receipts: string[] = [];
-        // Runtime (movies).
+        // Runtime — movies by feature length, TV by per-episode length. For TV we
+        // only filter when the episode runtime is actually known (never guess).
         if (q.maxRuntime != null && meta.mediaType === 'movie') {
           if ((meta.runtimeMinutes ?? 9999) > q.maxRuntime) return null;
           const rt = fmtRuntime(meta.runtimeMinutes);
           if (rt) receipts.push(rt);
+        } else if (q.maxRuntime != null && meta.mediaType === 'tv') {
+          const ep = meta.episodeRuntimeMinutes ?? 0;
+          if (ep > 0 && ep > q.maxRuntime) return null;
+          if (ep > 0) receipts.push(`${ep}m episodes`);
         }
         // Recency.
         if (q.sinceMonths != null && meta.year != null) {

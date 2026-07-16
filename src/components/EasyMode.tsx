@@ -11,6 +11,7 @@ import type { EasyAudience, EasyEra, EasyPick } from '@/lib/easyPicks';
 
 interface Favorite { id: number; name: string }
 interface StoredPrefs {
+  mediaType: 'any' | 'movie' | 'tv';
   maxRuntime: number | null;
   familySafe: boolean;
   era: EasyEra;
@@ -20,7 +21,7 @@ interface StoredPrefs {
 }
 
 const PREFS_KEY = 'wv_easy_prefs';
-const DEFAULTS: StoredPrefs = { maxRuntime: null, familySafe: false, era: 'any', favorites: [], dismissed: [], quizTaken: false };
+const DEFAULTS: StoredPrefs = { mediaType: 'any', maxRuntime: null, familySafe: false, era: 'any', favorites: [], dismissed: [], quizTaken: false };
 
 const AUDIENCES: { v: EasyAudience; label: string; emoji: string }[] = [
   { v: 'me', label: 'Just me', emoji: '🙂' },
@@ -93,7 +94,7 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
     }
   }, []);
 
-  const reqKey = `${audience}|${prefs.maxRuntime}|${prefs.familySafe}|${prefs.era}|${prefs.favorites.map((f) => f.id).join(',')}|${mood.join(',')}|${prefs.dismissed.join(',')}|${sessionSkips.join(',')}|${quizOpen}`;
+  const reqKey = `${audience}|${prefs.mediaType}|${prefs.maxRuntime}|${prefs.familySafe}|${prefs.era}|${prefs.favorites.map((f) => f.id).join(',')}|${mood.join(',')}|${prefs.dismissed.join(',')}|${sessionSkips.join(',')}|${quizOpen}`;
 
   useEffect(() => {
     if (!loaded.current || quizOpen) return; // don't fetch while the quiz is up
@@ -104,6 +105,7 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         audience,
+        mediaType: prefs.mediaType,
         maxRuntime: prefs.maxRuntime,
         familySafe: prefs.familySafe,
         era: prefs.era,
@@ -160,7 +162,7 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
   function finishQuiz(r: QuizResult) {
     setAudience(r.audience);
     setMood(r.moodGenres);
-    savePrefs({ ...prefs, era: r.era, familySafe: r.familySafe, maxRuntime: r.maxRuntime, quizTaken: true });
+    savePrefs({ ...prefs, mediaType: r.mediaType, era: r.era, familySafe: r.familySafe, maxRuntime: r.maxRuntime, quizTaken: true });
     setQuizOpen(false);
   }
   function skipQuiz() {
@@ -213,8 +215,22 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
         {customize && (
           <div className="space-y-6 border-t-2 border-white/10 p-5">
             <div>
+              <div className="mb-2 text-lg font-semibold text-slate-100">A movie or a show?</div>
+              <BigChoice value={prefs.mediaType} onChange={(v) => savePrefs({ ...prefs, mediaType: v })} options={[{ v: 'any', label: 'Either' }, { v: 'movie', label: '🎬 Movies' }, { v: 'tv', label: '📺 TV shows' }]} />
+            </div>
+            <div>
               <div className="mb-2 text-lg font-semibold text-slate-100">How long?</div>
-              <BigChoice value={prefs.maxRuntime} onChange={(v) => savePrefs({ ...prefs, maxRuntime: v })} options={[{ v: null, label: 'Any length' }, { v: 100, label: 'Short (under 1¾ h)' }, { v: 130, label: 'Medium (under 2¼ h)' }]} />
+              <BigChoice
+                value={prefs.maxRuntime}
+                onChange={(v) => savePrefs({ ...prefs, maxRuntime: v })}
+                options={[
+                  { v: null, label: 'Any length' },
+                  { v: 30, label: '30 min or less' },
+                  { v: 60, label: 'An hour or less' },
+                  { v: 90, label: 'About 1½ hours' },
+                  { v: 120, label: 'About 2 hours' },
+                ]}
+              />
             </div>
             <div>
               <div className="mb-2 text-lg font-semibold text-slate-100">Newer or older?</div>

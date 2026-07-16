@@ -5,6 +5,7 @@ import type { EasyAudience, EasyEra } from '@/lib/easyPicks';
 
 export interface QuizResult {
   audience: EasyAudience;
+  mediaType: 'any' | 'movie' | 'tv';
   era: EasyEra;
   familySafe: boolean;
   maxRuntime: number | null;
@@ -23,7 +24,7 @@ interface Question<T> {
 }
 
 // Five plain questions, each a big tap. Answers map straight onto real levers.
-const QUESTIONS: Question<EasyAudience | EasyEra | boolean | number | null | number[]>[] = [
+const QUESTIONS: Question<string | boolean | number | null | number[]>[] = [
   {
     key: 'audience',
     prompt: 'Who’s watching tonight?',
@@ -31,6 +32,26 @@ const QUESTIONS: Question<EasyAudience | EasyEra | boolean | number | null | num
       { label: 'Just me', emoji: '🙂', value: 'me' },
       { label: 'My partner & me', emoji: '💞', value: 'partner' },
       { label: 'The whole family', emoji: '👨‍👩‍👧', value: 'family' },
+    ],
+  },
+  {
+    key: 'mediaType',
+    prompt: 'A movie or a TV show?',
+    options: [
+      { label: 'A movie', emoji: '🎬', value: 'movie' },
+      { label: 'A TV show', emoji: '📺', value: 'tv' },
+      { label: 'Either is fine', emoji: '🍿', value: 'any' },
+    ],
+  },
+  {
+    key: 'maxRuntime',
+    prompt: 'How much time do you have?',
+    options: [
+      { label: '30 minutes or less', emoji: '⏱️', value: 30 },
+      { label: 'An hour or less', emoji: '🕐', value: 60 },
+      { label: 'About 1½ hours', emoji: '🕑', value: 90 },
+      { label: 'About 2 hours', emoji: '🕒', value: 120 },
+      { label: 'However long', emoji: '♾️', value: null },
     ],
   },
   {
@@ -48,15 +69,6 @@ const QUESTIONS: Question<EasyAudience | EasyEra | boolean | number | null | num
     options: [
       { label: 'Yes, keep it clean', emoji: '👍', value: true },
       { label: 'I don’t mind', emoji: '😌', value: false },
-    ],
-  },
-  {
-    key: 'maxRuntime',
-    prompt: 'How much time do you have?',
-    options: [
-      { label: 'About 1½ hours', emoji: '⏱️', value: 100 },
-      { label: 'About 2 hours', emoji: '🕑', value: 130 },
-      { label: 'However long', emoji: '♾️', value: null },
     ],
   },
   {
@@ -87,6 +99,7 @@ export function EasyQuiz({ onDone, onCancel }: { onDone: (r: QuizResult) => void
     } else {
       onDone({
         audience: (next.audience as EasyAudience) ?? 'me',
+        mediaType: (next.mediaType as 'any' | 'movie' | 'tv') ?? 'any',
         era: (next.era as EasyEra) ?? 'any',
         familySafe: Boolean(next.familySafe),
         maxRuntime: (next.maxRuntime as number | null) ?? null,

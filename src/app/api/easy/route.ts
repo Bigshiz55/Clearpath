@@ -12,6 +12,7 @@ function coerce(raw: unknown): EasyPrefs {
   const b = (raw ?? {}) as Partial<EasyPrefs>;
   return {
     audience: AUD.has(b.audience as EasyAudience) ? (b.audience as EasyAudience) : 'me',
+    mediaType: b.mediaType === 'movie' || b.mediaType === 'tv' ? b.mediaType : 'any',
     maxRuntime: typeof b.maxRuntime === 'number' ? b.maxRuntime : null,
     familySafe: Boolean(b.familySafe),
     era: ERA.has(b.era as EasyEra) ? (b.era as EasyEra) : 'any',
