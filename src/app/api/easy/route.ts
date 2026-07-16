@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getEasyPicks, DEFAULT_PREFS, type EasyPrefs, type EasyAudience, type EasyEra } from '@/lib/easyPicks';
+import { getEasyPicks, DEFAULT_PREFS, EASY_ERAS, EASY_CONTENT, type EasyPrefs, type EasyAudience, type EasyEra, type EasyContent } from '@/lib/easyPicks';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const AUD = new Set<EasyAudience>(['me', 'partner', 'family']);
-const ERA = new Set<EasyEra>(['any', 'recent', 'classic']);
+const ERA = new Set<EasyEra>(EASY_ERAS);
+const CONTENT = new Set<EasyContent>(EASY_CONTENT);
 
 function coerce(raw: unknown): EasyPrefs {
   const b = (raw ?? {}) as Partial<EasyPrefs>;
@@ -14,7 +15,7 @@ function coerce(raw: unknown): EasyPrefs {
     audience: AUD.has(b.audience as EasyAudience) ? (b.audience as EasyAudience) : 'me',
     mediaType: b.mediaType === 'movie' || b.mediaType === 'tv' ? b.mediaType : 'any',
     maxRuntime: typeof b.maxRuntime === 'number' ? b.maxRuntime : null,
-    familySafe: Boolean(b.familySafe),
+    content: CONTENT.has(b.content as EasyContent) ? (b.content as EasyContent) : 'any',
     era: ERA.has(b.era as EasyEra) ? (b.era as EasyEra) : 'any',
     actorIds: Array.isArray(b.actorIds) ? b.actorIds.map(Number).filter((n) => Number.isFinite(n)).slice(0, 8) : [],
     moodGenres: Array.isArray(b.moodGenres) ? b.moodGenres.map(Number).filter((n) => Number.isFinite(n)).slice(0, 4) : [],

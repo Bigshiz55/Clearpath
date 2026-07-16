@@ -290,6 +290,10 @@ export interface DiscoverOptions {
   castIds?: number[];
   /** Only titles released up to and including this year. */
   maxYear?: number;
+  /** Only titles released in or after this year. */
+  minYear?: number;
+  /** Exclude these TMDB genre ids (without_genres) — e.g. horror for "keep it clean". */
+  excludeGenreIds?: number[];
   page?: number;
 }
 
@@ -311,6 +315,7 @@ export async function discoverTitles(
     page: String(opts.page ?? 1),
   };
   if (opts.genreIds && opts.genreIds.length > 0) params.with_genres = opts.genreIds.join('|');
+  if (opts.excludeGenreIds && opts.excludeGenreIds.length > 0) params.without_genres = opts.excludeGenreIds.join(',');
   // Monetization: an explicit filter wins; otherwise, when filtering by provider,
   // default to the "included" tiers so results are things you can actually stream.
   const monetization = opts.monetization ?? (opts.providerIds && opts.providerIds.length > 0 ? 'flatrate|free|ads' : undefined);
@@ -347,6 +352,11 @@ export async function discoverTitles(
     const to = `${opts.maxYear}-12-31`;
     if (mediaType === 'movie') params['primary_release_date.lte'] = to;
     else params['first_air_date.lte'] = to;
+  }
+  if (opts.minYear != null) {
+    const from = `${opts.minYear}-01-01`;
+    if (mediaType === 'movie') params['primary_release_date.gte'] = from;
+    else params['first_air_date.gte'] = from;
   }
 
   const data = await tmdbFetch<TmdbMultiResult>(`/discover/${mediaType}`, params).catch(

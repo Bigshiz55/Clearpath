@@ -4,56 +4,29 @@ import { runFinder, type FinderQuery } from '@/lib/finder';
 import { EMPTY_QUERY } from '@/lib/finderParse';
 import { getMyServices } from '@/lib/profile';
 import { tmdbImage } from '@/lib/tmdb/image';
-import type { MediaType } from '@/lib/types';
-import type { TileRatings } from '@/lib/ratings';
+import { type EasyContent, type EasyEra, type EasyPick, type EasyPrefs } from '@/lib/easyTypes';
 
-export type EasyAudience = 'me' | 'partner' | 'family';
-export type EasyEra = 'any' | 'recent' | 'classic';
-
-export interface EasyPrefs {
-  audience: EasyAudience;
-  /** Movies only, shows only, or both. */
-  mediaType: 'any' | 'movie' | 'tv';
-  /** Max runtime in minutes, or null for any length. */
-  maxRuntime: number | null;
-  /** Keep it family-safe (no mature content) regardless of audience. */
-  familySafe: boolean;
-  era: EasyEra;
-  /** TMDB person ids the user loves — biases picks toward their films. */
-  actorIds: number[];
-  /** Tonight's mood — TMDB genre ids from the quiz (not saved long-term). */
-  moodGenres?: number[];
-  /** "type-id" keys the user waved off — never show these again. */
-  excludeKeys: string[];
-}
-
-export interface EasyPick {
-  id: number;
-  mediaType: MediaType;
-  title: string;
-  year: number | null;
-  posterUrl: string | null;
-  primaryCall: string;
-  matchScore: number;
-  reason: string;
-  where: string | null;
-  featuresFavorite: boolean; // contains one of the user's favorite actors
-  ratings: TileRatings;
-}
+// Re-export the client-safe types/constants so existing server imports keep working.
+export type { EasyAudience, EasyContent, EasyEra, EasyPick, EasyPrefs } from '@/lib/easyTypes';
+export { EASY_ERAS, EASY_CONTENT, DEFAULT_PREFS } from '@/lib/easyTypes';
 
 // Family genres only — Family + Animation + Adventure.
 const FAMILY_GENRES = [10751, 16, 12];
+const HORROR = 27;
+const THRILLER = 53;
+const WAR = 10752;
 
-export const DEFAULT_PREFS: EasyPrefs = {
-  audience: 'me',
-  mediaType: 'any',
-  maxRuntime: null,
-  familySafe: false,
-  era: 'any',
-  actorIds: [],
-  moodGenres: [],
-  excludeKeys: [],
-};
+/** Year window for each era choice. */
+function eraBounds(era: EasyEra): { minYear?: number; maxYear?: number } {
+  switch (era) {
+    case 'y2020s': return { minYear: 2020 };
+    case 'y2000s': return { minYear: 2000, maxYear: 2019 };
+    case 'y80s90s': return { minYear: 1980, maxYear: 1999 };
+    case 'y60s70s': return { minYear: 1960, maxYear: 1979 };
+    case 'ypre60': return { maxYear: 1959 };
+    default: return {};
+  }
+}
 
 /**
  * Three picks for tonight — customizable and taste-aware. Every preference maps
@@ -64,17 +37,24 @@ export const DEFAULT_PREFS: EasyPrefs = {
 export async function getEasyPicks(supabase: SupabaseClient, userId: string, prefs: EasyPrefs): Promise<EasyPick[]> {
   if (!userId) return [];
   const services = await getMyServices(supabase, userId);
-  const familySafe = prefs.familySafe || prefs.audience === 'family';
+  // Watching with the family forces the strictest content setting.
+  const content: EasyContent = prefs.audience === 'family' ? 'family' : prefs.content;
 
-  // Family-safe wins on genre; otherwise tonight's mood (from the quiz) leads.
-  const genreIds = familySafe ? FAMILY_GENRES : prefs.moodGenres ?? [];
+  // Content: 'family' picks kid-safe genres; 'clean'/'mild' exclude harsh ones;
+  // otherwise tonight's mood (from the quiz) leads.
+  const genreIds = content === 'family' ? FAMILY_GENRES : prefs.moodGenres ?? [];
+  const excludeGenreIds =
+    content === 'clean' ? [HORROR, THRILLER, WAR] : content === 'mild' ? [HORROR] : [];
+  const { minYear, maxYear } = eraBounds(prefs.era);
+
   const query: FinderQuery = {
     ...EMPTY_QUERY,
     mediaType: prefs.mediaType,
     genreIds,
+    excludeGenreIds,
     maxRuntime: prefs.maxRuntime,
-    sinceMonths: prefs.era === 'recent' ? 120 : null,
-    maxYear: prefs.era === 'classic' ? 1999 : null,
+    minYear: minYear ?? null,
+    maxYear: maxYear ?? null,
     onMyServices: services.length > 0,
     minMatch: null,
     castIds: prefs.actorIds.length > 0 ? prefs.actorIds : undefined,

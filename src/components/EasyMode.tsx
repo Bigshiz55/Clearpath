@@ -5,15 +5,16 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SaveButton } from './SaveButton';
 import { EasyQuiz, type QuizResult } from './EasyQuiz';
+import { TasteGame } from './TasteGame';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import { providerWatchUrl } from '@/lib/watchLinks';
-import type { EasyAudience, EasyEra, EasyPick } from '@/lib/easyPicks';
+import { EASY_ERAS, EASY_CONTENT, type EasyAudience, type EasyEra, type EasyContent, type EasyPick } from '@/lib/easyTypes';
 
 interface Favorite { id: number; name: string }
 interface StoredPrefs {
   mediaType: 'any' | 'movie' | 'tv';
   maxRuntime: number | null;
-  familySafe: boolean;
+  content: EasyContent;
   era: EasyEra;
   favorites: Favorite[];
   dismissed: string[];
@@ -21,7 +22,25 @@ interface StoredPrefs {
 }
 
 const PREFS_KEY = 'wv_easy_prefs';
-const DEFAULTS: StoredPrefs = { mediaType: 'any', maxRuntime: null, familySafe: false, era: 'any', favorites: [], dismissed: [], quizTaken: false };
+const DEFAULTS: StoredPrefs = { mediaType: 'any', maxRuntime: null, content: 'any', era: 'any', favorites: [], dismissed: [], quizTaken: false };
+
+const ERA_LABELS: Record<EasyEra, string> = {
+  any: 'Any era', y2020s: '2020s', y2000s: '2000s–10s', y80s90s: '80s & 90s', y60s70s: '60s & 70s', ypre60: 'Pre-1960',
+};
+const CONTENT_LABELS: Record<EasyContent, string> = {
+  any: 'Anything', mild: 'Nothing scary', clean: 'Keep it clean', family: 'Family only',
+};
+
+/** Old saved prefs used era:'recent'|'classic' and familySafe; migrate them. */
+function normalizePrefs(raw: Record<string, unknown>): StoredPrefs {
+  const era = EASY_ERAS.includes(raw.era as EasyEra) ? (raw.era as EasyEra) : 'any';
+  const content = EASY_CONTENT.includes(raw.content as EasyContent)
+    ? (raw.content as EasyContent)
+    : raw.familySafe === true
+      ? 'family'
+      : 'any';
+  return { ...DEFAULTS, ...raw, era, content } as StoredPrefs;
+}
 
 const AUDIENCES: { v: EasyAudience; label: string; emoji: string }[] = [
   { v: 'me', label: 'Just me', emoji: '🙂' },
@@ -62,6 +81,8 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
   const [sessionSkips, setSessionSkips] = useState<string[]>([]);
   const [mood, setMood] = useState<number[]>([]);
   const [quizOpen, setQuizOpen] = useState(false);
+  const [gameOpen, setGameOpen] = useState(false);
+  const [ratedNonce, setRatedNonce] = useState(0);
   const loaded = useRef(false);
 
   // Actor search
@@ -74,7 +95,7 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
     try {
       const raw = localStorage.getItem(PREFS_KEY);
       if (raw) {
-        const p = { ...DEFAULTS, ...JSON.parse(raw) } as StoredPrefs;
+        const p = normalizePrefs(JSON.parse(raw));
         setPrefs(p);
         taken = p.quizTaken;
       }
@@ -94,10 +115,10 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
     }
   }, []);
 
-  const reqKey = `${audience}|${prefs.mediaType}|${prefs.maxRuntime}|${prefs.familySafe}|${prefs.era}|${prefs.favorites.map((f) => f.id).join(',')}|${mood.join(',')}|${prefs.dismissed.join(',')}|${sessionSkips.join(',')}|${quizOpen}`;
+  const reqKey = `${audience}|${prefs.mediaType}|${prefs.maxRuntime}|${prefs.content}|${prefs.era}|${prefs.favorites.map((f) => f.id).join(',')}|${mood.join(',')}|${prefs.dismissed.join(',')}|${sessionSkips.join(',')}|${quizOpen}|${gameOpen}|${ratedNonce}`;
 
   useEffect(() => {
-    if (!loaded.current || quizOpen) return; // don't fetch while the quiz is up
+    if (!loaded.current || quizOpen || gameOpen) return; // don't fetch while a full-screen flow is up
     let active = true;
     setLoading(true);
     fetch('/api/easy', {
@@ -107,7 +128,7 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
         audience,
         mediaType: prefs.mediaType,
         maxRuntime: prefs.maxRuntime,
-        familySafe: prefs.familySafe,
+        content: prefs.content,
         era: prefs.era,
         actorIds: prefs.favorites.map((f) => f.id),
         moodGenres: mood,
@@ -162,7 +183,7 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
   function finishQuiz(r: QuizResult) {
     setAudience(r.audience);
     setMood(r.moodGenres);
-    savePrefs({ ...prefs, mediaType: r.mediaType, era: r.era, familySafe: r.familySafe, maxRuntime: r.maxRuntime, quizTaken: true });
+    savePrefs({ ...prefs, mediaType: r.mediaType, era: r.era, content: r.content, maxRuntime: r.maxRuntime, quizTaken: true });
     setQuizOpen(false);
   }
   function skipQuiz() {
@@ -182,15 +203,30 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
   if (quizOpen) {
     return <EasyQuiz onDone={finishQuiz} onCancel={skipQuiz} />;
   }
+  if (gameOpen) {
+    return (
+      <TasteGame
+        onDone={(n) => {
+          setGameOpen(false);
+          if (n > 0) setRatedNonce((k) => k + 1); // ruled on cases → resharpen picks
+        }}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 px-1 pb-16">
       <div className="pt-2 text-center">
         <h1 className="text-3xl font-black text-white sm:text-4xl">{name ? `Hello, ${name}.` : 'Hello.'}</h1>
         <p className="mt-2 text-xl text-slate-200">Let’s find something good to watch tonight.</p>
-        <button onClick={() => setQuizOpen(true)} className="mt-4 inline-flex rounded-xl border-2 border-brand-400/50 bg-brand-500/15 px-5 py-3 text-lg font-bold text-brand-100 transition hover:bg-brand-500/25">
-          📝 Take the 1-minute quiz
-        </button>
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          <button onClick={() => setQuizOpen(true)} className="inline-flex rounded-xl border-2 border-brand-400/50 bg-brand-500/15 px-5 py-3 text-lg font-bold text-brand-100 transition hover:bg-brand-500/25">
+            📝 Take the 1-minute quiz
+          </button>
+          <button onClick={() => setGameOpen(true)} className="inline-flex rounded-xl border-2 border-gold-400/50 bg-gold-500/10 px-5 py-3 text-lg font-bold text-amber-100 transition hover:bg-gold-500/20">
+            ⚖️ Rate titles in The Docket
+          </button>
+        </div>
       </div>
 
       {/* Who's watching */}
@@ -233,14 +269,12 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
               />
             </div>
             <div>
-              <div className="mb-2 text-lg font-semibold text-slate-100">Newer or older?</div>
-              <BigChoice value={prefs.era} onChange={(v) => savePrefs({ ...prefs, era: v })} options={[{ v: 'any', label: 'Any era' }, { v: 'recent', label: 'Newer' }, { v: 'classic', label: 'Classics (pre-2000)' }]} />
+              <div className="mb-2 text-lg font-semibold text-slate-100">From which era?</div>
+              <BigChoice value={prefs.era} onChange={(v) => savePrefs({ ...prefs, era: v })} options={EASY_ERAS.map((e) => ({ v: e, label: ERA_LABELS[e] }))} />
             </div>
             <div>
-              <div className="mb-2 text-lg font-semibold text-slate-100">Keep it clean?</div>
-              <button onClick={() => savePrefs({ ...prefs, familySafe: !prefs.familySafe })} className={`rounded-xl border-2 px-4 py-2.5 text-base font-bold transition ${prefs.familySafe ? 'border-emerald-400 bg-emerald-500/20 text-emerald-100' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}>
-                {prefs.familySafe ? '✓ No mature content' : 'No strong violence or adult content'}
-              </button>
+              <div className="mb-2 text-lg font-semibold text-slate-100">How clean?</div>
+              <BigChoice value={prefs.content} onChange={(v) => savePrefs({ ...prefs, content: v })} options={EASY_CONTENT.map((c) => ({ v: c, label: CONTENT_LABELS[c] }))} />
             </div>
             <div>
               <div className="mb-2 text-lg font-semibold text-slate-100">Actors you love</div>

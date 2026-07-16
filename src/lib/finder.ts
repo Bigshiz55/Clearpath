@@ -65,6 +65,10 @@ export interface FinderQuery {
   castIds?: number[];
   /** Only titles released no later than this year (for "classics"). */
   maxYear?: number | null;
+  /** Only titles released in or after this year (era ranges). */
+  minYear?: number | null;
+  /** Genre ids to exclude (content comfort — e.g. horror). */
+  excludeGenreIds?: number[];
 }
 
 export interface FinderItem {
@@ -163,6 +167,8 @@ export async function runFinder(
           maxRuntime: q.maxRuntime ?? undefined,
           castIds: q.castIds,
           maxYear: q.maxYear ?? undefined,
+          minYear: q.minYear ?? undefined,
+          excludeGenreIds: q.excludeGenreIds,
           sortBy: 'popularity.desc',
           page,
         }),
@@ -207,8 +213,9 @@ export async function runFinder(
           const cutoff = new Date().getUTCFullYear() - Math.ceil(q.sinceMonths / 12);
           if (meta.year < cutoff) return null;
         }
-        // Era ceiling ("classics").
+        // Era window.
         if (q.maxYear != null && meta.year != null && meta.year > q.maxYear) return null;
+        if (q.minYear != null && meta.year != null && meta.year < q.minYear) return null;
         if (meta.year != null) receipts.push(String(meta.year));
         // Audience (TMDB crowd score).
         if (q.minAudience != null) {

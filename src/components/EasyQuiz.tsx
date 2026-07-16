@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import type { EasyAudience, EasyEra } from '@/lib/easyPicks';
+import type { EasyAudience, EasyEra, EasyContent } from '@/lib/easyTypes';
 
 export interface QuizResult {
   audience: EasyAudience;
   mediaType: 'any' | 'movie' | 'tv';
   era: EasyEra;
-  familySafe: boolean;
+  content: EasyContent;
   maxRuntime: number | null;
   moodGenres: number[];
 }
@@ -56,19 +56,24 @@ const QUESTIONS: Question<string | boolean | number | null | number[]>[] = [
   },
   {
     key: 'era',
-    prompt: 'Newer movies or older classics?',
+    prompt: 'From which era?',
     options: [
-      { label: 'Newer', emoji: '✨', value: 'recent' },
-      { label: 'Classics', emoji: '🎞️', value: 'classic' },
-      { label: 'No preference', emoji: '🤷', value: 'any' },
+      { label: 'Any era', emoji: '🎞️', value: 'any' },
+      { label: 'Brand new (2020s)', emoji: '✨', value: 'y2020s' },
+      { label: '2000s & 2010s', emoji: '📀', value: 'y2000s' },
+      { label: 'The 80s & 90s', emoji: '📼', value: 'y80s90s' },
+      { label: 'The 60s & 70s', emoji: '📺', value: 'y60s70s' },
+      { label: 'Golden oldies (pre-1960)', emoji: '🎩', value: 'ypre60' },
     ],
   },
   {
-    key: 'familySafe',
-    prompt: 'Keep it clean — no strong violence or adult content?',
+    key: 'content',
+    prompt: 'How clean should we keep it?',
     options: [
-      { label: 'Yes, keep it clean', emoji: '👍', value: true },
-      { label: 'I don’t mind', emoji: '😌', value: false },
+      { label: 'Anything goes', emoji: '😌', value: 'any' },
+      { label: 'Nothing too scary', emoji: '🙂', value: 'mild' },
+      { label: 'Keep it clean', emoji: '👍', value: 'clean' },
+      { label: 'Family-friendly only', emoji: '👨‍👩‍👧', value: 'family' },
     ],
   },
   {
@@ -101,7 +106,7 @@ export function EasyQuiz({ onDone, onCancel }: { onDone: (r: QuizResult) => void
         audience: (next.audience as EasyAudience) ?? 'me',
         mediaType: (next.mediaType as 'any' | 'movie' | 'tv') ?? 'any',
         era: (next.era as EasyEra) ?? 'any',
-        familySafe: Boolean(next.familySafe),
+        content: (next.content as EasyContent) ?? 'any',
         maxRuntime: (next.maxRuntime as number | null) ?? null,
         moodGenres: (next.moodGenres as number[]) ?? [],
       });
