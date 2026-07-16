@@ -181,7 +181,7 @@ export function OnTvGuide({
                 <div className="p-2">
                   <div className="line-clamp-2 text-xs font-semibold text-white">{a.showName}</div>
                   <div className="mt-1 flex items-center justify-between gap-1">
-                    <span className="truncate text-sm font-black tabular-nums text-white">{streaming ? 'New' : fmtTime(a.time) ?? 'New'}</span>
+                    <span className="truncate text-sm font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
                     {a.rating != null && <span className={`flex-none text-xs font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
                   </div>
                   <div className="mt-1 line-clamp-2 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
@@ -242,10 +242,10 @@ export function OnTvGuide({
             return (
               <div key={a.id} className="card flex items-center gap-3 p-3">
                 <div className="w-24 flex-none text-center">
-                  {streaming || !t ? (
-                    <div className="rounded-md bg-emerald-500/20 px-1 py-1 text-xs font-black uppercase tracking-wide text-emerald-200">New</div>
-                  ) : (
+                  {t && a.minutes > 0 ? (
                     <div className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white">{t}</div>
+                  ) : (
+                    <div className="rounded-md bg-emerald-500/20 px-1 py-1 text-xs font-black uppercase tracking-wide text-emerald-200">{streaming ? 'Today' : 'New'}</div>
                   )}
                   <div className="mt-1.5 line-clamp-2 rounded-md border border-brand-400/30 bg-brand-500/15 px-1.5 py-1 text-xs font-bold leading-tight text-brand-100">{a.network}</div>
                 </div>
