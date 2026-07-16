@@ -1,0 +1,166 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
+
+interface Pick {
+  id: number;
+  showName: string;
+  network: string | null;
+  airstamp: string;
+  showType: string;
+  episodeName: string | null;
+  season: number | null;
+  number: number | null;
+  image: string | null;
+  tvmaze: number | null;
+  imdb: number | null;
+  rottenTomatoes: number | null;
+  metascore: number | null;
+}
+
+function whenLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return `Today · ${time}`;
+  if (new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString()) return `Tomorrow · ${time}`;
+  return `${d.toLocaleDateString([], { weekday: 'long' })} · ${time}`;
+}
+
+function Ratings({ p }: { p: Pick }) {
+  const has = p.tvmaze != null || p.imdb != null || p.rottenTomatoes != null || p.metascore != null;
+  if (!has) return <div className="text-[11px] text-slate-500">Ratings not available yet</div>;
+  return (
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold tabular-nums">
+      {p.rottenTomatoes != null && (
+        <span className={p.rottenTomatoes >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {p.rottenTomatoes}%</span>
+      )}
+      {p.imdb != null && <span className="rounded bg-[#f5c518] px-1 text-[10px] font-black text-black" title="IMDb">IMDb {p.imdb.toFixed(1)}</span>}
+      {p.metascore != null && <span className="text-sky-300" title="Metacritic">Ⓜ {p.metascore}</span>}
+      {p.tvmaze != null && <span className="text-gold-300" title="TVmaze community score">★ {p.tvmaze.toFixed(1)}</span>}
+    </div>
+  );
+}
+
+export function TvDetective() {
+  const [state, setState] = useState<'idle' | 'scanning' | 'done'>('idle');
+  const [picks, setPicks] = useState<Pick[]>([]);
+  const [reminded, setReminded] = useState<Set<number>>(new Set());
+  const [busy, setBusy] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function scan() {
+    setState('scanning');
+    try {
+      const res = await fetch('/api/detective');
+      const data = await res.json();
+      setPicks(data.picks ?? []);
+      setReminded(new Set((data.remindedIds ?? []) as number[]));
+    } catch {
+      setPicks([]);
+    } finally {
+      setState('done');
+    }
+  }
+
+  async function toggle(p: Pick) {
+    setBusy(p.id);
+    try {
+      if (reminded.has(p.id)) {
+        await removeTvReminder(p.id);
+        setReminded((s) => {
+          const n = new Set(s);
+          n.delete(p.id);
+          return n;
+        });
+      } else {
+        const r = await setTvReminder({ airingId: p.id, showName: p.showName, network: p.network, airstamp: p.airstamp, url: '/app/tv' });
+        if (!r.ok) {
+          setNotice(r.error ?? 'Could not set the reminder.');
+          return;
+        }
+        setReminded((s) => new Set(s).add(p.id));
+        setNotice(r.needsNotifications ? 'On the case! Turn on notifications in Settings so we can ping you before it airs.' : 'On the case — we’ll ping you 1 hour and 5 minutes before it starts. 🕵️');
+      }
+    } catch {
+      setNotice('Something went wrong. Please try again.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-brand-400/30 bg-gradient-to-br from-brand-500/12 to-ink-850 p-5">
+      <div className="flex items-start gap-4">
+        <span className="text-4xl" aria-hidden>🕵️</span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold text-white sm:text-xl">The TV Detective</h2>
+          <p className="mt-1 text-sm text-slate-300">
+            One tap and I’ll comb the <span className="font-semibold text-white">next 48 hours</span> of TV listings and
+            hand you a shortlist worth recording or catching live — with the time, the channel, and every rating I can dig up.
+          </p>
+          {state !== 'done' && (
+            <button onClick={scan} disabled={state === 'scanning'} className="btn-primary mt-4 px-5 py-2.5 disabled:opacity-70">
+              {state === 'scanning' ? '🔎 On the case… scanning listings' : '🔎 Scan the next 48 hours'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {notice && (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-brand-400/40 bg-brand-500/10 px-4 py-3 text-sm text-brand-100">
+          <span>{notice}</span>
+          <span className="flex flex-none items-center gap-3">
+            {notice.includes('Settings') && <Link href="/app/settings" className="font-bold underline">Turn on</Link>}
+            <button onClick={() => setNotice(null)} aria-label="Dismiss" className="text-lg leading-none">×</button>
+          </span>
+        </div>
+      )}
+
+      {state === 'done' && (
+        <div className="mt-5">
+          {picks.length === 0 ? (
+            <p className="text-sm text-slate-400">The trail went cold — nothing notable in the next 48 hours. Try again later.</p>
+          ) : (
+            <>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-300">Case file · {picks.length} worth your time</div>
+              <div className="space-y-2">
+                {picks.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                    <div className="w-24 flex-none text-center">
+                      <div className="whitespace-nowrap text-base font-black leading-tight text-white">{whenLabel(p.airstamp)}</div>
+                      <div className="mt-1.5 line-clamp-2 rounded-md border border-brand-400/30 bg-brand-500/15 px-1.5 py-1 text-xs font-bold leading-tight text-brand-100">{p.network}</div>
+                    </div>
+                    <div className="h-16 w-11 flex-none overflow-hidden rounded-md border border-white/10 bg-ink-800">
+                      {p.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.image} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center text-[9px] text-slate-500">TV</div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-1 text-sm font-semibold text-white">{p.showName}</div>
+                      <div className="mt-1"><Ratings p={p} /></div>
+                    </div>
+                    <button
+                      onClick={() => toggle(p)}
+                      disabled={busy === p.id}
+                      className={`flex-none rounded-lg border px-2.5 py-2 text-xs font-semibold transition disabled:opacity-50 ${reminded.has(p.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+                      title="Get a notification 1 hour and 5 minutes before it airs"
+                    >
+                      {reminded.has(p.id) ? '🔔 On' : '🔔 Remind'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button onClick={scan} className="mt-3 text-xs font-semibold text-brand-300 hover:text-brand-200">🔄 Scan again</button>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}

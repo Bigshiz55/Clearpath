@@ -7,6 +7,7 @@ import { SaveButton } from './SaveButton';
 import { EasyQuiz, type QuizResult } from './EasyQuiz';
 import { TasteGame } from './TasteGame';
 import { EasyOnTv } from './EasyOnTv';
+import { CardRatings } from './CardRatings';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import { providerWatchUrl } from '@/lib/watchLinks';
 import { EASY_ERAS, EASY_CONTENT, type EasyAudience, type EasyEra, type EasyContent, type EasyPick } from '@/lib/easyTypes';
@@ -378,6 +379,8 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
                         {p.featuresFavorite && <span className="rounded-full border-2 border-gold-400/60 bg-gold-500/15 px-3 py-1 text-base font-bold text-amber-100">⭐ An actor you love</span>}
                       </div>
                       <p className="mt-3 text-lg leading-relaxed text-slate-100">{p.reason}</p>
+                      {/* Every rating we have, right on the placard. */}
+                      <CardRatings mediaType={p.mediaType} tmdbId={p.id} title={p.title} year={p.year} decider={false} className="mt-2 text-sm" />
                       {p.where && <p className="mt-2 text-lg font-semibold text-emerald-300">▶ On {p.where}</p>}
 
                       <div className="mt-4 flex flex-wrap items-center gap-3">

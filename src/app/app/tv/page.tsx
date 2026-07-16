@@ -4,6 +4,7 @@ import { getProfile, regionFor } from '@/lib/profile';
 import { getOnTvToday, getStreamingToday } from '@/lib/onTv';
 import { OnTvTabs } from '@/components/OnTvTabs';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
+import { TvDetective } from '@/components/TvDetective';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'On TV today · WatchVerdict' };
@@ -53,6 +54,8 @@ export default async function OnTvPage() {
           a phone/PC notification <span className="font-semibold text-white">1 hour and 5 minutes before</span> it airs.
         </p>
       </section>
+
+      <TvDetective />
 
       {upcoming.length > 0 && <MyReminders initial={upcoming} />}
 
