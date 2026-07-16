@@ -19,6 +19,15 @@ function fmtTime(t: string): string | null {
   return `${h}:${min} ${ampm}`;
 }
 
+/** "Today" / "Tomorrow" / weekday for an airing, from its real UTC timestamp. */
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return 'Today';
+  if (new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString()) return 'Tomorrow';
+  return d.toLocaleDateString([], { weekday: 'short' });
+}
+
 /** A Google Calendar "add event" link so the reminder is real — the user can
  *  actually set their DVR or tune in. Built from the true airstamp + runtime. */
 function calendarUrl(a: Airing): string {
@@ -242,11 +251,18 @@ export function OnTvGuide({
             return (
               <div key={a.id} className="card flex items-center gap-3 p-3">
                 <div className="w-24 flex-none text-center">
-                  {t && a.minutes > 0 ? (
-                    <div className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white">{t}</div>
-                  ) : (
-                    <div className="rounded-md bg-emerald-500/20 px-1 py-1 text-xs font-black uppercase tracking-wide text-emerald-200">{streaming ? 'Today' : 'New'}</div>
-                  )}
+                  {(() => {
+                    const dl = dayLabel(a.airstamp);
+                    if (t && a.minutes > 0) {
+                      return (
+                        <>
+                          <div className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white">{t}</div>
+                          {dl !== 'Today' && <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">{dl}</div>}
+                        </>
+                      );
+                    }
+                    return <div className="rounded-md bg-emerald-500/20 px-1 py-1 text-xs font-black uppercase tracking-wide text-emerald-200">{streaming ? dl : 'New'}</div>;
+                  })()}
                   <div className="mt-1.5 line-clamp-2 rounded-md border border-brand-400/30 bg-brand-500/15 px-1.5 py-1 text-xs font-bold leading-tight text-brand-100">{a.network}</div>
                 </div>
                 <div className="h-16 w-11 flex-none overflow-hidden rounded-md border border-white/10 bg-ink-800">
