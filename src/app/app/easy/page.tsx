@@ -18,5 +18,8 @@ export default async function EasyModePage() {
 
   const picks = await getEasyPicks(supabase, uid, DEFAULT_PREFS);
 
-  return <EasyMode initialPicks={picks} name={name} />;
+  // Build stamp — lets us confirm which deploy a device is actually running.
+  const build = (process.env.VERCEL_GIT_COMMIT_SHA ?? 'dev').slice(0, 7);
+
+  return <EasyMode initialPicks={picks} name={name} build={build} />;
 }

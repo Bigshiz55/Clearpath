@@ -23,7 +23,7 @@ const RULINGS: { label: string; emoji: string; rating: number; style: string }[]
 
 /** "The Docket" — a court-themed taste game. Rule on as many cases as you like;
  *  each ruling tunes your taste. Adjourn (stop) whenever you want. */
-export function TasteGame({ onDone }: { onDone: (ruledCount: number) => void }) {
+export function TasteGame({ onDone, build = 'dev' }: { onDone: (ruledCount: number) => void; build?: string }) {
   const [items, setItems] = useState<Item[]>([]);
   const [idx, setIdx] = useState(0);
   const [ruled, setRuled] = useState(0);
@@ -88,7 +88,7 @@ export function TasteGame({ onDone }: { onDone: (ruledCount: number) => void }) 
       {/* Header (fixed) */}
       <div className="flex flex-none items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-black text-white sm:text-xl">⚖️ The Docket</h1>
+          <h1 className="text-lg font-black text-white sm:text-xl">⚖️ The Docket <span className="align-middle text-[10px] font-normal text-slate-600">v2·{build}</span></h1>
           {!failed && current && <div className="text-xs font-semibold text-slate-400">Case #{ruled + 1} · {ruled} ruled</div>}
         </div>
         <button onClick={() => onDone(ruled)} className="flex-none rounded-lg border-2 border-gold-400/50 bg-gold-500/10 px-3 py-2 text-sm font-bold text-amber-100 hover:bg-gold-500/20">

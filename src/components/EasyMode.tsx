@@ -76,7 +76,7 @@ function BigChoice<T extends string | number | null>({ value, onChange, options,
   );
 }
 
-export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; name: string | null }) {
+export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: EasyPick[]; name: string | null; build?: string }) {
   const router = useRouter();
   const [audience, setAudience] = useState<EasyAudience>('me');
   const [prefs, setPrefs] = useState<StoredPrefs>(DEFAULTS);
@@ -220,6 +220,7 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
   if (gameOpen) {
     return (
       <TasteGame
+        build={build}
         onDone={(n) => {
           setGameOpen(false);
           if (n > 0) setRatedNonce((k) => k + 1); // ruled on cases → resharpen picks
