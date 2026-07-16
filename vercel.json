@@ -5,7 +5,6 @@
   "installCommand": "npm ci",
   "regions": ["iad1"],
   "crons": [
-    { "path": "/api/cron/daily-scan", "schedule": "0 13 * * *" },
-    { "path": "/api/cron/tv-reminders", "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/daily-scan", "schedule": "0 13 * * *" }
   ]
 }
