@@ -13,12 +13,14 @@ interface Item {
   posterUrl: string | null;
 }
 
-// Court-themed rulings → a 1–10 rating the taste engine already understands.
+// Plain-language rulings → a 1–10 rating the taste engine already understands.
+// Icons map to the feeling at a glance (heart = loved, thumbs = good/bad) so a
+// first-timer never has to guess what a button means.
 const RULINGS: { label: string; emoji: string; rating: number; style: string }[] = [
-  { label: 'Loved it', emoji: '⚖️', rating: 9, style: 'border-gold-400/60 bg-gold-500/20 text-amber-100 hover:bg-gold-500/30' },
-  { label: 'Pretty good', emoji: '👍', rating: 7, style: 'border-brand-400/50 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25' },
+  { label: 'Loved it', emoji: '❤️', rating: 9, style: 'border-gold-400/60 bg-gold-500/20 text-amber-100 hover:bg-gold-500/30' },
+  { label: 'Liked it', emoji: '👍', rating: 7, style: 'border-brand-400/50 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25' },
   { label: 'It was okay', emoji: '😐', rating: 5, style: 'border-white/20 bg-white/5 text-slate-200 hover:bg-white/10' },
-  { label: 'Not for me', emoji: '👎', rating: 2, style: 'border-red-400/40 bg-red-500/15 text-red-100 hover:bg-red-500/25' },
+  { label: 'Didn’t like it', emoji: '👎', rating: 2, style: 'border-red-400/40 bg-red-500/15 text-red-100 hover:bg-red-500/25' },
 ];
 
 /** "The Docket" — a court-themed taste game. Rule on as many cases as you like;
@@ -88,7 +90,7 @@ export function TasteGame({ onDone, build = 'dev' }: { onDone: (ruledCount: numb
       {/* Header (fixed) */}
       <div className="flex-none text-center">
         <h1 className="text-lg font-black text-white sm:text-xl">⚖️ The Docket <span className="align-middle text-[10px] font-normal text-slate-600">v3·{build}</span></h1>
-        {!failed && current && <div className="text-xs font-semibold text-slate-400">Case #{ruled + 1} · {ruled} ruled</div>}
+        {!failed && current && <div className="text-xs font-semibold text-slate-400">Show #{ruled + 1} · {ruled} rated so far</div>}
       </div>
 
       {failed ? (
@@ -114,7 +116,7 @@ export function TasteGame({ onDone, build = 'dev' }: { onDone: (ruledCount: numb
                 onClick={() => onDone(ruled)}
                 className="absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-2 border-gold-400/60 bg-black/70 px-4 py-2 text-sm font-bold text-amber-100 backdrop-blur transition hover:bg-black/85"
               >
-                ⚖️ Adjourn whenever you like{ruled > 0 ? ` · ${ruled} ruled` : ''}
+⚖️ Adjourn whenever you like{ruled > 0 ? ` · ${ruled} rated` : ''}
               </button>
             </div>
           </div>
@@ -129,15 +131,18 @@ export function TasteGame({ onDone, build = 'dev' }: { onDone: (ruledCount: numb
 
           {/* Rulings (fixed) */}
           <div className="flex-none pt-2">
+            <p className="mb-1.5 text-center text-sm font-bold text-white">
+              Have you seen it? Tap how much you liked it 👇
+            </p>
             <div className="grid grid-cols-2 gap-2">
               {RULINGS.map((r) => (
-                <button key={r.label} onClick={() => rule(r.rating)} className={`flex items-center justify-center gap-1.5 rounded-xl border-2 px-2 py-2.5 text-sm font-bold transition active:scale-[0.98] ${r.style}`}>
+                <button key={r.label} onClick={() => rule(r.rating)} className={`flex items-center justify-center gap-1.5 rounded-xl border-2 px-2 py-2.5 text-base font-bold transition active:scale-[0.98] ${r.style}`}>
                   <span className="text-lg" aria-hidden>{r.emoji}</span> {r.label}
                 </button>
               ))}
             </div>
             <button onClick={advance} className="mt-2 w-full rounded-xl border-2 border-white/15 bg-white/5 py-2.5 text-sm font-bold text-slate-300 hover:bg-white/10">
-              🤷 Never seen it — next →
+              🤷 Haven’t seen this one — skip →
             </button>
           </div>
         </>
