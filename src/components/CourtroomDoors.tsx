@@ -71,6 +71,11 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
 
   return (
     <div className="select-none">
+      {/* Make the purpose unmistakable: this is where indecision goes. */}
+      <div className="mb-3 text-center">
+        <div className="text-xl font-black leading-tight text-white sm:text-2xl">Can’t decide? Take it to court. ⚖️</div>
+        <div className="mt-1 text-sm text-slate-300">You — or the whole group — can’t pick. Tap the doors and let the judge settle it.</div>
+      </div>
       <div
         className="group relative h-96 cursor-pointer overflow-hidden rounded-3xl border shadow-card"
         style={{ borderColor: `${accent}55`, perspective: '1400px' }}
@@ -228,8 +233,8 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
             )}
           </div>
           <div className="flex flex-col items-center gap-1">
-            <span className="rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-white backdrop-blur" style={{ fontFamily: 'Georgia, serif' }}>{name} will hear your case</span>
-            <span className="rounded-full bg-black/45 px-3 py-0.5 text-[11px] font-semibold text-amber-100 backdrop-blur">Tap to enter the court ⚖️</span>
+            <span className="rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-white backdrop-blur" style={{ fontFamily: 'Georgia, serif' }}>{name} will settle it for you</span>
+            <span className="rounded-full bg-black/45 px-3 py-0.5 text-[11px] font-semibold text-amber-100 backdrop-blur">Still deliberating? Tap to enter ⚖️</span>
           </div>
         </div>
       </div>
@@ -256,7 +261,7 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
 
       <div className="mt-2 flex items-center justify-center px-1">
         <button onClick={() => setOpen((v) => !v)} className="text-sm font-semibold text-white">
-          {open ? '‹ Close the doors' : 'Try your case — enter the court ›'}
+          {open ? '‹ Close the doors' : 'Can’t decide? Enter the court ›'}
         </button>
       </div>
       {showVendor && <p className="mt-1 text-center text-[10px] text-slate-500">Sponsored — presence and an offer only; never changes your verdict.</p>}
