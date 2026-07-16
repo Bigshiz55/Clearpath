@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
 import { getOnTvToday, getStreamingToday } from '@/lib/onTv';
 import { OnTvTabs } from '@/components/OnTvTabs';
+import { MyReminders, type ReminderRow } from '@/components/MyReminders';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'On TV today · WatchVerdict' };
@@ -25,11 +26,21 @@ export default async function OnTvPage() {
   const date = isoDate(now);
   const [airings, streaming] = await Promise.all([getOnTvToday(region, date), getStreamingToday(date)]);
 
-  // Which airings this user already has a reminder for (guarded pre-migration).
+  // Which airings this user already has a reminder for (guarded pre-migration),
+  // plus the upcoming ones to list at the top.
   let remindedIds: number[] = [];
+  let upcoming: ReminderRow[] = [];
   if (user) {
-    const { data } = await supabase.from('tv_reminders').select('airing_id').eq('user_id', user.id);
-    remindedIds = (data ?? []).map((r) => r.airing_id as number);
+    const { data } = await supabase
+      .from('tv_reminders')
+      .select('airing_id, show_name, network, airstamp')
+      .eq('user_id', user.id)
+      .order('airstamp', { ascending: true });
+    const rows = data ?? [];
+    remindedIds = rows.map((r) => r.airing_id as number);
+    upcoming = rows
+      .filter((r) => Date.parse(r.airstamp as string) >= now.getTime())
+      .map((r) => ({ airingId: r.airing_id as number, showName: r.show_name as string, network: (r.network as string | null) ?? null, airstamp: r.airstamp as string }));
   }
 
   return (
@@ -42,6 +53,8 @@ export default async function OnTvPage() {
           a phone/PC notification <span className="font-semibold text-white">1 hour and 5 minutes before</span> it airs.
         </p>
       </section>
+
+      {upcoming.length > 0 && <MyReminders initial={upcoming} />}
 
       <OnTvTabs broadcast={airings} streaming={streaming} dateLabel={friendlyDate(now)} country={region} remindedIds={remindedIds} />
 
