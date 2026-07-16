@@ -111,6 +111,15 @@ export function EasyMode({ initialPicks, name }: { initialPicks: EasyPick[]; nam
     loaded.current = true;
   }, []);
 
+  // The quiz and The Docket are full-screen overlays with their own big touch
+  // targets — the extra 1.25x "simple" scaling on top makes them overflow the
+  // screen. Turn it off while an overlay is open; restore it after.
+  useEffect(() => {
+    const overlay = quizOpen || gameOpen;
+    if (overlay) document.documentElement.removeAttribute('data-simple');
+    else document.documentElement.setAttribute('data-simple', '1');
+  }, [quizOpen, gameOpen]);
+
   const savePrefs = useCallback((next: StoredPrefs) => {
     setPrefs(next);
     try {
