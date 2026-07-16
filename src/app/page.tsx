@@ -81,8 +81,8 @@ export default function LandingPage() {
               Build a watchlist that reflects your taste, and share your verdicts with the people you
               watch with.
             </p>
-            <Link href="/login" className="btn-primary mt-6 px-6 py-3 text-base">
-              Get started — it&apos;s free
+            <Link href="/app" className="btn-primary mt-6 px-6 py-3 text-base">
+              Get started — no signup
             </Link>
           </div>
         </section>

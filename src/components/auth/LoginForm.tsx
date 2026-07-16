@@ -10,7 +10,7 @@ type Mode = 'signin' | 'signup' | 'magic';
 export function LoginForm({ next }: { next: string }) {
   const router = useRouter();
   const toast = useToast();
-  const [mode, setMode] = useState<Mode>('signup');
+  const [mode, setMode] = useState<Mode>('magic');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,7 +34,7 @@ export function LoginForm({ next }: { next: string }) {
           options: { emailRedirectTo: redirectTo },
         });
         if (error) throw error;
-        setNotice('Check your email for a secure sign-in link.');
+        setNotice('Check your email and tap the link to get in — no password needed.');
       } else if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({
           email,
