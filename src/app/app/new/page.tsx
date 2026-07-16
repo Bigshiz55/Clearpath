@@ -1,36 +1,17 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { getNewOnServices, getEpisodesWaiting, getNewReleaseWall } from '@/lib/servicesFeed';
+import { getEpisodesWaiting } from '@/lib/servicesFeed';
 import { getMyServices } from '@/lib/profile';
 import { STREAMING_SERVICES } from '@/lib/services';
-import { PosterCard } from '@/components/PosterCard';
-import { SaveButton } from '@/components/SaveButton';
+import { ReleaseWall, type WallService } from '@/components/ReleaseWall';
 import { tmdbImage } from '@/lib/tmdb/image';
-import type { FeedItem } from '@/lib/servicesFeed';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'New releases · WatchVerdict' };
 
-function Wall({ items }: { items: FeedItem[] }) {
-  return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      {items.map((t) => (
-        <PosterCard
-          key={`${t.mediaType}-${t.id}`}
-          href={`/app/title/${t.mediaType}/${t.id}`}
-          title={t.title}
-          year={t.year}
-          mediaType={t.mediaType}
-          posterUrl={tmdbImage(t.posterPath, 'w342')}
-          overlay={
-            <SaveButton tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
-          }
-        />
-      ))}
-    </div>
-  );
-}
+// Providers offered as platform filters on the wall (the full catalog we track).
+const WALL_SERVICES: WallService[] = STREAMING_SERVICES.map((s) => ({ id: s.id, name: s.name, emoji: s.emoji }));
 
 export default async function NewPage() {
   const supabase = createClient();
@@ -39,31 +20,22 @@ export default async function NewPage() {
   } = await supabase.auth.getUser();
   const uid = user?.id ?? '';
 
-  const services = await getMyServices(supabase, uid);
-  const [wall, feed, waiting] = await Promise.all([
-    getNewReleaseWall(supabase, uid),
-    getNewOnServices(supabase, uid),
+  const [services, waiting] = await Promise.all([
+    getMyServices(supabase, uid),
     getEpisodesWaiting(supabase, uid, Date.now()),
   ]);
-
-  const serviceNames = services
-    .map((id) => STREAMING_SERVICES.find((s) => s.id === id || s.ids.includes(id))?.name)
-    .filter(Boolean);
 
   return (
     <div className="space-y-8">
       <section>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">🆕 New releases</h1>
         <p className="mt-2 text-sm text-slate-300">
-          The freshest movies and shows out now — every poster is one tap from its verdict.
-          {services.length === 0 && ' Add your services to spotlight the ones you can stream tonight.'}
+          The freshest movies and shows — fine-tune by type, timing, platform, and rating, then tap any
+          poster for a quick look with the trailer. Every title is one tap from its full verdict.
         </p>
-        {serviceNames.length > 0 && (
-          <div className="mt-2 text-xs text-slate-400">Spotlighting: {serviceNames.join(' · ')}</div>
-        )}
       </section>
 
-      {/* Upcoming/just-dropped episodes for shows the user is already following. */}
+      {/* Upcoming/just-dropped episodes for shows the user already follows. */}
       {waiting.length > 0 && (
         <section>
           <h2 className="mb-3 text-lg font-semibold text-white">📺 Waiting for you</h2>
@@ -95,28 +67,8 @@ export default async function NewPage() {
         </section>
       )}
 
-      {/* On your services — only when services are set and something new is there. */}
-      {feed.items.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-white">✅ New on your services</h2>
-          <Wall items={feed.items} />
-        </section>
-      )}
-
-      {/* The wall — always present, gated by nothing. */}
-      <section>
-        <h2 className="mb-3 text-lg font-semibold text-white">
-          {feed.items.length > 0 ? 'Everything new right now' : 'Fresh this season'}
-        </h2>
-        {wall.length > 0 ? (
-          <Wall items={wall} />
-        ) : (
-          <p className="text-sm text-slate-400">
-            Couldn’t reach the release feed just now. Try again shortly, or{' '}
-            <Link href="/app/mood" className="text-brand-300 underline">browse by mood</Link>.
-          </p>
-        )}
-      </section>
+      {/* The wall — filterable, always full, quick-look on tap. */}
+      <ReleaseWall services={WALL_SERVICES} myServiceIds={services} />
 
       {/* Gentle personalization nudge — never blocks the content above. */}
       {services.length === 0 && (
@@ -124,7 +76,7 @@ export default async function NewPage() {
           <div>
             <h2 className="text-base font-semibold text-white">Make this yours</h2>
             <p className="mt-0.5 text-sm text-slate-300">
-              Tell us your streaming services and we’ll spotlight the new titles you can start tonight — no rentals, no dead ends.
+              Tell us your streaming services and the “My services” filter will spotlight new titles you can start tonight.
             </p>
           </div>
           <Link href="/app/settings" className="btn-primary flex-none">Pick my services</Link>

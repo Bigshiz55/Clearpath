@@ -262,8 +262,10 @@ export interface DiscoverOptions {
   sortBy?: string;
   minVotes?: number;
   minRating?: number;
-  /** Restrict to titles first released/aired within this many days. */
+  /** Restrict to titles first released/aired within this many days (past). */
   sinceDays?: number;
+  /** Restrict to titles releasing within this many days from now (future). */
+  upcomingDays?: number;
   /** Movie runtime ceiling in minutes (with_runtime.lte). */
   maxRuntime?: number;
   page?: number;
@@ -297,6 +299,18 @@ export async function discoverTitles(
   if (opts.sinceDays != null) {
     const from = isoDate(new Date(Date.now() - opts.sinceDays * 86_400_000));
     const to = isoDate(new Date());
+    if (mediaType === 'movie') {
+      params['primary_release_date.gte'] = from;
+      params['primary_release_date.lte'] = to;
+    } else {
+      params['first_air_date.gte'] = from;
+      params['first_air_date.lte'] = to;
+    }
+  }
+  if (opts.upcomingDays != null) {
+    // Strictly future: from tomorrow to now + N days, soonest-first when sorted asc.
+    const from = isoDate(new Date(Date.now() + 86_400_000));
+    const to = isoDate(new Date(Date.now() + opts.upcomingDays * 86_400_000));
     if (mediaType === 'movie') {
       params['primary_release_date.gte'] = from;
       params['primary_release_date.lte'] = to;

@@ -10,6 +10,95 @@ export interface FeedItem {
   title: string;
   year: number | null;
   posterPath: string | null;
+  releaseDate?: string | null; // ISO date the title released / airs
+}
+
+export type ReleaseWindow = 'recent' | 'upcoming';
+export type ReleaseSort = 'popular' | 'new' | 'top';
+export interface ReleaseQuery {
+  mediaType: 'all' | 'movie' | 'tv';
+  window: ReleaseWindow;
+  sort: ReleaseSort;
+  /** TMDB provider ids to filter to; empty = every platform. */
+  providerIds: number[];
+}
+
+/**
+ * The engine behind the New Release Wall — flexible discovery the client can
+ * fine-tune: media type, recent vs. upcoming, sort order, and platform filter.
+ * Region-aware, excludes what's already on the user's watchlist, real TMDB rows
+ * only. Upcoming titles carry their release date so the UI can label them.
+ */
+export async function getReleases(
+  supabase: SupabaseClient,
+  userId: string,
+  query: ReleaseQuery,
+): Promise<FeedItem[]> {
+  const profile = await getProfile(supabase, userId);
+  const region = regionFor(profile);
+  const types: MediaType[] = query.mediaType === 'all' ? ['movie', 'tv'] : [query.mediaType];
+  const upcoming = query.window === 'upcoming';
+
+  const sortField = (mt: MediaType) => (mt === 'movie' ? 'primary_release_date' : 'first_air_date');
+  const sortFor = (mt: MediaType): string => {
+    if (query.sort === 'popular') return 'popularity.desc';
+    if (query.sort === 'top') return 'vote_average.desc';
+    // "new": upcoming → soonest first; recent → most-recent first.
+    return `${sortField(mt)}.${upcoming ? 'asc' : 'desc'}`;
+  };
+  // Upcoming titles have few/no votes; don't gate them. "Top rated" needs a floor.
+  const minVotesFor = (mt: MediaType): number => {
+    if (upcoming) return 0;
+    if (query.sort === 'top') return 100;
+    return mt === 'movie' ? 25 : 12;
+  };
+
+  const pools = await Promise.all(
+    types.flatMap((mt) =>
+      [1, 2].map((page) =>
+        discoverTitles(mt, {
+          region,
+          providerIds: query.providerIds.length > 0 ? query.providerIds : undefined,
+          sortBy: sortFor(mt),
+          minVotes: minVotesFor(mt),
+          minRating: query.sort === 'top' ? 6 : undefined,
+          sinceDays: upcoming ? undefined : 120,
+          upcomingDays: upcoming ? 120 : undefined,
+          page,
+        }).catch(() => []),
+      ),
+    ),
+  );
+
+  const wl = userId
+    ? await supabase.from('watchlist_items').select('tmdb_id, media_type').eq('user_id', userId)
+    : { data: [] };
+  const exclude = new Set<string>();
+  for (const r of (wl as { data: { tmdb_id: number; media_type: string }[] | null }).data ?? []) {
+    exclude.add(`${r.media_type}-${r.tmdb_id}`);
+  }
+
+  // Group pools back by media type, then interleave movie/tv for a mixed wall.
+  const byType = new Map<MediaType, typeof pools[number]>();
+  types.forEach((mt, i) => {
+    byType.set(mt, [...pools[i * 2]!, ...pools[i * 2 + 1]!]);
+  });
+
+  const seen = new Set<string>();
+  const items: FeedItem[] = [];
+  const lists = types.map((mt) => byType.get(mt) ?? []);
+  const max = Math.max(0, ...lists.map((l) => l.length));
+  for (let i = 0; i < max; i++) {
+    for (const arr of lists) {
+      const t = arr[i];
+      if (!t) continue;
+      const key = `${t.mediaType}-${t.id}`;
+      if (exclude.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      items.push({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath, releaseDate: t.releaseDate });
+    }
+  }
+  return items.slice(0, 36);
 }
 
 export interface NewOnServices {
@@ -55,46 +144,6 @@ export async function getNewOnServices(
     }
   }
   return { services, items: items.slice(0, 18) };
-}
-
-/**
- * The New Release Wall — the freshest, most-talked-about movies & shows from the
- * last few months, region-aware and NOT gated by the user's services. This is
- * what makes the New page always full: everyone sees a wall of real new releases,
- * and the "on your services" feed layers on top when services are set.
- */
-export async function getNewReleaseWall(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<FeedItem[]> {
-  const profile = await getProfile(supabase, userId);
-  const region = regionFor(profile);
-
-  const [movies, tv, wl] = await Promise.all([
-    discoverTitles('movie', { region, sinceDays: 90, minVotes: 40, sortBy: 'popularity.desc' }),
-    discoverTitles('tv', { region, sinceDays: 90, minVotes: 20, sortBy: 'popularity.desc' }),
-    userId ? supabase.from('watchlist_items').select('tmdb_id, media_type').eq('user_id', userId) : Promise.resolve({ data: [] }),
-  ]);
-
-  const exclude = new Set<string>();
-  for (const r of (wl as { data: { tmdb_id: number; media_type: string }[] | null }).data ?? []) {
-    exclude.add(`${r.media_type}-${r.tmdb_id}`);
-  }
-
-  const seen = new Set<string>();
-  const items: FeedItem[] = [];
-  const max = Math.max(movies.length, tv.length);
-  for (let i = 0; i < max; i++) {
-    for (const arr of [movies, tv]) {
-      const t = arr[i];
-      if (!t) continue;
-      const key = `${t.mediaType}-${t.id}`;
-      if (exclude.has(key) || seen.has(key)) continue;
-      seen.add(key);
-      items.push({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath });
-    }
-  }
-  return items.slice(0, 24);
 }
 
 export interface WaitingShow {
