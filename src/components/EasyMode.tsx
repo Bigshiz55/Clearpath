@@ -214,8 +214,6 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
     } catch {
       /* ignore */
     }
-    // Remember the choice so the full home stops redirecting guests back here.
-    document.cookie = 'wv_full=1; path=/; max-age=31536000; samesite=lax';
     router.push('/app');
   }
 

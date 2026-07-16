@@ -1,6 +1,4 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, personalLabelFor } from '@/lib/profile';
 import { SearchBar } from '@/components/SearchBar';
@@ -37,19 +35,10 @@ export default async function DiscoverPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  // New guests land on the calm Easy Mode screen instead of the full home, so
-  // nobody we hand the link to hits the busy version first. The moment they tap
-  // "Switch to the full app" in Easy Mode it sets wv_full=1 and this stops
-  // redirecting. Registered accounts are never redirected.
-  const isGuest = user?.is_anonymous === true;
-  if (isGuest && cookies().get('wv_full')?.value !== '1') {
-    redirect('/app/easy');
-  }
-
   const profile = user ? await getProfile(supabase, user.id) : null;
   const label = profile ? personalLabelFor(profile) : 'Your match';
   const tonight = await getTonight(supabase, user?.id ?? '', new Date());
+  const isGuest = user?.is_anonymous === true;
   const firstName = profile?.display_name?.trim().split(/\s+/)[0] || null;
   const greeterName = isGuest ? null : firstName;
 
