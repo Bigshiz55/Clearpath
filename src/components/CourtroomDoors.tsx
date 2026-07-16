@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Cinzel } from 'next/font/google';
 import { claimSettlement } from '@/lib/actions/sponsors';
 import { RobedPortrait } from '@/components/RobedPortrait';
 import { HOUSE_JUDGES, HOUSE_KEY, houseByKey, readHousePick, type HousePick } from '@/lib/houseJudges';
 import type { Judge } from '@/lib/sponsors';
+
+// A classical, engraved-inscription face — reads "courtroom / monument".
+const cinzel = Cinzel({ subsets: ['latin'], weight: ['700', '900'] });
 
 function safeAccent(hex: string | null | undefined): string {
   return hex && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : '#f5c65a';
@@ -71,11 +75,6 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
 
   return (
     <div className="select-none">
-      {/* Make the purpose unmistakable: this is where indecision goes. */}
-      <div className="mb-3 text-center">
-        <div className="text-xl font-black leading-tight text-white sm:text-2xl">Can’t decide? Take it to court. ⚖️</div>
-        <div className="mt-1 text-sm text-slate-300">You — or the whole group — can’t pick. Tap the doors and let the judge settle it.</div>
-      </div>
       <div
         className="group relative h-96 cursor-pointer overflow-hidden rounded-3xl border shadow-card"
         style={{ borderColor: `${accent}55`, perspective: '1400px' }}
@@ -216,26 +215,28 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
           style={{ background: `linear-gradient(180deg, transparent, ${accent}, #fff8e6, ${accent}, transparent)`, boxShadow: `0 0 24px ${accent}, 0 0 60px ${accent}88` }}
         />
 
-        {/* Closed-door invitation — a mounted medallion of who's presiding today */}
-        <div className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 transition-opacity duration-300 ${open ? 'opacity-0' : 'opacity-100'}`}>
-          <div className="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap" style={{ borderColor: `${accent}77`, color: accent, background: 'rgba(0,0,0,.5)', boxShadow: `0 0 22px ${accent}44`, fontFamily: 'Georgia, serif' }}>
-            ⚖️ In session
-          </div>
+        {/* Closed-door invitation — the message IS the doors: big, engraved,
+            unmistakable. Judge medallion sits small above the headline. */}
+        <div className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center transition-opacity duration-300 ${open ? 'opacity-0' : 'opacity-100'}`}>
           <div
-            className="grid h-24 w-24 place-items-center overflow-hidden rounded-full border-2"
-            style={{ borderColor: accent, boxShadow: `0 0 28px ${accent}77, inset 0 0 0 4px rgba(0,0,0,.4)`, background: showVendor ? `radial-gradient(circle at 50% 35%, ${accent}44, ${accent}18)` : '#0b0e17' }}
+            className="grid h-16 w-16 place-items-center overflow-hidden rounded-full border-2"
+            style={{ borderColor: accent, boxShadow: `0 0 24px ${accent}77`, background: showVendor ? `radial-gradient(circle at 50% 35%, ${accent}44, ${accent}18)` : '#0b0e17' }}
           >
             {showVendor ? (
-              <span className="text-4xl" aria-hidden>{judge!.emoji ?? '⚖️'}</span>
+              <span className="text-2xl" aria-hidden>{judge!.emoji ?? '⚖️'}</span>
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={dog.src} alt={`${name}, presiding`} className="h-full w-full object-cover" />
             )}
           </div>
-          <div className="flex flex-col items-center gap-1">
-            <span className="rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-white backdrop-blur" style={{ fontFamily: 'Georgia, serif' }}>{name} will settle it for you</span>
-            <span className="rounded-full bg-black/45 px-3 py-0.5 text-[11px] font-semibold text-amber-100 backdrop-blur">Still deliberating? Tap to enter ⚖️</span>
+
+          <h2 className={`${cinzel.className} text-4xl font-black uppercase leading-[0.95] tracking-wide sm:text-5xl`} style={{ color: accent, textShadow: `0 2px 18px ${accent}55, 0 1px 0 rgba(0,0,0,.6)` }}>
+            Can’t<br />decide?
+          </h2>
+          <div className={`${cinzel.className} text-2xl font-bold leading-tight text-white sm:text-3xl`} style={{ textShadow: '0 2px 12px rgba(0,0,0,.8)' }}>
+            Take them to court
           </div>
+          <span className="mt-1 rounded-full bg-black/55 px-4 py-1.5 text-sm font-bold text-amber-100 backdrop-blur">⚖️ Tap the doors to enter</span>
         </div>
       </div>
 
@@ -260,8 +261,8 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
       </div>
 
       <div className="mt-2 flex items-center justify-center px-1">
-        <button onClick={() => setOpen((v) => !v)} className="text-sm font-semibold text-white">
-          {open ? '‹ Close the doors' : 'Can’t decide? Enter the court ›'}
+        <button onClick={() => setOpen((v) => !v)} className={`${cinzel.className} text-lg font-bold uppercase tracking-wide text-gold-300`}>
+          {open ? '‹ Close the doors' : 'Take them to court ›'}
         </button>
       </div>
       {showVendor && <p className="mt-1 text-center text-[10px] text-slate-500">Sponsored — presence and an offer only; never changes your verdict.</p>}
