@@ -268,6 +268,8 @@ export interface DiscoverOptions {
   upcomingDays?: number;
   /** Movie runtime ceiling in minutes (with_runtime.lte). */
   maxRuntime?: number;
+  /** TMDB monetization filter, e.g. 'flatrate|free|ads', 'free', 'rent', 'buy'. */
+  monetization?: string;
   page?: number;
 }
 
@@ -289,10 +291,11 @@ export async function discoverTitles(
     page: String(opts.page ?? 1),
   };
   if (opts.genreIds && opts.genreIds.length > 0) params.with_genres = opts.genreIds.join('|');
-  if (opts.providerIds && opts.providerIds.length > 0) {
-    params.with_watch_providers = opts.providerIds.join('|');
-    params.with_watch_monetization_types = 'flatrate|free|ads';
-  }
+  // Monetization: an explicit filter wins; otherwise, when filtering by provider,
+  // default to the "included" tiers so results are things you can actually stream.
+  const monetization = opts.monetization ?? (opts.providerIds && opts.providerIds.length > 0 ? 'flatrate|free|ads' : undefined);
+  if (opts.providerIds && opts.providerIds.length > 0) params.with_watch_providers = opts.providerIds.join('|');
+  if (monetization) params.with_watch_monetization_types = monetization;
   if (opts.minVotes != null) params['vote_count.gte'] = String(opts.minVotes);
   if (opts.minRating != null) params['vote_average.gte'] = String(opts.minRating);
   if (opts.maxRuntime != null && mediaType === 'movie') params['with_runtime.lte'] = String(opts.maxRuntime);
@@ -804,5 +807,35 @@ export async function getWatchProviders(
     options,
     available: options.length > 0,
   };
+}
+
+export interface ProviderCatalogEntry {
+  id: number;
+  name: string;
+  logoPath: string | null;
+  priority: number; // TMDB display_priority for the region (lower = shown first)
+}
+
+/**
+ * The full catalog of streaming providers TMDB knows for a region — the breadth
+ * that lets Browse cover every service, not a curated shortlist. Movies and TV
+ * merged and deduped, ordered by TMDB's regional display priority.
+ */
+export async function getProviderCatalog(region = 'US'): Promise<ProviderCatalogEntry[]> {
+  interface Row { provider_id: number; provider_name: string; logo_path?: string | null; display_priority?: number }
+  interface Resp { results?: Row[] }
+  const [movie, tv] = await Promise.all([
+    tmdbFetch<Resp>('/watch/providers/movie', { watch_region: region }).catch(() => ({ results: [] as Row[] })),
+    tmdbFetch<Resp>('/watch/providers/tv', { watch_region: region }).catch(() => ({ results: [] as Row[] })),
+  ]);
+  const map = new Map<number, ProviderCatalogEntry>();
+  for (const r of [...(movie.results ?? []), ...(tv.results ?? [])]) {
+    const existing = map.get(r.provider_id);
+    const priority = r.display_priority ?? 9999;
+    if (!existing || priority < existing.priority) {
+      map.set(r.provider_id, { id: r.provider_id, name: r.provider_name, logoPath: r.logo_path ?? null, priority });
+    }
+  }
+  return [...map.values()].sort((a, b) => a.priority - b.priority);
 }
 
