@@ -82,10 +82,16 @@ export function TasteGame({ onDone }: { onDone: (ruledCount: number) => void }) 
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-1 pb-16 pt-4">
-      <div className="text-center">
-        <h1 className="text-3xl font-black text-white sm:text-4xl">⚖️ The Docket</h1>
-        <p className="mt-2 text-lg text-slate-300">Rule on each case to teach the court your taste. Stop whenever you like.</p>
+    <div className="mx-auto flex min-h-[100dvh] max-w-2xl flex-col px-3 pb-3 pt-3">
+      {/* Header — compact, with the Adjourn (stop) button always reachable up top */}
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-black text-white sm:text-2xl">⚖️ The Docket</h1>
+          {!failed && current && <div className="text-xs font-semibold text-slate-400">Case #{ruled + 1} · {ruled} ruled</div>}
+        </div>
+        <button onClick={() => onDone(ruled)} className="flex-none rounded-lg border-2 border-gold-400/50 bg-gold-500/10 px-3 py-2 text-sm font-bold text-amber-100 hover:bg-gold-500/20">
+          ⚖️ Adjourn{ruled > 0 ? ` (${ruled})` : ''}
+        </button>
       </div>
 
       {failed ? (
@@ -94,43 +100,37 @@ export function TasteGame({ onDone }: { onDone: (ruledCount: number) => void }) 
           <button onClick={() => onDone(ruled)} className="btn-primary mt-4 px-6 py-3 text-lg">Back to my picks</button>
         </div>
       ) : !current ? (
-        <div className="mt-10 flex flex-col items-center gap-3 text-slate-300">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-slate-300">
           <span className="h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
           <span className="text-lg">Calling the next case…</span>
         </div>
       ) : (
         <>
-          <div className="mt-3 text-center text-base font-semibold text-slate-400">Case #{ruled + 1} · {ruled} ruled so far</div>
-
-          <div className="mt-4 flex flex-col items-center text-center">
-            <div className="h-64 w-44 overflow-hidden rounded-2xl border-2 border-white/10 shadow-card">
+          {/* Poster + title fill the middle and scale to the screen */}
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-2 text-center">
+            <div className="aspect-[2/3] h-[34vh] max-h-72 overflow-hidden rounded-2xl border-2 border-white/10 shadow-card">
               <Poster posterUrl={current.posterUrl} title={current.title} />
             </div>
-            <div className="mt-3 flex items-center gap-2">
-              <span className="rounded bg-white/10 px-2 py-0.5 text-xs uppercase text-slate-300">{current.mediaType === 'movie' ? 'Movie' : 'TV'}</span>
-              <h2 className="text-xl font-black text-white">
+            <div className="mt-2 flex items-center gap-2">
+              <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] uppercase text-slate-300">{current.mediaType === 'movie' ? 'Movie' : 'TV'}</span>
+              <h2 className="text-lg font-black leading-tight text-white sm:text-xl">
                 {current.title}{current.year ? <span className="font-semibold text-slate-400"> ({current.year})</span> : null}
               </h2>
             </div>
           </div>
 
-          <div className="mt-6">
-            <div className="mb-2 text-center text-lg font-semibold text-slate-200">Your ruling?</div>
-            <div className="grid grid-cols-2 gap-3">
+          {/* Rulings pinned to the bottom, compact 2×2 */}
+          <div>
+            <div className="mb-1.5 text-center text-base font-semibold text-slate-200">Your ruling?</div>
+            <div className="grid grid-cols-2 gap-2">
               {RULINGS.map((r) => (
-                <button key={r.label} onClick={() => rule(r.rating)} className={`flex items-center justify-center gap-2 rounded-2xl border-2 px-4 py-5 text-xl font-bold transition ${r.style}`}>
-                  <span className="text-2xl" aria-hidden>{r.emoji}</span> {r.label}
+                <button key={r.label} onClick={() => rule(r.rating)} className={`flex items-center justify-center gap-1.5 rounded-xl border-2 px-2 py-3 text-base font-bold transition active:scale-[0.98] ${r.style}`}>
+                  <span className="text-xl" aria-hidden>{r.emoji}</span> {r.label}
                 </button>
               ))}
             </div>
-            <button onClick={advance} className="mt-3 w-full rounded-2xl border-2 border-white/15 bg-white/5 py-4 text-lg font-bold text-slate-300 hover:bg-white/10">
-              🤷 Never seen it — next case →
-            </button>
-          </div>
-
-          <div className="mt-6 text-center">
-            <button onClick={() => onDone(ruled)} className="rounded-xl border-2 border-gold-400/50 bg-gold-500/10 px-6 py-3 text-lg font-bold text-amber-100 hover:bg-gold-500/20">
-              ⚖️ Adjourn court{ruled > 0 ? ` (${ruled} ruled)` : ''}
+            <button onClick={advance} className="mt-2 w-full rounded-xl border-2 border-white/15 bg-white/5 py-3 text-base font-bold text-slate-300 hover:bg-white/10">
+              🤷 Never seen it — next →
             </button>
           </div>
         </>
