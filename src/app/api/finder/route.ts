@@ -15,6 +15,7 @@ function coerceQuery(raw: unknown): FinderQuery {
     maxRuntime: typeof q.maxRuntime === 'number' ? q.maxRuntime : null,
     sinceMonths: typeof q.sinceMonths === 'number' ? q.sinceMonths : null,
     minAudience: typeof q.minAudience === 'number' ? q.minAudience : null,
+    minImdb: typeof q.minImdb === 'number' ? q.minImdb : null,
     englishAudioOnly: Boolean(q.englishAudioOnly),
     onMyServices: Boolean(q.onMyServices),
     minMatch: typeof q.minMatch === 'number' ? q.minMatch : null,

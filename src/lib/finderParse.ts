@@ -10,6 +10,7 @@ export const EMPTY_QUERY: FinderQuery = {
   maxRuntime: 150, // default cap ~2.5h; drag right to "Any length"
   sinceMonths: null,
   minAudience: null,
+  minImdb: null,
   englishAudioOnly: false,
   onMyServices: false,
   minMatch: null,
@@ -36,6 +37,7 @@ export function describeQuery(q: FinderQuery): string {
     parts.push(y >= 1 ? `from the last ${y} year${y > 1 ? 's' : ''}` : `from the last ${q.sinceMonths} months`);
   }
   if (q.minAudience != null) parts.push(`${q.minAudience}%+ audience`);
+  if (q.minImdb != null) parts.push(`IMDb ${q.minImdb.toFixed(1)}+`);
   if (q.minMatch != null) parts.push(`${q.minMatch}+ match`);
   if (q.englishAudioOnly) parts.push('English audio');
   if (q.streamItOnly) parts.push('“watch it” calls only');
@@ -78,6 +80,12 @@ export function naiveParseQuery(input: string): FinderQuery {
   if (mo) q.sinceMonths = Number(mo[1]);
   else if (yr) q.sinceMonths = Number(yr[1]) * 12;
   else if (/\b(recent|recently|new releases?|brand new|just came out)\b/.test(t)) q.sinceMonths = 24;
+
+  // IMDb rating — "imdb 7.5", "imdb above 8", "8+ on imdb". Parse before the
+  // generic audience match so "imdb 8" isn't misread as an 8% audience score.
+  const imdb =
+    t.match(/imdb\D{0,10}(\d(?:\.\d)?)/) || t.match(/(\d(?:\.\d)?)\s*\+?\s*(?:on |stars? )?imdb/);
+  if (imdb) q.minImdb = Math.min(10, Number(imdb[1]));
 
   // Audience score — "audience above 80", "80%+".
   const aud = t.match(/(?:audience|score|rating)\D{0,14}(\d{2,3})/) || t.match(/(\d{2,3})\s*%/);

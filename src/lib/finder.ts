@@ -50,7 +50,8 @@ export interface FinderQuery {
   genreIds: number[];
   maxRuntime: number | null;
   sinceMonths: number | null;
-  minAudience: number | null; // 0..100
+  minAudience: number | null; // 0..100 — TMDB crowd score
+  minImdb: number | null; // 0..10 — minimum IMDb rating
   englishAudioOnly: boolean;
   onMyServices: boolean;
   minMatch: number | null; // 0..100
@@ -196,11 +197,16 @@ export async function runFinder(
           if (meta.year < cutoff) return null;
         }
         if (meta.year != null) receipts.push(String(meta.year));
-        // Audience.
+        // Audience (TMDB crowd score).
         if (q.minAudience != null) {
           const aud = meta.voteAverage != null ? Math.round(meta.voteAverage * 10) : null;
           if (aud == null || aud < q.minAudience) return null;
           receipts.push(`${aud}% audience`);
+        }
+        // IMDb rating (from OMDb, when we have it).
+        if (q.minImdb != null) {
+          if (meta.imdbRating == null || meta.imdbRating < q.minImdb) return null;
+          receipts.push(`IMDb ${meta.imdbRating.toFixed(1)}`);
         }
         // English audio.
         if (q.englishAudioOnly && !(meta.englishAvailability === 'native' || meta.englishAvailability === 'available')) {

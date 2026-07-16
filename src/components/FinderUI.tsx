@@ -96,9 +96,10 @@ function runtimeReadout(v: number): string {
   const m = v % 60;
   return h > 0 ? `≤ ${h}h ${m ? `${m}m` : ''}`.trim() : `≤ ${m}m`;
 }
-function yearsReadout(years: number): string {
-  if (years <= 0) return 'Any time';
-  return `Last ${years} year${years > 1 ? 's' : ''}`;
+function releasedReadout(years: number): string {
+  if (years <= 0) return 'Any year';
+  const from = new Date().getFullYear() - years;
+  return `${from} → now`;
 }
 function paceReadout(v: number): string {
   return v <= 33 ? '🐢 Slow burn' : v >= 67 ? '⚡ Adrenaline' : '🎬 Balanced';
@@ -315,13 +316,18 @@ export function FinderUI({
         <div className="grid gap-4 sm:grid-cols-2">
           <Slider label="Max length" readout={runtimeReadout(q.maxRuntime ?? 240)} min={60} max={240} step={10}
             value={q.maxRuntime ?? 240} onChange={(v) => set('maxRuntime', v >= 240 ? null : v)} />
-          <Slider label="Released" readout={yearsReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0)} min={0} max={15} step={1}
+          <Slider label="Released since" readout={releasedReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0)} min={0} max={75} step={1}
             value={q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0} onChange={(years) => set('sinceMonths', years === 0 ? null : years * 12)} />
-          <Slider label="Audience at least" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
+          <Slider label="Audience score (TMDB)" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
             value={q.minAudience ?? 0} onChange={(v) => set('minAudience', v === 0 ? null : v)} />
+          <Slider label="IMDb rating" readout={q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'} min={0} max={9} step={0.5}
+            value={q.minImdb ?? 0} onChange={(v) => set('minImdb', v === 0 ? null : v)} accent />
           <Slider label={`${scoredFor} at least`} readout={q.minMatch ? `${q.minMatch}+` : 'Any'} min={0} max={95} step={5}
             value={q.minMatch ?? 0} onChange={(v) => set('minMatch', v === 0 ? null : v)} accent />
         </div>
+        <p className="-mt-1 text-[11px] text-slate-500">
+          “Audience score” is the crowd rating from TMDB — the open stand-in for Rotten Tomatoes’ audience/Popcorn score. Drag “Released since” left to reach classics from decades back.
+        </p>
 
         {/* Pace meter */}
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
@@ -354,12 +360,20 @@ export function FinderUI({
           <button onClick={() => set('englishAudioOnly', !q.englishAudioOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.englishAudioOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
             {q.englishAudioOnly ? '✓ ' : ''}English audio only
           </button>
-          <button onClick={() => set('streamItOnly', !q.streamItOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-            {q.streamItOnly ? '✓ ' : ''}🍿 Stream It only
+          <button
+            onClick={() => set('streamItOnly', !q.streamItOnly)}
+            title="Only titles the judge rules Stream It — our “Watch It” verdict, à la Decider’s Stream It or Skip It."
+            className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+          >
+            {q.streamItOnly ? '✓ ' : ''}⚖️ “Stream It” verdicts only
           </button>
           {q.mediaType !== 'movie' && (
-            <button onClick={() => set('bingeableOnly', !q.bingeableOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.bingeableOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-              {q.bingeableOnly ? '✓ ' : ''}📺 Bingeable (all episodes out)
+            <button
+              onClick={() => set('bingeableOnly', !q.bingeableOnly)}
+              title="TV only: every episode of the latest season is already out — nothing left to wait on (vs. an ongoing, week-to-week release)."
+              className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.bingeableOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+            >
+              {q.bingeableOnly ? '✓ ' : ''}📺 All episodes out
             </button>
           )}
           <button

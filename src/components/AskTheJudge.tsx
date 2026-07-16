@@ -53,8 +53,10 @@ function runtimeReadout(v: number): string {
   const m = v % 60;
   return h > 0 ? `≤ ${h}h ${m ? `${m}m` : ''}`.trim() : `≤ ${m}m`;
 }
-function yearsReadout(years: number): string {
-  return years <= 0 ? 'Any time' : `Last ${years} yr${years > 1 ? 's' : ''}`;
+function releasedReadout(years: number): string {
+  if (years <= 0) return 'Any year';
+  const from = new Date().getFullYear() - years;
+  return `${from} → now`;
 }
 
 export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: boolean; seedQuery?: string | null }) {
@@ -222,6 +224,7 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
   }, [seedQuery]);
 
   const showExamples = msgs.length <= 1 && !loading;
+  const sinceYears = q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0;
 
   return (
     <div className="space-y-4">
@@ -259,12 +262,19 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
                 <input type="range" min={60} max={240} step={10} value={q.maxRuntime ?? 240} onChange={(e) => set('maxRuntime', Number(e.target.value) >= 240 ? null : Number(e.target.value))} className="w-full accent-brand-500" />
               </div>
               <div>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Released</span><span className="font-semibold text-brand-200">{yearsReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0)}</span></div>
-                <input type="range" min={0} max={15} step={1} value={q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0} onChange={(e) => { const y = Number(e.target.value); set('sinceMonths', y === 0 ? null : y * 12); }} className="w-full accent-brand-500" />
+                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Released since</span><span className="font-semibold text-brand-200">{releasedReadout(sinceYears)}</span></div>
+                <input type="range" min={0} max={75} step={1} value={sinceYears} onChange={(e) => { const y = Number(e.target.value); set('sinceMonths', y === 0 ? null : y * 12); }} className="w-full accent-brand-500" />
+                <p className="mt-0.5 text-[10px] text-slate-500">Drag left to reach classics — decades back, not just recent.</p>
               </div>
               <div>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Audience at least</span><span className="font-semibold text-brand-200">{q.minAudience ? `${q.minAudience}%+` : 'Any'}</span></div>
+                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Audience score</span><span className="font-semibold text-brand-200">{q.minAudience ? `${q.minAudience}%+` : 'Any'}</span></div>
                 <input type="range" min={0} max={95} step={5} value={q.minAudience ?? 0} onChange={(e) => set('minAudience', Number(e.target.value) === 0 ? null : Number(e.target.value))} className="w-full accent-brand-500" />
+                <p className="mt-0.5 text-[10px] text-slate-500">The crowd score (TMDB) — the open stand-in for RT’s audience/Popcorn.</p>
+              </div>
+              <div>
+                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">IMDb rating</span><span className="font-semibold text-gold-400">{q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'}</span></div>
+                <input type="range" min={0} max={9} step={0.5} value={q.minImdb ?? 0} onChange={(e) => set('minImdb', Number(e.target.value) === 0 ? null : Number(e.target.value))} className="w-full accent-gold-400" />
+                <p className="mt-0.5 text-[10px] text-slate-500">IMDb’s 0–10 star rating, when we have it.</p>
               </div>
               <div>
                 <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Your match at least</span><span className="font-semibold text-gold-400">{q.minMatch ? `${q.minMatch}+` : 'Any'}</span></div>
@@ -276,9 +286,22 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
               <button onClick={() => set('englishAudioOnly', !q.englishAudioOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.englishAudioOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
                 {q.englishAudioOnly ? '✓ ' : ''}English audio
               </button>
-              <button onClick={() => set('streamItOnly', !q.streamItOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-                {q.streamItOnly ? '✓ ' : ''}🍿 Stream It only
+              <button
+                onClick={() => set('streamItOnly', !q.streamItOnly)}
+                title="Only titles the judge rules Stream It — our “Watch It” verdict, à la Decider’s Stream It or Skip It."
+                className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+              >
+                {q.streamItOnly ? '✓ ' : ''}⚖️ “Stream It” verdicts only
               </button>
+              {q.mediaType !== 'movie' && (
+                <button
+                  onClick={() => set('bingeableOnly', !q.bingeableOnly)}
+                  title="TV only: every episode of the latest season is already out — nothing left to wait on (vs. an ongoing, week-to-week release)."
+                  className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.bingeableOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                >
+                  {q.bingeableOnly ? '✓ ' : ''}📺 All episodes out
+                </button>
+              )}
               <button onClick={() => set('onMyServices', !q.onMyServices)} disabled={!hasServices} title={hasServices ? '' : 'Add your services in Settings first'} className={`rounded-lg border px-3 py-1.5 text-sm transition disabled:opacity-40 ${q.onMyServices ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
                 {q.onMyServices ? '✓ ' : ''}On my services
               </button>

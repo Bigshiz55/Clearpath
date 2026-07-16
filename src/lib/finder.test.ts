@@ -49,6 +49,12 @@ describe('Finder natural-language parsing (no AI needed)', () => {
     expect(q.sinceMonths).toBe(36);
   });
 
+  it('reads an IMDb floor without confusing it for an audience score', () => {
+    const q = naiveParseQuery('a thriller with imdb 7.5 or higher');
+    expect(q.minImdb).toBe(7.5);
+    expect(q.minAudience).toBeNull();
+  });
+
   it('defaults to no constraints on an empty ask', () => {
     const q = naiveParseQuery('help me pick something');
     expect(q.mediaType).toBe('any');
