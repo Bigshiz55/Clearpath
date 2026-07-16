@@ -52,11 +52,24 @@ interface TvmazeAiring {
   _embedded?: { show?: TvmazeShow | null }; // web (streaming) schedule
 }
 
-// Major streaming platforms we surface on the "Streaming today" tab. The web
-// feed is global and lists many regional services; this keeps it recognizable.
+// Streaming platforms we surface on the "Streaming today" tab. The web feed is
+// global and full of regional services; this keeps it to services a US/UK/AU
+// viewer would recognize, but broadly — not just the big five.
 const MAJOR_STREAMERS = [
-  'netflix', 'prime video', 'disney+', 'hulu', 'max', 'hbo', 'apple tv+', 'apple tv',
-  'peacock', 'paramount+', 'amc+', 'starz', 'showtime', 'youtube', 'tubi', 'crunchyroll',
+  // Majors
+  'netflix', 'prime video', 'amazon', 'disney+', 'hulu', 'max', 'hbo', 'apple tv',
+  'peacock', 'paramount+',
+  // Premium / cable
+  'amc+', 'starz', 'showtime', 'mgm+', 'epix', 'sundance now',
+  // Free / ad-supported
+  'tubi', 'pluto', 'the roku channel', 'roku', 'freevee', 'crackle', 'plex', 'vudu', 'xumo',
+  // Genre & specialty
+  'britbox', 'acorn', 'mubi', 'shudder', 'hallmark', 'bet+', 'allblk', 'discovery+',
+  'crunchyroll', 'funimation', 'hidive', 'espn+', 'fubo', 'philo',
+  // Docs / arthouse / library
+  'curiositystream', 'kanopy', 'hoopla', 'pbs', 'fandor', 'ovid',
+  // Global
+  'vix', 'youtube',
 ];
 function isMajorStreamer(name: string): boolean {
   const n = name.toLowerCase();

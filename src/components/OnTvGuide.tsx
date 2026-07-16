@@ -180,11 +180,11 @@ export function OnTvGuide({
                 </div>
                 <div className="p-2">
                   <div className="line-clamp-2 text-xs font-semibold text-white">{a.showName}</div>
-                  <div className="mt-1 flex items-center justify-between text-[11px]">
-                    <span className="truncate text-slate-300">{streaming ? a.network : fmtTime(a.time) ?? 'New'}</span>
-                    {a.rating != null && <span className={`flex-none ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
+                  <div className="mt-1 flex items-center justify-between gap-1">
+                    <span className="truncate text-sm font-black tabular-nums text-white">{streaming ? 'New' : fmtTime(a.time) ?? 'New'}</span>
+                    {a.rating != null && <span className={`flex-none text-xs font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
                   </div>
-                  {!streaming && <div className="truncate text-[11px] text-slate-400">{a.network}</div>}
+                  <div className="mt-1 line-clamp-2 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
                 </div>
               </div>
             ))}
@@ -241,13 +241,13 @@ export function OnTvGuide({
             const t = fmtTime(a.time);
             return (
               <div key={a.id} className="card flex items-center gap-3 p-3">
-                <div className="w-16 flex-none text-center">
+                <div className="w-24 flex-none text-center">
                   {streaming || !t ? (
-                    <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">New</div>
+                    <div className="rounded-md bg-emerald-500/20 px-1 py-1 text-xs font-black uppercase tracking-wide text-emerald-200">New</div>
                   ) : (
-                    <div className="text-sm font-bold tabular-nums text-white">{t}</div>
+                    <div className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white">{t}</div>
                   )}
-                  <div className="mt-0.5 truncate text-[11px] font-semibold text-brand-200">{a.network}</div>
+                  <div className="mt-1.5 line-clamp-2 rounded-md border border-brand-400/30 bg-brand-500/15 px-1.5 py-1 text-xs font-bold leading-tight text-brand-100">{a.network}</div>
                 </div>
                 <div className="h-16 w-11 flex-none overflow-hidden rounded-md border border-white/10 bg-ink-800">
                   {a.image ? (
