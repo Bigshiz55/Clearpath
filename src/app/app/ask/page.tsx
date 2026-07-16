@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getMyServices } from '@/lib/profile';
 import { AskTheJudge } from '@/components/AskTheJudge';
+import { TakeToCourtCard } from '@/components/TakeToCourtCard';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Ask the Judge · WatchVerdict' };
@@ -24,6 +25,10 @@ export default async function AskPage({ searchParams }: { searchParams: { q?: st
       </div>
       <div className="mt-5">
         <AskTheJudge hasServices={services.length > 0} seedQuery={seed} />
+      </div>
+
+      <div className="mt-6">
+        <TakeToCourtCard />
       </div>
     </div>
   );

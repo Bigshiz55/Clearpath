@@ -13,6 +13,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { getTonight } from '@/lib/tonight';
 import { CourtroomDoors } from '@/components/CourtroomDoors';
+import { TakeToCourtCard } from '@/components/TakeToCourtCard';
 import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import { regionFor } from '@/lib/profile';
 import type { VerdictTier } from '@/lib/types';
@@ -130,6 +131,9 @@ export default async function DiscoverPage() {
           <CourtroomDoors initialJudge={judge} />
         </div>
       </section>
+
+      {/* The group differentiator — what the solo homepage can't do. */}
+      <TakeToCourtCard />
 
       {/* Explore — big, inviting tiles for the places people come back to. */}
       <section>
