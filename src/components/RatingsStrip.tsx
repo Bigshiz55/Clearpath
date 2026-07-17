@@ -33,6 +33,8 @@ export function RatingsStrip({
   // Our own Stream It / Skip It call, on every card. Derived from the blended
   // score; "NA" only when there's genuinely no score to judge (e.g. unreleased).
   const verdict = ratings.standardScore == null ? 'na' : ratings.standardScore >= 55 ? 'stream' : 'skip';
+  const popcorn = ratings.rtAudience ?? ratings.audience;
+  const dim = 'text-slate-500';
 
   return (
     <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold tabular-nums ${className}`}>
@@ -53,29 +55,25 @@ export function RatingsStrip({
           ⚖️ {ratings.standardScore}
         </span>
       )}
-      {ratings.tomatometer != null && (
-        <span className={`inline-flex items-center gap-0.5 ${tomatoColor(ratings.tomatometer)}`} title="Rotten Tomatoes — Tomatometer (critics)">
-          🍅 {ratings.tomatometer}%
-        </span>
-      )}
-      {(ratings.rtAudience ?? ratings.audience) != null && (
-        <span
-          className="inline-flex items-center gap-0.5 text-amber-200"
-          title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience score (TMDB — no Rotten Tomatoes audience score available for this title)'}
-        >
-          🍿 {ratings.rtAudience ?? ratings.audience}%
-        </span>
-      )}
-      {ratings.imdb != null && (
-        <span className="inline-flex items-center gap-0.5 rounded bg-[#f5c518] px-1 text-[10px] font-black text-black" title="IMDb rating">
-          IMDb {ratings.imdb.toFixed(1)}
-        </span>
-      )}
-      {ratings.metacritic != null && (
-        <span className="inline-flex items-center gap-0.5 text-sky-300" title="Metacritic (critics)">
-          Ⓜ {ratings.metacritic}
-        </span>
-      )}
+
+      {/* A fixed set of icons on EVERY card — value, or "–" when unavailable — so
+          the row is consistent and easy to scan across cards. */}
+      <span className={`inline-flex items-center gap-0.5 ${ratings.tomatometer != null ? tomatoColor(ratings.tomatometer) : dim}`} title="Rotten Tomatoes — Tomatometer (critics)">
+        🍅 {ratings.tomatometer != null ? `${ratings.tomatometer}%` : '–'}
+      </span>
+      <span
+        className={`inline-flex items-center gap-0.5 ${popcorn != null ? 'text-amber-200' : dim}`}
+        title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
+      >
+        🍿 {popcorn != null ? `${popcorn}%` : '–'}
+      </span>
+      <span className={`inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-black ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : `border border-white/15 ${dim}`}`} title="IMDb rating">
+        IMDb {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
+      </span>
+      <span className={`inline-flex items-center gap-0.5 ${ratings.metacritic != null ? 'text-sky-300' : dim}`} title="Metacritic (critics)">
+        Ⓜ {ratings.metacritic != null ? ratings.metacritic : '–'}
+      </span>
+
       {decider && (
         <a
           href={deciderSearchUrl(title, year)}
