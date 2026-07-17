@@ -14,6 +14,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { getTonight } from '@/lib/tonight';
 import { CourtroomDoors } from '@/components/CourtroomDoors';
+import { QuickRuling } from '@/components/QuickRuling';
 import { TvDetective } from '@/components/TvDetective';
 import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import type { VerdictTier } from '@/lib/types';
@@ -121,21 +122,8 @@ export default async function DiscoverPage() {
           </div>
 
           <div className="space-y-4 lg:pl-1">
-            {/* Quick ruling — one tap, pick right out of the gate */}
-            <Link
-              href="/app/ask?q=surprise%20me%20%E2%80%94%20pick%20something%20great%20for%20tonight"
-              className="block overflow-hidden rounded-2xl border border-gold-400/40 bg-gradient-to-br from-gold-500/15 to-brand-500/10 p-5 transition hover:border-gold-400/70 hover:from-gold-500/20"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-3xl" aria-hidden>🎲</span>
-                <div className="min-w-0">
-                  <div className="text-lg font-black text-white">Quick ruling</div>
-                  <div className="text-sm leading-snug text-slate-300">
-                    Don’t feel like deciding? One tap and the judge picks something great right now.
-                  </div>
-                </div>
-              </div>
-            </Link>
+            {/* Quick ruling — one tap, instant ranked recommendations inline */}
+            <QuickRuling />
 
             {/* TV Guide Detective — one tap scans the next day+ of listings */}
             <TvDetective />
