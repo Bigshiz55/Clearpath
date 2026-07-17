@@ -186,17 +186,7 @@ export function FinderUI({
         {!embedded && <JudgeBench initialJudge={initialJudge} big />}
 
         <div className="card flex flex-col gap-3 p-4">
-          {embedded ? (
-            <span
-              className="grid h-24 w-24 place-items-center rounded-full border-2 border-gold-400/60 bg-gold-500/15 text-6xl shadow-lg"
-              style={{ boxShadow: '0 0 28px rgba(245,198,90,.35)' }}
-              aria-label="The judge"
-            >
-              🧑‍⚖️
-            </span>
-          ) : (
-            <div className="eyebrow-lg">⚖️ Try your case</div>
-          )}
+          {!embedded && <div className="eyebrow-lg">⚖️ Try your case</div>}
           <textarea
             value={text}
             onChange={(e) => onText(e.target.value)}
@@ -219,12 +209,6 @@ export function FinderUI({
           </div>
           <button onClick={find} disabled={loading} className="btn-primary w-full py-3.5 text-lg font-bold">
             {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
-          </button>
-          <button
-            onClick={() => document.getElementById('evidence')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            className="text-xs font-semibold text-slate-400 hover:text-white"
-          >
-            … or make your selections below ↓
           </button>
         </div>
       </div>
@@ -303,7 +287,7 @@ export function FinderUI({
       {/* Prepare your evidence — transparent, editable, no black box. */}
       <div id="evidence" className="card space-y-4 p-4 scroll-mt-20">
         <div className="eyebrow-lg">
-          ⚖️ Prepare your evidence
+          🎛️ Customize your evidence
         </div>
 
         {watchers.length > 0 && (
@@ -368,7 +352,7 @@ export function FinderUI({
             value={q.maxRuntime ?? 240} onChange={(v) => set('maxRuntime', v >= 240 ? null : v)} />
           <Slider label="Released since" readout={releasedReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0)} min={0} max={75} step={1}
             value={q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0} onChange={(years) => set('sinceMonths', years === 0 ? null : years * 12)} />
-          <Slider label="Audience score (TMDB)" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
+          <Slider label="🍿 Popcorn meter (audience)" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
             value={q.minAudience ?? 0} onChange={(v) => set('minAudience', v === 0 ? null : v)} />
           <Slider label="IMDb rating" readout={q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'} min={0} max={9} step={0.5}
             value={q.minImdb ?? 0} onChange={(v) => set('minImdb', v === 0 ? null : v)} accent />

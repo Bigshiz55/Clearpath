@@ -26,7 +26,7 @@ function WelcomeStrip({ isGuest }: { isGuest: boolean }) {
       </button>
       <h2 className="text-lg font-bold text-white">👋 Welcome to WatchVerdict</h2>
       <p className="mt-1 max-w-xl text-sm text-slate-300">
-        Stop scrolling, get rolling. Here’s the 20-second tour:
+        Stop scrolling, get rolling. Here’s the 30-second tour:
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-3">
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">

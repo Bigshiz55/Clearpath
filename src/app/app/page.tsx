@@ -8,13 +8,11 @@ import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictBadge } from '@/components/VerdictBadge';
-import { NewForYou, type DigestItem } from '@/components/NewForYou';
 import { RecommendedForYou } from '@/components/RecommendedForYou';
 import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { getTonight } from '@/lib/tonight';
 import { CourtroomDoors } from '@/components/CourtroomDoors';
-import { QuickRuling } from '@/components/QuickRuling';
 import { TvDetective } from '@/components/TvDetective';
 import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import type { VerdictTier } from '@/lib/types';
@@ -77,102 +75,74 @@ export default async function DiscoverPage() {
 
   const verdicts = (recent as RecentVerdict[] | null) ?? [];
 
-  const { data: digest } = await supabase
-    .from('digest_items')
-    .select('id, tmdb_id, media_type, title, year, poster_path, personal_score, primary_call, reason')
-    .eq('dismissed', false)
-    .order('personal_score', { ascending: false })
-    .limit(8);
-
-  const digestItems = (digest as DigestItem[] | null) ?? [];
+  // Total titles this account has reviewed — shown on the "Prepare for Court" game.
+  const { count: reviewedCount } = await supabase
+    .from('verdicts')
+    .select('id', { count: 'exact', head: true });
 
   return (
     <div className="space-y-8">
-      {/* HERO — decide right here: search, ask, and every tool on one screen. */}
-      <section className="animate-fade-up space-y-6">
-        <div>
-          <h1 className="text-4xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl">
-            Stop scrolling.{' '}
-            <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">
-              Get rolling.
-            </span>
-          </h1>
-          <p className="mt-3 text-base text-slate-400 sm:text-lg">
-            Search a title, ask the judge, or dial in exactly what you want — scored for {label.toLowerCase()}.
-          </p>
-        </div>
+      {/* Vintage Mode — a genuinely simple one-page experience for seniors. */}
+      <div className="flex justify-center">
+        <Link
+          href="/app/vintage"
+          className="inline-flex items-center gap-3 rounded-full border-2 border-amber-400/50 bg-amber-500/10 px-6 py-3 text-lg font-bold text-amber-100 transition hover:bg-amber-500/20"
+        >
+          <span className="text-2xl" aria-hidden>🧓</span> Vintage Mode — big &amp; simple
+        </Link>
+      </div>
 
-        {/* 1 · Search titles — top, full width */}
-        <div className="max-w-3xl">
-          <label className="mb-2 flex items-center gap-2 text-lg font-bold text-white">
-            <span aria-hidden>🔎</span> Search titles
-          </label>
-          <SearchBar />
-        </div>
-
-        {/* Tools on the left, the court on the right */}
-        <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-lg font-bold text-white">
-              <span aria-hidden>⚖️</span> Ask the judge — or dial in every detail
-            </div>
-            {/* All the search tools & sliders, inline: genre, length, released-since,
-                ratings, match, pace, English-audio, all-episodes-out, and Upcoming. */}
-            <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} />
-          </div>
-
-          <div className="space-y-4 lg:pl-1">
-            {/* Quick ruling — one tap, instant ranked recommendations inline */}
-            <QuickRuling />
-
-            {/* TV Guide Detective — one tap scans the next day+ of listings */}
-            <TvDetective />
-
-            {/* The court box — "Can't decide?" doors open to reveal the judge */}
-            <CourtroomDoors initialJudge={judge} />
-          </div>
-        </div>
-      </section>
-
-      {/* Explore — big, inviting tiles for the places people come back to. */}
-      <section>
-        <h2 className="mb-3 text-lg font-semibold text-white">Explore</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {[
-            { href: '/app/quiz', emoji: '🍿', label: 'Taste Quiz', sub: 'Rate fast, sharpen your picks', accent: '#f59e0b' },
-            { href: '/app/new', emoji: '🆕', label: 'New for you', sub: 'Fresh releases, matched to you', accent: '#34d399' },
-            { href: '/app/watchlist', emoji: '📺', label: 'Watchlist', sub: 'Everything you’ve lined up', accent: '#7aa8ff' },
-            { href: '/app/connect', emoji: '📸', label: 'Add from a photo', sub: 'Snap a guide → instant verdicts', accent: '#a78bfa' },
-          ].map((t) => (
-            <Link
-              key={t.href}
-              href={t.href}
-              className="card group relative flex flex-col gap-3 overflow-hidden p-4 transition hover:-translate-y-0.5 hover:border-white/25 hover:shadow-glow"
-            >
-              <span
-                aria-hidden
-                className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-20 blur-xl transition group-hover:opacity-40"
-                style={{ background: t.accent }}
-              />
-              <span
-                className="grid h-12 w-12 place-items-center rounded-2xl text-2xl transition group-hover:scale-105"
-                style={{ background: `${t.accent}1f`, border: `1px solid ${t.accent}55` }}
-              >
-                {t.emoji}
-              </span>
-              <div className="relative">
-                <div className="text-base font-bold text-white">{t.label}</div>
-                <div className="mt-0.5 text-xs leading-snug text-slate-400">{t.sub}</div>
-              </div>
-              <span className="relative text-sm font-semibold text-slate-500 transition group-hover:text-white">Open →</span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
+      {/* Welcome + 30-second tour, right at the top. */}
       <TonightHome tonight={tonight} isGuest={isGuest} />
 
-      {digestItems.length > 0 && <NewForYou items={digestItems} label={label} />}
+      {/* HERO — decide right here: search, ask, and every tool on one screen. */}
+      <section className="animate-fade-up space-y-6">
+        <div className="text-center">
+          <h1 className="text-4xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl">
+            Stop scrolling.{' '}
+            <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">Get rolling.</span>
+          </h1>
+        </div>
+
+        {/* Judge avatar (left) · Search titles (center, narrower) · Prepare-for-Court game (right) */}
+        <div className="mx-auto flex max-w-4xl flex-col items-stretch gap-4 md:flex-row md:items-center">
+          <span
+            className="mx-auto grid h-16 w-16 flex-none place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-gold-500 text-4xl shadow-glow ring-2 ring-gold-300/60 md:mx-0"
+            aria-label="The judge"
+          >
+            ⚖️
+          </span>
+          <div className="min-w-0 flex-1">
+            <label className="mb-2 block text-center text-2xl font-extrabold text-white">🔎 Search titles</label>
+            <SearchBar />
+          </div>
+          <Link
+            href="/app/quiz"
+            className="flex flex-none items-center gap-3 rounded-2xl border border-gold-400/50 bg-gradient-to-br from-gold-500/20 to-brand-500/10 px-5 py-4 text-left transition hover:border-gold-400/80 md:max-w-[210px] md:flex-col md:text-center"
+          >
+            <span className="text-3xl" aria-hidden>🎬</span>
+            <span>
+              <span className="block text-base font-black text-white">Prepare for Court</span>
+              <span className="block text-xs text-slate-300">Rate fast — teach the judge your taste</span>
+              <span className="mt-1 block text-sm font-bold text-gold-300">{reviewedCount ?? 0} reviewed</span>
+            </span>
+          </Link>
+        </div>
+
+        {/* Ask the judge — bigger */}
+        <div>
+          <div className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
+            <span aria-hidden>⚖️</span> Ask the judge
+          </div>
+          <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} />
+        </div>
+
+        {/* TV Guide Detective (left) + Can't-decide court (right) — big, side by side */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <TvDetective />
+          <CourtroomDoors initialJudge={judge} />
+        </div>
+      </section>
 
       <RecommendedForYou label={label} />
 
