@@ -5,6 +5,7 @@ import { SearchBar } from '@/components/SearchBar';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
 import { listCrews } from '@/lib/actions/crews';
 import { getBrowseProviders } from '@/lib/browse';
+import { getUpcomingTv } from '@/lib/onTv';
 import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
 import { tmdbImage } from '@/lib/tmdb/client';
@@ -78,10 +79,13 @@ export default async function DiscoverPage() {
 
   const verdicts = (recent as RecentVerdict[] | null) ?? [];
 
-  // Total titles this account has reviewed — shown on the "Prepare for Court" game.
+  // Total titles this account has reviewed — shown on the taste game.
   const { count: reviewedCount } = await supabase
     .from('verdicts')
     .select('id', { count: 'exact', head: true });
+
+  // A quick 48-hour scan of what's coming on TV, folded into recommendations.
+  const upcomingTv = (await getUpcomingTv(regionFor(profile), Date.now(), 2).catch(() => [])).slice(0, 12);
 
   return (
     <div className="space-y-8">
@@ -148,6 +152,41 @@ export default async function DiscoverPage() {
       </section>
 
       <RecommendedForYou label={label} />
+
+      {upcomingTv.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">📺 Coming up on TV — next 48 hours</h2>
+            <Link href="/app/tv" className="text-sm text-brand-300 hover:underline">
+              Full guide →
+            </Link>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {upcomingTv.map((a) => {
+              const d = new Date(a.airstamp);
+              const when = d.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+              return (
+                <div key={a.id} className="w-40 flex-none rounded-xl border border-white/10 bg-white/[0.04] p-2">
+                  <div className="aspect-[2/3] overflow-hidden rounded-lg bg-ink-800">
+                    {a.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={a.image} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center p-2 text-center text-xs text-slate-400">{a.showName}</div>
+                    )}
+                  </div>
+                  <div className="mt-1.5 line-clamp-1 text-sm font-bold text-white">{a.showName}</div>
+                  <div className="text-xs font-semibold text-brand-200">{when}</div>
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="truncate">{a.network}</span>
+                    {a.rating != null && <span className="flex-none font-bold text-gold-300">★ {a.rating.toFixed(1)}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section>
         <div className="mb-3 flex items-center justify-between">
