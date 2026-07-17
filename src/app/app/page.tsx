@@ -14,7 +14,6 @@ import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { getTonight } from '@/lib/tonight';
 import { CourtroomDoors } from '@/components/CourtroomDoors';
-import { TakeToCourtCard } from '@/components/TakeToCourtCard';
 import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import type { VerdictTier } from '@/lib/types';
 
@@ -141,9 +140,6 @@ export default async function DiscoverPage() {
             </Link>
           </div>
         </div>
-
-        {/* Take them to court — the QR group verdict */}
-        <TakeToCourtCard />
       </section>
 
       {/* Explore — big, inviting tiles for the places people come back to. */}

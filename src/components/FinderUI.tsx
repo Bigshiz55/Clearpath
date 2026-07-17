@@ -170,9 +170,17 @@ export function FinderUI({
         {!embedded && <JudgeBench initialJudge={initialJudge} big />}
 
         <div className="card flex flex-col gap-3 p-4">
-          <div className="eyebrow-lg">
-            ⚖️ Try your case
-          </div>
+          {embedded ? (
+            <span
+              className="grid h-11 w-11 place-items-center rounded-full border border-gold-400/50 bg-gold-500/15 text-2xl shadow-lg"
+              style={{ boxShadow: '0 0 18px rgba(245,198,90,.3)' }}
+              aria-label="The judge"
+            >
+              🧑‍⚖️
+            </span>
+          ) : (
+            <div className="eyebrow-lg">⚖️ Try your case</div>
+          )}
           <textarea
             value={text}
             onChange={(e) => onText(e.target.value)}
