@@ -54,7 +54,7 @@ export default async function DiscoverPage() {
   // and any crew members to score against ("who's watching").
   const services = user ? await getMyServices(supabase, user.id) : [];
   const providerCatalog = await getBrowseProviders(regionFor(profile)).catch(() => []);
-  const topProviders = providerCatalog.slice(0, 15).map((p) => ({ id: p.id, name: p.name }));
+  const topProviders = providerCatalog.slice(0, 60).map((p) => ({ id: p.id, name: p.name }));
   const watchers: WatcherOption[] = [];
   try {
     const { crews } = await listCrews();

@@ -144,6 +144,7 @@ export function FinderUI({
   const [relaxed, setRelaxed] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAllProviders, setShowAllProviders] = useState(false);
 
   function onText(v: string) {
     setText(v);
@@ -352,7 +353,7 @@ export function FinderUI({
             <div>
               <div className="label">What you have</div>
               <div className="flex flex-wrap gap-1.5">
-                {providers.map((p) => {
+                {(showAllProviders ? providers : providers.slice(0, 15)).map((p) => {
                   const on = (q.providerIds ?? []).includes(p.id);
                   return (
                     <button
@@ -364,6 +365,14 @@ export function FinderUI({
                     </button>
                   );
                 })}
+                {providers.length > 15 && (
+                  <button
+                    onClick={() => setShowAllProviders((v) => !v)}
+                    className="rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-300 hover:text-brand-200"
+                  >
+                    {showAllProviders ? 'Show fewer' : `+ ${providers.length - 15} more services`}
+                  </button>
+                )}
               </div>
               <p className="mt-1 text-[11px] text-slate-400">Check the services you have — results prefer what you can watch.</p>
             </div>
