@@ -113,7 +113,7 @@ export function parseRequestedCount(text: string): number {
 // Words that are never part of a person's name — stripped before we treat the
 // remainder as a candidate name to look up (TMDB's search fixes misspellings).
 const NON_NAME =
-  /\b(show|me|find|get|give|recommend|want|looking|for|search|pull|up|list|please|the|some|a|an|of|in|with|starring|featuring|directed|by|top|best|great|good|movies?|films?|shows?|series|tv|episodes?|one|two|three|four|five|six|seven|eight|nine|ten|and|or|over|under|above|below|audience|score|rating|ratings|imdb|percent|match|new|recent|old|classic|funny|scary|sad|happy|short|long|bingeable|comedy|comedies|action|thriller|thrillers|drama|dramas|horror|romance|romantic|documentary|documentaries|sci|fi|fantasy|mystery|crime|western|war|animated|animation|kids|family)\b/g;
+  /\b(show|me|find|get|give|recommend|want|looking|for|search|pull|up|list|please|the|some|a|an|of|in|on|with|starring|featuring|directed|by|top|best|great|good|movies?|films?|shows?|series|tv|episodes?|one|two|three|four|five|six|seven|eight|nine|ten|and|or|over|under|above|below|audience|score|rating|ratings|imdb|percent|match|new|recent|old|classic|latest|popular|trending|today|tonight|tomorrow|now|currently|this|that|week|weekend|night|right|playing|streaming|watch|funny|scary|sad|happy|short|long|bingeable|comedy|comedies|action|thriller|thrillers|drama|dramas|horror|romance|romantic|documentary|documentaries|sci|fi|fantasy|mystery|crime|western|war|animated|animation|kids|family)\b/g;
 
 /**
  * Resolve a person mentioned in the ask to a TMDB id — AI-independent. Strips
@@ -129,8 +129,10 @@ export async function resolvePersonId(text: string): Promise<number | null> {
     .replace(/[^a-z\s'-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  const words = candidate.split(' ').filter(Boolean);
-  if (words.length < 1 || words.length > 4) return null;
+  const words = candidate.split(' ').filter((w) => w.length > 1);
+  // Require a full name (2–4 words) — a single leftover word like "today" or
+  // "tonight" must never be treated as a person and hijack a plain request.
+  if (words.length < 2 || words.length > 4) return null;
   const people = await searchPeople(words.join(' ')).catch(() => []);
   const top = people[0];
   // Require a real, findable person (has known-for credits) to avoid false hits.
