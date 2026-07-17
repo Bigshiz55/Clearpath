@@ -332,7 +332,24 @@ export function FinderUI({
 
         <div>
           <div className="label">Type</div>
-          <Seg value={q.mediaType} onChange={(v) => set('mediaType', v)} options={[{ v: 'any', label: 'Any' }, { v: 'movie', label: 'Movies' }, { v: 'tv', label: 'Shows' }]} />
+          <Seg
+            value={q.liveOnly ? 'live' : q.mediaType === 'movie' ? 'movie' : 'tv'}
+            onChange={(v) =>
+              setQ((prev) => ({
+                ...prev,
+                mediaType: v === 'movie' ? 'movie' : 'tv',
+                liveOnly: v === 'live',
+              }))
+            }
+            options={[
+              { v: 'movie', label: 'Movies' },
+              { v: 'tv', label: 'Shows' },
+              { v: 'live', label: 'Live TV' },
+            ]}
+          />
+          {q.liveOnly && (
+            <p className="mt-1 text-[11px] text-slate-400">Shows with a real upcoming airing — channel & time on each result.</p>
+          )}
         </div>
 
         <div>

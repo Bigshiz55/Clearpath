@@ -22,6 +22,7 @@ function coerceQuery(raw: unknown): FinderQuery {
     streamItOnly: Boolean(q.streamItOnly),
     bingeableOnly: Boolean(q.bingeableOnly),
     upcoming: Boolean(q.upcoming),
+    liveOnly: Boolean(q.liveOnly),
     pace: typeof q.pace === 'number' ? Math.max(0, Math.min(100, q.pace)) : null,
   };
 }

@@ -62,6 +62,8 @@ export interface FinderQuery {
   bingeableOnly: boolean;
   /** Only titles that haven't come out yet (upcoming movies & new shows). */
   upcoming: boolean;
+  /** "Live TV": TV shows that actually have a real upcoming broadcast airing. */
+  liveOnly: boolean;
   /** Desired pace 0 (slow burn) .. 100 (adrenaline); null = any. */
   pace: number | null;
   /** Bias candidates toward titles featuring these TMDB people (with_cast). */
@@ -144,7 +146,8 @@ export async function runFinder(
     scoredFor = profile ? personalLabelFor(profile) : 'Your match';
   }
 
-  const types: MediaType[] = q.mediaType === 'any' ? ['movie', 'tv'] : [q.mediaType];
+  // "Live TV" means TV shows with a real upcoming airing — always TV-only.
+  const types: MediaType[] = q.liveOnly ? ['tv'] : q.mediaType === 'any' ? ['movie', 'tv'] : [q.mediaType];
   const sinceDays = q.sinceMonths ? q.sinceMonths * 30 : undefined;
   const minRating = q.minAudience != null ? q.minAudience / 10 : undefined; // % → 0..10
 
@@ -304,6 +307,21 @@ export async function runFinder(
       : 'Nothing cleared your match bar — here are the closest, honestly labeled.';
     const r = await runFinder(supabase, userId, relaxedQ, watcher);
     items = r.items;
+  }
+
+  // Live TV: enrich a wider pool with real airings and keep only shows that are
+  // actually on the air, best match first.
+  if (q.liveOnly) {
+    const pool = items.slice(0, 16);
+    await Promise.all(
+      pool.map(async (i) => {
+        if (i.airing === undefined) i.airing = await getNextAiring(i.imdbId ?? null);
+      }),
+    );
+    items = pool.filter((i) => i.airing);
+    if (items.length === 0 && !relaxed) {
+      relaxed = 'Nothing you’d love is on live TV in the next while — try Shows, or loosen your filters.';
+    }
   }
 
   const finalItems = items.slice(0, 8);

@@ -14,6 +14,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { getTonight } from '@/lib/tonight';
 import { CourtroomDoors } from '@/components/CourtroomDoors';
+import { TvDetective } from '@/components/TvDetective';
 import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import type { VerdictTier } from '@/lib/types';
 
@@ -99,6 +100,9 @@ export default async function DiscoverPage() {
             Search a title, ask the judge, or dial in exactly what you want — scored for {label.toLowerCase()}.
           </p>
         </div>
+
+        {/* TV Guide Detective — one tap scans the next day+ of listings for picks */}
+        <TvDetective />
 
         {/* 1 · Search titles — top, full width */}
         <div className="max-w-3xl">

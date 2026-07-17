@@ -17,6 +17,7 @@ export const EMPTY_QUERY: FinderQuery = {
   streamItOnly: false,
   bingeableOnly: false,
   upcoming: false,
+  liveOnly: false,
   pace: null,
 };
 
