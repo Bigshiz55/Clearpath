@@ -59,6 +59,8 @@ export interface FinderQuery {
   streamItOnly: boolean;
   /** TV only: every episode of the latest season is out (bingeable now). */
   bingeableOnly: boolean;
+  /** Only titles that haven't come out yet (upcoming movies & new shows). */
+  upcoming: boolean;
   /** Desired pace 0 (slow burn) .. 100 (adrenaline); null = any. */
   pace: number | null;
   /** Bias candidates toward titles featuring these TMDB people (with_cast). */
@@ -161,9 +163,11 @@ export async function runFinder(
           genreIds: q.genreIds,
           providerIds: q.onMyServices && services.length > 0 ? services : undefined,
           region,
-          minRating,
-          minVotes: q.castIds && q.castIds.length > 0 ? 20 : 80, // actor pools are smaller
-          sinceDays,
+          minRating: q.upcoming ? undefined : minRating,
+          // Upcoming titles have no votes/ratings yet, so don't require any.
+          minVotes: q.upcoming ? 0 : q.castIds && q.castIds.length > 0 ? 20 : 80,
+          sinceDays: q.upcoming ? undefined : sinceDays,
+          upcomingDays: q.upcoming ? 365 : undefined,
           maxRuntime: q.maxRuntime ?? undefined,
           castIds: q.castIds,
           maxYear: q.maxYear ?? undefined,
@@ -217,14 +221,17 @@ export async function runFinder(
         if (q.maxYear != null && meta.year != null && meta.year > q.maxYear) return null;
         if (q.minYear != null && meta.year != null && meta.year < q.minYear) return null;
         if (meta.year != null) receipts.push(String(meta.year));
+        // Upcoming: hasn't been released yet. Skip the rating gates below since
+        // unreleased titles have no crowd/critic scores to judge on.
+        if (q.upcoming) receipts.push('upcoming');
         // Audience (TMDB crowd score).
-        if (q.minAudience != null) {
+        if (q.minAudience != null && !q.upcoming) {
           const aud = meta.voteAverage != null ? Math.round(meta.voteAverage * 10) : null;
           if (aud == null || aud < q.minAudience) return null;
           receipts.push(`${aud}% audience`);
         }
         // IMDb rating (from OMDb, when we have it).
-        if (q.minImdb != null) {
+        if (q.minImdb != null && !q.upcoming) {
           if (meta.imdbRating == null || meta.imdbRating < q.minImdb) return null;
           receipts.push(`IMDb ${meta.imdbRating.toFixed(1)}`);
         }

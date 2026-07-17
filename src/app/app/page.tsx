@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { getProfile, personalLabelFor } from '@/lib/profile';
+import { getProfile, personalLabelFor, getMyServices, regionFor } from '@/lib/profile';
 import { SearchBar } from '@/components/SearchBar';
-import { HomeGreeter } from '@/components/HomeGreeter';
+import { FinderUI, type WatcherOption } from '@/components/FinderUI';
+import { listCrews } from '@/lib/actions/crews';
 import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
 import { tmdbImage } from '@/lib/tmdb/client';
@@ -15,7 +16,6 @@ import { getTonight } from '@/lib/tonight';
 import { CourtroomDoors } from '@/components/CourtroomDoors';
 import { TakeToCourtCard } from '@/components/TakeToCourtCard';
 import { getActiveJudge, type Judge } from '@/lib/sponsors';
-import { regionFor } from '@/lib/profile';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -39,8 +39,6 @@ export default async function DiscoverPage() {
   const label = profile ? personalLabelFor(profile) : 'Your match';
   const tonight = await getTonight(supabase, user?.id ?? '', new Date());
   const isGuest = user?.is_anonymous === true;
-  const firstName = profile?.display_name?.trim().split(/\s+/)[0] || null;
-  const greeterName = isGuest ? null : firstName;
 
   let judge: Judge | null = null;
   if (user) {
@@ -49,6 +47,25 @@ export default async function DiscoverPage() {
     } catch {
       /* sponsors optional / pre-migration */
     }
+  }
+
+  // For the on-home finder tools: the user's services (for "only on my services")
+  // and any crew members to score against ("who's watching").
+  const services = user ? await getMyServices(supabase, user.id) : [];
+  const watchers: WatcherOption[] = [];
+  try {
+    const { crews } = await listCrews();
+    const seen = new Set<string>();
+    for (const c of crews ?? []) {
+      for (const p of c.people) {
+        const key = p.name.toLowerCase();
+        if (seen.has(key) || (p.love.length === 0 && p.avoid.length === 0)) continue;
+        seen.add(key);
+        watchers.push({ name: p.name, love: p.love, avoid: p.avoid });
+      }
+    }
+  } catch {
+    /* crews optional */
   }
 
   const { data: recent } = await supabase
@@ -70,72 +87,74 @@ export default async function DiscoverPage() {
 
   return (
     <div className="space-y-8">
-      <section className="animate-fade-up grid items-center gap-6 lg:grid-cols-[1.7fr_1fr]">
-        <div className="min-w-0">
-        <h1 className="text-5xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-7xl">
-          Stop scrolling.{' '}
-          <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">
-            Get rolling.
-          </span>
-        </h1>
-        <p className="mt-4 text-base text-slate-400 sm:text-lg">
-          Tell the judge what you feel like — get a verdict, scored for {label.toLowerCase()}.
-        </p>
-        {/* The main event: talk to the judge. Big prompt, big input — this is the
-            first and largest thing on the page. */}
-        <HomeGreeter name={greeterName} size="lg" className="mt-6 max-w-2xl" />
-        {/* Or just look something up. */}
-        <div className="mt-6 max-w-2xl">
-          <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-300">
-            <span aria-hidden>🔎</span> Or search for a specific movie or show
+      {/* HERO — decide right here: search, ask, and every tool on one screen. */}
+      <section className="animate-fade-up space-y-6">
+        <div>
+          <h1 className="text-4xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl">
+            Stop scrolling.{' '}
+            <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">
+              Get rolling.
+            </span>
+          </h1>
+          <p className="mt-3 text-base text-slate-400 sm:text-lg">
+            Search a title, ask the judge, or dial in exactly what you want — scored for {label.toLowerCase()}.
+          </p>
+        </div>
+
+        {/* 1 · Search titles — top, full width */}
+        <div className="max-w-3xl">
+          <label className="mb-2 flex items-center gap-2 text-base font-semibold text-white">
+            <span aria-hidden>🔎</span> Search titles
           </label>
           <SearchBar />
         </div>
-        {/* Three primary decisions — start a decision, don't browse a menu. */}
-        <div className="mt-5 grid gap-2 sm:grid-cols-3">
-          <Link
-            href="/app/together"
-            className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
-          >
-            👪 Pick for us tonight
-          </Link>
-          <Link
-            href="/app/mood"
-            className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
-          >
-            🎭 By mood
-          </Link>
-          <Link
-            href="/app/finder"
-            className="flex items-center justify-center gap-2 rounded-xl border border-brand-400/50 bg-brand-500/20 px-4 py-3 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/30"
-          >
-            🔎 The Finder
-          </Link>
-        </div>
+
+        {/* Tools on the left, the court on the right */}
+        <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-base font-semibold text-white">
+              <span aria-hidden>⚖️</span> Ask the judge — or dial in every detail
+            </div>
+            {/* All the search tools & sliders, inline: genre, length, released-since,
+                ratings, match, pace, English-audio, all-episodes-out, and Upcoming. */}
+            <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} />
+          </div>
+
+          <div className="space-y-4 lg:pl-1">
+            {/* The court box — doors open to reveal the judge */}
+            <CourtroomDoors initialJudge={judge} />
+
+            {/* Quick ruling — one tap, pick right out of the gate */}
+            <Link
+              href="/app/ask?q=surprise%20me%20%E2%80%94%20pick%20something%20great%20for%20tonight"
+              className="block overflow-hidden rounded-2xl border border-gold-400/40 bg-gradient-to-br from-gold-500/15 to-brand-500/10 p-5 transition hover:border-gold-400/70 hover:from-gold-500/20"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-3xl" aria-hidden>🎲</span>
+                <div className="min-w-0">
+                  <div className="text-lg font-black text-white">Quick ruling</div>
+                  <div className="text-sm leading-snug text-slate-300">
+                    Don’t feel like deciding? One tap and the judge picks something great right now.
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </div>
         </div>
 
-        {/* The courtroom — a box off to the side; doors open to reveal the judge */}
-        <div className="lg:pl-2">
-          <CourtroomDoors initialJudge={judge} />
-        </div>
+        {/* Take them to court — the QR group verdict */}
+        <TakeToCourtCard />
       </section>
-
-      {/* The group differentiator — what the solo homepage can't do. */}
-      <TakeToCourtCard />
 
       {/* Explore — big, inviting tiles for the places people come back to. */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-white">Explore</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {[
-            { href: '/app/finder', emoji: '🔎', label: 'The Finder', sub: 'Dial in exactly what to watch', accent: '#4f86ff' },
-            { href: '/app/chambers', emoji: '⚖️', label: 'Your Chambers', sub: 'Your rank, badges & Watch DNA', accent: '#f5c65a' },
             { href: '/app/quiz', emoji: '🍿', label: 'Taste Quiz', sub: 'Rate fast, sharpen your picks', accent: '#f59e0b' },
-            { href: '/app/docket', emoji: '🗂️', label: 'The Docket', sub: 'This month’s viewing cases', accent: '#f5c65a' },
             { href: '/app/new', emoji: '🆕', label: 'New for you', sub: 'Fresh releases, matched to you', accent: '#34d399' },
             { href: '/app/watchlist', emoji: '📺', label: 'Watchlist', sub: 'Everything you’ve lined up', accent: '#7aa8ff' },
             { href: '/app/connect', emoji: '📸', label: 'Add from a photo', sub: 'Snap a guide → instant verdicts', accent: '#a78bfa' },
-            { href: '/app/cards', emoji: '✨', label: 'Share cards', sub: 'Turn a verdict into a shareable card', accent: '#f472b6' },
           ].map((t) => (
             <Link
               key={t.href}

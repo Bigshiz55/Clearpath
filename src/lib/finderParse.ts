@@ -16,6 +16,7 @@ export const EMPTY_QUERY: FinderQuery = {
   minMatch: null,
   streamItOnly: false,
   bingeableOnly: false,
+  upcoming: false,
   pace: null,
 };
 
@@ -42,6 +43,7 @@ export function describeQuery(q: FinderQuery): string {
   if (q.englishAudioOnly) parts.push('English audio');
   if (q.streamItOnly) parts.push('“watch it” calls only');
   if (q.bingeableOnly) parts.push('fully bingeable');
+  if (q.upcoming) parts.push('upcoming (not out yet)');
   if (q.onMyServices) parts.push('on your services');
   if (q.pace != null) parts.push(q.pace <= 33 ? 'a slow burn' : q.pace >= 67 ? 'high-adrenaline' : 'balanced pace');
   return parts.length ? parts.join(' · ') : 'anything — you didn’t pin down a single rule yet';
@@ -113,6 +115,11 @@ export function naiveParseQuery(input: string): FinderQuery {
   // Bingeable — all episodes out.
   if (/\bbinge\w*\b|all (?:the )?episodes? (?:are )?out\b|finished (?:series|show)\b|complete (?:series|season)\b/.test(t)) {
     q.bingeableOnly = true;
+  }
+
+  // Upcoming — not out yet (upcoming, coming soon, hasn't been released).
+  if (/\bupcoming\b|\bcoming soon\b|\bnot (?:out|released)( yet)?\b|\bhasn'?t (?:come out|been released)\b|\bfuture releases?\b/.test(t)) {
+    q.upcoming = true;
   }
 
   // Pace.

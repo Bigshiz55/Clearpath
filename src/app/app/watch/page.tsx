@@ -51,21 +51,6 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
           <WatchNowGrid items={onFree} />
         </section>
       )}
-      {ready.length === 0 && (
-        <section className="card p-6 text-center">
-          <div className="text-3xl">🎬</div>
-          <h2 className="mt-3 text-lg font-semibold text-white">Nothing on your list is streaming free right now</h2>
-          <p className="mx-auto mt-1 max-w-md text-sm text-slate-400">
-            {services.length === 0
-              ? 'Add your streaming services so we can spotlight what you can already watch — anything on your watchlist that’s on your plans shows up here.'
-              : 'Nothing on your watchlist is on your services or free at the moment. Try “Browse everything”, or check the free picks below.'}
-          </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {services.length === 0 && <Link href="/app/settings" className="btn-primary">Pick my services</Link>}
-            <Link href="/app/watchlist" className="btn-secondary">Go to my watchlist</Link>
-          </div>
-        </section>
-      )}
       {free.length > 0 && (
         <section>
           <h2 className="mb-1 text-lg font-semibold text-white">🍿 Free to watch tonight</h2>

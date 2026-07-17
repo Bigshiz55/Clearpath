@@ -109,10 +109,13 @@ export function FinderUI({
   hasServices,
   watchers = [],
   initialJudge = null,
+  embedded = false,
 }: {
   hasServices: boolean;
   watchers?: WatcherOption[];
   initialJudge?: Judge | null;
+  /** On the home screen the judge already lives elsewhere, so hide the bench. */
+  embedded?: boolean;
 }) {
   const [text, setText] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
@@ -163,8 +166,8 @@ export function FinderUI({
   return (
     <div className="space-y-5">
       {/* Hero — the judge & the bench on the left, your plain-English ask on the right */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <JudgeBench initialJudge={initialJudge} big />
+      <div className={`grid gap-4 ${embedded ? '' : 'lg:grid-cols-2'}`}>
+        {!embedded && <JudgeBench initialJudge={initialJudge} big />}
 
         <div className="card flex flex-col gap-3 p-4">
           <div className="eyebrow-lg">
@@ -376,6 +379,13 @@ export function FinderUI({
               {q.bingeableOnly ? '✓ ' : ''}📺 All episodes out
             </button>
           )}
+          <button
+            onClick={() => set('upcoming', !q.upcoming)}
+            title="Only titles that haven't come out yet — upcoming movies and brand-new shows. Something else nobody else lets you search."
+            className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.upcoming ? 'border-amber-400/50 bg-amber-500/15 text-amber-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+          >
+            {q.upcoming ? '✓ ' : ''}🔮 Upcoming only
+          </button>
           <button
             onClick={() => set('onMyServices', !q.onMyServices)}
             disabled={!hasServices}
