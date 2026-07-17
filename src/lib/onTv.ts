@@ -1,5 +1,6 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
+import { getCriticRatings } from '@/lib/omdb';
 
 /**
  * "On TV Today" — a real broadcast schedule, powered by TVmaze (free, no key).
@@ -26,6 +27,10 @@ export interface Airing {
   image: string | null;
   summary: string | null; // plain text
   imdb: string | null;
+  // Critic scores (OMDb, matched by imdb id) — filled by enrichAiringsWithCritics.
+  criticImdb?: number | null; // 0..10
+  criticRt?: number | null; // 0..100
+  criticMeta?: number | null; // 0..100
 }
 
 interface TvmazeShow {
@@ -118,6 +123,24 @@ async function fetchJson(url: string): Promise<TvmazeAiring[]> {
   if (!res || !res.ok) return [];
   const data = (await res.json().catch(() => [])) as TvmazeAiring[];
   return Array.isArray(data) ? data : [];
+}
+
+/**
+ * Attach IMDb / Rotten Tomatoes / Metacritic scores to airings, matched by the
+ * show's imdb id via OMDb (which caches 6h). Bounded by `cap` and spent on the
+ * best-rated first, so a full listings page never blows OMDb's limits.
+ */
+export async function enrichAiringsWithCritics(airings: Airing[], cap = 30): Promise<Airing[]> {
+  const ranked = [...airings].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+  const enrichIds = new Set(ranked.slice(0, cap).map((a) => a.id));
+  return Promise.all(
+    airings.map(async (a) => {
+      if (!a.imdb || !enrichIds.has(a.id)) return a;
+      const c = await getCriticRatings(a.imdb).catch(() => null);
+      if (!c) return a;
+      return { ...a, criticImdb: c.imdbRating ?? null, criticRt: c.rottenTomatoes ?? null, criticMeta: c.metascore ?? null };
+    }),
+  );
 }
 
 export interface NextAiring {

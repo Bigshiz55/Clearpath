@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
-import { getOnTvToday, getStreamingToday } from '@/lib/onTv';
+import { getOnTvToday, getStreamingToday, enrichAiringsWithCritics } from '@/lib/onTv';
 import { OnTvTabs } from '@/components/OnTvTabs';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
 import { TvDetective } from '@/components/TvDetective';
@@ -25,7 +25,12 @@ export default async function OnTvPage() {
 
   const now = new Date();
   const date = isoDate(now);
-  const [airings, streaming] = await Promise.all([getOnTvToday(region, date), getStreamingToday(date)]);
+  const [airingsRaw, streamingRaw] = await Promise.all([getOnTvToday(region, date), getStreamingToday(date)]);
+  // Add IMDb / Rotten Tomatoes / Metacritic to the placards (cached, bounded).
+  const [airings, streaming] = await Promise.all([
+    enrichAiringsWithCritics(airingsRaw),
+    enrichAiringsWithCritics(streamingRaw),
+  ]);
 
   // Which airings this user already has a reminder for (guarded pre-migration),
   // plus the upcoming ones to list at the top.

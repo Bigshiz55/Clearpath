@@ -101,6 +101,7 @@ export function OnTvGuide({
   const [network, setNetwork] = useState<string | null>(null);
   const [hideNoise, setHideNoise] = useState(!streaming);
   const [showAllNetworks, setShowAllNetworks] = useState(false);
+  const [media, setMedia] = useState<'all' | 'movie' | 'tv'>('all');
 
   const nowMin = useMemo(() => {
     const d = new Date();
@@ -119,6 +120,8 @@ export function OnTvGuide({
   const filtered = useMemo(() => {
     let list = airings;
     if (hideNoise) list = list.filter((a) => !NOISE_TYPES.has(a.showType));
+    if (media === 'movie') list = list.filter((a) => a.showType === 'Movie');
+    else if (media === 'tv') list = list.filter((a) => a.showType !== 'Movie');
     if (network) list = list.filter((a) => a.network === network);
     if (!streaming) {
       if (time === 'primetime') list = list.filter((a) => a.minutes >= 18 * 60 && a.minutes <= 23 * 60);
@@ -128,7 +131,7 @@ export function OnTvGuide({
     if (sort === 'rating') sorted.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
     else sorted.sort((a, b) => a.minutes - b.minutes);
     return sorted;
-  }, [airings, hideNoise, network, time, sort, nowMin, streaming]);
+  }, [airings, hideNoise, network, time, sort, nowMin, streaming, media]);
 
   // Highlights — best-rated picks (prime-time for broadcast; overall for streaming).
   const highlights = useMemo(() => {
@@ -212,6 +215,11 @@ export function OnTvGuide({
             </div>
           )}
           <div className="inline-flex rounded-lg border border-white/12 bg-white/5 p-0.5">
+            {([['all', 'All'], ['movie', 'Movies'], ['tv', 'Shows']] as const).map(([v, label]) => (
+              <button key={v} onClick={() => setMedia(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${media === v ? 'bg-brand-500 text-white shadow-glow' : 'text-slate-300 hover:text-white'}`}>{label}</button>
+            ))}
+          </div>
+          <div className="inline-flex rounded-lg border border-white/12 bg-white/5 p-0.5">
             {([['time', streaming ? 'Default' : 'By time'], ['rating', 'Top rated']] as const).map(([v, label]) => (
               <button key={v} onClick={() => setSort(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${sort === v ? 'bg-brand-500 text-white shadow-glow' : 'text-slate-300 hover:text-white'}`}>{label}</button>
             ))}
@@ -284,6 +292,17 @@ export function OnTvGuide({
                     {a.season && a.number ? ` (S${a.season}E${a.number})` : ''}
                     {a.genres.length ? ` · ${a.genres.slice(0, 2).join(', ')}` : ''}
                   </div>
+                  {(a.criticRt != null || a.criticImdb != null || a.criticMeta != null) && (
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-bold tabular-nums">
+                      {a.criticRt != null && (
+                        <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {a.criticRt}%</span>
+                      )}
+                      {a.criticImdb != null && (
+                        <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>
+                      )}
+                      {a.criticMeta != null && <span className="text-sky-300" title="Metacritic">Ⓜ {a.criticMeta}</span>}
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-none items-center gap-1.5">
                   <button
