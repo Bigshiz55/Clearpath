@@ -142,9 +142,22 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => results.length && setOpen(true)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && looksLikeRequest(q)) {
-              e.preventDefault();
-              fileWithJudge(q);
+            if (e.key !== 'Enter') return;
+            const query = q.trim();
+            if (query.length < 2) return;
+            e.preventDefault();
+            // Enter always acts: a request goes to the judge; otherwise open the
+            // top matching title; if there's no match yet, hand it to the judge.
+            if (looksLikeRequest(query)) {
+              fileWithJudge(query);
+              return;
+            }
+            const top = results[0];
+            if (top) {
+              setOpen(false);
+              router.push(`/app/title/${top.mediaType}/${top.id}`);
+            } else {
+              fileWithJudge(query);
             }
           }}
           placeholder="Search a title — or ask for what you want…"
