@@ -164,7 +164,9 @@ export function FinderUI({
       const res = await fetch('/api/finder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, watcher }),
+        // Send the raw ask too, so the server can parse it smartly (actor names,
+        // counts, "over 70%", etc.). Falls back to the tools below when empty.
+        body: JSON.stringify({ query: q, text: text.trim(), watcher }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed');

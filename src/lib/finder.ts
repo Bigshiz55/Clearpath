@@ -123,6 +123,7 @@ export async function runFinder(
   userId: string,
   q: FinderQuery,
   watcher?: Watcher | null,
+  limit = 8,
 ): Promise<FinderResult> {
   const profile = await getProfile(supabase, userId);
   const region = regionFor(profile);
@@ -305,7 +306,7 @@ export async function runFinder(
     relaxed = q.onMyServices
       ? 'Nothing matched all of that on your services — here are the closest picks anywhere.'
       : 'Nothing cleared your match bar — here are the closest, honestly labeled.';
-    const r = await runFinder(supabase, userId, relaxedQ, watcher);
+    const r = await runFinder(supabase, userId, relaxedQ, watcher, limit);
     items = r.items;
   }
 
@@ -324,7 +325,7 @@ export async function runFinder(
     }
   }
 
-  const finalItems = items.slice(0, 8);
+  const finalItems = items.slice(0, Math.max(1, Math.min(limit, 20)));
   // Attach the real next airing (channel + time) to every TV result, so "ask for
   // a show" always shows where and when it's on. Best-effort; null when unknown.
   await Promise.all(
