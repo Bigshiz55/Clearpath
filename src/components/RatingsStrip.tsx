@@ -1,5 +1,5 @@
 import type { TileRatings } from '@/lib/ratings';
-import { deciderSearchUrl, hasAnyRating } from '@/lib/ratings';
+import { deciderSearchUrl } from '@/lib/ratings';
 
 function tomatoColor(pct: number): string {
   return pct >= 60 ? 'text-red-300' : 'text-emerald-300';
@@ -29,10 +29,25 @@ export function RatingsStrip({
   if (loading) {
     return <div className={`h-4 w-24 animate-pulse rounded bg-white/10 ${className}`} />;
   }
-  if (!hasAnyRating(ratings) && !decider) return null;
+
+  // Our own Stream It / Skip It call, on every card. Derived from the blended
+  // score; "NA" only when there's genuinely no score to judge (e.g. unreleased).
+  const verdict = ratings.standardScore == null ? 'na' : ratings.standardScore >= 55 ? 'stream' : 'skip';
 
   return (
     <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold tabular-nums ${className}`}>
+      <span
+        className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-black ${
+          verdict === 'stream'
+            ? 'bg-emerald-500/20 text-emerald-200'
+            : verdict === 'skip'
+              ? 'bg-red-500/20 text-red-200'
+              : 'bg-white/10 text-slate-300'
+        }`}
+        title="WatchVerdict's Stream It or Skip It call for this title"
+      >
+        {verdict === 'stream' ? '✅ STREAM IT' : verdict === 'skip' ? '⛔ SKIP IT' : 'STREAM/SKIP: NA'}
+      </span>
       {standard && ratings.standardScore != null && (
         <span className="inline-flex items-center gap-0.5 text-gold-400" title="WatchVerdict Standard Score — blended across every rating source we have">
           ⚖️ {ratings.standardScore}

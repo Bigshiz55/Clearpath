@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getScoringData } from '@/lib/titleData';
 import { computeGeneralScore } from '@/lib/scoring/general';
-import { tileRatingsFromScore, EMPTY_TILE_RATINGS } from '@/lib/ratings';
+import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 
 export const runtime = 'nodejs';
 
@@ -19,7 +19,17 @@ export async function GET(_req: Request, { params }: { params: { type: string; i
   }
   try {
     const { meta, providers } = await getScoringData(mediaType, id, 'US');
-    const ratings = tileRatingsFromScore(computeGeneralScore(meta, providers));
+    const general = computeGeneralScore(meta, providers);
+    // Build straight from metadata so every card reliably gets the verdict
+    // (standardScore) and the real critic scores + Popcorn when available.
+    const ratings: TileRatings = {
+      standardScore: general.standardScore ?? general.score,
+      audience: meta.voteAverage != null ? Math.round(meta.voteAverage * 10) : null,
+      rtAudience: meta.rtAudience ?? null,
+      tomatometer: meta.rottenTomatoes ?? null,
+      imdb: meta.imdbRating ?? null,
+      metacritic: meta.metascore ?? null,
+    };
     return NextResponse.json(
       { ratings },
       { headers: { 'Cache-Control': 'public, s-maxage=43200, stale-while-revalidate=86400' } },
