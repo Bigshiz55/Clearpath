@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getSharedTitleData } from '@/lib/titleData';
 import { computeGeneralScore } from '@/lib/scoring/general';
-import { tileRatingsFromScore } from '@/lib/ratings';
+import type { TileRatings } from '@/lib/ratings';
 import { streamingNames } from '@/lib/services';
 import { getProfile, regionFor } from '@/lib/profile';
 import { tmdbImage } from '@/lib/tmdb/image';
@@ -31,7 +31,16 @@ export async function GET(req: Request, { params }: { params: { type: string; id
 
     const { meta, providers } = await getSharedTitleData(mediaType, id, region);
     const general = computeGeneralScore(meta, providers);
-    const ratings = tileRatingsFromScore(general);
+    // Build ratings straight from the metadata so every card shows what we have:
+    // TMDB audience is always present; IMDb/RT/Metacritic fill in when available.
+    const ratings: TileRatings = {
+      standardScore: general.standardScore ?? general.score,
+      audience: meta.voteAverage != null ? Math.round(meta.voteAverage * 10) : null,
+      rtAudience: meta.rtAudience ?? null,
+      tomatometer: meta.rottenTomatoes ?? null,
+      imdb: meta.imdbRating ?? null,
+      metacritic: meta.metascore ?? null,
+    };
     const where = providers ? streamingNames(providers.options).slice(0, 4) : [];
 
     const runtime =
