@@ -55,6 +55,8 @@ export interface FinderQuery {
   minImdb: number | null; // 0..10 — minimum IMDb rating
   englishAudioOnly: boolean;
   onMyServices: boolean;
+  /** Explicit streaming provider ids to require (the on-home service checkboxes). */
+  providerIds?: number[];
   minMatch: number | null; // 0..100
   /** Only titles our verdict rules WATCH IT ("Stream It"). */
   streamItOnly: boolean;
@@ -169,7 +171,12 @@ export async function runFinder(
       [1, 2].map((page) =>
         discoverTitles(mt, {
           genreIds: q.genreIds,
-          providerIds: q.onMyServices && services.length > 0 ? services : undefined,
+          providerIds:
+            q.providerIds && q.providerIds.length > 0
+              ? q.providerIds
+              : q.onMyServices && services.length > 0
+                ? services
+                : undefined,
           region,
           minRating: q.upcoming ? undefined : minRating,
           // Upcoming titles have no votes/ratings yet, so don't require any.

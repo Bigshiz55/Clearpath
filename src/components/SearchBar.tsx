@@ -39,7 +39,10 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
   // treated as a title search as before.
   function looksLikeRequest(text: string): boolean {
     const t = text.toLowerCase();
-    if (/\b(find|recommend|something|anything|give me|show me|what should|in the mood|tonight|binge|under|over|less than|minutes|hours|recent|new|funny|scary|match|audience|episodes?)\b/.test(t)) return true;
+    if (/\b(find|recommend|something|anything|give me|show me|what should|in the mood|tonight|binge|under|over|less than|minutes|hours|recent|new|funny|scary|match|audience|episodes?|movies|films|starring|directed by)\b/.test(t)) return true;
+    // "3 sylvester stallone movies", "five comedies" — a count + a plural noun is a
+    // request, not a single title. Send it to the judge (which corrects spelling).
+    if (/^\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/.test(t) && /\b(movie|film|show|series|comed|thriller|drama|pick)/.test(t)) return true;
     return text.trim().split(/\s+/).length >= 5;
   }
   function fileWithJudge(text: string) {

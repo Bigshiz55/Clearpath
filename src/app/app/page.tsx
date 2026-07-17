@@ -4,6 +4,7 @@ import { getProfile, personalLabelFor, getMyServices, regionFor } from '@/lib/pr
 import { SearchBar } from '@/components/SearchBar';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
 import { listCrews } from '@/lib/actions/crews';
+import { getBrowseProviders } from '@/lib/browse';
 import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
 import { tmdbImage } from '@/lib/tmdb/client';
@@ -51,6 +52,8 @@ export default async function DiscoverPage() {
   // For the on-home finder tools: the user's services (for "only on my services")
   // and any crew members to score against ("who's watching").
   const services = user ? await getMyServices(supabase, user.id) : [];
+  const providerCatalog = await getBrowseProviders(regionFor(profile)).catch(() => []);
+  const topProviders = providerCatalog.slice(0, 15).map((p) => ({ id: p.id, name: p.name }));
   const watchers: WatcherOption[] = [];
   try {
     const { crews } = await listCrews();
@@ -122,7 +125,7 @@ export default async function DiscoverPage() {
           >
             <span className="text-3xl" aria-hidden>🎬</span>
             <span>
-              <span className="block text-base font-black text-white">Prepare for Court</span>
+              <span className="block text-base font-black text-white">The Taste Game</span>
               <span className="block text-xs text-slate-300">Rate fast — teach the judge your taste</span>
               <span className="mt-1 block text-sm font-bold text-gold-300">{reviewedCount ?? 0} reviewed</span>
             </span>
@@ -134,7 +137,7 @@ export default async function DiscoverPage() {
           <div className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
             <span aria-hidden>⚖️</span> Ask the judge
           </div>
-          <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} />
+          <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} providers={topProviders} />
         </div>
 
         {/* TV Guide Detective (left) + Can't-decide court (right) — big, side by side */}

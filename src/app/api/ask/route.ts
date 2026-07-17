@@ -4,6 +4,7 @@ import { runFinder, type FinderQuery, type Watcher } from '@/lib/finder';
 import { askJudgeTitle } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
+import { parseAskWithAI } from '@/lib/askParse';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -19,6 +20,9 @@ function coerceQuery(raw: unknown): FinderQuery {
     minImdb: typeof q.minImdb === 'number' ? q.minImdb : null,
     englishAudioOnly: Boolean(q.englishAudioOnly),
     onMyServices: Boolean(q.onMyServices),
+    providerIds: Array.isArray(q.providerIds)
+      ? q.providerIds.map(Number).filter((n) => Number.isFinite(n)).slice(0, 20)
+      : undefined,
     minMatch: typeof q.minMatch === 'number' ? q.minMatch : null,
     streamItOnly: Boolean(q.streamItOnly),
     bingeableOnly: Boolean(q.bingeableOnly),
@@ -50,8 +54,17 @@ export async function POST(req: Request) {
       if (titled) return NextResponse.json({ kind: 'title', ...titled });
     }
 
-    // 2) Otherwise fall back to constraint-based discovery (the Finder).
-    const query: FinderQuery = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
+    // 2) Otherwise → smart discovery. Let the LLM parse the ask (handles
+    // misspellings, actor names, counts); fall back to the regex parser.
+    let query: FinderQuery;
+    let limit = 8;
+    const ai = text ? await parseAskWithAI(text) : null;
+    if (ai) {
+      query = ai.query;
+      limit = ai.limit;
+    } else {
+      query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
+    }
 
     let watcher: Watcher | null = null;
     const w = body.watcher as Partial<Watcher> | undefined;
@@ -59,7 +72,7 @@ export async function POST(req: Request) {
       watcher = { name: w.name.slice(0, 40), love: w.love.map(String).slice(0, 12), avoid: w.avoid.map(String).slice(0, 12) };
     }
 
-    const result = await runFinder(supabase, user.id, query, watcher);
+    const result = await runFinder(supabase, user.id, query, watcher, limit);
     return NextResponse.json({
       kind: 'search',
       query,

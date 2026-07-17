@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { SearchBar } from '@/components/SearchBar';
 import { QuickRuling } from '@/components/QuickRuling';
 import { TvDetective } from '@/components/TvDetective';
+import { VintageScale } from '@/components/VintageScale';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Vintage Mode · WatchVerdict' };
@@ -31,6 +32,7 @@ function BigLink({ href, emoji, label, sub }: { href: string; emoji: string; lab
 export default function VintagePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-7 px-2 pb-20">
+      <VintageScale />
       <header className="text-center">
         <div className="text-6xl" aria-hidden>🧓</div>
         <h1 className="mt-2 text-4xl font-black tracking-tight text-white">Vintage Mode</h1>
@@ -61,7 +63,7 @@ export default function VintagePage() {
       {/* Big simple buttons for the rest */}
       <section className="grid gap-4">
         <BigLink href="/app/tv" emoji="📺" label="What’s on TV now" sub="Live channels and times, big and clear" />
-        <BigLink href="/app/quiz" emoji="⭐" label="Rate movies (fun game)" sub="A few taps teaches us what you like" />
+        <BigLink href="/app/quiz" emoji="⭐" label="Play the Taste Game" sub="A few taps teaches us what you like" />
         <BigLink href="/app/reminders" emoji="🔔" label="My reminders" sub="Shows you asked to be reminded about" />
         <BigLink href="/app/watchlist" emoji="📝" label="My list" sub="Everything you’ve saved to watch" />
       </section>

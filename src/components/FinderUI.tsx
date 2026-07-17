@@ -126,12 +126,15 @@ export function FinderUI({
   watchers = [],
   initialJudge = null,
   embedded = false,
+  providers = [],
 }: {
   hasServices: boolean;
   watchers?: WatcherOption[];
   initialJudge?: Judge | null;
   /** On the home screen the judge already lives elsewhere, so hide the bench. */
   embedded?: boolean;
+  /** Top streaming services to offer as "what I have" checkboxes. */
+  providers?: { id: number; name: string }[];
 }) {
   const [text, setText] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
@@ -154,6 +157,12 @@ export function FinderUI({
       ...prev,
       genreIds: prev.genreIds.includes(id) ? prev.genreIds.filter((g) => g !== id) : [...prev.genreIds, id],
     }));
+  }
+  function toggleProvider(id: number) {
+    setQ((prev) => {
+      const cur = prev.providerIds ?? [];
+      return { ...prev, providerIds: cur.includes(id) ? cur.filter((p) => p !== id) : [...cur, id] };
+    });
   }
 
   async function find() {
@@ -316,25 +325,48 @@ export function FinderUI({
           </div>
         )}
 
-        <div>
-          <div className="label">Type</div>
-          <Seg
-            value={q.liveOnly ? 'live' : q.mediaType === 'movie' ? 'movie' : 'tv'}
-            onChange={(v) =>
-              setQ((prev) => ({
-                ...prev,
-                mediaType: v === 'movie' ? 'movie' : 'tv',
-                liveOnly: v === 'live',
-              }))
-            }
-            options={[
-              { v: 'movie', label: 'Movies' },
-              { v: 'tv', label: 'Shows' },
-              { v: 'live', label: 'Live TV' },
-            ]}
-          />
-          {q.liveOnly && (
-            <p className="mt-1 text-[11px] text-slate-400">Shows with a real upcoming airing — channel & time on each result.</p>
+        <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-start">
+          <div>
+            <div className="label">Type</div>
+            <Seg
+              value={q.liveOnly ? 'live' : q.mediaType === 'movie' ? 'movie' : 'tv'}
+              onChange={(v) =>
+                setQ((prev) => ({
+                  ...prev,
+                  mediaType: v === 'movie' ? 'movie' : 'tv',
+                  liveOnly: v === 'live',
+                }))
+              }
+              options={[
+                { v: 'movie', label: 'Movies' },
+                { v: 'tv', label: 'Shows' },
+                { v: 'live', label: 'Live TV' },
+              ]}
+            />
+            {q.liveOnly && (
+              <p className="mt-1 text-[11px] text-slate-400">Shows with a real upcoming airing — channel & time on each result.</p>
+            )}
+          </div>
+
+          {providers.length > 0 && (
+            <div>
+              <div className="label">What you have</div>
+              <div className="flex flex-wrap gap-1.5">
+                {providers.map((p) => {
+                  const on = (q.providerIds ?? []).includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => toggleProvider(p.id)}
+                      className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${on ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                    >
+                      {on ? '✓ ' : ''}{p.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">Check the services you have — results prefer what you can watch.</p>
+            </div>
           )}
         </div>
 

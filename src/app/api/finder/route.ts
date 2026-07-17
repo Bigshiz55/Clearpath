@@ -52,6 +52,9 @@ function coerceQuery(raw: unknown): FinderQuery {
     minImdb: typeof q.minImdb === 'number' ? q.minImdb : null,
     englishAudioOnly: Boolean(q.englishAudioOnly),
     onMyServices: Boolean(q.onMyServices),
+    providerIds: Array.isArray(q.providerIds)
+      ? q.providerIds.map(Number).filter((n) => Number.isFinite(n)).slice(0, 20)
+      : undefined,
     minMatch: typeof q.minMatch === 'number' ? q.minMatch : null,
     streamItOnly: Boolean(q.streamItOnly),
     bingeableOnly: Boolean(q.bingeableOnly),

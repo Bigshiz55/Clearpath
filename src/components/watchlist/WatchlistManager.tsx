@@ -35,7 +35,7 @@ const STATUSES: { value: WatchlistStatus | 'all'; label: string }[] = [
 
 const STATUS_OPTIONS: WatchlistStatus[] = ['strict', 'possible', 'watching', 'watched', 'paused', 'dropped'];
 
-type SortKey = 'added' | 'title' | 'rating';
+type SortKey = 'added' | 'watched' | 'title' | 'rating';
 
 export function WatchlistManager({ items: initial }: { items: WatchlistItem[] }) {
   const toast = useToast();
@@ -55,6 +55,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
     const sorted = [...list];
     if (sort === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
     else if (sort === 'rating') sorted.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+    else if (sort === 'watched') sorted.sort((a, b) => (b.watched_at ?? '').localeCompare(a.watched_at ?? ''));
     else sorted.sort((a, b) => b.added_at.localeCompare(a.added_at));
     return sorted;
   }, [items, filter, query, sort]);
@@ -114,6 +115,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
             aria-label="Sort watchlist"
           >
             <option value="added">Recently added</option>
+            <option value="watched">Recently watched</option>
             <option value="title">Title A–Z</option>
             <option value="rating">Your rating</option>
           </select>
