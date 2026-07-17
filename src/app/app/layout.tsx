@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, ensureGuestProfile, personalLabelFor } from '@/lib/profile';
 import { Nav } from '@/components/Nav';
+import { NavArrows } from '@/components/NavArrows';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-dvh pb-20 sm:pb-0">
       <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} />
-      <main className="container-page py-6">{children}</main>
+      <main className="container-page py-6">
+        <NavArrows />
+        {children}
+      </main>
     </div>
   );
 }
