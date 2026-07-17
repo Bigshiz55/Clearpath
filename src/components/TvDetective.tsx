@@ -96,7 +96,7 @@ export function TvDetective() {
       <div className="flex items-start gap-4">
         <span className="text-4xl" aria-hidden>🕵️</span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold text-white sm:text-xl">The TV Detective</h2>
+          <h2 className="text-lg font-bold text-white sm:text-xl">TV Guide Detective</h2>
           <p className="mt-1 text-sm text-slate-300">
             One tap and I’ll comb the <span className="font-semibold text-white">next 48 hours</span> of TV listings and
             hand you a shortlist worth recording or catching live — with the time, the channel, and every rating I can dig up.
