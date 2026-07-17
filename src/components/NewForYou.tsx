@@ -7,6 +7,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import { dismissDigestItem } from '@/lib/actions/digest';
 import { ReasonText } from '@/components/ReasonText';
 import { CardRatings } from '@/components/CardRatings';
+import { SaveButton } from '@/components/SaveButton';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import type { MediaType } from '@/lib/types';
 
@@ -44,13 +45,22 @@ export function NewForYou({ items, label }: { items: DigestItem[]; label: string
           const v = verdictVisualForCall(item.primary_call);
           return (
             <div key={item.id} className={`card group relative overflow-hidden border ${v.border}`}>
-              <button
-                onClick={() => dismiss(item.id)}
-                className="absolute right-1.5 top-1.5 z-10 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-slate-300 backdrop-blur transition hover:bg-black/80 hover:text-white"
-                aria-label={`Dismiss ${item.title}`}
-              >
-                ✕
-              </button>
+              <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1.5">
+                <SaveButton
+                  tmdbId={item.tmdb_id}
+                  mediaType={item.media_type}
+                  title={item.title}
+                  year={item.year}
+                  posterPath={item.poster_path}
+                />
+                <button
+                  onClick={() => dismiss(item.id)}
+                  className="grid h-7 w-7 place-items-center rounded-full bg-black/60 text-slate-300 backdrop-blur transition hover:bg-black/80 hover:text-white"
+                  aria-label={`Dismiss ${item.title}`}
+                >
+                  ✕
+                </button>
+              </div>
               <Link href={`/app/title/${item.media_type}/${item.tmdb_id}`} className="block">
                 <div className="relative aspect-[2/3] overflow-hidden">
                   <Poster posterUrl={tmdbImage(item.poster_path, 'w342')} title={item.title} className="transition group-hover:scale-105" />

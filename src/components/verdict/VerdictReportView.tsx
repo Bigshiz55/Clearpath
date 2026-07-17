@@ -146,11 +146,24 @@ export function VerdictReportView({
               </div>
             )}
             {t.overview && <p className="mt-3 max-w-2xl text-sm text-slate-300">{t.overview}</p>}
-            {t.trailerUrl && (
-              <a href={t.trailerUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary mt-4 inline-flex">
-                ▶ Watch trailer
-              </a>
-            )}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {t.trailerUrl && (
+                <a href={t.trailerUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex">
+                  ▶ Watch trailer
+                </a>
+              )}
+              {/* Save it right from the placard — same list as everywhere else. */}
+              <SaveButton
+                tmdbId={t.id}
+                mediaType={t.mediaType}
+                title={t.title}
+                year={t.year}
+                posterPath={t.posterPath}
+                initialSaved={watchState?.itemId != null}
+                initialItemId={watchState?.itemId ?? null}
+                variant="inline"
+              />
+            </div>
           </div>
         </div>
       </header>

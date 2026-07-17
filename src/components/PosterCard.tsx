@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { MediaType } from '@/lib/types';
 import { CardRatings } from './CardRatings';
+import { SaveButton } from './SaveButton';
 
 interface PosterCardProps {
   href?: string;
@@ -8,9 +9,14 @@ interface PosterCardProps {
   year?: number | null;
   mediaType: MediaType;
   posterUrl?: string | null;
+  /** TMDB poster path (e.g. "/abc.jpg") — stored on the saved item's thumbnail. */
+  posterPath?: string | null;
+  tmdbId?: number;
   meta?: string;
   children?: React.ReactNode;
-  /** Rendered in the top-right corner of the poster (e.g. a save button). */
+  /** Rendered in the top-right corner of the poster (e.g. a save button).
+   *  When omitted, a default "＋ add to your list" button is shown automatically,
+   *  so every placard has a way to save it. Pass `null` to suppress it. */
   overlay?: React.ReactNode;
 }
 
@@ -36,10 +42,22 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
   );
 }
 
-export function PosterCard({ href, title, year, mediaType, posterUrl, meta, children, overlay }: PosterCardProps) {
+export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay }: PosterCardProps) {
   const poster = (
     <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04]" />
   );
+
+  // Every placard gets a "＋ save" affordance. If the caller didn't supply its
+  // own overlay, and we can identify the title (an explicit id or one parsed
+  // from the href), drop in a default SaveButton. `overlay={null}` opts out.
+  const hrefId = href?.match(/\/app\/title\/(?:movie|tv)\/(\d+)/)?.[1];
+  const saveId = tmdbId ?? (hrefId ? Number(hrefId) : null);
+  const resolvedOverlay =
+    overlay !== undefined
+      ? overlay
+      : saveId != null
+        ? <SaveButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+        : null;
   const heading = (
     <>
       <div className="line-clamp-2 text-sm font-semibold text-white">{title}</div>
@@ -60,7 +78,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, meta, chil
         <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 backdrop-blur">
           {mediaType === 'movie' ? 'Movie' : 'TV'}
         </span>
-        {overlay && <div className="absolute right-2 top-2 z-10">{overlay}</div>}
+        {resolvedOverlay && <div className="absolute right-2 top-2 z-10">{resolvedOverlay}</div>}
       </div>
       <div className="p-3">
         {href ? <Link href={href} className="block">{heading}</Link> : heading}
