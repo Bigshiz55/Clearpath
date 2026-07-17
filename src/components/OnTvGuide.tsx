@@ -141,7 +141,9 @@ export function OnTvGuide({
       .slice(0, 6);
   }, [airings, streaming]);
 
-  const shownNetworks = showAllNetworks ? networks : networks.slice(0, 10);
+  // Show every channel by default — including public/broadcast networks (PBS,
+  // ABC, CBS, NBC, FOX) that air fewer distinct titles and used to hide here.
+  const shownNetworks = showAllNetworks ? networks : networks.slice(0, 24);
 
   if (airings.length === 0) {
     return (
@@ -235,9 +237,9 @@ export function OnTvGuide({
           {shownNetworks.map((n) => (
             <button key={n} onClick={() => setNetwork(network === n ? null : n)} className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${network === n ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>{n}</button>
           ))}
-          {networks.length > 10 && (
+          {networks.length > 24 && (
             <button onClick={() => setShowAllNetworks((v) => !v)} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-300 hover:text-brand-200">
-              {showAllNetworks ? 'Fewer' : `+${networks.length - 10} more`}
+              {showAllNetworks ? 'Fewer' : `+${networks.length - 24} more`}
             </button>
           )}
         </div>
