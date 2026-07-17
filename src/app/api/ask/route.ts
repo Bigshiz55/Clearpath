@@ -4,7 +4,7 @@ import { runFinder, type FinderQuery, type Watcher } from '@/lib/finder';
 import { askJudgeTitle } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
-import { parseAskWithAI } from '@/lib/askParse';
+import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -64,6 +64,16 @@ export async function POST(req: Request) {
       limit = ai.limit;
     } else {
       query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
+      if (text) limit = parseRequestedCount(text);
+    }
+    // Guarantee the actor filter regardless of AI: if a person is named and not
+    // already resolved, look them up (fuzzy, so misspellings still match).
+    if (text && (!query.castIds || query.castIds.length === 0)) {
+      const pid = await resolvePersonId(text);
+      if (pid) {
+        query.castIds = [pid];
+        query.mediaType = 'movie';
+      }
     }
 
     let watcher: Watcher | null = null;

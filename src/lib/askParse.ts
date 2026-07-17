@@ -98,6 +98,45 @@ async function toQuery(raw: RawAi): Promise<AiAsk> {
   return { query: q, limit };
 }
 
+const NUM_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+};
+
+/** A requested result count from the ask ("five …" → 5). Default 8. */
+export function parseRequestedCount(text: string): number {
+  const m = text.toLowerCase().match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})\b/);
+  if (!m || !m[1]) return 8;
+  const n = NUM_WORDS[m[1]] ?? Number.parseInt(m[1], 10);
+  return Number.isFinite(n) && n >= 1 && n <= 20 ? n : 8;
+}
+
+// Words that are never part of a person's name — stripped before we treat the
+// remainder as a candidate name to look up (TMDB's search fixes misspellings).
+const NON_NAME =
+  /\b(show|me|find|get|give|recommend|want|looking|for|search|pull|up|list|please|the|some|a|an|of|in|with|starring|featuring|directed|by|top|best|great|good|movies?|films?|shows?|series|tv|episodes?|one|two|three|four|five|six|seven|eight|nine|ten|and|or|over|under|above|below|audience|score|rating|ratings|imdb|percent|match|new|recent|old|classic|funny|scary|sad|happy|short|long|bingeable|comedy|comedies|action|thriller|thrillers|drama|dramas|horror|romance|romantic|documentary|documentaries|sci|fi|fantasy|mystery|crime|western|war|animated|animation|kids|family)\b/g;
+
+/**
+ * Resolve a person mentioned in the ask to a TMDB id — AI-independent. Strips
+ * filler words, then fuzzy-searches TMDB people on the remainder (so "sylvester
+ * stalone" still finds Sylvester Stallone). Returns null when there's no
+ * confident person, so a plain request isn't hijacked into an actor search.
+ */
+export async function resolvePersonId(text: string): Promise<number | null> {
+  const candidate = text
+    .toLowerCase()
+    .replace(/[0-9]+%?/g, ' ')
+    .replace(NON_NAME, ' ')
+    .replace(/[^a-z\s'-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const words = candidate.split(' ').filter(Boolean);
+  if (words.length < 1 || words.length > 4) return null;
+  const people = await searchPeople(words.join(' ')).catch(() => []);
+  const top = people[0];
+  // Require a real, findable person (has known-for credits) to avoid false hits.
+  return top && top.knownFor ? top.id : null;
+}
+
 export async function parseAskWithAI(text: string): Promise<AiAsk | null> {
   const key = serverEnv.openaiKey();
   if (!key || text.trim().length < 2) return null;

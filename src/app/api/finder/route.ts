@@ -3,40 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { runFinder, type FinderQuery, type Watcher } from '@/lib/finder';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
-import { searchPeople } from '@/lib/tmdb/client';
-import { parseAskWithAI } from '@/lib/askParse';
-
-const WORD_NUM: Record<string, number> = {
-  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-  a: 1, couple: 2, few: 3, several: 5,
-};
-
-/**
- * Read intent out of the plain-English ask that the pure client parser can't:
- * a requested count ("five …") and a person name ("Sigourney Weaver"), which we
- * resolve to a TMDB cast id. Mutates `query` in place, returns the result limit.
- */
-async function enrichFromText(text: string, query: FinderQuery): Promise<number> {
-  let limit = 8;
-  const numToken = text
-    .toLowerCase()
-    .match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|a|couple|few|several|\d{1,2})\b/)?.[1];
-  if (numToken) {
-    const n = WORD_NUM[numToken] ?? Number.parseInt(numToken, 10);
-    if (Number.isFinite(n) && n >= 1 && n <= 20) limit = n;
-  }
-  // A capitalized multi-word run is almost always a person's name in these asks.
-  const namePhrase = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z']+){1,2}\b/)?.[0];
-  if (namePhrase) {
-    const people = await searchPeople(namePhrase).catch(() => []);
-    const top = people[0];
-    if (top) {
-      query.castIds = [top.id];
-      query.mediaType = 'movie'; // cast filtering is movie-only
-    }
-  }
-  return limit;
-}
+import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -92,7 +59,15 @@ export async function POST(req: Request) {
       limit = ai.limit;
     } else {
       query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
-      if (text) limit = await enrichFromText(text, query);
+      if (text) limit = parseRequestedCount(text);
+    }
+    // Guarantee the actor filter regardless of AI (fuzzy, so misspellings match).
+    if (text && (!query.castIds || query.castIds.length === 0)) {
+      const pid = await resolvePersonId(text);
+      if (pid) {
+        query.castIds = [pid];
+        query.mediaType = 'movie';
+      }
     }
 
     let watcher: Watcher | null = null;
