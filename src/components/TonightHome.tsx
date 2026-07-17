@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { RateNudge } from '@/components/RateNudge';
+import { CardRatings } from '@/components/CardRatings';
 import type { Tonight } from '@/lib/tonight';
 
 const CALL_STYLE: Record<string, string> = {
@@ -94,6 +95,8 @@ export function TonightHome({ tonight, isGuest }: { tonight: Tonight; isGuest: b
                 )}
                 <span className="text-sm font-bold tabular-nums text-gold-400">{pick.personalScore} match</span>
               </div>
+              {/* Same full ratings row as every other card — Stream/Skip, RT, IMDb, Metacritic. */}
+              <CardRatings mediaType={pick.mediaType} tmdbId={pick.tmdbId} title={pick.title} year={pick.year} className="mt-2" />
               {pick.reason && <p className="mt-2 line-clamp-2 text-sm text-slate-300">{pick.reason}</p>}
               <Link href={`/app/title/${pick.mediaType}/${pick.tmdbId}`} className="btn-primary mt-3 inline-flex text-sm">
                 See the verdict →
