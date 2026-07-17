@@ -188,8 +188,8 @@ export function FinderUI({
         <div className="card flex flex-col gap-3 p-4">
           {embedded ? (
             <span
-              className="grid h-11 w-11 place-items-center rounded-full border border-gold-400/50 bg-gold-500/15 text-2xl shadow-lg"
-              style={{ boxShadow: '0 0 18px rgba(245,198,90,.3)' }}
+              className="grid h-24 w-24 place-items-center rounded-full border-2 border-gold-400/60 bg-gold-500/15 text-6xl shadow-lg"
+              style={{ boxShadow: '0 0 28px rgba(245,198,90,.35)' }}
               aria-label="The judge"
             >
               🧑‍⚖️
@@ -208,7 +208,7 @@ export function FinderUI({
             }}
             rows={3}
             placeholder="Tell me exactly what you want, then hit Enter… “a crime thriller under 140 min, out in the last 2 years, 80+ match”"
-            className="input min-h-[96px] w-full flex-1 resize-none"
+            className="input min-h-[110px] w-full flex-1 resize-none text-base sm:text-lg"
           />
           <div className="flex flex-wrap gap-1.5">
             {EXAMPLES.map((ex) => (
@@ -217,7 +217,7 @@ export function FinderUI({
               </button>
             ))}
           </div>
-          <button onClick={find} disabled={loading} className="btn-primary w-full py-3">
+          <button onClick={find} disabled={loading} className="btn-primary w-full py-3.5 text-lg font-bold">
             {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
           </button>
           <button
@@ -245,7 +245,7 @@ export function FinderUI({
           ) : (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-white">⚖️ The verdict — {items.length} match{items.length === 1 ? '' : 'es'}, ranked by {scoredFor}:</div>
+                <div className="text-base font-bold text-white sm:text-lg">⚖️ The verdict — {items.length} match{items.length === 1 ? '' : 'es'}, ranked by {scoredFor}:</div>
                 <button
                   onClick={() => document.getElementById('evidence')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                   className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
@@ -265,7 +265,7 @@ export function FinderUI({
                   </Link>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <Link href={`/app/title/${it.mediaType}/${it.id}`} className="line-clamp-1 font-semibold text-white hover:underline">
+                      <Link href={`/app/title/${it.mediaType}/${it.id}`} className="line-clamp-1 text-base font-bold text-white hover:underline sm:text-lg">
                         {it.title} {it.year ? <span className="font-normal text-slate-400">({it.year})</span> : null}
                       </Link>
                       <SaveButton tmdbId={it.id} mediaType={it.mediaType} title={it.title} year={it.year} posterPath={it.posterPath} />
@@ -275,7 +275,7 @@ export function FinderUI({
                       <span className="text-sm font-bold tabular-nums text-gold-400">{it.matchScore}</span>
                       <span className="text-xs text-slate-400">match · {it.generalScore} overall</span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-300">{it.reason}</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-slate-300">{it.reason}</p>
                     {it.mediaType === 'tv' && it.airing && (
                       <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 py-1.5 text-sm font-bold text-white">
                         <span aria-hidden className="text-base">📺</span>

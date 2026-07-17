@@ -101,12 +101,9 @@ export default async function DiscoverPage() {
           </p>
         </div>
 
-        {/* TV Guide Detective — one tap scans the next day+ of listings for picks */}
-        <TvDetective />
-
         {/* 1 · Search titles — top, full width */}
         <div className="max-w-3xl">
-          <label className="mb-2 flex items-center gap-2 text-base font-semibold text-white">
+          <label className="mb-2 flex items-center gap-2 text-lg font-bold text-white">
             <span aria-hidden>🔎</span> Search titles
           </label>
           <SearchBar />
@@ -115,7 +112,7 @@ export default async function DiscoverPage() {
         {/* Tools on the left, the court on the right */}
         <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
           <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-base font-semibold text-white">
+            <div className="mb-2 flex items-center gap-2 text-lg font-bold text-white">
               <span aria-hidden>⚖️</span> Ask the judge — or dial in every detail
             </div>
             {/* All the search tools & sliders, inline: genre, length, released-since,
@@ -142,6 +139,9 @@ export default async function DiscoverPage() {
                 </div>
               </div>
             </Link>
+
+            {/* TV Guide Detective — one tap scans the next day+ of listings */}
+            <TvDetective />
           </div>
         </div>
       </section>
