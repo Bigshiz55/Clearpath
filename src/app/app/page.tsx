@@ -121,9 +121,6 @@ export default async function DiscoverPage() {
           </div>
 
           <div className="space-y-4 lg:pl-1">
-            {/* The court box — doors open to reveal the judge */}
-            <CourtroomDoors initialJudge={judge} />
-
             {/* Quick ruling — one tap, pick right out of the gate */}
             <Link
               href="/app/ask?q=surprise%20me%20%E2%80%94%20pick%20something%20great%20for%20tonight"
@@ -142,6 +139,9 @@ export default async function DiscoverPage() {
 
             {/* TV Guide Detective — one tap scans the next day+ of listings */}
             <TvDetective />
+
+            {/* The court box — "Can't decide?" doors open to reveal the judge */}
+            <CourtroomDoors initialJudge={judge} />
           </div>
         </div>
       </section>
