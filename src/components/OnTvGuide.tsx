@@ -98,9 +98,6 @@ export function OnTvGuide({
   }
   const [time, setTime] = useState<TimeFilter>(streaming ? 'all' : 'primetime');
   const [sort, setSort] = useState<SortFilter>(streaming ? 'rating' : 'time');
-  const [network, setNetwork] = useState<string | null>(null);
-  const [hideNoise, setHideNoise] = useState(!streaming);
-  const [showAllNetworks, setShowAllNetworks] = useState(false);
   const [media, setMedia] = useState<'all' | 'movie' | 'tv'>('all');
 
   const nowMin = useMemo(() => {
@@ -108,21 +105,10 @@ export function OnTvGuide({
     return d.getHours() * 60 + d.getMinutes();
   }, []);
 
-  const channelLabel = streaming ? 'Platform' : 'Channel';
-
-  // Channels/platforms present today, by how much they're airing.
-  const networks = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const a of airings) counts.set(a.network, (counts.get(a.network) ?? 0) + 1);
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([n]) => n);
-  }, [airings]);
-
   const filtered = useMemo(() => {
     let list = airings;
-    if (hideNoise) list = list.filter((a) => !NOISE_TYPES.has(a.showType));
     if (media === 'movie') list = list.filter((a) => a.showType === 'Movie');
     else if (media === 'tv') list = list.filter((a) => a.showType !== 'Movie');
-    if (network) list = list.filter((a) => a.network === network);
     if (!streaming) {
       if (time === 'primetime') list = list.filter((a) => a.minutes >= 18 * 60 && a.minutes <= 23 * 60);
       else if (time === 'nownext') list = list.filter((a) => a.minutes >= nowMin - 30);
@@ -131,7 +117,7 @@ export function OnTvGuide({
     if (sort === 'rating') sorted.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
     else sorted.sort((a, b) => a.minutes - b.minutes);
     return sorted;
-  }, [airings, hideNoise, network, time, sort, nowMin, streaming, media]);
+  }, [airings, time, sort, nowMin, streaming, media]);
 
   // Highlights — best-rated picks (prime-time for broadcast; overall for streaming).
   const highlights = useMemo(() => {
@@ -140,10 +126,6 @@ export function OnTvGuide({
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
       .slice(0, 6);
   }, [airings, streaming]);
-
-  // Show every channel by default — including public/broadcast networks (PBS,
-  // ABC, CBS, NBC, FOX) that air fewer distinct titles and used to hide here.
-  const shownNetworks = showAllNetworks ? networks : networks.slice(0, 24);
 
   if (airings.length === 0) {
     return (
@@ -226,22 +208,6 @@ export function OnTvGuide({
               <button key={v} onClick={() => setSort(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${sort === v ? 'bg-brand-500 text-white shadow-glow' : 'text-slate-300 hover:text-white'}`}>{label}</button>
             ))}
           </div>
-          <button onClick={() => setHideNoise((v) => !v)} className={`rounded-lg border px-2.5 py-1.5 text-sm font-semibold transition ${hideNoise ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-            {hideNoise ? '✓ ' : ''}Hide news &amp; talk
-          </button>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{channelLabel}</span>
-          <button onClick={() => setNetwork(null)} className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${network == null ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>All {channelLabel.toLowerCase()}s</button>
-          {shownNetworks.map((n) => (
-            <button key={n} onClick={() => setNetwork(network === n ? null : n)} className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${network === n ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>{n}</button>
-          ))}
-          {networks.length > 24 && (
-            <button onClick={() => setShowAllNetworks((v) => !v)} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-300 hover:text-brand-200">
-              {showAllNetworks ? 'Fewer' : `+${networks.length - 24} more`}
-            </button>
-          )}
         </div>
         <div className="text-[11px] text-slate-400">
           {dateLabel} · {filtered.length} {streaming ? 'premiere' : 'airing'}{filtered.length === 1 ? '' : 's'}
@@ -252,7 +218,7 @@ export function OnTvGuide({
       {/* List */}
       {filtered.length === 0 ? (
         <p className="text-sm text-slate-400">
-          Nothing matches those filters — {streaming ? `clear the ${channelLabel.toLowerCase()}` : 'widen the time window or clear the channel'}.
+          Nothing on right now for that view — try a different time window or type.
         </p>
       ) : (
         <div className="space-y-2">

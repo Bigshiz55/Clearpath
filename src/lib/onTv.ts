@@ -179,7 +179,33 @@ export async function getNextAiring(imdbId: string | null): Promise<NextAiring |
   }
 }
 
-/** Broadcast (over-the-air / cable) schedule for a country. */
+// The major American TV networks carried on Xfinity / Verizon Fios — broadcast,
+// major cable entertainment, news, sports, and premium. We track these and skip
+// the long tail of tiny/regional channels, so the live guide stays useful.
+const MAJOR_US_NETWORKS = [
+  // Broadcast
+  'abc', 'cbs', 'nbc', 'fox', 'the cw', 'pbs', 'telemundo', 'univision', 'ion', 'mynetworktv',
+  // Cable entertainment
+  'amc', 'usa network', 'tnt', 'tbs', 'fx', 'fxx', 'bravo', 'e!', 'comedy central',
+  'paramount network', 'syfy', 'freeform', 'hallmark', 'hgtv', 'food network', 'discovery',
+  'tlc', 'history', 'a&e', 'lifetime', 'national geographic', 'nat geo', 'animal planet',
+  'bbc america', 'ifc', 'sundancetv', 'tcm', 'tv land', 'we tv', 'own', 'mtv', 'vh1', 'bet',
+  'cartoon network', 'nickelodeon', 'disney channel', 'adult swim', 'trutv', 'oxygen',
+  'investigation discovery', 'gsn', 'reelz', 'cooking channel', 'motortrend',
+  // News
+  'cnn', 'msnbc', 'fox news', 'cnbc', 'hln', 'newsmax',
+  // Sports
+  'espn', 'fs1', 'fs2', 'fox sports', 'nbc sports', 'nfl network', 'mlb network', 'nba tv',
+  'golf channel', 'tennis channel',
+  // Premium
+  'hbo', 'cinemax', 'showtime', 'starz', 'mgm+', 'epix',
+];
+function isMajorUsNetwork(name: string): boolean {
+  const n = name.toLowerCase().trim();
+  return MAJOR_US_NETWORKS.some((net) => n === net || n.startsWith(net + ' ') || n.startsWith(net));
+}
+
+/** Broadcast schedule, curated to the major American networks (Xfinity/Verizon). */
 async function fetchBroadcast(country: string, date: string): Promise<Airing[]> {
   const data = await fetchJson(`https://api.tvmaze.com/schedule?country=${encodeURIComponent(country)}&date=${date}`);
   const out: Airing[] = [];
@@ -187,6 +213,7 @@ async function fetchBroadcast(country: string, date: string): Promise<Airing[]> 
     const show = a.show;
     const network = show?.network?.name ?? show?.webChannel?.name ?? null;
     if (!show || !network) continue;
+    if (country === 'US' && !isMajorUsNetwork(network)) continue; // track only major US networks
     const item = toAiring(a, show, network, true); // broadcasts have a real airtime
     if (item) out.push(item);
   }
