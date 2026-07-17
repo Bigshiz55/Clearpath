@@ -16,8 +16,7 @@ const PRIMARY: NavLink[] = [
   { href: '/app/watchlist', label: 'Watchlist' },
 ];
 const SECONDARY: NavLink[] = [
-  { href: '/app/together', label: 'Court' },
-  { href: '/app/reminders', label: 'Reminders' },
+  { href: '/app/reminders', label: 'My reminders' },
   { href: '/app/friends', label: 'Friends' },
   { href: '/app/chambers', label: 'Chambers' },
   { href: '/app/settings', label: 'Settings' },
