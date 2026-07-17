@@ -58,8 +58,12 @@ export default async function DiscoverPage() {
   // buries the big names and free ones, so rank by this list, then TMDB.
   const COMMON_FIRST = [
     'netflix', 'amazon prime video', 'disney plus', 'max', 'hbo', 'hulu', 'apple tv', 'peacock',
-    'paramount', 'tubi', 'pluto', 'roku', 'freevee', 'crackle', 'pbs', 'plex', 'kanopy', 'hoopla',
-    'xumo', 'public domain', 'starz', 'showtime', 'amc', 'britbox', 'youtube',
+    'paramount', 'starz', 'showtime', 'amc',
+    // Add-on channels you reach through Prime / Apple — their own providers, easy to miss.
+    'acorn', 'britbox', 'mgm+', 'mubi', 'shudder', 'sundance now', 'hallmark',
+    // Free / public
+    'tubi', 'pluto', 'roku', 'freevee', 'crackle', 'pbs', 'plex', 'kanopy', 'hoopla', 'xumo',
+    'public domain', 'youtube',
   ];
   const commonRank = (name: string): number => {
     const n = name.toLowerCase();
