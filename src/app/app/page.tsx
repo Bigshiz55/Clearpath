@@ -54,7 +54,22 @@ export default async function DiscoverPage() {
   // and any crew members to score against ("who's watching").
   const services = user ? await getMyServices(supabase, user.id) : [];
   const providerCatalog = await getBrowseProviders(regionFor(profile)).catch(() => []);
-  const topProviders = providerCatalog.slice(0, 60).map((p) => ({ id: p.id, name: p.name }));
+  // Surface the most common + free/public services first; TMDB's raw order
+  // buries the big names and free ones, so rank by this list, then TMDB.
+  const COMMON_FIRST = [
+    'netflix', 'amazon prime video', 'disney plus', 'max', 'hbo', 'hulu', 'apple tv', 'peacock',
+    'paramount', 'tubi', 'pluto', 'roku', 'freevee', 'crackle', 'pbs', 'plex', 'kanopy', 'hoopla',
+    'xumo', 'public domain', 'starz', 'showtime', 'amc', 'britbox', 'youtube',
+  ];
+  const commonRank = (name: string): number => {
+    const n = name.toLowerCase();
+    const i = COMMON_FIRST.findIndex((c) => n.includes(c));
+    return i === -1 ? 999 : i;
+  };
+  const topProviders = [...providerCatalog]
+    .sort((a, b) => commonRank(a.name) - commonRank(b.name) || a.priority - b.priority)
+    .slice(0, 60)
+    .map((p) => ({ id: p.id, name: p.name }));
   const watchers: WatcherOption[] = [];
   try {
     const { crews } = await listCrews();
