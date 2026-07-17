@@ -32,6 +32,22 @@ interface ResultItem {
   receipts: string[];
   deciderUrl: string;
   ratings?: TileRatings;
+  airing?: { network: string; time: string; airstamp: string } | null;
+}
+
+/** "9:00 PM · AMC · Wed Jul 23" — the real airtime & channel, easy to read. */
+function airingLine(a: { network: string; time: string; airstamp: string }): string {
+  const d = new Date(a.airstamp);
+  const day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  let clock = '';
+  const m = a.time.match(/^(\d{1,2}):(\d{2})/);
+  if (m) {
+    let h = Number(m[1]);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    clock = `${h}:${m[2]} ${ampm}`;
+  }
+  return [clock, a.network, day].filter(Boolean).join(' · ');
 }
 
 const CALL_STYLE: Record<string, string> = {
@@ -260,6 +276,12 @@ export function FinderUI({
                       <span className="text-xs text-slate-400">match · {it.generalScore} overall</span>
                     </div>
                     <p className="mt-1 line-clamp-2 text-xs text-slate-300">{it.reason}</p>
+                    {it.mediaType === 'tv' && it.airing && (
+                      <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 py-1.5 text-sm font-bold text-white">
+                        <span aria-hidden className="text-base">📺</span>
+                        <span className="tabular-nums">{airingLine(it.airing)}</span>
+                      </div>
+                    )}
                     <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} decider={false} className="mt-1.5" />
                     <div className="mt-2 flex flex-wrap gap-1">
                       {it.receipts.map((r) => (

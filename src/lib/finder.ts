@@ -8,6 +8,7 @@ import { buildVerdict, avoidRule, loveRule } from '@/lib/scoring';
 import { getProfile, getPersonalContext, regionFor, getMyServices, personalLabelFor } from '@/lib/profile';
 import { includedServiceNames, streamingNames } from '@/lib/services';
 import { deciderSearchUrl } from '@/lib/tmdb/meta-helpers';
+import { getNextAiring, type NextAiring } from '@/lib/onTv';
 import { tileRatingsFromScore, type TileRatings } from '@/lib/ratings';
 import type { PersonalContext } from '@/lib/scoring/personal';
 import type { TitleMetadata } from '@/lib/types';
@@ -87,6 +88,9 @@ export interface FinderItem {
   receipts: string[];
   deciderUrl: string;
   ratings: TileRatings;
+  imdbId?: string | null;
+  /** TV only: the next real broadcast/stream airing (channel + time), if any. */
+  airing?: NextAiring | null;
 }
 
 export interface FinderResult {
@@ -281,6 +285,7 @@ export async function runFinder(
           receipts,
           deciderUrl: deciderSearchUrl(meta.title, meta.year),
           ratings: tileRatingsFromScore(report.general),
+          imdbId: meta.imdbId ?? null,
         } as FinderItem;
       } catch {
         return null;
@@ -301,5 +306,16 @@ export async function runFinder(
     items = r.items;
   }
 
-  return { items: items.slice(0, 8), scoredFor, relaxed, total: items.length };
+  const finalItems = items.slice(0, 8);
+  // Attach the real next airing (channel + time) to every TV result, so "ask for
+  // a show" always shows where and when it's on. Best-effort; null when unknown.
+  await Promise.all(
+    finalItems
+      .filter((i) => i.mediaType === 'tv' && i.airing === undefined)
+      .map(async (i) => {
+        i.airing = await getNextAiring(i.imdbId ?? null);
+      }),
+  );
+
+  return { items: finalItems, scoredFor, relaxed, total: items.length };
 }

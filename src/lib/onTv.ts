@@ -120,6 +120,42 @@ async function fetchJson(url: string): Promise<TvmazeAiring[]> {
   return Array.isArray(data) ? data : [];
 }
 
+export interface NextAiring {
+  network: string; // channel or platform, e.g. "AMC"
+  time: string; // network-local "HH:MM" (may be '')
+  airstamp: string; // ISO UTC start
+}
+
+/**
+ * The next scheduled airing of a show, looked up by IMDb id straight from
+ * TVmaze — real channel + airtime, never invented. Returns null when TVmaze has
+ * no listing or the show has no upcoming episode (finished / streaming-only).
+ */
+export async function getNextAiring(imdbId: string | null): Promise<NextAiring | null> {
+  if (!imdbId) return null;
+  try {
+    const sres = await fetch(`https://api.tvmaze.com/lookup/shows?imdb=${encodeURIComponent(imdbId)}`, {
+      next: { revalidate: 3600 },
+    }).catch(() => null);
+    if (!sres || !sres.ok) return null;
+    const show = (await sres.json().catch(() => null)) as {
+      network?: { name?: string } | null;
+      webChannel?: { name?: string } | null;
+      _links?: { nextepisode?: { href?: string } } | null;
+    } | null;
+    const network = show?.network?.name ?? show?.webChannel?.name ?? null;
+    const href = show?._links?.nextepisode?.href;
+    if (!href || !network) return null;
+    const eres = await fetch(href, { next: { revalidate: 3600 } }).catch(() => null);
+    if (!eres || !eres.ok) return null;
+    const ep = (await eres.json().catch(() => null)) as { airstamp?: string; airtime?: string } | null;
+    if (!ep?.airstamp) return null;
+    return { network, time: ep.airtime ?? '', airstamp: ep.airstamp };
+  } catch {
+    return null;
+  }
+}
+
 /** Broadcast (over-the-air / cable) schedule for a country. */
 async function fetchBroadcast(country: string, date: string): Promise<Airing[]> {
   const data = await fetchJson(`https://api.tvmaze.com/schedule?country=${encodeURIComponent(country)}&date=${date}`);
