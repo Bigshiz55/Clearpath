@@ -4,8 +4,6 @@ import { getProfile, personalLabelFor, getMyServices, regionFor } from '@/lib/pr
 import { SearchBar } from '@/components/SearchBar';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
 import { listCrews } from '@/lib/actions/crews';
-import { getBrowseProviders } from '@/lib/browse';
-import { STREAMING_SERVICES } from '@/lib/services';
 import { getUpcomingTv } from '@/lib/onTv';
 import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
@@ -52,70 +50,9 @@ export default async function DiscoverPage() {
   }
 
   // For the on-home finder tools: the user's services (for "only on my services")
-  // and any crew members to score against ("who's watching").
+  // and any crew members to score against ("who's watching"). Managing the actual
+  // service list happens in Settings now, so the home finder only needs the count.
   const services = user ? await getMyServices(supabase, user.id) : [];
-  const providerCatalog = await getBrowseProviders(regionFor(profile)).catch(() => []);
-  // A short, curated set of the services most people actually have — one clean
-  // entry per service. TMDB lists dozens of granular add-ons ("Cinemax Apple TV
-  // Channel", "Starz Amazon Channel", "… with Ads"); we collapse those to the
-  // parent brand so the picker stays scannable. Only services present in the
-  // region's real catalog are shown — nothing is invented.
-  const CURATED: { label: string; match: (n: string) => boolean }[] = [
-    // The big streamers
-    { label: 'Netflix', match: (n) => n === 'netflix' },
-    { label: 'Amazon Prime Video', match: (n) => n === 'amazon prime video' },
-    { label: 'Disney+', match: (n) => n === 'disney plus' },
-    { label: 'Max', match: (n) => n === 'max' || n === 'hbo max' },
-    { label: 'Hulu', match: (n) => n === 'hulu' },
-    { label: 'Apple TV+', match: (n) => n === 'apple tv plus' || n === 'apple tv+' },
-    { label: 'Peacock', match: (n) => n.startsWith('peacock') && !n.includes('amazon') },
-    { label: 'Paramount+', match: (n) => n === 'paramount plus' || n === 'paramount+' },
-    { label: 'Starz', match: (n) => n === 'starz' },
-    { label: 'Showtime', match: (n) => n === 'showtime' },
-    { label: 'AMC+', match: (n) => n === 'amc+' || n === 'amc plus' },
-    // Free / public — no subscription needed
-    { label: 'Tubi', match: (n) => n === 'tubi' || n === 'tubi tv' },
-    { label: 'Pluto TV', match: (n) => n === 'pluto tv' },
-    { label: 'The Roku Channel', match: (n) => n === 'the roku channel' || n === 'roku channel' },
-    { label: 'Amazon Freevee', match: (n) => n.includes('freevee') },
-    { label: 'Crackle', match: (n) => n === 'crackle' },
-    { label: 'YouTube', match: (n) => n === 'youtube' },
-    // Live-TV bundles (top cable-replacement services)
-    { label: 'YouTube TV', match: (n) => n === 'youtube tv' },
-    { label: 'Hulu (Live TV)', match: (n) => n === 'hulu live tv' || n === 'hulu + live tv' },
-    { label: 'fuboTV', match: (n) => n.includes('fubo') },
-    { label: 'Sling TV', match: (n) => n.startsWith('sling') },
-    { label: 'DIRECTV', match: (n) => n.includes('directv') },
-  ];
-  const chosen = new Set<number>();
-  const topProviders: { id: number; name: string }[] = [];
-  for (const c of CURATED) {
-    const hit = providerCatalog.find((p) => !chosen.has(p.id) && c.match(p.name.trim().toLowerCase()));
-    if (hit) {
-      chosen.add(hit.id);
-      topProviders.push({ id: hit.id, name: c.label });
-    }
-  }
-  // The search screen's "What you have" is personal: show only the services this
-  // user picked (in onboarding or Settings). Fall back to the common catalog when
-  // they haven't chosen any yet, so a brand-new user still has something to pick.
-  // Resolve each saved service to a name for the search chips. Live-TV / cable
-  // boxes (private 900000+ ids) are skipped here — they're informational only
-  // and can't narrow on-demand results, so they'd be dead toggles on search.
-  const seenSvc = new Set<number>();
-  const svcChipName = (id: number): string | null => {
-    if (id >= 900000) return null;
-    return (
-      STREAMING_SERVICES.find((s) => s.id === id || s.ids.includes(id))?.name ??
-      providerCatalog.find((p) => p.id === id)?.name ??
-      null
-    );
-  };
-  const myServiceChips = services
-    .map((id) => ({ id, name: svcChipName(id) }))
-    .filter((x): x is { id: number; name: string } => Boolean(x.name) && !seenSvc.has(x.id) && (seenSvc.add(x.id), true));
-  const usingMyServices = myServiceChips.length > 0;
-  const providerChips = usingMyServices ? myServiceChips : topProviders;
   const watchers: WatcherOption[] = [];
   try {
     const { crews } = await listCrews();
@@ -191,7 +128,7 @@ export default async function DiscoverPage() {
         {/* Two ways to decide — say what you want, or build the case by hand —
             both inside one outlined box (heading lives inside FinderUI now). */}
         <div>
-          <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} providers={providerChips} personalServices={usingMyServices} />
+          <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} />
         </div>
 
         {/* TV Guide Detective (left) + Can't-decide court (right) — big, side by side */}

@@ -148,18 +148,12 @@ export function FinderUI({
   watchers = [],
   initialJudge = null,
   embedded = false,
-  providers = [],
-  personalServices = false,
 }: {
   hasServices: boolean;
   watchers?: WatcherOption[];
   initialJudge?: Judge | null;
   /** On the home screen the judge already lives elsewhere, so hide the bench. */
   embedded?: boolean;
-  /** Streaming services to offer as "what I have" checkboxes. */
-  providers?: { id: number; name: string }[];
-  /** True when `providers` is the user's own saved services (not the catalog). */
-  personalServices?: boolean;
 }) {
   const [text, setText] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
@@ -169,7 +163,6 @@ export function FinderUI({
   const [relaxed, setRelaxed] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showAllProviders, setShowAllProviders] = useState(false);
 
   function onText(v: string) {
     setText(v);
@@ -184,13 +177,6 @@ export function FinderUI({
       genreIds: prev.genreIds.includes(id) ? prev.genreIds.filter((g) => g !== id) : [...prev.genreIds, id],
     }));
   }
-  function toggleProvider(id: number) {
-    setQ((prev) => {
-      const cur = prev.providerIds ?? [];
-      return { ...prev, providerIds: cur.includes(id) ? cur.filter((p) => p !== id) : [...cur, id] };
-    });
-  }
-
   async function find() {
     setLoading(true);
     setError(null);
@@ -354,18 +340,6 @@ export function FinderUI({
           <span aria-hidden>🎛️</span> Submit your evidence
         </div>
 
-        {embedded ? (
-          <div className="space-y-3">
-            <p className="text-sm text-slate-300">
-              Your results are tuned to the streaming services &amp; channels you have. Change what you have — and how
-              you like your shows — in Settings.
-            </p>
-            <a href="/app/settings" className="btn-primary inline-flex items-center gap-2 py-2.5 text-base font-semibold">
-              <span aria-hidden>⚙️</span> Adjust your services
-            </a>
-          </div>
-        ) : (
-          <>
         {watchers.length > 0 && (
           <div>
             <div className="label">Who’s watching</div>
@@ -413,43 +387,18 @@ export function FinderUI({
             )}
           </div>
 
-          {providers.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="label">{personalServices ? 'Your services' : 'What you have'}</div>
-                <a href="/app/settings" className="text-[11px] font-semibold text-brand-300 hover:text-brand-200">
-                  {personalServices ? 'Edit in Settings' : 'Set up my services'}
-                </a>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {(showAllProviders ? providers : providers.slice(0, 24)).map((p) => {
-                  const on = (q.providerIds ?? []).includes(p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => toggleProvider(p.id)}
-                      className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${on ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
-                    >
-                      {on ? '✓ ' : ''}{p.name}
-                    </button>
-                  );
-                })}
-                {providers.length > 24 && (
-                  <button
-                    onClick={() => setShowAllProviders((v) => !v)}
-                    className="rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-300 hover:text-brand-200"
-                  >
-                    {showAllProviders ? 'Show fewer' : `+ ${providers.length - 24} more services`}
-                  </button>
-                )}
-              </div>
-              <p className="mt-1 text-[11px] text-slate-400">
-                {personalServices
-                  ? 'Your saved services — tap any to narrow results to just those. Add or remove them in Settings.'
-                  : 'Check the services you have — results prefer what you can watch. Save them in Settings so only yours show here.'}
-              </p>
-            </div>
-          )}
+          <div>
+            <div className="label">Your services</div>
+            <a
+              href="/app/settings"
+              className="inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 py-2 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/25"
+            >
+              <span aria-hidden>⚙️</span> Adjust your services
+            </a>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Results prefer the streaming services &amp; channels you have — set those up in Settings.
+            </p>
+          </div>
         </div>
 
         <div>
@@ -519,8 +468,6 @@ export function FinderUI({
         <button onClick={find} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
           {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
         </button>
-          </>
-        )}
       </div>
       </div>
     </div>
