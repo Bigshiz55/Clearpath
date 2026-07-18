@@ -64,7 +64,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   // unless the caller explicitly opts out of overlays with `overlay={null}`.
   const feedback =
     overlay !== null && saveId != null ? (
-      <TasteFeedback tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+      <TasteFeedback compact tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
     ) : null;
   const heading = (
     <>
@@ -76,27 +76,23 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
     </>
   );
 
-  // The poster and title link out; `overlay` and `children` are siblings of the
-  // link (never nested inside it) so they may contain their own interactive
-  // controls — a save button, a tap-to-expand reason — as valid markup.
+  // The poster and title link out; the top bar and `children` are siblings of
+  // the link (never nested inside it) so they may hold interactive controls.
   return (
     <div className="card group h-full overflow-hidden transition hover:border-white/20 hover:shadow-glow">
-      <div className="relative aspect-[2/3] overflow-hidden">
-        {href ? <Link href={href} className="block h-full">{poster}</Link> : poster}
-        <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 backdrop-blur">
+      {/* Top action bar — Movie/TV · DNA · ＋ · O. Above the art, never over it. */}
+      <div className="flex items-center justify-between gap-1 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
+        <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
           {mediaType === 'movie' ? 'Movie' : 'TV'}
         </span>
-        {(resolvedOverlay || feedback) && (
-          <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1.5">
-            {resolvedOverlay}
-            {feedback}
-          </div>
-        )}
-        {saveId != null && (
-          <div className="absolute bottom-2 left-2 z-10">
-            <CardDna mediaType={mediaType} tmdbId={saveId} />
-          </div>
-        )}
+        <div className="flex items-center gap-1.5">
+          {saveId != null && <CardDna mediaType={mediaType} tmdbId={saveId} />}
+          {resolvedOverlay}
+          {feedback}
+        </div>
+      </div>
+      <div className="relative aspect-[2/3] overflow-hidden">
+        {href ? <Link href={href} className="block h-full">{poster}</Link> : poster}
       </div>
       <div className="p-3">
         {href ? <Link href={href} className="block">{heading}</Link> : heading}

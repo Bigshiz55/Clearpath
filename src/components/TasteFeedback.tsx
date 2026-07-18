@@ -27,6 +27,7 @@ export function TasteFeedback({
   year,
   posterPath,
   onFlagged,
+  compact = false,
 }: {
   tmdbId: number;
   mediaType: MediaType;
@@ -34,6 +35,8 @@ export function TasteFeedback({
   year: number | null;
   posterPath: string | null;
   onFlagged?: () => void;
+  /** Icon-only trigger (the red O) for the card top bar. */
+  compact?: boolean;
 }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -64,9 +67,14 @@ export function TasteFeedback({
         }}
         aria-label="Remove — tell us why"
         title="Remove from your picks"
-        className="inline-flex items-center gap-1 rounded-lg border border-red-400/50 bg-black/60 px-2 py-1 text-[11px] font-bold text-red-100 backdrop-blur transition hover:bg-red-500/25"
+        className={
+          compact
+            ? 'grid h-7 w-7 place-items-center rounded-md border border-red-400/60 bg-red-500/25 text-sm leading-none transition hover:bg-red-500/40'
+            : 'inline-flex items-center gap-1 rounded-lg border border-red-400/50 bg-black/60 px-2 py-1 text-[11px] font-bold text-red-100 backdrop-blur transition hover:bg-red-500/25'
+        }
       >
-        <span aria-hidden className="text-sm leading-none">🚫</span> Remove
+        <span aria-hidden className="leading-none">🚫</span>
+        {!compact && ' Remove'}
       </button>
 
       {open &&

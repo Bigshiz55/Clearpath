@@ -21,7 +21,26 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
         {shown.map((t) => {
           const v = verdictVisualForCall(t.primaryCall);
           return (
-            <div key={`${t.mediaType}-${t.id}`} className="card group relative h-full overflow-hidden transition hover:border-white/20 hover:shadow-glow">
+            <div key={`${t.mediaType}-${t.id}`} className="card group h-full overflow-hidden transition hover:border-white/20 hover:shadow-glow">
+              {/* Top action bar — Movie/TV · DNA · ＋ · O — above the art. */}
+              <div className="flex items-center justify-between gap-1 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
+                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
+                  {t.mediaType === 'movie' ? 'Movie' : 'TV'}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <CardDna mediaType={t.mediaType} tmdbId={t.id} />
+                  <SaveButton tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
+                  <TasteFeedback
+                    compact
+                    tmdbId={t.id}
+                    mediaType={t.mediaType}
+                    title={t.title}
+                    year={t.year}
+                    posterPath={t.posterPath}
+                    onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
+                  />
+                </div>
+              </div>
               <button
                 onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
                 className="relative block aspect-[2/3] w-full overflow-hidden"
@@ -40,23 +59,7 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
                 <span className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
                   <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
                 </span>
-                <span className="pointer-events-none absolute bottom-2 right-2">
-                  <CardDna mediaType={t.mediaType} tmdbId={t.id} />
-                </span>
               </button>
-              <div className="absolute right-2 top-2 z-10">
-                <SaveButton tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
-              </div>
-              <div className="absolute left-2 top-2 z-10">
-                <TasteFeedback
-                  tmdbId={t.id}
-                  mediaType={t.mediaType}
-                  title={t.title}
-                  year={t.year}
-                  posterPath={t.posterPath}
-                  onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
-                />
-              </div>
               <div className="p-3">
                 <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block w-full text-left">
                   <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>

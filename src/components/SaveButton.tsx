@@ -100,10 +100,10 @@ export function SaveButton({
       disabled={busy}
       aria-label={saved ? 'Remove from list' : 'Add to list'}
       title={saved ? 'Remove from your list' : 'Add to your list'}
-      className={`grid h-8 w-8 place-items-center rounded-lg border backdrop-blur transition ${
+      className={`grid h-7 w-7 place-items-center rounded-md border text-white transition ${
         saved
-          ? 'border-brand-400/60 bg-brand-500/40 text-white'
-          : 'border-white/20 bg-black/55 text-white hover:bg-black/75'
+          ? 'border-brand-300 bg-brand-500'
+          : 'border-brand-400/60 bg-brand-500/35 hover:bg-brand-500/60'
       }`}
     >
       {icon}
