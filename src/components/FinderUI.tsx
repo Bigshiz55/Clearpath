@@ -35,10 +35,37 @@ interface ResultItem {
   airing?: { network: string; time: string; airstamp: string } | null;
 }
 
-/** "9:00 PM · AMC · Wed Jul 23" — the real airtime & channel, easy to read. */
-function airingLine(a: { network: string; time: string; airstamp: string }): string {
-  const d = new Date(a.airstamp);
-  const day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+/**
+ * How to show a show's next airing. If it's on soon (within ~8 days) we surface a
+ * bright, actionable listing — "8:00 PM · CBS · Tonight". If the next *new*
+ * episode is far off (a show on hiatus, e.g. a fall premiere months away), we
+ * show a calm "New episodes Oct 6, 2026" return date instead, with the year, so
+ * a months-away date never looks like a broken or past listing.
+ */
+function airingInfo(a: { network: string; time: string; airstamp: string }): { text: string; soon: boolean } {
+  const airMs = Date.parse(a.airstamp);
+  const now = Date.now();
+  const d = new Date(airMs);
+  const dayMs = 86_400_000;
+  const daysOut = (airMs - now) / dayMs;
+  const soon = daysOut <= 8;
+
+  // "Today" / "Tomorrow" for the near term; otherwise a weekday + date.
+  const today = new Date(now);
+  const isToday = d.toDateString() === today.toDateString();
+  const isTomorrow = new Date(now + dayMs).toDateString() === d.toDateString();
+
+  if (!soon) {
+    const far = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return { text: `New episodes ${far}`, soon: false };
+  }
+
+  const day = isToday
+    ? 'Tonight'
+    : isTomorrow
+      ? 'Tomorrow'
+      : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
   let clock = '';
   const m = a.time.match(/^(\d{1,2}):(\d{2})/);
   if (m) {
@@ -47,7 +74,7 @@ function airingLine(a: { network: string; time: string; airstamp: string }): str
     h = h % 12 || 12;
     clock = `${h}:${m[2]} ${ampm}`;
   }
-  return [clock, a.network, day].filter(Boolean).join(' · ');
+  return { text: [clock, a.network, day].filter(Boolean).join(' · '), soon: true };
 }
 
 const CALL_STYLE: Record<string, string> = {
@@ -272,12 +299,21 @@ export function FinderUI({
                       <span className="text-xs text-slate-400">match · {it.generalScore} overall</span>
                     </div>
                     <p className="mt-1 line-clamp-2 text-sm text-slate-300">{it.reason}</p>
-                    {it.mediaType === 'tv' && it.airing && (
-                      <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 py-1.5 text-sm font-bold text-white">
-                        <span aria-hidden className="text-base">📺</span>
-                        <span className="tabular-nums">{airingLine(it.airing)}</span>
-                      </div>
-                    )}
+                    {it.mediaType === 'tv' && it.airing && (() => {
+                      const info = airingInfo(it.airing);
+                      return (
+                        <div
+                          className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-bold ${
+                            info.soon
+                              ? 'border-brand-400/50 bg-brand-500/15 text-white'
+                              : 'border-white/12 bg-white/5 text-slate-300'
+                          }`}
+                        >
+                          <span aria-hidden className="text-base">{info.soon ? '📺' : '🗓️'}</span>
+                          <span className="tabular-nums">{info.text}</span>
+                        </div>
+                      );
+                    })()}
                     <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} decider={false} className="mt-1.5" />
                     <div className="mt-2 flex flex-wrap gap-1">
                       {it.receipts.map((r) => (
