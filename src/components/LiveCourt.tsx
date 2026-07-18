@@ -45,6 +45,7 @@ export function LiveCourt({ code }: { code: string }) {
   const [pendingVeto, setPendingVeto] = useState<number | null>(null);
   const [starting, setStarting] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
+  const [gaveled, setGaveled] = useState(false); // played the gavel-strike reveal
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/court/${code}` : '';
@@ -82,6 +83,14 @@ export function LiveCourt({ code }: { code: string }) {
     poll.current = setInterval(refresh, 1500);
     return () => { if (poll.current) clearInterval(poll.current); };
   }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Play the gavel-strike once when the verdict lands, then reveal the winner.
+  useEffect(() => {
+    if (state?.status === 'verdict' && !gaveled) {
+      const t = setTimeout(() => setGaveled(true), 1650);
+      return () => clearTimeout(t);
+    }
+  }, [state?.status, gaveled]);
 
   async function join() {
     if (!name.trim()) return;
@@ -197,7 +206,12 @@ export function LiveCourt({ code }: { code: string }) {
         </div>
         {me?.voted ? (
           <div className="card p-6 text-center text-sm text-slate-300">
-            Your veto is in. Waiting for the others…
+            <div className="text-3xl" aria-hidden>⚖️</div>
+            <p className="mt-2">Your veto is in. Waiting for the others…</p>
+            <div className="mx-auto mt-3 h-2 w-40 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${(votedCount / Math.max(1, state.participants.length)) * 100}%` }} />
+            </div>
+            <div className="mt-1 text-xs text-slate-400">{votedCount} of {state.participants.length} have ruled</div>
             {isHost && <button onClick={reveal} className="btn-secondary mt-4">Reveal the verdict now</button>}
           </div>
         ) : pendingVeto === null ? (
@@ -241,26 +255,50 @@ export function LiveCourt({ code }: { code: string }) {
       if (vs.length) lines.push(`${f.title}${bestAvg ? ` had the highest average (${f.avgScore}) but` : ' —'} took a “${vs[0]!.vetoReason ?? 'no'}” veto${vs.length > 1 ? ` from ${vs.length} people` : ` from ${vs[0]!.name}`}.`);
       else { const low = f.perMember.reduce((a, b) => (b.score < a.score ? b : a)); lines.push(`${f.title} fell short — ${low.name} only gave it ${low.score}.`); }
     });
+    // The gavel-strike moment — a brief "ORDER!" reveal before the winner shows.
+    if (!gaveled) {
+      return (
+        <Shell>
+          <div className="grid min-h-[60vh] place-items-center text-center">
+            <div>
+              <div className="wv-gavel text-7xl" aria-hidden>⚖️</div>
+              <div className="wv-order mt-4 text-2xl font-black uppercase tracking-[0.2em] text-gold-300">Order in the court</div>
+              <div className="mt-2 text-sm text-slate-400">The judge is handing down the verdict…</div>
+            </div>
+          </div>
+        </Shell>
+      );
+    }
     return (
       <Shell>
-        <div className="text-center">
-          <div className="text-xs uppercase tracking-widest text-brand-300">The Verdict</div>
-          <h2 className="mt-1 text-3xl font-extrabold text-white">{w.title}</h2>
-          {w.year && <div className="text-slate-400">({w.year})</div>}
+        <div className="wv-verdict-in">
+          <div className="text-center">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-gold-400/40 bg-gold-500/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.15em] text-gold-200">
+              <span aria-hidden>🔨</span> The verdict is in
+            </div>
+            <p className="mt-3 text-sm text-slate-300">The court hereby rules in favor of…</p>
+            <h2 className="mt-1 text-3xl font-extrabold text-white sm:text-4xl">{w.title}</h2>
+            {w.year && <div className="text-slate-400">({w.year})</div>}
+          </div>
+          <div className="mt-4 flex justify-center">
+            <Link href={`/app/title/${w.mediaType}/${w.id}`} className="h-52 w-36 overflow-hidden rounded-xl border border-gold-400/50 shadow-glow ring-2 ring-gold-300/40">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {w.posterUrl ? <img src={w.posterUrl} alt="" className="h-full w-full object-cover" /> : null}
+            </Link>
+          </div>
+          {w.streaming.length > 0 && <div className="mt-2 text-center text-xs text-slate-400">📺 {w.streaming.join(', ')}</div>}
+          <div className="mt-5 card p-4">
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-400">The Judge’s reasoning</div>
+            <ul className="mt-2 space-y-1.5 text-sm text-slate-200">{lines.map((l, i) => <li key={i} className="flex gap-2"><span className="text-brand-300">•</span>{l}</li>)}</ul>
+            <p className="mt-2 text-[11px] text-slate-500">From the real per-person scores and vetoes — no guessing.</p>
+          </div>
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            <Link href={`/app/title/${w.mediaType}/${w.id}`} className="btn-primary inline-flex justify-center">
+              ▶ Open {w.title.length > 18 ? 'the winner' : w.title} →
+            </Link>
+            <Link href="/app/together" className="btn-secondary inline-flex justify-center">⚖️ New round</Link>
+          </div>
         </div>
-        <div className="mt-4 flex justify-center">
-          <Link href={`/app/title/${w.mediaType}/${w.id}`} className="h-52 w-36 overflow-hidden rounded-xl border border-brand-400/40 shadow-glow">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {w.posterUrl ? <img src={w.posterUrl} alt="" className="h-full w-full object-cover" /> : null}
-          </Link>
-        </div>
-        {w.streaming.length > 0 && <div className="mt-2 text-center text-xs text-slate-400">📺 {w.streaming.join(', ')}</div>}
-        <div className="mt-5 card p-4">
-          <div className="text-xs font-bold uppercase tracking-wide text-slate-400">The Judge’s reasoning</div>
-          <ul className="mt-2 space-y-1.5 text-sm text-slate-200">{lines.map((l, i) => <li key={i} className="flex gap-2"><span className="text-brand-300">•</span>{l}</li>)}</ul>
-          <p className="mt-2 text-[11px] text-slate-500">From the real per-person scores and vetoes — no guessing.</p>
-        </div>
-        <Link href="/app" className="btn-primary mt-5 inline-flex w-full justify-center">Done — let’s watch</Link>
       </Shell>
     );
   }

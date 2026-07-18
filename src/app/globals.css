@@ -145,3 +145,28 @@ body {
 :root[data-simple='1'] [data-simple-hide] {
   display: none !important;
 }
+
+/* Live Court — the gavel-strike reveal that hands down the verdict. */
+@keyframes wv-gavel-strike {
+  0%   { transform: rotate(-42deg) translateY(-8px); opacity: 0; }
+  35%  { transform: rotate(-42deg) translateY(-8px); opacity: 1; }
+  55%  { transform: rotate(6deg) translateY(4px); }
+  70%  { transform: rotate(-4deg) translateY(0); }
+  100% { transform: rotate(0deg) translateY(0); }
+}
+@keyframes wv-order-flash {
+  0%, 40% { opacity: 0; transform: scale(0.9); }
+  55%     { opacity: 1; transform: scale(1.06); }
+  85%     { opacity: 1; transform: scale(1); }
+  100%    { opacity: 0; transform: scale(1); }
+}
+@keyframes wv-verdict-in {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.wv-gavel { animation: wv-gavel-strike 1.5s cubic-bezier(0.3, 0.7, 0.2, 1) both; transform-origin: 80% 80%; }
+.wv-order { animation: wv-order-flash 1.7s ease-out both; }
+.wv-verdict-in { animation: wv-verdict-in 0.5s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .wv-gavel, .wv-order, .wv-verdict-in { animation: none; }
+}
