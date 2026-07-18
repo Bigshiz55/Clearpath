@@ -35,31 +35,28 @@ interface ResultItem {
   airing?: { network: string; time: string; airstamp: string } | null;
 }
 
+/** How far ahead a broadcast still counts as "what to watch" — 48 hours. A show
+ *  on hiatus whose next new episode is a fall premiere months out isn't
+ *  something you can watch now, so we simply don't show an airtime for it. */
+const AIRING_WINDOW_MS = 48 * 60 * 60 * 1000;
+
 /**
- * How to show a show's next airing. If it's on soon (within ~8 days) we surface a
- * bright, actionable listing — "8:00 PM · CBS · Tonight". If the next *new*
- * episode is far off (a show on hiatus, e.g. a fall premiere months away), we
- * show a calm "New episodes Oct 6, 2026" return date instead, with the year, so
- * a months-away date never looks like a broken or past listing.
+ * A show's next airing, but only when it's within the next 48 hours of the
+ * search — the window you can actually act on. Returns null otherwise (e.g. a
+ * premiere months away), so no months-out date ever shows up as an airtime.
+ * "8:00 PM · CBS · Tonight" / "… · Tomorrow" / "… · Wed Jul 23".
  */
-function airingInfo(a: { network: string; time: string; airstamp: string }): { text: string; soon: boolean } {
+function airingInfo(a: { network: string; time: string; airstamp: string }): { text: string } | null {
   const airMs = Date.parse(a.airstamp);
+  if (!Number.isFinite(airMs)) return null;
   const now = Date.now();
-  const d = new Date(airMs);
+  // Beyond the 48h window (or more than a few hours past) it isn't watch-now.
+  if (airMs - now > AIRING_WINDOW_MS || airMs - now < -3 * 60 * 60 * 1000) return null;
+
   const dayMs = 86_400_000;
-  const daysOut = (airMs - now) / dayMs;
-  const soon = daysOut <= 8;
-
-  // "Today" / "Tomorrow" for the near term; otherwise a weekday + date.
-  const today = new Date(now);
-  const isToday = d.toDateString() === today.toDateString();
+  const d = new Date(airMs);
+  const isToday = d.toDateString() === new Date(now).toDateString();
   const isTomorrow = new Date(now + dayMs).toDateString() === d.toDateString();
-
-  if (!soon) {
-    const far = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return { text: `New episodes ${far}`, soon: false };
-  }
-
   const day = isToday
     ? 'Tonight'
     : isTomorrow
@@ -74,7 +71,7 @@ function airingInfo(a: { network: string; time: string; airstamp: string }): { t
     h = h % 12 || 12;
     clock = `${h}:${m[2]} ${ampm}`;
   }
-  return { text: [clock, a.network, day].filter(Boolean).join(' · '), soon: true };
+  return { text: [clock, a.network, day].filter(Boolean).join(' · ') };
 }
 
 const CALL_STYLE: Record<string, string> = {
@@ -299,17 +296,12 @@ export function FinderUI({
                       <span className="text-xs text-slate-400">match · {it.generalScore} overall</span>
                     </div>
                     <p className="mt-1 line-clamp-2 text-sm text-slate-300">{it.reason}</p>
-                    {it.mediaType === 'tv' && it.airing && (() => {
-                      const info = airingInfo(it.airing);
+                    {(() => {
+                      const info = it.mediaType === 'tv' && it.airing ? airingInfo(it.airing) : null;
+                      if (!info) return null;
                       return (
-                        <div
-                          className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-bold ${
-                            info.soon
-                              ? 'border-brand-400/50 bg-brand-500/15 text-white'
-                              : 'border-white/12 bg-white/5 text-slate-300'
-                          }`}
-                        >
-                          <span aria-hidden className="text-base">{info.soon ? '📺' : '🗓️'}</span>
+                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 py-1.5 text-sm font-bold text-white">
+                          <span aria-hidden className="text-base">📺</span>
                           <span className="tabular-nums">{info.text}</span>
                         </div>
                       );
