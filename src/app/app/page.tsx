@@ -140,17 +140,8 @@ export default async function DiscoverPage() {
 
   return (
     <div className="space-y-8">
-      {/* Vintage Mode — a genuinely simple one-page experience for seniors. */}
-      <div className="flex justify-center">
-        <Link
-          href="/app/vintage"
-          className="inline-flex items-center gap-3 rounded-full border-2 border-amber-400/50 bg-amber-500/10 px-6 py-3 text-lg font-bold text-amber-100 transition hover:bg-amber-500/20"
-        >
-          <span className="text-2xl" aria-hidden>🧓</span> Vintage Mode — big &amp; simple
-        </Link>
-      </div>
-
-      {/* Welcome + 30-second tour, right at the top. */}
+      {/* Welcome + 30-second tour, right at the top. (Vintage Mode now lives in
+          the top nav, where the Simple-view toggle used to be.) */}
       <TonightHome tonight={tonight} isGuest={isGuest} />
 
       {/* HERO — decide right here: search, ask, and every tool on one screen. */}
@@ -187,11 +178,9 @@ export default async function DiscoverPage() {
           </Link>
         </div>
 
-        {/* Your opening statement — plain-English ask, or use the evidence controls */}
+        {/* Two ways to decide — say what you want, or build the case by hand —
+            both inside one outlined box (heading lives inside FinderUI now). */}
         <div>
-          <div className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
-            <span aria-hidden>⚖️</span> Your opening statement
-          </div>
           <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} providers={providerChips} personalServices={usingMyServices} />
         </div>
 

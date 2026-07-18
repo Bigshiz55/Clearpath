@@ -217,11 +217,21 @@ export function FinderUI({
 
   return (
     <div className="space-y-5">
-      {/* Hero — the judge & the bench on the left, your plain-English ask on the right */}
-      <div className={`grid gap-4 ${embedded ? '' : 'lg:grid-cols-2'}`}>
+      {/* On the home screen, both ways to search live inside ONE outlined box —
+          "say what you want" OR "build it by hand" — so it reads as two options
+          in a single section. Elsewhere the wrapper is transparent (`contents`). */}
+      <div className={embedded ? 'space-y-5 rounded-3xl border-2 border-brand-400/40 bg-brand-500/[0.05] p-4 sm:p-6' : 'contents'}>
+        {embedded && (
+          <div className="flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
+            <span aria-hidden>⚖️</span> Your opening statement
+          </div>
+        )}
+
+        {/* Hero — the judge & the bench on the left, your plain-English ask on the right */}
+        <div className={`grid gap-4 ${embedded ? '' : 'lg:grid-cols-2'}`}>
         {!embedded && <JudgeBench initialJudge={initialJudge} big />}
 
-        <div className="card flex flex-col gap-3 p-4">
+        <div className={embedded ? 'flex flex-col gap-3' : 'card flex flex-col gap-3 p-4'}>
           {!embedded && <div className="eyebrow-lg">⚖️ Try your case</div>}
           <textarea
             value={text}
@@ -325,16 +335,16 @@ export function FinderUI({
       )}
 
       {/* OR — type an opening statement above, or build the case with the controls. */}
-      <div className="flex items-center gap-3" aria-hidden>
-        <span className="h-px flex-1 bg-white/10" />
-        <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">or</span>
-        <span className="h-px flex-1 bg-white/10" />
+      <div className="flex items-center gap-4" aria-hidden>
+        <span className="h-0.5 flex-1 rounded-full bg-white/15" />
+        <span className="text-3xl font-black uppercase tracking-[0.15em] text-slate-300 sm:text-4xl">OR</span>
+        <span className="h-0.5 flex-1 rounded-full bg-white/15" />
       </div>
 
       {/* Submit your evidence — transparent, editable, no black box. */}
-      <div id="evidence" className="card space-y-4 p-4 scroll-mt-20">
-        <div className="eyebrow-lg">
-          🎛️ Submit your evidence
+      <div id="evidence" className={embedded ? 'space-y-4 scroll-mt-20' : 'card space-y-4 p-4 scroll-mt-20'}>
+        <div className="flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
+          <span aria-hidden>🎛️</span> Submit your evidence
         </div>
 
         {watchers.length > 0 && (
@@ -490,6 +500,7 @@ export function FinderUI({
         <button onClick={find} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
           {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
         </button>
+      </div>
       </div>
     </div>
   );

@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { Logo } from './Logo';
 import { SignOutButton } from './SignOutButton';
 import { GuestSaveButton } from './GuestSaveButton';
-import { SimpleModeToggle } from './SimpleModeToggle';
 import { MoreMenu, type NavLink } from './nav/MoreMenu';
 import { MobileNav } from './nav/MobileNav';
 
@@ -39,7 +38,14 @@ export function Nav({ personalLabel, isGuest = false }: { personalLabel?: string
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            <SimpleModeToggle />
+            <Link
+              href="/app/vintage"
+              title="Vintage Mode — a big, simple, easy-to-read screen"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-amber-500/10 px-2.5 py-1.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/20"
+            >
+              <span aria-hidden className="text-lg leading-none">🧓</span>
+              <span className="hidden sm:inline">Vintage mode</span>
+            </Link>
             {personalLabel && !isGuest && (
               <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 md:inline">
                 {personalLabel}
