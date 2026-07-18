@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
 import { saveOnboarding } from '@/lib/actions/profile';
+import { STREAMING_SERVICES } from '@/lib/services';
 import { useToast } from '@/components/Toast';
 
 const AVOIDABLE: PreferenceTrait[] = ['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn'];
@@ -33,8 +34,18 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
   const [avoid, setAvoid] = useState<Set<PreferenceTrait>>(new Set());
   const [love, setLove] = useState<Set<PreferenceTrait>>(new Set());
   const [usePreset, setUsePreset] = useState(false);
+  const [services, setServices] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function toggleService(id: number) {
+    setServices((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function toggle(set: Set<PreferenceTrait>, val: PreferenceTrait, setter: (s: Set<PreferenceTrait>) => void) {
     const next = new Set(set);
@@ -53,6 +64,7 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
       avoidTraits: Array.from(avoid),
       loveTraits: Array.from(love),
       usePreset: usePreset ? 'scott' : 'none',
+      services: Array.from(services),
     });
     setLoading(false);
     if (!res.ok) {
@@ -70,7 +82,7 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
   return (
     <div className="card w-full max-w-lg p-7">
       <div className="mb-5 flex items-center gap-2">
-        {[1, 2].map((s) => (
+        {[1, 2, 3].map((s) => (
           <div key={s} className={`h-1.5 flex-1 rounded-full ${step >= s ? 'bg-brand-500' : 'bg-white/10'}`} />
         ))}
       </div>
@@ -166,6 +178,47 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
 
           <div className="flex gap-2">
             <button onClick={() => setStep(1)} className="btn-ghost">Back</button>
+            <button onClick={() => setStep(3)} className="btn-primary flex-1">
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-5">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Which channels do you have?</h1>
+            <p className="mt-1 text-sm text-slate-400">
+              Tap every service you subscribe to. These are the only ones shown on your search screen — you can add or
+              remove them anytime in Settings.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {STREAMING_SERVICES.map((s) => {
+              const on = services.has(s.id);
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => toggleService(s.id)}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition ${
+                    on ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'
+                  }`}
+                >
+                  <span aria-hidden>{s.emoji}</span>
+                  {s.name}
+                  {on && <span className="text-xs font-bold text-emerald-300">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-slate-500">{services.size} selected · you can skip this and set it later.</p>
+
+          {error && <p className="text-sm text-red-300">{error}</p>}
+
+          <div className="flex gap-2">
+            <button onClick={() => setStep(2)} className="btn-ghost">Back</button>
             <button onClick={submit} disabled={loading} className="btn-primary flex-1">
               {loading ? 'Saving…' : 'Finish & start watching'}
             </button>

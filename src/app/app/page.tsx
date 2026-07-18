@@ -5,6 +5,7 @@ import { SearchBar } from '@/components/SearchBar';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
 import { listCrews } from '@/lib/actions/crews';
 import { getBrowseProviders } from '@/lib/browse';
+import { STREAMING_SERVICES } from '@/lib/services';
 import { getUpcomingTv } from '@/lib/onTv';
 import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
@@ -95,6 +96,16 @@ export default async function DiscoverPage() {
       topProviders.push({ id: hit.id, name: c.label });
     }
   }
+  // The search screen's "What you have" is personal: show only the services this
+  // user picked (in onboarding or Settings). Fall back to the common catalog when
+  // they haven't chosen any yet, so a brand-new user still has something to pick.
+  const seenSvc = new Set<number>();
+  const myServiceChips = services
+    .map((id) => STREAMING_SERVICES.find((s) => s.id === id || s.ids.includes(id)))
+    .filter((s): s is (typeof STREAMING_SERVICES)[number] => Boolean(s) && !seenSvc.has(s!.id) && (seenSvc.add(s!.id), true))
+    .map((s) => ({ id: s.id, name: s.name }));
+  const usingMyServices = myServiceChips.length > 0;
+  const providerChips = usingMyServices ? myServiceChips : topProviders;
   const watchers: WatcherOption[] = [];
   try {
     const { crews } = await listCrews();
@@ -181,7 +192,7 @@ export default async function DiscoverPage() {
           <div className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
             <span aria-hidden>⚖️</span> Your opening statement
           </div>
-          <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} providers={topProviders} />
+          <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} providers={providerChips} personalServices={usingMyServices} />
         </div>
 
         {/* TV Guide Detective (left) + Can't-decide court (right) — big, side by side */}

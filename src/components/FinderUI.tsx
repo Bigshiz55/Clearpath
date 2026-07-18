@@ -148,14 +148,17 @@ export function FinderUI({
   initialJudge = null,
   embedded = false,
   providers = [],
+  personalServices = false,
 }: {
   hasServices: boolean;
   watchers?: WatcherOption[];
   initialJudge?: Judge | null;
   /** On the home screen the judge already lives elsewhere, so hide the bench. */
   embedded?: boolean;
-  /** Top streaming services to offer as "what I have" checkboxes. */
+  /** Streaming services to offer as "what I have" checkboxes. */
   providers?: { id: number; name: string }[];
+  /** True when `providers` is the user's own saved services (not the catalog). */
+  personalServices?: boolean;
 }) {
   const [text, setText] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
@@ -383,7 +386,12 @@ export function FinderUI({
 
           {providers.length > 0 && (
             <div>
-              <div className="label">What you have</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="label">{personalServices ? 'Your services' : 'What you have'}</div>
+                <a href="/app/settings" className="text-[11px] font-semibold text-brand-300 hover:text-brand-200">
+                  {personalServices ? 'Edit in Settings' : 'Set up my services'}
+                </a>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {(showAllProviders ? providers : providers.slice(0, 24)).map((p) => {
                   const on = (q.providerIds ?? []).includes(p.id);
@@ -406,7 +414,11 @@ export function FinderUI({
                   </button>
                 )}
               </div>
-              <p className="mt-1 text-[11px] text-slate-400">Check the services you have — results prefer what you can watch.</p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                {personalServices
+                  ? 'Your saved services — tap any to narrow results to just those. Add or remove them in Settings.'
+                  : 'Check the services you have — results prefer what you can watch. Save them in Settings so only yours show here.'}
+              </p>
             </div>
           )}
         </div>

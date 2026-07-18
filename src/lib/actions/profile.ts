@@ -45,6 +45,7 @@ const onboardingSchema = z.object({
   avoidTraits: z.array(z.enum(AVOIDABLE as [PreferenceTrait, ...PreferenceTrait[]])).default([]),
   loveTraits: z.array(z.enum(LOVABLE as [PreferenceTrait, ...PreferenceTrait[]])).default([]),
   usePreset: z.enum(['none', 'scott']).default('none'),
+  services: z.array(z.number().int().positive()).max(40).default([]),
 });
 
 export async function saveOnboarding(input: z.infer<typeof onboardingSchema>): Promise<ActionResult> {
@@ -97,6 +98,17 @@ export async function saveOnboarding(input: z.infer<typeof onboardingSchema>): P
       ];
     }
     await writeRules(supabase, user.id, rules);
+
+    // Save the streaming services they picked (what "What you have" will show on
+    // their own search screen). Optional and forgiving: a pre-migration DB that
+    // lacks the column simply skips this — onboarding still succeeds.
+    if (v.services.length > 0) {
+      const unique = Array.from(new Set(v.services));
+      const { error: svcErr } = await supabase.from('profiles').update({ my_services: unique }).eq('id', user.id);
+      if (svcErr && !(svcErr.code === '42703' || /my_services/.test(svcErr.message))) {
+        return { ok: false, error: svcErr.message };
+      }
+    }
 
     // Ensure a default watchlist exists.
     const { data: wl } = await supabase
