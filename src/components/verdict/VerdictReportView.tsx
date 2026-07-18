@@ -155,7 +155,6 @@ export function VerdictReportView({
         primaryCall={report.primaryCall}
         tier={report.tier}
         oneLiner={report.oneLiner}
-        watchVerdictScore={report.general.score}
         matchScore={report.personal.score}
         matchLabel={report.personal.label}
         sources={report.general.sources}

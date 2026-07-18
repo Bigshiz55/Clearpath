@@ -1,7 +1,6 @@
 import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier, WatchProviders } from '@/lib/types';
 import { episodeSummary } from '@/lib/tmdb/meta-helpers';
 import { originSummary } from '@/lib/origin';
-import { LogoMark } from '@/components/Logo';
 
 function callStyleFor(call: PrimaryCall): string {
   return call === 'WATCH IT'
@@ -21,7 +20,6 @@ export function AtAGlance({
   primaryCall,
   tier,
   oneLiner,
-  watchVerdictScore,
   matchScore,
   matchLabel,
   sources,
@@ -30,7 +28,6 @@ export function AtAGlance({
   primaryCall: PrimaryCall;
   tier: VerdictTier;
   oneLiner: string;
-  watchVerdictScore: number;
   matchScore: number;
   matchLabel: string;
   sources: RatingSource[];
@@ -67,26 +64,14 @@ export function AtAGlance({
             <span className="text-[9px] uppercase tracking-wide opacity-70">Stream / Skip</span>
           </span>
         </div>
-        {/* The WatchVerdict score — carried inside the site's own mark, prominent. */}
-        <div className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-brand-400/40 bg-brand-500/10 px-3 py-1.5">
-          <LogoMark
-            box="h-12 w-12 rounded-xl"
-            inner="h-9 w-9"
-            overlay={<span className="text-lg font-black tabular-nums text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{watchVerdictScore}</span>}
-          />
-          <span className="flex flex-col leading-tight">
-            <span className="text-[10px] font-black uppercase tracking-wide text-brand-100">WatchVerdict</span>
-            <span className="text-[9px] uppercase tracking-wide text-slate-400">Score / 100</span>
-          </span>
-        </div>
-        {/* WV Fit — your personal match, in a hot-pink box so it pops. */}
-        <div className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-pink-400/60 bg-gradient-to-br from-pink-500/30 to-fuchsia-600/20 px-3 py-1.5 shadow-[0_0_18px_rgba(236,72,153,0.28)]">
-          <span className="grid h-11 w-11 place-items-center rounded-lg bg-pink-500/35 text-xl font-black tabular-nums text-white ring-1 ring-pink-300/50">
+        {/* WatchVerdict Fit — your personal match, the hero number, in hot pink. */}
+        <div className="flex flex-shrink-0 items-center gap-2.5 rounded-xl border-2 border-pink-400/80 bg-gradient-to-br from-pink-500/45 to-rose-500/30 px-3.5 py-2 shadow-[0_0_22px_rgba(244,63,94,0.4)]">
+          <span className="grid h-12 w-12 place-items-center rounded-lg bg-pink-500/60 text-2xl font-black tabular-nums text-white ring-2 ring-pink-200/70">
             {matchScore}
           </span>
           <span className="flex flex-col leading-tight">
-            <span className="text-[11px] font-black uppercase tracking-wide text-pink-50">WV Fit</span>
-            <span className="text-[9px] uppercase tracking-wide text-pink-200/90">({matchLabel.replace(/\s*match$/i, '')})</span>
+            <span className="text-[12px] font-black uppercase tracking-wide text-white">WatchVerdict Fit</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-pink-100/90">({matchLabel.replace(/\s*match$/i, '')})</span>
           </span>
         </div>
         {available.map((s) => {
@@ -129,6 +114,8 @@ function iconFor(name: string): { node: React.ReactNode; label: string } {
       };
     case 'Rotten Tomatoes':
       return { label: 'Tomatometer', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#fa320a] text-base">🍅</span> };
+    case 'RT Audience':
+      return { label: 'Popcorn', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#faa71a] text-base">🍿</span> };
     case 'Metacritic':
       return { label: 'Metacritic', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#00ce7a] text-[11px] font-black text-emerald-950">M</span> };
     case 'TMDB Audience':
