@@ -11,18 +11,6 @@ function callStyleFor(call: PrimaryCall): string {
       : 'border-red-400/40 bg-red-500/15 text-red-100';
 }
 
-function ScoreChip({ icon, tint, value, label }: { icon: string; tint: string; value: string; label: string }) {
-  return (
-    <div className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-      <span className={`grid h-7 w-7 place-items-center rounded-md text-sm ${tint}`}>{icon}</span>
-      <span className="flex flex-col leading-tight">
-        <span className="text-sm font-extrabold tabular-nums text-white">{value}</span>
-        <span className="text-[9px] uppercase tracking-wide text-slate-500">{label}</span>
-      </span>
-    </div>
-  );
-}
-
 /**
  * Top-of-page summary: the headline call plus every score in one glanceable
  * strip — WatchVerdict score, personal match, and all *available* external
@@ -91,7 +79,16 @@ export function AtAGlance({
             <span className="text-[9px] uppercase tracking-wide text-slate-400">Score / 100</span>
           </span>
         </div>
-        <ScoreChip icon="🎯" tint="bg-amber-500/25" value={`${matchScore}`} label={matchLabel} />
+        {/* WV Fit — your personal match, in a hot-pink box so it pops. */}
+        <div className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-pink-400/60 bg-gradient-to-br from-pink-500/30 to-fuchsia-600/20 px-3 py-1.5 shadow-[0_0_18px_rgba(236,72,153,0.28)]">
+          <span className="grid h-11 w-11 place-items-center rounded-lg bg-pink-500/35 text-xl font-black tabular-nums text-white ring-1 ring-pink-300/50">
+            {matchScore}
+          </span>
+          <span className="flex flex-col leading-tight">
+            <span className="text-[11px] font-black uppercase tracking-wide text-pink-50">WV Fit</span>
+            <span className="text-[9px] uppercase tracking-wide text-pink-200/90">({matchLabel.replace(/\s*match$/i, '')})</span>
+          </span>
+        </div>
         {available.map((s) => {
           const { node, label } = iconFor(s.name);
           return (
