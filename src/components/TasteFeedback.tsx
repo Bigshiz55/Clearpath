@@ -62,11 +62,11 @@ export function TasteFeedback({
           e.stopPropagation();
           setOpen(true);
         }}
-        aria-label="Not for me — flag this title"
-        title="Not for me"
-        className="grid h-8 w-8 place-items-center rounded-lg border border-white/20 bg-black/55 text-white backdrop-blur transition hover:bg-black/75"
+        aria-label="Remove — tell us why"
+        title="Remove from your picks"
+        className="inline-flex items-center gap-1 rounded-lg border border-red-400/50 bg-black/60 px-2 py-1 text-[11px] font-bold text-red-100 backdrop-blur transition hover:bg-red-500/25"
       >
-        <span aria-hidden className="text-sm leading-none">🚫</span>
+        <span aria-hidden className="text-sm leading-none">🚫</span> Remove
       </button>
 
       {open &&
@@ -81,7 +81,7 @@ export function TasteFeedback({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="text-sm font-bold text-white">
-                Not for me — <span className="font-semibold text-slate-300">{title}</span>
+                🚫 Remove <span className="font-semibold text-slate-300">{title}</span> — why?
               </div>
               <p className="mt-0.5 text-xs text-slate-400">We’ll hide it from your picks; it stays in your watchlist to look up later.</p>
               <div className="mt-3 space-y-2">
