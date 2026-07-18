@@ -1,11 +1,9 @@
 import type { VerdictReport, ContentSignal, WatchlistStatus } from '@/lib/types';
 import Link from 'next/link';
-import { ScoreRing } from '@/components/ScoreRing';
 import { VerdictBadge, DispositionChip } from '@/components/VerdictBadge';
 import { ProviderRow } from '@/components/ProviderRow';
 import { Poster } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
-import { MatchMark, MATCH_TOOLTIP } from '@/components/MatchMark';
 import { CardRatings } from '@/components/CardRatings';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
@@ -31,10 +29,6 @@ const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   high: 'bg-red-500/15 text-red-200',
   unknown: 'bg-white/5 text-slate-500',
 };
-
-function confidenceLabel(c: 'high' | 'medium' | 'low'): string {
-  return c === 'high' ? 'High confidence' : c === 'medium' ? 'Moderate confidence' : 'Low confidence — limited data';
-}
 
 function Bar({ label, value }: { label: string; value: number }) {
   return (
@@ -92,22 +86,7 @@ export function VerdictReportView({
 
   return (
     <article className="space-y-6">
-      {/* At-a-glance summary — call + every score/rating in one strip, always first */}
-      <AtAGlance
-        primaryCall={report.primaryCall}
-        tier={report.tier}
-        oneLiner={report.oneLiner}
-        watchVerdictScore={report.general.score}
-        matchScore={report.personal.score}
-        matchLabel={report.personal.label}
-        sources={report.general.sources}
-        providers={report.providers}
-      />
-
-      {/* Can I watch it tonight on a plan I have? */}
-      <TonightBanner providers={report.providers} myServices={myServices} />
-
-      {/* Header */}
+      {/* Header — the movie placard */}
       <header className="card relative overflow-hidden">
         {backdrop && (
           <div className="absolute inset-0">
@@ -148,8 +127,6 @@ export function VerdictReportView({
               </div>
             )}
             {t.overview && <p className="mt-3 max-w-2xl text-sm text-slate-300">{t.overview}</p>}
-            {/* All ratings, right in the hero card — same row as every other card. */}
-            <CardRatings mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-3" />
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {t.trailerUrl && (
                 <a href={t.trailerUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex">
@@ -172,29 +149,21 @@ export function VerdictReportView({
         </div>
       </header>
 
-      {/* Score summary */}
-      <section className="card p-5 sm:p-6">
-        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-around">
-          <ScoreRing score={report.general.score} label="WatchVerdict Score" sublabel={confidenceLabel(report.general.confidence)} accent="brand" size={128} />
-          <div className="hidden h-24 w-px bg-white/10 sm:block" />
-          <ScoreRing
-            score={report.personal.score}
-            label={report.personal.label}
-            sublabel={`base ${report.personal.baseScore} → ${report.personal.score}`}
-            accent="gold"
-            size={128}
-            icon={<MatchMark />}
-            title={MATCH_TOOLTIP}
-          />
-        </div>
-        <div className="mt-5 flex flex-col items-center gap-3 text-center">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <VerdictBadge tier={report.tier} size="lg" />
-            <DispositionChip disposition={report.watchlistDisposition} />
-          </div>
-          <p className="max-w-xl text-slate-200">{report.oneLiner}</p>
-        </div>
-      </section>
+      {/* Ratings — right under the placard: the call + every score in one strip,
+          with the WatchVerdict score carried inside the site's own mark. */}
+      <AtAGlance
+        primaryCall={report.primaryCall}
+        tier={report.tier}
+        oneLiner={report.oneLiner}
+        watchVerdictScore={report.general.score}
+        matchScore={report.personal.score}
+        matchLabel={report.personal.label}
+        sources={report.general.sources}
+        providers={report.providers}
+      />
+
+      {/* Can I watch it tonight on a plan I have? */}
+      <TonightBanner providers={report.providers} myServices={myServices} />
 
       {/* Will you finish it? — honest, from your own history */}
       {finishCheck && <FinishCheck assessment={finishCheck} />}

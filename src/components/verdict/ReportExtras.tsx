@@ -1,6 +1,7 @@
 import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier, WatchProviders } from '@/lib/types';
 import { episodeSummary } from '@/lib/tmdb/meta-helpers';
 import { originSummary } from '@/lib/origin';
+import { LogoMark } from '@/components/Logo';
 
 function callStyleFor(call: PrimaryCall): string {
   return call === 'WATCH IT'
@@ -78,7 +79,18 @@ export function AtAGlance({
             <span className="text-[9px] uppercase tracking-wide opacity-70">Stream / Skip</span>
           </span>
         </div>
-        <ScoreChip icon="🍿" tint="bg-brand-500/25" value={`${watchVerdictScore}`} label="WatchVerdict" />
+        {/* The WatchVerdict score — carried inside the site's own mark, prominent. */}
+        <div className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-brand-400/40 bg-brand-500/10 px-3 py-1.5">
+          <LogoMark
+            box="h-12 w-12 rounded-xl"
+            inner="h-9 w-9"
+            overlay={<span className="text-lg font-black tabular-nums text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{watchVerdictScore}</span>}
+          />
+          <span className="flex flex-col leading-tight">
+            <span className="text-[10px] font-black uppercase tracking-wide text-brand-100">WatchVerdict</span>
+            <span className="text-[9px] uppercase tracking-wide text-slate-400">Score / 100</span>
+          </span>
+        </div>
         <ScoreChip icon="🎯" tint="bg-amber-500/25" value={`${matchScore}`} label={matchLabel} />
         {available.map((s) => {
           const { node, label } = iconFor(s.name);
