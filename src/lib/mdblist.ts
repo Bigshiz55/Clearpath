@@ -68,14 +68,14 @@ export async function getMdbRatings(
   const key = serverEnv.mdblistKey();
   if (!key) return null;
 
-  const url = new URL('https://api.mdblist.com/');
+  // MDBList's media endpoint is REST: /{imdb|tmdb}/{movie|show}/{id}. The root
+  // host (https://api.mdblist.com/) just returns API docs with no `ratings`, so
+  // the old query-param form silently yielded null for every title. Prefer the
+  // IMDb id when we have it; otherwise use the TMDB id.
+  const kind = mediaType === 'tv' ? 'show' : 'movie';
+  const path = imdbId ? `imdb/${kind}/${encodeURIComponent(imdbId)}` : `tmdb/${kind}/${tmdbId}`;
+  const url = new URL(`https://api.mdblist.com/${path}`);
   url.searchParams.set('apikey', key);
-  // Prefer the id we always have (TMDB); MDBList also accepts imdb via `i`.
-  if (imdbId) url.searchParams.set('i', imdbId);
-  else {
-    url.searchParams.set('tm', String(tmdbId));
-    url.searchParams.set('m', mediaType === 'tv' ? 'show' : 'movie');
-  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6000);

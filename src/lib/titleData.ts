@@ -91,6 +91,9 @@ async function hydrateScoring(mediaType: MediaType, id: number, region: string):
     meta.rottenTomatoes = critics.rottenTomatoes;
     meta.metascore = critics.metascore;
   }
+  // Also pull the RT audience/Popcorn from MDBList here, so the card ratings
+  // endpoint (/api/ratings) gets it too — not just the full title page.
+  await mergeMdbRatings(meta);
   return { meta, providers };
 }
 
