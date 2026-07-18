@@ -3,17 +3,21 @@
 import { useState } from 'react';
 import { SaveButton } from './SaveButton';
 import { RatingsStrip } from './RatingsStrip';
+import { TasteFeedback } from './TasteFeedback';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import type { WatchNowItem } from '@/lib/watchNow';
 
 export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
   const [open, setOpen] = useState<QuickLookTarget | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+
+  const shown = items.filter((t) => !hidden.has(`${t.mediaType}-${t.id}`));
 
   return (
     <>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {items.map((t) => {
+        {shown.map((t) => {
           const v = verdictVisualForCall(t.primaryCall);
           return (
             <div key={`${t.mediaType}-${t.id}`} className="card group relative h-full overflow-hidden transition hover:border-white/20 hover:shadow-glow">
@@ -38,6 +42,16 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
               </button>
               <div className="absolute right-2 top-2 z-10">
                 <SaveButton tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
+              </div>
+              <div className="absolute left-2 top-2 z-10">
+                <TasteFeedback
+                  tmdbId={t.id}
+                  mediaType={t.mediaType}
+                  title={t.title}
+                  year={t.year}
+                  posterPath={t.posterPath}
+                  onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
+                />
               </div>
               <div className="p-3">
                 <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block w-full text-left">

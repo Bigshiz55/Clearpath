@@ -36,13 +36,20 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
   const onMine = ready.filter((r) => r.kind === 'mine');
   const onFree = ready.filter((r) => r.kind === 'free');
 
+  // Titles the user has flagged (dropped / seen) never resurface in picks.
+  const { data: handledRows } = uid
+    ? await supabase.from('watchlist_items').select('tmdb_id, media_type').eq('user_id', uid).in('status', ['dropped', 'watched'])
+    : { data: null };
+  const handled = new Set((handledRows ?? []).map((r) => `${r.media_type === 'tv' ? 'tv' : 'movie'}-${r.tmdb_id}`));
+  const freePool = free.filter((f) => !handled.has(`${f.mediaType}-${f.id}`));
+
   // Rank every Watch Now pool by the user's Taste-DNA (best fit first) so the
   // whole page delivers on its DNA promise. rankByDna no-ops (original order,
   // personalized:false) for guests or users without enough rating history yet.
   const [rankedMine, rankedOnFree, rankedFree] = await Promise.all([
     rankByDna(supabase, uid, onMine),
     rankByDna(supabase, uid, onFree),
-    rankByDna(supabase, uid, free),
+    rankByDna(supabase, uid, freePool),
   ]);
 
   const readyContent = (

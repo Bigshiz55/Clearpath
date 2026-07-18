@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { MediaType } from '@/lib/types';
 import { CardRatings } from './CardRatings';
 import { SaveButton } from './SaveButton';
+import { TasteFeedback } from './TasteFeedback';
 
 interface PosterCardProps {
   href?: string;
@@ -58,6 +59,12 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
       : saveId != null
         ? <SaveButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
         : null;
+  // Every placard everywhere also gets the "not for me" flag (feeds your DNA),
+  // unless the caller explicitly opts out of overlays with `overlay={null}`.
+  const feedback =
+    overlay !== null && saveId != null ? (
+      <TasteFeedback tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+    ) : null;
   const heading = (
     <>
       <div className="line-clamp-2 text-sm font-semibold text-white">{title}</div>
@@ -78,7 +85,12 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 backdrop-blur">
           {mediaType === 'movie' ? 'Movie' : 'TV'}
         </span>
-        {resolvedOverlay && <div className="absolute right-2 top-2 z-10">{resolvedOverlay}</div>}
+        {(resolvedOverlay || feedback) && (
+          <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1.5">
+            {resolvedOverlay}
+            {feedback}
+          </div>
+        )}
       </div>
       <div className="p-3">
         {href ? <Link href={href} className="block">{heading}</Link> : heading}
