@@ -76,6 +76,8 @@ export interface FinderQuery {
   minYear?: number | null;
   /** Genre ids to exclude (content comfort — e.g. horror). */
   excludeGenreIds?: number[];
+  /** TMDB keyword ids for trope/vibe filtering (heist, dystopia, feel-good…). */
+  keywordIds?: number[];
 }
 
 export interface FinderItem {
@@ -188,6 +190,7 @@ export async function runFinder(
           maxYear: q.maxYear ?? undefined,
           minYear: q.minYear ?? undefined,
           excludeGenreIds: q.excludeGenreIds,
+          keywordIds: q.keywordIds,
           sortBy: 'popularity.desc',
           page,
         }),

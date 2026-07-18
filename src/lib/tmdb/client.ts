@@ -294,6 +294,8 @@ export interface DiscoverOptions {
   minYear?: number;
   /** Exclude these TMDB genre ids (without_genres) — e.g. horror for "keep it clean". */
   excludeGenreIds?: number[];
+  /** TMDB keyword ids (with_keywords) — trope/subject/vibe filtering (OR). */
+  keywordIds?: number[];
   page?: number;
 }
 
@@ -316,6 +318,7 @@ export async function discoverTitles(
   };
   if (opts.genreIds && opts.genreIds.length > 0) params.with_genres = opts.genreIds.join('|');
   if (opts.excludeGenreIds && opts.excludeGenreIds.length > 0) params.without_genres = opts.excludeGenreIds.join(',');
+  if (opts.keywordIds && opts.keywordIds.length > 0) params.with_keywords = opts.keywordIds.join('|'); // OR — any matching trope
   // Monetization: an explicit filter wins; otherwise, when filtering by provider,
   // default to the "included" tiers so results are things you can actually stream.
   const monetization = opts.monetization ?? (opts.providerIds && opts.providerIds.length > 0 ? 'flatrate|free|ads' : undefined);
@@ -868,6 +871,25 @@ export async function searchPeople(query: string): Promise<PersonHit[]> {
       profilePath: r.profile_path ?? null,
       knownFor: (r.known_for ?? []).map((k) => k.title ?? k.name).filter(Boolean).slice(0, 2).join(', '),
     }));
+}
+
+/**
+ * Resolve trope/vibe words to TMDB keyword ids (e.g. "heist" → 9748), so the
+ * finder can filter by subject matter, not just genre. Returns the first, most
+ * relevant id per term. Best-effort: an unresolved term is simply skipped.
+ */
+export async function searchKeywords(terms: string[]): Promise<number[]> {
+  const out: number[] = [];
+  for (const term of terms.slice(0, 4)) {
+    const q = term.trim();
+    if (!q) continue;
+    const data = await tmdbFetch<{ results?: Array<{ id: number; name: string }> }>('/search/keyword', {
+      query: q,
+    }).catch(() => ({ results: [] as Array<{ id: number; name: string }> }));
+    const hit = data.results?.[0];
+    if (hit && !out.includes(hit.id)) out.push(hit.id);
+  }
+  return out;
 }
 
 export interface ProviderCatalogEntry {

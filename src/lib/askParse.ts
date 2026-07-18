@@ -3,7 +3,7 @@ import { serverEnv } from '@/lib/env';
 import type { FinderQuery } from '@/lib/finder';
 import { EMPTY_QUERY } from '@/lib/finderParse';
 import { genreIdFromName } from '@/lib/finderGenres';
-import { searchPeople } from '@/lib/tmdb/client';
+import { searchPeople, searchKeywords } from '@/lib/tmdb/client';
 
 /**
  * Turn a free-form ask into structured search filters using the LLM — so the
@@ -34,31 +34,44 @@ interface RawAi {
   liveTv?: boolean;
   pace?: number | null;
   people?: string[];
+  keywords?: string[];
+  similarTo?: string;
   count?: number | null;
 }
 
-const SYSTEM = `You convert a person's plain-English request for something to watch into JSON search filters. Return ONLY a JSON object. Omit fields you're unsure about (do not guess).
+const SYSTEM = `You convert a person's plain-English request for something to watch into JSON search filters. Understand VIBES, TONE, PACING, TROPES, NEGATIONS, and "like X" comparisons — not just literal keywords. Return ONLY a JSON object. Omit fields you're unsure about (do not guess).
 
 Fields:
 - mediaType: "movie" | "tv" | "any"
 - genres: array of genre names from: action, adventure, animation, comedy, crime, documentary, drama, family, fantasy, history, horror, music, mystery, romance, "science fiction", thriller, war, western
-- excludeGenres: genre names to AVOID (e.g. "no horror")
+- excludeGenres: genre names to AVOID
+- keywords: array of short trope/subject/setting words (lowercase) that a movie database would tag, e.g. "heist", "time loop", "based on a true story", "corporate", "dystopia", "courtroom", "road trip", "revenge", "coming of age", "small town", "one location". Use these for specific vibes/tropes that aren't genres.
 - maxRuntimeMinutes: number (movies) if they mention a length limit ("under 2 hours" -> 120)
 - sinceYears: number, if they want recent titles ("from the last 5 years" -> 5; "90s" is not this)
-- minAudiencePct: 0-100, audience/popcorn score threshold ("over 70%" -> 70)
-- minImdb: 0-10, IMDb rating threshold ("imdb above 8" -> 8)
+- minAudiencePct: 0-100, audience/popcorn score threshold. Also set ~75 for "well-reviewed / critically loved / the best / acclaimed".
+- minImdb: 0-10, IMDb rating threshold
 - minMatchPct: 0-100, personal match threshold
 - englishAudioOnly: true if they want English audio
 - allEpisodesOut: true if they want a fully-released/bingeable show
 - upcoming: true if they want unreleased/upcoming titles
 - liveTv: true if they specifically want what's on live TV
-- pace: 0 (slow burn) to 100 (fast/adrenaline) if implied
-- people: array of actor/director names mentioned ("Sigourney Weaver" -> ["Sigourney Weaver"])
+- pace: 0 (slow burn) to 100 (fast/adrenaline). Infer from vibe: "slow-burn/meditative/quiet/atmospheric" -> ~15; "cozy/comfort/easy" -> ~35; "fast-paced/edge-of-your-seat/relentless/pulse-pounding" -> ~90.
+- similarTo: a single reference TITLE if they compare ("like Succession", "in the vein of Fargo") — the show/movie name only.
+- people: array of actor/director names mentioned
 - count: number of results requested ("five" -> 5)
+
+INFERENCE RULES:
+- "like Succession but a movie" -> {"mediaType":"movie","similarTo":"Succession","keywords":["corporate","family drama"],"genres":["drama"]}
+- "no sad endings / nothing depressing / feel-good only" -> excludeGenres tends to add "drama" is WRONG; instead add keywords:["feel good"] and DON'T force a downer genre.
+- "nothing too scary / not violent" -> excludeGenres:["horror"] (and "war" if violence).
+- "highly stylized / visually stunning / great cinematography" -> keep genres/pace; these aren't filterable, so just don't block on them.
+- Map tone words to genres+pace: "cozy mystery" -> genres:["mystery"], pace:35; "gritty crime" -> genres:["crime"], pace:60; "mind-bending sci-fi" -> genres:["science fiction"], keywords:["mind bending"].
 
 Examples:
 "five Sigourney Weaver movies with an audience score over 70%" -> {"mediaType":"movie","people":["Sigourney Weaver"],"minAudiencePct":70,"count":5}
 "a slow burn korean thriller under two hours, no gore" -> {"mediaType":"movie","genres":["thriller"],"maxRuntimeMinutes":120,"pace":15}
+"a fast-paced corporate thriller like Succession but a movie" -> {"mediaType":"movie","genres":["thriller","drama"],"keywords":["corporate"],"similarTo":"Succession","pace":85}
+"cozy feel-good shows, nothing sad, all out so i can binge" -> {"mediaType":"tv","keywords":["feel good"],"pace":35,"allEpisodesOut":true}
 "bingeable sci-fi shows imdb above 8" -> {"mediaType":"tv","genres":["science fiction"],"minImdb":8,"allEpisodesOut":true}`;
 
 async function toQuery(raw: RawAi): Promise<AiAsk> {
@@ -82,6 +95,17 @@ async function toQuery(raw: RawAi): Promise<AiAsk> {
   if (raw.upcoming) q.upcoming = true;
   if (raw.liveTv) { q.liveOnly = true; q.mediaType = 'tv'; }
   if (typeof raw.pace === 'number') q.pace = Math.max(0, Math.min(100, raw.pace));
+
+  // Resolve trope/vibe words to TMDB keyword ids so we can filter by subject
+  // matter ("heist", "dystopia", "feel good"), not just genre.
+  const kwTerms = (Array.isArray(raw.keywords) ? raw.keywords : [])
+    .map((k) => String(k).trim())
+    .filter(Boolean)
+    .slice(0, 4);
+  if (kwTerms.length) {
+    const ids = await searchKeywords(kwTerms).catch(() => []);
+    if (ids.length) q.keywordIds = ids;
+  }
 
   // Resolve the first named person to a TMDB cast id (cast filtering is movie-only).
   const firstPerson = Array.isArray(raw.people) ? raw.people[0] : undefined;
