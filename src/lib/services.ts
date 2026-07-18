@@ -36,6 +36,28 @@ export const STREAMING_SERVICES: StreamingService[] = [
   { id: 207, name: 'The Roku Channel (free)', ids: [207], emoji: '🟪' },
 ];
 
+/**
+ * Live-TV / cable & fiber providers TMDB doesn't model as on-demand catalogs.
+ * They're selectable so a viewer can record what they actually have (a cable or
+ * fiber box, a live-TV bundle) — but they don't filter on-demand availability,
+ * since "having Xfinity" isn't a streaming catalog TMDB can match a title to.
+ * Ids are in a private 900000+ range so they never collide with a real TMDB id.
+ */
+export const LIVE_TV_PROVIDERS: StreamingService[] = [
+  { id: 900001, name: 'YouTube TV', ids: [900001], emoji: '📺' },
+  { id: 900002, name: 'Hulu + Live TV', ids: [900002], emoji: '📺' },
+  { id: 900003, name: 'Sling TV', ids: [900003], emoji: '📺' },
+  { id: 900004, name: 'DIRECTV / DIRECTV Stream', ids: [900004], emoji: '📡' },
+  { id: 900005, name: 'DISH Network', ids: [900005], emoji: '📡' },
+  { id: 900006, name: 'Verizon Fios TV', ids: [900006], emoji: '📡' },
+  { id: 900007, name: 'Xfinity (Comcast)', ids: [900007], emoji: '📡' },
+  { id: 900008, name: 'Spectrum (Charter)', ids: [900008], emoji: '📡' },
+  { id: 900009, name: 'Cox Contour', ids: [900009], emoji: '📡' },
+  { id: 900010, name: 'Optimum / Altice', ids: [900010], emoji: '📡' },
+  { id: 900011, name: 'AT&T U-verse', ids: [900011], emoji: '📡' },
+  { id: 900012, name: 'Antenna / Over-the-air', ids: [900012], emoji: '📶' },
+];
+
 /** Subscription/free types — the ones a plan "includes" (not rent/buy). */
 const INCLUDED_TYPES: ReadonlySet<WatchProvider['type']> = new Set(['flatrate', 'free', 'ads']);
 

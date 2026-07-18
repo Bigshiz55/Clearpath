@@ -45,7 +45,7 @@ const onboardingSchema = z.object({
   avoidTraits: z.array(z.enum(AVOIDABLE as [PreferenceTrait, ...PreferenceTrait[]])).default([]),
   loveTraits: z.array(z.enum(LOVABLE as [PreferenceTrait, ...PreferenceTrait[]])).default([]),
   usePreset: z.enum(['none', 'scott']).default('none'),
-  services: z.array(z.number().int().positive()).max(40).default([]),
+  services: z.array(z.number().int().positive()).max(120).default([]),
 });
 
 export async function saveOnboarding(input: z.infer<typeof onboardingSchema>): Promise<ActionResult> {
@@ -276,7 +276,7 @@ export async function getMyTaste(): Promise<MyTaste> {
 }
 
 const servicesSchema = z.object({
-  services: z.array(z.number().int().positive()).max(40),
+  services: z.array(z.number().int().positive()).max(120),
 });
 
 /** Save the user's streaming subscriptions (TMDB provider ids). */

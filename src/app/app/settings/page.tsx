@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
-import { getProfile, getPreferenceRules, personalLabelFor, getMyServices, getPublicActivity } from '@/lib/profile';
+import { getProfile, getPreferenceRules, personalLabelFor, getMyServices, getPublicActivity, regionFor } from '@/lib/profile';
+import { getBrowseProviders } from '@/lib/browse';
 import { isAdminEmail } from '@/lib/admin';
 import { SettingsView, type ShareRow } from '@/components/settings/SettingsView';
 
@@ -25,6 +26,13 @@ export default async function SettingsPage() {
     getPublicActivity(supabase, uid),
   ]);
 
+  // The full region provider catalog (real TMDB ids + names) so the services
+  // picker can be searched and is genuinely extensive — not a hardcoded 15.
+  const providerCatalog = (await getBrowseProviders(regionFor(profile)).catch(() => [])).map((p) => ({
+    id: p.id,
+    name: p.name,
+  }));
+
   const shares: ShareRow[] = ((sharesRes.data as Array<Record<string, unknown>> | null) ?? []).map((s) => ({
     token: s.token as string,
     kind: s.kind as string,
@@ -46,6 +54,7 @@ export default async function SettingsPage() {
       rules={rules}
       shares={shares}
       myServices={myServices}
+      providerCatalog={providerCatalog}
       publicActivity={publicActivity}
       isAdmin={isAdminEmail(user?.email)}
     />

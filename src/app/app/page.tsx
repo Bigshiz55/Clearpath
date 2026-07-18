@@ -99,11 +99,21 @@ export default async function DiscoverPage() {
   // The search screen's "What you have" is personal: show only the services this
   // user picked (in onboarding or Settings). Fall back to the common catalog when
   // they haven't chosen any yet, so a brand-new user still has something to pick.
+  // Resolve each saved service to a name for the search chips. Live-TV / cable
+  // boxes (private 900000+ ids) are skipped here — they're informational only
+  // and can't narrow on-demand results, so they'd be dead toggles on search.
   const seenSvc = new Set<number>();
+  const svcChipName = (id: number): string | null => {
+    if (id >= 900000) return null;
+    return (
+      STREAMING_SERVICES.find((s) => s.id === id || s.ids.includes(id))?.name ??
+      providerCatalog.find((p) => p.id === id)?.name ??
+      null
+    );
+  };
   const myServiceChips = services
-    .map((id) => STREAMING_SERVICES.find((s) => s.id === id || s.ids.includes(id)))
-    .filter((s): s is (typeof STREAMING_SERVICES)[number] => Boolean(s) && !seenSvc.has(s!.id) && (seenSvc.add(s!.id), true))
-    .map((s) => ({ id: s.id, name: s.name }));
+    .map((id) => ({ id, name: svcChipName(id) }))
+    .filter((x): x is { id: number; name: string } => Boolean(x.name) && !seenSvc.has(x.id) && (seenSvc.add(x.id), true));
   const usingMyServices = myServiceChips.length > 0;
   const providerChips = usingMyServices ? myServiceChips : topProviders;
   const watchers: WatcherOption[] = [];

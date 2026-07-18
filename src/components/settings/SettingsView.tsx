@@ -10,7 +10,7 @@ import { setPublicActivity } from '@/lib/actions/social';
 import { deactivateShare } from '@/lib/actions/share';
 import { deleteAccount } from '@/lib/actions/account';
 import { useToast } from '@/components/Toast';
-import { STREAMING_SERVICES } from '@/lib/services';
+import { STREAMING_SERVICES, LIVE_TV_PROVIDERS } from '@/lib/services';
 import { EnableNotifications } from '@/components/EnableNotifications';
 import { SimpleModeToggle } from '@/components/SimpleModeToggle';
 
@@ -39,6 +39,7 @@ export function SettingsView(props: {
   rules: PreferenceRule[];
   shares: ShareRow[];
   myServices: number[];
+  providerCatalog?: { id: number; name: string }[];
   publicActivity: boolean;
   isAdmin?: boolean;
 }) {
@@ -47,6 +48,34 @@ export function SettingsView(props: {
 
   const [services, setServices] = useState<Set<number>>(new Set(props.myServices));
   const [savingServices, setSavingServices] = useState(false);
+  const [svcQuery, setSvcQuery] = useState('');
+
+  // The everyday picks shown by default (real TMDB ids) + live-TV/cable boxes.
+  const POPULAR_SERVICES = [...STREAMING_SERVICES, ...LIVE_TV_PROVIDERS];
+  const catalog = props.providerCatalog ?? [];
+  // A name for any id we might need to render as a selected chip.
+  const serviceName = (id: number): string =>
+    POPULAR_SERVICES.find((s) => s.id === id)?.name ?? catalog.find((c) => c.id === id)?.name ?? `Service #${id}`;
+
+  // What to show: on a search, every matching real service + live-TV option;
+  // otherwise the popular set plus anything already selected (so picks from a
+  // prior search stay visible after you clear the box).
+  const svcQ = svcQuery.trim().toLowerCase();
+  const shownServices: { id: number; name: string; emoji?: string }[] = (() => {
+    if (svcQ) {
+      const fromPopular = POPULAR_SERVICES.filter((s) => s.name.toLowerCase().includes(svcQ));
+      const popularIds = new Set(fromPopular.map((s) => s.id));
+      const fromCatalog = catalog
+        .filter((c) => c.name.toLowerCase().includes(svcQ) && !popularIds.has(c.id))
+        .map((c) => ({ id: c.id, name: c.name }));
+      return [...fromPopular, ...fromCatalog].slice(0, 80);
+    }
+    const popularIds = new Set(POPULAR_SERVICES.map((s) => s.id));
+    const extras = Array.from(services)
+      .filter((id) => !popularIds.has(id))
+      .map((id) => ({ id, name: serviceName(id) }));
+    return [...extras, ...POPULAR_SERVICES];
+  })();
 
   const [publicOn, setPublicOn] = useState(props.publicActivity);
   const [savingPublic, setSavingPublic] = useState(false);
@@ -250,14 +279,24 @@ export function SettingsView(props: {
 
       {/* My streaming services */}
       <section className="card p-5">
-        <h2 className="text-lg font-semibold text-white">My streaming services</h2>
+        <h2 className="text-lg font-semibold text-white">My services &amp; channels</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Pick what you subscribe to. Every verdict will flag what’s{' '}
-          <span className="font-semibold text-emerald-300">✓ free on a plan you have</span> vs. what needs a rental —
-          so you can tell at a glance what you can actually watch tonight.
+          Pick everything you have — streaming apps, premium channels (Hallmark, Acorn, BritBox…), and your live-TV or
+          cable box (Verizon Fios, Xfinity, YouTube TV…). On-demand picks flag what’s{' '}
+          <span className="font-semibold text-emerald-300">✓ free on a plan you have</span> vs. a rental. Live-TV/cable
+          boxes are recorded for your reference (they aren’t on-demand catalogs, so they don’t filter results).
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {STREAMING_SERVICES.map((s) => (
+
+        <input
+          value={svcQuery}
+          onChange={(e) => setSvcQuery(e.target.value)}
+          placeholder="Search 500+ services & channels — e.g. Hallmark, Acorn, ESPN, Xfinity…"
+          className="input mt-4"
+          aria-label="Search services and channels"
+        />
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {shownServices.map((s) => (
             <button
               key={s.id}
               onClick={() => toggleService(s.id)}
@@ -267,15 +306,22 @@ export function SettingsView(props: {
                   : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10'
               }`}
             >
-              <span aria-hidden>{s.emoji}</span>
+              {s.emoji && <span aria-hidden>{s.emoji}</span>}
               {s.name}
               {services.has(s.id) && <span className="text-xs font-bold text-emerald-300">✓</span>}
             </button>
           ))}
+          {svcQ && shownServices.length === 0 && (
+            <p className="text-sm text-slate-400">No match for “{svcQuery}”. Try a shorter name.</p>
+          )}
         </div>
-        <button onClick={saveServices} disabled={savingServices} className="btn-primary mt-4">
-          {savingServices ? 'Saving…' : 'Save services'}
-        </button>
+
+        <div className="mt-4 flex items-center gap-3">
+          <button onClick={saveServices} disabled={savingServices} className="btn-primary">
+            {savingServices ? 'Saving…' : 'Save services'}
+          </button>
+          <span className="text-xs text-slate-400">{services.size} selected</span>
+        </div>
       </section>
 
       {/* Friends / public activity */}
