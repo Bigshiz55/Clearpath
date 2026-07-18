@@ -36,41 +36,47 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
   const onMine = ready.filter((r) => r.kind === 'mine');
   const onFree = ready.filter((r) => r.kind === 'free');
 
-  // Rank the free-tonight pool by the user's Taste-DNA (best fit first) so
-  // "Watch Now" delivers on its DNA promise. Falls back to the original order
-  // for users without enough rating history yet.
-  const { items: rankedFree, personalized: freeByDna } = user
-    ? await rankByDna(supabase, uid, free)
-    : { items: free.map((f) => ({ ...f, dnaFit: null })), personalized: false };
+  // Rank every Watch Now pool by the user's Taste-DNA (best fit first) so the
+  // whole page delivers on its DNA promise. rankByDna no-ops (original order,
+  // personalized:false) for guests or users without enough rating history yet.
+  const [rankedMine, rankedOnFree, rankedFree] = await Promise.all([
+    rankByDna(supabase, uid, onMine),
+    rankByDna(supabase, uid, onFree),
+    rankByDna(supabase, uid, free),
+  ]);
 
   const readyContent = (
     <div className="space-y-8">
-      {onMine.length > 0 && (
-        <section>
-          <h2 className="mb-1 text-lg font-semibold text-white">✅ On your services</h2>
-          <p className="mb-3 text-xs text-slate-400">From your watchlist, included in a plan you already have.</p>
-          <WatchNowGrid items={onMine} />
-        </section>
-      )}
-      {onFree.length > 0 && (
-        <section>
-          <h2 className="mb-1 text-lg font-semibold text-white">🆓 Free right now</h2>
-          <p className="mb-3 text-xs text-slate-400">From your watchlist, streaming free (with ads) today.</p>
-          <WatchNowGrid items={onFree} />
-        </section>
-      )}
-      {rankedFree.length > 0 && (
+      {rankedMine.items.length > 0 && (
         <section>
           <h2 className="mb-1 text-lg font-semibold text-white">
-            {freeByDna ? '🧬 Your DNA picks — free tonight' : '🍿 Free to watch tonight'}
+            {rankedMine.personalized ? '🧬 On your services — ranked by your DNA' : '✅ On your services'}
+          </h2>
+          <p className="mb-3 text-xs text-slate-400">From your watchlist, included in a plan you already have.</p>
+          <WatchNowGrid items={rankedMine.items} />
+        </section>
+      )}
+      {rankedOnFree.items.length > 0 && (
+        <section>
+          <h2 className="mb-1 text-lg font-semibold text-white">
+            {rankedOnFree.personalized ? '🧬 Free right now — ranked by your DNA' : '🆓 Free right now'}
+          </h2>
+          <p className="mb-3 text-xs text-slate-400">From your watchlist, streaming free (with ads) today.</p>
+          <WatchNowGrid items={rankedOnFree.items} />
+        </section>
+      )}
+      {rankedFree.items.length > 0 && (
+        <section>
+          <h2 className="mb-1 text-lg font-semibold text-white">
+            {rankedFree.personalized ? '🧬 Your DNA picks — free tonight' : '🍿 Free to watch tonight'}
           </h2>
           <p className="mb-3 text-xs text-slate-400">
-            {freeByDna
+            {rankedFree.personalized
               ? 'Free, ad-supported titles — ranked by how well they fit your Taste-DNA. No subscription needed.'
               : 'Popular right now on the free, ad-supported services — no subscription needed.'}
           </p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {rankedFree.map((t) => (
+            {rankedFree.items.map((t) => (
               <PosterCard
                 key={`${t.mediaType}-${t.id}`}
                 href={`/app/title/${t.mediaType}/${t.id}`}
