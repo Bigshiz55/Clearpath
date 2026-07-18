@@ -2,6 +2,9 @@ import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier, WatchProvid
 import { episodeSummary } from '@/lib/tmdb/meta-helpers';
 import { originSummary } from '@/lib/origin';
 
+// Niche community aggregators we don't surface — they read as "random stars".
+const HIDDEN_SOURCES = new Set(['Trakt', 'Letterboxd', 'Roger Ebert']);
+
 function callStyleFor(call: PrimaryCall): string {
   return call === 'WATCH IT'
     ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'
@@ -33,7 +36,7 @@ export function AtAGlance({
   sources: RatingSource[];
   providers: WatchProviders | null;
 }) {
-  const available = sources.filter((s) => s.available);
+  const available = sources.filter((s) => s.available && !HIDDEN_SOURCES.has(s.name));
   const streamNames = Array.from(
     new Set(
       (providers?.options ?? [])
@@ -64,14 +67,16 @@ export function AtAGlance({
             <span className="text-[9px] uppercase tracking-wide opacity-70">Stream / Skip</span>
           </span>
         </div>
-        {/* WatchVerdict Fit — your personal match, the hero number, in hot pink. */}
+        {/* The algorithm's score for this person — the hero number, in hot pink. */}
         <div className="flex flex-shrink-0 items-center gap-2.5 rounded-xl border-2 border-pink-400/80 bg-gradient-to-br from-pink-500/45 to-rose-500/30 px-3.5 py-2 shadow-[0_0_22px_rgba(244,63,94,0.4)]">
           <span className="grid h-12 w-12 place-items-center rounded-lg bg-pink-500/60 text-2xl font-black tabular-nums text-white ring-2 ring-pink-200/70">
             {matchScore}
           </span>
           <span className="flex flex-col leading-tight">
-            <span className="text-[12px] font-black uppercase tracking-wide text-white">WatchVerdict Fit</span>
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-pink-100/90">({matchLabel.replace(/\s*match$/i, '')})</span>
+            <span className="flex items-center gap-1 text-[12px] font-black uppercase tracking-wide text-white">
+              <span aria-hidden>🧠</span> {matchLabel.replace(/\s*match$/i, '')}
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-pink-100/90">Algorithm score</span>
           </span>
         </div>
         {available.map((s) => {
@@ -120,13 +125,15 @@ function iconFor(name: string): { node: React.ReactNode; label: string } {
       return { label: 'Metacritic', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#00ce7a] text-[11px] font-black text-emerald-950">M</span> };
     case 'TMDB Audience':
       return { label: 'audience', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#0d253f] text-[8px] font-black text-[#90cea1]">TMDB</span> };
+    case 'Metacritic Users':
+      return { label: 'MC users', node: <span className="grid h-7 w-7 place-items-center rounded-md border border-[#00ce7a]/60 text-[11px] font-black text-[#00ce7a]">M</span> };
     default:
       return { label: '', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-xs">★</span> };
   }
 }
 
 export function RatingIcons({ sources }: { sources: RatingSource[] }) {
-  const available = sources.filter((s) => s.available);
+  const available = sources.filter((s) => s.available && !HIDDEN_SOURCES.has(s.name));
   if (available.length === 0) {
     return <p className="text-sm text-slate-400">No external ratings available yet for this title.</p>;
   }
@@ -225,7 +232,7 @@ export function RecommendationConsensus({
   primaryCall: PrimaryCall;
   sources: RatingSource[];
 }) {
-  const available = sources.filter((s) => s.available);
+  const available = sources.filter((s) => s.available && !HIDDEN_SOURCES.has(s.name));
   const callStyle = callStyleFor(primaryCall);
 
   const Row = ({ icon, name, value, right }: { icon: string; name: string; value: string; right?: React.ReactNode }) => (
