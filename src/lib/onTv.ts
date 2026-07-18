@@ -254,19 +254,32 @@ function isoDate(ms: number): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
+/** We never surface a TV airing further out than this — "what's on" means the
+ *  next two days, never a listing weeks away. Enforced here so every caller
+ *  (home strip, TV Detective, Easy/Vintage) is bounded to the same window. */
+export const UPCOMING_TV_HORIZON_MS = 48 * 60 * 60 * 1000;
+
 /**
- * "Coming up on TV" for Easy Mode — the best-reviewed real airings still ahead
- * of `nowMs`, across today and the next couple of days. Skips news/talk noise,
- * favors well-rated shows, and returns them in time order so it reads like a
- * short, friendly what's-on list. Real TVmaze data only.
+ * "Coming up on TV" — the best-reviewed real airings between now and 48 hours
+ * from now. Skips news/talk noise, favors well-rated shows, and returns them in
+ * time order so it reads like a short, friendly what's-on list. The 48-hour cap
+ * is hard: anything further out (a show on hiatus, a fall premiere) is never
+ * shown. Real TVmaze data only.
  */
-export async function getUpcomingTv(country: string, nowMs: number, daysAhead = 3): Promise<Airing[]> {
-  const dates = Array.from({ length: daysAhead }, (_, i) => isoDate(nowMs + i * DAY_MS));
+export async function getUpcomingTv(country: string, nowMs: number, _daysAhead = 3): Promise<Airing[]> {
+  const horizon = nowMs + UPCOMING_TV_HORIZON_MS;
+  // Fetch every UTC date the 48h window can touch (up to 3, depending on the
+  // time of day), then filter strictly to [now, now+48h].
+  const spanDays = Math.ceil(UPCOMING_TV_HORIZON_MS / DAY_MS) + 1;
+  const dates = Array.from({ length: spanDays }, (_, i) => isoDate(nowMs + i * DAY_MS));
   const perDay = await Promise.all(dates.map((d) => getOnTvToday(country, d)));
 
   const upcoming = perDay
     .flat()
-    .filter((a) => !NOISE_TYPES.has(a.showType) && Date.parse(a.airstamp) >= nowMs);
+    .filter((a) => {
+      const ms = Date.parse(a.airstamp);
+      return !NOISE_TYPES.has(a.showType) && ms >= nowMs && ms <= horizon;
+    });
 
   // Rank by rating (unrated last), keep a healthy set, then show in time order.
   const ranked = [...upcoming].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 20);
