@@ -12,6 +12,7 @@ import { VerdictBadge } from '@/components/VerdictBadge';
 import { RecommendedForYou } from '@/components/RecommendedForYou';
 import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
+import { InstallHint } from '@/components/InstallHint';
 import { getTonight } from '@/lib/tonight';
 import { CourtroomDoors } from '@/components/CourtroomDoors';
 import { TvDetective } from '@/components/TvDetective';
@@ -87,6 +88,9 @@ export default async function DiscoverPage() {
 
   return (
     <div className="space-y-8">
+      {/* App-install nudge for testers — self-hides once installed/dismissed. */}
+      <InstallHint />
+
       {/* Welcome + 30-second tour, right at the top. (Vintage Mode now lives in
           the top nav, where the Simple-view toggle used to be.) */}
       <TonightHome tonight={tonight} isGuest={isGuest} />
