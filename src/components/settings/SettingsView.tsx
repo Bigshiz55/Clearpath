@@ -56,23 +56,42 @@ export function SettingsView(props: {
 
   // Popular premium channels & add-ons to also surface by default — resolved
   // from the real catalog by name (so IDs are correct and availability still
-  // matches), skipping the granular "X Amazon/Apple TV Channel" duplicates.
-  const EXTRA_CHANNELS = [
-    'britbox', 'acorn', 'hallmark', 'amc+', 'starz', 'showtime', 'mgm+', 'shudder',
-    'sundance now', 'mubi', 'bet+', 'discovery+', 'espn', 'crunchyroll', 'criterion',
+  // matches). We prefer the clean parent brand, but if TMDB only carries a
+  // "… Apple TV / Amazon Channel" variant (e.g. Hallmark+), we still surface it
+  // under a clean label so it's never missing from the picker.
+  const EXTRA_CHANNELS: { q: string; label: string }[] = [
+    { q: 'britbox', label: 'BritBox' },
+    { q: 'acorn', label: 'Acorn TV' },
+    { q: 'hallmark', label: 'Hallmark+' },
+    { q: 'amc+', label: 'AMC+' },
+    { q: 'starz', label: 'Starz' },
+    { q: 'showtime', label: 'Showtime' },
+    { q: 'mgm+', label: 'MGM+' },
+    { q: 'shudder', label: 'Shudder' },
+    { q: 'sundance now', label: 'Sundance Now' },
+    { q: 'mubi', label: 'MUBI' },
+    { q: 'bet+', label: 'BET+' },
+    { q: 'discovery+', label: 'Discovery+' },
+    { q: 'espn', label: 'ESPN+' },
+    { q: 'crunchyroll', label: 'Crunchyroll' },
+    { q: 'criterion', label: 'Criterion Channel' },
   ];
   const isGranular = (n: string) => /(amazon channel|apple tv channel|roku premium channel|with ads|standard with ads)/.test(n);
   const popularIdSet = new Set(POPULAR_SERVICES.map((s) => s.id));
   const CATALOG_DEFAULTS: { id: number; name: string }[] = [];
   const seenExtra = new Set<number>();
-  for (const brand of EXTRA_CHANNELS) {
-    const hit = catalog.find((c) => {
-      const n = c.name.trim().toLowerCase();
-      return n.includes(brand) && !isGranular(n) && !popularIdSet.has(c.id) && !seenExtra.has(c.id);
-    });
+  for (const { q, label } of EXTRA_CHANNELS) {
+    const matches = (granularOk: boolean) =>
+      catalog.find((c) => {
+        const n = c.name.trim().toLowerCase();
+        return n.includes(q) && (granularOk || !isGranular(n)) && !popularIdSet.has(c.id) && !seenExtra.has(c.id);
+      });
+    const clean = matches(false);
+    const hit = clean ?? matches(true); // fall back to a channel variant if that's all TMDB has
     if (hit) {
       seenExtra.add(hit.id);
-      CATALOG_DEFAULTS.push({ id: hit.id, name: hit.name });
+      // Keep the real name when it's already clean; relabel a channel variant.
+      CATALOG_DEFAULTS.push({ id: hit.id, name: clean ? hit.name : label });
     }
   }
 
