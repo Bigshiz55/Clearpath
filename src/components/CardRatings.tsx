@@ -29,7 +29,6 @@ export function CardRatings({
   mediaType,
   title,
   year,
-  decider = true,
   hideCall = false,
   className = '',
 }: {
@@ -37,7 +36,6 @@ export function CardRatings({
   mediaType: MediaType;
   title: string;
   year?: number | null;
-  decider?: boolean;
   hideCall?: boolean;
   className?: string;
 }) {
@@ -58,7 +56,6 @@ export function CardRatings({
       year={year}
       mediaType={mediaType}
       tmdbId={tmdbId}
-      decider={decider}
       hideCall={hideCall}
       loading={ratings == null}
       className={className}

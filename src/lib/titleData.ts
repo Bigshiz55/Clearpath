@@ -4,7 +4,18 @@ import type { MediaType, TitleMetadata, WatchProviders, SimilarTitle } from '@/l
 import { getTitle, getWatchProviders, getCollectionId, getSimilar } from '@/lib/tmdb/client';
 import { getCriticRatings } from '@/lib/omdb';
 import { getMdbRatings } from '@/lib/mdblist';
+import { getWatchmodeProviders, mergeWatchmode } from '@/lib/watchmode/client';
 import { getBriefing, type Briefing } from '@/lib/briefing';
+
+/** Availability = TMDB providers, with Watchmode's deep links + fresher sources
+ *  merged in when WATCHMODE_API_KEY is set (dormant/no-op otherwise). */
+async function resolveAvailability(mediaType: MediaType, id: number, region: string): Promise<WatchProviders | null> {
+  const [tmdb, wm] = await Promise.all([
+    getWatchProviders(mediaType, id, region).catch(() => null),
+    getWatchmodeProviders(mediaType, id, region).catch(() => null),
+  ]);
+  return mergeWatchmode(tmdb, wm);
+}
 
 /** Adds the Rotten Tomatoes audience (Popcorn) score from MDBList, and backfills
  *  any critic value OMDb didn't return. No-op without MDBLIST_API_KEY. */
@@ -39,7 +50,7 @@ const EMPTY_BRIEFING: Briefing = { leads: [], cast: [], franchise: null };
 async function hydrate(mediaType: MediaType, id: number, region: string): Promise<SharedTitleData> {
   const [meta, providers, collectionId, similar, briefing] = await Promise.all([
     getTitle(mediaType, id, region),
-    getWatchProviders(mediaType, id, region).catch(() => null),
+    resolveAvailability(mediaType, id, region),
     getCollectionId(mediaType, id).catch(() => null),
     getSimilar(mediaType, id).catch(() => []),
     getBriefing(mediaType, id).catch(() => EMPTY_BRIEFING),

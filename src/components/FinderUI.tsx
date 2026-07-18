@@ -324,15 +324,12 @@ export function FinderUI({
                         </div>
                       );
                     })()}
-                    <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} decider={false} className="mt-1.5" />
+                    <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} className="mt-1.5" />
                     <div className="mt-2 flex flex-wrap gap-1">
                       {it.receipts.map((r) => (
                         <span key={r} className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">✓ {r}</span>
                       ))}
                       {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
-                      <a href={it.deciderUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-brand-300 hover:bg-white/10">
-                        Decider: Stream It or Skip It? ↗
-                      </a>
                     </div>
                   </div>
                 </div>
@@ -455,7 +452,7 @@ export function FinderUI({
           </button>
           <button
             onClick={() => set('streamItOnly', !q.streamItOnly)}
-            title="Only titles the judge rules Stream It — our “Watch It” verdict, à la Decider’s Stream It or Skip It."
+            title="Only titles the judge rules Stream It — our “Watch It” verdict."
             className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
           >
             {q.streamItOnly ? '✓ ' : ''}⚖️ “Stream It” verdicts only

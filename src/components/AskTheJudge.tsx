@@ -286,7 +286,7 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
               </button>
               <button
                 onClick={() => set('streamItOnly', !q.streamItOnly)}
-                title="Only titles the judge rules Stream It — our “Watch It” verdict, à la Decider’s Stream It or Skip It."
+                title="Only titles the judge rules Stream It — our “Watch It” verdict."
                 className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
               >
                 {q.streamItOnly ? '✓ ' : ''}⚖️ “Stream It” verdicts only
@@ -367,12 +367,9 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
                                   <span className="text-[11px] text-slate-400">match</span>
                                 </div>
                                 {it.reason && <ReasonText text={it.reason} className="mt-1 text-[11px] text-slate-300" />}
-                                <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} decider={false} className="mt-1" />
+                                <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} className="mt-1" />
                                 <div className="mt-1.5 flex flex-wrap gap-1">
                                   {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
-                                  <a href={it.deciderUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-brand-300 hover:bg-white/10">
-                                    Stream It or Skip It? ↗
-                                  </a>
                                 </div>
                               </div>
                             </div>

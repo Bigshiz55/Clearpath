@@ -4,7 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MediaType, TitleMetadata } from '@/lib/types';
 import { embed } from '@/lib/embeddings';
 import { getScoringData } from '@/lib/titleData';
-import { buildTasteDna, dnaScore, cosine, type TasteDna, type DnaResult } from '@/lib/scoring/dna';
+import { computeGeneralScore } from '@/lib/scoring/general';
+import { buildTasteDna, dnaScore, type TasteDna, type DnaResult } from '@/lib/scoring/dna';
 
 /** The text we embed for a title's "vibe vector" — its meaning, not its tags. */
 function vibeText(meta: TitleMetadata): string {
@@ -91,12 +92,20 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
   const dna = userId ? await getUserTasteDna(supabase, userId) : EMPTY_DNA;
   if (!dna.liked) return { items: pool.map((i) => ({ ...i, dnaFit: null })), personalized: false };
 
+  // Rank by the full Watchability score — the user's DNA blended with the
+  // objective ratings (the same 0–100 shown at the top of every card), so the
+  // order on screen matches the number the user sees.
   const scored = await Promise.all(
     pool.map(async (i) => {
-      const v = await getTitleVector(i.mediaType, i.id);
-      if (!v) return { ...i, dnaFit: null };
-      const fit = dna.disliked ? cosine(v, dna.liked!) - cosine(v, dna.disliked) : cosine(v, dna.liked!);
-      return { ...i, dnaFit: fit };
+      const [vector, data] = await Promise.all([
+        getTitleVector(i.mediaType, i.id),
+        getScoringData(i.mediaType, i.id, 'US').catch(() => null),
+      ]);
+      if (!vector || !data) return { ...i, dnaFit: null };
+      const general = computeGeneralScore(data.meta, data.providers);
+      const objective = general.standardScore ?? general.score;
+      const { score } = dnaScore(vector, dna, objective);
+      return { ...i, dnaFit: score };
     }),
   );
   const personalized = scored.some((s) => s.dnaFit != null);

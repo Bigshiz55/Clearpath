@@ -1,8 +1,6 @@
 import type { TileRatings } from '@/lib/ratings';
-import { deciderSearchUrl } from '@/lib/ratings';
 import type { MediaType } from '@/lib/types';
 import { WatchCall } from './WatchCall';
-import { WatchabilityChip } from './WatchabilityChip';
 
 function tomatoColor(pct: number): string {
   return pct >= 60 ? 'text-red-300' : 'text-emerald-300';
@@ -18,22 +16,19 @@ function tomatoColor(pct: number): string {
  */
 export function RatingsStrip({
   ratings,
-  title,
-  year,
   mediaType,
   tmdbId,
-  decider = true,
   standard = false,
   hideCall = false,
   loading = false,
   className = '',
 }: {
   ratings: TileRatings;
-  title: string;
+  /** Accepted for call-site convenience; no longer rendered. */
+  title?: string;
   year?: number | null;
   mediaType?: MediaType;
   tmdbId?: number;
-  decider?: boolean;
   standard?: boolean;
   /** Hide the leading Stream It / Skip It call — used when the card shows it in
    *  its top bar instead, leaving only the source chips here. */
@@ -62,9 +57,11 @@ export function RatingsStrip({
               ? 'bg-red-500/20 text-red-200'
               : 'bg-white/10 text-slate-300'
         }`}
-        title="WatchVerdict's Stream It or Skip It call for this title"
+        title="WatchVerdict's Watchability score (0–100) and the Stream It / Skip It call it produces"
       >
-        {verdict === 'stream' ? '✅ STREAM IT' : verdict === 'skip' ? '⛔ SKIP IT' : 'STREAM/SKIP: NA'}
+        {ratings.standardScore != null
+          ? `${verdict === 'stream' ? '✅' : '⛔'} ${ratings.standardScore} · ${verdict === 'stream' ? 'STREAM IT' : 'SKIP IT'}`
+          : 'STREAM/SKIP: NA'}
       </span>
     );
 
@@ -83,12 +80,9 @@ export function RatingsStrip({
         </div>
       )}
 
-      {/* Line 2 — the DNA-weighted Watchability, then the source ratings, as
-          aligned chips so they line up card to card and scan cleanly. */}
+      {/* Line 2 — the source ratings, as aligned chips so they line up card to
+          card and scan cleanly. (Watchability leads the top-bar call instead.) */}
       <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold tabular-nums">
-        {mediaType && tmdbId && (
-          <WatchabilityChip mediaType={mediaType} tmdbId={tmdbId} objectiveScore={ratings.standardScore ?? null} />
-        )}
         <RatingChip
           label="🍅"
           value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
@@ -107,18 +101,6 @@ export function RatingsStrip({
         >
           IMDb {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
         </span>
-        {decider && (
-          <a
-            href={deciderSearchUrl(title, year)}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-0.5 rounded-md bg-white/5 px-1.5 py-0.5 text-brand-300 hover:bg-white/10 hover:text-brand-200"
-            title="Decider’s “Stream It or Skip It?” review — opens Decider (they publish no rating feed we can embed, so we link you to their verdict)"
-          >
-            Decider: Stream / Skip ↗
-          </a>
-        )}
       </div>
     </div>
   );

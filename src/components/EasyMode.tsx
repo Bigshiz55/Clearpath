@@ -380,7 +380,7 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
                       </div>
                       <p className="mt-3 text-lg leading-relaxed text-slate-100">{p.reason}</p>
                       {/* Every rating we have, right on the placard. */}
-                      <CardRatings mediaType={p.mediaType} tmdbId={p.id} title={p.title} year={p.year} decider={false} className="mt-2 text-sm" />
+                      <CardRatings mediaType={p.mediaType} tmdbId={p.id} title={p.title} year={p.year} className="mt-2 text-sm" />
                       {p.where && <p className="mt-2 text-lg font-semibold text-emerald-300">▶ On {p.where}</p>}
 
                       <div className="mt-4 flex flex-wrap items-center gap-3">

@@ -111,6 +111,11 @@ export const serverEnv = {
   mdblistKey(): string | undefined {
     return optional('MDBLIST_API_KEY');
   },
+  /** Watchmode — streaming availability + deep links. Optional; TMDB is the
+   *  fallback when unset. Get a key at https://api.watchmode.com/. */
+  watchmodeKey(): string | undefined {
+    return optional('WATCHMODE_API_KEY');
+  },
   cronSecret(): string | undefined {
     return optional('CRON_SECRET');
   },
@@ -147,6 +152,7 @@ export function envHealth() {
     openaiKey: Boolean(optional('OPENAI_API_KEY')),
     omdbKey: Boolean(optional('OMDB_API_KEY')),
     mdblistKey: Boolean(optional('MDBLIST_API_KEY')),
+    watchmodeKey: Boolean(optional('WATCHMODE_API_KEY')),
     cronSecret: Boolean(optional('CRON_SECRET')),
     resendKey: Boolean(optional('RESEND_API_KEY')),
     push: Boolean(optional('NEXT_PUBLIC_VAPID_PUBLIC_KEY') && optional('VAPID_PRIVATE_KEY')),

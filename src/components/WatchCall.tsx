@@ -6,10 +6,10 @@ import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
 
 /**
- * The single headline "should you watch this" call — driven by the user's DNA
- * Score when they've rated enough to personalize it, and by the objective score
- * otherwise. This replaces the old objective-only STREAM IT badge AND the old
- * personal-match pill, so a card shows exactly one call.
+ * The single headline Watchability rating — the 0–100 score that blends your DNA
+ * with every other rating (RT, IMDb, audience), leading with the number and
+ * followed by the Stream It / Skip It call it produces. This is the same score
+ * that drives the ranking order, so the top of the card and the sort agree.
  *
  * `objectiveScore` is the fallback (0–100, or null when there's genuinely
  * nothing to judge, e.g. unreleased).
@@ -18,15 +18,11 @@ export function WatchCall({
   mediaType,
   tmdbId,
   objectiveScore,
-  compact = false,
   className = '',
 }: {
   mediaType: MediaType;
   tmdbId: number;
   objectiveScore: number | null;
-  /** Call only (no "· score") — for the tight card top bar, where the DNA box
-   *  below carries the number. */
-  compact?: boolean;
   className?: string;
 }) {
   const [dna, setDna] = useState<DnaClientResult | null>(null);
@@ -53,12 +49,11 @@ export function WatchCall({
       className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-black ${v.visual.badge} ${className}`}
       title={
         personal
-          ? `Your DNA call — a ${score}/100 fit for you, learned from what you’ve rated. This drives the recommendation.`
-          : 'WatchVerdict’s objective call. Rate a few titles and this becomes your personal DNA call.'
+          ? `Watchability ${score}/100 — your DNA blended with every rating. This drives the ${v.call.toLowerCase()} call and the ranking order.`
+          : `Watchability ${score}/100 — every rating blended. Rate a few titles and your DNA starts weighting it. Drives the ranking order.`
       }
     >
-      {personal ? '🧬' : v.emoji} {v.call}
-      {!compact && ` · ${score}`}
+      {personal ? '🧬' : v.emoji} {score} · {v.call}
     </span>
   );
 }

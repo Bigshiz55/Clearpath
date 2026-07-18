@@ -90,12 +90,9 @@ export function JudgeVerdictCard({ v }: { v: TitleVerdict }) {
       )}
 
       <div className="mt-3">
-        <RatingsStrip ratings={v.ratings ?? EMPTY_TILE_RATINGS} title={v.title} year={v.year} decider={false} />
+        <RatingsStrip ratings={v.ratings ?? EMPTY_TILE_RATINGS} title={v.title} year={v.year} />
         <div className="mt-1.5 flex flex-wrap gap-1">
           {v.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-300">📺 {v.where}</span>}
-          <a href={v.deciderUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-brand-300 hover:bg-white/10">
-            Decider ↗
-          </a>
         </div>
       </div>
     </div>

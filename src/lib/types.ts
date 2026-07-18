@@ -94,6 +94,9 @@ export interface WatchProvider {
   providerName: string;
   logoPath: string | null;
   type: 'flatrate' | 'free' | 'ads' | 'rent' | 'buy';
+  /** Deep link straight to the title on this service (Watchmode). Null when we
+   *  only know it's available (TMDB) but have no direct link. */
+  link?: string | null;
 }
 
 export interface WatchProviders {

@@ -386,7 +386,7 @@ export function VerdictReportView({
                   </div>
                 </div>
                 <div className="mt-1 line-clamp-1 text-xs text-slate-300">{s.title}</div>
-                <CardRatings mediaType={s.mediaType} tmdbId={s.id} title={s.title} year={s.year} decider={false} className="mt-0.5" />
+                <CardRatings mediaType={s.mediaType} tmdbId={s.id} title={s.title} year={s.year} className="mt-0.5" />
               </Link>
             ))}
           </div>
