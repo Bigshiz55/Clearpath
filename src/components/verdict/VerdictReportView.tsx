@@ -155,8 +155,8 @@ export function VerdictReportView({
         primaryCall={report.primaryCall}
         tier={report.tier}
         oneLiner={report.oneLiner}
-        matchScore={report.personal.score}
-        matchLabel={report.personal.label}
+        mediaType={t.mediaType}
+        tmdbId={t.id}
         sources={report.general.sources}
         providers={report.providers}
       />

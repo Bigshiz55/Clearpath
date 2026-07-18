@@ -1,6 +1,7 @@
-import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier, WatchProviders } from '@/lib/types';
+import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier, WatchProviders, MediaType } from '@/lib/types';
 import { episodeSummary } from '@/lib/tmdb/meta-helpers';
 import { originSummary } from '@/lib/origin';
+import { DnaScore } from '@/components/DnaScore';
 
 // Niche community aggregators we don't surface — they read as "random stars".
 const HIDDEN_SOURCES = new Set(['Trakt', 'Letterboxd', 'Roger Ebert']);
@@ -23,16 +24,16 @@ export function AtAGlance({
   primaryCall,
   tier,
   oneLiner,
-  matchScore,
-  matchLabel,
+  mediaType,
+  tmdbId,
   sources,
   providers,
 }: {
   primaryCall: PrimaryCall;
   tier: VerdictTier;
   oneLiner: string;
-  matchScore: number;
-  matchLabel: string;
+  mediaType: MediaType;
+  tmdbId: number;
   sources: RatingSource[];
   providers: WatchProviders | null;
 }) {
@@ -67,18 +68,8 @@ export function AtAGlance({
             <span className="text-[9px] uppercase tracking-wide opacity-70">Stream / Skip</span>
           </span>
         </div>
-        {/* The algorithm's score for this person — the hero number, in hot pink. */}
-        <div className="flex flex-shrink-0 items-center gap-2.5 rounded-xl border-2 border-pink-400/80 bg-gradient-to-br from-pink-500/45 to-rose-500/30 px-3.5 py-2 shadow-[0_0_22px_rgba(244,63,94,0.4)]">
-          <span className="grid h-12 w-12 place-items-center rounded-lg bg-pink-500/60 text-2xl font-black tabular-nums text-white ring-2 ring-pink-200/70">
-            {matchScore}
-          </span>
-          <span className="flex flex-col leading-tight">
-            <span className="flex items-center gap-1 text-[12px] font-black uppercase tracking-wide text-white">
-              <span aria-hidden>🧠</span> {matchLabel.replace(/\s*match$/i, '')}
-            </span>
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-pink-100/90">Algorithm score</span>
-          </span>
-        </div>
+        {/* WatchVerdict DNA Score — the personal "odds you'll love it", client-fetched. */}
+        <DnaScore mediaType={mediaType} tmdbId={tmdbId} />
         {available.map((s) => {
           const { node, label } = iconFor(s.name);
           return (
