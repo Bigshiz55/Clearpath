@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { MediaType, WatchlistStatus } from '@/lib/types';
 import { addToWatchlist, updateWatchlistItem, removeWatchlistItem } from '@/lib/actions/watchlist';
 import { useToast } from '@/components/Toast';
@@ -114,10 +115,56 @@ export function VerdictActions(props: Props) {
     toast.show('Removed from your watchlist.', 'info');
   }
 
+  // The "Final Verdict" — a themed way to close a title out after watching. Each
+  // maps to the existing watched/dropped status + a rating bucket, so it flows
+  // straight into your diary (the Docket) with a date, no separate schema.
+  const FINAL_VERDICTS: { key: string; label: string; emoji: string; status: WatchlistStatus; rating: number; tone: string }[] = [
+    { key: 'guilty', label: 'Guilty — amazing', emoji: '⚖️', status: 'watched', rating: 9, tone: 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' },
+    { key: 'acquitted', label: 'Acquitted — it was fine', emoji: '🤝', status: 'watched', rating: 6, tone: 'border-yellow-400/50 bg-yellow-500/15 text-yellow-100' },
+    { key: 'archive', label: 'Sentenced to the archive', emoji: '🗄️', status: 'dropped', rating: 3, tone: 'border-red-400/50 bg-red-500/15 text-red-100' },
+  ];
+  const [finalVerdict, setFinalVerdict] = useState<string | null>(null);
+
+  async function logFinalVerdict(v: (typeof FINAL_VERDICTS)[number]) {
+    setFinalVerdict(v.key);
+    await setItemStatus(v.status);
+    const id = await ensureItem();
+    if (id) {
+      setRating(v.rating);
+      await updateWatchlistItem({ itemId: id, rating: v.rating });
+    }
+    toast.show(`Final verdict logged: ${v.label}. It’s in your diary.`, 'success');
+  }
+
   const btn = (active: boolean) => (active ? 'btn-primary' : 'btn-secondary');
 
   return (
     <section className="card p-4 sm:p-5">
+      {/* Final Verdict — the after-watching close-out that feeds your diary */}
+      <div className="mb-4 rounded-2xl border border-gold-400/30 bg-gold-500/[0.06] p-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-white">
+          <span aria-hidden>📓</span> Finished it? Hand down your Final Verdict
+        </div>
+        <p className="mt-0.5 text-xs text-slate-400">Logs a dated entry to your diary (the Docket).</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {FINAL_VERDICTS.map((v) => (
+            <button
+              key={v.key}
+              onClick={() => logFinalVerdict(v)}
+              disabled={pending}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                finalVerdict === v.key ? v.tone : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10'
+              }`}
+            >
+              <span aria-hidden>{v.emoji}</span> {v.label}
+            </button>
+          ))}
+          <Link href="/app/docket" className="inline-flex items-center rounded-xl px-3 py-2 text-sm font-semibold text-brand-300 hover:text-brand-200">
+            Open my diary →
+          </Link>
+        </div>
+      </div>
+
       <div className="flex flex-wrap gap-2">
         <button onClick={() => setItemStatus('strict')} className={btn(status === 'strict')} disabled={pending}>
           ★ Strict Watchlist
