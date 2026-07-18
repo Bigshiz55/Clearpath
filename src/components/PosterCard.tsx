@@ -86,7 +86,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
       <div className="border-b border-white/10 bg-ink-900/85">
         {saveId != null && (
           <div className="px-2 pt-1.5">
-            <WatchCall mediaType={mediaType} tmdbId={saveId} objectiveScore={null} className="w-full justify-center py-1 text-[11px]" />
+            <WatchCall mediaType={mediaType} tmdbId={saveId} objectiveScore={null} compact className="w-full justify-center py-1 text-[11px]" />
           </div>
         )}
         <div className="flex items-center gap-1.5 px-2 py-1.5">

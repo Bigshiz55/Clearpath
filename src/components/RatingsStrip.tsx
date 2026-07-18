@@ -2,6 +2,7 @@ import type { TileRatings } from '@/lib/ratings';
 import { deciderSearchUrl } from '@/lib/ratings';
 import type { MediaType } from '@/lib/types';
 import { WatchCall } from './WatchCall';
+import { WatchabilityChip } from './WatchabilityChip';
 
 function tomatoColor(pct: number): string {
   return pct >= 60 ? 'text-red-300' : 'text-emerald-300';
@@ -82,9 +83,12 @@ export function RatingsStrip({
         </div>
       )}
 
-      {/* Line 2 — the source ratings, as aligned chips so they line up card to
-          card and scan cleanly. A fixed set (value or "–" when unavailable). */}
+      {/* Line 2 — the DNA-weighted Watchability, then the source ratings, as
+          aligned chips so they line up card to card and scan cleanly. */}
       <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold tabular-nums">
+        {mediaType && tmdbId && (
+          <WatchabilityChip mediaType={mediaType} tmdbId={tmdbId} objectiveScore={ratings.standardScore ?? null} />
+        )}
         <RatingChip
           label="🍅"
           value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}

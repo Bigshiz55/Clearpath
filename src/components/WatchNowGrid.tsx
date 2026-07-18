@@ -24,7 +24,7 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
               {/* Top bar — the DNA call as a full-width rating bar, Movie/TV · ＋ · O beneath. */}
               <div className="border-b border-white/10 bg-ink-900/85">
                 <div className="px-2 pt-1.5">
-                  <WatchCall mediaType={t.mediaType} tmdbId={t.id} objectiveScore={t.ratings.standardScore ?? null} className="w-full justify-center py-1 text-[11px]" />
+                  <WatchCall mediaType={t.mediaType} tmdbId={t.id} objectiveScore={t.ratings.standardScore ?? null} compact className="w-full justify-center py-1 text-[11px]" />
                 </div>
                 <div className="flex items-center gap-1.5 px-2 py-1.5">
                   <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
