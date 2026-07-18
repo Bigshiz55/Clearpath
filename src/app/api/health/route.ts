@@ -84,10 +84,36 @@ async function probeOmdb() {
   }
 }
 
+/** Live Watchmode probe — confirms the deployment's key works and returns sources. */
+async function probeWatchmode() {
+  const raw = process.env.WATCHMODE_API_KEY ?? '';
+  // eslint-disable-next-line no-control-regex
+  const key = raw.trim().replace(/[^\x20-\x7E]/g, '');
+  const shape = { rawLength: raw.length, cleanedLength: key.length, strippedChars: raw.trim().length - key.length };
+  if (!key) return { shape, ok: false, error: 'WATCHMODE_API_KEY not set' };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const url = new URL('https://api.watchmode.com/v1/title/movie-278/details/');
+    url.searchParams.set('apiKey', key);
+    url.searchParams.set('append_to_response', 'sources');
+    const res = await fetch(url, { signal: controller.signal });
+    const body = (await res.json().catch(() => ({}))) as { sources?: unknown[]; success?: boolean; statusMessage?: string };
+    const usSources = Array.isArray(body.sources)
+      ? (body.sources as { region?: string }[]).filter((s) => (s.region ?? '').toUpperCase() === 'US').length
+      : 0;
+    return { shape, ok: res.ok && Array.isArray(body.sources), httpStatus: res.status, usSources, watchmodeMessage: body.statusMessage ?? null };
+  } catch (e) {
+    return { shape, ok: false, error: e instanceof Error ? e.message : String(e) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Health endpoint. Reports readiness of each dependency by *presence* of
  * configuration only — never returns secret values. `?probe=tmdb` / `?probe=omdb`
- * additionally run a live request and report the outcome (no secrets).
+ * / `?probe=watchmode` additionally run a live request and report the outcome.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -100,6 +126,12 @@ export async function GET(request: Request) {
   if (searchParams.get('probe') === 'omdb') {
     return NextResponse.json(
       { probe: 'omdb', result: await probeOmdb() },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
+  if (searchParams.get('probe') === 'watchmode') {
+    return NextResponse.json(
+      { probe: 'watchmode', result: await probeWatchmode() },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   }
@@ -118,6 +150,8 @@ export async function GET(request: Request) {
         service_role_key: cfg.serviceRoleKey,
         openai_key: cfg.openaiKey,
         omdb_key: cfg.omdbKey,
+        mdblist_key: cfg.mdblistKey,
+        watchmode_key: cfg.watchmodeKey,
         cron_secret: cfg.cronSecret,
         resend_key: cfg.resendKey,
       },
