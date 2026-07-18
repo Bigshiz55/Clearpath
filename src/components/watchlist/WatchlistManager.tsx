@@ -41,12 +41,14 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
   const toast = useToast();
   const [items, setItems] = useState(initial);
   const [filter, setFilter] = useState<WatchlistStatus | 'all'>('all');
+  const [favOnly, setFavOnly] = useState(false);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('added');
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
   const visible = useMemo(() => {
     let list = items;
+    if (favOnly) list = list.filter((i) => i.priority >= 1);
     if (filter !== 'all') list = list.filter((i) => i.status === filter);
     if (query.trim()) {
       const q = query.toLowerCase();
@@ -58,12 +60,23 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
     else if (sort === 'watched') sorted.sort((a, b) => (b.watched_at ?? '').localeCompare(a.watched_at ?? ''));
     else sorted.sort((a, b) => b.added_at.localeCompare(a.added_at));
     return sorted;
-  }, [items, filter, query, sort]);
+  }, [items, filter, favOnly, query, sort]);
 
   async function changeStatus(id: string, status: WatchlistStatus) {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)));
     const res = await updateWatchlistItem({ itemId: id, status });
     if (!res.ok) toast.show(res.error ?? 'Could not update.', 'error');
+  }
+
+  async function toggleFav(item: WatchlistItem) {
+    const next = item.priority >= 1 ? 0 : 1;
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, priority: next } : i)));
+    const res = await updateWatchlistItem({ itemId: item.id, priority: next });
+    if (res.ok) toast.show(next ? 'Added to Favourites ⭐' : 'Removed from Favourites.', next ? 'success' : 'info');
+    else {
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, priority: item.priority } : i)));
+      toast.show(res.error ?? 'Could not update.', 'error');
+    }
   }
 
   async function remove(id: string) {
@@ -83,12 +96,22 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
     for (const s of STATUS_OPTIONS) c[s] = items.filter((i) => i.status === s).length;
     return c;
   }, [items]);
+  const favCount = useMemo(() => items.filter((i) => i.priority >= 1).length, [items]);
 
   return (
     <div className="space-y-4">
       {/* Controls */}
       <div className="card p-4">
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setFavOnly((v) => !v)}
+            className={`chip border ${favOnly ? 'border-gold-400/60 bg-gold-500/15 text-gold-200' : ''}`}
+            aria-pressed={favOnly}
+          >
+            ⭐ Favourites
+            <span className="ml-1 text-[10px] text-slate-500">{favCount}</span>
+          </button>
+          <span className="mx-1 h-5 w-px bg-white/10" aria-hidden />
           {STATUSES.map((s) => (
             <button
               key={s.value}
@@ -150,10 +173,15 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
                 </div>
               </Link>
               <div className="p-2.5">
-                <div className="line-clamp-1 text-sm font-semibold text-white">{item.title}</div>
-                <div className="text-xs text-slate-400">
-                  {item.year ?? '—'}
-                  {item.rating ? ` · ★${item.rating}` : ''}
+                <div className="flex items-start justify-between gap-1.5">
+                  <div className="min-w-0">
+                    <div className="line-clamp-1 text-sm font-semibold text-white">{item.title}</div>
+                    <div className="text-xs text-slate-400">
+                      {item.year ?? '—'}
+                      {item.rating ? ` · ★${item.rating}` : ''}
+                    </div>
+                  </div>
+                  <FavStar on={item.priority >= 1} onClick={() => toggleFav(item)} />
                 </div>
                 <select
                   value={item.status}
@@ -190,6 +218,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
                   {item.rating ? ` · ★${item.rating}/10` : ''}
                 </div>
               </div>
+              <FavStar on={item.priority >= 1} onClick={() => toggleFav(item)} />
               <select
                 value={item.status}
                 onChange={(e) => changeStatus(item.id, e.target.value as WatchlistStatus)}
@@ -210,5 +239,27 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
         </div>
       )}
     </div>
+  );
+}
+
+/** A tap-to-favourite star. Filled gold when on, hollow otherwise. */
+function FavStar({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      aria-label={on ? 'Remove from Favourites' : 'Add to Favourites'}
+      title={on ? 'Remove from Favourites' : 'Add to Favourites'}
+      className={`grid h-7 w-7 flex-none place-items-center rounded-md border transition ${
+        on
+          ? 'border-gold-400/60 bg-gold-500/20 text-gold-300'
+          : 'border-white/10 bg-white/5 text-slate-500 hover:text-gold-300'
+      }`}
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" aria-hidden>
+        <path d="m12 3 2.6 5.3 5.9.9-4.3 4.2 1 5.9L12 16.9 6.8 19.5l1-5.9L3.5 9.4l5.9-.9L12 3Z" strokeLinejoin="round" />
+      </svg>
+    </button>
   );
 }

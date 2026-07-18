@@ -53,8 +53,8 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
                   <div className="grid h-full w-full place-items-center bg-gradient-to-br from-ink-700 to-ink-850 p-2 text-center text-[11px] text-slate-400">{t.title}</div>
                 )}
                 {/* Availability chip — the JustWatch "you can watch this now" signal. */}
-                <span className={`pointer-events-none absolute bottom-2 left-2 max-w-[85%] truncate rounded-md px-2 py-0.5 text-[10px] font-bold backdrop-blur ${t.kind === 'mine' ? 'bg-emerald-500/85 text-white' : 'bg-amber-500/85 text-black'}`}>
-                  {t.kind === 'mine' ? `▶ ${t.where}` : `🆓 ${t.where}`}
+                <span className="pointer-events-none absolute bottom-2 left-2 max-w-[90%] truncate rounded-md bg-black/75 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur">
+                  ▶ {t.where}
                 </span>
                 <span className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
                   <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>

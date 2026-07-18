@@ -33,57 +33,43 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
     getBrowseProviders(region),
   ]);
 
-  const onMine = ready.filter((r) => r.kind === 'mine');
-  const onFree = ready.filter((r) => r.kind === 'free');
-
   // Titles the user has flagged (dropped / seen) never resurface in picks.
   const { data: handledRows } = uid
     ? await supabase.from('watchlist_items').select('tmdb_id, media_type').eq('user_id', uid).in('status', ['dropped', 'watched'])
     : { data: null };
   const handled = new Set((handledRows ?? []).map((r) => `${r.media_type === 'tv' ? 'tv' : 'movie'}-${r.tmdb_id}`));
-  const freePool = free.filter((f) => !handled.has(`${f.mediaType}-${f.id}`));
+  const morePool = free.filter((f) => !handled.has(`${f.mediaType}-${f.id}`));
 
-  // Rank every Watch Now pool by the user's Taste-DNA (best fit first) so the
-  // whole page delivers on its DNA promise. rankByDna no-ops (original order,
-  // personalized:false) for guests or users without enough rating history yet.
-  const [rankedMine, rankedOnFree, rankedFree] = await Promise.all([
-    rankByDna(supabase, uid, onMine),
-    rankByDna(supabase, uid, onFree),
-    rankByDna(supabase, uid, freePool),
+  // Rank by the user's Taste-DNA (best fit first). rankByDna no-ops (original
+  // order, personalized:false) for guests or users without enough history yet.
+  const [rankedReady, rankedMore] = await Promise.all([
+    rankByDna(supabase, uid, ready),
+    rankByDna(supabase, uid, morePool),
   ]);
 
   const readyContent = (
     <div className="space-y-8">
-      {rankedMine.items.length > 0 && (
+      {rankedReady.items.length > 0 && (
         <section>
           <h2 className="mb-1 text-lg font-semibold text-white">
-            {rankedMine.personalized ? '🧬 On your services — ranked by your DNA' : '✅ On your services'}
+            {rankedReady.personalized ? '🧬 Ready to watch — ranked by your DNA' : '▶ Ready to watch'}
           </h2>
-          <p className="mb-3 text-xs text-slate-400">From your watchlist, included in a plan you already have.</p>
-          <WatchNowGrid items={rankedMine.items} />
+          <p className="mb-3 text-xs text-slate-400">From your watchlist — where each one’s streaming right now.</p>
+          <WatchNowGrid items={rankedReady.items} />
         </section>
       )}
-      {rankedOnFree.items.length > 0 && (
+      {rankedMore.items.length > 0 && (
         <section>
           <h2 className="mb-1 text-lg font-semibold text-white">
-            {rankedOnFree.personalized ? '🧬 Free right now — ranked by your DNA' : '🆓 Free right now'}
-          </h2>
-          <p className="mb-3 text-xs text-slate-400">From your watchlist, streaming free (with ads) today.</p>
-          <WatchNowGrid items={rankedOnFree.items} />
-        </section>
-      )}
-      {rankedFree.items.length > 0 && (
-        <section>
-          <h2 className="mb-1 text-lg font-semibold text-white">
-            {rankedFree.personalized ? '🧬 Your DNA picks — free tonight' : '🍿 Free to watch tonight'}
+            {rankedMore.personalized ? '🧬 Recommended for you' : '🍿 Popular right now'}
           </h2>
           <p className="mb-3 text-xs text-slate-400">
-            {rankedFree.personalized
-              ? 'Free, ad-supported titles — ranked by how well they fit your Taste-DNA. No subscription needed.'
-              : 'Popular right now on the free, ad-supported services — no subscription needed.'}
+            {rankedMore.personalized
+              ? 'Ranked by your Taste-DNA — tap any to see where to watch.'
+              : 'Trending titles you can stream right now — tap any for where to watch.'}
           </p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {rankedFree.items.map((t) => (
+            {rankedMore.items.map((t) => (
               <PosterCard
                 key={`${t.mediaType}-${t.id}`}
                 href={`/app/title/${t.mediaType}/${t.id}`}
@@ -105,10 +91,9 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
       <section>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">▶ Watch now</h1>
         <p className="mt-2 text-sm text-slate-300">
-          Find something to watch by where it’s streaming — filtered to any service, in any price tier — with your
-          personalized verdict on every result. <span className="font-semibold text-white">Ready to watch</span> is
-          your list, already streamable; <span className="font-semibold text-white">Browse everything</span> is the
-          whole catalog.
+          What you can actually watch right now — with where it’s streaming and your DNA Score on every title.
+          <span className="font-semibold text-white"> Ready to watch</span> is your list, streamable now;
+          <span className="font-semibold text-white"> Browse everything</span> is the whole catalog.
         </p>
       </section>
 

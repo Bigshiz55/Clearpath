@@ -117,7 +117,7 @@ export function VerdictActions(props: Props) {
 
   // The "Final Verdict" — a themed way to close a title out after watching. Each
   // maps to the existing watched/dropped status + a rating bucket, so it flows
-  // straight into your diary (the Docket) with a date, no separate schema.
+  // straight into your watchlist with a date, no separate schema.
   const FINAL_VERDICTS: { key: string; label: string; emoji: string; status: WatchlistStatus; rating: number; tone: string }[] = [
     { key: 'guilty', label: 'Guilty — amazing', emoji: '⚖️', status: 'watched', rating: 9, tone: 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' },
     { key: 'acquitted', label: 'Acquitted — it was fine', emoji: '🤝', status: 'watched', rating: 6, tone: 'border-yellow-400/50 bg-yellow-500/15 text-yellow-100' },
@@ -133,7 +133,7 @@ export function VerdictActions(props: Props) {
       setRating(v.rating);
       await updateWatchlistItem({ itemId: id, rating: v.rating });
     }
-    toast.show(`Final verdict logged: ${v.label}. It’s in your diary.`, 'success');
+    toast.show(`Final verdict logged: ${v.label}. It’s in your watchlist.`, 'success');
   }
 
   const btn = (active: boolean) => (active ? 'btn-primary' : 'btn-secondary');
@@ -145,7 +145,7 @@ export function VerdictActions(props: Props) {
         <div className="flex items-center gap-2 text-sm font-bold text-white">
           <span aria-hidden>📓</span> Finished it? Hand down your Final Verdict
         </div>
-        <p className="mt-0.5 text-xs text-slate-400">Logs a dated entry to your diary (the Docket).</p>
+        <p className="mt-0.5 text-xs text-slate-400">Logs a dated entry to your watchlist, marked watched.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {FINAL_VERDICTS.map((v) => (
             <button
@@ -159,8 +159,8 @@ export function VerdictActions(props: Props) {
               <span aria-hidden>{v.emoji}</span> {v.label}
             </button>
           ))}
-          <Link href="/app/docket" className="inline-flex items-center rounded-xl px-3 py-2 text-sm font-semibold text-brand-300 hover:text-brand-200">
-            Open my diary →
+          <Link href="/app/watchlist" className="inline-flex items-center rounded-xl px-3 py-2 text-sm font-semibold text-brand-300 hover:text-brand-200">
+            Open my watchlist →
           </Link>
         </div>
       </div>
