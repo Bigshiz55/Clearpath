@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { getReadyToWatch, getFreeToWatch } from '@/lib/watchNow';
 import { getBrowseProviders } from '@/lib/browse';
+import { rankByDna } from '@/lib/dna';
 import { getMyServices, getProfile, regionFor } from '@/lib/profile';
 import { WatchNowGrid } from '@/components/WatchNowGrid';
 import { WatchTabs } from '@/components/WatchTabs';
@@ -35,6 +36,13 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
   const onMine = ready.filter((r) => r.kind === 'mine');
   const onFree = ready.filter((r) => r.kind === 'free');
 
+  // Rank the free-tonight pool by the user's Taste-DNA (best fit first) so
+  // "Watch Now" delivers on its DNA promise. Falls back to the original order
+  // for users without enough rating history yet.
+  const { items: rankedFree, personalized: freeByDna } = user
+    ? await rankByDna(supabase, uid, free)
+    : { items: free.map((f) => ({ ...f, dnaFit: null })), personalized: false };
+
   const readyContent = (
     <div className="space-y-8">
       {onMine.length > 0 && (
@@ -51,12 +59,18 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
           <WatchNowGrid items={onFree} />
         </section>
       )}
-      {free.length > 0 && (
+      {rankedFree.length > 0 && (
         <section>
-          <h2 className="mb-1 text-lg font-semibold text-white">🍿 Free to watch tonight</h2>
-          <p className="mb-3 text-xs text-slate-400">Popular right now on the free, ad-supported services — no subscription needed.</p>
+          <h2 className="mb-1 text-lg font-semibold text-white">
+            {freeByDna ? '🧬 Your DNA picks — free tonight' : '🍿 Free to watch tonight'}
+          </h2>
+          <p className="mb-3 text-xs text-slate-400">
+            {freeByDna
+              ? 'Free, ad-supported titles — ranked by how well they fit your Taste-DNA. No subscription needed.'
+              : 'Popular right now on the free, ad-supported services — no subscription needed.'}
+          </p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {free.map((t) => (
+            {rankedFree.map((t) => (
               <PosterCard
                 key={`${t.mediaType}-${t.id}`}
                 href={`/app/title/${t.mediaType}/${t.id}`}

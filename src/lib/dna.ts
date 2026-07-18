@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MediaType, TitleMetadata } from '@/lib/types';
 import { embed } from '@/lib/embeddings';
 import { getScoringData } from '@/lib/titleData';
-import { buildTasteDna, dnaScore, type TasteDna, type DnaResult } from '@/lib/scoring/dna';
+import { buildTasteDna, dnaScore, cosine, type TasteDna, type DnaResult } from '@/lib/scoring/dna';
 
 /** The text we embed for a title's "vibe vector" — its meaning, not its tags. */
 function vibeText(meta: TitleMetadata): string {
@@ -74,6 +74,34 @@ export async function getUserTasteDna(supabase: SupabaseClient, userId: string):
 export interface UserDnaResult extends DnaResult {
   available: boolean; // whether we had a title vibe vector (needs OPENAI key)
   sampleSize: number; // rated titles feeding the model
+}
+
+/**
+ * Rank a candidate pool by how well each fits the user's Taste-DNA (best first).
+ * `personalized` is false when there's no taste data yet (or no key), in which
+ * case the original order is preserved. Bounded — embeds at most `cap` titles.
+ */
+export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
+  supabase: SupabaseClient,
+  userId: string,
+  items: T[],
+  cap = 24,
+): Promise<{ items: Array<T & { dnaFit: number | null }>; personalized: boolean }> {
+  const pool = items.slice(0, cap);
+  const dna = userId ? await getUserTasteDna(supabase, userId) : EMPTY_DNA;
+  if (!dna.liked) return { items: pool.map((i) => ({ ...i, dnaFit: null })), personalized: false };
+
+  const scored = await Promise.all(
+    pool.map(async (i) => {
+      const v = await getTitleVector(i.mediaType, i.id);
+      if (!v) return { ...i, dnaFit: null };
+      const fit = dna.disliked ? cosine(v, dna.liked!) - cosine(v, dna.disliked) : cosine(v, dna.liked!);
+      return { ...i, dnaFit: fit };
+    }),
+  );
+  const personalized = scored.some((s) => s.dnaFit != null);
+  scored.sort((a, b) => (b.dnaFit ?? -Infinity) - (a.dnaFit ?? -Infinity));
+  return { items: scored, personalized };
 }
 
 /** The DNA Score for one title, for one user. */

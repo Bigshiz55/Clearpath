@@ -79,12 +79,15 @@ export default async function DiscoverPage() {
         {/* Big, clear tiles — every area of the app, tap to go deeper. */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {[
-            { href: '/app/tv', icon: '📺', title: 'TV Guide Decoder', sub: 'What’s on live — next 48h', tint: 'from-emerald-500/20' },
+            // Row 1
             { href: '/app/ask', icon: '⚖️', title: 'Ask the Judge', sub: 'Say what you want to see', tint: 'from-gold-500/25' },
             { href: '/app/finder', icon: '🎛️', title: 'Custom Search', sub: 'Filter by genre, rating, length…', tint: 'from-brand-500/25' },
             { href: '/app/watch', icon: '🎬', title: 'Watch Now', sub: '🧬 Your DNA picks, ranked', tint: 'from-pink-500/25' },
-            { href: '/app/new', icon: '🆕', title: 'New Releases', sub: 'Fresh, matched to you', tint: 'from-brand-500/20' },
+            // Row 2
             { href: '/app/quiz', icon: '🎮', title: 'Taste Quiz', sub: `${reviewedCount ?? 0} rated — teach your taste`, tint: 'from-gold-500/25' },
+            { href: '/app/new', icon: '🆕', title: 'New Releases', sub: 'Fresh, matched to you', tint: 'from-brand-500/20' },
+            { href: '/app/tv', icon: '📺', title: 'TV Guide Decoder', sub: 'What’s on live — next 48h', tint: 'from-emerald-500/20' },
+            // Row 3
             { href: '/app/together', icon: '🍿', title: 'Decide Together', sub: 'One verdict for the room', tint: 'from-pink-500/25' },
             { href: '/app/watchlist', icon: '📋', title: 'Watchlist', sub: 'Everything you saved', tint: 'from-brand-500/20' },
             { href: '/app/vintage', icon: '🧓', title: 'Vintage Mode', sub: 'Big & simple to read', tint: 'from-amber-500/20' },
