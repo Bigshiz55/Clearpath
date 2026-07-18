@@ -112,7 +112,13 @@ export async function getUserDnaForTitle(
   id: number,
   objectiveScore: number,
 ): Promise<UserDnaResult> {
-  const [titleVector, dna] = await Promise.all([getTitleVector(mediaType, id), getUserTasteDna(supabase, userId)]);
+  const dna = await getUserTasteDna(supabase, userId);
+  // No taste model yet → skip the (paid) title embed; fall back to objective.
+  if (!dna.liked) {
+    const score = Math.max(0, Math.min(100, Math.round(objectiveScore)));
+    return { score, confidence: 0, tasteScore: null, available: false, sampleSize: dna.sampleSize };
+  }
+  const titleVector = await getTitleVector(mediaType, id);
   const result = dnaScore(titleVector, dna, objectiveScore);
   return { ...result, available: titleVector != null, sampleSize: dna.sampleSize };
 }

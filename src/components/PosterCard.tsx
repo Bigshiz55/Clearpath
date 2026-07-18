@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { MediaType } from '@/lib/types';
 import { CardRatings } from './CardRatings';
+import { CardDna } from './CardDna';
 import { SaveButton } from './SaveButton';
 import { TasteFeedback } from './TasteFeedback';
 
@@ -89,6 +90,11 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1.5">
             {resolvedOverlay}
             {feedback}
+          </div>
+        )}
+        {saveId != null && (
+          <div className="absolute bottom-2 left-2 z-10">
+            <CardDna mediaType={mediaType} tmdbId={saveId} />
           </div>
         )}
       </div>

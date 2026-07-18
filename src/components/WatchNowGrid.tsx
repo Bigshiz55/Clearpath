@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { SaveButton } from './SaveButton';
 import { RatingsStrip } from './RatingsStrip';
+import { CardDna } from './CardDna';
 import { TasteFeedback } from './TasteFeedback';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
@@ -38,6 +39,9 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
                 </span>
                 <span className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
                   <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
+                </span>
+                <span className="pointer-events-none absolute bottom-2 right-2">
+                  <CardDna mediaType={t.mediaType} tmdbId={t.id} />
                 </span>
               </button>
               <div className="absolute right-2 top-2 z-10">
