@@ -1,9 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { getProfile, personalLabelFor, getMyServices, regionFor } from '@/lib/profile';
+import { getProfile, personalLabelFor, regionFor } from '@/lib/profile';
 import { SearchBar } from '@/components/SearchBar';
-import { FinderUI, type WatcherOption } from '@/components/FinderUI';
-import { listCrews } from '@/lib/actions/crews';
 import { getUpcomingTv } from '@/lib/onTv';
 import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
@@ -14,9 +12,6 @@ import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { InstallHint } from '@/components/InstallHint';
 import { getTonight } from '@/lib/tonight';
-import { CourtroomDoors } from '@/components/CourtroomDoors';
-import { TvDetective } from '@/components/TvDetective';
-import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -40,35 +35,6 @@ export default async function DiscoverPage() {
   const label = profile ? personalLabelFor(profile) : 'Your match';
   const tonight = await getTonight(supabase, user?.id ?? '', new Date());
   const isGuest = user?.is_anonymous === true;
-
-  let judge: Judge | null = null;
-  if (user) {
-    try {
-      judge = await getActiveJudge(supabase, { region: regionFor(profile), nowMs: Date.now() });
-    } catch {
-      /* sponsors optional / pre-migration */
-    }
-  }
-
-  // For the on-home finder tools: the user's services (for "only on my services")
-  // and any crew members to score against ("who's watching"). Managing the actual
-  // service list happens in Settings now, so the home finder only needs the count.
-  const services = user ? await getMyServices(supabase, user.id) : [];
-  const watchers: WatcherOption[] = [];
-  try {
-    const { crews } = await listCrews();
-    const seen = new Set<string>();
-    for (const c of crews ?? []) {
-      for (const p of c.people) {
-        const key = p.name.toLowerCase();
-        if (seen.has(key) || (p.love.length === 0 && p.avoid.length === 0)) continue;
-        seen.add(key);
-        watchers.push({ name: p.name, love: p.love, avoid: p.avoid });
-      }
-    }
-  } catch {
-    /* crews optional */
-  }
 
   const { data: recent } = await supabase
     .from('verdicts')
@@ -104,66 +70,37 @@ export default async function DiscoverPage() {
           </h1>
         </div>
 
-        {/* Judge avatar (left) · Search titles (center, narrower) · Prepare-for-Court game (right) */}
-        <div className="mx-auto flex max-w-4xl flex-col items-stretch gap-4 md:flex-row md:items-center">
-          <span
-            className="mx-auto grid h-16 w-16 flex-none place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-gold-500 text-4xl shadow-glow ring-2 ring-gold-300/60 md:mx-0"
-            aria-label="The judge"
-          >
-            ⚖️
-          </span>
-          <div className="min-w-0 flex-1">
-            <label className="mb-2 block text-center text-2xl font-extrabold text-white">🔎 Search titles</label>
-            <SearchBar />
-          </div>
-          <Link
-            href="/app/quiz"
-            className="flex flex-none items-center gap-3 rounded-2xl border border-gold-400/50 bg-gradient-to-br from-gold-500/20 to-brand-500/10 px-5 py-4 text-left transition hover:border-gold-400/80 md:max-w-[210px] md:flex-col md:text-center"
-          >
-            <span className="text-3xl" aria-hidden>🎬</span>
-            <span>
-              <span className="block text-base font-black text-white">The Taste Game</span>
-              <span className="block text-xs text-slate-300">Rate fast — teach the judge your taste</span>
-              <span className="mt-1 block text-sm font-bold text-gold-300">{reviewedCount ?? 0} reviewed</span>
-            </span>
-          </Link>
+        {/* Quick search — a title, or a plain-English ask. */}
+        <div className="mx-auto max-w-2xl">
+          <label className="mb-2 block text-center text-xl font-bold text-white sm:text-2xl">🔎 Search a title — or tell the judge what you want</label>
+          <SearchBar />
         </div>
 
-        {/* Two ways to decide — say what you want, or build the case by hand —
-            both inside one outlined box (heading lives inside FinderUI now). */}
-        <div>
-          <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} />
-        </div>
-
-        {/* TV Guide Detective (left) + Can't-decide court (right) — big, side by side */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <TvDetective />
-          <CourtroomDoors initialJudge={judge} />
-        </div>
-
-        {/* The two signature features people can't find elsewhere: settle movie
-            night together, and keep a real watch diary. */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Link
-            href="/app/together"
-            className="group flex items-center gap-4 rounded-2xl border border-brand-400/40 bg-gradient-to-br from-brand-500/15 to-transparent p-5 transition hover:border-brand-400/70"
-          >
-            <span className="grid h-14 w-14 flex-none place-items-center rounded-2xl bg-brand-500/20 text-3xl" aria-hidden>🍿</span>
-            <span>
-              <span className="block text-lg font-bold text-white">Movie night, together</span>
-              <span className="mt-0.5 block text-sm text-slate-300">Everyone votes on their own phone — the judge hands down one binding verdict for the room.</span>
-            </span>
-          </Link>
-          <Link
-            href="/app/docket"
-            className="group flex items-center gap-4 rounded-2xl border border-gold-400/40 bg-gradient-to-br from-gold-500/15 to-transparent p-5 transition hover:border-gold-400/70"
-          >
-            <span className="grid h-14 w-14 flex-none place-items-center rounded-2xl bg-gold-500/20 text-3xl" aria-hidden>📓</span>
-            <span>
-              <span className="block text-lg font-bold text-white">Your watch diary</span>
-              <span className="mt-0.5 block text-sm text-slate-300">Every title you finish gets a dated Final Verdict — your record of what you watched and what you thought.</span>
-            </span>
-          </Link>
+        {/* Big, clear tiles — every area of the app, tap to go deeper. */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+          {[
+            { href: '/app/watch', icon: '🎬', title: 'Watch Now', sub: 'Top picks, ranked for you', tint: 'from-brand-500/25' },
+            { href: '/app/finder', icon: '⚖️', title: 'Ask the Judge', sub: 'Say what you want to see', tint: 'from-gold-500/25' },
+            { href: '/app/tv', icon: '📺', title: 'On TV', sub: 'What’s on live — next 48h', tint: 'from-emerald-500/20' },
+            { href: '/app/together', icon: '🍿', title: 'Movie Night', sub: 'Decide together — one verdict', tint: 'from-pink-500/25' },
+            { href: '/app/quiz', icon: '🎮', title: 'The Taste Game', sub: `${reviewedCount ?? 0} rated — teach your taste`, tint: 'from-gold-500/25' },
+            { href: '/app/new', icon: '🆕', title: 'New Releases', sub: 'Fresh, matched to you', tint: 'from-brand-500/20' },
+            { href: '/app/docket', icon: '📓', title: 'Watch Diary', sub: 'Your verdicts, dated', tint: 'from-gold-500/20' },
+            { href: '/app/watchlist', icon: '📋', title: 'Watchlist', sub: 'Everything you saved', tint: 'from-brand-500/20' },
+            { href: '/app/vintage', icon: '🧓', title: 'Vintage Mode', sub: 'Big & simple to read', tint: 'from-amber-500/20' },
+          ].map((t) => (
+            <Link
+              key={t.href}
+              href={t.href}
+              className={`group flex min-h-[128px] flex-col justify-between rounded-2xl border border-white/12 bg-gradient-to-br ${t.tint} to-transparent p-4 transition hover:border-white/30 hover:shadow-glow sm:min-h-[150px] sm:p-5`}
+            >
+              <span className="text-4xl sm:text-5xl" aria-hidden>{t.icon}</span>
+              <span className="mt-2">
+                <span className="block text-lg font-bold text-white sm:text-xl">{t.title}</span>
+                <span className="block text-sm text-slate-300">{t.sub}</span>
+              </span>
+            </Link>
+          ))}
         </div>
       </section>
 
