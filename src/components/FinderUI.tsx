@@ -108,16 +108,25 @@ function Seg<T extends string | number>({
 }
 
 function Slider({
-  label, readout, min, max, step, value, onChange, accent = false,
+  label, readout, min, max, step, value, onChange, accent = false, icon, minLabel, maxLabel, hint,
 }: {
-  label: string; readout: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void; accent?: boolean;
+  label: string; readout: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void;
+  accent?: boolean;
+  /** Small glyph before the label (e.g. the "your match" brain). */
+  icon?: React.ReactNode;
+  /** What the far-left / far-right ends of the track mean — makes the direction clear. */
+  minLabel?: string;
+  maxLabel?: string;
+  /** One-line explanation of what this slider controls. */
+  hint?: string;
 }) {
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between">
-        <span className="label mb-0">{label}</span>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="label mb-0 flex items-center gap-1">{icon}{label}</span>
         <span className={`text-xs font-semibold tabular-nums ${accent ? 'text-gold-400' : 'text-brand-200'}`}>{readout}</span>
       </div>
+      {hint && <p className="mb-1 text-[11px] leading-tight text-slate-400">{hint}</p>}
       <input
         type="range"
         min={min}
@@ -127,6 +136,12 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         className={`w-full ${accent ? 'accent-gold-400' : 'accent-brand-500'}`}
       />
+      {(minLabel || maxLabel) && (
+        <div className="mt-0.5 flex justify-between text-[10px] uppercase tracking-wide text-slate-500">
+          <span>{minLabel}</span>
+          <span>{maxLabel}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -412,20 +427,26 @@ export function FinderUI({
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Slider label="Max length" readout={runtimeReadout(q.maxRuntime ?? 240)} min={60} max={240} step={10}
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Slider label="Max length" hint="The longest a movie can run" readout={runtimeReadout(q.maxRuntime ?? 240)} min={60} max={240} step={10}
+            minLabel="1 hr" maxLabel="Any length"
             value={q.maxRuntime ?? 240} onChange={(v) => set('maxRuntime', v >= 240 ? null : v)} />
-          <Slider label="Released since" readout={releasedReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0)} min={0} max={75} step={1}
+          <Slider label="How far back" hint="How old a title can be" readout={releasedReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0)} min={0} max={75} step={1}
+            minLabel="Any year" maxLabel="Classics"
             value={q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0} onChange={(years) => set('sinceMonths', years === 0 ? null : years * 12)} />
-          <Slider label="🍿 Popcorn meter (audience)" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
+          <Slider label="🍿 Popcorn meter (audience)" hint="Minimum crowd score" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
+            minLabel="Any" maxLabel="Crowd-loved"
             value={q.minAudience ?? 0} onChange={(v) => set('minAudience', v === 0 ? null : v)} />
-          <Slider label="IMDb rating" readout={q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'} min={0} max={9} step={0.5}
+          <Slider label="IMDb rating" hint="Minimum IMDb score" readout={q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'} min={0} max={9} step={0.5}
+            minLabel="Any" maxLabel="9.0 +"
             value={q.minImdb ?? 0} onChange={(v) => set('minImdb', v === 0 ? null : v)} accent />
-          <Slider label={`${scoredFor} at least`} readout={q.minMatch ? `${q.minMatch}+` : 'Any'} min={0} max={95} step={5}
+          <Slider label={`${scoredFor} at least`} icon={<MatchMark size="text-sm" />} hint="How well it must fit your taste" readout={q.minMatch ? `${q.minMatch}+` : 'Any'} min={0} max={95} step={5}
+            minLabel="Any" maxLabel="Best fit for you"
             value={q.minMatch ?? 0} onChange={(v) => set('minMatch', v === 0 ? null : v)} accent />
         </div>
         <p className="-mt-1 text-[11px] leading-relaxed text-slate-400">
-          “Audience score” is the crowd rating from TMDB — the open stand-in for Rotten Tomatoes’ audience/Popcorn score. Drag “Released since” left to reach classics from decades back.
+          Each slider stays at “Any” until you drag it right. “Audience score” is the crowd rating from TMDB — the open
+          stand-in for Rotten Tomatoes’ audience/Popcorn score.
         </p>
 
         <div className="flex flex-wrap gap-2">
