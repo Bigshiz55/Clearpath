@@ -136,6 +136,31 @@ export default async function DiscoverPage() {
           <TvDetective />
           <CourtroomDoors initialJudge={judge} />
         </div>
+
+        {/* The two signature features people can't find elsewhere: settle movie
+            night together, and keep a real watch diary. */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Link
+            href="/app/together"
+            className="group flex items-center gap-4 rounded-2xl border border-brand-400/40 bg-gradient-to-br from-brand-500/15 to-transparent p-5 transition hover:border-brand-400/70"
+          >
+            <span className="grid h-14 w-14 flex-none place-items-center rounded-2xl bg-brand-500/20 text-3xl" aria-hidden>🍿</span>
+            <span>
+              <span className="block text-lg font-bold text-white">Movie night, together</span>
+              <span className="mt-0.5 block text-sm text-slate-300">Everyone votes on their own phone — the judge hands down one binding verdict for the room.</span>
+            </span>
+          </Link>
+          <Link
+            href="/app/docket"
+            className="group flex items-center gap-4 rounded-2xl border border-gold-400/40 bg-gradient-to-br from-gold-500/15 to-transparent p-5 transition hover:border-gold-400/70"
+          >
+            <span className="grid h-14 w-14 flex-none place-items-center rounded-2xl bg-gold-500/20 text-3xl" aria-hidden>📓</span>
+            <span>
+              <span className="block text-lg font-bold text-white">Your watch diary</span>
+              <span className="mt-0.5 block text-sm text-slate-300">Every title you finish gets a dated Final Verdict — your record of what you watched and what you thought.</span>
+            </span>
+          </Link>
+        </div>
       </section>
 
       <RecommendedForYou label={label} />
