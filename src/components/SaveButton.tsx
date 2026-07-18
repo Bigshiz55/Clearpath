@@ -15,6 +15,8 @@ interface Props {
   initialItemId?: string | null;
   /** 'overlay' = compact icon for poster corners; 'inline' = icon + label. */
   variant?: 'overlay' | 'inline';
+  /** Overlay variant only: grow to fill its flex track instead of a fixed square. */
+  wide?: boolean;
 }
 
 export function SaveButton({
@@ -26,6 +28,7 @@ export function SaveButton({
   initialSaved = false,
   initialItemId = null,
   variant = 'overlay',
+  wide = false,
 }: Props) {
   const toast = useToast();
   const [saved, setSaved] = useState(initialSaved);
@@ -100,7 +103,7 @@ export function SaveButton({
       disabled={busy}
       aria-label={saved ? 'Remove from list' : 'Add to list'}
       title={saved ? 'Remove from your list' : 'Add to your list'}
-      className={`grid h-7 w-7 place-items-center rounded-md border text-white transition ${
+      className={`grid h-7 place-items-center rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-7'} ${
         saved
           ? 'border-brand-300 bg-brand-500'
           : 'border-brand-400/60 bg-brand-500/35 hover:bg-brand-500/60'

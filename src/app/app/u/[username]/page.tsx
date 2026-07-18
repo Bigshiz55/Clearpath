@@ -95,7 +95,7 @@ export default async function PublicProfilePage({ params }: { params: { username
                 mediaType={v.mediaType}
                 posterUrl={tmdbImage(v.posterPath, 'w342')}
                 overlay={
-                  <SaveButton tmdbId={v.tmdbId} mediaType={v.mediaType} title={v.title} year={v.year} posterPath={v.posterPath} />
+                  <SaveButton wide tmdbId={v.tmdbId} mediaType={v.mediaType} title={v.title} year={v.year} posterPath={v.posterPath} />
                 }
               >
                 <div className="mt-2 flex items-center justify-between">

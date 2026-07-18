@@ -80,6 +80,7 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
               posterUrl={r.posterUrl}
               overlay={
                 <SaveButton
+                  wide
                   tmdbId={r.id}
                   mediaType={r.mediaType}
                   title={r.title}

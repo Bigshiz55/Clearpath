@@ -59,13 +59,13 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
     overlay !== undefined
       ? overlay
       : saveId != null
-        ? <SaveButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+        ? <SaveButton wide tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
         : null;
   // Every placard everywhere also gets the "not for me" flag (feeds your DNA),
   // unless the caller explicitly opts out of overlays with `overlay={null}`.
   const feedback =
     overlay !== null && saveId != null ? (
-      <TasteFeedback compact tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+      <TasteFeedback compact wide tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
     ) : null;
   const heading = (
     <>
@@ -89,11 +89,11 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             <WatchCall mediaType={mediaType} tmdbId={saveId} objectiveScore={null} className="w-full justify-center py-1 text-[11px]" />
           </div>
         )}
-        <div className="flex items-center justify-between gap-1 px-2 py-1.5">
-          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
             {mediaType === 'movie' ? 'Movie' : 'TV'}
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-1 items-center gap-1.5">
             {resolvedOverlay}
             {feedback}
           </div>

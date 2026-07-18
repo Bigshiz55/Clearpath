@@ -28,6 +28,7 @@ export function TasteFeedback({
   posterPath,
   onFlagged,
   compact = false,
+  wide = false,
 }: {
   tmdbId: number;
   mediaType: MediaType;
@@ -37,6 +38,8 @@ export function TasteFeedback({
   onFlagged?: () => void;
   /** Icon-only trigger (the red O) for the card top bar. */
   compact?: boolean;
+  /** Compact variant only: grow to fill its flex track instead of a fixed square. */
+  wide?: boolean;
 }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -76,7 +79,7 @@ export function TasteFeedback({
         title="Remove from your picks"
         className={
           compact
-            ? 'grid h-7 w-7 place-items-center rounded-md border border-red-400/60 bg-red-500/25 text-sm leading-none transition hover:bg-red-500/40'
+            ? `grid h-7 place-items-center rounded-md border border-red-400/60 bg-red-500/25 text-sm leading-none transition hover:bg-red-500/40 ${wide ? 'w-full flex-1' : 'w-7'}`
             : 'inline-flex items-center gap-1 rounded-lg border border-red-400/50 bg-black/60 px-2 py-1 text-[11px] font-bold text-red-100 backdrop-blur transition hover:bg-red-500/25'
         }
       >

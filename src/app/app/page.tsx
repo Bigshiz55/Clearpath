@@ -175,6 +175,7 @@ export default async function DiscoverPage() {
                 posterUrl={tmdbImage(v.poster_path, 'w342')}
                 overlay={
                   <SaveButton
+                    wide
                     tmdbId={v.tmdb_id}
                     mediaType={v.media_type}
                     title={v.title}

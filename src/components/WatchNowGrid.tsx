@@ -26,14 +26,15 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
                 <div className="px-2 pt-1.5">
                   <WatchCall mediaType={t.mediaType} tmdbId={t.id} objectiveScore={t.ratings.standardScore ?? null} className="w-full justify-center py-1 text-[11px]" />
                 </div>
-                <div className="flex items-center justify-between gap-1 px-2 py-1.5">
-                  <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
+                <div className="flex items-center gap-1.5 px-2 py-1.5">
+                  <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
                     {t.mediaType === 'movie' ? 'Movie' : 'TV'}
                   </span>
-                  <div className="flex items-center gap-1.5">
-                    <SaveButton tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
+                  <div className="flex flex-1 items-center gap-1.5">
+                    <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
                     <TasteFeedback
                       compact
+                      wide
                       tmdbId={t.id}
                       mediaType={t.mediaType}
                       title={t.title}
