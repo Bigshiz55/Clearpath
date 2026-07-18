@@ -1,5 +1,7 @@
 import type { TileRatings } from '@/lib/ratings';
 import { deciderSearchUrl } from '@/lib/ratings';
+import type { MediaType } from '@/lib/types';
+import { WatchCall } from './WatchCall';
 
 function tomatoColor(pct: number): string {
   return pct >= 60 ? 'text-red-300' : 'text-emerald-300';
@@ -8,11 +10,17 @@ function tomatoColor(pct: number): string {
 /** A compact row of the real ratings for a title — shown right on the card so
  *  you don't have to open it: Tomatometer, audience, IMDb, Metacritic, and a
  *  Decider link. Renders only the sources we actually have (audience is TMDB's;
- *  RT's own popcorn score isn't in our data feed). */
+ *  RT's own popcorn score isn't in our data feed).
+ *
+ *  When `mediaType`/`tmdbId` are supplied, the leading call becomes the DNA-driven
+ *  WatchCall (personalized when the user has rated enough, objective otherwise).
+ */
 export function RatingsStrip({
   ratings,
   title,
   year,
+  mediaType,
+  tmdbId,
   decider = true,
   standard = false,
   loading = false,
@@ -21,6 +29,8 @@ export function RatingsStrip({
   ratings: TileRatings;
   title: string;
   year?: number | null;
+  mediaType?: MediaType;
+  tmdbId?: number;
   decider?: boolean;
   standard?: boolean;
   loading?: boolean;
@@ -38,18 +48,22 @@ export function RatingsStrip({
 
   return (
     <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold tabular-nums ${className}`}>
-      <span
-        className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-black ${
-          verdict === 'stream'
-            ? 'bg-emerald-500/20 text-emerald-200'
-            : verdict === 'skip'
-              ? 'bg-red-500/20 text-red-200'
-              : 'bg-white/10 text-slate-300'
-        }`}
-        title="WatchVerdict's Stream It or Skip It call for this title"
-      >
-        {verdict === 'stream' ? '✅ STREAM IT' : verdict === 'skip' ? '⛔ SKIP IT' : 'STREAM/SKIP: NA'}
-      </span>
+      {mediaType && tmdbId ? (
+        <WatchCall mediaType={mediaType} tmdbId={tmdbId} objectiveScore={ratings.standardScore ?? null} />
+      ) : (
+        <span
+          className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-black ${
+            verdict === 'stream'
+              ? 'bg-emerald-500/20 text-emerald-200'
+              : verdict === 'skip'
+                ? 'bg-red-500/20 text-red-200'
+                : 'bg-white/10 text-slate-300'
+          }`}
+          title="WatchVerdict's Stream It or Skip It call for this title"
+        >
+          {verdict === 'stream' ? '✅ STREAM IT' : verdict === 'skip' ? '⛔ SKIP IT' : 'STREAM/SKIP: NA'}
+        </span>
+      )}
       {standard && ratings.standardScore != null && (
         <span className="inline-flex items-center gap-0.5 text-gold-400" title="WatchVerdict Standard Score — blended across every rating source we have">
           ⚖️ {ratings.standardScore}

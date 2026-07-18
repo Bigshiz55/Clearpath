@@ -2,28 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
-
-interface Dna {
-  score: number;
-  confidence: number;
-  sampleSize: number;
-  available: boolean;
-}
-
-// One in-flight fetch per title, shared across every card on the page.
-const cache = new Map<string, Promise<Dna | null>>();
-function load(mediaType: MediaType, tmdbId: number): Promise<Dna | null> {
-  const key = `${mediaType}:${tmdbId}`;
-  let p = cache.get(key);
-  if (!p) {
-    p = fetch(`/api/dna/${mediaType}/${tmdbId}`)
-      .then((r) => r.json())
-      .then((d) => (d?.dna as Dna | null) ?? null)
-      .catch(() => null);
-    cache.set(key, p);
-  }
-  return p;
-}
+import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
 
 /**
  * A compact 🧬 DNA Score badge for any card — "odds you'll love it". Only shows
@@ -31,17 +10,17 @@ function load(mediaType: MediaType, tmdbId: number): Promise<Dna | null> {
  * renders nothing (the objective score already covers "is it good").
  */
 export function CardDna({ mediaType, tmdbId, className = '' }: { mediaType: MediaType; tmdbId: number; className?: string }) {
-  const [dna, setDna] = useState<Dna | null>(null);
+  const [dna, setDna] = useState<DnaClientResult | null>(null);
 
   useEffect(() => {
     let active = true;
-    load(mediaType, tmdbId).then((d) => active && setDna(d));
+    loadDna(mediaType, tmdbId).then((d) => active && setDna(d));
     return () => {
       active = false;
     };
   }, [mediaType, tmdbId]);
 
-  if (!dna || dna.sampleSize === 0 || !dna.available) return null;
+  if (!dna || !isPersonalized(dna)) return null;
 
   return (
     <span

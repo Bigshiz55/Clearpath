@@ -54,6 +54,8 @@ export function CardRatings({
       ratings={ratings ?? EMPTY_TILE_RATINGS}
       title={title}
       year={year}
+      mediaType={mediaType}
+      tmdbId={tmdbId}
       decider={decider}
       loading={ratings == null}
       className={className}

@@ -112,3 +112,41 @@ export function verdictVisualForCall(call: string): VerdictVisual {
 export function isTopTier(tier: string): boolean {
   return tier === 'Must Watch';
 }
+
+// Client-safe score → tier thresholds. Mirrors `tierFromScore` in
+// scoring/verdict.ts (kept in sync) so the DNA Score maps to the SAME tiers and
+// colors as the objective verdict — one call vocabulary everywhere.
+export function tierForScore(score: number): VerdictTier {
+  if (score >= 85) return 'Must Watch';
+  if (score >= 75) return 'Strong Watch';
+  if (score >= 65) return 'Worth Watching';
+  if (score >= 50) return 'Possible Watch';
+  if (score >= 35) return 'Low Priority';
+  return 'Skip';
+}
+
+export interface ScoreVerdict {
+  tier: VerdictTier;
+  visual: VerdictVisual;
+  /** The short, all-caps headline call. */
+  call: string;
+  /** An emoji that reads at a glance. */
+  emoji: string;
+}
+
+const CALL_TEXT: Record<VerdictKey, { call: string; emoji: string }> = {
+  watch: { call: 'STREAM IT', emoji: '✅' },
+  worth: { call: 'WORTH A LOOK', emoji: '👍' },
+  uncertain: { call: 'TOSS-UP', emoji: '🤔' },
+  skip: { call: 'SKIP IT', emoji: '⛔' },
+  wildcard: { call: 'WILDCARD', emoji: '🃏' },
+};
+
+/** One place to turn any 0–100 score (objective OR DNA) into a tier, its color,
+ *  and its headline call. */
+export function scoreVerdict(score: number): ScoreVerdict {
+  const tier = tierForScore(score);
+  const visual = verdictVisualForTier(tier);
+  const text = CALL_TEXT[visual.key];
+  return { tier, visual, call: text.call, emoji: text.emoji };
+}

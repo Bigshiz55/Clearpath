@@ -3,9 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PosterCard } from './PosterCard';
 import { SaveButton } from './SaveButton';
-import { MatchMark, MATCH_TOOLTIP } from './MatchMark';
 import { ReasonText } from './ReasonText';
-import { verdictVisualForTier, isTopTier } from '@/lib/verdictVisual';
 
 interface Rec {
   id: number;
@@ -91,19 +89,15 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
               }
             >
               {(() => {
-                const v = verdictVisualForTier(r.tier);
-                const top = isTopTier(r.tier);
+                // The call now lives in the DNA-driven badge (card top bar +
+                // ratings row), so here we keep only the reason — the "why this
+                // is on your list" that the call can't express on its own.
                 const reason = fullReason(r);
+                if (!reason) return null;
                 return (
-                  <div className="mt-2 space-y-1.5">
-                    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${top ? v.solid : v.badge}`} title={MATCH_TOOLTIP}>
-                      <MatchMark size="text-[11px]" />
-                      {top ? '★ ' : ''}{r.personalScore}% · {r.tier}
-                    </span>
-                    {reason && (
-                      // One complete sentence; tap/click to expand the full text.
-                      <ReasonText text={reason} className="text-[11px] text-slate-400" />
-                    )}
+                  <div className="mt-2">
+                    {/* One complete sentence; tap/click to expand the full text. */}
+                    <ReasonText text={reason} className="text-[11px] text-slate-400" />
                   </div>
                 );
               })()}

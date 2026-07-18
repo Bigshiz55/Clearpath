@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { verdictVisualForTier, verdictVisualForCall, verdictVisual, isTopTier } from './verdictVisual';
+import { verdictVisualForTier, verdictVisualForCall, verdictVisual, isTopTier, tierForScore, scoreVerdict } from './verdictVisual';
+import { tierFromScore } from './scoring/verdict';
 
 describe('Verdict visual language', () => {
   it('collapses the two top tiers into one green "watch" signal', () => {
@@ -36,5 +37,21 @@ describe('Verdict visual language', () => {
     expect(isTopTier('Must Watch')).toBe(true);
     expect(isTopTier('Strong Watch')).toBe(false);
     expect(isTopTier('Skip')).toBe(false);
+  });
+
+  it('keeps the DNA score→tier thresholds identical to the objective verdict', () => {
+    // The DNA Score must land in the SAME tier as an equal objective score, or
+    // the "one call" promise breaks. Sweep the whole range including boundaries.
+    for (let s = 0; s <= 100; s++) {
+      expect(tierForScore(s)).toBe(tierFromScore(s));
+    }
+  });
+
+  it('turns a score into a single headline call with matching color', () => {
+    expect(scoreVerdict(90).call).toBe('STREAM IT');
+    expect(scoreVerdict(90).visual.key).toBe('watch');
+    expect(scoreVerdict(60).call).toBe('WORTH A LOOK');
+    expect(scoreVerdict(10).call).toBe('SKIP IT');
+    expect(scoreVerdict(10).visual.key).toBe('skip');
   });
 });

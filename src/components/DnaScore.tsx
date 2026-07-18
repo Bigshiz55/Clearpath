@@ -2,14 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
-
-interface Dna {
-  score: number;
-  confidence: number; // 0..1 — taste vs. objective blend
-  tasteScore: number | null;
-  available: boolean;
-  sampleSize: number;
-}
+import { loadDna, isPersonalized, type DnaClientResult as Dna } from '@/lib/dnaClient';
+import { scoreVerdict } from '@/lib/verdictVisual';
 
 /** A small double-helix mark — the DNA Score's identity. */
 function HelixMark({ className = 'h-6 w-6' }: { className?: string }) {
@@ -34,11 +28,10 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
 
   useEffect(() => {
     let active = true;
-    fetch(`/api/dna/${mediaType}/${tmdbId}`)
-      .then((r) => r.json())
+    loadDna(mediaType, tmdbId)
       .then((d) => {
         if (!active) return;
-        setDna((d?.dna as Dna | null) ?? null);
+        setDna(d);
         setLoaded(true);
       })
       .catch(() => active && setLoaded(true));
@@ -52,6 +45,7 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
   }
   if (!dna) return null;
 
+  const personal = isPersonalized(dna);
   const learning = dna.confidence < 0.5;
   const sub = !dna.available
     ? 'Odds you’ll love it'
@@ -61,20 +55,25 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
         ? `Learning · ${dna.sampleSize} rated`
         : 'Odds you’ll love it';
 
+  const v = scoreVerdict(dna.score);
+
   return (
     <div
       className="flex flex-shrink-0 items-center gap-2.5 rounded-xl border-2 border-pink-400/80 bg-gradient-to-br from-pink-500/45 to-rose-500/30 px-3.5 py-2 shadow-[0_0_22px_rgba(244,63,94,0.4)]"
-      title="WatchVerdict DNA Score — a 0–100 estimate of how much YOU will love this, learned from what you’ve rated. Sharpens the more you use the app."
+      title="WatchVerdict DNA Score — a 0–100 estimate of how much YOU will love this, learned from what you’ve rated. It drives your Stream It / Skip It call and sharpens the more you use the app."
     >
       <span className="grid h-12 w-12 place-items-center rounded-lg bg-pink-500/60 ring-2 ring-pink-200/70">
         <HelixMark />
       </span>
       <span className="flex flex-col leading-tight">
-        <span className="flex items-center gap-1 text-xl font-black tabular-nums text-white">
+        <span className="flex items-center gap-1.5 text-xl font-black tabular-nums text-white">
           {dna.score}
           <span className="text-[11px] font-bold text-pink-100/80">/100</span>
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-black tracking-wide ${v.visual.badge}`}>
+            {personal ? '🧬' : v.emoji} {v.call}
+          </span>
         </span>
-        <span className="text-[10px] font-black uppercase tracking-wide text-white">🧬 DNA Score</span>
+        <span className="text-[10px] font-black uppercase tracking-wide text-white">🧬 DNA Score · {v.tier}</span>
         <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/90">{sub}</span>
       </span>
     </div>

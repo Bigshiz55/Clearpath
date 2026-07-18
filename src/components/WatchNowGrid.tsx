@@ -6,7 +6,6 @@ import { RatingsStrip } from './RatingsStrip';
 import { CardDna } from './CardDna';
 import { TasteFeedback } from './TasteFeedback';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
-import { verdictVisualForCall } from '@/lib/verdictVisual';
 import type { WatchNowItem } from '@/lib/watchNow';
 
 export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
@@ -19,7 +18,6 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
     <>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {shown.map((t) => {
-          const v = verdictVisualForCall(t.primaryCall);
           return (
             <div key={`${t.mediaType}-${t.id}`} className="card group h-full overflow-hidden transition hover:border-white/20 hover:shadow-glow">
               {/* Top action bar — Movie/TV · DNA · ＋ · O — above the art. */}
@@ -63,13 +61,8 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
               <div className="p-3">
                 <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block w-full text-left">
                   <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black ${v.badge}`}>{t.primaryCall}</span>
-                    <span className="text-sm font-bold tabular-nums text-gold-300">{t.matchScore}</span>
-                    <span className="text-[11px] text-slate-400">match</span>
-                  </div>
                 </button>
-                <RatingsStrip ratings={t.ratings} title={t.title} year={t.year} standard className="mt-1.5" />
+                <RatingsStrip ratings={t.ratings} title={t.title} year={t.year} mediaType={t.mediaType} tmdbId={t.id} standard className="mt-1.5" />
               </div>
             </div>
           );
