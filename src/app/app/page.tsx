@@ -54,26 +54,47 @@ export default async function DiscoverPage() {
   // and any crew members to score against ("who's watching").
   const services = user ? await getMyServices(supabase, user.id) : [];
   const providerCatalog = await getBrowseProviders(regionFor(profile)).catch(() => []);
-  // Surface the most common + free/public services first; TMDB's raw order
-  // buries the big names and free ones, so rank by this list, then TMDB.
-  const COMMON_FIRST = [
-    'netflix', 'amazon prime video', 'disney plus', 'max', 'hbo', 'hulu', 'apple tv', 'peacock',
-    'paramount', 'starz', 'showtime', 'amc',
-    // Add-on channels you reach through Prime / Apple — their own providers, easy to miss.
-    'acorn', 'britbox', 'mgm+', 'mubi', 'shudder', 'sundance now', 'hallmark',
-    // Free / public
-    'tubi', 'pluto', 'roku', 'freevee', 'crackle', 'pbs', 'plex', 'kanopy', 'hoopla', 'xumo',
-    'public domain', 'youtube',
+  // A short, curated set of the services most people actually have — one clean
+  // entry per service. TMDB lists dozens of granular add-ons ("Cinemax Apple TV
+  // Channel", "Starz Amazon Channel", "… with Ads"); we collapse those to the
+  // parent brand so the picker stays scannable. Only services present in the
+  // region's real catalog are shown — nothing is invented.
+  const CURATED: { label: string; match: (n: string) => boolean }[] = [
+    // The big streamers
+    { label: 'Netflix', match: (n) => n === 'netflix' },
+    { label: 'Amazon Prime Video', match: (n) => n === 'amazon prime video' },
+    { label: 'Disney+', match: (n) => n === 'disney plus' },
+    { label: 'Max', match: (n) => n === 'max' || n === 'hbo max' },
+    { label: 'Hulu', match: (n) => n === 'hulu' },
+    { label: 'Apple TV+', match: (n) => n === 'apple tv plus' || n === 'apple tv+' },
+    { label: 'Peacock', match: (n) => n.startsWith('peacock') && !n.includes('amazon') },
+    { label: 'Paramount+', match: (n) => n === 'paramount plus' || n === 'paramount+' },
+    { label: 'Starz', match: (n) => n === 'starz' },
+    { label: 'Showtime', match: (n) => n === 'showtime' },
+    { label: 'AMC+', match: (n) => n === 'amc+' || n === 'amc plus' },
+    // Free / public — no subscription needed
+    { label: 'Tubi', match: (n) => n === 'tubi' || n === 'tubi tv' },
+    { label: 'Pluto TV', match: (n) => n === 'pluto tv' },
+    { label: 'The Roku Channel', match: (n) => n === 'the roku channel' || n === 'roku channel' },
+    { label: 'Amazon Freevee', match: (n) => n.includes('freevee') },
+    { label: 'Crackle', match: (n) => n === 'crackle' },
+    { label: 'YouTube', match: (n) => n === 'youtube' },
+    // Live-TV bundles (top cable-replacement services)
+    { label: 'YouTube TV', match: (n) => n === 'youtube tv' },
+    { label: 'Hulu (Live TV)', match: (n) => n === 'hulu live tv' || n === 'hulu + live tv' },
+    { label: 'fuboTV', match: (n) => n.includes('fubo') },
+    { label: 'Sling TV', match: (n) => n.startsWith('sling') },
+    { label: 'DIRECTV', match: (n) => n.includes('directv') },
   ];
-  const commonRank = (name: string): number => {
-    const n = name.toLowerCase();
-    const i = COMMON_FIRST.findIndex((c) => n.includes(c));
-    return i === -1 ? 999 : i;
-  };
-  const topProviders = [...providerCatalog]
-    .sort((a, b) => commonRank(a.name) - commonRank(b.name) || a.priority - b.priority)
-    .slice(0, 60)
-    .map((p) => ({ id: p.id, name: p.name }));
+  const chosen = new Set<number>();
+  const topProviders: { id: number; name: string }[] = [];
+  for (const c of CURATED) {
+    const hit = providerCatalog.find((p) => !chosen.has(p.id) && c.match(p.name.trim().toLowerCase()));
+    if (hit) {
+      chosen.add(hit.id);
+      topProviders.push({ id: hit.id, name: c.label });
+    }
+  }
   const watchers: WatcherOption[] = [];
   try {
     const { crews } = await listCrews();
@@ -155,10 +176,10 @@ export default async function DiscoverPage() {
           </Link>
         </div>
 
-        {/* Ask the judge — bigger */}
+        {/* Your opening statement — plain-English ask, or use the evidence controls */}
         <div>
           <div className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
-            <span aria-hidden>⚖️</span> Ask the judge
+            <span aria-hidden>⚖️</span> Your opening statement
           </div>
           <FinderUI embedded hasServices={services.length > 0} watchers={watchers} initialJudge={judge} providers={topProviders} />
         </div>

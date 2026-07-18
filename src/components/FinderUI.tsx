@@ -141,9 +141,6 @@ function releasedReadout(years: number): string {
   const from = new Date().getFullYear() - years;
   return `${from} → now`;
 }
-function paceReadout(v: number): string {
-  return v <= 33 ? '🐢 Slow burn' : v >= 67 ? '⚡ Adrenaline' : '🎬 Balanced';
-}
 
 export function FinderUI({
   hasServices,
@@ -243,7 +240,7 @@ export function FinderUI({
               </button>
             ))}
           </div>
-          <button onClick={find} disabled={loading} className="btn-primary w-full py-3.5 text-lg font-bold">
+          <button onClick={find} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
             {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
           </button>
         </div>
@@ -324,10 +321,17 @@ export function FinderUI({
         </div>
       )}
 
-      {/* Prepare your evidence — transparent, editable, no black box. */}
+      {/* OR — type an opening statement above, or build the case with the controls. */}
+      <div className="flex items-center gap-3" aria-hidden>
+        <span className="h-px flex-1 bg-white/10" />
+        <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">or</span>
+        <span className="h-px flex-1 bg-white/10" />
+      </div>
+
+      {/* Submit your evidence — transparent, editable, no black box. */}
       <div id="evidence" className="card space-y-4 p-4 scroll-mt-20">
         <div className="eyebrow-lg">
-          🎛️ Customize your evidence
+          🎛️ Submit your evidence
         </div>
 
         {watchers.length > 0 && (
@@ -381,7 +385,7 @@ export function FinderUI({
             <div>
               <div className="label">What you have</div>
               <div className="flex flex-wrap gap-1.5">
-                {(showAllProviders ? providers : providers.slice(0, 15)).map((p) => {
+                {(showAllProviders ? providers : providers.slice(0, 24)).map((p) => {
                   const on = (q.providerIds ?? []).includes(p.id);
                   return (
                     <button
@@ -393,12 +397,12 @@ export function FinderUI({
                     </button>
                   );
                 })}
-                {providers.length > 15 && (
+                {providers.length > 24 && (
                   <button
                     onClick={() => setShowAllProviders((v) => !v)}
                     className="rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-300 hover:text-brand-200"
                   >
-                    {showAllProviders ? 'Show fewer' : `+ ${providers.length - 15} more services`}
+                    {showAllProviders ? 'Show fewer' : `+ ${providers.length - 24} more services`}
                   </button>
                 )}
               </div>
@@ -433,33 +437,6 @@ export function FinderUI({
         <p className="-mt-1 text-[11px] leading-relaxed text-slate-400">
           “Audience score” is the crowd rating from TMDB — the open stand-in for Rotten Tomatoes’ audience/Popcorn score. Drag “Released since” left to reach classics from decades back.
         </p>
-
-        {/* Pace meter */}
-        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="label mb-0">Pace</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-brand-200">{q.pace == null ? 'Any' : paceReadout(q.pace)}</span>
-              <button
-                onClick={() => set('pace', q.pace == null ? 50 : null)}
-                className={`rounded-md border px-2 py-0.5 text-[11px] transition ${q.pace == null ? 'border-white/12 bg-white/5 text-slate-400' : 'border-brand-400/60 bg-brand-500/20 text-brand-100'}`}
-              >
-                {q.pace == null ? 'Set pace' : 'On'}
-              </button>
-            </div>
-          </div>
-          <input
-            type="range" min={0} max={100} step={5}
-            value={q.pace ?? 50}
-            disabled={q.pace == null}
-            onChange={(e) => set('pace', Number(e.target.value))}
-            className="w-full accent-brand-500 disabled:opacity-40"
-          />
-          <div className="mt-0.5 flex justify-between text-[11px] text-slate-400">
-            <span>🐢 Slow burn</span>
-            <span>⚡ Adrenaline rush</span>
-          </div>
-        </div>
 
         <div className="flex flex-wrap gap-2">
           <button onClick={() => set('englishAudioOnly', !q.englishAudioOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.englishAudioOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
@@ -498,7 +475,7 @@ export function FinderUI({
           </button>
         </div>
 
-        <button onClick={find} disabled={loading} className="btn-primary w-full py-3">
+        <button onClick={find} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
           {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
         </button>
       </div>
