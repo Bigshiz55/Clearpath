@@ -164,7 +164,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
       {visible.length === 0 ? (
         <p className="py-10 text-center text-sm text-slate-400">Nothing matches these filters.</p>
       ) : view === 'grid' ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        <div className="poster-grid">
           {visible.map((item) => (
             <div key={item.id} className="card overflow-hidden">
               <Link href={`/app/title/${item.media_type}/${item.tmdb_id}`} className="block">

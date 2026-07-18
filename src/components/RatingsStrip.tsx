@@ -23,6 +23,7 @@ export function RatingsStrip({
   tmdbId,
   decider = true,
   standard = false,
+  hideCall = false,
   loading = false,
   className = '',
 }: {
@@ -33,6 +34,9 @@ export function RatingsStrip({
   tmdbId?: number;
   decider?: boolean;
   standard?: boolean;
+  /** Hide the leading Stream It / Skip It call — used when the card shows it in
+   *  its top bar instead, leaving only the source chips here. */
+  hideCall?: boolean;
   loading?: boolean;
   className?: string;
 }) {
@@ -44,62 +48,88 @@ export function RatingsStrip({
   // score; "NA" only when there's genuinely no score to judge (e.g. unreleased).
   const verdict = ratings.standardScore == null ? 'na' : ratings.standardScore >= 55 ? 'stream' : 'skip';
   const popcorn = ratings.rtAudience ?? ratings.audience;
-  const dim = 'text-slate-500';
+
+  const call =
+    mediaType && tmdbId ? (
+      <WatchCall mediaType={mediaType} tmdbId={tmdbId} objectiveScore={ratings.standardScore ?? null} />
+    ) : (
+      <span
+        className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-black ${
+          verdict === 'stream'
+            ? 'bg-emerald-500/20 text-emerald-200'
+            : verdict === 'skip'
+              ? 'bg-red-500/20 text-red-200'
+              : 'bg-white/10 text-slate-300'
+        }`}
+        title="WatchVerdict's Stream It or Skip It call for this title"
+      >
+        {verdict === 'stream' ? '✅ STREAM IT' : verdict === 'skip' ? '⛔ SKIP IT' : 'STREAM/SKIP: NA'}
+      </span>
+    );
 
   return (
-    <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold tabular-nums ${className}`}>
-      {mediaType && tmdbId ? (
-        <WatchCall mediaType={mediaType} tmdbId={tmdbId} objectiveScore={ratings.standardScore ?? null} />
-      ) : (
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      {/* Line 1 — the one call, on its own line so it reads as the headline.
+          Skipped when the card already shows the call in its top bar. */}
+      {!hideCall && (
+        <div className="flex items-center gap-2">
+          {call}
+          {standard && !(mediaType && tmdbId) && ratings.standardScore != null && (
+            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-gold-400" title="WatchVerdict Standard Score — blended across every rating source we have">
+              ⚖️ {ratings.standardScore}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Line 2 — the source ratings, as aligned chips so they line up card to
+          card and scan cleanly. A fixed set (value or "–" when unavailable). */}
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold tabular-nums">
+        <RatingChip
+          label="🍅"
+          value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
+          tone={ratings.tomatometer != null ? tomatoColor(ratings.tomatometer) : ''}
+          title="Rotten Tomatoes — Tomatometer (critics)"
+        />
+        <RatingChip
+          label="🍿"
+          value={popcorn != null ? `${popcorn}%` : null}
+          tone={popcorn != null ? 'text-amber-200' : ''}
+          title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
+        />
         <span
-          className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-black ${
-            verdict === 'stream'
-              ? 'bg-emerald-500/20 text-emerald-200'
-              : verdict === 'skip'
-                ? 'bg-red-500/20 text-red-200'
-                : 'bg-white/10 text-slate-300'
-          }`}
-          title="WatchVerdict's Stream It or Skip It call for this title"
+          className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
+          title="IMDb rating"
         >
-          {verdict === 'stream' ? '✅ STREAM IT' : verdict === 'skip' ? '⛔ SKIP IT' : 'STREAM/SKIP: NA'}
+          IMDb {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
         </span>
-      )}
-      {standard && ratings.standardScore != null && (
-        <span className="inline-flex items-center gap-0.5 text-gold-400" title="WatchVerdict Standard Score — blended across every rating source we have">
-          ⚖️ {ratings.standardScore}
-        </span>
-      )}
-
-      {/* A fixed set of icons on EVERY card — value, or "–" when unavailable — so
-          the row is consistent and easy to scan across cards. */}
-      <span className={`inline-flex items-center gap-0.5 ${ratings.tomatometer != null ? tomatoColor(ratings.tomatometer) : dim}`} title="Rotten Tomatoes — Tomatometer (critics)">
-        🍅 {ratings.tomatometer != null ? `${ratings.tomatometer}%` : '–'}
-      </span>
-      <span
-        className={`inline-flex items-center gap-0.5 ${popcorn != null ? 'text-amber-200' : dim}`}
-        title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
-      >
-        🍿 {popcorn != null ? `${popcorn}%` : '–'}
-      </span>
-      <span className={`inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-black ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : `border border-white/15 ${dim}`}`} title="IMDb rating">
-        IMDb {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
-      </span>
-      <span className={`inline-flex items-center gap-0.5 ${ratings.metacritic != null ? 'text-sky-300' : dim}`} title="Metacritic (critics)">
-        Ⓜ {ratings.metacritic != null ? ratings.metacritic : '–'}
-      </span>
-
-      {decider && (
-        <a
-          href={deciderSearchUrl(title, year)}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-0.5 text-brand-300 hover:text-brand-200"
-          title="Decider — Stream It or Skip It? (opens Decider; they have no public rating feed to embed)"
-        >
-          Decider ↗
-        </a>
-      )}
+        {decider && (
+          <a
+            href={deciderSearchUrl(title, year)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-0.5 rounded-md bg-white/5 px-1.5 py-0.5 text-brand-300 hover:bg-white/10 hover:text-brand-200"
+            title="Decider — Stream It or Skip It? (opens Decider; they have no public rating feed to embed)"
+          >
+            Decider ↗
+          </a>
+        )}
+      </div>
     </div>
+  );
+}
+
+/** One source chip — value in a subtle pill, dimmed to "–" when unavailable, so
+ *  the row stays aligned across cards. */
+function RatingChip({ label, value, tone, title }: { label: string; value: string | null; tone: string; title: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-md bg-white/5 px-1.5 py-0.5 ${value != null ? tone : 'text-slate-500'}`}
+      title={title}
+    >
+      <span aria-hidden>{label}</span>
+      {value ?? '–'}
+    </span>
   );
 }

@@ -68,7 +68,7 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
               ? 'Ranked by your Taste-DNA — tap any to see where to watch.'
               : 'Trending titles you can stream right now — tap any for where to watch.'}
           </p>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          <div className="poster-grid">
             {rankedMore.items.map((t) => (
               <PosterCard
                 key={`${t.mediaType}-${t.id}`}

@@ -268,7 +268,6 @@ export function OnTvGuide({
                       {a.criticImdb != null && (
                         <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>
                       )}
-                      {a.criticMeta != null && <span className="text-sky-300" title="Metacritic">Ⓜ {a.criticMeta}</span>}
                     </div>
                   )}
                 </div>

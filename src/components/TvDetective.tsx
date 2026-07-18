@@ -38,7 +38,6 @@ function Ratings({ p }: { p: Pick }) {
         <span className={p.rottenTomatoes >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {p.rottenTomatoes}%</span>
       )}
       {p.imdb != null && <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {p.imdb.toFixed(1)}</span>}
-      {p.metascore != null && <span className="text-sky-300" title="Metacritic">Ⓜ {p.metascore}</span>}
       {p.tvmaze != null && <span className="text-gold-300" title="TVmaze community score">★ {p.tvmaze.toFixed(1)}</span>}
     </div>
   );

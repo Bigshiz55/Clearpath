@@ -18,11 +18,15 @@ export function WatchCall({
   mediaType,
   tmdbId,
   objectiveScore,
+  compact = false,
   className = '',
 }: {
   mediaType: MediaType;
   tmdbId: number;
   objectiveScore: number | null;
+  /** Call only (no "· score") — for the tight card top bar, where the DNA box
+   *  below carries the number. */
+  compact?: boolean;
   className?: string;
 }) {
   const [dna, setDna] = useState<DnaClientResult | null>(null);
@@ -36,15 +40,12 @@ export function WatchCall({
   }, [mediaType, tmdbId]);
 
   const personal = isPersonalized(dna);
-  const score = personal ? dna!.score : objectiveScore;
+  // The /api/dna endpoint returns the objective score as `dna.score` even before
+  // the model is personalized, so prefer it; fall back to the passed objective
+  // score for guests (no dna at all).
+  const score = personal ? dna!.score : dna?.score ?? objectiveScore;
 
-  if (score == null) {
-    return (
-      <span className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-black bg-white/10 text-slate-300 ${className}`} title="Not enough data to make a call yet.">
-        NO CALL YET
-      </span>
-    );
-  }
+  if (score == null) return null;
 
   const v = scoreVerdict(score);
   return (
@@ -56,7 +57,8 @@ export function WatchCall({
           : 'WatchVerdict’s objective call. Rate a few titles and this becomes your personal DNA call.'
       }
     >
-      {personal ? '🧬' : v.emoji} {v.call} · {score}
+      {personal ? '🧬' : v.emoji} {v.call}
+      {!compact && ` · ${score}`}
     </span>
   );
 }

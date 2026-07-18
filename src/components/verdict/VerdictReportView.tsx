@@ -211,7 +211,7 @@ export function VerdictReportView({
       <section className="card p-5 sm:p-6">
         <h2 className="text-lg font-semibold text-white">Ratings</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Critic scores from IMDb / Rotten Tomatoes / Metacritic (when available); audience from TMDB.
+          Critic scores from IMDb / Rotten Tomatoes (when available); audience from TMDB.
         </p>
         <div className="mt-4">
           <RatingIcons sources={report.general.sources} />

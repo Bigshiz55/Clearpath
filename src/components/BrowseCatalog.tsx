@@ -190,14 +190,14 @@ export function BrowseCatalog({
 
       {/* Results */}
       {items.length === 0 && loading ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        <div className="poster-grid">
           {Array.from({ length: 12 }).map((_, i) => <div key={i} className="aspect-[2/3] animate-pulse rounded-2xl bg-white/5" />)}
         </div>
       ) : items.length === 0 ? (
         <p className="text-sm text-slate-400">Nothing matches those filters. Loosen the price, rating, or service and try again.</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          <div className="poster-grid">
             {items.map((t) => (
               <div key={`${t.mediaType}-${t.id}`} className="card group relative h-full overflow-hidden transition hover:border-white/20 hover:shadow-glow">
                 <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="relative block aspect-[2/3] w-full overflow-hidden" aria-label={`Quick look at ${t.title}`}>

@@ -30,6 +30,7 @@ export function CardRatings({
   title,
   year,
   decider = true,
+  hideCall = false,
   className = '',
 }: {
   tmdbId: number;
@@ -37,6 +38,7 @@ export function CardRatings({
   title: string;
   year?: number | null;
   decider?: boolean;
+  hideCall?: boolean;
   className?: string;
 }) {
   const [ratings, setRatings] = useState<TileRatings | null>(null);
@@ -57,6 +59,7 @@ export function CardRatings({
       mediaType={mediaType}
       tmdbId={tmdbId}
       decider={decider}
+      hideCall={hideCall}
       loading={ratings == null}
       className={className}
     />

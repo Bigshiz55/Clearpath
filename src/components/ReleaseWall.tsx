@@ -158,13 +158,13 @@ export function ReleaseWall({
 
       {/* ---- Grid ---- */}
       {loading && items == null ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        <div className="poster-grid">
           {Array.from({ length: 12 }).map((_, i) => (
             <div key={i} className="aspect-[2/3] animate-pulse rounded-2xl bg-white/5" />
           ))}
         </div>
       ) : items && items.length > 0 ? (
-        <div className={`grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 ${loading ? 'opacity-60' : ''}`}>
+        <div className={`poster-grid ${loading ? 'opacity-60' : ''}`}>
           {items.map((t) => {
             const label = dateLabel(t.releaseDate);
             const d = daysUntil(t.releaseDate);

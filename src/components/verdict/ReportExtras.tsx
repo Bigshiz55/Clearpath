@@ -4,7 +4,9 @@ import { originSummary } from '@/lib/origin';
 import { DnaScore } from '@/components/DnaScore';
 
 // Niche community aggregators we don't surface — they read as "random stars".
-const HIDDEN_SOURCES = new Set(['Trakt', 'Letterboxd', 'Roger Ebert']);
+// Metacritic is dropped too: it's usually sparse and adds a fourth number that
+// clutters the row without changing the call.
+const HIDDEN_SOURCES = new Set(['Trakt', 'Letterboxd', 'Roger Ebert', 'Metacritic', 'Metacritic Users']);
 
 function callStyleFor(call: PrimaryCall): string {
   return call === 'WATCH IT'
