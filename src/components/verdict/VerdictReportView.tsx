@@ -6,6 +6,7 @@ import { ProviderRow } from '@/components/ProviderRow';
 import { Poster } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
 import { MatchMark, MATCH_TOOLTIP } from '@/components/MatchMark';
+import { CardRatings } from '@/components/CardRatings';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
 import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
@@ -147,6 +148,8 @@ export function VerdictReportView({
               </div>
             )}
             {t.overview && <p className="mt-3 max-w-2xl text-sm text-slate-300">{t.overview}</p>}
+            {/* All ratings, right in the hero card — same row as every other card. */}
+            <CardRatings mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-3" />
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {t.trailerUrl && (
                 <a href={t.trailerUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex">
@@ -415,6 +418,7 @@ export function VerdictReportView({
                   </div>
                 </div>
                 <div className="mt-1 line-clamp-1 text-xs text-slate-300">{s.title}</div>
+                <CardRatings mediaType={s.mediaType} tmdbId={s.id} title={s.title} year={s.year} decider={false} className="mt-0.5" />
               </Link>
             ))}
           </div>
