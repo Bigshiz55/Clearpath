@@ -4,6 +4,10 @@ interface ScoreRingProps {
   sublabel?: string;
   size?: number;
   accent?: 'brand' | 'gold' | 'auto';
+  /** Small glyph shown before the label (e.g. the "algorithm match" brain). */
+  icon?: React.ReactNode;
+  /** Tooltip on the label — explains what the number is. */
+  title?: string;
 }
 
 function colorForScore(score: number): string {
@@ -14,7 +18,7 @@ function colorForScore(score: number): string {
   return '#f87171';
 }
 
-export function ScoreRing({ score, label, sublabel, size = 116, accent = 'auto' }: ScoreRingProps) {
+export function ScoreRing({ score, label, sublabel, size = 116, accent = 'auto', icon, title }: ScoreRingProps) {
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
   const stroke = 9;
   const r = (size - stroke) / 2;
@@ -46,7 +50,12 @@ export function ScoreRing({ score, label, sublabel, size = 116, accent = 'auto' 
           <span className="text-[10px] uppercase tracking-wider text-slate-400">/ 100</span>
         </div>
       </div>
-      {label && <div className="mt-2 text-sm font-semibold text-white">{label}</div>}
+      {label && (
+        <div className="mt-2 flex items-center gap-1 text-sm font-semibold text-white" title={title}>
+          {icon}
+          <span>{label}</span>
+        </div>
+      )}
       {sublabel && <div className="text-xs text-slate-400">{sublabel}</div>}
     </div>
   );

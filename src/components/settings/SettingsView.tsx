@@ -53,9 +53,34 @@ export function SettingsView(props: {
   // The everyday picks shown by default (real TMDB ids) + live-TV/cable boxes.
   const POPULAR_SERVICES = [...STREAMING_SERVICES, ...LIVE_TV_PROVIDERS];
   const catalog = props.providerCatalog ?? [];
+
+  // Popular premium channels & add-ons to also surface by default — resolved
+  // from the real catalog by name (so IDs are correct and availability still
+  // matches), skipping the granular "X Amazon/Apple TV Channel" duplicates.
+  const EXTRA_CHANNELS = [
+    'britbox', 'acorn', 'hallmark', 'amc+', 'starz', 'showtime', 'mgm+', 'shudder',
+    'sundance now', 'mubi', 'bet+', 'discovery+', 'espn', 'crunchyroll', 'criterion',
+  ];
+  const isGranular = (n: string) => /(amazon channel|apple tv channel|roku premium channel|with ads|standard with ads)/.test(n);
+  const popularIdSet = new Set(POPULAR_SERVICES.map((s) => s.id));
+  const CATALOG_DEFAULTS: { id: number; name: string }[] = [];
+  const seenExtra = new Set<number>();
+  for (const brand of EXTRA_CHANNELS) {
+    const hit = catalog.find((c) => {
+      const n = c.name.trim().toLowerCase();
+      return n.includes(brand) && !isGranular(n) && !popularIdSet.has(c.id) && !seenExtra.has(c.id);
+    });
+    if (hit) {
+      seenExtra.add(hit.id);
+      CATALOG_DEFAULTS.push({ id: hit.id, name: hit.name });
+    }
+  }
+
   // A name for any id we might need to render as a selected chip.
   const serviceName = (id: number): string =>
-    POPULAR_SERVICES.find((s) => s.id === id)?.name ?? catalog.find((c) => c.id === id)?.name ?? `Service #${id}`;
+    POPULAR_SERVICES.find((s) => s.id === id)?.name ??
+    catalog.find((c) => c.id === id)?.name ??
+    `Service #${id}`;
 
   // What to show: on a search, every matching real service + live-TV option;
   // otherwise the popular set plus anything already selected (so picks from a
@@ -70,11 +95,11 @@ export function SettingsView(props: {
         .map((c) => ({ id: c.id, name: c.name }));
       return [...fromPopular, ...fromCatalog].slice(0, 80);
     }
-    const popularIds = new Set(POPULAR_SERVICES.map((s) => s.id));
+    const shownIds = new Set([...POPULAR_SERVICES.map((s) => s.id), ...CATALOG_DEFAULTS.map((s) => s.id)]);
     const extras = Array.from(services)
-      .filter((id) => !popularIds.has(id))
+      .filter((id) => !shownIds.has(id))
       .map((id) => ({ id, name: serviceName(id) }));
-    return [...extras, ...POPULAR_SERVICES];
+    return [...extras, ...POPULAR_SERVICES, ...CATALOG_DEFAULTS];
   })();
 
   const [publicOn, setPublicOn] = useState(props.publicActivity);

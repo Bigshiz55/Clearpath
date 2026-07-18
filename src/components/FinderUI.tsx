@@ -7,6 +7,7 @@ import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { SaveButton } from '@/components/SaveButton';
 import { JudgeBench } from '@/components/JudgeBench';
 import { RatingsStrip } from '@/components/RatingsStrip';
+import { MatchMark, MATCH_TOOLTIP } from '@/components/MatchMark';
 import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 import type { FinderQuery } from '@/lib/finder';
 import type { Judge } from '@/lib/sponsors';
@@ -275,7 +276,10 @@ export function FinderUI({
           ) : (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-base font-bold text-white sm:text-lg">⚖️ The verdict — {items.length} match{items.length === 1 ? '' : 'es'}, ranked by {scoredFor}:</div>
+                <div className="inline-flex flex-wrap items-center gap-1 text-base font-bold text-white sm:text-lg">
+                  ⚖️ The verdict — {items.length} match{items.length === 1 ? '' : 'es'}, ranked by
+                  <MatchMark size="text-sm" /> {scoredFor}:
+                </div>
                 <button
                   onClick={() => document.getElementById('evidence')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                   className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
@@ -302,7 +306,10 @@ export function FinderUI({
                     </div>
                     <div className="mt-1 flex items-center gap-2">
                       <span className={`rounded-md border px-2 py-0.5 text-[11px] font-black ${CALL_STYLE[it.primaryCall] ?? 'border-white/15 text-slate-200'}`}>{it.primaryCall}</span>
-                      <span className="text-sm font-bold tabular-nums text-gold-400">{it.matchScore}</span>
+                      <span className="inline-flex items-center gap-1 text-sm font-bold tabular-nums text-gold-400" title={MATCH_TOOLTIP}>
+                        <MatchMark size="text-sm" />
+                        {it.matchScore}
+                      </span>
                       <span className="text-xs text-slate-400">match · {it.generalScore} overall</span>
                     </div>
                     <p className="mt-1 line-clamp-2 text-sm text-slate-300">{it.reason}</p>

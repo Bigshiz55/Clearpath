@@ -5,6 +5,7 @@ import { VerdictBadge, DispositionChip } from '@/components/VerdictBadge';
 import { ProviderRow } from '@/components/ProviderRow';
 import { Poster } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
+import { MatchMark, MATCH_TOOLTIP } from '@/components/MatchMark';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
 import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
@@ -173,7 +174,15 @@ export function VerdictReportView({
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-around">
           <ScoreRing score={report.general.score} label="WatchVerdict Score" sublabel={confidenceLabel(report.general.confidence)} accent="brand" size={128} />
           <div className="hidden h-24 w-px bg-white/10 sm:block" />
-          <ScoreRing score={report.personal.score} label={report.personal.label} sublabel={`base ${report.personal.baseScore} → ${report.personal.score}`} accent="gold" size={128} />
+          <ScoreRing
+            score={report.personal.score}
+            label={report.personal.label}
+            sublabel={`base ${report.personal.baseScore} → ${report.personal.score}`}
+            accent="gold"
+            size={128}
+            icon={<MatchMark />}
+            title={MATCH_TOOLTIP}
+          />
         </div>
         <div className="mt-5 flex flex-col items-center gap-3 text-center">
           <div className="flex flex-wrap items-center justify-center gap-2">

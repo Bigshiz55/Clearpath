@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PosterCard } from './PosterCard';
 import { SaveButton } from './SaveButton';
+import { MatchMark, MATCH_TOOLTIP } from './MatchMark';
 import { ReasonText } from './ReasonText';
 import { verdictVisualForTier, isTopTier } from '@/lib/verdictVisual';
 
@@ -95,7 +96,8 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
                 const reason = fullReason(r);
                 return (
                   <div className="mt-2 space-y-1.5">
-                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${top ? v.solid : v.badge}`}>
+                    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${top ? v.solid : v.badge}`} title={MATCH_TOOLTIP}>
+                      <MatchMark size="text-[11px]" />
                       {top ? '★ ' : ''}{r.personalScore}% · {r.tier}
                     </span>
                     {reason && (
