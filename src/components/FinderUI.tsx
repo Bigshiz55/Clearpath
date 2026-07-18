@@ -354,6 +354,18 @@ export function FinderUI({
           <span aria-hidden>🎛️</span> Submit your evidence
         </div>
 
+        {embedded ? (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-300">
+              Your results are tuned to the streaming services &amp; channels you have. Change what you have — and how
+              you like your shows — in Settings.
+            </p>
+            <a href="/app/settings" className="btn-primary inline-flex items-center gap-2 py-2.5 text-base font-semibold">
+              <span aria-hidden>⚙️</span> Adjust your services
+            </a>
+          </div>
+        ) : (
+          <>
         {watchers.length > 0 && (
           <div>
             <div className="label">Who’s watching</div>
@@ -507,6 +519,8 @@ export function FinderUI({
         <button onClick={find} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
           {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
         </button>
+          </>
+        )}
       </div>
       </div>
     </div>
