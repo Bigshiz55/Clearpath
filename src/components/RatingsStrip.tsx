@@ -110,9 +110,9 @@ export function RatingsStrip({
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             className="inline-flex items-center gap-0.5 rounded-md bg-white/5 px-1.5 py-0.5 text-brand-300 hover:bg-white/10 hover:text-brand-200"
-            title="Decider — Stream It or Skip It? (opens Decider; they have no public rating feed to embed)"
+            title="Decider’s “Stream It or Skip It?” review — opens Decider (they publish no rating feed we can embed, so we link you to their verdict)"
           >
-            Decider ↗
+            Decider: Stream / Skip ↗
           </a>
         )}
       </div>
