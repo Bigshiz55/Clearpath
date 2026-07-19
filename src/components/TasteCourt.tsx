@@ -269,7 +269,7 @@ export function TasteCourt({
                   <button onClick={() => { onWinnerLogged(finalists[winnerIdx]!, 'nope'); setLogged(true); }} className="rounded-lg border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-xs text-red-100">👎 Nope</button>
                 </div>
               ) : logged ? (
-                <div className="text-center text-xs text-slate-400">Logged to your crew’s DNA ✓</div>
+                <div className="text-center text-xs text-slate-400">Logged to your jury’s DNA ✓</div>
               ) : null}
               <button onClick={() => setShowShare(true)} className="btn-secondary mt-3 w-full">📸 Share this verdict</button>
               <button onClick={onClose} className="btn-primary mt-2 w-full">Done — let’s watch</button>

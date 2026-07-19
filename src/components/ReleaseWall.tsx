@@ -208,12 +208,6 @@ export function ReleaseWall({
                       {win === 'upcoming' ? `📅 ${label}` : label}
                     </span>
                   )}
-                  {t.network && (
-                    <span className="pointer-events-none absolute left-2 top-2 inline-flex max-w-[88%] items-center gap-1 rounded-md bg-brand-600/95 px-2 py-1 text-[11px] font-extrabold text-white shadow-md ring-1 ring-white/20 backdrop-blur">
-                      <span aria-hidden>📺</span>
-                      <span className="truncate">{t.network}</span>
-                    </span>
-                  )}
                   <span className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
                   </span>

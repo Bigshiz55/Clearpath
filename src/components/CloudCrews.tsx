@@ -67,7 +67,7 @@ export function CloudCrews() {
   const selected = crews?.find((c) => c.id === selId) ?? null;
 
   async function onCreate() {
-    const name = window.prompt('Name this crew (e.g. Friday movie night)');
+    const name = window.prompt('Name this jury (e.g. Friday movie night)');
     if (!name?.trim()) return;
     setBusy(true);
     const res = await createCrew(name.trim());
@@ -126,16 +126,16 @@ export function CloudCrews() {
   }
 
   if (crews === null) {
-    return <div className="mt-3 text-sm text-slate-400">Loading synced crews…</div>;
+    return <div className="mt-3 text-sm text-slate-400">Loading synced juries…</div>;
   }
 
   if (needsSetup) {
     return (
       <div className="card p-4">
-        <div className="text-sm font-semibold text-white">One-time setup for synced crews</div>
+        <div className="text-sm font-semibold text-white">One-time setup for synced juries</div>
         <p className="mt-1 text-xs text-slate-400">
           Run the migration <code className="text-slate-300">supabase/migrations/0003_crews.sql</code> in your
-          Supabase SQL editor, then refresh. Until then, the on-device crews below work fully.
+          Supabase SQL editor, then refresh. Until then, the on-device juries below work fully.
         </p>
         <a
           href="https://supabase.com/dashboard/project/vajgviraxigkwlvysxfz/sql/new"
@@ -163,7 +163,7 @@ export function CloudCrews() {
             {c.name}{c.dna.nights > 0 ? <span className="ml-1 text-[10px] text-slate-400">· {c.dna.nights}</span> : null}
           </button>
         ))}
-        <button onClick={onCreate} disabled={busy} className="btn-secondary text-sm">+ New synced crew</button>
+        <button onClick={onCreate} disabled={busy} className="btn-secondary text-sm">+ New synced jury</button>
       </div>
 
       {selected && (
@@ -172,7 +172,7 @@ export function CloudCrews() {
             <div className="font-bold text-white">🧬 {selected.name}</div>
             <div className="flex gap-2">
               <button onClick={onInvite} disabled={busy} className="rounded-lg border border-brand-400/40 bg-brand-500/15 px-2.5 py-1 text-xs font-semibold text-brand-100">📱 Invite (QR)</button>
-              <button onClick={async () => { if (confirm('Delete this crew?')) { await deleteCrew(selected.id); await reload(); } }} className="text-[11px] text-slate-500 hover:text-red-300">Delete</button>
+              <button onClick={async () => { if (confirm('Delete this jury?')) { await deleteCrew(selected.id); await reload(); } }} className="text-[11px] text-slate-500 hover:text-red-300">Delete</button>
             </div>
           </div>
 
@@ -302,7 +302,7 @@ export function CloudCrews() {
       {invite && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setInvite(null)}>
           <div className="card max-w-sm p-6 text-center" onClick={(e) => e.stopPropagation()}>
-            <div className="text-sm font-bold text-white">Scan to join this crew</div>
+            <div className="text-sm font-bold text-white">Scan to join this jury</div>
             <div className="mx-auto mt-3 h-56 w-56 rounded-xl bg-white p-2" dangerouslySetInnerHTML={{ __html: invite.qrSvg }} />
             <p className="mt-3 break-all text-xs text-slate-400">{invite.url}</p>
             <div className="mt-4 flex justify-center gap-2">

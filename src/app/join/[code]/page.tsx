@@ -5,7 +5,7 @@ import { Logo } from '@/components/Logo';
 import { JoinForm } from '@/components/JoinForm';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Join a crew · WatchVerdict' };
+export const metadata: Metadata = { title: 'Join a jury · WatchVerdict' };
 
 export default async function JoinPage({ params }: { params: { code: string } }) {
   let crewName: string | null = null;

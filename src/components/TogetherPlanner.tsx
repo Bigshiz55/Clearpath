@@ -167,7 +167,7 @@ export function TogetherPlanner() {
     if (ids.length < 2) return;
     const names = store.members.filter((m) => ids.includes(m.id)).map((m) => m.name);
     const suggested = names.length <= 2 ? names.join(' & ') : `${names[0]} + ${names.length - 1} others`;
-    const name = (typeof window !== 'undefined' ? window.prompt('Name this crew', suggested) : suggested) || suggested;
+    const name = (typeof window !== 'undefined' ? window.prompt('Name this jury', suggested) : suggested) || suggested;
     const group: Group = { id: newId(), name, memberIds: ids, dna: emptyDNA() };
     persist({ ...store, groups: [...store.groups, group] });
     setActiveGroupId(group.id);
@@ -320,7 +320,7 @@ export function TogetherPlanner() {
       {/* Saved groups */}
       {store.groups.length > 0 && (
         <div>
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Your crews</div>
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Your juries</div>
           <div className="flex flex-wrap gap-2">
             {store.groups.map((g) => (
               <button
@@ -375,7 +375,7 @@ export function TogetherPlanner() {
         </button>
         {selected.size >= 2 && !activeGroup && (
           <button onClick={saveGroup} className="btn-ghost text-sm text-brand-200">
-            ★ Save this crew as a group
+            ★ Save this jury as a group
           </button>
         )}
       </div>
@@ -457,7 +457,7 @@ export function TogetherPlanner() {
                 {i === 0 && (
                   <div className="border-t border-white/10 px-4 py-3">
                     {isLogged ? (
-                      <div className="text-xs text-slate-400">Logged{activeGroup ? ` to ${activeGroup.name}’s DNA` : ' — pick a saved crew to remember it'} ✓</div>
+                      <div className="text-xs text-slate-400">Logged{activeGroup ? ` to ${activeGroup.name}’s DNA` : ' — pick a saved jury to remember it'} ✓</div>
                     ) : (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-slate-400">Watched it? How’d it go:</span>
@@ -490,10 +490,10 @@ function GroupDNAPanel({ group, onDelete }: { group: Group; onDelete: () => void
     <div className="card p-4">
       <div className="flex items-center justify-between">
         <div className="text-sm font-bold text-white">🧬 {group.name} — Group DNA</div>
-        <button onClick={onDelete} className="text-[11px] text-slate-500 hover:text-red-300">Delete crew</button>
+        <button onClick={onDelete} className="text-[11px] text-slate-500 hover:text-red-300">Delete jury</button>
       </div>
       {dna.nights === 0 ? (
-        <p className="mt-2 text-xs text-slate-400">Watch something together and tap how it went — this crew’s taste builds here, separate from each person’s.</p>
+        <p className="mt-2 text-xs text-slate-400">Watch something together and tap how it went — this jury’s taste builds here, separate from each person’s.</p>
       ) : (
         <div className="mt-3 space-y-3 text-sm">
           <div className="text-xs text-slate-400">{dna.nights} {dna.nights === 1 ? 'night' : 'nights'} logged together</div>
