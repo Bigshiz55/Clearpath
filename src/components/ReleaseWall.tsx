@@ -208,6 +208,12 @@ export function ReleaseWall({
                       {win === 'upcoming' ? `📅 ${label}` : label}
                     </span>
                   )}
+                  {t.network && (
+                    <span className="pointer-events-none absolute left-2 top-2 inline-flex max-w-[88%] items-center gap-1 rounded-md bg-brand-600/95 px-2 py-1 text-[11px] font-extrabold text-white shadow-md ring-1 ring-white/20 backdrop-blur">
+                      <span aria-hidden>📺</span>
+                      <span className="truncate">{t.network}</span>
+                    </span>
+                  )}
                   <span className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
                   </span>
@@ -215,15 +221,13 @@ export function ReleaseWall({
                 <div className="p-3">
                   <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block text-left">
                     <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">
-                      <span>{t.year ?? '—'}</span>
-                      {t.network && (
-                        <span className="inline-flex items-center gap-1 truncate rounded bg-brand-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-brand-200">
-                          <span aria-hidden>📺</span>
-                          <span className="truncate">{t.network}</span>
-                        </span>
-                      )}
-                    </div>
+                    <div className="mt-0.5 text-xs text-slate-400">{t.year ?? '—'}</div>
+                    {t.network && (
+                      <div className="mt-1 inline-flex max-w-full items-center gap-1 rounded-md border border-brand-400/50 bg-brand-500/20 px-2 py-1 text-xs font-bold text-brand-100">
+                        <span aria-hidden>📺</span>
+                        <span className="truncate">{t.network}</span>
+                      </div>
+                    )}
                   </button>
                   <AlgorithmScore mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-2" />
                 </div>
