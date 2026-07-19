@@ -6,7 +6,7 @@ import { TvDetective } from '@/components/TvDetective';
 import { VintageScale } from '@/components/VintageScale';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Vintage Mode · WatchVrdikt' };
+export const metadata: Metadata = { title: 'Vintage Mode · WatchVrdIQt' };
 
 function BigLink({ href, emoji, label, sub }: { href: string; emoji: string; label: string; sub: string }) {
   return (

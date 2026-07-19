@@ -98,7 +98,7 @@ export function EnableNotifications() {
   if (state === 'unsupported') {
     return (
       <p className="text-sm text-slate-400">
-        This browser doesn’t support push notifications. On iPhone, add WatchVrdikt to your Home Screen first
+        This browser doesn’t support push notifications. On iPhone, add WatchVrdIQt to your Home Screen first
         (Share → Add to Home Screen), then open it from there and this will appear.
       </p>
     );

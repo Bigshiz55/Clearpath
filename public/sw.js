@@ -1,4 +1,4 @@
-/* WatchVrdikt service worker.
+/* WatchVrdIQt service worker.
  * Privacy-first: caches ONLY public static assets. Never caches authenticated
  * HTML, API responses, auth flows, or anything carrying credentials. Provides
  * an offline fallback page for navigations.
@@ -85,9 +85,9 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch (e) {
-    data = { title: 'WatchVrdikt', body: event.data ? event.data.text() : '' };
+    data = { title: 'WatchVrdIQt', body: event.data ? event.data.text() : '' };
   }
-  const title = data.title || 'WatchVrdikt';
+  const title = data.title || 'WatchVrdIQt';
   const options = {
     body: data.body || '',
     icon: '/icons/icon-192.png',

@@ -56,12 +56,12 @@ export function ConnectPhone() {
       </div>
 
       <div className="card p-4">
-        <div className="text-sm font-semibold text-white">🗣️ iPhone: “Hey Siri, add to WatchVrdikt”</div>
+        <div className="text-sm font-semibold text-white">🗣️ iPhone: “Hey Siri, add to WatchVrdIQt”</div>
         <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-slate-300">
           <li>Open the <span className="text-white">Shortcuts</span> app → <span className="text-white">+</span> to make a new shortcut.</li>
           <li>Add action <span className="text-white">“Dictate Text.”</span></li>
           <li>Add action <span className="text-white">“Get Contents of URL.”</span> Set it to the <span className="text-white">Copy URL</span> above, then tap the end and insert the <span className="text-white">Dictated Text</span> variable so it becomes <code className="text-[11px]">…&amp;q=[Dictated&nbsp;Text]</code>.</li>
-          <li>Name it <span className="text-white">“Add to WatchVrdikt.”</span> Done — say <span className="text-white">“Hey Siri, Add to WatchVrdikt.”</span></li>
+          <li>Name it <span className="text-white">“Add to WatchVrdIQt.”</span> Done — say <span className="text-white">“Hey Siri, Add to WatchVrdIQt.”</span></li>
         </ol>
       </div>
 
@@ -71,14 +71,14 @@ export function ConnectPhone() {
           <li>New shortcut → in settings, turn on <span className="text-white">“Show in Share Sheet”</span> and accept <span className="text-white">Images</span>.</li>
           <li>Add <span className="text-white">“Extract Text from Image”</span> (Shortcut Input).</li>
           <li>Add <span className="text-white">“Get Contents of URL”</span> → the <span className="text-white">Copy URL</span> above with the <span className="text-white">Extracted Text</span> on the end (<code className="text-[11px]">&amp;q=[Extracted&nbsp;Text]</code>).</li>
-          <li>Name it <span className="text-white">“Add to WatchVrdikt.”</span> Now: screenshot a title → <span className="text-white">Share → Add to WatchVrdikt.</span></li>
+          <li>Name it <span className="text-white">“Add to WatchVrdIQt.”</span> Now: screenshot a title → <span className="text-white">Share → Add to WatchVrdIQt.</span></li>
         </ol>
         <p className="mt-2 text-[11px] text-slate-500">Works when the title text is visible on screen (it reads the words, not the poster art).</p>
       </div>
 
       <p className="text-xs text-slate-500">
         Added titles land on your Watchlist as “Possible.” On Android, once the app is installed you can also
-        just use the system <span className="text-slate-300">Share → WatchVrdikt</span>.
+        just use the system <span className="text-slate-300">Share → WatchVrdIQt</span>.
       </p>
     </div>
   );

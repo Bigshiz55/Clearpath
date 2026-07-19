@@ -1,4 +1,4 @@
-// Shared domain types for WatchVrdikt.
+// Shared domain types for WatchVrdIQt.
 
 export type MediaType = 'movie' | 'tv';
 

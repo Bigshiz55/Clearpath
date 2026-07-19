@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { PhotoAdd } from '@/components/PhotoAdd';
 import { ConnectPhone } from '@/components/ConnectPhone';
 
-export const metadata: Metadata = { title: 'Add from your phone · WatchVrdikt' };
+export const metadata: Metadata = { title: 'Add from your phone · WatchVrdIQt' };
 
 export default function ConnectPage() {
   return (

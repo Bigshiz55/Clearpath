@@ -59,7 +59,7 @@ export function LiveCourt({ code }: { code: string }) {
     if (!shareUrl) return;
     const share = (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share;
     if (share) {
-      try { await share({ title: 'Join my WatchVrdikt Court', text: 'Help us pick what to watch — tap to join:', url: shareUrl }); return; } catch { /* cancelled */ }
+      try { await share({ title: 'Join my WatchVrdIQt Court', text: 'Help us pick what to watch — tap to join:', url: shareUrl }); return; } catch { /* cancelled */ }
     }
     try { await navigator.clipboard?.writeText(shareUrl); setErr(null); } catch { /* ignore */ }
   }
@@ -165,7 +165,7 @@ export function LiveCourt({ code }: { code: string }) {
   }
 
   if (notFound) {
-    return <Shell><div className="card p-8 text-center"><div className="text-3xl">🔗</div><p className="mt-3 text-sm text-slate-400">This Court room doesn’t exist or has ended.</p><Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVrdikt →</Link></div></Shell>;
+    return <Shell><div className="card p-8 text-center"><div className="text-3xl">🔗</div><p className="mt-3 text-sm text-slate-400">This Court room doesn’t exist or has ended.</p><Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVrdIQt →</Link></div></Shell>;
   }
   if (!state) return <Shell><div className="text-sm text-slate-400">Connecting to the room…</div></Shell>;
 
@@ -371,7 +371,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       <header className="container-page flex h-16 items-center">
-        <span className="text-lg font-bold tracking-tight text-white">Watch<span className="text-brand-300">Vrdikt</span> · ⚖️ Court</span>
+        <span className="text-lg font-bold tracking-tight text-white">Watch<span className="text-brand-300">VrdIQt</span> · ⚖️ Court</span>
       </header>
       <main className="container-page mx-auto max-w-md py-4">{children}</main>
     </div>

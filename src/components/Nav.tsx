@@ -43,7 +43,7 @@ export function Nav({ personalLabel, isGuest = false }: { personalLabel?: string
             <ViewModeToggle />
             <Link
               href="/app/pro"
-              title="WatchVrdikt Pro — AI-tuned verdicts, household profiles & more"
+              title="WatchVrdIQt Pro — AI-tuned verdicts, household profiles & more"
               className="inline-flex items-center gap-1.5 rounded-lg border border-gold-400/50 bg-gold-500/10 px-2.5 py-1.5 text-sm font-semibold text-gold-100 transition hover:bg-gold-500/20"
             >
               <span aria-hidden className="text-base leading-none">⭐</span>

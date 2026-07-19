@@ -52,7 +52,7 @@ export function ShareDialog({
     if (!url) return;
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
-        await navigator.share({ title: 'WatchVrdikt', url });
+        await navigator.share({ title: 'WatchVrdIQt', url });
       } catch {
         /* user cancelled */
       }

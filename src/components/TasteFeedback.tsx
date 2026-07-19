@@ -16,7 +16,7 @@ const OPTIONS: { verdict: Verdict; label: string; emoji: string; hint: string }[
 
 /**
  * A "not for me" flag on a card. Opens a small sheet (Seen it / Not interested
- * / Didn't like it); each choice feeds the WatchVrdikt DNA Score so the next
+ * / Didn't like it); each choice feeds the WatchVrdIQt DNA Score so the next
  * picks improve, and the title is saved to your watchlist (dropped/watched) so
  * you can still look it up later. Calls `onFlagged` so the grid hides the card.
  */

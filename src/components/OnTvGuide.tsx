@@ -36,7 +36,7 @@ function calendarUrl(a: Airing): string {
   const z = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const text = encodeURIComponent(`${a.showName} on ${a.network}`);
   const details = encodeURIComponent(
-    `${a.episodeName ? `"${a.episodeName}" · ` : ''}${a.showType}${a.genres.length ? ` · ${a.genres.join(', ')}` : ''}\nOn ${a.network}. Added from WatchVrdikt.`,
+    `${a.episodeName ? `"${a.episodeName}" · ` : ''}${a.showType}${a.genres.length ? ` · ${a.genres.join(', ')}` : ''}\nOn ${a.network}. Added from WatchVrdIQt.`,
   );
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${z(start)}/${z(end)}&details=${details}`;
 }

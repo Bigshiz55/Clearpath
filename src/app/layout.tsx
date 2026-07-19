@@ -10,17 +10,17 @@ const siteUrl = publicEnv.siteUrl();
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'WatchVrdikt — Should you watch it?',
-    template: '%s · WatchVrdikt',
+    default: 'WatchVrdIQt — Should you watch it?',
+    template: '%s · WatchVrdIQt',
   },
   description:
     'Personalized movie & TV verdicts. Get a clear recommendation, a match score tuned to your taste, and where to watch it legally.',
-  applicationName: 'WatchVrdikt',
+  applicationName: 'WatchVrdIQt',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'WatchVrdikt',
+    title: 'WatchVrdIQt',
   },
   icons: {
     icon: [
@@ -31,14 +31,14 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    siteName: 'WatchVrdikt',
-    title: 'WatchVrdikt — Should you watch it?',
+    siteName: 'WatchVrdIQt',
+    title: 'WatchVrdIQt — Should you watch it?',
     description: 'Personalized movie & TV verdicts with a match score tuned to your taste.',
     url: siteUrl,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'WatchVrdikt',
+    title: 'WatchVrdIQt',
     description: 'Personalized movie & TV verdicts.',
   },
 };

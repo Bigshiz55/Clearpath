@@ -46,7 +46,7 @@ export default function LandingPage() {
               </span>
             </h1>
             <p className="mx-auto mt-6 max-w-xl animate-fade-up text-lg text-slate-300">
-              WatchVrdikt scores any movie or show two ways — a general recommendation and a match
+              WatchVrdIQt scores any movie or show two ways — a general recommendation and a match
               tuned to <em>your</em> taste — then tells you exactly where to watch it.
             </p>
             <div className="mt-8 flex animate-fade-up items-center justify-center gap-3">
@@ -96,7 +96,7 @@ export default function LandingPage() {
             <a href="https://www.themoviedb.org" className="text-brand-300 underline" rel="noopener noreferrer" target="_blank">
               TMDB
             </a>{' '}
-            and JustWatch. WatchVrdikt is not endorsed by TMDB.
+            and JustWatch. WatchVrdIQt is not endorsed by TMDB.
           </p>
         </div>
       </footer>

@@ -7,7 +7,7 @@ import { serverEnv } from '@/lib/env';
  * fingerprint and cache. Server-only (uses the secret key). Returns null when
  * `OPENAI_API_KEY` is unset or the call fails, so callers degrade gracefully.
  *
- * This is the backbone of the WatchVrdikt DNA Score: a title's "vibe vector"
+ * This is the backbone of the WatchVrdIQt DNA Score: a title's "vibe vector"
  * and a user's Taste-DNA both live in this same 1536-d space.
  */
 export async function embed(text: string): Promise<number[] | null> {

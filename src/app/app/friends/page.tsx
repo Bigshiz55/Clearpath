@@ -9,7 +9,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Friends · WatchVrdikt' };
+export const metadata: Metadata = { title: 'Friends · WatchVrdIQt' };
 
 function timeAgo(iso: string): string {
   const s = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 1000));

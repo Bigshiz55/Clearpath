@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'My reminders · WatchVrdikt' };
+export const metadata: Metadata = { title: 'My reminders · WatchVrdIQt' };
 
 export default async function RemindersPage() {
   const supabase = createClient();
