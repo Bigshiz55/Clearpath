@@ -1,7 +1,31 @@
 import { NextResponse } from 'next/server';
-import { envHealth } from '@/lib/env';
+import { createServerClient } from '@supabase/ssr';
+import { envHealth, publicEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Guest-access probe: can a link-only visitor actually get in? The app mints an
+ * anonymous "guest" session in middleware for anyone without an account — but
+ * that only works if "Anonymous sign-ins" is enabled in the Supabase project.
+ * This runs a real anonymous sign-in (with throwaway cookies) and reports
+ * whether it succeeded, so "my friends get kicked to login" is a one-request
+ * diagnosis. No secrets returned.
+ */
+async function probeGuest() {
+  try {
+    const supabase = createServerClient(publicEnv.supabaseUrl(), publicEnv.supabasePublishableKey(), {
+      cookies: { getAll: () => [], setAll: () => {} },
+    });
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      return { anonEnabled: false, ok: false, error: error.message, hint: 'Enable Authentication → Sign In / Providers → “Allow anonymous sign-ins” in Supabase.' };
+    }
+    return { anonEnabled: true, ok: Boolean(data.user), userIsAnonymous: data.user?.is_anonymous ?? null };
+  } catch (e) {
+    return { anonEnabled: false, ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 /**
  * Live TMDB connectivity probe. Never returns the key — only its shape and the
@@ -132,6 +156,12 @@ export async function GET(request: Request) {
   if (searchParams.get('probe') === 'watchmode') {
     return NextResponse.json(
       { probe: 'watchmode', result: await probeWatchmode() },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
+  if (searchParams.get('probe') === 'guest') {
+    return NextResponse.json(
+      { probe: 'guest', result: await probeGuest() },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   }
