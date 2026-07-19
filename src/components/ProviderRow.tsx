@@ -1,7 +1,7 @@
 import type { WatchProviders, WatchProvider } from '@/lib/types';
 import { TMDB_IMAGE_BASE } from '@/lib/tmdb/client';
 import { isProviderMine } from '@/lib/services';
-import { outHref } from '@/lib/affiliate';
+import { outHref, providerPayout } from '@/lib/affiliate';
 
 const TYPE_LABELS: Record<WatchProvider['type'], string> = {
   flatrate: 'Stream',
@@ -77,9 +77,25 @@ export function ProviderRow({
     );
   }
 
+  // Within each type group, surface the user's own services first (honest best
+  // pick — they already pay for it), then order by our payout weight so the
+  // best-monetizing option leads. Ordering only — every real option still shows.
+  const isMineType = (t: WatchProvider['type']) => t === 'flatrate' || t === 'free' || t === 'ads';
   const grouped = TYPE_ORDER.map((type) => ({
     type,
-    items: providers.options.filter((o) => o.type === type),
+    items: providers.options
+      .filter((o) => o.type === type)
+      .map((o, i) => ({ o, i }))
+      .sort((a, b) => {
+        if (isMineType(type)) {
+          const am = isProviderMine(a.o.providerId, myServices) ? 1 : 0;
+          const bm = isProviderMine(b.o.providerId, myServices) ? 1 : 0;
+          if (am !== bm) return bm - am;
+        }
+        const dp = providerPayout(b.o.providerName) - providerPayout(a.o.providerName);
+        return dp !== 0 ? dp : a.i - b.i; // stable within equal payout
+      })
+      .map((x) => x.o),
   })).filter((g) => g.items.length > 0);
 
   return (

@@ -42,6 +42,14 @@ export function Nav({ personalLabel, isGuest = false }: { personalLabel?: string
           <div className="flex items-center gap-2">
             <ViewModeToggle />
             <Link
+              href="/app/pro"
+              title="WatchVerdict Pro — AI-tuned verdicts, household profiles & more"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gold-400/50 bg-gold-500/10 px-2.5 py-1.5 text-sm font-semibold text-gold-100 transition hover:bg-gold-500/20"
+            >
+              <span aria-hidden className="text-base leading-none">⭐</span>
+              <span className="hidden sm:inline">Pro</span>
+            </Link>
+            <Link
               href="/app/vintage"
               title="Easy Mode — a big, simple, easy-to-read screen"
               className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-amber-500/10 px-2.5 py-1.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/20"

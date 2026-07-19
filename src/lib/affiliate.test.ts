@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { affiliateLink, hasAffiliate, isHttpUrl, outHref } from './affiliate';
+import { affiliateLink, hasAffiliate, isHttpUrl, outHref, providerPayout } from './affiliate';
 
 describe('affiliateLink', () => {
   it('tags Amazon / Prime Video links with the associates tag', () => {
@@ -51,6 +51,28 @@ describe('isHttpUrl', () => {
     expect(isHttpUrl('javascript:alert(1)')).toBe(false);
     expect(isHttpUrl('data:text/html,x')).toBe(false);
     expect(isHttpUrl('nope')).toBe(false);
+  });
+});
+
+describe('providerPayout', () => {
+  it('ranks CPA-bounty services above rentals above no-program services', () => {
+    expect(providerPayout('Max')).toBeGreaterThan(providerPayout('Amazon Video'));
+    expect(providerPayout('Amazon Video')).toBeGreaterThan(providerPayout('Netflix'));
+  });
+
+  it('matches on normalized names (punctuation/case-insensitive)', () => {
+    expect(providerPayout('Paramount+')).toBe(providerPayout('paramount'));
+    expect(providerPayout('Disney+')).toBeGreaterThan(0);
+  });
+
+  it('gives Netflix zero (no affiliate program)', () => {
+    expect(providerPayout('Netflix')).toBe(0);
+  });
+
+  it('defaults unknown services to a neutral weight above no-payout ones', () => {
+    const unknown = providerPayout('Some Regional Service');
+    expect(unknown).toBe(1);
+    expect(unknown).toBeGreaterThan(providerPayout('Netflix'));
   });
 });
 

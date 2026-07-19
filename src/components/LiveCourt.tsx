@@ -76,7 +76,7 @@ export function LiveCourt({ code }: { code: string }) {
 
   async function refresh() {
     const { data, error } = await supabase.rpc('court_state', { p_code: code });
-    if (error) { if (error.code === '42P01') setErr('Live Court isn’t set up yet (run migrations 0004 + 0005).'); return; }
+    if (error) { if (error.code === '42P01') setErr('Live Court isn’t set up yet — run the latest Supabase migrations (0004 + 0014).'); return; }
     if (data == null) { setNotFound(true); return; }
     setState(data as State);
   }

@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       .eq('code', body.code)
       .maybeSingle();
     if (error) {
-      if (error.code === '42P01') return NextResponse.json({ error: 'Live Court isn’t set up yet (run migration 0004/0005).' }, { status: 501 });
+      if (error.code === '42P01') return NextResponse.json({ error: 'Live Court isn’t set up yet — run the latest Supabase migrations (0004 + 0014).' }, { status: 501 });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     if (!room) return NextResponse.json({ error: 'Room not found.' }, { status: 404 });

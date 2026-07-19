@@ -7,6 +7,7 @@ import { getScoringData } from '@/lib/titleData';
 import { computeGeneralScore } from '@/lib/scoring/general';
 import { buildTasteDna, dnaScore, type TasteDna, type DnaResult } from '@/lib/scoring/dna';
 import { aiAdjustScore, type AiAdjustment } from '@/lib/aiAdjust';
+import { isPro } from '@/lib/pro';
 
 const clampScore = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
@@ -194,8 +195,10 @@ export async function getUserDnaForTitle(
   const result = dnaScore(titleVector, dna, objectiveScore);
   const base: UserDnaResult = { ...result, available: titleVector != null, sampleSize: dna.sampleSize };
 
-  // AI adjustment — deep view only, and only once we actually have taste data.
+  // AI adjustment — deep view only, once we have taste data, and Pro-only (it's
+  // a per-title LLM call and the headline Pro feature).
   if (!opts.ai || !titleVector) return base;
+  if (!(await isPro(supabase, userId))) return base;
   const tasteProfile = await getTasteProfileText(supabase, userId);
   if (!tasteProfile) return base;
   const adj = await getCachedAiAdjustment(userId, mediaType, id, dna.sampleSize, {
