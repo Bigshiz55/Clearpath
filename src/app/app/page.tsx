@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, personalLabelFor, regionFor } from '@/lib/profile';
 import { SearchBar } from '@/components/SearchBar';
+import { TileIcon } from '@/components/TileIcon';
 import { getUpcomingTv } from '@/lib/onTv';
 import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
@@ -78,26 +79,26 @@ export default async function DiscoverPage() {
 
         {/* Big, clear tiles — every area of the app, tap to go deeper. */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-          {[
+          {([
             // Row 1
-            { href: '/app/watch', icon: '▶️', title: 'Watch Now', sub: '🧬 Your DNA picks, ranked', tint: 'from-pink-500/25' },
-            { href: '/app/ask', icon: '🧑‍⚖️', title: 'Ask the Judge', sub: 'Say what you want to see', tint: 'from-gold-500/25' },
-            { href: '/app/finder', icon: '🔎', title: 'Custom Search', sub: 'Filter by genre, rating, length…', tint: 'from-brand-500/25' },
+            { href: '/app/watch', icon: 'watch', title: 'Watch Now', sub: '🧬 Your DNA picks, ranked', tint: 'from-pink-500/25', accent: 'text-pink-300' },
+            { href: '/app/ask', icon: 'judge', title: 'Ask the Judge', sub: 'Say what you want to see', tint: 'from-gold-500/25', accent: 'text-gold-300' },
+            { href: '/app/finder', icon: 'search', title: 'Custom Search', sub: 'Filter by genre, rating, length…', tint: 'from-brand-500/25', accent: 'text-brand-300' },
             // Row 2
-            { href: '/app/quiz', icon: '🕹️', title: 'Taste Quiz', sub: `${reviewedCount ?? 0} rated — teach your taste`, tint: 'from-gold-500/25' },
-            { href: '/app/new', icon: '🎬', title: 'New Releases', sub: 'Fresh, matched to you', tint: 'from-brand-500/20' },
-            { href: '/app/tv', icon: '📺', title: 'TV Guide Decoder', sub: 'What’s on live — next 48h', tint: 'from-emerald-500/20' },
+            { href: '/app/quiz', icon: 'quiz', title: 'Taste Quiz', sub: `${reviewedCount ?? 0} rated — teach your taste`, tint: 'from-gold-500/25', accent: 'text-gold-300' },
+            { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', tint: 'from-brand-500/20', accent: 'text-brand-300' },
+            { href: '/app/tv', icon: 'tv', title: 'TV Guide Decoder', sub: 'What’s on live — next 48h', tint: 'from-emerald-500/20', accent: 'text-emerald-300' },
             // Row 3
-            { href: '/app/together', icon: '👥', title: 'Decide Together', sub: 'One verdict for the room', tint: 'from-pink-500/25' },
-            { href: '/app/watchlist', icon: '📋', title: 'Watchlist', sub: 'Everything you saved', tint: 'from-brand-500/20' },
-            { href: '/app/vintage', icon: '🧓', title: 'Easy Mode', sub: 'Big & simple to read', tint: 'from-amber-500/20' },
-          ].map((t) => (
+            { href: '/app/together', icon: 'together', title: 'Decide Together', sub: 'One verdict for the room', tint: 'from-pink-500/25', accent: 'text-pink-300' },
+            { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', tint: 'from-brand-500/20', accent: 'text-brand-300' },
+            { href: '/app/vintage', icon: 'easy', title: 'Easy Mode', sub: 'Big & simple to read', tint: 'from-amber-500/20', accent: 'text-amber-300' },
+          ] as const).map((t) => (
             <Link
               key={t.href}
               href={t.href}
               className={`group flex min-h-[128px] flex-col justify-between rounded-2xl border border-white/12 bg-gradient-to-br ${t.tint} to-transparent p-4 transition hover:border-white/30 hover:shadow-glow sm:min-h-[150px] sm:p-5`}
             >
-              <span className="text-4xl sm:text-5xl" aria-hidden>{t.icon}</span>
+              <TileIcon name={t.icon} className={`h-10 w-10 ${t.accent} transition group-hover:scale-110 sm:h-12 sm:w-12`} />
               <span className="mt-2">
                 <span className="block text-lg font-bold text-white sm:text-xl">{t.title}</span>
                 <span className="block text-sm text-slate-300">{t.sub}</span>

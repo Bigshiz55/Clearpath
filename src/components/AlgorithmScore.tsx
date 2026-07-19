@@ -48,24 +48,18 @@ export function AlgorithmScore({
       className={`rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 p-2.5 shadow-[0_0_16px_rgba(244,63,94,0.28)] ${className}`}
       title="WatchVerdict algorithm — your DNA blended with every rating into one 0–100 estimate of how much YOU will like it."
     >
-      {/* Ruling — blue mark + "Ruling", tinted to the verdict's colour so the
-          header and the call below read as one unit. */}
+      {/* The WatchVerdict mark + the ruling itself (Stream It / …) — one line. */}
       <div className="mb-1.5 flex items-center gap-2 border-b border-pink-200/25 pb-1.5">
-        <LogoMark box="h-6 w-6 rounded-md" inner="h-4 w-4" />
-        <span className={`whitespace-nowrap text-xs font-black uppercase tracking-wide ${v ? v.visual.text : 'text-white'}`}>
-          Ruling
-        </span>
+        <LogoMark box="h-8 w-8 rounded-lg" inner="h-5 w-5" />
+        {v && (
+          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-black tracking-wide ${v.visual.badge}`}>
+            {personal ? '🧬' : v.emoji} {v.call}
+          </span>
+        )}
       </div>
 
-      {/* What the ruling is — Stream It / Worth a Look / Skip It — bigger. */}
-      {v && (
-        <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-black tracking-wide ${v.visual.badge}`}>
-          {personal ? '🧬' : v.emoji} {v.call}
-        </span>
-      )}
-
       {/* DNA + the number, bigger and on one line. */}
-      <div className="mt-1.5 flex items-center gap-2">
+      <div className="flex items-center gap-2">
         <span className="text-[11px] font-black uppercase tracking-wide text-pink-100/90">🧬 DNA</span>
         <span className="text-3xl font-black leading-none tabular-nums text-white">{score ?? '—'}</span>
         {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 && (
