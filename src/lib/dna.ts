@@ -6,6 +6,9 @@ import { embed } from '@/lib/embeddings';
 import { getScoringData } from '@/lib/titleData';
 import { computeGeneralScore } from '@/lib/scoring/general';
 import { buildTasteDna, dnaScore, type TasteDna, type DnaResult } from '@/lib/scoring/dna';
+import { aiAdjustScore, type AiAdjustment } from '@/lib/aiAdjust';
+
+const clampScore = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
 /** The text we embed for a title's "vibe vector" — its meaning, not its tags. */
 function vibeText(meta: TitleMetadata): string {
@@ -75,6 +78,54 @@ export async function getUserTasteDna(supabase: SupabaseClient, userId: string):
 export interface UserDnaResult extends DnaResult {
   available: boolean; // whether we had a title vibe vector (needs OPENAI key)
   sampleSize: number; // rated titles feeding the model
+  baseScore?: number; // the deterministic blend before any AI adjustment
+  adjustment?: number | null; // the bounded AI nudge applied (null when no AI ran)
+  reasoning?: string | null; // one-sentence AI rationale for the nudge
+}
+
+/**
+ * A short, human-readable summary of the user's taste — the titles they've rated
+ * highest and lowest — so the AI adjustment layer can reason about franchise
+ * fatigue, format fit, etc. ("loves tight limited series", "avoids long
+ * procedurals"). Real data only; empty string when there's nothing to say.
+ */
+async function getTasteProfileText(supabase: SupabaseClient, userId: string): Promise<string> {
+  const { data } = await supabase
+    .from('watchlist_items')
+    .select('title, year, rating')
+    .eq('user_id', userId)
+    .not('rating', 'is', null)
+    .order('rating', { ascending: false })
+    .limit(60);
+  const rows = (data ?? []) as Array<{ title: string; year: number | null; rating: number }>;
+  if (rows.length === 0) return '';
+  const fmt = (r: { title: string; year: number | null }) => (r.year ? `${r.title} (${r.year})` : r.title);
+  const loves = rows.filter((r) => r.rating >= 8).slice(0, 8).map(fmt);
+  const likes = rows.filter((r) => r.rating >= 6 && r.rating < 8).slice(0, 4).map(fmt);
+  const pans = rows.filter((r) => r.rating <= 4).slice(-6).map(fmt);
+  const parts: string[] = [];
+  if (loves.length) parts.push(`Rates highest (loves): ${loves.join(', ')}.`);
+  if (likes.length) parts.push(`Also likes: ${likes.join(', ')}.`);
+  if (pans.length) parts.push(`Rates lowest (avoids): ${pans.join(', ')}.`);
+  return parts.join(' ');
+}
+
+/**
+ * The bounded AI adjustment for one (user, title), cached 12h. Keyed by sample
+ * size so it refreshes as the user rates more. Null when the AI layer is off,
+ * fails, or has no key — the caller then keeps the deterministic score.
+ */
+async function getCachedAiAdjustment(
+  userId: string,
+  mediaType: MediaType,
+  id: number,
+  sampleSize: number,
+  input: Parameters<typeof aiAdjustScore>[0],
+): Promise<AiAdjustment | null> {
+  return unstable_cache(() => aiAdjustScore(input), ['dna-ai', userId, mediaType, String(id), String(sampleSize)], {
+    revalidate: 60 * 60 * 12,
+    tags: [`dna-ai:${userId}:${mediaType}:${id}`],
+  })();
 }
 
 /**
@@ -113,21 +164,56 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
   return { items: scored, personalized };
 }
 
-/** The DNA Score for one title, for one user. */
+/** Optional context for the (deep-view only) AI adjustment layer. */
+export interface DnaTitleOptions {
+  /** Run the bounded AI adjustment on top of the deterministic blend. Off by
+   *  default — it's a per-title LLM call, reserved for the title page. */
+  ai?: boolean;
+  title?: string;
+  year?: number | null;
+  genres?: string[];
+}
+
+/** The DNA Score for one title, for one user. With `ai`, refines the
+ *  deterministic blend by the bounded AI adjustment (falls back on any failure). */
 export async function getUserDnaForTitle(
   supabase: SupabaseClient,
   userId: string,
   mediaType: MediaType,
   id: number,
   objectiveScore: number,
+  opts: DnaTitleOptions = {},
 ): Promise<UserDnaResult> {
   const dna = await getUserTasteDna(supabase, userId);
   // No taste model yet → skip the (paid) title embed; fall back to objective.
   if (!dna.liked) {
-    const score = Math.max(0, Math.min(100, Math.round(objectiveScore)));
+    const score = clampScore(objectiveScore);
     return { score, confidence: 0, tasteScore: null, available: false, sampleSize: dna.sampleSize };
   }
   const titleVector = await getTitleVector(mediaType, id);
   const result = dnaScore(titleVector, dna, objectiveScore);
-  return { ...result, available: titleVector != null, sampleSize: dna.sampleSize };
+  const base: UserDnaResult = { ...result, available: titleVector != null, sampleSize: dna.sampleSize };
+
+  // AI adjustment — deep view only, and only once we actually have taste data.
+  if (!opts.ai || !titleVector) return base;
+  const tasteProfile = await getTasteProfileText(supabase, userId);
+  if (!tasteProfile) return base;
+  const adj = await getCachedAiAdjustment(userId, mediaType, id, dna.sampleSize, {
+    title: opts.title ?? '',
+    year: opts.year ?? null,
+    mediaType,
+    genres: opts.genres ?? [],
+    dnaScore: result.tasteScore ?? result.score,
+    qualityScore: clampScore(objectiveScore),
+    baseScore: result.score,
+    tasteProfile,
+  });
+  if (!adj) return base;
+  return {
+    ...base,
+    score: clampScore(result.score + adj.adjustment),
+    baseScore: result.score,
+    adjustment: adj.adjustment,
+    reasoning: adj.reasoning,
+  };
 }

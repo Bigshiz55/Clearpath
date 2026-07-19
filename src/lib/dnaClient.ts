@@ -9,6 +9,9 @@ export interface DnaClientResult {
   tasteScore: number | null;
   available: boolean; // whether we had a title vibe vector (needs OPENAI key)
   sampleSize: number; // rated titles feeding the model
+  baseScore?: number; // deterministic blend before the AI adjustment
+  adjustment?: number | null; // bounded AI nudge (only present when ai=1 was requested)
+  reasoning?: string | null; // one-sentence AI rationale
 }
 
 // One in-flight fetch per title, shared across every component on the page (the

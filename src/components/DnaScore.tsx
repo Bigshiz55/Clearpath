@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
-import { loadDna, isPersonalized, type DnaClientResult as Dna } from '@/lib/dnaClient';
+import { isPersonalized, type DnaClientResult as Dna } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
 import { HelixMark } from './HelixMark';
 
 /**
- * The WatchVerdict DNA Score — a per-user "odds you'll love it" (0..100),
- * fetched from the user's Taste-DNA. Shows a hot-pink DNA badge with the number.
- * When the model has little of your data yet, it leans on the objective score
- * and says so; it sharpens as you rate more.
+ * The WatchVerdict DNA Score — a per-user "odds you'll love it" (0..100). On the
+ * title page it requests the AI adjustment layer (`?ai=1`): the deterministic
+ * Watchability blend, refined by a bounded ±15 AI nudge with a one-line reason.
+ * When the model has little of your data yet, it leans on the objective score.
  */
 export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: number }) {
   const [dna, setDna] = useState<Dna | null>(null);
@@ -18,10 +18,13 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
 
   useEffect(() => {
     let active = true;
-    loadDna(mediaType, tmdbId)
+    // Dedicated fetch (not the shared card loader) so the title page gets the AI
+    // adjustment + reasoning that the many-card grids deliberately skip.
+    fetch(`/api/dna/${mediaType}/${tmdbId}?ai=1`)
+      .then((r) => r.json())
       .then((d) => {
         if (!active) return;
-        setDna(d);
+        setDna((d?.dna as Dna | null) ?? null);
         setLoaded(true);
       })
       .catch(() => active && setLoaded(true));
@@ -46,22 +49,38 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
         : 'Odds you’ll love it';
 
   const v = scoreVerdict(dna.score);
+  const adj = dna.adjustment ?? 0;
+  const hasAi = adj !== 0 && dna.baseScore != null;
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border-2 border-pink-400/80 bg-gradient-to-r from-pink-500/40 to-rose-500/25 px-3 py-1.5 shadow-[0_0_18px_rgba(244,63,94,0.35)]"
-      title="WatchVerdict DNA Score — a 0–100 estimate of how much YOU will love this, learned from what you’ve rated. It drives your Stream It / Skip It call and sharpens the more you use the app."
-    >
-      <HelixMark className="h-5 w-5" />
-      <span className="text-[10px] font-black uppercase tracking-wide text-white">🧬 DNA Score</span>
-      <span className="flex items-baseline gap-1 tabular-nums text-white">
-        <span className="text-lg font-black">{dna.score}</span>
-        <span className="text-[10px] font-bold text-pink-100/80">/100</span>
-      </span>
-      <span className={`rounded px-1.5 py-0.5 text-[10px] font-black tracking-wide ${v.visual.badge}`}>
-        {personal ? '🧬' : v.emoji} {v.call}
-      </span>
-      <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/90">{sub}</span>
+    <div className="flex flex-col gap-1">
+      <div
+        className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border-2 border-pink-400/80 bg-gradient-to-r from-pink-500/40 to-rose-500/25 px-3 py-1.5 shadow-[0_0_18px_rgba(244,63,94,0.35)]"
+        title="WatchVerdict DNA Score — a 0–100 estimate of how much YOU will love this, learned from what you’ve rated. It drives your Stream It / Skip It call and sharpens the more you use the app."
+      >
+        <HelixMark className="h-5 w-5" />
+        <span className="text-[10px] font-black uppercase tracking-wide text-white">🧬 DNA Score</span>
+        <span className="flex items-baseline gap-1 tabular-nums text-white">
+          <span className="text-lg font-black">{dna.score}</span>
+          <span className="text-[10px] font-bold text-pink-100/80">/100</span>
+        </span>
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-black tracking-wide ${v.visual.badge}`}>
+          {personal ? '🧬' : v.emoji} {v.call}
+        </span>
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/90">{sub}</span>
+      </div>
+
+      {/* The bounded AI refinement, shown transparently: base → adjustment → final. */}
+      {hasAi && (
+        <div className="flex items-start gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-slate-300">
+          <span aria-hidden className="mt-px">🤖</span>
+          <span>
+            <span className="font-bold text-white">AI {adj > 0 ? `+${adj}` : adj}</span>{' '}
+            <span className="tabular-nums text-slate-400">({dna.baseScore} → {dna.score})</span>
+            {dna.reasoning ? <> — {dna.reasoning}</> : null}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

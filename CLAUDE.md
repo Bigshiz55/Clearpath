@@ -8,10 +8,18 @@ WatchVerdict: Next.js 14 (App Router) + TypeScript strict + Supabase + TMDB.
 - Gates before committing: `npm run typecheck && npm run lint && npm test && npm run build`
 
 ## Architecture rules (important)
-- **Scoring is deterministic and authoritative.** All scoring lives in
-  `src/lib/scoring/`. It is pure (no I/O) and unit-tested. Never let AI or UI
-  change a computed score. If you touch scoring, update/extend the tests in
-  `src/lib/scoring/*.test.ts` and keep all 7 spec scenarios passing.
+- **The deterministic engine is authoritative.** All core scoring lives in
+  `src/lib/scoring/` — pure (no I/O), unit-tested, and never changed by AI or UI.
+  It is always computed first and is what ranking, filtering, and the 7 spec
+  scenarios rely on. If you touch it, update `src/lib/scoring/*.test.ts` and keep
+  all 7 scenarios passing.
+- **The AI adjustment layer is the one sanctioned exception, and it lives
+  OUTSIDE `src/lib/scoring/`.** `src/lib/aiAdjust.ts` may nudge the *displayed*
+  final score by a bounded ±15 (`MAX_ADJUSTMENT`) with a one-line reason, on top
+  of the deterministic blend. It must always degrade to the deterministic score
+  on any failure (no key, timeout, unparseable output) and is reserved for the
+  title page (`?ai=1`), never the many-card grids or ranking. Keep the pure
+  engine untouched — the AI only refines the number after the fact.
 - **Secrets are server-only.** `TMDB_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
   `OPENAI_API_KEY` must never get a `NEXT_PUBLIC_` prefix or be imported into a
   client component. Server-only modules start with `import 'server-only'`.

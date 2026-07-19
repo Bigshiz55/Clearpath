@@ -74,6 +74,15 @@ export interface DnaResult {
 }
 
 /**
+ * The most weight the taste signal is ever allowed in the blend, even at full
+ * confidence. Capping it below 1 means the objective Quality score NEVER drops
+ * out — a title you'd love but that's objectively weak still scores below an
+ * equally-loved great one. (Before this cap the blend collapsed to 100% taste at
+ * full confidence, so Quality stopped moving the number.)
+ */
+export const MAX_TASTE_WEIGHT = 0.6;
+
+/**
  * The DNA Score for a title given a user's Taste-DNA and the objective quality.
  * With little history it leans on objective quality; with more, it leans on your
  * proven taste — so the number sharpens the more you rate.
@@ -107,6 +116,8 @@ export function dnaScore(
   if (tasteScore == null) {
     return { score: clamp(Math.round(objectiveScore)), confidence: 0, tasteScore: null };
   }
-  const blended = confidence * tasteScore + (1 - confidence) * objectiveScore;
+  // Taste weight ramps with confidence but is capped so Quality always counts.
+  const tasteWeight = confidence * MAX_TASTE_WEIGHT;
+  const blended = tasteWeight * tasteScore + (1 - tasteWeight) * objectiveScore;
   return { score: clamp(Math.round(blended)), confidence, tasteScore: clamp(Math.round(tasteScore)) };
 }

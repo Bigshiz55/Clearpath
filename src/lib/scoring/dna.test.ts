@@ -84,4 +84,15 @@ describe('dnaScore', () => {
     expect(r.score).toBeLessThanOrEqual(100);
     expect(r.score).toBeGreaterThanOrEqual(0);
   });
+
+  it('keeps Quality weighted at full confidence — two equally-loved titles split on Quality', () => {
+    // Same taste fit (both point at your loves), different objective Quality.
+    // The blend must separate them, not collapse to a single taste number.
+    const great = dnaScore([1, 0], dna, 81, 2).score; // Quality 81
+    const weak = dnaScore([1, 0], dna, 70, 2).score; // Quality 70
+    expect(great).toBeGreaterThan(weak);
+    // At full confidence taste is capped at 60%, so ~40% of an 11-pt Quality
+    // gap survives (~4–5 pts) — Quality is genuinely moving the score.
+    expect(great - weak).toBeGreaterThanOrEqual(3);
+  });
 });
