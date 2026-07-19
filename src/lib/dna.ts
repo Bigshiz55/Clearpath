@@ -8,8 +8,8 @@ import { computeGeneralScore } from '@/lib/scoring/general';
 import { buildTasteDna, dnaScore, type TasteDna, type DnaResult } from '@/lib/scoring/dna';
 import { aiAdjustScore, type AiAdjustment } from '@/lib/aiAdjust';
 import { isPro } from '@/lib/pro';
-import { getUserDimensionProfile, getCachedDimensions } from '@/lib/titleDimensions';
-import { dimensionMatch } from '@/lib/scoring/dimensions';
+import { getUserDimensionProfile, getCachedDimensions, getTitleDimensions } from '@/lib/titleDimensions';
+import { dimensionMatch, matchHighlights } from '@/lib/scoring/dimensions';
 
 const clampScore = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
@@ -185,6 +185,32 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
   return { items: scored, personalized };
 }
 
+/**
+ * A compact "content-fingerprint fit" line for the AI adjustment prompt: the
+ * match score plus the axes this title agrees/clashes with. Best-effort —
+ * returns undefined when the title isn't fingerprinted or the profile is empty.
+ */
+async function buildDimensionSummary(
+  supabase: SupabaseClient,
+  userId: string,
+  mediaType: MediaType,
+  id: number,
+  sampleSize: number,
+): Promise<string | undefined> {
+  const data = await getScoringData(mediaType, id, 'US').catch(() => null);
+  if (!data) return undefined;
+  const dims = await getTitleDimensions(data.meta);
+  if (!dims) return undefined;
+  const profile = await getUserDimensionProfile(supabase, userId, sampleSize);
+  if (profile.samples === 0) return undefined;
+  const match = dimensionMatch(dims, profile);
+  const { agree, clash } = matchHighlights(dims, profile);
+  const parts = [`content match ${match}/100`];
+  if (agree.length) parts.push(`matches: ${agree.map((a) => `${a.label} ${a.note}`).join(', ')}`);
+  if (clash.length) parts.push(`clashes: ${clash.map((c) => `${c.label} (${c.note})`).join(', ')}`);
+  return parts.join('; ');
+}
+
 /** Optional context for the (deep-view only) AI adjustment layer. */
 export interface DnaTitleOptions {
   /** Run the bounded AI adjustment on top of the deterministic blend. Off by
@@ -221,6 +247,11 @@ export async function getUserDnaForTitle(
   if (!(await isPro(supabase, userId))) return base;
   const tasteProfile = await getTasteProfileText(supabase, userId);
   if (!tasteProfile) return base;
+
+  // Content-fingerprint fit → a compact summary the AI can reason about (which
+  // taste axes this title matches or clashes with). Best-effort; omitted on miss.
+  const dimensionSummary = await buildDimensionSummary(supabase, userId, mediaType, id, dna.sampleSize).catch(() => undefined);
+
   const adj = await getCachedAiAdjustment(userId, mediaType, id, dna.sampleSize, {
     title: opts.title ?? '',
     year: opts.year ?? null,
@@ -230,6 +261,7 @@ export async function getUserDnaForTitle(
     qualityScore: clampScore(objectiveScore),
     baseScore: result.score,
     tasteProfile,
+    dimensionSummary,
   });
   if (!adj) return base;
   return {

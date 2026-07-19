@@ -33,11 +33,15 @@ export interface AiAdjustInput {
   baseScore: number;
   /** A short human-readable summary of what this user loves and avoids. */
   tasteProfile: string;
+  /** How this title's AI content fingerprint lines up with the user's learned
+   *  dimension profile (match score + agreeing/clashing axes). Optional. */
+  dimensionSummary?: string;
 }
 
 const SYSTEM_PROMPT = [
   'You refine a 0–100 "how much will THIS user like it" score for one movie or TV show.',
   'You are given the deterministic base score and its two parts — DNA (pure taste fit) and Quality (objective critic/audience) — plus the user\'s taste profile and the candidate title.',
+  'When a content-fingerprint fit is provided, treat it as strong evidence: the axes where the title matches or clashes with the user\'s dimension profile (tone, pacing, gore, dialogue, etc.) are exactly the nuance you should reward or penalize.',
   'Return a SMALL bounded adjustment that captures nuance the formula misses: franchise fatigue, a format/length mismatch (e.g. a 20-season procedural vs. a limited-series lover), tone, or a beloved niche the numbers underrate.',
   `The adjustment MUST be an integer between -${MAX_ADJUSTMENT} and +${MAX_ADJUSTMENT}. Use 0 when the numbers already look right — most titles need little or none.`,
   'Never restate or recompute the score. Never invent ratings, cast, plot, or availability. Base the reasoning only on the supplied taste profile and title facts.',
@@ -61,6 +65,7 @@ export async function aiAdjustScore(input: AiAdjustInput): Promise<AiAdjustment 
       objective_quality: input.qualityScore,
     },
     user_taste_profile: input.tasteProfile,
+    ...(input.dimensionSummary ? { content_fingerprint_fit: input.dimensionSummary } : {}),
   };
 
   const controller = new AbortController();
