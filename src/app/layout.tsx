@@ -42,22 +42,24 @@ export const metadata: Metadata = {
   },
 };
 
+// Only themeColor here — the viewport meta is rendered manually below so the
+// "Desktop view" toggle can rewrite its width at runtime (single controlled tag).
 export const viewport: Viewport = {
   themeColor: '#0b0e17',
-  width: 'device-width',
-  initialScale: 1,
-  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Apply Simple (Senior) view before paint to avoid a flash. */}
+        {/* The single, runtime-controlled viewport meta — the Desktop view toggle
+            rewrites its width. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        {/* Apply Simple (Senior) view + Desktop-view preference before paint. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{if(localStorage.getItem('wv_simple')==='1')document.documentElement.setAttribute('data-simple','1');}catch(e){}",
+              "try{if(localStorage.getItem('wv_simple')==='1')document.documentElement.setAttribute('data-simple','1');if(localStorage.getItem('wv_view')==='desktop'){var m=document.querySelector('meta[name=viewport]');if(m)m.setAttribute('content','width=1200, viewport-fit=cover');}}catch(e){}",
           }}
         />
       </head>

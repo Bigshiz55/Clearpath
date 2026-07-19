@@ -4,6 +4,7 @@ import { SignOutButton } from './SignOutButton';
 import { GuestSaveButton } from './GuestSaveButton';
 import { MoreMenu, type NavLink } from './nav/MoreMenu';
 import { MobileNav } from './nav/MobileNav';
+import { ViewModeToggle } from './ViewModeToggle';
 
 // Primary destinations stay inline; secondary ones live under "More" so neither
 // the desktop bar nor the mobile tab bar gets overcrowded.
@@ -39,6 +40,7 @@ export function Nav({ personalLabel, isGuest = false }: { personalLabel?: string
             </nav>
           </div>
           <div className="flex items-center gap-2">
+            <ViewModeToggle />
             <Link
               href="/app/vintage"
               title="Easy Mode — a big, simple, easy-to-read screen"
