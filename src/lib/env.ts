@@ -128,6 +128,15 @@ export const serverEnv = {
   vapidSubject(): string {
     return optional('VAPID_SUBJECT') ?? 'mailto:notifications@watchverdict.app';
   },
+  /** Direct Postgres connection string for admin migrations (SUPABASE_DB_URL or
+   *  MIGRATIONS_DB_URL). Optional — the migrate endpoint is dormant without it. */
+  migrationsDbUrl(): string | undefined {
+    return optional('SUPABASE_DB_URL') ?? optional('MIGRATIONS_DB_URL');
+  },
+  /** Shared secret that also authorizes the migrate endpoint (MIGRATE_SECRET). */
+  migrateSecret(): string | undefined {
+    return optional('MIGRATE_SECRET');
+  },
   /** Comma/space-separated allowlist of admin emails (ADMIN_EMAILS). */
   adminEmails(): string[] {
     return (optional('ADMIN_EMAILS') ?? '')
