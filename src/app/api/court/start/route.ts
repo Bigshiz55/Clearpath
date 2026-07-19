@@ -1,11 +1,32 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { computeFinalists } from '@/lib/court';
+import { computeFinalistsFromPicks, type CourtPick, type CourtWishMember } from '@/lib/court';
 
 export const dynamic = 'force-dynamic';
 
 const schema = z.object({ code: z.string().min(4).max(64), hostToken: z.string().min(8).max(80) });
+
+/** Coerce a stored `picks` jsonb blob into clean CourtPick[]. */
+function toPicks(raw: unknown): CourtPick[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CourtPick[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') continue;
+    const p = r as Record<string, unknown>;
+    const id = Number(p.id);
+    const mt = p.mediaType;
+    if (!Number.isFinite(id) || (mt !== 'movie' && mt !== 'tv')) continue;
+    out.push({
+      id,
+      mediaType: mt,
+      title: typeof p.title === 'string' ? p.title : 'Untitled',
+      year: typeof p.year === 'number' ? p.year : null,
+      posterPath: typeof p.posterPath === 'string' ? p.posterPath : null,
+    });
+  }
+  return out;
+}
 
 export async function POST(request: Request) {
   let body: z.infer<typeof schema>;
@@ -32,22 +53,25 @@ export async function POST(request: Request) {
 
     const { data: people } = await admin
       .from('court_participants')
-      .select('name, love, avoid, mood')
+      .select('name, mood, picks')
       .eq('room_id', room.id);
-    const members = (people ?? []).map((p) => ({
+    const members: CourtWishMember[] = (people ?? []).map((p) => ({
       name: p.name as string,
-      love: (p.love as string[]) ?? [],
-      avoid: (p.avoid as string[]) ?? [],
       mood: (p.mood as string) ?? 'any',
+      picks: toPicks(p.picks),
     }));
     if (members.length < 2) return NextResponse.json({ error: 'Need at least 2 players.' }, { status: 400 });
+    if (!members.some((m) => m.picks.length > 0)) {
+      return NextResponse.json({ error: 'Add a few titles to your wishlist first, then start.' }, { status: 200 });
+    }
 
-    const result = await computeFinalists(members, (room.media_type as 'any' | 'movie' | 'tv') ?? 'any', [], [], 'US');
+    const result = await computeFinalistsFromPicks(members, (room.media_type as 'any' | 'movie' | 'tv') ?? 'any', [], 'US');
     if (result.error || !result.finalists) return NextResponse.json({ error: result.error ?? 'No finalists.' }, { status: 200 });
 
+    const seenKeys = result.finalists.map((f) => `${f.mediaType}-${f.id}`);
     const { error: upErr } = await admin
       .from('court_rooms')
-      .update({ finalists: result.finalists, status: 'veto', updated_at: new Date().toISOString() })
+      .update({ finalists: result.finalists, seen_keys: seenKeys, status: 'verdict', updated_at: new Date().toISOString() })
       .eq('id', room.id);
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
