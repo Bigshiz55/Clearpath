@@ -301,6 +301,16 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
                 {q.onMyServices ? '✓ ' : ''}On my services
               </button>
             </div>
+
+            {/* Submit right here — no scrolling back to the chat to file the case. */}
+            <button
+              type="button"
+              onClick={() => submit()}
+              disabled={loading}
+              className="btn-primary mt-5 w-full py-3.5 text-base font-bold disabled:opacity-40"
+            >
+              ⚖️ File my case →
+            </button>
           </div>
         )}
       </div>
