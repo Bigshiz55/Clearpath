@@ -45,7 +45,7 @@ export default async function Image({ params }: { params: { token: string } }) {
             </svg>
           </div>
           <span>
-            Watch<span style={{ color: '#7aa8ff' }}>Vrd<span style={{ color: '#f472b6' }}>IQ</span>t</span>
+            Watch<span style={{ color: '#7aa8ff' }}>Vrd<span style={{ color: '#ff1493' }}>IQ</span>t</span>
           </span>
         </div>
 
