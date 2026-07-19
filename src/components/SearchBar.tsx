@@ -2,10 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { Poster } from './PosterCard';
-import { SaveButton } from './SaveButton';
-import { CardRatings } from './CardRatings';
+import { PosterCard } from './PosterCard';
 
 interface Result {
   id: number;
@@ -188,40 +185,21 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
 
       {open && results.length > 0 && (
-        <div className="absolute z-30 mt-2 max-h-[70vh] w-full overflow-auto rounded-2xl border border-white/10 bg-ink-850/95 p-2 shadow-card backdrop-blur">
-          {results.map((r) => (
-            <Link
-              key={`${r.mediaType}-${r.id}`}
-              href={`/app/title/${r.mediaType}/${r.id}`}
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-xl p-2 transition hover:bg-white/5"
-            >
-              <div className="h-16 w-11 flex-shrink-0 overflow-hidden rounded-md">
-                <Poster posterUrl={r.posterUrl} title={r.title} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-semibold text-white">{r.title}</span>
-                  <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase text-slate-300">
-                    {r.mediaType === 'movie' ? 'Movie' : 'TV'}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-400">{r.year ?? '—'}</div>
-                <CardRatings mediaType={r.mediaType} tmdbId={r.id} title={r.title} year={r.year} className="mt-0.5" />
-                <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{r.overview}</p>
-              </div>
-              <div className="flex-shrink-0 self-center">
-                <SaveButton
-                  tmdbId={r.id}
-                  mediaType={r.mediaType}
-                  title={r.title}
-                  year={r.year}
-                  posterPath={r.posterPath}
-                  variant="inline"
-                />
-              </div>
-            </Link>
-          ))}
+        <div className="absolute z-30 mt-2 max-h-[75vh] w-full overflow-auto rounded-2xl border border-white/10 bg-ink-850/95 p-3 shadow-card backdrop-blur">
+          <div className="poster-grid" onClick={() => setOpen(false)}>
+            {results.map((r) => (
+              <PosterCard
+                key={`${r.mediaType}-${r.id}`}
+                href={`/app/title/${r.mediaType}/${r.id}`}
+                mediaType={r.mediaType}
+                tmdbId={r.id}
+                title={r.title}
+                year={r.year}
+                posterUrl={r.posterUrl}
+                posterPath={r.posterPath}
+              />
+            ))}
+          </div>
         </div>
       )}
 

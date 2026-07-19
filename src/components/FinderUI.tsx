@@ -1,14 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
-import { SaveButton } from '@/components/SaveButton';
+import { PosterCard } from '@/components/PosterCard';
 import { JudgeBench } from '@/components/JudgeBench';
-import { RatingsStrip } from '@/components/RatingsStrip';
-import { MatchMark, MATCH_TOOLTIP } from '@/components/MatchMark';
-import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
+import { MatchMark } from '@/components/MatchMark';
+import { type TileRatings } from '@/lib/ratings';
 import type { FinderQuery } from '@/lib/finder';
 import type { Judge } from '@/lib/sponsors';
 
@@ -75,11 +73,6 @@ function airingInfo(a: { network: string; time: string; airstamp: string }): { t
   return { text: [clock, a.network, day].filter(Boolean).join(' · ') };
 }
 
-const CALL_STYLE: Record<string, string> = {
-  'WATCH IT': 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100',
-  MAYBE: 'border-yellow-400/40 bg-yellow-500/15 text-yellow-100',
-  'SKIP IT': 'border-red-400/40 bg-red-500/15 text-red-100',
-};
 
 const EXAMPLES = [
   'A crime thriller movie under 140 minutes, out in the last 24 months, match 80+',
@@ -288,52 +281,40 @@ export function FinderUI({
                   ⚖️ Present new evidence ↓
                 </button>
               </div>
-              {items.map((it) => (
-                <div key={`${it.mediaType}-${it.id}`} className="card flex gap-3 p-3">
-                  <Link href={`/app/title/${it.mediaType}/${it.id}`} className="h-28 w-20 flex-none overflow-hidden rounded-lg border border-white/10">
-                    {it.posterUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={it.posterUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="grid h-full w-full place-items-center bg-white/5 p-1 text-center text-[10px] text-slate-400">{it.title}</div>
-                    )}
-                  </Link>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <Link href={`/app/title/${it.mediaType}/${it.id}`} className="line-clamp-1 text-base font-bold text-white hover:underline sm:text-lg">
-                        {it.title} {it.year ? <span className="font-normal text-slate-400">({it.year})</span> : null}
-                      </Link>
-                      <SaveButton tmdbId={it.id} mediaType={it.mediaType} title={it.title} year={it.year} posterPath={it.posterPath} />
-                    </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className={`rounded-md border px-2 py-0.5 text-[11px] font-black ${CALL_STYLE[it.primaryCall] ?? 'border-white/15 text-slate-200'}`}>{it.primaryCall}</span>
-                      <span className="inline-flex items-center gap-1 text-sm font-bold tabular-nums text-gold-400" title={MATCH_TOOLTIP}>
-                        <MatchMark size="text-sm" />
-                        {it.matchScore}
-                      </span>
-                      <span className="text-xs text-slate-400">match · {it.generalScore} overall</span>
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-sm text-slate-300">{it.reason}</p>
+              <div className="poster-grid">
+                {items.map((it) => (
+                  <PosterCard
+                    key={`${it.mediaType}-${it.id}`}
+                    href={`/app/title/${it.mediaType}/${it.id}`}
+                    mediaType={it.mediaType}
+                    tmdbId={it.id}
+                    title={it.title}
+                    year={it.year}
+                    posterUrl={it.posterUrl}
+                    posterPath={it.posterPath}
+                  >
+                    {it.reason && <p className="mt-1.5 line-clamp-3 text-xs text-slate-400">{it.reason}</p>}
                     {(() => {
                       const info = it.mediaType === 'tv' && it.airing ? airingInfo(it.airing) : null;
                       if (!info) return null;
                       return (
-                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 py-1.5 text-sm font-bold text-white">
-                          <span aria-hidden className="text-base">📺</span>
+                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-2 py-1 text-xs font-bold text-white">
+                          <span aria-hidden>📺</span>
                           <span className="tabular-nums">{info.text}</span>
                         </div>
                       );
                     })()}
-                    <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} className="mt-1.5" />
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {it.receipts.map((r) => (
-                        <span key={r} className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">✓ {r}</span>
-                      ))}
-                      {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                    {(it.receipts.length > 0 || it.where) && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {it.receipts.map((r) => (
+                          <span key={r} className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">✓ {r}</span>
+                        ))}
+                        {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
+                      </div>
+                    )}
+                  </PosterCard>
+                ))}
+              </div>
             </div>
           )}
         </div>

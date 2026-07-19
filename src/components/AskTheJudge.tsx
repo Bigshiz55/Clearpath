@@ -1,18 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { RobedPortrait } from '@/components/RobedPortrait';
 import { ReasonText } from '@/components/ReasonText';
-import { SaveButton } from '@/components/SaveButton';
-import { RatingsStrip } from '@/components/RatingsStrip';
+import { PosterCard } from '@/components/PosterCard';
 import { JudgeVerdictCard } from '@/components/JudgeVerdictCard';
 import type { TitleVerdict } from '@/lib/askTypes';
-import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
+import { type TileRatings } from '@/lib/ratings';
 import { houseByKey, readHousePick } from '@/lib/houseJudges';
 import { naiveParseQuery, describeQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
-import { verdictVisualForCall } from '@/lib/verdictVisual';
 import type { FinderQuery } from '@/lib/finder';
 
 interface ResultItem {
@@ -338,43 +335,31 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
                       </div>
                     )}
                     {m.items && m.items.length > 0 && (
-                      <div className="mt-3 space-y-2">
+                      <div className="mt-3">
                         {m.verdict && (
-                          <div className="eyebrow text-[11px]">Better for you</div>
+                          <div className="eyebrow mb-2 text-[11px]">Better for you</div>
                         )}
-                        {m.items.map((it) => {
-                          const v = verdictVisualForCall(it.primaryCall);
-                          return (
-                            <div key={`${it.mediaType}-${it.id}`} className={`flex gap-3 rounded-xl border bg-black/20 p-2 ${v.border}`}>
-                              <Link href={`/app/title/${it.mediaType}/${it.id}`} className="h-24 w-16 flex-none overflow-hidden rounded-lg border border-white/10">
-                                {it.posterUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={it.posterUrl} alt="" className="h-full w-full object-cover" />
-                                ) : (
-                                  <div className="grid h-full w-full place-items-center bg-white/5 p-1 text-center text-[9px] text-slate-400">{it.title}</div>
-                                )}
-                              </Link>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-start justify-between gap-2">
-                                  <Link href={`/app/title/${it.mediaType}/${it.id}`} className="line-clamp-1 text-sm font-semibold text-white hover:underline">
-                                    {it.title} {it.year ? <span className="font-normal text-slate-400">({it.year})</span> : null}
-                                  </Link>
-                                  <SaveButton tmdbId={it.id} mediaType={it.mediaType} title={it.title} year={it.year} posterPath={it.posterPath} variant="inline" />
+                        <div className="poster-grid">
+                          {m.items.map((it) => (
+                            <PosterCard
+                              key={`${it.mediaType}-${it.id}`}
+                              href={`/app/title/${it.mediaType}/${it.id}`}
+                              mediaType={it.mediaType}
+                              tmdbId={it.id}
+                              title={it.title}
+                              year={it.year}
+                              posterUrl={it.posterUrl}
+                              posterPath={it.posterPath}
+                            >
+                              {it.reason && <ReasonText text={it.reason} className="mt-1.5 text-[11px] text-slate-300" />}
+                              {it.where && (
+                                <div className="mt-1.5">
+                                  <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>
                                 </div>
-                                <div className="mt-1 flex items-center gap-2">
-                                  <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${v.badge}`}>{it.primaryCall}</span>
-                                  <span className="text-sm font-bold tabular-nums text-gold-400">{it.matchScore}</span>
-                                  <span className="text-[11px] text-slate-400">match</span>
-                                </div>
-                                {it.reason && <ReasonText text={it.reason} className="mt-1 text-[11px] text-slate-300" />}
-                                <RatingsStrip ratings={it.ratings ?? EMPTY_TILE_RATINGS} title={it.title} year={it.year} className="mt-1" />
-                                <div className="mt-1.5 flex flex-wrap gap-1">
-                                  {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                              )}
+                            </PosterCard>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

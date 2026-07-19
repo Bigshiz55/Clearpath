@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { MOODS } from '@/lib/moods';
-import { SaveButton } from '@/components/SaveButton';
+import { PosterCard } from '@/components/PosterCard';
 
 interface Pick {
   id: number;
@@ -119,22 +119,18 @@ export function MoodFinder({ hasServices }: { hasServices: boolean }) {
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
+              <div className="poster-grid">
                 {picks.map((p) => (
-                  <Link key={`${p.mediaType}-${p.id}`} href={`/app/title/${p.mediaType}/${p.id}`} className="group block">
-                    <div className="relative aspect-[2/3] overflow-hidden rounded-lg border border-white/10">
-                      {p.posterUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.posterUrl} alt="" className="h-full w-full object-cover transition group-hover:scale-105" loading="lazy" />
-                      ) : (
-                        <div className="grid h-full w-full place-items-center bg-white/5 p-2 text-center text-xs text-slate-400">{p.title}</div>
-                      )}
-                      <div className="absolute right-1.5 top-1.5 z-10">
-                        <SaveButton tmdbId={p.id} mediaType={p.mediaType} title={p.title} year={p.year} posterPath={p.posterPath} />
-                      </div>
-                    </div>
-                    <div className="mt-1 line-clamp-1 text-xs text-slate-300">{p.title}</div>
-                  </Link>
+                  <PosterCard
+                    key={`${p.mediaType}-${p.id}`}
+                    href={`/app/title/${p.mediaType}/${p.id}`}
+                    mediaType={p.mediaType}
+                    tmdbId={p.id}
+                    title={p.title}
+                    year={p.year}
+                    posterUrl={p.posterUrl}
+                    posterPath={p.posterPath}
+                  />
                 ))}
               </div>
             </>
