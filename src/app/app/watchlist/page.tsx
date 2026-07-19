@@ -24,7 +24,7 @@ export default async function WatchlistPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">Your watchlist</h1>
-        <p className="mt-1 text-sm text-slate-400">Everything you’ve saved — search it, sort it, and ⭐ star your Favourites.</p>
+        <p className="mt-1 text-sm text-slate-400">Everything you’ve saved — search it, sort it, and ⭐ star your Favorites.</p>
       </div>
 
       {items.length === 0 ? (

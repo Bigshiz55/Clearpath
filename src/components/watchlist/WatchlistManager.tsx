@@ -72,7 +72,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
     const next = item.priority >= 1 ? 0 : 1;
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, priority: next } : i)));
     const res = await updateWatchlistItem({ itemId: item.id, priority: next });
-    if (res.ok) toast.show(next ? 'Added to Favourites ⭐' : 'Removed from Favourites.', next ? 'success' : 'info');
+    if (res.ok) toast.show(next ? 'Added to Favorites ⭐' : 'Removed from Favorites.', next ? 'success' : 'info');
     else {
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, priority: item.priority } : i)));
       toast.show(res.error ?? 'Could not update.', 'error');
@@ -108,7 +108,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
             className={`chip border ${favOnly ? 'border-gold-400/60 bg-gold-500/15 text-gold-200' : ''}`}
             aria-pressed={favOnly}
           >
-            ⭐ Favourites
+            ⭐ Favorites
             <span className="ml-1 text-[10px] text-slate-500">{favCount}</span>
           </button>
           <span className="mx-1 h-5 w-px bg-white/10" aria-hidden />
@@ -242,15 +242,15 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
   );
 }
 
-/** A tap-to-favourite star. Filled gold when on, hollow otherwise. */
+/** A tap-to-favorite star. Filled gold when on, hollow otherwise. */
 function FavStar({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={on}
-      aria-label={on ? 'Remove from Favourites' : 'Add to Favourites'}
-      title={on ? 'Remove from Favourites' : 'Add to Favourites'}
+      aria-label={on ? 'Remove from Favorites' : 'Add to Favorites'}
+      title={on ? 'Remove from Favorites' : 'Add to Favorites'}
       className={`grid h-7 w-7 flex-none place-items-center rounded-md border transition ${
         on
           ? 'border-gold-400/60 bg-gold-500/20 text-gold-300'

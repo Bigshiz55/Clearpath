@@ -53,7 +53,7 @@ export default async function WatchDnaPage() {
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Rated" value={String(stats.rated)} />
         <Stat label="Finish rate" value={pct(stats.finishRate)} hint={stats.finishRate != null ? `${stats.finished} of ${stats.finished + stats.abandoned}` : 'watch a few'} />
-        <Stat label="⭐ Favourites" value={String(stats.favourites)} />
+        <Stat label="⭐ Favorites" value={String(stats.favorites)} />
         <Stat label="Avg. days to watch" value={stats.avgDaysToWatch == null ? '—' : stats.avgDaysToWatch < 1 ? 'same day' : String(Math.round(stats.avgDaysToWatch))} />
       </section>
 
