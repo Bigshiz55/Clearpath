@@ -3,13 +3,21 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { recordTasteFeedback } from '@/lib/actions/feedback';
+import { rateQuizTitle } from '@/lib/actions/quiz';
 import { useToast } from '@/components/Toast';
 import type { MediaType } from '@/lib/types';
+
+function ratingColor(n: number): string {
+  if (n <= 3) return 'border-red-400/40 bg-red-500/15 text-red-100 hover:bg-red-500/25';
+  if (n <= 6) return 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10';
+  if (n <= 8) return 'border-brand-400/40 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25';
+  return 'border-gold-400/50 bg-gold-500/20 text-amber-100 hover:bg-gold-500/30';
+}
 
 type Verdict = 'seen' | 'not_interested' | 'disliked';
 
 const OPTIONS: { verdict: Verdict; label: string; emoji: string; hint: string }[] = [
-  { verdict: 'seen', label: 'Seen it', emoji: '👀', hint: 'Already watched — just hide it' },
+  { verdict: 'seen', label: 'Seen it', emoji: '👀', hint: 'Already watched — give it a quick 1–10' },
   { verdict: 'not_interested', label: 'Not interested', emoji: '🙅', hint: 'Not my thing — show me less like this' },
   { verdict: 'disliked', label: 'Didn’t like it', emoji: '👎', hint: 'A miss — steer my DNA away from it' },
 ];
@@ -45,6 +53,33 @@ export function TasteFeedback({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [updating, setUpdating] = useState<Verdict | null>(null);
+  const [rating, setRating] = useState(false); // "Seen it" → quick 1–10 step
+
+  function close() {
+    if (updating) return;
+    setOpen(false);
+    setRating(false);
+  }
+
+  // "Seen it" with a tapped score — feeds the DNA like the quiz, then the beat.
+  async function rateSeen(score: number) {
+    if (busy) return;
+    setBusy(true);
+    const res = await rateQuizTitle({ tmdbId, mediaType, title, year, posterPath, rating: score });
+    setBusy(false);
+    if (res.ok) {
+      setUpdating('seen');
+      window.setTimeout(() => {
+        setUpdating(null);
+        setOpen(false);
+        setRating(false);
+        toast.show(`Rated ${score}/10 — your DNA just got smarter. 🧬`, 'success');
+        onFlagged?.();
+      }, 1500);
+    } else {
+      toast.show(res.error ?? 'Could not save the rating.', 'error');
+    }
+  }
 
   async function choose(verdict: Verdict) {
     if (busy) return;
@@ -92,7 +127,7 @@ export function TasteFeedback({
         createPortal(
           <div
             className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
-            onClick={() => !updating && setOpen(false)}
+            onClick={close}
           >
             <div
               className="w-full max-w-sm rounded-2xl border border-white/15 bg-ink-850 p-4 shadow-card"
@@ -100,6 +135,37 @@ export function TasteFeedback({
             >
               {updating ? (
                 <DnaUpdating verdict={updating} />
+              ) : rating ? (
+                <>
+                  <div className="text-sm font-bold text-white">
+                    👀 You’ve seen <span className="font-semibold text-slate-300">{title}</span> — how was it?
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-400">Tap a score. It teaches your DNA and sharpens every pick.</p>
+                  <div className="mt-3 flex justify-between px-0.5 text-[11px] text-slate-500">
+                    <span>Not for me</span>
+                    <span>Loved it</span>
+                  </div>
+                  <div className="mt-1 grid grid-cols-10 gap-1.5">
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void rateSeen(n)}
+                        className={`h-10 rounded-lg border text-sm font-bold tabular-nums transition disabled:opacity-50 ${ratingColor(n)}`}
+                        aria-label={`Rate ${n} out of 10`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" disabled={busy} onClick={() => void choose('seen')} className="mt-3 w-full rounded-xl border border-white/12 bg-white/5 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/10 disabled:opacity-50">
+                    Just hide it — skip rating
+                  </button>
+                  <button type="button" onClick={() => setRating(false)} className="btn-ghost mt-1 w-full text-sm">
+                    ← Back
+                  </button>
+                </>
               ) : (
                 <>
                   <div className="text-sm font-bold text-white">
@@ -112,7 +178,7 @@ export function TasteFeedback({
                         key={o.verdict}
                         type="button"
                         disabled={busy}
-                        onClick={() => void choose(o.verdict)}
+                        onClick={() => (o.verdict === 'seen' ? setRating(true) : void choose(o.verdict))}
                         className="flex w-full items-center gap-3 rounded-xl border border-white/12 bg-white/5 p-3 text-left transition hover:bg-white/10 disabled:opacity-50"
                       >
                         <span aria-hidden className="text-2xl leading-none">{o.emoji}</span>
@@ -123,7 +189,7 @@ export function TasteFeedback({
                       </button>
                     ))}
                   </div>
-                  <button type="button" onClick={() => setOpen(false)} className="btn-ghost mt-2 w-full text-sm">
+                  <button type="button" onClick={close} className="btn-ghost mt-2 w-full text-sm">
                     Cancel
                   </button>
                 </>
