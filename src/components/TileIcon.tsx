@@ -1,7 +1,8 @@
 /**
- * The home-tile icon set — one consistent line-art family (24×24, rounded,
- * `currentColor` stroke) so the tiles read as a designed set rather than a row
- * of mismatched emoji.
+ * The home-tile graphics — a set of bold, gradient-filled SVG "app-icon" marks
+ * (24×24) with glossy highlights, so each tile pops as a modern illustration
+ * rather than a thin line glyph. Each icon carries its own colour, so it works
+ * on any background with no `currentColor` needed.
  */
 export type TileIconName =
   | 'watch'
@@ -14,107 +15,141 @@ export type TileIconName =
   | 'watchlist'
   | 'easy';
 
-function Svg({ className, children }: { className?: string; children: React.ReactNode }) {
+function G({ id, from, to, v }: { id: string; from: string; to: string; v?: boolean }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      {children}
-    </svg>
+    <linearGradient id={id} x1="0" y1="0" x2={v ? '0' : '1'} y2="1">
+      <stop offset="0" stopColor={from} />
+      <stop offset="1" stopColor={to} />
+    </linearGradient>
   );
 }
 
-const STAR = 'M12 6.6l1.4 2.85 3.15.46-2.28 2.22.54 3.14L12 13.75l-2.82 1.48.54-3.14L7.44 9.9l3.15-.46z';
+/** A soft top gloss over the whole icon, for that glossy 3D-flat feel. */
+function Gloss() {
+  return <rect x="1.5" y="1.5" width="21" height="10" rx="6" fill="#ffffff" opacity="0.16" />;
+}
 
 export function TileIcon({ name, className = 'h-11 w-11' }: { name: TileIconName; className?: string }) {
+  const svg = (children: React.ReactNode) => (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="none">
+      {children}
+    </svg>
+  );
+
   switch (name) {
-    case 'watch': // play in a screen
-      return (
-        <Svg className={className}>
-          <rect x="3" y="5" width="18" height="14" rx="3" />
-          <path d="M10.5 9.2v5.6l5-2.8z" fill="currentColor" stroke="none" />
-        </Svg>
+    case 'watch': // play in a rounded screen
+      return svg(
+        <>
+          <defs><G id="ti-watch" from="#fb7185" to="#e11d48" /></defs>
+          <rect x="2.5" y="4.5" width="19" height="15" rx="4.5" fill="url(#ti-watch)" />
+          <Gloss />
+          <path d="M10 8.9l5.4 3.1-5.4 3.1z" fill="#fff" />
+        </>,
       );
     case 'judge': // gavel + sound block
-      return (
-        <Svg className={className}>
-          <g transform="rotate(45 12 10)">
-            <rect x="8" y="7" width="8" height="4" rx="1.3" />
-            <line x1="12" y1="11" x2="12" y2="18.5" />
+      return svg(
+        <>
+          <defs><G id="ti-judge" from="#fbbf24" to="#ea580c" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-judge)" />
+          <Gloss />
+          <g stroke="#fff" strokeWidth="2" strokeLinecap="round">
+            <g transform="rotate(45 12 10)">
+              <rect x="8.2" y="7.2" width="7.6" height="3.6" rx="1.2" fill="#fff" stroke="none" />
+              <line x1="12" y1="10.8" x2="12" y2="17.4" />
+            </g>
+            <line x1="5.5" y1="19.6" x2="12.5" y2="19.6" />
           </g>
-          <line x1="4.5" y1="20.7" x2="12.5" y2="20.7" />
-        </Svg>
+        </>,
       );
-    case 'search': // magnifier with filter sliders in the lens
-      return (
-        <Svg className={className}>
-          <circle cx="10.5" cy="10.5" r="7" />
-          <line x1="15.8" y1="15.8" x2="20.5" y2="20.5" />
-          <line x1="7" y1="9" x2="14" y2="9" />
-          <circle cx="12" cy="9" r="1.15" fill="currentColor" stroke="none" />
-          <line x1="7" y1="12.2" x2="14" y2="12.2" />
-          <circle cx="9" cy="12.2" r="1.15" fill="currentColor" stroke="none" />
-        </Svg>
+    case 'search': // magnifier with filter sliders
+      return svg(
+        <>
+          <defs><G id="ti-search" from="#818cf8" to="#4f46e5" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-search)" />
+          <Gloss />
+          <circle cx="10.5" cy="10.5" r="5.4" fill="#fff" opacity="0.22" />
+          <circle cx="10.5" cy="10.5" r="5.4" fill="none" stroke="#fff" strokeWidth="1.8" />
+          <line x1="14.6" y1="14.6" x2="18.4" y2="18.4" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+          <g stroke="#fff" strokeWidth="1.5" strokeLinecap="round">
+            <line x1="7.6" y1="9" x2="13.4" y2="9" />
+            <line x1="7.6" y1="12" x2="13.4" y2="12" />
+          </g>
+          <circle cx="12" cy="9" r="1.15" fill="#fff" />
+          <circle cx="9" cy="12" r="1.15" fill="#fff" />
+        </>,
       );
     case 'quiz': // game controller
-      return (
-        <Svg className={className}>
-          <rect x="2.5" y="8" width="19" height="9.5" rx="4.75" />
-          <line x1="7" y1="11" x2="7" y2="14.5" />
-          <line x1="5.25" y1="12.75" x2="8.75" y2="12.75" />
-          <circle cx="15.6" cy="11.6" r="1.05" fill="currentColor" stroke="none" />
-          <circle cx="17.8" cy="13.8" r="1.05" fill="currentColor" stroke="none" />
-        </Svg>
+      return svg(
+        <>
+          <defs><G id="ti-quiz" from="#c084fc" to="#c026d3" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-quiz)" />
+          <Gloss />
+          <rect x="4.5" y="8.5" width="15" height="8.5" rx="4.25" fill="#fff" opacity="0.9" />
+          <g stroke="#c026d3" strokeWidth="1.7" strokeLinecap="round">
+            <line x1="7.6" y1="11" x2="7.6" y2="14.4" />
+            <line x1="5.9" y1="12.7" x2="9.3" y2="12.7" />
+          </g>
+          <circle cx="14.8" cy="11.8" r="1.15" fill="#c026d3" />
+          <circle cx="16.9" cy="13.9" r="1.15" fill="#c026d3" />
+        </>,
       );
-    case 'new': // billboard on legs + "new" star
-      return (
-        <Svg className={className}>
-          <rect x="3" y="3.5" width="18" height="12" rx="2" />
-          <line x1="7.5" y1="15.5" x2="7.5" y2="20.5" />
-          <line x1="16.5" y1="15.5" x2="16.5" y2="20.5" />
-          <path d={STAR} transform="translate(0 -0.5)" fill="currentColor" stroke="none" />
-        </Svg>
+    case 'new': // sparkle star badge
+      return svg(
+        <>
+          <defs><G id="ti-new" from="#60a5fa" to="#4338ca" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-new)" />
+          <Gloss />
+          <path d="M12 5.2l1.9 3.9 4.3.6-3.1 3 .75 4.25L12 14.95 8.15 17l.75-4.25-3.1-3 4.3-.6z" fill="#fff" />
+        </>,
       );
     case 'tv': // television with antenna
-      return (
-        <Svg className={className}>
-          <rect x="2.5" y="7" width="19" height="13" rx="2" />
-          <path d="M8 3l4 4 4-4" />
-        </Svg>
+      return svg(
+        <>
+          <defs><G id="ti-tv" from="#34d399" to="#0d9488" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-tv)" />
+          <Gloss />
+          <path d="M8 5l4 3.4L16 5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <rect x="4.8" y="8.6" width="14.4" height="9.4" rx="2.4" fill="#fff" />
+          <rect x="6.8" y="10.6" width="7.4" height="5.4" rx="1.2" fill="#0d9488" opacity="0.35" />
+        </>,
       );
-    case 'together': // two heads above a couch
-      return (
-        <Svg className={className}>
-          <circle cx="9" cy="7.5" r="2" />
-          <circle cx="15" cy="7.5" r="2" />
-          <path d="M5 16v-1.5A2 2 0 0 1 7 12.5h10a2 2 0 0 1 2 2V16" />
-          <rect x="3.5" y="15.5" width="17" height="4" rx="1.6" />
-          <line x1="5.5" y1="19.5" x2="5.5" y2="21" />
-          <line x1="18.5" y1="19.5" x2="18.5" y2="21" />
-        </Svg>
+    case 'together': // two people
+      return svg(
+        <>
+          <defs><G id="ti-together" from="#fb7185" to="#db2777" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-together)" />
+          <Gloss />
+          <g fill="#fff">
+            <circle cx="8.6" cy="9" r="2.2" />
+            <circle cx="15.4" cy="9" r="2.2" />
+            <path d="M4.6 17.4c0-2.2 1.9-3.6 4-3.6s4 1.4 4 3.6z" />
+            <path d="M11.4 17.4c0-2.2 1.9-3.6 4-3.6s4 1.4 4 3.6z" opacity="0.85" />
+          </g>
+        </>,
       );
-    case 'watchlist': // bookmark with a check
-      return (
-        <Svg className={className}>
-          <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4.2L5 21V4.5a1 1 0 0 1 1-1z" />
-          <path d="M9.4 8.6l1.7 1.7 3.5-3.4" />
-        </Svg>
+    case 'watchlist': // bookmark with check
+      return svg(
+        <>
+          <defs><G id="ti-wl" from="#38bdf8" to="#2563eb" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-wl)" />
+          <Gloss />
+          <path d="M8 5.5h8a1 1 0 0 1 1 1V19l-5-3-5 3V6.5a1 1 0 0 1 1-1z" fill="#fff" />
+          <path d="M10 10.4l1.6 1.6 3-3" stroke="#2563eb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </>,
       );
-    case 'easy': // big reading glasses
-      return (
-        <Svg className={className}>
-          <circle cx="7" cy="13.5" r="3.3" />
-          <circle cx="17" cy="13.5" r="3.3" />
-          <path d="M10.2 13c1.05-1 2.55-1 3.6 0" />
-          <path d="M3.9 12.4 2 10.3M20.1 12.4 22 10.3" />
-        </Svg>
+    case 'easy': // reading glasses
+      return svg(
+        <>
+          <defs><G id="ti-easy" from="#fbbf24" to="#ea580c" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-easy)" />
+          <Gloss />
+          <g stroke="#fff" strokeWidth="1.9" fill="none" strokeLinecap="round">
+            <circle cx="7.6" cy="13.4" r="3.1" fill="#fff" fillOpacity="0.25" />
+            <circle cx="16.4" cy="13.4" r="3.1" fill="#fff" fillOpacity="0.25" />
+            <path d="M10.7 12.9c.9-.8 2.7-.8 2.6 0" />
+            <path d="M4.5 12.2 3 10.6M19.5 12.2 21 10.6" />
+          </g>
+        </>,
       );
   }
 }

@@ -80,62 +80,40 @@ export default async function DiscoverPage() {
         {/* Big, clear tiles — every area of the app, tap to go deeper. */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {([
-            // Row 1 — rgb = the tile's accent colour, drives glow/halo/spotlight.
-            { href: '/app/watch', icon: 'watch', title: 'Watch Now', sub: 'Your DNA picks, ranked', chip: 'from-pink-500 to-rose-600', rgb: '244,63,94' },
-            { href: '/app/ask', icon: 'judge', title: 'Ask the Judge', sub: 'Say what you want to see', chip: 'from-amber-400 to-orange-600', rgb: '245,158,11' },
-            { href: '/app/finder', icon: 'search', title: 'Custom Search', sub: 'Filter by genre, rating, length…', chip: 'from-indigo-500 to-blue-600', rgb: '99,102,241' },
+            // Row 1 — rgb = the tile's accent colour (border/tint/arrow).
+            { href: '/app/watch', icon: 'watch', title: 'Watch Now', sub: 'Your DNA picks, ranked', rgb: '244,63,94' },
+            { href: '/app/ask', icon: 'judge', title: 'Ask the Judge', sub: 'Say what you want to see', rgb: '245,158,11' },
+            { href: '/app/finder', icon: 'search', title: 'Custom Search', sub: 'Filter by genre, rating, length…', rgb: '99,102,241' },
             // Row 2
-            { href: '/app/quiz', icon: 'quiz', title: 'Taste Quiz', sub: `${reviewedCount ?? 0} rated — teach your taste`, chip: 'from-violet-500 to-fuchsia-600', rgb: '168,85,247' },
-            { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', chip: 'from-blue-500 to-indigo-600', rgb: '59,130,246' },
-            { href: '/app/tv', icon: 'tv', title: 'TV Guide Decoder', sub: 'What’s on live — next 48h', chip: 'from-emerald-500 to-teal-600', rgb: '16,185,129' },
+            { href: '/app/quiz', icon: 'quiz', title: 'Taste Quiz', sub: `${reviewedCount ?? 0} rated — teach your taste`, rgb: '168,85,247' },
+            { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', rgb: '59,130,246' },
+            { href: '/app/tv', icon: 'tv', title: 'TV Guide Decoder', sub: 'What’s on live — next 48h', rgb: '16,185,129' },
             // Row 3
-            { href: '/app/together', icon: 'together', title: 'Decide Together', sub: 'One verdict for the room', chip: 'from-rose-500 to-pink-600', rgb: '244,63,94' },
-            { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', chip: 'from-sky-500 to-blue-600', rgb: '14,165,233' },
-            { href: '/app/vintage', icon: 'easy', title: 'Easy Mode', sub: 'Big & simple to read', chip: 'from-amber-400 to-orange-600', rgb: '245,158,11' },
-          ] as const).map((t, i) => (
+            { href: '/app/together', icon: 'together', title: 'Decide Together', sub: 'One verdict for the room', rgb: '244,63,94' },
+            { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', rgb: '14,165,233' },
+            { href: '/app/vintage', icon: 'easy', title: 'Easy Mode', sub: 'Big & simple to read', rgb: '245,158,11' },
+          ] as const).map((t) => (
             <Link
               key={t.href}
               href={t.href}
               style={{
                 '--accent': t.rgb,
-                background: 'linear-gradient(145deg, rgba(var(--accent),0.30), rgba(var(--accent),0.08) 52%, rgba(9,11,18,0.55))',
-                borderColor: 'rgba(var(--accent),0.45)',
-                boxShadow: '0 14px 40px -18px rgba(var(--accent),0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
+                background: 'linear-gradient(150deg, rgba(var(--accent),0.15), rgba(9,11,18,0.55))',
+                borderColor: 'rgba(var(--accent),0.30)',
               } as React.CSSProperties}
-              className="group relative flex min-h-[150px] flex-col justify-between overflow-hidden rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-1.5 hover:brightness-110 active:scale-[0.98] active:brightness-125 sm:min-h-[176px] sm:p-5"
+              className="group relative flex min-h-[150px] flex-col justify-between overflow-hidden rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-1 hover:border-white/25 active:scale-[0.98] sm:min-h-[176px] sm:p-5"
             >
-              {/* Always-on corner spotlight, gently breathing. */}
-              <span
-                aria-hidden
-                className="wv-tile-pulse pointer-events-none absolute -right-10 -top-12 h-48 w-48 rounded-full blur-2xl"
-                style={{ background: 'radial-gradient(circle, rgba(var(--accent),0.8), transparent 70%)', animationDelay: `${i * 0.6}s` }}
+              <TileIcon
+                name={t.icon}
+                className="h-14 w-14 flex-none drop-shadow-[0_8px_18px_rgba(0,0,0,0.5)] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-[1.06] sm:h-[68px] sm:w-[68px]"
               />
-              {/* Continuous sheen band — alive without hover (touch-friendly). */}
-              <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/3 overflow-hidden">
-                <span
-                  className="wv-tile-sheen absolute inset-y-0 -left-1/2 w-full bg-gradient-to-r from-transparent via-white/25 to-transparent"
-                  style={{ animationDelay: `${i * 0.9}s` }}
-                />
-              </span>
-
-              <span
-                className={`relative grid h-14 w-14 flex-none place-items-center overflow-hidden rounded-2xl bg-gradient-to-br ${t.chip} text-white ring-1 ring-inset ring-white/40 transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110 sm:h-16 sm:w-16`}
-                style={{ boxShadow: '0 12px 30px -6px rgba(var(--accent),0.9)' }}
-              >
-                {/* Top gloss highlight. */}
-                <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/45 to-transparent" />
-                <TileIcon name={t.icon} className="relative h-7 w-7 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)] sm:h-8 sm:w-8" />
-              </span>
-
-              <span className="relative mt-3">
-                <span className="block text-lg font-extrabold tracking-tight text-white drop-shadow-sm sm:text-xl">{t.title}</span>
+              <span className="mt-3">
+                <span className="block text-lg font-extrabold tracking-tight text-white sm:text-xl">{t.title}</span>
                 <span className="block text-sm text-slate-300/90">{t.sub}</span>
               </span>
-
-              {/* Accent arrow — always visible, nudges on hover. */}
               <span
                 aria-hidden
-                className="pointer-events-none absolute bottom-4 right-4 text-lg font-black opacity-70 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100 sm:bottom-5 sm:right-5"
+                className="pointer-events-none absolute bottom-4 right-4 text-lg font-black opacity-70 transition-transform duration-300 group-hover:translate-x-0.5 sm:bottom-5 sm:right-5"
                 style={{ color: 'rgb(var(--accent))' }}
               >
                 →
