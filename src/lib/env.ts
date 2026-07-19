@@ -135,6 +135,19 @@ export const serverEnv = {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
   },
+  /**
+   * Affiliate program tags — appended to provider deep links at redirect time.
+   * These are NOT secrets (they ride in the public outbound URL), but we read
+   * them server-side so they never bloat the client bundle. Each is optional;
+   * a service earns nothing until its tag is set.
+   */
+  affiliateConfig(): { amazonTag?: string; appleToken?: string; appleCampaign?: string } {
+    return {
+      amazonTag: optional('AMAZON_ASSOCIATES_TAG'),
+      appleToken: optional('APPLE_AFFILIATE_TOKEN'),
+      appleCampaign: optional('APPLE_AFFILIATE_CAMPAIGN'),
+    };
+  },
 };
 
 /**
@@ -156,6 +169,7 @@ export function envHealth() {
     cronSecret: Boolean(optional('CRON_SECRET')),
     resendKey: Boolean(optional('RESEND_API_KEY')),
     push: Boolean(optional('NEXT_PUBLIC_VAPID_PUBLIC_KEY') && optional('VAPID_PRIVATE_KEY')),
+    affiliate: Boolean(optional('AMAZON_ASSOCIATES_TAG') || optional('APPLE_AFFILIATE_TOKEN')),
     siteUrl: publicEnv.siteUrl(),
   };
 }

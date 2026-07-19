@@ -1,6 +1,7 @@
 import type { WatchProviders, WatchProvider } from '@/lib/types';
 import { TMDB_IMAGE_BASE } from '@/lib/tmdb/client';
 import { isProviderMine } from '@/lib/services';
+import { outHref } from '@/lib/affiliate';
 
 const TYPE_LABELS: Record<WatchProvider['type'], string> = {
   flatrate: 'Stream',
@@ -34,13 +35,14 @@ function ProviderLogo({ p, mine }: { p: WatchProvider; mine: boolean }) {
   }`;
 
   // Watchmode gives us a deep link straight to the title on this service — make
-  // the badge tappable ("open it on Netflix"). Falls back to a static badge.
+  // the badge tappable ("open it on Netflix"). Routed through /api/out so the
+  // click is attributable and gets our affiliate tag. Falls back to a static badge.
   if (p.link) {
     return (
       <a
-        href={p.link}
+        href={outHref({ u: p.link, p: p.providerName, t: p.type })}
         target="_blank"
-        rel="noopener noreferrer"
+        rel="noopener noreferrer sponsored"
         className={`${cls} hover:border-brand-400/60 hover:bg-brand-500/15`}
         title={`Open ${p.providerName} →`}
       >
