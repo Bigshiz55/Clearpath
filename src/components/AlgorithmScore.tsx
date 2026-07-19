@@ -61,7 +61,7 @@ export function AlgorithmScore({
       {/* DNA + the number, bigger and on one line. */}
       <div className="flex items-center gap-2">
         <span className="text-[11px] font-black uppercase tracking-wide text-pink-100/90">🧬 DNA</span>
-        <span className="text-3xl font-black leading-none tabular-nums text-white">{score ?? '—'}</span>
+        <span className="text-2xl font-black leading-none tabular-nums text-white">{score ?? '—'}</span>
         {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 && (
           <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">learning</span>
         )}
