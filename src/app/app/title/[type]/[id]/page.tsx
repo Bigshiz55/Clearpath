@@ -11,8 +11,49 @@ import { getMyServices } from '@/lib/profile';
 import { buildInterview, type Disposition } from '@/lib/interview';
 import { getFinishProfile, assessTitleRisk } from '@/lib/finish';
 import { getContentDna, type ContentDna } from '@/lib/contentDna';
+import { getTitleDimensions, getUserDimensionProfile } from '@/lib/titleDimensions';
+import { dimensionMatch, matchHighlights, topDials } from '@/lib/scoring/dimensions';
+import { TasteMatchView, type TasteMatch } from '@/components/verdict/TasteMatchView';
+import type { TitleMetadata } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * "Your taste match" — compare this title's AI content fingerprint to the
+ * dimensions the user consistently rates highly. Null (hidden) until they've
+ * rated enough titles or when the fingerprint/profile isn't available.
+ */
+async function getTasteMatchForCurrentUser(meta: TitleMetadata): Promise<TasteMatch | null> {
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { count } = await supabase
+      .from('watchlist_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .not('rating', 'is', null);
+    const samples = count ?? 0;
+    if (samples < 3) return null; // not enough signal to be meaningful yet
+
+    const [dims, profile] = await Promise.all([
+      getTitleDimensions(meta),
+      getUserDimensionProfile(supabase, user.id, samples),
+    ]);
+    if (!dims || profile.samples === 0) return null;
+
+    const { agree, clash } = matchHighlights(dims, profile);
+    return {
+      match: dimensionMatch(dims, profile),
+      samples: profile.samples,
+      dials: topDials(profile).map((d) => ({ label: d.dim.label, lean: d.lean })),
+      agree,
+      clash,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function parseParams(params: { type: string; id: string }): { mediaType: MediaType; id: number } | null {
   if (params.type !== 'movie' && params.type !== 'tv') return null;
@@ -157,6 +198,8 @@ export default async function TitlePage({ params }: { params: { type: string; id
         )
       : null;
 
+    const tasteMatch = await getTasteMatchForCurrentUser(report.title as TitleMetadata).catch(() => null);
+
     const status = watchState?.status;
     const disposition: Disposition | null =
       status === 'watched' ? 'finished' : status === 'dropped' ? 'abandoned' : null;
@@ -185,6 +228,7 @@ export default async function TitlePage({ params }: { params: { type: string; id
         interview={interview}
         finishCheck={finishCheck}
         contentDna={contentDna}
+        tasteMatch={tasteMatch}
       />
     );
   } catch (e) {

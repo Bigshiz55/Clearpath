@@ -17,6 +17,7 @@ import { TheaterMode } from '@/components/TheaterMode';
 import { PostWatchInterview } from './PostWatchInterview';
 import { FinishCheck } from './FinishCheck';
 import { ContentDnaView } from './ContentDnaView';
+import { TasteMatchView, type TasteMatch } from './TasteMatchView';
 import { buildPanel } from '@/lib/swarm';
 import type { InterviewQuestion, Disposition } from '@/lib/interview';
 import type { RiskAssessment } from '@/lib/finish';
@@ -61,6 +62,7 @@ export function VerdictReportView({
   interview,
   finishCheck,
   contentDna,
+  tasteMatch,
 }: {
   report: VerdictReport;
   watchState?: WatchState;
@@ -69,6 +71,7 @@ export function VerdictReportView({
   interview?: { disposition: Disposition; questions: InterviewQuestion[] } | null;
   finishCheck?: RiskAssessment | null;
   contentDna?: ContentDna | null;
+  tasteMatch?: TasteMatch | null;
 }) {
   const t = report.title;
   const origin = originSummary(t);
@@ -346,6 +349,7 @@ export function VerdictReportView({
       )}
 
       {/* Content DNA — aggregated from real viewer check-ins */}
+      {tasteMatch && <TasteMatchView tm={tasteMatch} />}
       {contentDna && <ContentDnaView dna={contentDna} />}
 
       {/* Content & tone */}
