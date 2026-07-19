@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { QuizGame } from '@/components/QuizGame';
 
 export const metadata: Metadata = {
-  title: 'Taste Quiz · WatchVerdict',
+  title: 'Taste Quiz · WatchVrdikt',
 };
 
 export default function QuizPage() {

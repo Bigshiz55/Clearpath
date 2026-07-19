@@ -8,7 +8,7 @@ export default function OfflinePage() {
       <Logo />
       <h1 className="mt-4 text-2xl font-bold text-white">You’re offline</h1>
       <p className="max-w-sm text-sm text-slate-400">
-        WatchVerdict needs a connection to fetch verdicts and title data. Reconnect and try again —
+        WatchVrdikt needs a connection to fetch verdicts and title data. Reconnect and try again —
         your watchlist is safe.
       </p>
     </div>

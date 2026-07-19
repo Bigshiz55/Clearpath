@@ -72,7 +72,7 @@ export async function sendTestPush(): Promise<ActionResult> {
     const supabase = createClient();
     const user = await requireUser(supabase);
     const sent = await sendPushToUser(supabase, user.id, {
-      title: 'WatchVerdict',
+      title: 'WatchVrdikt',
       body: '🍿 Notifications are on — this is your test. Stop scrolling, get rolling.',
       url: '/app',
       tag: 'wv-test',

@@ -15,7 +15,7 @@ export interface PersonalContext extends DetectionContext {
 
 /**
  * Compute the user's Personal Match score by applying their preference rules to
- * the general WatchVerdict score. Penalties fire only when the trait is a
+ * the general WatchVrdikt score. Penalties fire only when the trait is a
  * defining characteristic (rule.requiresDefining). Every adjustment is
  * explained so the report can show exactly why the score moved.
  *

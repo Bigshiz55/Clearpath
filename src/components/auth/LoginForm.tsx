@@ -43,7 +43,7 @@ export function LoginForm({ next }: { next: string }) {
         });
         if (error) throw error;
         if (data.session) {
-          toast.show('Welcome to WatchVerdict!', 'success');
+          toast.show('Welcome to WatchVrdikt!', 'success');
           router.push(next);
           router.refresh();
         } else {
@@ -75,7 +75,7 @@ export function LoginForm({ next }: { next: string }) {
           ? 'Start getting verdicts tuned to your taste.'
           : mode === 'magic'
             ? 'We’ll send a secure one-time sign-in link.'
-            : 'Sign in to your WatchVerdict account.'}
+            : 'Sign in to your WatchVrdikt account.'}
       </p>
 
       <form onSubmit={handle} className="mt-6 space-y-4">

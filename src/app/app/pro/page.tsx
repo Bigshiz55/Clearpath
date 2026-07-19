@@ -6,7 +6,7 @@ import { PRO_FEATURES, PRO_PRICE_LABEL } from '@/lib/proPlan';
 import { ProUpgradeButton } from '@/components/ProUpgrade';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'WatchVerdict Pro' };
+export const metadata = { title: 'WatchVrdikt Pro' };
 
 export default async function ProPage() {
   const supabase = createClient();
@@ -18,7 +18,7 @@ export default async function ProPage() {
     <div className="mx-auto max-w-lg space-y-6">
       <div className="text-center">
         <div className="inline-flex items-center gap-1.5 rounded-full border border-gold-400/40 bg-gold-500/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.15em] text-gold-200">
-          <span aria-hidden>⭐</span> WatchVerdict Pro
+          <span aria-hidden>⭐</span> WatchVrdikt Pro
         </div>
         <h1 className="mt-3 text-3xl font-extrabold text-white sm:text-4xl">Your taste, turned up.</h1>
         <p className="mt-2 text-sm text-slate-300">
@@ -31,12 +31,12 @@ export default async function ProPage() {
           <div className="text-3xl" aria-hidden>🎉</div>
           <div className="mt-2 text-lg font-bold text-white">You’re on Pro</div>
           <p className="mt-1 text-sm text-slate-300">
-            AI-tuned verdicts and household profiles are unlocked. Thanks for supporting WatchVerdict.
+            AI-tuned verdicts and household profiles are unlocked. Thanks for supporting WatchVrdikt.
           </p>
           {ent.currentPeriodEnd && (
             <p className="mt-2 text-xs text-slate-500">Renews {new Date(ent.currentPeriodEnd).toLocaleDateString()}</p>
           )}
-          <Link href="/app" className="btn-secondary mt-4 inline-flex">Back to WatchVerdict →</Link>
+          <Link href="/app" className="btn-secondary mt-4 inline-flex">Back to WatchVrdikt →</Link>
         </div>
       ) : (
         <>
@@ -54,7 +54,7 @@ export default async function ProPage() {
 
           <div className="card p-5">
             <div className="flex items-baseline justify-between">
-              <span className="text-sm text-slate-300">WatchVerdict Pro</span>
+              <span className="text-sm text-slate-300">WatchVrdikt Pro</span>
               <span className="text-2xl font-black text-white">{PRO_PRICE_LABEL}</span>
             </div>
             <div className="mt-4"><ProUpgradeButton isAdmin={isAdmin} /></div>

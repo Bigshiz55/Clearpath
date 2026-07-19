@@ -7,7 +7,7 @@ import { scoreVerdict } from '@/lib/verdictVisual';
 import { HelixMark } from './HelixMark';
 
 /**
- * The WatchVerdict DNA Score — a per-user "odds you'll love it" (0..100). On the
+ * The WatchVrdikt DNA Score — a per-user "odds you'll love it" (0..100). On the
  * title page it requests the AI adjustment layer (`?ai=1`): the deterministic
  * Watchability blend, refined by a bounded ±15 AI nudge with a one-line reason.
  * When the model has little of your data yet, it leans on the objective score.
@@ -56,7 +56,7 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
     <div className="flex flex-col gap-1">
       <div
         className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border-2 border-pink-400/80 bg-gradient-to-r from-pink-500/40 to-rose-500/25 px-3 py-1.5 shadow-[0_0_18px_rgba(244,63,94,0.35)]"
-        title="WatchVerdict DNA Score — a 0–100 estimate of how much YOU will love this, learned from what you’ve rated. It drives your Stream It / Skip It call and sharpens the more you use the app."
+        title="WatchVrdikt DNA Score — a 0–100 estimate of how much YOU will love this, learned from what you’ve rated. It drives your Stream It / Skip It call and sharpens the more you use the app."
       >
         <HelixMark className="h-5 w-5" />
         <span className="text-[10px] font-black uppercase tracking-wide text-white">🧬 DNA Score</span>

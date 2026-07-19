@@ -63,7 +63,7 @@ export default function LiteHome() {
       </section>
 
       <p className="mt-6 text-center text-[11px] text-slate-600">
-        WatchVerdict · the simple way in. Tap <span className="text-slate-400">Full app →</span> anytime for everything else.
+        WatchVrdikt · the simple way in. Tap <span className="text-slate-400">Full app →</span> anytime for everything else.
       </p>
     </div>
   );

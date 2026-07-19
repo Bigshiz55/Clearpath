@@ -5,7 +5,7 @@ import { AskTheJudge } from '@/components/AskTheJudge';
 import { TakeToCourtCard } from '@/components/TakeToCourtCard';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Ask the Judge · WatchVerdict' };
+export const metadata: Metadata = { title: 'Ask the Judge · WatchVrdikt' };
 
 export default async function AskPage({ searchParams }: { searchParams: { q?: string } }) {
   const supabase = createClient();

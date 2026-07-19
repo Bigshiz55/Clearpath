@@ -27,7 +27,7 @@ export function CardDna({ mediaType, tmdbId, className = '' }: { mediaType: Medi
   return (
     <div
       className={`flex items-center justify-between gap-2 rounded-lg border border-pink-400/60 bg-gradient-to-r from-pink-500/25 to-rose-500/15 px-2 py-1 ${className}`}
-      title="WatchVerdict DNA Score — how closely this matches YOUR taste (0–100), learned from what you’ve rated. Pure taste fit; the Watchability rating blends this with the critic/audience scores."
+      title="WatchVrdikt DNA Score — how closely this matches YOUR taste (0–100), learned from what you’ve rated. Pure taste fit; the Watchability rating blends this with the critic/audience scores."
     >
       <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-pink-100">
         <HelixMark className="h-4 w-4" />

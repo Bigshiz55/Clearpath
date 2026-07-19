@@ -8,7 +8,7 @@ import { ReleaseWall, type WallService } from '@/components/ReleaseWall';
 import { tmdbImage } from '@/lib/tmdb/image';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'New releases · WatchVerdict' };
+export const metadata: Metadata = { title: 'New releases · WatchVrdikt' };
 
 // Providers offered as platform filters on the wall (the full catalog we track).
 const WALL_SERVICES: WallService[] = STREAMING_SERVICES.map((s) => ({ id: s.id, name: s.name, emoji: s.emoji }));

@@ -81,7 +81,7 @@ export function InstallHint() {
         📱
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-bold text-white">Keep WatchVerdict one tap away</div>
+        <div className="text-sm font-bold text-white">Keep WatchVrdikt one tap away</div>
         {ios ? (
           <div className="mt-0.5 text-xs text-slate-300">
             Tap the <span className="font-semibold text-white">Share</span> button

@@ -7,7 +7,7 @@ import type { PreferenceTrait } from '@/lib/types';
 import { ShareCard, TasteCardArt, WrappedCardArt } from '@/components/ShareCards';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Share cards · WatchVerdict' };
+export const metadata: Metadata = { title: 'Share cards · WatchVrdikt' };
 
 const LOVABLE = new Set(['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer']);
 const AVOIDABLE = new Set(['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn']);

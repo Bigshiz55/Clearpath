@@ -6,7 +6,7 @@ import { getChambersData } from '@/lib/chambersData';
 import { ChambersProfile } from '@/components/chambers/ChambersProfile';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Your Chambers · WatchVerdict' };
+export const metadata: Metadata = { title: 'Your Chambers · WatchVrdikt' };
 
 export default async function ChambersPage() {
   const supabase = createClient();

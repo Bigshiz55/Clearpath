@@ -23,7 +23,7 @@ const MAP: Record<z.infer<typeof schema>['verdict'], { status: 'watched' | 'drop
 };
 
 /**
- * Record a "not for me" flag on a title. Feeds the WatchVerdict DNA Score: the
+ * Record a "not for me" flag on a title. Feeds the WatchVrdikt DNA Score: the
  * negative flags pull your Taste-DNA away from similar titles, so the next set
  * of picks improves. Reuses the validated watchlist actions.
  */

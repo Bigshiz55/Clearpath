@@ -5,7 +5,7 @@ import { Logo } from '@/components/Logo';
 import { JoinForm } from '@/components/JoinForm';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Join a crew · WatchVerdict' };
+export const metadata: Metadata = { title: 'Join a crew · WatchVrdikt' };
 
 export default async function JoinPage({ params }: { params: { code: string } }) {
   let crewName: string | null = null;
@@ -41,8 +41,8 @@ export default async function JoinPage({ params }: { params: { code: string } })
           <div className="card p-8 text-center">
             <div className="text-3xl">🔗</div>
             <h1 className="mt-3 text-lg font-semibold text-white">This invite link isn’t valid</h1>
-            <p className="mt-2 text-sm text-slate-400">Ask for a fresh link, or explore WatchVerdict yourself.</p>
-            <Link href="/app" className="btn-secondary mt-5 inline-flex">Open WatchVerdict →</Link>
+            <p className="mt-2 text-sm text-slate-400">Ask for a fresh link, or explore WatchVrdikt yourself.</p>
+            <Link href="/app" className="btn-secondary mt-5 inline-flex">Open WatchVrdikt →</Link>
           </div>
         )}
       </main>

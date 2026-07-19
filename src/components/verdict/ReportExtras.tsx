@@ -18,7 +18,7 @@ function callStyleFor(call: PrimaryCall): string {
 
 /**
  * Top-of-page summary: the headline call plus every score in one glanceable
- * strip — WatchVerdict score, personal match, and all *available* external
+ * strip — WatchVrdikt score, personal match, and all *available* external
  * ratings (IMDb, Rotten Tomatoes, Metacritic, TMDB). Missing sources are simply
  * omitted; nothing is fabricated.
  */
@@ -236,7 +236,7 @@ export function RecommendationConsensus({
     <div className="space-y-2.5">
       <Row
         icon="🎬"
-        name="WatchVerdict"
+        name="WatchVrdikt"
         value="Our personalized call"
         right={<span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${callStyle}`}>{primaryCall}</span>}
       />

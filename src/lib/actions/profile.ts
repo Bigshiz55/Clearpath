@@ -232,7 +232,7 @@ export interface MyTaste {
 
 /**
  * The current user's taste as crew/court traits, so joining pre-fills from their
- * WatchVerdict account. Only returns real, chosen rules (not defaults), and
+ * WatchVrdikt account. Only returns real, chosen rules (not defaults), and
  * treats anonymous guests as not-really-signed-in for pre-fill purposes.
  */
 export async function getMyTaste(): Promise<MyTaste> {

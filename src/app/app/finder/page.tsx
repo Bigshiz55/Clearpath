@@ -6,7 +6,7 @@ import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Find it · WatchVerdict' };
+export const metadata: Metadata = { title: 'Find it · WatchVrdikt' };
 
 export default async function FinderPage() {
   const supabase = createClient();
