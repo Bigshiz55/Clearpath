@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
+import { CardDna } from '@/components/CardDna';
+import type { MediaType } from '@/lib/types';
 
 interface Pick {
   id: number;
@@ -18,15 +20,18 @@ interface Pick {
   imdb: number | null;
   rottenTomatoes: number | null;
   metascore: number | null;
+  tmdbId: number | null;
+  mediaType: MediaType | null;
 }
 
 function whenLabel(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
-  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  // Force 12-hour AM/PM regardless of the device/server locale.
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   if (d.toDateString() === now.toDateString()) return `Today · ${time}`;
   if (new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString()) return `Tomorrow · ${time}`;
-  return `${d.toLocaleDateString([], { weekday: 'long' })} · ${time}`;
+  return `${d.toLocaleDateString('en-US', { weekday: 'long' })} · ${time}`;
 }
 
 function Ratings({ p }: { p: Pick }) {
@@ -156,11 +161,19 @@ export function TvDetective() {
                           </span>
                         </div>
 
-                        <div className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white">{p.showName}</div>
+                        {p.tmdbId && p.mediaType ? (
+                          <Link href={`/app/title/${p.mediaType}/${p.tmdbId}`} className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white hover:text-brand-200">
+                            {p.showName}
+                          </Link>
+                        ) : (
+                          <div className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white">{p.showName}</div>
+                        )}
                         {ep && <div className="mt-0.5 line-clamp-1 text-sm text-slate-300">{ep}</div>}
                         {p.showType && <div className="mt-0.5 text-xs uppercase tracking-wide text-slate-500">{p.showType}</div>}
 
                         <div className="mt-2"><Ratings p={p} /></div>
+                        {/* Your DNA score for this show (when it resolves + you're personalized). */}
+                        {p.tmdbId && p.mediaType && <CardDna mediaType={p.mediaType} tmdbId={p.tmdbId} className="mt-2 max-w-[240px]" />}
 
                         <button
                           onClick={() => toggle(p)}

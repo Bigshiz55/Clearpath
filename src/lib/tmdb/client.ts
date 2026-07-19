@@ -892,6 +892,26 @@ export async function searchKeywords(terms: string[]): Promise<number[]> {
   return out;
 }
 
+/**
+ * Resolve an IMDb id (tt…) to a TMDB id + media type via `/find` — an EXACT
+ * mapping (no fuzzy name matching), so it's safe to hang a DNA score off. Prefers
+ * a TV match (the guide is TV listings), falls back to a movie. Null when unmatched.
+ */
+export async function findTmdbByImdb(imdbId: string): Promise<{ id: number; mediaType: MediaType } | null> {
+  const id = imdbId.trim();
+  if (!/^tt\d+$/.test(id)) return null;
+  const data = await tmdbFetch<{
+    tv_results?: Array<{ id: number }>;
+    movie_results?: Array<{ id: number }>;
+  }>(`/find/${id}`, { external_source: 'imdb_id' }).catch(() => null);
+  if (!data) return null;
+  const tv = data.tv_results?.[0];
+  if (tv) return { id: tv.id, mediaType: 'tv' };
+  const movie = data.movie_results?.[0];
+  if (movie) return { id: movie.id, mediaType: 'movie' };
+  return null;
+}
+
 export interface ProviderCatalogEntry {
   id: number;
   name: string;

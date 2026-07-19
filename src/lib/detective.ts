@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getUpcomingTv } from '@/lib/onTv';
 import { getProfile, regionFor } from '@/lib/profile';
 import { getCriticRatings } from '@/lib/omdb';
+import { findTmdbByImdb } from '@/lib/tmdb/client';
+import type { MediaType } from '@/lib/types';
 
 export interface DetectivePick {
   id: number; // TVmaze airing id (for reminders)
@@ -18,6 +20,8 @@ export interface DetectivePick {
   imdb: number | null; // 0..10
   rottenTomatoes: number | null; // 0..100
   metascore: number | null; // 0..100
+  tmdbId: number | null; // resolved from the show's IMDb id — powers the DNA score
+  mediaType: MediaType | null;
 }
 
 /**
@@ -32,7 +36,10 @@ export async function getDetectivePicks(supabase: SupabaseClient, userId: string
 
   return Promise.all(
     airings.map(async (a) => {
-      const critic = a.imdb ? await getCriticRatings(a.imdb).catch(() => null) : null;
+      const [critic, tmdb] = await Promise.all([
+        a.imdb ? getCriticRatings(a.imdb).catch(() => null) : null,
+        a.imdb ? findTmdbByImdb(a.imdb).catch(() => null) : null,
+      ]);
       return {
         id: a.id,
         showName: a.showName,
@@ -47,6 +54,8 @@ export async function getDetectivePicks(supabase: SupabaseClient, userId: string
         imdb: critic?.imdbRating ?? null,
         rottenTomatoes: critic?.rottenTomatoes ?? null,
         metascore: critic?.metascore ?? null,
+        tmdbId: tmdb?.id ?? null,
+        mediaType: tmdb?.mediaType ?? null,
       };
     }),
   );
