@@ -49,10 +49,10 @@ export function AlgorithmScore({
       title="WatchVerdict algorithm — your DNA blended with every rating into one 0–100 estimate of how much YOU will like it."
     >
       {/* The WatchVerdict mark + the ruling itself (Stream It / …) — one line. */}
-      <div className="mb-1.5 flex items-center gap-2 border-b border-pink-200/25 pb-1.5">
-        <LogoMark box="h-8 w-8 rounded-lg" inner="h-5 w-5" />
+      <div className="mb-1.5 flex items-center gap-1.5 border-b border-pink-200/25 pb-1.5">
+        <LogoMark box="h-7 w-7 flex-none rounded-lg" inner="h-4 w-4" />
         {v && (
-          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-black tracking-wide ${v.visual.badge}`}>
+          <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-1 text-xs font-black tracking-tight ${v.visual.badge}`}>
             {personal ? '🧬' : v.emoji} {v.call}
           </span>
         )}
