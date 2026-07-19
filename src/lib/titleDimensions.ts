@@ -136,6 +136,17 @@ async function getCachedDimsBatch(
   return out;
 }
 
+/** Read cached fingerprints for a set of titles (never classifies). Empty on any miss. */
+export async function getCachedDimensions(
+  keys: { tmdb_id: number; media_type: MediaType }[],
+): Promise<Map<string, TitleDimensions>> {
+  try {
+    return await getCachedDimsBatch(createAdminClient(), keys);
+  } catch {
+    return new Map();
+  }
+}
+
 async function computeUserProfile(userId: string): Promise<DimensionProfile> {
   const empty = buildProfile([]);
   if (!userId) return empty;

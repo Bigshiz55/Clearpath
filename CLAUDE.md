@@ -20,6 +20,17 @@ WatchVerdict: Next.js 14 (App Router) + TypeScript strict + Supabase + TMDB.
   on any failure (no key, timeout, unparseable output) and is reserved for the
   title page (`?ai=1`), never the many-card grids or ranking. Keep the pure
   engine untouched — the AI only refines the number after the fact.
+- **The content fingerprint is a second sanctioned personalization signal,
+  also OUTSIDE `src/lib/scoring/`.** Every title is classified once across 18
+  interpretable axes (`src/lib/scoring/dimensions.ts` is pure math; the
+  gpt-4o-mini classifier + `title_dimensions` cache live in
+  `src/lib/titleDimensions.ts`). In `rankByDna` (personalization layer, not the
+  pure engine) the fingerprint may nudge a title's *rank score* by a bounded
+  ±8 (`DIM_NUDGE_MAX`) toward the user's learned dimension profile. It is
+  cache-only and deterministic at request time (no per-request LLM call) and a
+  no-op whenever the profile or a title's fingerprint is missing, so the
+  deterministic Watchability score stays authoritative and the 7 scenarios
+  (which never touch `rankByDna`) are unaffected.
 - **Secrets are server-only.** `TMDB_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
   `OPENAI_API_KEY` must never get a `NEXT_PUBLIC_` prefix or be imported into a
   client component. Server-only modules start with `import 'server-only'`.

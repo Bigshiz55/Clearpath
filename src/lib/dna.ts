@@ -8,8 +8,15 @@ import { computeGeneralScore } from '@/lib/scoring/general';
 import { buildTasteDna, dnaScore, type TasteDna, type DnaResult } from '@/lib/scoring/dna';
 import { aiAdjustScore, type AiAdjustment } from '@/lib/aiAdjust';
 import { isPro } from '@/lib/pro';
+import { getUserDimensionProfile, getCachedDimensions } from '@/lib/titleDimensions';
+import { dimensionMatch } from '@/lib/scoring/dimensions';
 
 const clampScore = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+
+// Content-fingerprint ranking nudge bounds — how far a perfect/terrible content
+// match can move a title's rank score (±8), and the slope from match delta.
+const DIM_NUDGE_MAX = 8;
+const DIM_NUDGE_SLOPE = 0.16;
 
 /** The text we embed for a title's "vibe vector" — its meaning, not its tags. */
 function vibeText(meta: TitleMetadata): string {
@@ -144,6 +151,17 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
   const dna = userId ? await getUserTasteDna(supabase, userId) : EMPTY_DNA;
   if (!dna.liked) return { items: pool.map((i) => ({ ...i, dnaFit: null })), personalized: false };
 
+  // Content-fingerprint personalization (bounded, deterministic, cache-only):
+  // nudge the ranking toward titles whose AI content DNA matches the axes this
+  // user keeps rating highly. No-op unless BOTH the user's dimension profile and
+  // a title's cached fingerprint exist, so the deterministic Watchability score
+  // stays authoritative and the nudge only re-orders within ±DIM_NUDGE_MAX.
+  const [dimProfile, dimsMap] = await Promise.all([
+    getUserDimensionProfile(supabase, userId, dna.sampleSize),
+    getCachedDimensions(pool.map((i) => ({ tmdb_id: i.id, media_type: i.mediaType }))),
+  ]);
+  const useDims = dimProfile.samples > 0;
+
   // Rank by the full Watchability score — the user's DNA blended with the
   // objective ratings (the same 0–100 shown at the top of every card), so the
   // order on screen matches the number the user sees.
@@ -157,7 +175,9 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
       const general = computeGeneralScore(data.meta, data.providers);
       const objective = general.standardScore ?? general.score;
       const { score } = dnaScore(vector, dna, objective);
-      return { ...i, dnaFit: score };
+      const dims = useDims ? dimsMap.get(`${i.mediaType}-${i.id}`) : undefined;
+      const nudge = dims ? Math.max(-DIM_NUDGE_MAX, Math.min(DIM_NUDGE_MAX, (dimensionMatch(dims, dimProfile) - 50) * DIM_NUDGE_SLOPE)) : 0;
+      return { ...i, dnaFit: clampScore(score + nudge) };
     }),
   );
   const personalized = scored.some((s) => s.dnaFit != null);
