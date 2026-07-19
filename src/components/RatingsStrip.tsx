@@ -80,25 +80,23 @@ export function RatingsStrip({
         </div>
       )}
 
-      {/* Line 2 — the source ratings. Tomato + popcorn are locked together as one
-          non-wrapping unit so they always share a line; IMDb wraps after them. */}
-      <div className="flex flex-wrap items-center gap-1 text-[11px] font-bold tabular-nums">
-        <span className="flex flex-none items-center gap-1">
-          <RatingChip
-            label="🍅"
-            value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
-            tone={ratings.tomatometer != null ? tomatoColor(ratings.tomatometer) : ''}
-            title="Rotten Tomatoes — Tomatometer (critics)"
-          />
-          <RatingChip
-            label="🍿"
-            value={popcorn != null ? `${popcorn}%` : null}
-            tone={popcorn != null ? 'text-amber-200' : ''}
-            title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
-          />
-        </span>
+      {/* Line 2 — all three source ratings on one line: no pills on 🍅/🍿 (just
+          icon + value) so tomato, popcorn and IMDb always fit together. */}
+      <div className="flex items-center gap-2 text-[11px] font-bold tabular-nums">
+        <RatingChip
+          label="🍅"
+          value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
+          tone={ratings.tomatometer != null ? tomatoColor(ratings.tomatometer) : ''}
+          title="Rotten Tomatoes — Tomatometer (critics)"
+        />
+        <RatingChip
+          label="🍿"
+          value={popcorn != null ? `${popcorn}%` : null}
+          tone={popcorn != null ? 'text-amber-200' : ''}
+          title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
+        />
         <span
-          className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded px-1 py-0.5 ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
+          className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded px-1 py-0.5 text-[10px] ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
           title="IMDb rating"
         >
           IMDb {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
@@ -108,15 +106,15 @@ export function RatingsStrip({
   );
 }
 
-/** One source chip — value in a subtle pill, dimmed to "–" when unavailable, so
- *  the row stays aligned across cards. Compact so both fit one line in a card. */
+/** One source rating — icon + value, dimmed to "–" when unavailable. No pill, so
+ *  all three ratings fit one line in a narrow card. */
 function RatingChip({ label, value, tone, title }: { label: string; value: string | null; tone: string; title: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded bg-white/5 px-1 py-0.5 ${value != null ? tone : 'text-slate-500'}`}
+      className={`inline-flex items-center gap-0.5 whitespace-nowrap ${value != null ? tone : 'text-slate-500'}`}
       title={title}
     >
-      <span aria-hidden className="text-xs leading-none">{label}</span>
+      <span aria-hidden className="text-sm leading-none">{label}</span>
       {value ?? '–'}
     </span>
   );
