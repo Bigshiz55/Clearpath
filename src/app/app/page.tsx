@@ -92,49 +92,50 @@ export default async function DiscoverPage() {
             { href: '/app/together', icon: 'together', title: 'Decide Together', sub: 'One verdict for the room', chip: 'from-rose-500 to-pink-600', rgb: '244,63,94' },
             { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', chip: 'from-sky-500 to-blue-600', rgb: '14,165,233' },
             { href: '/app/vintage', icon: 'easy', title: 'Easy Mode', sub: 'Big & simple to read', chip: 'from-amber-400 to-orange-600', rgb: '245,158,11' },
-          ] as const).map((t) => (
+          ] as const).map((t, i) => (
             <Link
               key={t.href}
               href={t.href}
-              style={{ '--accent': t.rgb } as React.CSSProperties}
-              className="group relative flex min-h-[140px] flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-ink-900/60 p-4 transition-all duration-300 hover:-translate-y-1.5 hover:border-white/25 hover:shadow-[0_24px_60px_-18px_rgba(var(--accent),0.55)] sm:min-h-[172px] sm:p-5"
+              style={{
+                '--accent': t.rgb,
+                background: 'linear-gradient(145deg, rgba(var(--accent),0.30), rgba(var(--accent),0.08) 52%, rgba(9,11,18,0.55))',
+                borderColor: 'rgba(var(--accent),0.45)',
+                boxShadow: '0 14px 40px -18px rgba(var(--accent),0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
+              } as React.CSSProperties}
+              className="group relative flex min-h-[150px] flex-col justify-between overflow-hidden rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-1.5 hover:brightness-110 active:scale-[0.98] active:brightness-125 sm:min-h-[176px] sm:p-5"
             >
-              {/* Corner colour spotlight — brightens on hover. */}
+              {/* Always-on corner spotlight, gently breathing. */}
               <span
                 aria-hidden
-                className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full opacity-40 blur-2xl transition-opacity duration-500 group-hover:opacity-90"
-                style={{ background: 'radial-gradient(circle, rgba(var(--accent),0.6), transparent 70%)' }}
+                className="wv-tile-pulse pointer-events-none absolute -right-10 -top-12 h-48 w-48 rounded-full blur-2xl"
+                style={{ background: 'radial-gradient(circle, rgba(var(--accent),0.8), transparent 70%)', animationDelay: `${i * 0.6}s` }}
               />
-              {/* Base tint wash. */}
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-0 opacity-70 transition-opacity duration-300 group-hover:opacity-100"
-                style={{ background: 'linear-gradient(135deg, rgba(var(--accent),0.16), transparent 60%)' }}
-              />
-              {/* Diagonal shine sweep on hover. */}
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 -left-3/4 w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/12 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-[280%]"
-              />
+              {/* Continuous sheen band — alive without hover (touch-friendly). */}
+              <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/3 overflow-hidden">
+                <span
+                  className="wv-tile-sheen absolute inset-y-0 -left-1/2 w-full bg-gradient-to-r from-transparent via-white/25 to-transparent"
+                  style={{ animationDelay: `${i * 0.9}s` }}
+                />
+              </span>
 
               <span
-                className={`relative grid h-14 w-14 flex-none place-items-center overflow-hidden rounded-2xl bg-gradient-to-br ${t.chip} text-white ring-1 ring-inset ring-white/30 transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110 sm:h-16 sm:w-16`}
-                style={{ boxShadow: '0 10px 26px -6px rgba(var(--accent),0.7)' }}
+                className={`relative grid h-14 w-14 flex-none place-items-center overflow-hidden rounded-2xl bg-gradient-to-br ${t.chip} text-white ring-1 ring-inset ring-white/40 transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110 sm:h-16 sm:w-16`}
+                style={{ boxShadow: '0 12px 30px -6px rgba(var(--accent),0.9)' }}
               >
                 {/* Top gloss highlight. */}
-                <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent" />
-                <TileIcon name={t.icon} className="relative h-7 w-7 drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)] sm:h-8 sm:w-8" />
+                <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/45 to-transparent" />
+                <TileIcon name={t.icon} className="relative h-7 w-7 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)] sm:h-8 sm:w-8" />
               </span>
 
               <span className="relative mt-3">
-                <span className="block text-lg font-extrabold tracking-tight text-white sm:text-xl">{t.title}</span>
-                <span className="block text-sm text-slate-400">{t.sub}</span>
+                <span className="block text-lg font-extrabold tracking-tight text-white drop-shadow-sm sm:text-xl">{t.title}</span>
+                <span className="block text-sm text-slate-300/90">{t.sub}</span>
               </span>
 
-              {/* Hover chevron. */}
+              {/* Accent arrow — always visible, nudges on hover. */}
               <span
                 aria-hidden
-                className="pointer-events-none absolute bottom-4 right-4 translate-x-1 text-lg font-black opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 sm:bottom-5 sm:right-5"
+                className="pointer-events-none absolute bottom-4 right-4 text-lg font-black opacity-70 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100 sm:bottom-5 sm:right-5"
                 style={{ color: 'rgb(var(--accent))' }}
               >
                 →
