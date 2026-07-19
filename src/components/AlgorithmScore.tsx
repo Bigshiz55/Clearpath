@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
-import { HelixMark } from './HelixMark';
+import { LogoMark } from './Logo';
 import { CardRatings } from './CardRatings';
 
 /**
@@ -48,11 +48,11 @@ export function AlgorithmScore({
       className={`rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 p-2.5 shadow-[0_0_16px_rgba(244,63,94,0.28)] ${className}`}
       title="WatchVerdict algorithm — your DNA blended with every rating into one 0–100 estimate of how much YOU will like it."
     >
-      {/* WatchVerdict Ruling — one line across the top. */}
+      {/* WatchVerdict Ruling — the blue mark + "Ruling", one line across the top. */}
       <div className="mb-1.5 flex items-center gap-1.5 border-b border-pink-200/25 pb-1.5">
-        <HelixMark className="h-4 w-4" />
-        <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wide text-white">
-          WatchVerdict Ruling
+        <LogoMark box="h-5 w-5 rounded-md" inner="h-3.5 w-3.5" />
+        <span className="whitespace-nowrap text-[12px] font-black uppercase tracking-wide text-white">
+          Ruling
         </span>
       </div>
 
@@ -65,7 +65,7 @@ export function AlgorithmScore({
 
       {/* DNA score label and the number, on one line (it's always out of 100). */}
       <div className="mt-1 flex items-center gap-2">
-        <span className="text-[9px] font-black uppercase tracking-wide text-pink-100/90">🧬 DNA Score</span>
+        <span className="text-[9px] font-black uppercase tracking-wide text-pink-100/90">🧬 DNA</span>
         <span className="text-2xl font-black leading-none tabular-nums text-white">{score ?? '—'}</span>
         {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 && (
           <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">learning</span>
