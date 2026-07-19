@@ -128,9 +128,9 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
   return (
     <div ref={boxRef} className="relative w-full">
       <div className="relative">
-        <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" fill="none" aria-hidden>
-          <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.6" />
-          <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-300" fill="none" aria-hidden>
+          <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.9" />
+          <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
         </svg>
         {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
         <input
@@ -158,7 +158,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
             }
           }}
           placeholder="Search a title — or ask for what you want…"
-          className="input pl-11 pr-10"
+          className="w-full rounded-2xl border-2 border-white/25 bg-white/[0.07] py-4 pl-12 pr-11 text-base text-white outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:bg-white/[0.1] focus:ring-4 focus:ring-brand-500/25 shadow-[0_12px_40px_-14px_rgba(0,0,0,0.75)] min-h-[56px]"
           aria-label="Search for a movie or TV show, or describe what you want"
         />
         {loading && (
