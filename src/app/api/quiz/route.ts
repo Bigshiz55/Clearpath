@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getPopular } from '@/lib/tmdb/client';
+import { getPopular, discoverTitles } from '@/lib/tmdb/client';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { getProfile, regionFor } from '@/lib/profile';
 
@@ -26,18 +26,26 @@ export async function GET() {
     const profile = await getProfile(supabase, user.id);
     const region = regionFor(profile);
 
-    // Random page window (1..MAX) so each replay pulls a different slice of the
-    // catalog. Three consecutive pages per media type keeps the pool big enough
-    // that a fresh 24 remain even after many rounds of exclusions.
-    const MAX_PAGE = 12;
+    // Each round mixes two sources, both randomized so selections differ every
+    // play: (1) current popular titles, and (2) acclaimed CLASSICS from a random
+    // older era — old movies & TV are great taste signal, so we throw them in to
+    // fine-tune the DNA, not just chart-toppers.
+    const MAX_PAGE = 10;
     const start = 1 + Math.floor(Math.random() * MAX_PAGE);
     const pageOf = (n: number) => ((start + n - 1) % MAX_PAGE) + 1; // wrap within 1..MAX_PAGE
-    const pages = [pageOf(0), pageOf(1), pageOf(2)];
+    const popPages = [pageOf(0), pageOf(1)];
 
-    const pools = await Promise.all([
-      ...pages.map((p) => getPopular('movie', region, p)),
-      ...pages.map((p) => getPopular('tv', region, p)),
+    const ERAS: readonly [number, number][] = [[1970, 1990], [1985, 2000], [1995, 2010], [2005, 2016]];
+    const era = ERAS[Math.floor(Math.random() * ERAS.length)]!;
+    const classicPage = 1 + Math.floor(Math.random() * 3);
+
+    const [popMovies, popTv, classicMovies, classicTv] = await Promise.all([
+      Promise.all(popPages.map((p) => getPopular('movie', region, p))).then((a) => a.flat()),
+      Promise.all(popPages.map((p) => getPopular('tv', region, p))).then((a) => a.flat()),
+      discoverTitles('movie', { region, sortBy: 'vote_average.desc', minVotes: 1200, minYear: era[0], maxYear: era[1], page: classicPage }),
+      discoverTitles('tv', { region, sortBy: 'vote_average.desc', minVotes: 300, minYear: era[0], maxYear: era[1], page: classicPage }),
     ]);
+    const pools = [popMovies, popTv, classicMovies, classicTv];
 
     const { data: existing } = await supabase
       .from('watchlist_items')

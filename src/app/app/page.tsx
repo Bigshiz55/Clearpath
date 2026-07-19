@@ -80,32 +80,64 @@ export default async function DiscoverPage() {
         {/* Big, clear tiles — every area of the app, tap to go deeper. */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {([
-            // Row 1
-            { href: '/app/watch', icon: 'watch', title: 'Watch Now', sub: 'Your DNA picks, ranked', tint: 'from-pink-500/20', chip: 'from-pink-500 to-rose-600', glow: 'group-hover:shadow-[0_0_30px_-6px_rgba(244,63,94,.7)]' },
-            { href: '/app/ask', icon: 'judge', title: 'Ask the Judge', sub: 'Say what you want to see', tint: 'from-amber-500/20', chip: 'from-amber-400 to-orange-600', glow: 'group-hover:shadow-[0_0_30px_-6px_rgba(245,158,11,.7)]' },
-            { href: '/app/finder', icon: 'search', title: 'Custom Search', sub: 'Filter by genre, rating, length…', tint: 'from-brand-500/20', chip: 'from-brand-500 to-indigo-600', glow: 'group-hover:shadow-[0_0_30px_-6px_rgba(47,107,255,.7)]' },
+            // Row 1 — rgb = the tile's accent colour, drives glow/halo/spotlight.
+            { href: '/app/watch', icon: 'watch', title: 'Watch Now', sub: 'Your DNA picks, ranked', chip: 'from-pink-500 to-rose-600', rgb: '244,63,94' },
+            { href: '/app/ask', icon: 'judge', title: 'Ask the Judge', sub: 'Say what you want to see', chip: 'from-amber-400 to-orange-600', rgb: '245,158,11' },
+            { href: '/app/finder', icon: 'search', title: 'Custom Search', sub: 'Filter by genre, rating, length…', chip: 'from-indigo-500 to-blue-600', rgb: '99,102,241' },
             // Row 2
-            { href: '/app/quiz', icon: 'quiz', title: 'Taste Quiz', sub: `${reviewedCount ?? 0} rated — teach your taste`, tint: 'from-violet-500/20', chip: 'from-violet-500 to-fuchsia-600', glow: 'group-hover:shadow-[0_0_30px_-6px_rgba(139,92,246,.7)]' },
-            { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', tint: 'from-blue-500/20', chip: 'from-blue-500 to-indigo-600', glow: 'group-hover:shadow-[0_0_30px_-6px_rgba(59,130,246,.7)]' },
-            { href: '/app/tv', icon: 'tv', title: 'TV Guide Decoder', sub: 'What’s on live — next 48h', tint: 'from-emerald-500/20', chip: 'from-emerald-500 to-teal-600', glow: 'group-hover:shadow-[0_0_30px_-6px_rgba(16,185,129,.7)]' },
+            { href: '/app/quiz', icon: 'quiz', title: 'Taste Quiz', sub: `${reviewedCount ?? 0} rated — teach your taste`, chip: 'from-violet-500 to-fuchsia-600', rgb: '168,85,247' },
+            { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', chip: 'from-blue-500 to-indigo-600', rgb: '59,130,246' },
+            { href: '/app/tv', icon: 'tv', title: 'TV Guide Decoder', sub: 'What’s on live — next 48h', chip: 'from-emerald-500 to-teal-600', rgb: '16,185,129' },
             // Row 3
-            { href: '/app/together', icon: 'together', title: 'Decide Together', sub: 'One verdict for the room', tint: 'from-rose-500/20', chip: 'from-rose-500 to-pink-600', glow: 'group-hover:shadow-[0_0_30px_-6px_rgba(244,63,94,.7)]' },
-            { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', tint: 'from-brand-500/20', chip: 'from-sky-500 to-blue-600', glow: 'group-hover:shadow-[0_0_30px_-6px_rgba(14,165,233,.7)]' },
-            { href: '/app/vintage', icon: 'easy', title: 'Easy Mode', sub: 'Big & simple to read', tint: 'from-amber-500/20', chip: 'from-amber-400 to-orange-600', glow: 'group-hover:shadow-[0_0_30px_-6px_rgba(245,158,11,.7)]' },
+            { href: '/app/together', icon: 'together', title: 'Decide Together', sub: 'One verdict for the room', chip: 'from-rose-500 to-pink-600', rgb: '244,63,94' },
+            { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', chip: 'from-sky-500 to-blue-600', rgb: '14,165,233' },
+            { href: '/app/vintage', icon: 'easy', title: 'Easy Mode', sub: 'Big & simple to read', chip: 'from-amber-400 to-orange-600', rgb: '245,158,11' },
           ] as const).map((t) => (
             <Link
               key={t.href}
               href={t.href}
-              className={`group relative flex min-h-[132px] flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${t.tint} to-transparent p-4 transition duration-200 hover:-translate-y-1 hover:border-white/25 sm:min-h-[160px] sm:p-5`}
+              style={{ '--accent': t.rgb } as React.CSSProperties}
+              className="group relative flex min-h-[140px] flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-ink-900/60 p-4 transition-all duration-300 hover:-translate-y-1.5 hover:border-white/25 hover:shadow-[0_24px_60px_-18px_rgba(var(--accent),0.55)] sm:min-h-[172px] sm:p-5"
             >
+              {/* Corner colour spotlight — brightens on hover. */}
               <span
-                className={`grid h-12 w-12 flex-none place-items-center rounded-2xl bg-gradient-to-br ${t.chip} text-white shadow-lg ring-1 ring-inset ring-white/25 transition duration-200 group-hover:scale-110 ${t.glow} sm:h-14 sm:w-14`}
+                aria-hidden
+                className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full opacity-40 blur-2xl transition-opacity duration-500 group-hover:opacity-90"
+                style={{ background: 'radial-gradient(circle, rgba(var(--accent),0.6), transparent 70%)' }}
+              />
+              {/* Base tint wash. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-70 transition-opacity duration-300 group-hover:opacity-100"
+                style={{ background: 'linear-gradient(135deg, rgba(var(--accent),0.16), transparent 60%)' }}
+              />
+              {/* Diagonal shine sweep on hover. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 -left-3/4 w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/12 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-[280%]"
+              />
+
+              <span
+                className={`relative grid h-14 w-14 flex-none place-items-center overflow-hidden rounded-2xl bg-gradient-to-br ${t.chip} text-white ring-1 ring-inset ring-white/30 transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110 sm:h-16 sm:w-16`}
+                style={{ boxShadow: '0 10px 26px -6px rgba(var(--accent),0.7)' }}
               >
-                <TileIcon name={t.icon} className="h-6 w-6 sm:h-7 sm:w-7" />
+                {/* Top gloss highlight. */}
+                <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent" />
+                <TileIcon name={t.icon} className="relative h-7 w-7 drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)] sm:h-8 sm:w-8" />
               </span>
-              <span className="mt-3">
+
+              <span className="relative mt-3">
                 <span className="block text-lg font-extrabold tracking-tight text-white sm:text-xl">{t.title}</span>
                 <span className="block text-sm text-slate-400">{t.sub}</span>
+              </span>
+
+              {/* Hover chevron. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute bottom-4 right-4 translate-x-1 text-lg font-black opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 sm:bottom-5 sm:right-5"
+                style={{ color: 'rgb(var(--accent))' }}
+              >
+                →
               </span>
             </Link>
           ))}
