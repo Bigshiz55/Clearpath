@@ -6,7 +6,15 @@ import { getProfile, regionFor } from '@/lib/profile';
 
 export const dynamic = 'force-dynamic';
 
-/** A shuffled set of popular titles to rate, excluding ones already rated/saved. */
+/**
+ * A shuffled set of popular titles to rate, excluding ones already rated/saved.
+ *
+ * The quiz is meant to be replayed endlessly and show *different* titles each
+ * time, with every rating building the user's DNA. So we (a) exclude everything
+ * they've already rated/saved (those became DNA signal — no point re-asking),
+ * and (b) draw from a randomized span of popularity pages each play, so a fresh
+ * mix surfaces every round instead of the same top-of-the-charts titles.
+ */
 export async function GET() {
   try {
     const supabase = createClient();
@@ -18,11 +26,17 @@ export async function GET() {
     const profile = await getProfile(supabase, user.id);
     const region = regionFor(profile);
 
-    const [m1, m2, t1, t2] = await Promise.all([
-      getPopular('movie', region, 1),
-      getPopular('movie', region, 2),
-      getPopular('tv', region, 1),
-      getPopular('tv', region, 2),
+    // Random page window (1..MAX) so each replay pulls a different slice of the
+    // catalog. Three consecutive pages per media type keeps the pool big enough
+    // that a fresh 24 remain even after many rounds of exclusions.
+    const MAX_PAGE = 12;
+    const start = 1 + Math.floor(Math.random() * MAX_PAGE);
+    const pageOf = (n: number) => ((start + n - 1) % MAX_PAGE) + 1; // wrap within 1..MAX_PAGE
+    const pages = [pageOf(0), pageOf(1), pageOf(2)];
+
+    const pools = await Promise.all([
+      ...pages.map((p) => getPopular('movie', region, p)),
+      ...pages.map((p) => getPopular('tv', region, p)),
     ]);
 
     const { data: existing } = await supabase
@@ -31,9 +45,7 @@ export async function GET() {
       .eq('user_id', user.id);
     const seen = new Set((existing ?? []).map((r) => `${r.media_type}-${r.tmdb_id}`));
 
-    const pool = [...m1, ...t1, ...m2, ...t2].filter(
-      (d) => !seen.has(`${d.mediaType}-${d.id}`),
-    );
+    const pool = pools.flat().filter((d) => !seen.has(`${d.mediaType}-${d.id}`));
 
     // Dedupe.
     const dedupKeys = new Set<string>();

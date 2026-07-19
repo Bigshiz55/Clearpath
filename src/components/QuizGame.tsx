@@ -33,11 +33,20 @@ export function QuizGame() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const advanceRef = useRef<() => void>(() => {});
 
-  useEffect(() => {
-    fetch('/api/quiz')
+  function load() {
+    setItems(null);
+    setIdx(0);
+    setRated(0);
+    setSeen(0);
+    setFailed(false);
+    fetch('/api/quiz', { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => (d.error ? setFailed(true) : setItems(d.items ?? [])))
       .catch(() => setFailed(true));
+  }
+
+  useEffect(() => {
+    load();
   }, []);
 
   const current = items && idx < items.length ? items[idx] : null;
@@ -103,21 +112,38 @@ export function QuizGame() {
     );
   }
 
+  if (items && items.length === 0) {
+    return (
+      <div className="mt-8 card p-8 text-center">
+        <div className="text-4xl">🎉</div>
+        <h2 className="mt-3 text-xl font-bold text-white">You’ve rated everything we had!</h2>
+        <p className="mx-auto mt-2 max-w-sm text-sm text-slate-400">
+          Your DNA is well-fed. Fresh popular titles rotate in over time — check back soon, or
+          keep rating from search and the release wall.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <button onClick={() => load()} className="btn-secondary">Try again</button>
+          <Link href="/app" className="btn-primary">See my recommendations →</Link>
+        </div>
+      </div>
+    );
+  }
+
   if (done) {
     return (
       <div className="mt-8 card p-8 text-center">
-        <div className="text-4xl">🎬</div>
+        <div className="text-4xl">🧬</div>
         <h2 className="mt-3 text-xl font-bold text-white">Nice — you rated {rated} titles!</h2>
         <p className="mx-auto mt-2 max-w-sm text-sm text-slate-400">
-          Your taste profile just got smarter. The more you rate, the sharper your
-          recommendations get.
+          Your DNA just got smarter. Play as many rounds as you like — each one shows{' '}
+          <span className="text-slate-200">fresh titles</span> and keeps building your taste.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/app" className="btn-primary">
+          <button onClick={() => { window.scrollTo({ top: 0 }); load(); }} className="btn-primary">
+            🔁 Play another round
+          </button>
+          <Link href="/app" className="btn-secondary">
             See my recommendations →
-          </Link>
-          <Link href="/app/quiz" className="btn-secondary">
-            Play again
           </Link>
         </div>
       </div>
