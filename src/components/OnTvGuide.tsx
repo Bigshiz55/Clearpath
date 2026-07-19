@@ -226,13 +226,13 @@ export function OnTvGuide({
             const t = fmtTime(a.time);
             return (
               <div key={a.id} className="card flex items-center gap-3 p-3.5">
-                <div className="w-[6.5rem] flex-none text-center sm:w-32">
+                <div className="w-[5rem] flex-none text-center sm:w-28">
                   {(() => {
                     const dl = dayLabel(a.airstamp);
                     if (t && a.minutes > 0) {
                       return (
                         <>
-                          <div className="whitespace-nowrap text-2xl font-black tabular-nums leading-none text-white sm:text-3xl">{t}</div>
+                          <div className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white sm:text-2xl">{t}</div>
                           {dl !== 'Today' && <div className="mt-1 text-xs font-bold uppercase tracking-wide text-amber-300">{dl}</div>}
                         </>
                       );
@@ -250,18 +250,18 @@ export function OnTvGuide({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="line-clamp-2 text-base font-bold text-white sm:text-lg">{a.showName}</span>
-                    {a.rating != null && <span className={`flex-none text-sm font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
-                  </div>
+                  <div className="line-clamp-2 text-lg font-bold leading-snug text-white sm:text-xl">{a.showName}</div>
                   <div className="truncate text-xs text-slate-400">
                     {a.showType}
                     {a.episodeName ? ` · ${a.episodeName}` : ''}
                     {a.season && a.number ? ` (S${a.season}E${a.number})` : ''}
                     {a.genres.length ? ` · ${a.genres.slice(0, 2).join(', ')}` : ''}
                   </div>
-                  {(a.criticRt != null || a.criticImdb != null || a.criticMeta != null) && (
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-bold tabular-nums">
+                  {(a.rating != null || a.criticRt != null || a.criticImdb != null) && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm font-bold tabular-nums">
+                      {a.rating != null && (
+                        <span className={ratingTone(a.rating)} title="TVmaze community score">★ {a.rating.toFixed(1)}</span>
+                      )}
                       {a.criticRt != null && (
                         <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {a.criticRt}%</span>
                       )}
@@ -275,10 +275,10 @@ export function OnTvGuide({
                   <button
                     onClick={() => toggleReminder(a)}
                     disabled={busy === a.id}
-                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 ${reminded.has(a.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+                    className={`whitespace-nowrap rounded-lg border px-2.5 py-2 text-sm font-semibold transition disabled:opacity-50 sm:px-3 ${reminded.has(a.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10'}`}
                     title="Get a phone/PC notification 1 hour and 5 minutes before it airs"
                   >
-                    {reminded.has(a.id) ? '🔔 On' : '🔔 Remind'}
+                    🔔<span className="ml-1 hidden sm:inline">{reminded.has(a.id) ? 'On' : 'Remind'}</span>
                   </button>
                   <a href={calendarUrl(a)} target="_blank" rel="noopener noreferrer" className="hidden rounded-lg border border-white/12 bg-white/5 px-2 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 sm:inline-flex" title="Or add it to your calendar">
                     📅
