@@ -24,15 +24,30 @@ export interface DetectivePick {
   mediaType: MediaType | null;
 }
 
+/** Valid scan windows for the TV Detective, in hours. */
+export const DETECTIVE_HORIZONS = [12, 24, 48] as const;
+export type DetectiveHorizon = (typeof DETECTIVE_HORIZONS)[number];
+
+/** Coerce an arbitrary value to a supported horizon, defaulting to 48h. */
+export function coerceHorizon(value: unknown): DetectiveHorizon {
+  const n = Number(value);
+  return (DETECTIVE_HORIZONS as readonly number[]).includes(n) ? (n as DetectiveHorizon) : 48;
+}
+
 /**
- * The TV Detective's report: scan the next ~48 hours of broadcast listings and
- * return a shortlist worth recording or tuning in for, each with its airtime,
- * network, and every rating we can find (TVmaze community + IMDb / Rotten
- * Tomatoes / Metacritic via OMDb, matched by the show's IMDb id). Real data only.
+ * The TV Detective's report: scan the next `horizonHours` (12 / 24 / 48) of
+ * broadcast listings and return a shortlist worth recording or tuning in for,
+ * each with its airtime, network, and every rating we can find (TVmaze community
+ * + IMDb / Rotten Tomatoes / Metacritic via OMDb, matched by the show's IMDb id).
+ * Real data only.
  */
-export async function getDetectivePicks(supabase: SupabaseClient, userId: string): Promise<DetectivePick[]> {
+export async function getDetectivePicks(
+  supabase: SupabaseClient,
+  userId: string,
+  horizonHours: DetectiveHorizon = 48,
+): Promise<DetectivePick[]> {
   const region = regionFor(userId ? await getProfile(supabase, userId) : null);
-  const airings = (await getUpcomingTv(region, Date.now(), 2)).slice(0, 14); // ~48h
+  const airings = (await getUpcomingTv(region, Date.now(), horizonHours * 60 * 60 * 1000)).slice(0, 14);
 
   return Promise.all(
     airings.map(async (a) => {

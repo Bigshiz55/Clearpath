@@ -48,17 +48,22 @@ function Ratings({ p }: { p: Pick }) {
   );
 }
 
+type Horizon = 12 | 24 | 48;
+const HORIZONS: Horizon[] = [12, 24, 48];
+const horizonLabel = (h: Horizon) => `next ${h} hours`;
+
 export function TvDetective() {
   const [state, setState] = useState<'idle' | 'scanning' | 'done'>('idle');
+  const [hours, setHours] = useState<Horizon>(48);
   const [picks, setPicks] = useState<Pick[]>([]);
   const [reminded, setReminded] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  async function scan() {
+  async function scan(h: Horizon = hours) {
     setState('scanning');
     try {
-      const res = await fetch('/api/detective');
+      const res = await fetch(`/api/detective?hours=${h}`);
       const data = await res.json();
       setPicks(data.picks ?? []);
       setReminded(new Set((data.remindedIds ?? []) as number[]));
@@ -68,6 +73,33 @@ export function TvDetective() {
       setState('done');
     }
   }
+
+  // Change the scan window. Re-scan immediately if we've already run one so the
+  // list always matches the selected horizon.
+  function pickHorizon(h: Horizon) {
+    if (h === hours) return;
+    setHours(h);
+    if (state !== 'idle') scan(h);
+  }
+
+  const HorizonToggle = (
+    <div className="inline-flex rounded-xl border border-white/15 bg-ink-900/60 p-1" role="group" aria-label="Scan window">
+      {HORIZONS.map((h) => (
+        <button
+          key={h}
+          type="button"
+          onClick={() => pickHorizon(h)}
+          disabled={state === 'scanning'}
+          aria-pressed={hours === h}
+          className={`rounded-lg px-3 py-1.5 text-sm font-bold transition disabled:opacity-60 ${
+            hours === h ? 'bg-brand-500 text-white shadow' : 'text-slate-300 hover:text-white'
+          }`}
+        >
+          {h}h
+        </button>
+      ))}
+    </div>
+  );
 
   async function toggle(p: Pick) {
     setBusy(p.id);
@@ -102,12 +134,16 @@ export function TvDetective() {
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-white sm:text-xl">TV Guide Detective</h2>
           <p className="mt-1 text-sm text-slate-300">
-            One tap and I’ll comb the <span className="font-semibold text-white">next 48 hours</span> of TV listings and
+            One tap and I’ll comb the <span className="font-semibold text-white">{horizonLabel(hours)}</span> of TV listings and
             hand you a shortlist worth recording or catching live — with the time, the channel, and every rating I can dig up.
           </p>
+          <div className="mt-3">
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">How far ahead?</div>
+            {HorizonToggle}
+          </div>
           {state !== 'done' && (
-            <button onClick={scan} disabled={state === 'scanning'} className="btn-primary mt-4 px-5 py-2.5 disabled:opacity-70">
-              {state === 'scanning' ? '🔎 On the case… scanning listings' : '🔎 Scan the next 48 hours'}
+            <button onClick={() => scan()} disabled={state === 'scanning'} className="btn-primary mt-4 px-5 py-2.5 disabled:opacity-70">
+              {state === 'scanning' ? '🔎 On the case… scanning listings' : `🔎 Scan the ${horizonLabel(hours)}`}
             </button>
           )}
         </div>
@@ -126,7 +162,7 @@ export function TvDetective() {
       {state === 'done' && (
         <div className="mt-5">
           {picks.length === 0 ? (
-            <p className="text-sm text-slate-400">The trail went cold — nothing notable in the next 48 hours. Try again later.</p>
+            <p className="text-sm text-slate-400">The trail went cold — nothing notable in the {horizonLabel(hours)}. Try a wider window or check back later.</p>
           ) : (
             <>
               <div className="mb-3 text-sm font-bold uppercase tracking-wide text-brand-300">Case file · {picks.length} worth your time</div>
@@ -188,7 +224,7 @@ export function TvDetective() {
                   );
                 })}
               </div>
-              <button onClick={scan} className="mt-4 text-sm font-bold text-brand-300 hover:text-brand-200">🔄 Scan again</button>
+              <button onClick={() => scan()} className="mt-4 text-sm font-bold text-brand-300 hover:text-brand-200">🔄 Scan again</button>
             </>
           )}
         </div>

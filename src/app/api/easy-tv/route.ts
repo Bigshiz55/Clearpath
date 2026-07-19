@@ -15,7 +15,7 @@ export async function GET() {
     } = await supabase.auth.getUser();
     const region = regionFor(user ? await getProfile(supabase, user.id) : null);
 
-    const airings = await getUpcomingTv(region, Date.now(), 3);
+    const airings = await getUpcomingTv(region, Date.now());
 
     // Which the user already has a reminder for (guarded pre-migration).
     let remindedIds: number[] = [];

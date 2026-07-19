@@ -51,7 +51,7 @@ export default async function DiscoverPage() {
     .select('id', { count: 'exact', head: true });
 
   // A quick 48-hour scan of what's coming on TV, folded into recommendations.
-  const upcomingTv = (await getUpcomingTv(regionFor(profile), Date.now(), 2).catch(() => [])).slice(0, 12);
+  const upcomingTv = (await getUpcomingTv(regionFor(profile), Date.now()).catch(() => [])).slice(0, 12);
 
   return (
     <div className="space-y-8">

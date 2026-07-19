@@ -256,20 +256,32 @@ function isoDate(ms: number): string {
 
 /** We never surface a TV airing further out than this — "what's on" means the
  *  next two days, never a listing weeks away. Enforced here so every caller
- *  (home strip, TV Detective, Easy/Vintage) is bounded to the same window. */
+ *  (home strip, TV Detective, Easy/Vintage) is bounded to the same window. This
+ *  is the hard maximum; callers may request a shorter window (12h / 24h). */
 export const UPCOMING_TV_HORIZON_MS = 48 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 
 /**
- * "Coming up on TV" — the best-reviewed real airings between now and 48 hours
- * from now. Skips news/talk noise, favors well-rated shows, and returns them in
- * time order so it reads like a short, friendly what's-on list. The 48-hour cap
- * is hard: anything further out (a show on hiatus, a fall premiere) is never
- * shown. Real TVmaze data only.
+ * "Coming up on TV" — the best-reviewed real airings between now and the chosen
+ * horizon (default 48h, capped at 48h). Skips news/talk noise, favors well-rated
+ * shows, and returns them in time order so it reads like a short, friendly
+ * what's-on list. The 48-hour cap is hard: anything further out (a show on
+ * hiatus, a fall premiere) is never shown. Real TVmaze data only.
+ *
+ * `horizonMs` lets the TV Detective narrow the window (12h / 24h / 48h). We
+ * still fetch the full 48h span of dates so the daily cache keys stay identical
+ * across horizons — only the final [now, now+horizon] filter changes.
  */
-export async function getUpcomingTv(country: string, nowMs: number, _daysAhead = 3): Promise<Airing[]> {
-  const horizon = nowMs + UPCOMING_TV_HORIZON_MS;
-  // Fetch every UTC date the 48h window can touch (up to 3, depending on the
-  // time of day), then filter strictly to [now, now+48h].
+export async function getUpcomingTv(
+  country: string,
+  nowMs: number,
+  horizonMs: number = UPCOMING_TV_HORIZON_MS,
+): Promise<Airing[]> {
+  const clampedHorizon = Math.max(HOUR_MS, Math.min(horizonMs, UPCOMING_TV_HORIZON_MS));
+  const horizon = nowMs + clampedHorizon;
+  // Fetch every UTC date the full 48h window can touch (up to 3, depending on
+  // the time of day) — cache keys stay stable regardless of the chosen horizon —
+  // then filter strictly to [now, now+horizon].
   const spanDays = Math.ceil(UPCOMING_TV_HORIZON_MS / DAY_MS) + 1;
   const dates = Array.from({ length: spanDays }, (_, i) => isoDate(nowMs + i * DAY_MS));
   const perDay = await Promise.all(dates.map((d) => getOnTvToday(country, d)));
