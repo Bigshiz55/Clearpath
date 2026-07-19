@@ -10,6 +10,8 @@ import { aiAdjustScore, type AiAdjustment } from '@/lib/aiAdjust';
 import { isPro } from '@/lib/pro';
 import { getUserDimensionProfile, getCachedDimensions, getTitleDimensions } from '@/lib/titleDimensions';
 import { dimensionMatch, matchHighlights } from '@/lib/scoring/dimensions';
+import { rerankNudge } from '@/lib/scoring/reranker';
+import { RERANK_MODEL } from '@/lib/scoring/rerankerWeights';
 
 const clampScore = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
@@ -176,8 +178,12 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
       const objective = general.standardScore ?? general.score;
       const { score } = dnaScore(vector, dna, objective);
       const dims = useDims ? dimsMap.get(`${i.mediaType}-${i.id}`) : undefined;
-      const nudge = dims ? Math.max(-DIM_NUDGE_MAX, Math.min(DIM_NUDGE_MAX, (dimensionMatch(dims, dimProfile) - 50) * DIM_NUDGE_SLOPE)) : 0;
-      return { ...i, dnaFit: clampScore(score + nudge) };
+      const match = dims ? dimensionMatch(dims, dimProfile) : null;
+      // Heuristic dimension nudge + the learned re-ranker nudge (a no-op until a
+      // model is promoted into rerankerWeights.ts). Both bounded.
+      const dimN = match != null ? Math.max(-DIM_NUDGE_MAX, Math.min(DIM_NUDGE_MAX, (match - 50) * DIM_NUDGE_SLOPE)) : 0;
+      const rerankN = match != null ? rerankNudge(objective, match, RERANK_MODEL) : 0;
+      return { ...i, dnaFit: clampScore(score + dimN + rerankN) };
     }),
   );
   const personalized = scored.some((s) => s.dnaFit != null);

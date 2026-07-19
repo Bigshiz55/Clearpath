@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminEmail } from '@/lib/admin';
 import { STANDARD_WEIGHTS_META } from '@/lib/scoring/standardWeights';
-import { CalibrationAdmin } from '@/components/admin/CalibrationAdmin';
+import { CalibrationAdmin, RerankerAdmin } from '@/components/admin/CalibrationAdmin';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Score Calibration · Admin' };
@@ -29,6 +29,7 @@ export default async function CalibrationPage() {
         {STANDARD_WEIGHTS_META.hitRate != null ? ` · hit-rate ${Math.round(STANDARD_WEIGHTS_META.hitRate * 100)}%` : ''}
       </p>
       <CalibrationAdmin />
+      <RerankerAdmin />
     </div>
   );
 }
