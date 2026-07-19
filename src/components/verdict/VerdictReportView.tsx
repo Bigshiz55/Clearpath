@@ -5,6 +5,7 @@ import { ProviderRow } from '@/components/ProviderRow';
 import { Poster } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
 import { CardRatings } from '@/components/CardRatings';
+import { TasteFeedback } from '@/components/TasteFeedback';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
 import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
@@ -127,6 +128,9 @@ export function VerdictReportView({
               </div>
             )}
             {t.overview && <p className="mt-3 max-w-2xl text-sm text-slate-300">{t.overview}</p>}
+            {/* Same "everything" every card shows: the DNA-driven call + real
+                ratings, right on the placard. */}
+            <CardRatings mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-3" />
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {t.trailerUrl && (
                 <a href={t.trailerUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex">
@@ -143,6 +147,14 @@ export function VerdictReportView({
                 initialSaved={watchState?.itemId != null}
                 initialItemId={watchState?.itemId ?? null}
                 variant="inline"
+              />
+              {/* Not for you? Flag it here too — feeds your DNA, same as the cards. */}
+              <TasteFeedback
+                tmdbId={t.id}
+                mediaType={t.mediaType}
+                title={t.title}
+                year={t.year}
+                posterPath={t.posterPath}
               />
             </div>
           </div>
