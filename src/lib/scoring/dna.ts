@@ -1,5 +1,5 @@
 /**
- * WatchVrdIQt DNA Score — the math (pure, deterministic, no I/O).
+ * WatchVerdict DNA Score — the math (pure, deterministic, no I/O).
  *
  * The idea: represent every title as a "vibe vector" (an embedding of its
  * meaning) and every user as a "Taste-DNA" — the centroid of what they've rated

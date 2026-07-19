@@ -64,7 +64,7 @@ export function JoinForm({ code, crewName }: { code: string; crewName: string })
           {crewName} can now include your taste on movie night. Hand the phone back — you’re all set.
         </p>
         <Link href="/app" className="btn-secondary mt-6 inline-flex">
-          Explore WatchVrdIQt →
+          Explore WatchVerdict →
         </Link>
       </div>
     );
@@ -74,7 +74,7 @@ export function JoinForm({ code, crewName }: { code: string; crewName: string })
     <div className="card p-5">
       {mine?.signedIn && !prefilled && (mine.name || mine.love.length > 0 || mine.avoid.length > 0) && (
         <button onClick={useMyTaste} className="mb-3 w-full rounded-xl border border-brand-400/40 bg-brand-500/15 px-3 py-2 text-sm font-semibold text-brand-100">
-          ✨ Use my WatchVrdIQt taste{mine.name ? ` (${mine.name})` : ''}
+          ✨ Use my WatchVerdict taste{mine.name ? ` (${mine.name})` : ''}
         </button>
       )}
       <label className="label" htmlFor="jn">Your name</label>

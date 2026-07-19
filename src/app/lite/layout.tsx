@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'WatchVrdIQt — Simple' };
+export const metadata: Metadata = { title: 'WatchVerdict — Simple' };
 
 /**
  * The "second copy": a deliberately minimal shell with no app chrome. Guests get

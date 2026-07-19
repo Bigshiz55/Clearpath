@@ -7,7 +7,7 @@ import { MyReminders, type ReminderRow } from '@/components/MyReminders';
 import { TvDetective } from '@/components/TvDetective';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'On TV today · WatchVrdIQt' };
+export const metadata: Metadata = { title: 'On TV today · WatchVerdict' };
 
 function isoDate(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;

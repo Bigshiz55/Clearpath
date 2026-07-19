@@ -9,7 +9,7 @@ import { getActiveJudge, type Judge } from '@/lib/sponsors';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'Tonight, Together · WatchVrdIQt',
+  title: 'Tonight, Together · WatchVerdict',
 };
 
 export default async function TogetherPage() {

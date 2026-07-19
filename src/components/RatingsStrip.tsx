@@ -57,7 +57,7 @@ export function RatingsStrip({
               ? 'bg-red-500/20 text-red-200'
               : 'bg-white/10 text-slate-300'
         }`}
-        title="WatchVrdIQt's Watchability score (0–100) and the Stream It / Skip It call it produces"
+        title="WatchVerdict's Watchability score (0–100) and the Stream It / Skip It call it produces"
       >
         {ratings.standardScore != null
           ? `${verdict === 'stream' ? '✅' : '⛔'} ${ratings.standardScore} · ${verdict === 'stream' ? 'STREAM IT' : 'SKIP IT'}`
@@ -73,7 +73,7 @@ export function RatingsStrip({
         <div className="flex items-center gap-2">
           {call}
           {standard && !(mediaType && tmdbId) && ratings.standardScore != null && (
-            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-gold-400" title="WatchVrdIQt Standard Score — blended across every rating source we have">
+            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-gold-400" title="WatchVerdict Standard Score — blended across every rating source we have">
               ⚖️ {ratings.standardScore}
             </span>
           )}

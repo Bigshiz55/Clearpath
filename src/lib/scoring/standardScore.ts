@@ -1,4 +1,4 @@
-// The WatchVrdIQt Standard Score — one honest 0..100 quality number blended
+// The WatchVerdict Standard Score — one honest 0..100 quality number blended
 // from every rating source we actually have for a title (TMDB audience, IMDb,
 // Rotten Tomatoes critics, Metacritic). Pure, deterministic, unit-tested — the
 // same discipline as the rest of scoring. Two ideas make it honest:

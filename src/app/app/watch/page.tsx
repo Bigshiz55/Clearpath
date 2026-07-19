@@ -13,7 +13,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { tmdbImage } from '@/lib/tmdb/image';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Watch now · WatchVrdIQt' };
+export const metadata: Metadata = { title: 'Watch now · WatchVerdict' };
 
 export default async function WatchNowPage({ searchParams }: { searchParams?: { type?: string } }) {
   // Deep link from the simple version: /app/watch?type=tv opens straight into the

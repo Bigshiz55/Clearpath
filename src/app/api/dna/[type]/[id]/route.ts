@@ -8,7 +8,7 @@ import type { MediaType } from '@/lib/types';
 export const runtime = 'nodejs';
 
 /**
- * The WatchVrdIQt DNA Score for the signed-in user on one title — a 0..100
+ * The WatchVerdict DNA Score for the signed-in user on one title — a 0..100
  * "odds you'll love it" from their Taste-DNA. Returns { dna: null } for guests
  * or when embeddings are unavailable, so the UI falls back cleanly.
  */

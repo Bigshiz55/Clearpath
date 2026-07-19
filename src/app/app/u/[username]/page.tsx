@@ -11,7 +11,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import type { PreferenceTrait, VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Profile · WatchVrdIQt' };
+export const metadata: Metadata = { title: 'Profile · WatchVerdict' };
 
 export default async function PublicProfilePage({ params }: { params: { username: string } }) {
   const supabase = createClient();
@@ -30,14 +30,14 @@ export default async function PublicProfilePage({ params }: { params: { username
     return (
       <div className="card mx-auto max-w-lg p-8 text-center">
         <h1 className="text-xl font-semibold text-white">No one here</h1>
-        <p className="mt-2 text-sm text-slate-400">There’s no WatchVrdIQt user with that username.</p>
+        <p className="mt-2 text-sm text-slate-400">There’s no WatchVerdict user with that username.</p>
         <Link href="/app/friends" className="btn-secondary mt-6 inline-flex">← Find people</Link>
       </div>
     );
   }
 
   const p = res.profile;
-  const name = p.displayName?.trim() || (p.username ? `@${p.username}` : 'WatchVrdIQt user');
+  const name = p.displayName?.trim() || (p.username ? `@${p.username}` : 'WatchVerdict user');
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

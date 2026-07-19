@@ -7,7 +7,7 @@ const MARK = (
   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
     <div style={{ width: 22, height: 22, borderRadius: 7, background: 'linear-gradient(135deg,#3b82f6,#7c5cff)' }} />
     <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: 0.3 }}>
-      Watch<span style={{ color: '#7dd3fc' }}>Vrd<span style={{ color: '#ff1493', fontFamily: 'Georgia, "Times New Roman", serif' }}>IQ</span>t</span>
+      Watch<span style={{ color: '#ff1493' }}>Verdict</span>
     </span>
   </div>
 );
@@ -43,7 +43,7 @@ export function ShareCard({ filename, children }: { filename: string; children: 
       const blob = await (await fetch(url)).blob();
       const file = new File([blob], `${filename}.png`, { type: 'image/png' });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'WatchVrdIQt' });
+        await navigator.share({ files: [file], title: 'WatchVerdict' });
       } else {
         await save();
       }
@@ -132,7 +132,7 @@ export function WrappedCardArt({ monthLabel, watched, avgRating, top }: { monthL
           </div>
         </>
       )}
-      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>My month on WatchVrdIQt · clearpath-pearl-chi.vercel.app</div>
+      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>My month on WatchVerdict · clearpath-pearl-chi.vercel.app</div>
     </div>
   );
 }
@@ -150,7 +150,7 @@ export function CourtCardArt({ title, oneLiner, members }: { title: string; oneL
           <span key={m.name} style={{ fontSize: 13, padding: '5px 10px', borderRadius: 999, background: 'rgba(255,255,255,.08)' }}>{m.name} {m.score}</span>
         ))}
       </div>
-      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>Settled by WatchVrdIQt · clearpath-pearl-chi.vercel.app</div>
+      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>Settled by WatchVerdict · clearpath-pearl-chi.vercel.app</div>
     </div>
   );
 }

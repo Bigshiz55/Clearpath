@@ -1,4 +1,4 @@
-// The one WatchVrdIQt color language. Every surface that signals a call — the
+// The one WatchVerdict color language. Every surface that signals a call — the
 // score badge, a card's accent, a progress bar, a button — routes through here
 // so "Watch It" always reads the same green and "Skip It" the same red. Pure and
 // client-safe. Keep this the ONLY place these colors are defined.

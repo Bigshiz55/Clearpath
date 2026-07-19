@@ -157,7 +157,7 @@ export async function runDailyScan(admin: SupabaseClient): Promise<DailyScanSumm
     if (res.newMatches > 0) {
       const n = res.newMatches;
       const sent = await sendPushToUser(admin, profile.id, {
-        title: 'New for you on WatchVrdIQt',
+        title: 'New for you on WatchVerdict',
         body: `${n} new pick${n === 1 ? '' : 's'} that fit your taste just landed.`,
         url: '/app',
         tag: 'wv-digest',

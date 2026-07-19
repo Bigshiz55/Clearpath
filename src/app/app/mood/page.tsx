@@ -4,7 +4,7 @@ import { getMyServices } from '@/lib/profile';
 import { MoodFinder } from '@/components/MoodFinder';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'What are you in the mood for? · WatchVrdIQt' };
+export const metadata: Metadata = { title: 'What are you in the mood for? · WatchVerdict' };
 
 export default async function MoodPage() {
   const supabase = createClient();

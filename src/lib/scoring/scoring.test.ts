@@ -53,7 +53,7 @@ function scottCtx(extra: Partial<PersonalContext> = {}): PersonalContext {
 const byTrait = (adjustments: ScoreAdjustment[], trait: PreferenceTrait) =>
   adjustments.find((a) => a.trait === trait);
 
-describe('WatchVrdIQt scoring engine', () => {
+describe('WatchVerdict scoring engine', () => {
   it('1. highly rated supernatural horror gets a strong Scott penalty', () => {
     const meta = makeTitle({
       genres: ['Horror'],

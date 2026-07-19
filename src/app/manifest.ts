@@ -6,8 +6,8 @@ export default function manifest(): MetadataRoute.Manifest {
   // `share_target` follows the Web Share Target spec (params as an object).
   // Next's Manifest type models params as an array, so we cast past it.
   return {
-    name: 'WatchVrdIQt',
-    short_name: 'WatchVrdIQt',
+    name: 'WatchVerdict',
+    short_name: 'WatchVerdict',
     description: 'Personalized movie & TV verdicts — should you watch it?',
     start_url: '/app',
     scope: '/',

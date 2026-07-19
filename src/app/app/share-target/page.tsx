@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { ShareTargetHandler } from '@/components/ShareTargetHandler';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Adding… · WatchVrdIQt' };
+export const metadata: Metadata = { title: 'Adding… · WatchVerdict' };
 
 export default function ShareTargetPage({
   searchParams,
