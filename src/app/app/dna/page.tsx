@@ -5,6 +5,7 @@ import { getUserDimensionProfile } from '@/lib/titleDimensions';
 import { getWatchStats } from '@/lib/watchStats';
 import { topDials } from '@/lib/scoring/dimensions';
 import { describePersonality } from '@/lib/scoring/personality';
+import { ShareCard, WatchDnaCardArt } from '@/components/ShareCards';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Your Watch DNA' };
@@ -93,6 +94,26 @@ export default async function WatchDnaPage() {
         )}
         {ready && <p className="mt-4 text-[11px] text-slate-500">Learned from {profile.samples} rated titles. The more you rate, the sharper it gets.</p>}
       </section>
+
+      {/* Shareable card */}
+      {ready && (
+        <section className="card p-5 sm:p-6">
+          <h2 className="text-lg font-bold text-white">Share your Watch DNA</h2>
+          <p className="mt-0.5 text-sm text-slate-400">Save the card or share it — see who matches your taste.</p>
+          <div className="mt-4">
+            <ShareCard filename="my-watch-dna">
+              <WatchDnaCardArt
+                title={persona.title}
+                blurb={persona.blurb}
+                traits={persona.traits}
+                dials={dials.slice(0, 5).map((d) => ({ label: d.dim.label, low: d.dim.low, high: d.dim.high, pref: d.pref, lean: d.lean }))}
+                finishRate={stats.finishRate}
+                rated={stats.rated}
+              />
+            </ShareCard>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

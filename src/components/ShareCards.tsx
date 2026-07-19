@@ -154,3 +154,61 @@ export function CourtCardArt({ title, oneLiner, members }: { title: string; oneL
     </div>
   );
 }
+
+export interface DnaDial { label: string; low: string; high: string; pref: number; lean: string }
+
+export function WatchDnaCardArt({
+  title,
+  blurb,
+  traits,
+  dials,
+  finishRate,
+  rated,
+}: {
+  title: string;
+  blurb: string;
+  traits: string[];
+  dials: DnaDial[];
+  finishRate: number | null;
+  rated: number;
+}) {
+  return (
+    <div style={{ ...shell, width: 360, minHeight: 520, background: 'radial-gradient(130% 100% at 0% 0%, #2a1747 0%, #10233f 45%, #0b1020 75%)' }}>
+      {MARK}
+      <div style={{ marginTop: 24, fontSize: 12, letterSpacing: 2, color: '#c4b5fd', textTransform: 'uppercase' }}>My Watch DNA 🧬</div>
+      <div style={{ marginTop: 4, fontSize: 32, fontWeight: 900, lineHeight: 1.03 }}>{title}</div>
+      <div style={{ marginTop: 8, fontSize: 14, color: '#c7d0e4', lineHeight: 1.35 }}>{blurb}</div>
+
+      {traits.length > 0 && (
+        <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {traits.map((t) => (
+            <span key={t} style={{ fontSize: 12, fontWeight: 700, padding: '5px 10px', borderRadius: 999, background: 'rgba(255,255,255,.10)', color: '#e8edf7' }}>{t}</span>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 11 }}>
+        {dials.map((d) => (
+          <div key={d.label}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#8b95ad', marginBottom: 3 }}>
+              <span>{d.low}</span>
+              <span style={{ color: '#c4b5fd', fontWeight: 700 }}>{d.lean}</span>
+              <span>{d.high}</span>
+            </div>
+            <div style={{ position: 'relative', height: 6, borderRadius: 999, background: 'rgba(255,255,255,.12)' }}>
+              <span style={{ position: 'absolute', left: `${Math.max(3, Math.min(97, d.pref))}%`, top: '50%', width: 12, height: 12, marginLeft: -6, marginTop: -6, borderRadius: 999, background: 'linear-gradient(135deg,#a855f7,#3b82f6)', border: '2px solid #fff' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div style={{ fontSize: 12, color: '#5f6b85' }}>
+          {rated} rated{finishRate != null ? ` · ${Math.round(finishRate * 100)}% finish rate` : ''}
+          <div style={{ marginTop: 2 }}>clearpath-pearl-chi.vercel.app</div>
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>What’s yours?</div>
+      </div>
+    </div>
+  );
+}
