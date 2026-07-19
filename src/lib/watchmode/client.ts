@@ -98,6 +98,87 @@ export function getWatchmodeProviders(mediaType: MediaType, tmdbId: number, regi
   })();
 }
 
+// ---------------------------------------------------------------------------
+// Episode-level availability — which streaming service carries each SEASON of a
+// show. Watchmode's episodes endpoint returns per-episode sources in one call;
+// we roll that up to seasons and only credit a service with a season when it
+// carries a majority of that season's episodes (so a single free pilot doesn't
+// masquerade as full-season availability).
+// ---------------------------------------------------------------------------
+
+export interface SeasonAvailability {
+  season: number;
+  services: WatchProvider[]; // subscription / free services carrying the season
+}
+
+interface WatchmodeEpisode {
+  season_number?: number | null;
+  episode_number?: number | null;
+  sources?: WatchmodeSource[];
+}
+
+async function fetchWatchmodeSeasons(tmdbId: number, region: string): Promise<SeasonAvailability[] | null> {
+  const key = serverEnv.watchmodeKey();
+  if (!key) return null;
+  const url = new URL(`${BASE}/title/tv-${tmdbId}/episodes/`);
+  url.searchParams.set('apiKey', key);
+
+  let episodes: WatchmodeEpisode[];
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(9000) });
+    if (!res.ok) return null;
+    const data = (await res.json()) as unknown;
+    episodes = Array.isArray(data) ? (data as WatchmodeEpisode[]) : [];
+  } catch {
+    return null;
+  }
+  if (episodes.length === 0) return [];
+
+  const total = new Map<number, number>(); // episodes counted per season
+  const cover = new Map<string, { count: number; provider: WatchProvider }>(); // `${season}|${name}`
+
+  for (const ep of episodes) {
+    const sn = ep.season_number;
+    if (sn == null || sn <= 0) continue; // skip specials (season 0)
+    total.set(sn, (total.get(sn) ?? 0) + 1);
+    const onThisEp = new Set<string>();
+    for (const s of ep.sources ?? []) {
+      if ((s.region ?? '').toUpperCase() !== region.toUpperCase()) continue;
+      if (s.type !== 'sub' && s.type !== 'free' && s.type !== 'tve') continue;
+      if (!s.name) continue;
+      const k = `${sn}|${s.name.toLowerCase()}`;
+      if (onThisEp.has(k)) continue; // count a service once per episode
+      onThisEp.add(k);
+      const entry = cover.get(k);
+      if (entry) entry.count += 1;
+      else
+        cover.set(k, {
+          count: 1,
+          provider: { providerId: s.source_id, providerName: s.name, logoPath: null, type: mapType(s.type), link: s.web_url ?? null },
+        });
+    }
+  }
+
+  const out: SeasonAvailability[] = [];
+  for (const [season, epCount] of [...total.entries()].sort((a, b) => a[0] - b[0])) {
+    const need = Math.ceil(epCount / 2);
+    const services = [...cover.entries()]
+      .filter(([k, v]) => k.startsWith(`${season}|`) && v.count >= need)
+      .map(([, v]) => v.provider);
+    if (services.length > 0) out.push({ season, services });
+  }
+  return out;
+}
+
+/** Per-season streaming availability for a TV show, cached 12h. Null on no key/miss. */
+export function getWatchmodeSeasons(tmdbId: number, region = 'US'): Promise<SeasonAvailability[] | null> {
+  if (!serverEnv.watchmodeKey()) return Promise.resolve(null);
+  return unstable_cache(() => fetchWatchmodeSeasons(tmdbId, region), ['watchmode-seasons', String(tmdbId), region], {
+    revalidate: 60 * 60 * 12,
+    tags: [`watchmode:tv:${tmdbId}`],
+  })();
+}
+
 const norm = (name: string) =>
   name
     .toLowerCase()

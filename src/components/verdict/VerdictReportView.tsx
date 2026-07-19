@@ -2,6 +2,7 @@ import type { VerdictReport, ContentSignal, WatchlistStatus } from '@/lib/types'
 import Link from 'next/link';
 import { VerdictBadge, DispositionChip } from '@/components/VerdictBadge';
 import { ProviderRow } from '@/components/ProviderRow';
+import { SeasonWhereToWatch } from '@/components/SeasonWhereToWatch';
 import { Poster } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
 import { CardRatings } from '@/components/CardRatings';
@@ -374,6 +375,9 @@ export function VerdictReportView({
           <ProviderRow providers={report.providers} myServices={myServices} />
         </div>
       </section>
+
+      {/* Episode-level: which service carries each season (only if split) */}
+      <SeasonWhereToWatch mediaType={t.mediaType} tmdbId={t.id} />
 
       {/* The Dossier — real credits, themes, franchise */}
       {briefing && <TitleBriefing briefing={briefing} keywords={t.keywords} />}
