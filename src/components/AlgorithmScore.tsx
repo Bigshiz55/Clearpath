@@ -48,14 +48,17 @@ export function AlgorithmScore({
       className={`rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 p-2.5 shadow-[0_0_16px_rgba(244,63,94,0.28)] ${className}`}
       title="WatchVerdict algorithm — your DNA blended with every rating into one 0–100 estimate of how much YOU will like it."
     >
-      <div className="flex items-center gap-1.5">
+      {/* WatchVerdict Ruling — one line across the top. */}
+      <div className="mb-1.5 flex items-center justify-center gap-1.5 border-b border-pink-200/25 pb-1.5">
         <HelixMark className="h-4 w-4" />
-        <span className="text-[10px] font-black uppercase tracking-wide text-pink-100">
-          {personal ? 'Will you like it?' : 'Watchability'}
+        <span className="whitespace-nowrap text-[13px] font-black tracking-tight text-white" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+          WatchVerdict Ruling
         </span>
       </div>
 
-      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+      {/* The DNA score. */}
+      <div className="text-[9px] font-black uppercase tracking-wide text-pink-100/90">🧬 DNA Score</div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="flex items-baseline gap-1 tabular-nums text-white">
           <span className="text-2xl font-black leading-none">{score ?? '—'}</span>
           <span className="text-[10px] font-bold text-pink-100/80">/100</span>
