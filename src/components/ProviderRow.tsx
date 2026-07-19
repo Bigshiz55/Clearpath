@@ -14,12 +14,8 @@ const TYPE_ORDER: WatchProvider['type'][] = ['flatrate', 'free', 'ads', 'rent', 
 
 function ProviderLogo({ p, mine }: { p: WatchProvider; mine: boolean }) {
   const src = p.logoPath ? `${TMDB_IMAGE_BASE}/w92${p.logoPath}` : null;
-  return (
-    <div
-      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${
-        mine ? 'border-emerald-400/50 bg-emerald-500/10' : 'border-white/10 bg-white/5'
-      }`}
-    >
+  const inner = (
+    <>
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="" className="h-6 w-6 rounded" loading="lazy" />
@@ -30,8 +26,29 @@ function ProviderLogo({ p, mine }: { p: WatchProvider; mine: boolean }) {
       )}
       <span className={`text-xs font-medium ${mine ? 'text-emerald-100' : 'text-slate-200'}`}>{p.providerName}</span>
       {mine && <span className="text-[10px] font-bold text-emerald-300">✓ yours</span>}
-    </div>
+      {p.link && <span aria-hidden className="text-[11px] text-brand-300">↗</span>}
+    </>
   );
+  const cls = `flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition ${
+    mine ? 'border-emerald-400/50 bg-emerald-500/10' : 'border-white/10 bg-white/5'
+  }`;
+
+  // Watchmode gives us a deep link straight to the title on this service — make
+  // the badge tappable ("open it on Netflix"). Falls back to a static badge.
+  if (p.link) {
+    return (
+      <a
+        href={p.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`${cls} hover:border-brand-400/60 hover:bg-brand-500/15`}
+        title={`Open ${p.providerName} →`}
+      >
+        {inner}
+      </a>
+    );
+  }
+  return <div className={cls}>{inner}</div>;
 }
 
 export function ProviderRow({
