@@ -49,25 +49,24 @@ export function AlgorithmScore({
       title="WatchVerdict algorithm — your DNA blended with every rating into one 0–100 estimate of how much YOU will like it."
     >
       {/* WatchVerdict Ruling — one line across the top. */}
-      <div className="mb-1.5 flex items-center justify-center gap-1.5 border-b border-pink-200/25 pb-1.5">
+      <div className="mb-1.5 flex items-center gap-1.5 border-b border-pink-200/25 pb-1.5">
         <HelixMark className="h-4 w-4" />
-        <span className="whitespace-nowrap text-[13px] font-black tracking-tight text-white" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+        <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wide text-white">
           WatchVerdict Ruling
         </span>
       </div>
 
-      {/* The DNA score. */}
-      <div className="text-[9px] font-black uppercase tracking-wide text-pink-100/90">🧬 DNA Score</div>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="flex items-baseline gap-1 tabular-nums text-white">
-          <span className="text-2xl font-black leading-none">{score ?? '—'}</span>
-          <span className="text-[10px] font-bold text-pink-100/80">/100</span>
+      {/* What the ruling is — Stream It / Worth a Look / Skip It. */}
+      {v && (
+        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-black tracking-wide ${v.visual.badge}`}>
+          {personal ? '🧬' : v.emoji} {v.call}
         </span>
-        {v && (
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-black tracking-wide ${v.visual.badge}`}>
-            {personal ? '🧬' : v.emoji} {v.call}
-          </span>
-        )}
+      )}
+
+      {/* DNA score label and the number, on one line (it's always out of 100). */}
+      <div className="mt-1 flex items-center gap-2">
+        <span className="text-[9px] font-black uppercase tracking-wide text-pink-100/90">🧬 DNA Score</span>
+        <span className="text-2xl font-black leading-none tabular-nums text-white">{score ?? '—'}</span>
         {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 && (
           <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">learning</span>
         )}
