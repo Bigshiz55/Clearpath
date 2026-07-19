@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { SaveButton } from './SaveButton';
-import { CardRatings } from './CardRatings';
+import { PosterCard } from './PosterCard';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { TMDB_IMAGE_BASE } from '@/lib/tmdb/image';
@@ -199,29 +198,16 @@ export function BrowseCatalog({
         <>
           <div className="poster-grid">
             {items.map((t) => (
-              <div key={`${t.mediaType}-${t.id}`} className="card group relative h-full overflow-hidden transition hover:border-white/20 hover:shadow-glow">
-                <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="relative block aspect-[2/3] w-full overflow-hidden" aria-label={`Quick look at ${t.title}`}>
-                  {t.posterUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={t.posterUrl} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]" />
-                  ) : (
-                    <div className="grid h-full w-full place-items-center bg-gradient-to-br from-ink-700 to-ink-850 p-2 text-center text-[11px] text-slate-400">{t.title}</div>
-                  )}
-                  <span className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
-                    <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
-                  </span>
-                </button>
-                <div className="absolute right-2 top-2 z-10">
-                  <SaveButton tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
-                </div>
-                <div className="p-3">
-                  <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block w-full text-left">
-                    <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>
-                    <div className="mt-0.5 text-xs text-slate-400">{t.year ?? '—'}</div>
-                  </button>
-                  <CardRatings mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-1.5" />
-                </div>
-              </div>
+              <PosterCard
+                key={`${t.mediaType}-${t.id}`}
+                mediaType={t.mediaType}
+                tmdbId={t.id}
+                title={t.title}
+                year={t.year}
+                posterUrl={t.posterUrl}
+                posterPath={t.posterPath}
+                onOpen={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
+              />
             ))}
           </div>
           <div className="flex justify-center pt-2">

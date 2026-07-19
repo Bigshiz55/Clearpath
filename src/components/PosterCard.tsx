@@ -19,6 +19,9 @@ interface PosterCardProps {
    *  When omitted, a default "＋ add to your list" button is shown automatically,
    *  so every placard has a way to save it. Pass `null` to suppress it. */
   overlay?: React.ReactNode;
+  /** If provided, the poster/title open this (e.g. a QuickLook modal) instead of
+   *  navigating via `href`. Requires `tmdbId` so the card can still score itself. */
+  onOpen?: () => void;
 }
 
 export function Poster({ posterUrl, title, className = '' }: { posterUrl?: string | null; title: string; className?: string }) {
@@ -43,7 +46,7 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
   );
 }
 
-export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay }: PosterCardProps) {
+export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen }: PosterCardProps) {
   const poster = (
     <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04]" />
   );
@@ -90,10 +93,22 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         </div>
       </div>
       <div className="relative aspect-[2/3] overflow-hidden">
-        {href ? <Link href={href} className="block h-full">{poster}</Link> : poster}
+        {onOpen ? (
+          <button type="button" onClick={onOpen} className="block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
+        ) : href ? (
+          <Link href={href} className="block h-full">{poster}</Link>
+        ) : (
+          poster
+        )}
       </div>
       <div className="flex flex-1 flex-col p-3">
-        {href ? <Link href={href} className="block">{heading}</Link> : heading}
+        {onOpen ? (
+          <button type="button" onClick={onOpen} className="block w-full text-left">{heading}</button>
+        ) : href ? (
+          <Link href={href} className="block">{heading}</Link>
+        ) : (
+          heading
+        )}
         {/* One pink box: the algorithm score (your DNA + every rating) + will-you-
             like-it call, with the ratings underneath. */}
         {saveId != null && (

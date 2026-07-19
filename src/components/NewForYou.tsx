@@ -1,14 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Poster } from '@/components/PosterCard';
+import { PosterCard } from '@/components/PosterCard';
 import { tmdbImage } from '@/lib/tmdb/image';
-import { dismissDigestItem } from '@/lib/actions/digest';
 import { ReasonText } from '@/components/ReasonText';
-import { CardRatings } from '@/components/CardRatings';
-import { SaveButton } from '@/components/SaveButton';
-import { verdictVisualForCall } from '@/lib/verdictVisual';
 import type { MediaType } from '@/lib/types';
 
 export interface DigestItem {
@@ -24,13 +18,7 @@ export interface DigestItem {
 }
 
 export function NewForYou({ items, label }: { items: DigestItem[]; label: string }) {
-  const [list, setList] = useState(items);
-  if (list.length === 0) return null;
-
-  async function dismiss(id: string) {
-    setList((l) => l.filter((i) => i.id !== id));
-    await dismissDigestItem(id);
-  }
+  if (items.length === 0) return null;
 
   return (
     <section className="rounded-2xl border border-gold-400/30 bg-gradient-to-b from-gold-500/10 to-transparent p-4 sm:p-5">
@@ -40,48 +28,21 @@ export function NewForYou({ items, label }: { items: DigestItem[]; label: string
         </h2>
         <span className="text-xs text-slate-400">Fresh releases matched to {label.toLowerCase()}</span>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {list.map((item) => {
-          const v = verdictVisualForCall(item.primary_call);
-          return (
-            <div key={item.id} className={`card group relative overflow-hidden border ${v.border}`}>
-              <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1.5">
-                <SaveButton
-                  tmdbId={item.tmdb_id}
-                  mediaType={item.media_type}
-                  title={item.title}
-                  year={item.year}
-                  posterPath={item.poster_path}
-                />
-                <button
-                  onClick={() => dismiss(item.id)}
-                  className="grid h-7 w-7 place-items-center rounded-full bg-black/60 text-slate-300 backdrop-blur transition hover:bg-black/80 hover:text-white"
-                  aria-label={`Dismiss ${item.title}`}
-                >
-                  ✕
-                </button>
-              </div>
-              <Link href={`/app/title/${item.media_type}/${item.tmdb_id}`} className="block">
-                <div className="relative aspect-[2/3] overflow-hidden">
-                  <Poster posterUrl={tmdbImage(item.poster_path, 'w342')} title={item.title} className="transition group-hover:scale-105" />
-                  <span className={`absolute left-2 top-2 rounded-full border px-2 py-0.5 text-xs font-bold tabular-nums ${v.badge}`}>
-                    {item.personal_score}%
-                  </span>
-                </div>
-                <div className="px-2.5 pt-2.5">
-                  <div className="line-clamp-1 text-sm font-semibold text-white">{item.title}</div>
-                  <div className="text-xs text-slate-400">
-                    {item.year ?? '—'} · <span className={`font-semibold ${v.text}`}>{item.primary_call}</span>
-                  </div>
-                </div>
-              </Link>
-              <div className="px-2.5 pb-2.5 pt-0.5">
-                <CardRatings mediaType={item.media_type} tmdbId={item.tmdb_id} title={item.title} year={item.year} />
-                {item.reason && <ReasonText text={item.reason} className="mt-1 text-[11px] text-slate-500" />}
-              </div>
-            </div>
-          );
-        })}
+      <div className="poster-grid">
+        {items.map((item) => (
+          <PosterCard
+            key={item.id}
+            href={`/app/title/${item.media_type}/${item.tmdb_id}`}
+            mediaType={item.media_type}
+            tmdbId={item.tmdb_id}
+            title={item.title}
+            year={item.year}
+            posterUrl={tmdbImage(item.poster_path, 'w342')}
+            posterPath={item.poster_path}
+          >
+            {item.reason && <ReasonText text={item.reason} className="mt-1.5 text-[11px] text-slate-500" />}
+          </PosterCard>
+        ))}
       </div>
     </section>
   );
