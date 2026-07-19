@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SaveButton } from './SaveButton';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
-import { CardRatings } from './CardRatings';
-import { CardDna } from './CardDna';
-import { WatchCall } from './WatchCall';
+import { AlgorithmScore } from './AlgorithmScore';
 import { TasteFeedback } from './TasteFeedback';
 import type { MediaType } from '@/lib/types';
 
@@ -174,28 +172,23 @@ export function ReleaseWall({
             const soon = win === 'upcoming' && d != null && d <= 14;
             return (
               <div key={`${t.mediaType}-${t.id}`} className="card group h-full overflow-hidden text-left transition hover:border-white/20 hover:shadow-glow">
-                {/* Top bar — the DNA call, then Movie/TV · ＋ · O — like every other card. */}
-                <div className="border-b border-white/10 bg-ink-900/85">
-                  <div className="px-2 pt-1.5">
-                    <WatchCall mediaType={t.mediaType} tmdbId={t.id} objectiveScore={null} className="w-full justify-center py-1 text-[11px]" />
-                  </div>
-                  <div className="flex items-center gap-1.5 px-2 py-1.5">
-                    <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
-                      {t.mediaType === 'movie' ? 'Movie' : 'TV'}
-                    </span>
-                    <div className="flex flex-1 items-center gap-1.5">
-                      <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
-                      <TasteFeedback
-                        compact
-                        wide
-                        tmdbId={t.id}
-                        mediaType={t.mediaType}
-                        title={t.title}
-                        year={t.year}
-                        posterPath={t.posterPath}
-                        onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
-                      />
-                    </div>
+                {/* Top bar — Movie/TV · ＋ · O. Score lives in the pink box below. */}
+                <div className="flex items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
+                  <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
+                    {t.mediaType === 'movie' ? 'Movie' : 'TV'}
+                  </span>
+                  <div className="flex flex-1 items-center gap-1.5">
+                    <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
+                    <TasteFeedback
+                      compact
+                      wide
+                      tmdbId={t.id}
+                      mediaType={t.mediaType}
+                      title={t.title}
+                      year={t.year}
+                      posterPath={t.posterPath}
+                      onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
+                    />
                   </div>
                 </div>
                 <button
@@ -223,8 +216,7 @@ export function ReleaseWall({
                     <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>
                     <div className="mt-0.5 text-xs text-slate-400">{t.year ?? '—'}</div>
                   </button>
-                  <CardDna mediaType={t.mediaType} tmdbId={t.id} className="mt-2" />
-                  <CardRatings mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} hideCall className="mt-2" />
+                  <AlgorithmScore mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-2" />
                 </div>
               </div>
             );

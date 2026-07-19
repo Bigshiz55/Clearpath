@@ -1,8 +1,6 @@
 import Link from 'next/link';
 import type { MediaType } from '@/lib/types';
-import { CardRatings } from './CardRatings';
-import { CardDna } from './CardDna';
-import { WatchCall } from './WatchCall';
+import { AlgorithmScore } from './AlgorithmScore';
 import { SaveButton } from './SaveButton';
 import { TasteFeedback } from './TasteFeedback';
 
@@ -81,22 +79,14 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   // the link (never nested inside it) so they may hold interactive controls.
   return (
     <div className="card group flex h-full flex-col overflow-hidden transition hover:border-white/20 hover:shadow-glow">
-      {/* Top bar — the DNA call as a full-width rating bar, with Movie/TV · ＋ · O
-          on the row beneath it. Above the art, never over it. */}
-      <div className="border-b border-white/10 bg-ink-900/85">
-        {saveId != null && (
-          <div className="px-2 pt-1.5">
-            <WatchCall mediaType={mediaType} tmdbId={saveId} objectiveScore={null} className="w-full justify-center py-1 text-[11px]" />
-          </div>
-        )}
-        <div className="flex items-center gap-1.5 px-2 py-1.5">
-          <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
-            {mediaType === 'movie' ? 'Movie' : 'TV'}
-          </span>
-          <div className="flex flex-1 items-center gap-1.5">
-            {resolvedOverlay}
-            {feedback}
-          </div>
+      {/* Top bar — Movie/TV · ＋ · O. The score lives in the pink box below. */}
+      <div className="flex items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
+        <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
+          {mediaType === 'movie' ? 'Movie' : 'TV'}
+        </span>
+        <div className="flex flex-1 items-center gap-1.5">
+          {resolvedOverlay}
+          {feedback}
         </div>
       </div>
       <div className="relative aspect-[2/3] overflow-hidden">
@@ -104,16 +94,11 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
       </div>
       <div className="flex flex-1 flex-col p-3">
         {href ? <Link href={href} className="block">{heading}</Link> : heading}
-        {/* The large DNA box, with the other ratings around it, under the show. */}
-        {saveId != null && <CardDna mediaType={mediaType} tmdbId={saveId} className="mt-2" />}
-        {(() => {
-          // Every card that links to a title shows its real ratings, no matter
-          // which list rendered it — hydrated from the id in the href. The call
-          // is in the top bar, so here we show only the source chips.
-          const m = href?.match(/\/app\/title\/(movie|tv)\/(\d+)/);
-          if (!m) return null;
-          return <CardRatings mediaType={m[1] as MediaType} tmdbId={Number(m[2])} title={title} year={year} hideCall className="mt-2" />;
-        })()}
+        {/* One pink box: the algorithm score (your DNA + every rating) + will-you-
+            like-it call, with the ratings underneath. */}
+        {saveId != null && (
+          <AlgorithmScore mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-2" />
+        )}
         {children}
       </div>
     </div>
