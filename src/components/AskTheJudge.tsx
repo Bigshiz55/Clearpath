@@ -265,9 +265,9 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
                 <p className="mt-1 text-[11px] leading-snug text-slate-400">Drag left to reach classics — decades back, not just recent.</p>
               </div>
               <div>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Audience score</span><span className="font-semibold text-brand-200">{q.minAudience ? `${q.minAudience}%+` : 'Any'}</span></div>
+                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">🍿 Popcorn meter</span><span className="font-semibold text-brand-200">{q.minAudience ? `${q.minAudience}%+` : 'Any'}</span></div>
                 <input type="range" min={0} max={95} step={5} value={q.minAudience ?? 0} onChange={(e) => set('minAudience', Number(e.target.value) === 0 ? null : Number(e.target.value))} className="w-full accent-brand-500" />
-                <p className="mt-1 text-[11px] leading-snug text-slate-400">The crowd score (TMDB) — the open stand-in for RT’s audience/Popcorn.</p>
+                <p className="mt-1 text-[11px] leading-snug text-slate-400">The audience / Popcorn score (crowd rating).</p>
               </div>
               <div>
                 <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">IMDb rating</span><span className="font-semibold text-gold-400">{q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'}</span></div>

@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { RatingsStrip } from './RatingsStrip';
 import { SaveButton } from './SaveButton';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { CardRatings } from './CardRatings';
+import { CardDna } from './CardDna';
+import { WatchCall } from './WatchCall';
+import { TasteFeedback } from './TasteFeedback';
 import type { MediaType } from '@/lib/types';
 
 export interface WallService {
@@ -82,6 +84,7 @@ export function ReleaseWall({
   const [items, setItems] = useState<WallItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<QuickLookTarget | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -165,12 +168,36 @@ export function ReleaseWall({
         </div>
       ) : items && items.length > 0 ? (
         <div className={`poster-grid ${loading ? 'opacity-60' : ''}`}>
-          {items.map((t) => {
+          {items.filter((t) => !hidden.has(`${t.mediaType}-${t.id}`)).map((t) => {
             const label = dateLabel(t.releaseDate);
             const d = daysUntil(t.releaseDate);
             const soon = win === 'upcoming' && d != null && d <= 14;
             return (
-              <div key={`${t.mediaType}-${t.id}`} className="card group relative h-full overflow-hidden text-left transition hover:border-white/20 hover:shadow-glow">
+              <div key={`${t.mediaType}-${t.id}`} className="card group h-full overflow-hidden text-left transition hover:border-white/20 hover:shadow-glow">
+                {/* Top bar — the DNA call, then Movie/TV · ＋ · O — like every other card. */}
+                <div className="border-b border-white/10 bg-ink-900/85">
+                  <div className="px-2 pt-1.5">
+                    <WatchCall mediaType={t.mediaType} tmdbId={t.id} objectiveScore={null} className="w-full justify-center py-1 text-[11px]" />
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2 py-1.5">
+                    <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
+                      {t.mediaType === 'movie' ? 'Movie' : 'TV'}
+                    </span>
+                    <div className="flex flex-1 items-center gap-1.5">
+                      <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
+                      <TasteFeedback
+                        compact
+                        wide
+                        tmdbId={t.id}
+                        mediaType={t.mediaType}
+                        title={t.title}
+                        year={t.year}
+                        posterPath={t.posterPath}
+                        onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
+                      />
+                    </div>
+                  </div>
+                </div>
                 <button
                   onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
                   className="relative block aspect-[2/3] w-full overflow-hidden"
@@ -182,9 +209,6 @@ export function ReleaseWall({
                   ) : (
                     <div className="grid h-full w-full place-items-center bg-gradient-to-br from-ink-700 to-ink-850 p-2 text-center text-[11px] text-slate-400">{t.title}</div>
                   )}
-                  <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 backdrop-blur">
-                    {t.mediaType === 'movie' ? 'Movie' : 'TV'}
-                  </span>
                   {label && (
                     <span className={`pointer-events-none absolute bottom-2 left-2 rounded-md px-2 py-0.5 text-[10px] font-bold backdrop-blur ${soon ? 'bg-emerald-500/85 text-white' : 'bg-black/65 text-slate-100'}`}>
                       {win === 'upcoming' ? `📅 ${label}` : label}
@@ -194,15 +218,13 @@ export function ReleaseWall({
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
                   </span>
                 </button>
-                <div className="absolute right-2 top-2 z-10">
-                  <SaveButton tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
-                </div>
                 <div className="p-3">
                   <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block text-left">
                     <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>
                     <div className="mt-0.5 text-xs text-slate-400">{t.year ?? '—'}</div>
                   </button>
-                  <CardRatings mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-1.5" />
+                  <CardDna mediaType={t.mediaType} tmdbId={t.id} className="mt-2" />
+                  <CardRatings mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} hideCall className="mt-2" />
                 </div>
               </div>
             );

@@ -61,16 +61,9 @@ export function AtAGlance({
       </div>
 
       <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
-        <div className={`flex flex-shrink-0 items-center gap-2 rounded-xl border px-3 py-2 ${callStyleFor(primaryCall)}`}>
-          <span aria-hidden>📺</span>
-          <span className="flex flex-col leading-tight">
-            <span className="text-sm font-extrabold">
-              {primaryCall === 'WATCH IT' ? 'STREAM IT' : primaryCall}
-            </span>
-            <span className="text-[9px] uppercase tracking-wide opacity-70">Stream / Skip</span>
-          </span>
-        </div>
-        {/* WatchVerdict DNA Score — the personal "odds you'll love it", client-fetched. */}
+        {/* The DNA Score is the headline personal call (its own Stream It / Skip
+            It lives inside it); the objective verdict is the badge above. No
+            duplicate Stream/Skip box here — it only collided with the DNA call. */}
         <DnaScore mediaType={mediaType} tmdbId={tmdbId} />
         {available.map((s) => {
           const { node, label } = iconFor(s.name);
