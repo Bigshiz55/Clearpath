@@ -1,17 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const MOBILE = 'width=device-width, initial-scale=1, viewport-fit=cover';
 
 /**
- * A floating "Phone view" button, shown ONLY when Desktop view is active. In
- * desktop mode the top nav (with the toggle) slides under the phone's status bar
- * and can't be tapped, so this always-reachable pill at the bottom lets you get
- * back to the phone layout.
+ * A floating "Phone view" button, shown ONLY when Desktop view is active — the
+ * top nav slides under the phone status bar in desktop mode, so this is the
+ * reliable way back.
+ *
+ * In a forced-width (desktop) viewport, `position: fixed` anchors to the huge
+ * 1200px layout viewport, so a plain fixed button lands off-screen. We pin it to
+ * the actual visible window using the visualViewport API instead, and reposition
+ * on scroll/zoom so it's always reachable.
  */
 export function DesktopViewExit() {
   const [desktop, setDesktop] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     try {
@@ -20,6 +25,37 @@ export function DesktopViewExit() {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    if (!desktop) return;
+    const vv = window.visualViewport;
+    const place = () => {
+      const el = ref.current;
+      if (!el) return;
+      if (vv) {
+        // Bottom-centre of the *visible* area, in layout-viewport coordinates.
+        el.style.left = `${vv.offsetLeft + vv.width / 2}px`;
+        el.style.top = `${vv.offsetTop + vv.height - 16}px`;
+        el.style.transform = 'translate(-50%, -100%)';
+        // Counter-scale so the button stays a readable, tappable size no matter
+        // how far the desktop page is zoomed out.
+        const s = vv.scale ? 1 / vv.scale : 1;
+        el.style.transform = `translate(-50%, -100%) scale(${s})`;
+        el.style.transformOrigin = 'bottom center';
+      }
+    };
+    place();
+    vv?.addEventListener('resize', place);
+    vv?.addEventListener('scroll', place);
+    window.addEventListener('scroll', place, true);
+    const id = window.setInterval(place, 500); // catch momentum-scroll drift on iOS
+    return () => {
+      vv?.removeEventListener('resize', place);
+      vv?.removeEventListener('scroll', place);
+      window.removeEventListener('scroll', place, true);
+      window.clearInterval(id);
+    };
+  }, [desktop]);
 
   if (!desktop) return null;
 
@@ -36,10 +72,10 @@ export function DesktopViewExit() {
 
   return (
     <button
+      ref={ref}
       type="button"
       onClick={backToPhone}
-      className="fixed bottom-5 left-1/2 z-[300] flex -translate-x-1/2 items-center gap-2 rounded-full border-2 border-white/25 bg-brand-500 px-6 py-3.5 text-lg font-bold text-white shadow-[0_10px_30px_-6px_rgba(0,0,0,0.7)] transition hover:bg-brand-400"
-      style={{ bottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
+      className="fixed left-1/2 top-0 z-[300] flex items-center gap-2 whitespace-nowrap rounded-full border-2 border-white/30 bg-brand-500 px-6 py-3.5 text-lg font-bold text-white shadow-[0_10px_30px_-6px_rgba(0,0,0,0.8)]"
       title="Switch back to the phone-friendly layout"
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
