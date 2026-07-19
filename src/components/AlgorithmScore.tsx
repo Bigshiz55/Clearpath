@@ -48,25 +48,26 @@ export function AlgorithmScore({
       className={`rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 p-2.5 shadow-[0_0_16px_rgba(244,63,94,0.28)] ${className}`}
       title="WatchVerdict algorithm — your DNA blended with every rating into one 0–100 estimate of how much YOU will like it."
     >
-      {/* WatchVerdict Ruling — the blue mark + "Ruling", one line across the top. */}
-      <div className="mb-1.5 flex items-center gap-1.5 border-b border-pink-200/25 pb-1.5">
-        <LogoMark box="h-5 w-5 rounded-md" inner="h-3.5 w-3.5" />
-        <span className="whitespace-nowrap text-[12px] font-black uppercase tracking-wide text-white">
+      {/* Ruling — blue mark + "Ruling", tinted to the verdict's colour so the
+          header and the call below read as one unit. */}
+      <div className="mb-1.5 flex items-center gap-2 border-b border-pink-200/25 pb-1.5">
+        <LogoMark box="h-6 w-6 rounded-md" inner="h-4 w-4" />
+        <span className={`whitespace-nowrap text-xs font-black uppercase tracking-wide ${v ? v.visual.text : 'text-white'}`}>
           Ruling
         </span>
       </div>
 
-      {/* What the ruling is — Stream It / Worth a Look / Skip It. */}
+      {/* What the ruling is — Stream It / Worth a Look / Skip It — bigger. */}
       {v && (
-        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-black tracking-wide ${v.visual.badge}`}>
+        <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-black tracking-wide ${v.visual.badge}`}>
           {personal ? '🧬' : v.emoji} {v.call}
         </span>
       )}
 
-      {/* DNA score label and the number, on one line (it's always out of 100). */}
-      <div className="mt-1 flex items-center gap-2">
-        <span className="text-[9px] font-black uppercase tracking-wide text-pink-100/90">🧬 DNA</span>
-        <span className="text-2xl font-black leading-none tabular-nums text-white">{score ?? '—'}</span>
+      {/* DNA + the number, bigger and on one line. */}
+      <div className="mt-1.5 flex items-center gap-2">
+        <span className="text-[11px] font-black uppercase tracking-wide text-pink-100/90">🧬 DNA</span>
+        <span className="text-3xl font-black leading-none tabular-nums text-white">{score ?? '—'}</span>
         {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 && (
           <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">learning</span>
         )}
