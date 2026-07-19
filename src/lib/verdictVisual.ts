@@ -136,7 +136,7 @@ export interface ScoreVerdict {
 
 const CALL_TEXT: Record<VerdictKey, { call: string; emoji: string }> = {
   watch: { call: 'STREAM IT', emoji: '✅' },
-  worth: { call: 'WORTH IT', emoji: '👍' },
+  worth: { call: 'MAYBE', emoji: '👍' },
   uncertain: { call: 'TOSS-UP', emoji: '🤔' },
   skip: { call: 'SKIP IT', emoji: '⛔' },
   wildcard: { call: 'WILDCARD', emoji: '🃏' },

@@ -50,7 +50,7 @@ describe('Verdict visual language', () => {
   it('turns a score into a single headline call with matching color', () => {
     expect(scoreVerdict(90).call).toBe('STREAM IT');
     expect(scoreVerdict(90).visual.key).toBe('watch');
-    expect(scoreVerdict(60).call).toBe('WORTH IT');
+    expect(scoreVerdict(60).call).toBe('MAYBE');
     expect(scoreVerdict(10).call).toBe('SKIP IT');
     expect(scoreVerdict(10).visual.key).toBe('skip');
   });

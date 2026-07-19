@@ -52,8 +52,8 @@ export function AlgorithmScore({
       <div className="mb-1.5 flex items-center gap-1.5 border-b border-pink-200/25 pb-1.5">
         <LogoMark box="h-7 w-7 flex-none rounded-lg" inner="h-4 w-4" />
         {v && (
-          <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-1 text-xs font-black tracking-tight ${v.visual.badge}`}>
-            {personal ? '🧬' : v.emoji} {v.call}
+          <span className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-1 text-sm font-black tracking-tight ${v.visual.badge}`}>
+            {v.call}
           </span>
         )}
       </div>
