@@ -1,8 +1,9 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MediaType } from '@/lib/types';
-import { discoverTitles, getTvFreshness } from '@/lib/tmdb/client';
+import { discoverTitles, getTvFreshness, getWatchProviders } from '@/lib/tmdb/client';
 import { getProfile, regionFor, getMyServices } from '@/lib/profile';
+import { streamingNames } from '@/lib/services';
 
 export interface FeedItem {
   id: number;
@@ -11,6 +12,7 @@ export interface FeedItem {
   year: number | null;
   posterPath: string | null;
   releaseDate?: string | null; // ISO date the title released / airs
+  network?: string | null; // primary streaming service carrying it (null = unknown)
 }
 
 export type ReleaseWindow = 'recent' | 'upcoming';
@@ -98,7 +100,22 @@ export async function getReleases(
       items.push({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath, releaseDate: t.releaseDate });
     }
   }
-  return items.slice(0, 36);
+
+  // Attach the primary streaming service (where-to-watch) per title, from the
+  // 12h-cached provider data. Real availability only — null when TMDB has none
+  // yet (common for still-upcoming titles), so the UI simply shows no badge.
+  const top = items.slice(0, 36);
+  return Promise.all(
+    top.map(async (it) => {
+      try {
+        const providers = await getWatchProviders(it.mediaType, it.id, region);
+        const names = providers ? streamingNames(providers.options) : [];
+        return { ...it, network: names[0] ?? null };
+      } catch {
+        return { ...it, network: null };
+      }
+    }),
+  );
 }
 
 export interface NewOnServices {

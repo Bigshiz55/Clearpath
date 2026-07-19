@@ -21,6 +21,7 @@ interface WallItem {
   posterPath: string | null;
   posterUrl: string | null;
   releaseDate?: string | null;
+  network?: string | null;
 }
 
 type MediaFilter = 'all' | 'movie' | 'tv';
@@ -214,7 +215,15 @@ export function ReleaseWall({
                 <div className="p-3">
                   <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block text-left">
                     <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>
-                    <div className="mt-0.5 text-xs text-slate-400">{t.year ?? '—'}</div>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">
+                      <span>{t.year ?? '—'}</span>
+                      {t.network && (
+                        <span className="inline-flex items-center gap-1 truncate rounded bg-brand-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-brand-200">
+                          <span aria-hidden>📺</span>
+                          <span className="truncate">{t.network}</span>
+                        </span>
+                      )}
+                    </div>
                   </button>
                   <AlgorithmScore mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-2" />
                 </div>
