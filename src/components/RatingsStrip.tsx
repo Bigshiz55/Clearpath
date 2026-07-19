@@ -82,7 +82,7 @@ export function RatingsStrip({
 
       {/* Line 2 — all three source ratings on one line: no pills on 🍅/🍿 (just
           icon + value) so tomato, popcorn and IMDb always fit together. */}
-      <div className="flex items-center gap-2 text-[11px] font-bold tabular-nums">
+      <div className="flex items-center gap-1.5 text-[10px] font-bold tabular-nums">
         <RatingChip
           label="🍅"
           value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
@@ -99,7 +99,7 @@ export function RatingsStrip({
           className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded px-1 py-0.5 text-[10px] ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
           title="IMDb rating"
         >
-          IMDb {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
+          <span className="text-[8px] font-black opacity-80">IMDb</span> {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
         </span>
       </div>
     </div>
@@ -114,7 +114,7 @@ function RatingChip({ label, value, tone, title }: { label: string; value: strin
       className={`inline-flex items-center gap-0.5 whitespace-nowrap ${value != null ? tone : 'text-slate-500'}`}
       title={title}
     >
-      <span aria-hidden className="text-sm leading-none">{label}</span>
+      <span aria-hidden className="text-xs leading-none">{label}</span>
       {value ?? '–'}
     </span>
   );
