@@ -47,7 +47,7 @@ export async function getDetectivePicks(
   horizonHours: DetectiveHorizon = 48,
 ): Promise<DetectivePick[]> {
   const region = regionFor(userId ? await getProfile(supabase, userId) : null);
-  const airings = (await getUpcomingTv(region, Date.now(), horizonHours * 60 * 60 * 1000)).slice(0, 14);
+  const airings = (await getUpcomingTv(region, Date.now(), horizonHours * 60 * 60 * 1000)).slice(0, 24);
 
   return Promise.all(
     airings.map(async (a) => {

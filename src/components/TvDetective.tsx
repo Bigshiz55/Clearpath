@@ -4,7 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
 import { CardDna } from '@/components/CardDna';
+import { SaveButton } from '@/components/SaveButton';
+import { TasteFeedback } from '@/components/TasteFeedback';
 import type { MediaType } from '@/lib/types';
+
+const VISIBLE = 12; // show a window of the pool; hiding one slides the next in
 
 interface Pick {
   id: number;
@@ -57,11 +61,19 @@ export function TvDetective() {
   const [hours, setHours] = useState<Horizon>(48);
   const [picks, setPicks] = useState<Pick[]>([]);
   const [reminded, setReminded] = useState<Set<number>>(new Set());
+  const [hidden, setHidden] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Triage: drop a pick and let the next reserve item slide into view.
+  function remove(id: number, note?: string) {
+    setHidden((s) => new Set(s).add(id));
+    if (note) setNotice(note);
+  }
+
   async function scan(h: Horizon = hours) {
     setState('scanning');
+    setHidden(new Set());
     try {
       const res = await fetch(`/api/detective?hours=${h}`);
       const data = await res.json();
@@ -159,15 +171,19 @@ export function TvDetective() {
         </div>
       )}
 
-      {state === 'done' && (
+      {state === 'done' && (() => {
+        const visible = picks.filter((p) => !hidden.has(p.id)).slice(0, VISIBLE);
+        return (
         <div className="mt-5">
           {picks.length === 0 ? (
             <p className="text-sm text-slate-400">The trail went cold — nothing notable in the {horizonLabel(hours)}. Try a wider window or check back later.</p>
+          ) : visible.length === 0 ? (
+            <p className="text-sm text-slate-400">You’ve been through them all. Scan again or widen the window for more.</p>
           ) : (
             <>
-              <div className="mb-3 text-sm font-bold uppercase tracking-wide text-brand-300">Case file · {picks.length} worth your time</div>
+              <div className="mb-3 text-sm font-bold uppercase tracking-wide text-brand-300">Case file · {visible.length} worth your time</div>
               <div className="space-y-3">
-                {picks.map((p) => {
+                {visible.map((p) => {
                   const ep = [
                     p.season != null && p.number != null ? `S${p.season}·E${p.number}` : null,
                     p.episodeName,
@@ -211,14 +227,37 @@ export function TvDetective() {
                         {/* Your DNA score for this show (when it resolves + you're personalized). */}
                         {p.tmdbId && p.mediaType && <CardDna mediaType={p.mediaType} tmdbId={p.tmdbId} className="mt-2 max-w-[240px]" />}
 
-                        <button
-                          onClick={() => toggle(p)}
-                          disabled={busy === p.id}
-                          className={`mt-3 self-start rounded-xl border px-4 py-2.5 text-sm font-bold transition disabled:opacity-50 ${reminded.has(p.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-brand-400/50 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25'}`}
-                          title="Get a notification 1 hour and 5 minutes before it airs"
-                        >
-                          {reminded.has(p.id) ? '🔔 Reminder on' : '🔔 Remind me'}
-                        </button>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => toggle(p)}
+                            disabled={busy === p.id}
+                            className={`rounded-xl border px-4 py-2.5 text-sm font-bold transition disabled:opacity-50 ${reminded.has(p.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-brand-400/50 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25'}`}
+                            title="Get a notification 1 hour and 5 minutes before it airs"
+                          >
+                            {reminded.has(p.id) ? '🔔 Reminder on' : '🔔 Remind me'}
+                          </button>
+                          {p.tmdbId && p.mediaType && (
+                            <>
+                              <SaveButton
+                                tmdbId={p.tmdbId}
+                                mediaType={p.mediaType}
+                                title={p.showName}
+                                year={null}
+                                posterPath={null}
+                                variant="inline"
+                                onSaved={() => remove(p.id, 'Added to your list — pulled in another pick.')}
+                              />
+                              <TasteFeedback
+                                tmdbId={p.tmdbId}
+                                mediaType={p.mediaType}
+                                title={p.showName}
+                                year={null}
+                                posterPath={null}
+                                onFlagged={() => remove(p.id)}
+                              />
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -228,7 +267,8 @@ export function TvDetective() {
             </>
           )}
         </div>
-      )}
+        );
+      })()}
     </section>
   );
 }

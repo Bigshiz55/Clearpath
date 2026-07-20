@@ -17,6 +17,8 @@ interface Props {
   variant?: 'overlay' | 'inline';
   /** Overlay variant only: grow to fill its flex track instead of a fixed square. */
   wide?: boolean;
+  /** Fires after a successful add — lets a list make room / advance. */
+  onSaved?: () => void;
 }
 
 export function SaveButton({
@@ -29,6 +31,7 @@ export function SaveButton({
   initialItemId = null,
   variant = 'overlay',
   wide = false,
+  onSaved,
 }: Props) {
   const toast = useToast();
   const [saved, setSaved] = useState(initialSaved);
@@ -58,6 +61,7 @@ export function SaveButton({
           setItemId(data?.itemId ?? null);
           setSaved(true);
           toast.show('Added to your list.', 'success');
+          onSaved?.();
         } else {
           toast.show(res.error ?? 'Sign in to save to your list.', 'error');
         }

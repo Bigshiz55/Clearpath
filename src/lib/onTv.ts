@@ -294,7 +294,7 @@ export async function getUpcomingTv(
     });
 
   // Rank by rating (unrated last), keep a healthy set, then show in time order.
-  const ranked = [...upcoming].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 20);
+  const ranked = [...upcoming].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 30);
   const seen = new Set<number>();
   return ranked
     .filter((a) => (seen.has(a.showId) ? false : (seen.add(a.showId), true)))
