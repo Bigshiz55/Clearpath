@@ -42,11 +42,11 @@ describe('buildProfile + dimensionMatch', () => {
   });
 
   it('a disliked title pushes the profile toward the opposite end', () => {
-    // Hated a gory title → profile should prefer clean, and reward a clean one.
-    const profile = buildProfile([{ dims: withDims({ gore: 95 }), rating: 2 }]);
-    expect(profile.pref.gore!).toBeLessThan(50);
-    expect(dimensionMatch(withDims({ gore: 5 }), profile)).toBeGreaterThan(
-      dimensionMatch(withDims({ gore: 95 }), profile),
+    // Hated a brutal title → profile should prefer tame, and reward a tame one.
+    const profile = buildProfile([{ dims: withDims({ violence: 95 }), rating: 2 }]);
+    expect(profile.pref.violence!).toBeLessThan(50);
+    expect(dimensionMatch(withDims({ violence: 5 }), profile)).toBeGreaterThan(
+      dimensionMatch(withDims({ violence: 95 }), profile),
     );
   });
 
@@ -66,13 +66,13 @@ describe('buildProfile + dimensionMatch', () => {
 describe('topDials', () => {
   it('surfaces the decisive axes with the right lean', () => {
     const profile = buildProfile([
-      { dims: withDims({ gore: 95, humor: 90 }), rating: 2 }, // hates gore & (via dislike) humor-opposite
+      { dims: withDims({ violence: 95, humor: 90 }), rating: 2 }, // hates brutal & (via dislike) humor-opposite
       { dims: withDims({ pacing: 5 }), rating: 10 }, // loves slow burn
     ]);
     const dials = topDials(profile);
     expect(dials.length).toBeGreaterThan(0);
-    const gore = dials.find((d) => d.dim.key === 'gore');
-    if (gore) expect(gore.lean).toBe('Clean');
+    const edge = dials.find((d) => d.dim.key === 'violence');
+    if (edge) expect(edge.lean).toBe('Tame');
   });
 });
 
@@ -112,7 +112,7 @@ describe('tasteDials', () => {
     const dials = tasteDials(strong);
     expect(dials.length).toBeGreaterThan(0);
     const dark = dials.find((d) => d.dim.key === 'darkness')!;
-    expect(dark.lean).toBe('Dark');
+    expect(dark.lean).toBe('Dark & heavy');
     expect(dark.samples).toBe(30);
     expect(dark.confidence).toBeGreaterThan(0.5);
     expect(dark.tier).toBe('strong');
@@ -126,13 +126,13 @@ describe('tasteDials', () => {
 
   it('always surfaces a pinned axis and marks it, even with no learned signal', () => {
     const empty = buildProfile([]);
-    const pinned = applyOverrides(empty, { romance: { pref: 90, isLimit: false }, gore: { pref: 0, isLimit: true } });
+    const pinned = applyOverrides(empty, { romance: { pref: 90, isLimit: false }, violence: { pref: 0, isLimit: true } });
     const dials = tasteDials(pinned);
     const romance = dials.find((d) => d.dim.key === 'romance')!;
     expect(romance.pinned).toBe(true);
     expect(romance.tier).toBe('strong');
-    const gore = dials.find((d) => d.dim.key === 'gore')!;
-    expect(gore.isLimit).toBe(true);
+    const edge = dials.find((d) => d.dim.key === 'violence')!;
+    expect(edge.isLimit).toBe(true);
   });
 });
 

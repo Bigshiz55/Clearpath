@@ -26,9 +26,9 @@ const RULES: { title: string; blurb: string; test: (p: DimensionProfile) => bool
     test: (p) => has(p, 'darkness', 'high') && has(p, 'pacing', 'low'),
   },
   {
-    title: 'The Thrill Seeker',
-    blurb: 'High tension, high stakes — you want to be gripped from the first minute.',
-    test: (p) => has(p, 'suspense', 'high') && (has(p, 'violence', 'high') || has(p, 'pacing', 'high')),
+    title: 'The Moral Gray-Zone',
+    blurb: 'Antiheroes, blurred lines, no easy answers — you like your good and evil tangled.',
+    test: (p) => has(p, 'morality', 'high') && has(p, 'darkness', 'high'),
   },
   {
     title: 'The Prestige Purist',
@@ -36,24 +36,39 @@ const RULES: { title: string; blurb: string; test: (p: DimensionProfile) => bool
     test: (p) => has(p, 'complexity', 'high') && has(p, 'character', 'high'),
   },
   {
+    title: 'The Thrill Seeker',
+    blurb: 'High tension, high stakes — you want to be gripped from the first minute.',
+    test: (p) => has(p, 'suspense', 'high') && (has(p, 'violence', 'high') || has(p, 'pacing', 'high')),
+  },
+  {
+    title: 'The Epic Escapist',
+    blurb: 'Sweeping, world-on-the-line stories set far from the everyday.',
+    test: (p) => has(p, 'stakes', 'high') && has(p, 'realism', 'low'),
+  },
+  {
+    title: 'The Feels Chaser',
+    blurb: 'You watch for the lump in your throat — big-hearted, deeply felt stories.',
+    test: (p) => has(p, 'emotion', 'high') && (has(p, 'darkness', 'low') || has(p, 'warmth', 'high')),
+  },
+  {
+    title: 'The Genre Explorer',
+    blurb: 'The fantastical and the impossible — you love worlds unlike your own.',
+    test: (p) => has(p, 'realism', 'low'),
+  },
+  {
+    title: 'The Grounded Realist',
+    blurb: 'True-to-life, grounded stories over spectacle — you like it real.',
+    test: (p) => has(p, 'realism', 'high'),
+  },
+  {
     title: 'The Comfort Watcher',
     blurb: 'Warm, funny, easy to love — you watch to feel good, not to work for it.',
-    test: (p) => has(p, 'humor', 'high') && (has(p, 'darkness', 'low') || has(p, 'family', 'high')),
+    test: (p) => has(p, 'humor', 'high') && (has(p, 'darkness', 'low') || has(p, 'warmth', 'high')),
   },
   {
     title: 'The Easy Streamer',
     blurb: 'Low-effort, background-friendly picks that don’t demand your full attention.',
     test: (p) => has(p, 'attention', 'low'),
-  },
-  {
-    title: 'The Genre Explorer',
-    blurb: 'Sci-fi, the supernatural, the fantastical — you love worlds unlike your own.',
-    test: (p) => has(p, 'scifi', 'high') || has(p, 'supernatural', 'high'),
-  },
-  {
-    title: 'The Grounded Realist',
-    blurb: 'True-to-life, grounded stories over spectacle — you like it real.',
-    test: (p) => has(p, 'realism', 'high') && has(p, 'supernatural', 'low'),
   },
   {
     title: 'The Romantic',

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { unstable_cache } from 'next/cache';
 import { serverEnv } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getTitle } from '@/lib/tmdb/client';
 import {
   DIMENSIONS,
   DIMENSION_KEYS,
@@ -24,6 +25,9 @@ import type { MediaType, TitleMetadata } from '@/lib/types';
  */
 
 const MODEL = 'gpt-4o-mini';
+
+/** Max titles to classify on-demand per profile build (bounds cost; the rest fill in on later builds). */
+const BACKFILL_CAP = 12;
 
 const SYSTEM_PROMPT =
   `You are a film & TV taste analyst. Score the title on each axis from 0 to 100 using its genres, keywords, and synopsis. ` +
@@ -193,6 +197,27 @@ async function computeUserProfile(userId: string): Promise<DimensionProfile> {
   if (rows.length === 0) return hasOverrides ? applyOverrides(empty, overrides) : empty;
 
   const dimsByKey = await getCachedDimsBatch(admin, rows);
+
+  // Backfill: titles with no valid (current-vocabulary) fingerprint yet — classify
+  // a bounded few per build so a user's DNA repopulates quickly after an axis-set
+  // change, instead of thinning until each title is re-viewed elsewhere. Cached
+  // globally once classified, so this cost is paid at most once per title.
+  const missing = rows.filter((r) => !dimsByKey.has(`${r.media_type}-${r.tmdb_id}`)).slice(0, BACKFILL_CAP);
+  if (missing.length > 0) {
+    const filled = await Promise.all(
+      missing.map(async (r) => {
+        try {
+          const meta = await getTitle(r.media_type, r.tmdb_id);
+          const dims = await getTitleDimensions(meta);
+          return dims ? ([`${r.media_type}-${r.tmdb_id}`, dims] as const) : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    for (const f of filled) if (f) dimsByKey.set(f[0], f[1]);
+  }
+
   const pairs = rows
     .map((r) => {
       const dims = dimsByKey.get(`${r.media_type}-${r.tmdb_id}`);

@@ -17,7 +17,7 @@ describe('describePersonality', () => {
   it('reads a dark slow-burn lover as The Slow-Burn Noir', () => {
     const p = describePersonality(loves({ darkness: 95, pacing: 5 }));
     expect(p.title).toBe('The Slow-Burn Noir');
-    expect(p.traits).toContain('Dark');
+    expect(p.traits).toContain('Dark & heavy');
   });
 
   it('reads a cerebral character lover as The Prestige Purist', () => {
@@ -29,7 +29,7 @@ describe('describePersonality', () => {
   });
 
   it('falls back to a signature mix for an unusual but decisive profile', () => {
-    const p = describePersonality(loves({ dialogue: 95 }));
+    const p = describePersonality(loves({ serialized: 95 }));
     expect(p.title).toBe('Your Signature Mix');
     expect(p.traits.length).toBeGreaterThan(0);
   });

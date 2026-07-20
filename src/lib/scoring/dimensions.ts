@@ -14,26 +14,28 @@ export interface Dimension {
   high: string; // what 100 means
 }
 
-/** The fixed 18 axes. Order is stable — profiles/vectors key off `key`, not index. */
+/**
+ * The curated 15 taste axes — each is classifiable from genres/keywords/synopsis,
+ * discriminating (people genuinely split on it), and non-redundant. Genre flags
+ * (sci-fi, supernatural) live in genre-affinity, not here; audience-friendliness
+ * is a context filter, not a taste axis. Order is stable — profiles key off `key`.
+ */
 export const DIMENSIONS: readonly Dimension[] = [
-  { key: 'pacing', label: 'Pacing', low: 'Slow burn', high: 'Fast-paced' },
-  { key: 'darkness', label: 'Tone', low: 'Light', high: 'Dark' },
-  { key: 'suspense', label: 'Suspense', low: 'Low tension', high: 'Edge-of-seat' },
+  { key: 'pacing', label: 'Pace', low: 'Slow burn', high: 'Fast-paced' },
+  { key: 'darkness', label: 'Tone', low: 'Feel-good', high: 'Dark & heavy' },
+  { key: 'warmth', label: 'Warmth', low: 'Cynical', high: 'Hopeful' },
+  { key: 'humor', label: 'Humor', low: 'Serious', high: 'Comedy-heavy' },
+  { key: 'suspense', label: 'Tension', low: 'Low tension', high: 'Edge-of-seat' },
+  { key: 'emotion', label: 'Emotional intensity', low: 'Breezy', high: 'Gut-punch' },
   { key: 'complexity', label: 'Complexity', low: 'Easy watch', high: 'Cerebral' },
-  { key: 'emotion', label: 'Emotional weight', low: 'Breezy', high: 'Heavy' },
-  { key: 'humor', label: 'Humor', low: 'Serious', high: 'Funny' },
   { key: 'realism', label: 'Realism', low: 'Fantastical', high: 'Grounded' },
-  { key: 'scifi', label: 'Sci-fi', low: 'None', high: 'Core sci-fi' },
-  { key: 'supernatural', label: 'Supernatural', low: 'None', high: 'Central' },
-  { key: 'romance', label: 'Romance', low: 'None', high: 'Central' },
-  { key: 'violence', label: 'Violence', low: 'Tame', high: 'Brutal' },
-  { key: 'gore', label: 'Gore', low: 'Clean', high: 'Graphic' },
-  { key: 'surprise', label: 'Surprise', low: 'Predictable', high: 'Unpredictable' },
-  { key: 'dialogue', label: 'Dialogue', low: 'Sparse', high: 'Dialogue-driven' },
   { key: 'character', label: 'Focus', low: 'Plot-driven', high: 'Character-driven' },
-  { key: 'serialized', label: 'Structure', low: 'Episodic', high: 'Serialized' },
-  { key: 'family', label: 'Audience', low: 'Adult', high: 'Family-friendly' },
+  { key: 'stakes', label: 'Stakes', low: 'Intimate', high: 'Epic' },
+  { key: 'morality', label: 'Moral clarity', low: 'Clear-cut', high: 'Morally grey' },
+  { key: 'violence', label: 'Content edge', low: 'Tame', high: 'Brutal' },
   { key: 'attention', label: 'Attention', low: 'Background-friendly', high: 'Demands focus' },
+  { key: 'serialized', label: 'Structure', low: 'Episodic', high: 'Serialized' },
+  { key: 'romance', label: 'Romance', low: 'None', high: 'Central' },
 ] as const;
 
 export const DIMENSION_KEYS = DIMENSIONS.map((d) => d.key);
