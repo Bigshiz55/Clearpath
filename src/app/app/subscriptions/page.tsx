@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
 import { getSubscriptionValue, type ServiceValue } from '@/lib/subscriptionValue';
+import { isPro } from '@/lib/pro';
+import { PRO_PRICE_LABEL } from '@/lib/proPlan';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Are your subscriptions worth it?' };
@@ -23,6 +25,7 @@ export default async function SubscriptionsPage() {
   const uid = user?.id ?? '';
   const region = regionFor(uid ? await getProfile(supabase, uid) : null);
   const v = await getSubscriptionValue(supabase, uid, region);
+  const pro = uid ? await isPro(supabase, uid) : false;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -54,6 +57,26 @@ export default async function SubscriptionsPage() {
               )}
             </div>
           </div>
+
+          {/* Pro conversion — at the AHA moment, framed as ROI. Honest: all real Pro features. */}
+          {!pro && (
+            <div className="card border-gold-400/40 bg-gradient-to-br from-gold-500/[0.08] to-transparent p-5">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl" aria-hidden>⭐</span>
+                <div className="min-w-0">
+                  <div className="font-bold text-white">
+                    {v.potentialSavings >= 3.99
+                      ? `Pro is basically free here — cancel one unused service and it pays for itself.`
+                      : `Get more out of what you already pay for.`}
+                  </div>
+                  <p className="mt-1 text-sm text-slate-300">
+                    WatchVerdict Pro ({PRO_PRICE_LABEL}) unlocks <span className="text-white">AI-tuned verdicts</span>, <span className="text-white">household profiles</span>, bigger Live Court, and an <span className="text-white">ad-free grid</span> — so the services you keep actually get used.
+                  </p>
+                  <Link href="/app/pro" className="btn-primary mt-3 inline-flex">✨ Go Pro — {PRO_PRICE_LABEL}</Link>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Per service */}
           <div className="space-y-2.5">
