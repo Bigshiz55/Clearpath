@@ -88,7 +88,9 @@ export function SaveButton({
         onClick={toggle}
         disabled={busy}
         aria-label={saved ? 'Remove from list' : 'Add to list'}
-        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+        className={`items-center gap-1.5 rounded-lg border font-semibold transition ${
+          wide ? 'flex w-full justify-center px-3 py-3 text-sm' : 'inline-flex px-2.5 py-1.5 text-xs'
+        } ${
           saved
             ? 'border-brand-400/50 bg-brand-500/25 text-white'
             : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'

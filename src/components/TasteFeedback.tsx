@@ -115,7 +115,7 @@ export function TasteFeedback({
         className={
           compact
             ? `grid h-7 place-items-center rounded-md border border-red-400/60 bg-red-500/25 text-sm leading-none transition hover:bg-red-500/40 ${wide ? 'w-full flex-1' : 'w-7'}`
-            : 'inline-flex items-center gap-1 rounded-lg border border-red-400/50 bg-black/60 px-2 py-1 text-[11px] font-bold text-red-100 backdrop-blur transition hover:bg-red-500/25'
+            : `items-center gap-1 rounded-lg border border-red-400/50 bg-black/60 font-bold text-red-100 backdrop-blur transition hover:bg-red-500/25 ${wide ? 'flex w-full justify-center px-3 py-3 text-sm' : 'inline-flex px-2 py-1 text-[11px]'}`
         }
       >
         <span aria-hidden className="leading-none">🚫</span>
