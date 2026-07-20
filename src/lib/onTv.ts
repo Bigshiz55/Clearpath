@@ -1,6 +1,8 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getCriticRatings } from '@/lib/omdb';
+import { findTmdbByImdb } from '@/lib/tmdb/client';
+import type { MediaType } from '@/lib/types';
 
 /**
  * "On TV Today" — a real broadcast schedule, powered by TVmaze (free, no key).
@@ -31,6 +33,9 @@ export interface Airing {
   criticImdb?: number | null; // 0..10
   criticRt?: number | null; // 0..100
   criticMeta?: number | null; // 0..100
+  // Resolved TMDB id (from the imdb id) — powers Save / Remove / DNA on the card.
+  tmdbId?: number | null;
+  mediaType?: MediaType | null;
 }
 
 interface TvmazeShow {
@@ -141,6 +146,30 @@ export async function enrichAiringsWithCritics(airings: Airing[], cap = 30): Pro
       return { ...a, criticImdb: c.imdbRating ?? null, criticRt: c.rottenTomatoes ?? null, criticMeta: c.metascore ?? null };
     }),
   );
+}
+
+/**
+ * Resolve TMDB ids (movie/tv) for the best-rated airings so their cards can
+ * offer Save / Remove / a DNA score. Bounded by `cap` and spent on the
+ * highest-rated first (they're what surface as "highlights"), matched by the
+ * show's imdb id. Real matches only — no id, no buttons.
+ */
+export async function enrichAiringsWithTmdb(airings: Airing[], cap = 14): Promise<Airing[]> {
+  const ranked = [...airings]
+    .filter((a) => a.imdb)
+    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
+    .slice(0, cap);
+  const resolved = new Map<number, { id: number; mediaType: MediaType }>();
+  await Promise.all(
+    ranked.map(async (a) => {
+      const r = await findTmdbByImdb(a.imdb!).catch(() => null);
+      if (r) resolved.set(a.id, r);
+    }),
+  );
+  return airings.map((a) => {
+    const r = resolved.get(a.id);
+    return r ? { ...a, tmdbId: r.id, mediaType: r.mediaType } : a;
+  });
 }
 
 export interface NextAiring {

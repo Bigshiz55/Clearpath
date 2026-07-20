@@ -3,6 +3,9 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
+import { SaveButton } from '@/components/SaveButton';
+import { TasteFeedback } from '@/components/TasteFeedback';
+import { CardDna } from '@/components/CardDna';
 import type { Airing } from '@/lib/onTv';
 
 type TimeFilter = 'all' | 'primetime' | 'nownext';
@@ -66,6 +69,8 @@ export function OnTvGuide({
   const [reminded, setReminded] = useState<Set<number>>(new Set(remindedIds));
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<Set<number>>(new Set());
+  const remove = (id: number) => setHidden((s) => new Set(s).add(id));
 
   async function toggleReminder(a: Airing) {
     setBusy(a.id);
@@ -120,12 +125,13 @@ export function OnTvGuide({
   }, [airings, time, sort, nowMin, streaming, media]);
 
   // Highlights — best-rated picks (prime-time for broadcast; overall for streaming).
-  const highlights = useMemo(() => {
+  const highlightPool = useMemo(() => {
     return airings
       .filter((a) => !NOISE_TYPES.has(a.showType) && a.rating != null && (streaming || (a.minutes >= 18 * 60 && a.minutes <= 23 * 60)))
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
-      .slice(0, 6);
+      .slice(0, 10);
   }, [airings, streaming]);
+  const highlights = highlightPool.filter((a) => !hidden.has(a.id)).slice(0, 6);
 
   if (airings.length === 0) {
     return (
@@ -163,27 +169,46 @@ export function OnTvGuide({
           <p className="mb-3 text-xs text-slate-400">
             {streaming ? 'Highest-rated premieres on the major services' : 'Best-reviewed shows in prime time'} — rating is TVmaze’s community score.
           </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {highlights.map((a) => (
-              <div key={a.id} className="card overflow-hidden">
-                <div className="aspect-[2/3] overflow-hidden bg-ink-800">
-                  {a.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={a.image} alt="" loading="lazy" className="h-full w-full object-cover" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {highlights.map((a) => {
+              const poster = a.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={a.image} alt="" loading="lazy" className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full w-full place-items-center p-2 text-center text-[11px] text-slate-400">{a.showName}</div>
+              );
+              const resolved = a.tmdbId != null && a.mediaType != null;
+              return (
+                <div key={a.id} className="card flex flex-col overflow-hidden">
+                  {resolved ? (
+                    <Link href={`/app/title/${a.mediaType}/${a.tmdbId}`} className="block aspect-[2/3] overflow-hidden bg-ink-800">{poster}</Link>
                   ) : (
-                    <div className="grid h-full w-full place-items-center p-2 text-center text-[11px] text-slate-400">{a.showName}</div>
+                    <div className="aspect-[2/3] overflow-hidden bg-ink-800">{poster}</div>
                   )}
-                </div>
-                <div className="p-2">
-                  <div className="line-clamp-2 text-xs font-semibold text-white">{a.showName}</div>
-                  <div className="mt-1 flex items-center justify-between gap-1">
-                    <span className="truncate text-sm font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
-                    {a.rating != null && <span className={`flex-none text-xs font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
+                  <div className="flex flex-1 flex-col p-2">
+                    <div className="line-clamp-2 text-xs font-semibold text-white">{a.showName}</div>
+                    <div className="mt-1 flex items-center justify-between gap-1">
+                      <span className="truncate text-sm font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
+                      {a.rating != null && <span className={`flex-none text-xs font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
+                    </div>
+                    {(a.criticRt != null || a.criticImdb != null) && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-bold tabular-nums">
+                        {a.criticRt != null && <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes">🍅 {a.criticRt}%</span>}
+                        {a.criticImdb != null && <span className="rounded bg-[#f5c518] px-1 text-[10px] font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>}
+                      </div>
+                    )}
+                    <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
+                    {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
+                    {resolved && (
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <SaveButton tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={null} posterPath={null} wide onSaved={() => remove(a.id)} />
+                        <TasteFeedback compact wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={null} posterPath={null} onFlagged={() => remove(a.id)} />
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-1 line-clamp-2 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
