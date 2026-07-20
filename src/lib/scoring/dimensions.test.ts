@@ -136,6 +136,34 @@ describe('tasteDials', () => {
   });
 });
 
+describe('missing axes never produce NaN', () => {
+  // A profile cached before an axis existed: only some keys present.
+  const stale = { pref: { pacing: 85, darkness: 90 }, weight: { pacing: 30, darkness: 30 }, samples: 12 };
+
+  it('dnaStrength stays a finite 0..100', () => {
+    const s = dnaStrength(stale);
+    expect(Number.isNaN(s)).toBe(false);
+    expect(s).toBeGreaterThanOrEqual(0);
+    expect(s).toBeLessThanOrEqual(100);
+  });
+
+  it('dimensionMatch stays finite', () => {
+    const m = dimensionMatch(fill(50), stale);
+    expect(Number.isNaN(m)).toBe(false);
+  });
+
+  it('tasteDials emit finite positions and treat absent axes as neutral', () => {
+    const dials = tasteDials(stale);
+    for (const d of dials) {
+      expect(Number.isNaN(d.pref)).toBe(false);
+      expect(Number.isNaN(d.decisiveness)).toBe(false);
+    }
+    // Present decisive axis surfaces; absent ones default to neutral and drop out.
+    expect(dials.some((d) => d.dim.key === 'pacing')).toBe(true);
+    expect(dials.some((d) => d.dim.key === 'warmth')).toBe(false);
+  });
+});
+
 describe('applyOverrides', () => {
   it('overlays the pinned value, ignores unknown keys, and clamps', () => {
     const p = applyOverrides(buildProfile([]), {

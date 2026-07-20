@@ -126,6 +126,16 @@ export function buildProfile(rows: { dims: TitleDimensions; rating: number }[]):
 const clamp100 = (n: number) => Math.max(0, Math.min(100, n));
 
 /**
+ * A profile's preference on an axis, defaulting to neutral (50) when the axis is
+ * absent — e.g. a profile cached before an axis was added. Guarantees a finite
+ * number so downstream arithmetic never yields NaN.
+ */
+function prefOf(profile: DimensionProfile, key: string): number {
+  const v = profile.pref[key];
+  return typeof v === 'number' && Number.isFinite(v) ? v : 50;
+}
+
+/**
  * How well a title's fingerprint matches a user's profile, 0..100.
  * Per axis: similarity = 100 - |title - pref|, weighted by how *decisive* the
  * user is on that axis (|pref - 50|) and how much evidence backs it. Axes the
@@ -137,11 +147,12 @@ export function dimensionMatch(dims: TitleDimensions, profile: DimensionProfile)
   for (const k of DIMENSION_KEYS) {
     const v = dims[k];
     if (typeof v !== 'number') continue;
-    const decisiveness = Math.abs(profile.pref[k]! - 50) / 50; // 0..1
+    const pk = prefOf(profile, k);
+    const decisiveness = Math.abs(pk - 50) / 50; // 0..1
     const evidence = Math.min(1, (profile.weight[k] ?? 0) / 12); // saturates ~ a few strong ratings
     const w = decisiveness * evidence;
     if (w <= 0) continue;
-    const sim = 100 - Math.abs(v - profile.pref[k]!);
+    const sim = 100 - Math.abs(v - pk);
     num += w * sim;
     den += w;
   }
@@ -158,7 +169,7 @@ export function dnaStrength(profile: DimensionProfile): number {
   const coverage = Math.min(1, profile.samples / 50);
   let sum = 0;
   for (const k of DIMENSION_KEYS) {
-    const decisive = Math.abs(profile.pref[k]! - 50) / 50; // 0..1
+    const decisive = Math.abs(prefOf(profile, k) - 50) / 50; // 0..1
     const evidence = Math.min(1, (profile.weight[k] ?? 0) / 12);
     sum += decisive * evidence;
   }
@@ -168,11 +179,10 @@ export function dnaStrength(profile: DimensionProfile): number {
 
 /** The axes the user cares most about (decisive + backed by evidence), for "your taste dials". */
 export function topDials(profile: DimensionProfile, limit = 4): { dim: Dimension; pref: number; lean: string }[] {
-  return DIMENSIONS.map((dim) => ({
-    dim,
-    pref: profile.pref[dim.key]!,
-    score: Math.abs(profile.pref[dim.key]! - 50) * Math.min(1, (profile.weight[dim.key] ?? 0) / 12),
-  }))
+  return DIMENSIONS.map((dim) => {
+    const pref = prefOf(profile, dim.key);
+    return { dim, pref, score: Math.abs(pref - 50) * Math.min(1, (profile.weight[dim.key] ?? 0) / 12) };
+  })
     .filter((x) => x.score > 4)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
@@ -241,7 +251,7 @@ export function tasteDials(profile: DimensionProfile, limit = 8): TasteDial[] {
   const confidence = profileConfidence(profile);
   const overrides = profile.overrides ?? {};
   return DIMENSIONS.map((dim) => {
-    const pref = profile.pref[dim.key]!;
+    const pref = prefOf(profile, dim.key);
     const evidence = Math.min(1, (profile.weight[dim.key] ?? 0) / 12);
     const pinned = !!overrides[dim.key];
     return { dim, pref, evidence, pinned, score: Math.abs(pref - 50) * evidence + (pinned ? 1000 : 0) };
@@ -276,7 +286,7 @@ export function matchHighlights(
 ): { agree: { label: string; note: string }[]; clash: { label: string; note: string }[] } {
   const scored = DIMENSIONS.map((dim) => {
     const v = dims[dim.key];
-    const pref = profile.pref[dim.key]!;
+    const pref = prefOf(profile, dim.key);
     const decisiveness = Math.abs(pref - 50) / 50;
     const evidence = Math.min(1, (profile.weight[dim.key] ?? 0) / 12);
     const w = decisiveness * evidence;
