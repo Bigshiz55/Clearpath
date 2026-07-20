@@ -51,7 +51,7 @@ export function ImportForm() {
 
     let titles: ParsedTitle[] = parseImportText(text);
     if (titles.length === 0) {
-      setError('No titles found. Paste a list or choose your Netflix CSV file.');
+      setError('No titles found. Paste a list, or choose a CSV export (Letterboxd, Trakt, Simkl, TV Time, Netflix…).');
       return;
     }
     if (titles.length > MAX_TITLES) titles = titles.slice(0, MAX_TITLES);
@@ -94,7 +94,7 @@ export function ImportForm() {
           className="btn-secondary"
           disabled={running}
         >
-          Choose Netflix CSV…
+          Choose a CSV file…
         </button>
         <input
           ref={fileRef}
@@ -125,7 +125,7 @@ export function ImportForm() {
         <span className="text-xs text-slate-500">
           {previewCount > 0
             ? `${previewCount} unique ${previewCount === 1 ? 'title' : 'titles'} ready`
-            : 'Netflix CSV or one title per line'}
+            : 'Any CSV export, or one title per line'}
         </span>
         <button
           type="button"
