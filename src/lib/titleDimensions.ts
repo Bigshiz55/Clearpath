@@ -8,8 +8,10 @@ import {
   DIMENSION_KEYS,
   isValidDimensions,
   buildProfile,
+  applyOverrides,
   type TitleDimensions,
   type DimensionProfile,
+  type DimensionOverrides,
 } from '@/lib/scoring/dimensions';
 import type { MediaType, TitleMetadata } from '@/lib/types';
 
@@ -147,6 +149,23 @@ export async function getCachedDimensions(
   }
 }
 
+/** Read the user's manual dial corrections (guarded — table missing = none). */
+async function getOverrides(admin: ReturnType<typeof createAdminClient>, userId: string): Promise<DimensionOverrides> {
+  try {
+    const { data } = await admin
+      .from('dimension_overrides')
+      .select('dimension_key, pref, is_limit')
+      .eq('user_id', userId);
+    const out: DimensionOverrides = {};
+    for (const row of data ?? []) {
+      if (typeof row.pref === 'number') out[row.dimension_key as string] = { pref: row.pref, isLimit: !!row.is_limit };
+    }
+    return out;
+  } catch {
+    return {}; // table missing (migration 0018 not applied) → no corrections
+  }
+}
+
 async function computeUserProfile(userId: string): Promise<DimensionProfile> {
   const empty = buildProfile([]);
   if (!userId) return empty;
@@ -168,7 +187,10 @@ async function computeUserProfile(userId: string): Promise<DimensionProfile> {
     media_type: MediaType;
     rating: number;
   }[];
-  if (rows.length === 0) return empty;
+
+  const overrides = await getOverrides(admin, userId);
+  const hasOverrides = Object.keys(overrides).length > 0;
+  if (rows.length === 0) return hasOverrides ? applyOverrides(empty, overrides) : empty;
 
   const dimsByKey = await getCachedDimsBatch(admin, rows);
   const pairs = rows
@@ -177,7 +199,8 @@ async function computeUserProfile(userId: string): Promise<DimensionProfile> {
       return dims ? { dims, rating: r.rating } : null;
     })
     .filter((x): x is { dims: TitleDimensions; rating: number } => x !== null);
-  return buildProfile(pairs);
+  const learned = buildProfile(pairs);
+  return hasOverrides ? applyOverrides(learned, overrides) : learned;
 }
 
 /**

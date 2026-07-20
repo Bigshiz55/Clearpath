@@ -6,6 +6,9 @@ import {
   dimensionMatch,
   dnaStrength,
   topDials,
+  tasteDials,
+  applyOverrides,
+  profileConfidence,
   matchHighlights,
   type TitleDimensions,
 } from './dimensions';
@@ -97,6 +100,68 @@ describe('dnaStrength', () => {
     const decisive = dnaStrength(buildProfile(rows({ darkness: 98, humor: 2, pacing: 5 })));
     const bland = dnaStrength(buildProfile(rows({ darkness: 52, humor: 48, pacing: 51 })));
     expect(decisive).toBeGreaterThan(bland);
+  });
+});
+
+describe('tasteDials', () => {
+  const strong = buildProfile(
+    Array.from({ length: 30 }, () => ({ dims: withDims({ darkness: 96, humor: 4, pacing: 8 }), rating: 9 })),
+  );
+
+  it('carries confidence, sample count, lean and a strength tier', () => {
+    const dials = tasteDials(strong);
+    expect(dials.length).toBeGreaterThan(0);
+    const dark = dials.find((d) => d.dim.key === 'darkness')!;
+    expect(dark.lean).toBe('Dark');
+    expect(dark.samples).toBe(30);
+    expect(dark.confidence).toBeGreaterThan(0.5);
+    expect(dark.tier).toBe('strong');
+  });
+
+  it('labels a thin profile as still learning', () => {
+    const thin = buildProfile([{ dims: withDims({ darkness: 70 }), rating: 7 }]);
+    const dials = tasteDials(thin);
+    if (dials.length) expect(dials.every((d) => d.confidence < 0.3 ? d.tier === 'learning' : true)).toBe(true);
+  });
+
+  it('always surfaces a pinned axis and marks it, even with no learned signal', () => {
+    const empty = buildProfile([]);
+    const pinned = applyOverrides(empty, { romance: { pref: 90, isLimit: false }, gore: { pref: 0, isLimit: true } });
+    const dials = tasteDials(pinned);
+    const romance = dials.find((d) => d.dim.key === 'romance')!;
+    expect(romance.pinned).toBe(true);
+    expect(romance.tier).toBe('strong');
+    const gore = dials.find((d) => d.dim.key === 'gore')!;
+    expect(gore.isLimit).toBe(true);
+  });
+});
+
+describe('applyOverrides', () => {
+  it('overlays the pinned value, ignores unknown keys, and clamps', () => {
+    const p = applyOverrides(buildProfile([]), {
+      humor: { pref: 120, isLimit: false }, // clamps to 100
+      bogus: { pref: 50, isLimit: false },
+    });
+    expect(p.pref.humor).toBe(100);
+    expect(p.overrides?.humor).toEqual({ pref: 100, isLimit: false });
+    expect(p.overrides?.bogus).toBeUndefined();
+  });
+
+  it('a pinned dial steers matching toward the chosen end', () => {
+    const p = applyOverrides(buildProfile([]), { violence: { pref: 5, isLimit: true } });
+    expect(dimensionMatch(withDims({ violence: 5 }), p)).toBeGreaterThan(dimensionMatch(withDims({ violence: 95 }), p));
+  });
+});
+
+describe('profileConfidence', () => {
+  it('rises with more, stronger ratings and stays in 0..1', () => {
+    const few = profileConfidence(buildProfile([{ dims: withDims({ darkness: 90 }), rating: 7 }]));
+    const many = profileConfidence(
+      buildProfile(Array.from({ length: 30 }, () => ({ dims: withDims({ darkness: 90 }), rating: 10 }))),
+    );
+    expect(few).toBeGreaterThanOrEqual(0);
+    expect(many).toBeGreaterThan(few);
+    expect(many).toBeLessThanOrEqual(1);
   });
 });
 

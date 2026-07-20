@@ -3,9 +3,10 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getUserDimensionProfile } from '@/lib/titleDimensions';
 import { getWatchStats } from '@/lib/watchStats';
-import { topDials, dnaStrength } from '@/lib/scoring/dimensions';
+import { tasteDials, dnaStrength } from '@/lib/scoring/dimensions';
 import { describePersonality } from '@/lib/scoring/personality';
 import { ShareCard, WatchDnaCardArt } from '@/components/ShareCards';
+import { TasteDials } from '@/components/TasteDials';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Your Watch DNA' };
@@ -21,7 +22,7 @@ export default async function WatchDnaPage() {
 
   const stats = await getWatchStats(supabase, uid);
   const profile = await getUserDimensionProfile(supabase, uid, stats.rated);
-  const dials = topDials(profile, 8);
+  const dials = tasteDials(profile, 8);
   const persona = describePersonality(profile);
   const dnaScore = dnaStrength(profile);
 
@@ -70,32 +71,21 @@ export default async function WatchDnaPage() {
           <Link href="/app/quiz" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
         </div>
         {ready && dials.length > 0 ? (
-          <div className="mt-4 space-y-4">
-            {dials.map((d) => {
-              const strong = Math.abs(d.pref - 50) >= 25;
-              return (
-                <div key={d.dim.key}>
-                  {/* Axis name + which way this user leans on it */}
-                  <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                    <span className="text-sm font-bold text-white">{d.dim.label}</span>
-                    <span className={`text-xs font-bold ${strong ? 'text-brand-200' : 'text-slate-300'}`}>{d.lean}</span>
-                  </div>
-                  <div className="relative h-2 rounded-full bg-white/10">
-                    <span className="absolute left-1/2 top-1/2 h-3 w-px -translate-y-1/2 bg-white/25" />
-                    <span
-                      className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand-500 shadow"
-                      style={{ left: `${d.pref}%` }}
-                    />
-                  </div>
-                  {/* Endpoint labels under the track so the axis reads left↔right */}
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{d.dim.low}</span>
-                    <span>{d.dim.high}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <TasteDials
+            dials={dials.map((d) => ({
+              key: d.dim.key,
+              label: d.dim.label,
+              low: d.dim.low,
+              high: d.dim.high,
+              pref: d.pref,
+              lean: d.lean,
+              tier: d.tier,
+              confidence: d.confidence,
+              samples: d.samples,
+              pinned: d.pinned,
+              isLimit: d.isLimit,
+            }))}
+          />
         ) : (
           <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-5 text-center">
             <div className="text-3xl">🍿</div>
@@ -103,7 +93,13 @@ export default async function WatchDnaPage() {
             <Link href="/app/quiz" className="btn-primary mt-3 inline-flex">Play the Taste Quiz →</Link>
           </div>
         )}
-        {ready && <p className="mt-4 text-[11px] text-slate-500">Learned from {profile.samples} rated titles. The more you rate, the sharper it gets.</p>}
+        {ready && (
+          <p className="mt-4 text-[11px] text-slate-500">
+            Learned from {profile.samples} rated titles — the more you rate, the sharper it gets. Tap{' '}
+            <span className="font-semibold text-slate-400">Adjust</span> on any dial to correct it yourself; a dealbreaker
+            steers your recommendations hard away (and becomes a hard filter as content-advisory data lands).
+          </p>
+        )}
       </section>
 
       {/* Shareable card */}

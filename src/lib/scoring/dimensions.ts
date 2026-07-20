@@ -60,7 +60,15 @@ export interface DimensionProfile {
   pref: Record<string, number>;
   weight: Record<string, number>;
   samples: number;
+  /** Axes the user has manually corrected/pinned (overlaid onto the learned values). */
+  overrides?: DimensionOverrides;
 }
+
+/** A user's manual correction of a dial: a pinned position and whether it's a hard limit. */
+export type DimensionOverrides = Record<string, { pref: number; isLimit: boolean }>;
+
+/** Evidence weight assigned to a pinned axis so a manual correction is decisive and always surfaces. */
+export const PINNED_WEIGHT = 12;
 
 interface ProfileAccumulator {
   wSum: Record<string, number>; // Σ |w|
@@ -167,6 +175,92 @@ export function topDials(profile: DimensionProfile, limit = 4): { dim: Dimension
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((x) => ({ dim: x.dim, pref: x.pref, lean: x.pref >= 50 ? x.dim.high : x.dim.low }));
+}
+
+/**
+ * Overlay the user's manual corrections onto a learned profile: each pinned axis
+ * takes the user's chosen position and a decisive evidence weight, so it always
+ * surfaces and steers matching. Pure — returns a new profile, unknown keys ignored.
+ */
+export function applyOverrides(profile: DimensionProfile, overrides: DimensionOverrides): DimensionProfile {
+  const pref = { ...profile.pref };
+  const weight = { ...profile.weight };
+  const clean: DimensionOverrides = {};
+  for (const [k, o] of Object.entries(overrides)) {
+    if (!DIMENSION_KEYS.includes(k) || typeof o?.pref !== 'number' || !Number.isFinite(o.pref)) continue;
+    pref[k] = clamp100(o.pref);
+    weight[k] = Math.max(weight[k] ?? 0, PINNED_WEIGHT);
+    clean[k] = { pref: clamp100(o.pref), isLimit: !!o.isLimit };
+  }
+  return { ...profile, pref, weight, overrides: clean };
+}
+
+/**
+ * Overall confidence in the profile, 0..1 — how much evidence stands behind it.
+ * Blends how many titles were rated with the strength of those ratings. Drives the
+ * "still learning → strong read" labeling; a manual pin reads as fully confident.
+ */
+export function profileConfidence(profile: DimensionProfile): number {
+  const volume = Math.min(1, profile.samples / 20);
+  const anyKey = DIMENSION_KEYS[0]!;
+  const evidence = Math.min(1, (profile.weight[anyKey] ?? 0) / 30);
+  return Math.max(0, Math.min(1, 0.55 * volume + 0.45 * evidence));
+}
+
+export type DialTier = 'learning' | 'weak' | 'moderate' | 'strong';
+
+function dialTier(decisiveness: number, confidence: number, pinned: boolean): DialTier {
+  if (pinned) return 'strong';
+  if (confidence < 0.3) return 'learning';
+  if (decisiveness < 0.2) return 'weak';
+  if (decisiveness < 0.45) return 'moderate';
+  return 'strong';
+}
+
+/** A fully-described taste dial: position, lean, how sure/decisive it is, and manual-correction state. */
+export interface TasteDial {
+  dim: Dimension;
+  pref: number; // 0..100 position on the axis
+  lean: string; // the endpoint label the user leans toward
+  decisiveness: number; // 0..1 — how far from neutral
+  confidence: number; // 0..1 — how much evidence backs it
+  samples: number; // titles behind the profile
+  tier: DialTier; // learning | weak | moderate | strong
+  pinned: boolean; // the user manually set this
+  isLimit: boolean; // the user marked it a hard "never recommend" limit
+}
+
+/**
+ * The dials to show, richest first. Surfaces axes that are decisive + evidenced,
+ * plus any the user has pinned (which always appear). Each carries its confidence,
+ * sample count, strength tier, and manual-correction state for the UI.
+ */
+export function tasteDials(profile: DimensionProfile, limit = 8): TasteDial[] {
+  const confidence = profileConfidence(profile);
+  const overrides = profile.overrides ?? {};
+  return DIMENSIONS.map((dim) => {
+    const pref = profile.pref[dim.key]!;
+    const evidence = Math.min(1, (profile.weight[dim.key] ?? 0) / 12);
+    const pinned = !!overrides[dim.key];
+    return { dim, pref, evidence, pinned, score: Math.abs(pref - 50) * evidence + (pinned ? 1000 : 0) };
+  })
+    .filter((x) => x.pinned || x.score > 4)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((x) => {
+      const decisiveness = Math.abs(x.pref - 50) / 50;
+      return {
+        dim: x.dim,
+        pref: x.pref,
+        lean: x.pref >= 50 ? x.dim.high : x.dim.low,
+        decisiveness,
+        confidence: x.pinned ? 1 : confidence,
+        samples: profile.samples,
+        tier: dialTier(decisiveness, confidence, x.pinned),
+        pinned: x.pinned,
+        isLimit: !!overrides[x.dim.key]?.isLimit,
+      };
+    });
 }
 
 /**
