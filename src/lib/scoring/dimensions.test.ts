@@ -4,6 +4,7 @@ import {
   isValidDimensions,
   buildProfile,
   dimensionMatch,
+  dnaStrength,
   topDials,
   matchHighlights,
   type TitleDimensions,
@@ -69,6 +70,33 @@ describe('topDials', () => {
     expect(dials.length).toBeGreaterThan(0);
     const gore = dials.find((d) => d.dim.key === 'gore');
     if (gore) expect(gore.lean).toBe('Clean');
+  });
+});
+
+describe('dnaStrength', () => {
+  it('is 0 for an empty profile and always in 0..100', () => {
+    const s = dnaStrength(buildProfile([]));
+    expect(s).toBe(0);
+    expect(s).toBeGreaterThanOrEqual(0);
+    expect(s).toBeLessThanOrEqual(100);
+  });
+
+  it('grows as you rate more decisive titles', () => {
+    const few = dnaStrength(buildProfile([{ dims: withDims({ darkness: 95, pacing: 5 }), rating: 10 }]));
+    const many = dnaStrength(
+      buildProfile(
+        Array.from({ length: 40 }, () => ({ dims: withDims({ darkness: 95, pacing: 5, humor: 5 }), rating: 10 })),
+      ),
+    );
+    expect(many).toBeGreaterThan(few);
+    expect(many).toBeLessThanOrEqual(100);
+  });
+
+  it('a decisive taste scores above a wishy-washy one at equal volume', () => {
+    const rows = (over: Partial<TitleDimensions>) => Array.from({ length: 20 }, () => ({ dims: withDims(over), rating: 9 }));
+    const decisive = dnaStrength(buildProfile(rows({ darkness: 98, humor: 2, pacing: 5 })));
+    const bland = dnaStrength(buildProfile(rows({ darkness: 52, humor: 48, pacing: 51 })));
+    expect(decisive).toBeGreaterThan(bland);
   });
 });
 

@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getUserDimensionProfile } from '@/lib/titleDimensions';
 import { getWatchStats } from '@/lib/watchStats';
-import { topDials } from '@/lib/scoring/dimensions';
+import { topDials, dnaStrength } from '@/lib/scoring/dimensions';
 import { describePersonality } from '@/lib/scoring/personality';
 import { ShareCard, WatchDnaCardArt } from '@/components/ShareCards';
 
@@ -23,6 +23,7 @@ export default async function WatchDnaPage() {
   const profile = await getUserDimensionProfile(supabase, uid, stats.rated);
   const dials = topDials(profile, 8);
   const persona = describePersonality(profile);
+  const dnaScore = dnaStrength(profile);
 
   const ready = profile.samples >= 3;
 
@@ -36,8 +37,13 @@ export default async function WatchDnaPage() {
       {/* Personality */}
       <section className="card overflow-hidden p-0">
         <div className="bg-gradient-to-br from-brand-500/20 via-fuchsia-500/10 to-transparent p-5 sm:p-6">
-          <div className="text-xs font-bold uppercase tracking-[0.15em] text-brand-300">Your watch personality</div>
-          <h2 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">{persona.title}</h2>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-xs font-bold uppercase tracking-[0.15em] text-brand-300">Your watch personality</div>
+              <h2 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">{persona.title}</h2>
+            </div>
+            <DnaScoreBadge score={dnaScore} />
+          </div>
           <p className="mt-1.5 text-sm text-slate-200">{persona.blurb}</p>
           {persona.traits.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -64,15 +70,15 @@ export default async function WatchDnaPage() {
           <Link href="/app/quiz" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
         </div>
         {ready && dials.length > 0 ? (
-          <div className="mt-4 space-y-3.5">
+          <div className="mt-4 space-y-4">
             {dials.map((d) => {
               const strong = Math.abs(d.pref - 50) >= 25;
               return (
                 <div key={d.dim.key}>
-                  <div className="mb-1 flex items-center justify-between text-xs">
-                    <span className="text-slate-400">{d.dim.low}</span>
-                    <span className={`font-bold ${strong ? 'text-brand-200' : 'text-slate-200'}`}>{d.lean}</span>
-                    <span className="text-slate-400">{d.dim.high}</span>
+                  {/* Axis name + which way this user leans on it */}
+                  <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-bold text-white">{d.dim.label}</span>
+                    <span className={`text-xs font-bold ${strong ? 'text-brand-200' : 'text-slate-300'}`}>{d.lean}</span>
                   </div>
                   <div className="relative h-2 rounded-full bg-white/10">
                     <span className="absolute left-1/2 top-1/2 h-3 w-px -translate-y-1/2 bg-white/25" />
@@ -80,6 +86,11 @@ export default async function WatchDnaPage() {
                       className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand-500 shadow"
                       style={{ left: `${d.pref}%` }}
                     />
+                  </div>
+                  {/* Endpoint labels under the track so the axis reads left↔right */}
+                  <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>{d.dim.low}</span>
+                    <span>{d.dim.high}</span>
                   </div>
                 </div>
               );
@@ -109,11 +120,49 @@ export default async function WatchDnaPage() {
                 dials={dials.slice(0, 5).map((d) => ({ label: d.dim.label, low: d.dim.low, high: d.dim.high, pref: d.pref, lean: d.lean }))}
                 finishRate={stats.finishRate}
                 rated={stats.rated}
+                dnaScore={dnaScore}
               />
             </ShareCard>
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+/** A cool circular "Watch DNA score" gauge — how developed the taste profile is. */
+function DnaScoreBadge({ score }: { score: number }) {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  const dash = (Math.max(0, Math.min(100, score)) / 100) * c;
+  const tier = score >= 75 ? 'Elite' : score >= 50 ? 'Sharp' : score >= 25 ? 'Forming' : 'New';
+  return (
+    <div className="flex flex-none flex-col items-center">
+      <div className="relative h-[68px] w-[68px]">
+        <svg viewBox="0 0 68 68" className="h-full w-full -rotate-90">
+          <circle cx="34" cy="34" r={r} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="6" />
+          <circle
+            cx="34"
+            cy="34"
+            r={r}
+            fill="none"
+            stroke="url(#dnaGauge)"
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${c}`}
+          />
+          <defs>
+            <linearGradient id="dnaGauge" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#a855f7" />
+              <stop offset="100%" stopColor="#ff1493" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-xl font-black tabular-nums leading-none text-white">{score}</span>
+        </div>
+      </div>
+      <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-brand-300">DNA · {tier}</div>
     </div>
   );
 }

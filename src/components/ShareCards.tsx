@@ -164,6 +164,7 @@ export function WatchDnaCardArt({
   dials,
   finishRate,
   rated,
+  dnaScore,
 }: {
   title: string;
   blurb: string;
@@ -171,12 +172,39 @@ export function WatchDnaCardArt({
   dials: DnaDial[];
   finishRate: number | null;
   rated: number;
+  dnaScore?: number;
 }) {
+  const tier =
+    dnaScore == null ? '' : dnaScore >= 75 ? 'Elite' : dnaScore >= 50 ? 'Sharp' : dnaScore >= 25 ? 'Forming' : 'New';
   return (
     <div style={{ ...shell, width: 360, minHeight: 520, background: 'radial-gradient(130% 100% at 0% 0%, #2a1747 0%, #10233f 45%, #0b1020 75%)' }}>
       {MARK}
-      <div style={{ marginTop: 24, fontSize: 12, letterSpacing: 2, color: '#c4b5fd', textTransform: 'uppercase' }}>My Watch DNA 🧬</div>
-      <div style={{ marginTop: 4, fontSize: 32, fontWeight: 900, lineHeight: 1.03 }}>{title}</div>
+      <div style={{ marginTop: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 12, letterSpacing: 2, color: '#c4b5fd', textTransform: 'uppercase' }}>My Watch DNA 🧬</div>
+          <div style={{ marginTop: 4, fontSize: 32, fontWeight: 900, lineHeight: 1.03 }}>{title}</div>
+        </div>
+        {dnaScore != null && (
+          <div style={{ flex: 'none', textAlign: 'center' }}>
+            <div
+              style={{
+                width: 62,
+                height: 62,
+                borderRadius: 999,
+                background: 'linear-gradient(135deg,#a855f7,#ff1493)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 22px rgba(168,85,247,.45)',
+              }}
+            >
+              <span style={{ fontSize: 24, fontWeight: 900, lineHeight: 1, color: '#fff' }}>{dnaScore}</span>
+            </div>
+            <div style={{ marginTop: 4, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.6, color: '#c4b5fd', textTransform: 'uppercase' }}>DNA · {tier}</div>
+          </div>
+        )}
+      </div>
       <div style={{ marginTop: 8, fontSize: 14, color: '#c7d0e4', lineHeight: 1.35 }}>{blurb}</div>
 
       {traits.length > 0 && (

@@ -138,6 +138,24 @@ export function dimensionMatch(dims: TitleDimensions, profile: DimensionProfile)
   return den > 0 ? clamp100(Math.round(num / den)) : 50;
 }
 
+/**
+ * A single "Watch DNA" score, 0..100 — how developed a user's taste profile is.
+ * Blends coverage (how many titles they've rated) with definition (how decisive
+ * and well-evidenced their leans are). Grows as they rate more and their taste
+ * sharpens. Cosmetic/motivational — never feeds title scoring.
+ */
+export function dnaStrength(profile: DimensionProfile): number {
+  const coverage = Math.min(1, profile.samples / 50);
+  let sum = 0;
+  for (const k of DIMENSION_KEYS) {
+    const decisive = Math.abs(profile.pref[k]! - 50) / 50; // 0..1
+    const evidence = Math.min(1, (profile.weight[k] ?? 0) / 12);
+    sum += decisive * evidence;
+  }
+  const definition = Math.min(1, (sum / DIMENSION_KEYS.length) * 3);
+  return clamp100(Math.round(100 * (0.5 * coverage + 0.5 * definition)));
+}
+
 /** The axes the user cares most about (decisive + backed by evidence), for "your taste dials". */
 export function topDials(profile: DimensionProfile, limit = 4): { dim: Dimension; pref: number; lean: string }[] {
   return DIMENSIONS.map((dim) => ({
