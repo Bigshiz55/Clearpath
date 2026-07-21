@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
-import { HelixMark } from './HelixMark';
+import { Verd1ctBadge } from './Verd1ctBadge';
 
 /**
  * The pure DNA Score for a card — a slim pink row (helix + your 0–100 taste
@@ -26,17 +26,13 @@ export function CardDna({ mediaType, tmdbId, className = '' }: { mediaType: Medi
 
   return (
     <div
-      className={`flex items-center justify-between gap-2 rounded-lg border border-pink-400/60 bg-gradient-to-r from-pink-500/25 to-rose-500/15 px-2 py-1 ${className}`}
-      title="WatchVerdict DNA Score — how closely this matches YOUR taste (0–100), learned from what you’ve rated. Pure taste fit; the Watchability rating blends this with the critic/audience scores."
+      className={`flex items-center gap-2 rounded-lg border border-pink-400/50 bg-gradient-to-r from-pink-500/20 to-rose-500/10 px-2 py-1.5 ${className}`}
+      title="Your VERD1CT — how closely this matches YOUR taste (0–100), learned from what you’ve rated. Pure taste fit; the Watchability rating blends this with the critic/audience scores."
     >
-      <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-pink-100">
-        <HelixMark className="h-4 w-4" />
-        DNA Score
-      </span>
-      <span className="flex items-baseline gap-1 tabular-nums text-white">
-        <span className="text-sm font-black">{dna.tasteScore}</span>
-        <span className="text-[9px] font-bold text-pink-100/80">/100</span>
-        <span className="ml-1 text-[9px] font-semibold uppercase tracking-wide text-pink-100/90">your taste</span>
+      <Verd1ctBadge score={dna.tasteScore} px={30} />
+      <span className="flex min-w-0 flex-col leading-tight">
+        <span className="text-[10px] font-black uppercase tracking-wide text-pink-100">Your VERD1CT</span>
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">your taste match</span>
       </span>
     </div>
   );
