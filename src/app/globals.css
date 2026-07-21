@@ -205,10 +205,19 @@ body {
 /* Fixed-width slot so the wider "1" never pushes the "CT" — the mark's width
    never changes. The glyph flips on the horizontal axis like a baseball
    scoreboard / split-flap: front is the "I", back is a white "1". */
-.wv-iflip { display: inline-block; width: 0.58em; text-align: center; perspective: 420px; }
+.wv-iflip {
+  display: inline-block;
+  width: 0.64em;
+  text-align: center;
+  perspective: 420px;
+  color: #ffffff; /* accent stays white on both the I and the 1 */
+  /* A slab/serif face so the capital "I" carries top + bottom bars and can't be
+     mistaken for a lowercase l or a 1 — modern slab first, serif fallback. */
+  font-family: 'Roboto Slab', 'Rockwell', 'Zilla Slab', Georgia, 'Times New Roman', serif;
+}
 .wv-iflip-inner { position: relative; display: block; transform-style: preserve-3d; animation: wv-iflip 12s ease-in-out infinite; }
 .wv-iflip-face { display: block; backface-visibility: hidden; }
-.wv-iflip-back { position: absolute; top: 0; left: 0; right: 0; transform: rotateX(180deg); color: #ffffff; }
+.wv-iflip-back { position: absolute; top: 0; left: 0; right: 0; transform: rotateX(180deg); }
 /* Even alternation I → 1 → I → 1: ~2s held on each, ~1s slow flip between.
    Ends at 720deg (an I) so the loop repeats seamlessly. */
 @keyframes wv-iflip {

@@ -54,7 +54,7 @@ export function Logo({
     <Link href={href} className="group inline-flex items-center gap-2.5">
       <LogoMark box={box} inner={inner} />
       {!compact && (
-        <span className={`font-bold tracking-tight text-white ${word}`}>
+        <span className={`whitespace-nowrap font-bold tracking-tight text-white ${word}`}>
           Watch
           <span className="text-[#ff1493]" aria-hidden>
             VERD
