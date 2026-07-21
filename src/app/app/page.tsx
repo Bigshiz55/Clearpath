@@ -13,6 +13,8 @@ import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { InstallHint } from '@/components/InstallHint';
 import { getTonight } from '@/lib/tonight';
+import { ImpactCounter } from '@/components/ImpactCounter';
+import { proMemberCount } from '@/lib/pro';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -52,6 +54,7 @@ export default async function DiscoverPage() {
 
   // A quick 48-hour scan of what's coming on TV, folded into recommendations.
   const upcomingTv = (await getUpcomingTv(regionFor(profile), Date.now()).catch(() => [])).slice(0, 12);
+  const members = await proMemberCount();
 
   return (
     <div className="space-y-8">
@@ -122,6 +125,11 @@ export default async function DiscoverPage() {
           ))}
         </div>
       </section>
+
+      {/* Watching gives back — the pledge, visible right on the hub. */}
+      <div className="mx-auto max-w-2xl">
+        <ImpactCounter members={members} />
+      </div>
 
       <RecommendedForYou label={label} />
 
