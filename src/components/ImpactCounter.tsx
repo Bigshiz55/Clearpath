@@ -10,7 +10,6 @@ import { PLEDGE } from '@/lib/proPlan';
 export function ImpactCounter({ members, className = '' }: { members: number; className?: string }) {
   const monthly = members * PLEDGE.amountUsd;
   const annual = monthly * 12;
-  const dest = PLEDGE.charity ?? PLEDGE.cause;
 
   return (
     <div className={`card border-pink-400/40 bg-gradient-to-br from-pink-500/[0.12] to-transparent p-5 ${className}`}>
@@ -33,12 +32,12 @@ export function ImpactCounter({ members, className = '' }: { members: number; cl
         {members > 0 ? (
           <>
             <span className="font-bold text-white">{members.toLocaleString('en-US')}</span> member{members === 1 ? '' : 's'} giving{' '}
-            <span className="text-white">${PLEDGE.amountUsd}/mo</span> each to {dest} — about{' '}
+            <span className="text-white">${PLEDGE.amountUsd}/mo</span> each to the causes they choose — about{' '}
             <span className="font-bold text-white">${annual.toLocaleString('en-US')}/yr</span>. Company-funded and disbursed monthly.
           </>
         ) : (
           <>
-            Every WatchVerdict Pro membership pledges <span className="text-white">${PLEDGE.amountUsd}/mo</span> to {dest}. Join and you’re part of the first payout.
+            Every WatchVerdict Pro membership pledges <span className="text-white">${PLEDGE.amountUsd}/mo</span> to {PLEDGE.cause}. Join and you’re part of the first payout.
           </>
         )}
       </p>

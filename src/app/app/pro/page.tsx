@@ -6,6 +6,9 @@ import { PRO_FEATURES, PRO_PRICE_LABEL, PLEDGE } from '@/lib/proPlan';
 import { ProUpgradeButton } from '@/components/ProUpgrade';
 import { PinkRibbon } from '@/components/PinkRibbon';
 import { ImpactCounter } from '@/components/ImpactCounter';
+import { CharityPicker } from '@/components/CharityPicker';
+import { getCharity } from '@/lib/profile';
+import { charityById } from '@/lib/charities';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'WatchVerdict Pro' };
@@ -16,6 +19,8 @@ export default async function ProPage() {
   const ent = user ? await getEntitlement(supabase, user.id) : { pro: false, source: null, currentPeriodEnd: null };
   const isAdmin = !!user?.email && serverEnv.adminEmails().includes(user.email.toLowerCase());
   const members = await proMemberCount();
+  const charityId = user ? await getCharity(supabase, user.id) : null;
+  const chosen = charityById(charityId);
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -43,7 +48,7 @@ export default async function ProPage() {
           )}
           <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-pink-400/30 bg-pink-500/[0.08] px-4 py-2.5 text-sm text-pink-100">
             <PinkRibbon className="h-5 w-5 flex-none text-[#ff6fae]" />
-            <span>Your membership gives <span className="font-bold text-white">${PLEDGE.amountUsd}/mo</span> to {PLEDGE.cause}. 💗</span>
+            <span>Your membership gives <span className="font-bold text-white">${PLEDGE.amountUsd}/mo</span> to {chosen ? <span className="font-bold text-white">{chosen.emoji} {chosen.name}</span> : PLEDGE.cause}. 💗</span>
           </div>
           <Link href="/app" className="btn-secondary mt-4 inline-flex">Back to WatchVerdict →</Link>
         </div>
@@ -87,6 +92,9 @@ export default async function ProPage() {
           </div>
         </>
       )}
+
+      {/* Pick / change the cause the pledge supports — for members and prospects alike. */}
+      {user && <CharityPicker current={charityId} isPro={ent.pro} />}
     </div>
   );
 }

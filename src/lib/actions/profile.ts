@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PreferenceTrait, PreferenceRule } from '@/lib/types';
 import { avoidRule, loveRule, SCOTT_RULES, SCOTT_LIKED_FRANCHISE_IDS, normalizeRule } from '@/lib/scoring/preferences';
+import { isCharityId } from '@/lib/charities';
 
 export interface ActionResult {
   ok: boolean;
@@ -296,6 +297,55 @@ export async function updateMyServices(input: z.infer<typeof servicesSchema>): P
     }
     revalidatePath('/app/settings');
     revalidatePath('/app');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed.' };
+  }
+}
+
+const avatarSchema = z.object({ avatar: z.string().max(8).nullable() });
+
+/** Set (or clear) the account avatar emoji. Clearing (null) falls back to the initial. */
+export async function updateAvatar(input: z.infer<typeof avatarSchema>): Promise<ActionResult> {
+  const parsed = avatarSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'Invalid avatar.' };
+  try {
+    const supabase = createClient();
+    const user = await requireUser(supabase);
+    const value = parsed.data.avatar && parsed.data.avatar.trim() ? parsed.data.avatar.trim() : null;
+    const { error } = await supabase.from('profiles').update({ avatar: value }).eq('id', user.id);
+    if (error) {
+      if (error.code === '42703' || /avatar/.test(error.message)) {
+        return { ok: false, error: 'Avatars need migration 0019 applied to the database first.' };
+      }
+      return { ok: false, error: error.message };
+    }
+    revalidatePath('/app');
+    revalidatePath('/app/settings');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed.' };
+  }
+}
+
+const charitySchema = z.object({ charity: z.string().max(40) });
+
+/** Direct the membership pledge to one of the listed causes. */
+export async function updateCharity(input: z.infer<typeof charitySchema>): Promise<ActionResult> {
+  const parsed = charitySchema.safeParse(input);
+  if (!parsed.success || !isCharityId(parsed.data.charity)) return { ok: false, error: 'Pick a listed cause.' };
+  try {
+    const supabase = createClient();
+    const user = await requireUser(supabase);
+    const { error } = await supabase.from('profiles').update({ charity: parsed.data.charity }).eq('id', user.id);
+    if (error) {
+      if (error.code === '42703' || /charity/.test(error.message)) {
+        return { ok: false, error: 'Choosing a cause needs migration 0019 applied to the database first.' };
+      }
+      return { ok: false, error: error.message };
+    }
+    revalidatePath('/app/pro');
+    revalidatePath('/app/settings');
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Failed.' };

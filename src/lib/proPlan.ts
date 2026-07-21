@@ -16,8 +16,8 @@ export const PRO_PRICE_LABEL = '$3.99/mo';
  */
 export const PLEDGE = {
   amountUsd: 1,
-  cause: 'breast cancer research',
-  charity: null as string | null, // e.g. 'the Breast Cancer Research Foundation'
+  cause: 'a cause you choose', // members pick from the charity list; default is BCRF
+  charity: null as string | null,
 } as const;
 
 export const pledgeLabel = () => `$${PLEDGE.amountUsd}/mo to ${PLEDGE.cause}`;

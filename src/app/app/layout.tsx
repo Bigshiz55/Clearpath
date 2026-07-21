@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getProfile, ensureGuestProfile, personalLabelFor } from '@/lib/profile';
+import { getProfile, ensureGuestProfile, personalLabelFor, getAvatar } from '@/lib/profile';
 import { isPro } from '@/lib/pro';
 import { Nav } from '@/components/Nav';
 import { NavArrows } from '@/components/NavArrows';
@@ -35,7 +35,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const pro = isGuest ? false : await isPro(supabase, user.id);
-  const avatarLabel = (user.email?.[0] ?? '🍿').toUpperCase();
+  const avatar = isGuest ? null : await getAvatar(supabase, user.id);
+  const avatarLabel = avatar ?? (user.email?.[0] ?? '🍿').toUpperCase();
 
   return (
     <div className="min-h-dvh pb-20 sm:pb-0">

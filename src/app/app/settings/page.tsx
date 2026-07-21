@@ -1,8 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
-import { getProfile, getPreferenceRules, personalLabelFor, getMyServices, getPublicActivity, regionFor } from '@/lib/profile';
+import { getProfile, getPreferenceRules, personalLabelFor, getMyServices, getPublicActivity, getAvatar, getCharity, regionFor } from '@/lib/profile';
+import { isPro } from '@/lib/pro';
 import { getBrowseProviders } from '@/lib/browse';
 import { isAdminEmail } from '@/lib/admin';
 import { SettingsView, type ShareRow } from '@/components/settings/SettingsView';
+import { AvatarPicker } from '@/components/AvatarPicker';
+import { CharityPicker } from '@/components/CharityPicker';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Settings' };
@@ -14,7 +17,7 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
   const uid = user?.id ?? '';
 
-  const [profile, rules, sharesRes, myServices, publicActivity] = await Promise.all([
+  const [profile, rules, sharesRes, myServices, publicActivity, avatar, charity, pro] = await Promise.all([
     getProfile(supabase, uid),
     getPreferenceRules(supabase, uid),
     supabase
@@ -24,7 +27,11 @@ export default async function SettingsPage() {
       .order('created_at', { ascending: false }),
     getMyServices(supabase, uid),
     getPublicActivity(supabase, uid),
+    getAvatar(supabase, uid),
+    getCharity(supabase, uid),
+    uid ? isPro(supabase, uid) : Promise.resolve(false),
   ]);
+  const avatarInitial = (user?.email?.[0] ?? '🍿').toUpperCase();
 
   // The full region provider catalog (real TMDB ids + names) so the services
   // picker can be searched and is genuinely extensive — not a hardcoded 15.
@@ -43,20 +50,26 @@ export default async function SettingsPage() {
   }));
 
   return (
-    <SettingsView
-      email={user?.email ?? ''}
-      displayName={profile?.display_name ?? ''}
-      username={profile?.username ?? ''}
-      region={profile?.region ?? 'US'}
-      personalLabel={profile ? personalLabelFor(profile) : 'My Match'}
-      dailyDigest={profile?.daily_digest ?? true}
-      digestMinScore={profile?.digest_min_score ?? 72}
-      rules={rules}
-      shares={shares}
-      myServices={myServices}
-      providerCatalog={providerCatalog}
-      publicActivity={publicActivity}
-      isAdmin={isAdminEmail(user?.email)}
-    />
+    <div className="space-y-6">
+      <AvatarPicker current={avatar} initial={avatarInitial} pro={pro} donor={pro} />
+
+      <SettingsView
+        email={user?.email ?? ''}
+        displayName={profile?.display_name ?? ''}
+        username={profile?.username ?? ''}
+        region={profile?.region ?? 'US'}
+        personalLabel={profile ? personalLabelFor(profile) : 'My Match'}
+        dailyDigest={profile?.daily_digest ?? true}
+        digestMinScore={profile?.digest_min_score ?? 72}
+        rules={rules}
+        shares={shares}
+        myServices={myServices}
+        providerCatalog={providerCatalog}
+        publicActivity={publicActivity}
+        isAdmin={isAdminEmail(user?.email)}
+      />
+
+      <CharityPicker current={charity} isPro={pro} />
+    </div>
   );
 }
