@@ -1,11 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
-import { getProfile, getPreferenceRules, personalLabelFor, getMyServices, getPublicActivity, getAvatar, getCharity, regionFor } from '@/lib/profile';
+import { getProfile, getPreferenceRules, personalLabelFor, getMyServices, getPublicActivity, getAvatar, regionFor } from '@/lib/profile';
 import { isPro } from '@/lib/pro';
 import { getBrowseProviders } from '@/lib/browse';
 import { isAdminEmail } from '@/lib/admin';
 import { SettingsView, type ShareRow } from '@/components/settings/SettingsView';
 import { AvatarPicker } from '@/components/AvatarPicker';
-import { CharityPicker } from '@/components/CharityPicker';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Settings' };
@@ -17,7 +16,7 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
   const uid = user?.id ?? '';
 
-  const [profile, rules, sharesRes, myServices, publicActivity, avatar, charity, pro] = await Promise.all([
+  const [profile, rules, sharesRes, myServices, publicActivity, avatar, pro] = await Promise.all([
     getProfile(supabase, uid),
     getPreferenceRules(supabase, uid),
     supabase
@@ -28,7 +27,6 @@ export default async function SettingsPage() {
     getMyServices(supabase, uid),
     getPublicActivity(supabase, uid),
     getAvatar(supabase, uid),
-    getCharity(supabase, uid),
     uid ? isPro(supabase, uid) : Promise.resolve(false),
   ]);
   const avatarInitial = (user?.email?.[0] ?? '🍿').toUpperCase();
@@ -51,7 +49,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <AvatarPicker current={avatar} initial={avatarInitial} pro={pro} donor={pro} />
+      <AvatarPicker current={avatar} initial={avatarInitial} pro={pro} />
 
       <SettingsView
         email={user?.email ?? ''}
@@ -68,8 +66,6 @@ export default async function SettingsPage() {
         publicActivity={publicActivity}
         isAdmin={isAdminEmail(user?.email)}
       />
-
-      <CharityPicker current={charity} isPro={pro} />
     </div>
   );
 }

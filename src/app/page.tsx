@@ -1,11 +1,6 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { PromiseBar } from '@/components/PromiseBar';
-import { ImpactCounter } from '@/components/ImpactCounter';
-import { proMemberCount } from '@/lib/pro';
-
-// Regenerate the page (and its impact count) every 10 min — cached, still fast.
-export const revalidate = 600;
 
 const FEATURES = [
   {
@@ -26,8 +21,7 @@ const FEATURES = [
   },
 ];
 
-export default async function LandingPage() {
-  const members = await proMemberCount();
+export default function LandingPage() {
   return (
     <div className="min-h-dvh">
       <PromiseBar />
@@ -77,18 +71,6 @@ export default async function LandingPage() {
                 <p className="mt-2 text-sm text-slate-400">{f.body}</p>
               </div>
             ))}
-          </div>
-        </section>
-
-        <section className="container-page pb-16">
-          <div className="mx-auto max-w-xl">
-            <div className="mb-4 text-center">
-              <h2 className="text-2xl font-bold text-white sm:text-3xl">Watching gives back.</h2>
-              <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-                Every WatchVerdict Pro membership sends part of its price to charity — no extra cost, no catch.
-              </p>
-            </div>
-            <ImpactCounter members={members} />
           </div>
         </section>
 

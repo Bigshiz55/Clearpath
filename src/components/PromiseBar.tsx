@@ -1,9 +1,7 @@
-import { PinkRibbon } from '@/components/PinkRibbon';
-
 /**
  * A slim, glowing tagline strip for the very top of the site — the three
  * promises, with a slow sheen so it catches the eye without taking over the
- * screen. The ribbon marks "Meaningful impact" (the charity pledge).
+ * screen.
  */
 export function PromiseBar({ rounded = false }: { rounded?: boolean }) {
   return (
@@ -18,11 +16,11 @@ export function PromiseBar({ rounded = false }: { rounded?: boolean }) {
           <span aria-hidden className="text-base sm:text-lg">🎯</span> Better recommendations
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden>🤝</span> Honest subscriptions
+          <span aria-hidden>💸</span> Stop overpaying for streaming
         </span>
         <span aria-hidden className="text-white/40">·</span>
         <span className="inline-flex items-center gap-1.5">
-          <PinkRibbon className="h-3.5 w-3.5 text-white" /> Meaningful impact
+          <span aria-hidden>🤝</span> Honest &amp; on your side
         </span>
       </div>
       {/* moving sheen */}

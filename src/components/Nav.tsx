@@ -83,10 +83,10 @@ export function Nav({
                 <Link
                   href="/app/settings"
                   aria-label={`Account${pro ? ' · Pro member' : ''}`}
-                  title={pro ? 'Your account · Pro member & donor' : 'Your account'}
+                  title={pro ? 'Your account · Pro member' : 'Your account'}
                   className="ml-0.5 inline-flex"
                 >
-                  <Avatar label={avatarLabel} px={34} pro={pro} donor={pro} />
+                  <Avatar label={avatarLabel} px={34} pro={pro} />
                 </Link>
               </>
             )}

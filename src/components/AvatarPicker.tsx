@@ -7,7 +7,7 @@ import { Avatar } from '@/components/Avatar';
 
 const EMOJI = ['🍿', '🎬', '🎭', '🕶️', '👑', '🐉', '🦊', '🧠', '🔥', '🌙', '⚡', '🎯', '🦉', '🌵', '🎸', '👽', '🐺', '🍕', '🧛', '🤠'];
 
-export function AvatarPicker({ current, initial, pro = false, donor = false }: { current: string | null; initial: string; pro?: boolean; donor?: boolean }) {
+export function AvatarPicker({ current, initial, pro = false }: { current: string | null; initial: string; pro?: boolean }) {
   const router = useRouter();
   const [sel, setSel] = useState<string | null>(current);
   const [pending, start] = useTransition();
@@ -30,7 +30,7 @@ export function AvatarPicker({ current, initial, pro = false, donor = false }: {
   return (
     <section className="card p-5 sm:p-6">
       <div className="flex items-center gap-4">
-        <Avatar label={sel || initial} px={56} pro={pro} donor={donor} />
+        <Avatar label={sel || initial} px={56} pro={pro} />
         <div>
           <h2 className="text-lg font-bold text-white">Your avatar</h2>
           <p className="text-sm text-slate-400">Pick an emoji, or use your initial ({initial}).</p>

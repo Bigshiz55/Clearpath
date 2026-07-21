@@ -45,27 +45,6 @@ export async function isPro(supabase: SupabaseClient, userId: string): Promise<b
 }
 
 /**
- * Count of currently-active Pro members (service role, across all users) — the
- * honest basis for the charity impact counter. Never throws: returns 0 if the
- * table is missing or anything errors, so the counter degrades to "be the first".
- */
-export async function proMemberCount(): Promise<number> {
-  try {
-    const admin = createAdminClient();
-    const nowIso = new Date().toISOString();
-    const { count, error } = await admin
-      .from('entitlements')
-      .select('user_id', { count: 'exact', head: true })
-      .eq('pro', true)
-      .or(`current_period_end.is.null,current_period_end.gt.${nowIso}`);
-    if (error) return 0;
-    return count ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-/**
  * Grant (or refresh) Pro for a user — used by a processor webhook or an admin
  * action. Writes via the service role. `currentPeriodEnd` null = no expiry.
  */

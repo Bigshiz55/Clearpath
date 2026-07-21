@@ -7,21 +7,6 @@
 export const PRO_PRICE_USD = 3.99;
 export const PRO_PRICE_LABEL = '$3.99/mo';
 
-/**
- * Cause pledge shown on Pro: $1 of every membership, every month, goes to
- * breast cancer research. This is a WatchVerdict pledge funded by memberships —
- * NOT a separate tax-deductible gift by the member, so copy never implies that.
- * TODO before launch: name the specific 501(c)(3) partner in `charity` (e.g.
- * the Breast Cancer Research Foundation) once the arrangement is confirmed.
- */
-export const PLEDGE = {
-  amountUsd: 1,
-  cause: 'a cause you choose', // members pick from the charity list; default is BCRF
-  charity: null as string | null,
-} as const;
-
-export const pledgeLabel = () => `$${PLEDGE.amountUsd}/mo to ${PLEDGE.cause}`;
-
 export interface ProFeature {
   emoji: string;
   title: string;

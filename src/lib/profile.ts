@@ -159,15 +159,6 @@ export async function getAvatar(supabase: SupabaseClient, userId: string): Promi
   return typeof v === 'string' && v.trim() ? v : null;
 }
 
-/** The charity id the user directs their pledge to (guarded — null before migration 0019). */
-export async function getCharity(supabase: SupabaseClient, userId: string): Promise<string | null> {
-  if (!userId) return null;
-  const { data, error } = await supabase.from('profiles').select('charity').eq('id', userId).maybeSingle();
-  if (error || !data) return null;
-  const v = (data as { charity?: unknown }).charity;
-  return typeof v === 'string' && v.trim() ? v : null;
-}
-
 /** Whether the user shares their verdicts on a public profile (guarded read). */
 export async function getPublicActivity(
   supabase: SupabaseClient,
