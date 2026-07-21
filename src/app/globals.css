@@ -198,6 +198,17 @@ body {
 }
 .wv-tile-pulse { animation: wv-tile-pulse 5.5s ease-in-out infinite; }
 
+/* Brand wordmark: the stylized accent flips between the "Y" variant (VYRDICT)
+   and the "1" variant (VERD1CT) every couple seconds. Two spans stacked in the
+   same grid cell cross-fade, so the width is fixed and nothing shifts. */
+@keyframes wv-mark-a { 0%, 44% { opacity: 1; } 56%, 100% { opacity: 0; } }
+@keyframes wv-mark-b { 0%, 44% { opacity: 0; } 56%, 100% { opacity: 1; } }
+.wv-mark-a { animation: wv-mark-a 4.4s ease-in-out infinite; }
+.wv-mark-b { animation: wv-mark-b 4.4s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   .wv-gavel, .wv-order, .wv-verdict-in, .wv-tile-sheen, .wv-tile-pulse { animation: none; }
+  /* Freeze on the Y variant — no flashing for motion-sensitive users. */
+  .wv-mark-a { animation: none; opacity: 1; }
+  .wv-mark-b { animation: none; opacity: 0; }
 }
