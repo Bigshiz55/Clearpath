@@ -91,7 +91,7 @@ export default async function DiscoverPage() {
             // Row 2
             { href: '/app/quiz', icon: 'quiz', title: 'Taste Quiz', sub: `${reviewedCount ?? 0} rated — teach your taste`, rgb: '168,85,247' },
             { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', rgb: '59,130,246' },
-            { href: '/app/tv', icon: 'tv', title: 'TV Guide Decoder', sub: 'What’s on live — next 48h', rgb: '16,185,129' },
+            { href: '/app/tv', icon: 'tv', title: 'TV Guide Decoder', sub: 'What’s on live — next 12/24/48h', rgb: '16,185,129' },
             // Row 3
             { href: '/app/together', icon: 'together', title: 'Decide Together', sub: 'One verdict for the room', rgb: '244,63,94' },
             { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', rgb: '14,165,233' },

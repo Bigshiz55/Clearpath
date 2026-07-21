@@ -100,16 +100,16 @@ export function Verd1ctBadge({
           V
         </span>
 
-        {/* Big number */}
+        {/* Big number — in the WatchVerdict blue, with a dark outline for punch on the pink */}
         <span
           style={{
             position: 'relative',
-            color: '#fff',
-            fontWeight: 800,
+            color: '#38bdf8',
+            fontWeight: 900,
             fontSize: Math.round(px * 0.5),
             lineHeight: 1,
             fontVariantNumeric: 'tabular-nums',
-            textShadow: '0 1px 3px rgba(70,0,40,.5)',
+            textShadow: '0 1px 2px rgba(4,10,30,.7), 0 0 1px rgba(4,10,30,.9)',
           }}
         >
           {score}
