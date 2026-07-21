@@ -20,7 +20,7 @@ export function PromiseBar({ rounded = false }: { rounded?: boolean }) {
         </span>
         <span aria-hidden className="text-white/40">·</span>
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden>🔔</span> No trial traps — we&rsquo;ll remind you before any charge
+          <span aria-hidden>🙌</span> We win you over with accuracy — not tricks
         </span>
       </div>
       {/* moving sheen */}
