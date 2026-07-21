@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
-import { LogoMark } from './Logo';
+import { Verd1ctBadge } from './Verd1ctBadge';
 import { CardRatings } from './CardRatings';
 
 /**
@@ -46,25 +46,26 @@ export function AlgorithmScore({
   return (
     <div
       className={`rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 px-2 py-2 shadow-[0_0_16px_rgba(244,63,94,0.28)] ${className}`}
-      title="WatchVerdict algorithm — your DNA blended with every rating into one 0–100 estimate of how much YOU will like it."
+      title="Your VERD1CT — your taste blended with every rating into one 0–100 estimate of how much YOU will like it. The blue TV means it’s from WatchVerdict."
     >
-      {/* The WatchVerdict mark + the ruling itself (Stream It / …) — one line. */}
-      <div className="mb-1.5 flex items-center gap-1.5 border-b border-pink-200/25 pb-1.5">
-        <LogoMark box="h-7 w-7 flex-none rounded-lg" inner="h-4 w-4" />
-        {v && (
-          <span className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-1 text-sm font-black tracking-tight ${v.visual.badge}`}>
-            {v.call}
-          </span>
+      {/* The VERD1CT badge (number + TV) beside the ruling (Stream It / …). */}
+      <div className="flex items-center gap-2.5">
+        {score != null ? (
+          <Verd1ctBadge score={score} px={44} />
+        ) : (
+          <span className="grid h-11 w-11 flex-none place-items-center rounded-[24%] bg-white/10 text-xl font-black text-slate-400">—</span>
         )}
-      </div>
-
-      {/* DNA + the number, bigger and on one line. */}
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] font-black uppercase tracking-wide text-pink-100/90">🧬 DNA</span>
-        <span className="text-2xl font-black leading-none tabular-nums text-white">{score ?? '—'}</span>
-        {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 && (
-          <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">learning</span>
-        )}
+        <div className="min-w-0">
+          {v && (
+            <span className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-sm font-black tracking-tight ${v.visual.badge}`}>
+              {v.call}
+            </span>
+          )}
+          <div className="mt-1 text-[10px] font-black uppercase tracking-wide text-pink-100/90">
+            {personal ? 'Your VERD1CT' : 'WatchVerdict'}
+            {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 ? ' · learning' : ''}
+          </div>
+        </div>
       </div>
 
       {/* The ratings that feed the score, on the same card. */}

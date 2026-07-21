@@ -5,6 +5,7 @@ import { GuestSaveButton } from './GuestSaveButton';
 import { MoreMenu, type NavLink } from './nav/MoreMenu';
 import { MobileNav } from './nav/MobileNav';
 import { ViewModeToggle } from './ViewModeToggle';
+import { Avatar } from './Avatar';
 
 // Primary destinations stay inline; secondary ones live under "More" so neither
 // the desktop bar nor the mobile tab bar gets overcrowded.
@@ -25,7 +26,17 @@ const SECONDARY: NavLink[] = [
   { href: '/app/settings', label: 'Settings' },
 ];
 
-export function Nav({ personalLabel, isGuest = false }: { personalLabel?: string | null; isGuest?: boolean }) {
+export function Nav({
+  personalLabel,
+  isGuest = false,
+  pro = false,
+  avatarLabel = '🍿',
+}: {
+  personalLabel?: string | null;
+  isGuest?: boolean;
+  pro?: boolean;
+  avatarLabel?: string;
+}) {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[env(safe-area-inset-top)] backdrop-blur">
@@ -67,7 +78,17 @@ export function Nav({ personalLabel, isGuest = false }: { personalLabel?: string
             {isGuest ? (
               <GuestSaveButton className="btn-primary hidden sm:inline-flex" />
             ) : (
-              <SignOutButton className="btn-secondary hidden sm:inline-flex" />
+              <>
+                <SignOutButton className="btn-secondary hidden sm:inline-flex" />
+                <Link
+                  href="/app/settings"
+                  aria-label={`Account${pro ? ' · Pro member' : ''}`}
+                  title={pro ? 'Your account · Pro member & donor' : 'Your account'}
+                  className="ml-0.5 inline-flex"
+                >
+                  <Avatar label={avatarLabel} px={34} pro={pro} donor={pro} />
+                </Link>
+              </>
             )}
           </div>
         </div>

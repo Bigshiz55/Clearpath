@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, ensureGuestProfile, personalLabelFor } from '@/lib/profile';
+import { isPro } from '@/lib/pro';
 import { Nav } from '@/components/Nav';
 import { NavArrows } from '@/components/NavArrows';
 
@@ -33,9 +34,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/onboarding');
   }
 
+  const pro = isGuest ? false : await isPro(supabase, user.id);
+  const avatarLabel = (user.email?.[0] ?? '🍿').toUpperCase();
+
   return (
     <div className="min-h-dvh pb-20 sm:pb-0">
-      <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} />
+      <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} pro={pro} avatarLabel={avatarLabel} />
       <main className="container-page py-6">
         <NavArrows />
         {children}
