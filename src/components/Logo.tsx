@@ -55,7 +55,7 @@ export function Logo({
       <LogoMark box={box} inner={inner} />
       {!compact && (
         <span className={`font-bold tracking-tight text-white ${word}`}>
-          Watch<span className="text-[#ff1493]">Verdict</span>
+          Watch<span className="text-[#ff1493]">V<span className="text-white">3</span>RDICT</span>
         </span>
       )}
     </Link>

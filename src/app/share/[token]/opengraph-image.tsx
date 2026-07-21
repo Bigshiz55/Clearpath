@@ -44,8 +44,11 @@ export default async function Image({ params }: { params: { token: string } }) {
               <path d="M4 12.5l5 5L20 6.5" stroke="#ffffff" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <span>
-            Watch<span style={{ color: '#ff1493' }}>Verdict</span>
+          <span style={{ display: 'flex' }}>
+            <span>Watch</span>
+            <span style={{ color: '#ff1493' }}>V</span>
+            <span style={{ color: '#ffffff' }}>3</span>
+            <span style={{ color: '#ff1493' }}>RDICT</span>
           </span>
         </div>
 

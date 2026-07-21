@@ -371,7 +371,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       <header className="container-page flex h-16 items-center">
-        <span className="text-lg font-bold tracking-tight text-white">Watch<span className="text-[#ff1493]">Verdict</span> · ⚖️ Court</span>
+        <span className="text-lg font-bold tracking-tight text-white">Watch<span className="text-[#ff1493]">V<span className="text-white">3</span>RDICT</span> · ⚖️ Court</span>
       </header>
       <main className="container-page mx-auto max-w-md py-4">{children}</main>
     </div>
