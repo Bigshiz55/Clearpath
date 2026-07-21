@@ -79,7 +79,7 @@ export function Verd1ctBadge({
           display: 'grid',
           placeItems: 'center',
           background: 'linear-gradient(150deg,#a855f7,#ff1493 74%)',
-          boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.28), 0 6px 16px -8px rgba(255,20,147,.7)',
+          boxShadow: `0 0 0 ${Math.max(2, Math.round(px * 0.05))}px #000, inset 0 0 0 2px rgba(255,255,255,0.28), 0 8px 18px -8px rgba(255,20,147,.7)`,
         }}
       >
         {/* V watermark — bold and clearly visible behind the number */}
