@@ -28,19 +28,25 @@ export function Verd1ctBadge({
   const tipR = Math.max(1.8, px * 0.06);
   const tipY = Math.max(antH * 0.16, tipR + 1);
 
-  // A black outline drawn with layered shadows — renders identically on every
-  // browser (incl. iOS Safari), unlike -webkit-text-stroke + paint-order.
+  // An outline drawn with layered shadows — renders identically on every browser
+  // (incl. iOS Safari), unlike -webkit-text-stroke + paint-order.
   const o = Math.max(1, px * 0.045);
-  const numberOutline = [
-    `${o}px 0 0 #000`,
-    `-${o}px 0 0 #000`,
-    `0 ${o}px 0 #000`,
-    `0 -${o}px 0 #000`,
-    `${o}px ${o}px 0 #000`,
-    `-${o}px ${o}px 0 #000`,
-    `${o}px -${o}px 0 #000`,
-    `-${o}px -${o}px 0 #000`,
-  ].join(', ');
+  const ring = (col: string) =>
+    [
+      `${o}px 0 0 ${col}`,
+      `-${o}px 0 0 ${col}`,
+      `0 ${o}px 0 ${col}`,
+      `0 -${o}px 0 ${col}`,
+      `${o}px ${o}px 0 ${col}`,
+      `-${o}px ${o}px 0 ${col}`,
+      `${o}px -${o}px 0 ${col}`,
+      `-${o}px -${o}px 0 ${col}`,
+    ].join(', ');
+  const numberOutline = ring('#ffffff'); // white outline around the black number
+
+  // Antennas + feet: a lighter blue with a white line around them.
+  const antBlue = '#4f86ff';
+  const antEdge = Math.max(1, px * 0.024);
 
   return (
     <span
@@ -58,10 +64,16 @@ export function Verd1ctBadge({
           fill="none"
           style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
         >
-          <path d={`M${px / 2} ${antH} L${px * 0.26} ${tipY}`} stroke="#cbd5e1" strokeWidth={stroke} strokeLinecap="round" />
-          <path d={`M${px / 2} ${antH} L${px * 0.74} ${tipY}`} stroke="#cbd5e1" strokeWidth={stroke} strokeLinecap="round" />
-          <circle cx={px * 0.26} cy={tipY} r={tipR} fill="#e2e8f0" />
-          <circle cx={px * 0.74} cy={tipY} r={tipR} fill="#e2e8f0" />
+          {/* white outline behind */}
+          <path d={`M${px / 2} ${antH} L${px * 0.26} ${tipY}`} stroke="#fff" strokeWidth={stroke + antEdge * 2} strokeLinecap="round" />
+          <path d={`M${px / 2} ${antH} L${px * 0.74} ${tipY}`} stroke="#fff" strokeWidth={stroke + antEdge * 2} strokeLinecap="round" />
+          <circle cx={px * 0.26} cy={tipY} r={tipR + antEdge} fill="#fff" />
+          <circle cx={px * 0.74} cy={tipY} r={tipR + antEdge} fill="#fff" />
+          {/* lighter blue on top */}
+          <path d={`M${px / 2} ${antH} L${px * 0.26} ${tipY}`} stroke={antBlue} strokeWidth={stroke} strokeLinecap="round" />
+          <path d={`M${px / 2} ${antH} L${px * 0.74} ${tipY}`} stroke={antBlue} strokeWidth={stroke} strokeLinecap="round" />
+          <circle cx={px * 0.26} cy={tipY} r={tipR} fill={antBlue} />
+          <circle cx={px * 0.74} cy={tipY} r={tipR} fill={antBlue} />
         </svg>
       )}
 
@@ -75,12 +87,16 @@ export function Verd1ctBadge({
           fill="none"
           style={{ position: 'absolute', bottom: 0, left: 0, pointerEvents: 'none' }}
         >
-          <path d={`M${px * 0.34} 0 L${px * 0.27} ${footH - legStroke / 2}`} stroke="#cbd5e1" strokeWidth={legStroke} strokeLinecap="round" />
-          <path d={`M${px * 0.66} 0 L${px * 0.73} ${footH - legStroke / 2}`} stroke="#cbd5e1" strokeWidth={legStroke} strokeLinecap="round" />
+          {/* white outline behind */}
+          <path d={`M${px * 0.34} 0 L${px * 0.27} ${footH - legStroke / 2}`} stroke="#fff" strokeWidth={legStroke + antEdge * 2} strokeLinecap="round" />
+          <path d={`M${px * 0.66} 0 L${px * 0.73} ${footH - legStroke / 2}`} stroke="#fff" strokeWidth={legStroke + antEdge * 2} strokeLinecap="round" />
+          {/* lighter blue on top */}
+          <path d={`M${px * 0.34} 0 L${px * 0.27} ${footH - legStroke / 2}`} stroke={antBlue} strokeWidth={legStroke} strokeLinecap="round" />
+          <path d={`M${px * 0.66} 0 L${px * 0.73} ${footH - legStroke / 2}`} stroke={antBlue} strokeWidth={legStroke} strokeLinecap="round" />
         </svg>
       )}
 
-      {/* The TV screen — pink→blue body with the number */}
+      {/* The TV screen — all-pink body with the number */}
       <span
         style={{
           position: 'absolute',
@@ -92,8 +108,8 @@ export function Verd1ctBadge({
           overflow: 'hidden',
           display: 'grid',
           placeItems: 'center',
-          background: 'linear-gradient(150deg,#ff1493,#0000ff)',
-          boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.28), 0 8px 18px -8px rgba(120,20,180,.7)',
+          background: 'linear-gradient(150deg,#ff5ab0,#ff1493 80%)',
+          boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.28), 0 8px 18px -8px rgba(255,20,147,.7)',
         }}
       >
         {/* V watermark — bold and clearly visible behind the number */}
@@ -104,8 +120,8 @@ export function Verd1ctBadge({
             inset: 0,
             display: 'grid',
             placeItems: 'center',
-            color: 'rgba(255,255,255,0.5)',
-            WebkitTextStroke: `${Math.max(1, px * 0.03)}px rgba(255,255,255,0.65)`,
+            color: 'rgba(0,0,0,0.3)',
+            WebkitTextStroke: `${Math.max(1, px * 0.02)}px rgba(0,0,0,0.35)`,
             fontWeight: 900,
             fontSize: px * 1.05,
             lineHeight: 1,
@@ -114,12 +130,12 @@ export function Verd1ctBadge({
           V
         </span>
 
-        {/* Big white number with a solid black outline around the digits so it
-            reads clearly against the pink→blue screen. */}
+        {/* Big black number with a solid white outline around the digits so it
+            reads clearly against the pink screen. */}
         <span
           style={{
             position: 'relative',
-            color: '#ffffff',
+            color: '#000000',
             fontWeight: 900,
             fontSize: Math.round(px * 0.5),
             lineHeight: 1,
