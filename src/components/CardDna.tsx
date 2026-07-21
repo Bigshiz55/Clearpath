@@ -27,12 +27,12 @@ export function CardDna({ mediaType, tmdbId, className = '' }: { mediaType: Medi
   return (
     <div
       className={`flex items-center gap-2 rounded-lg border border-pink-400/50 bg-gradient-to-r from-pink-500/20 to-rose-500/10 px-2 py-1.5 ${className}`}
-      title={`Your VERD1CT ${dna.tasteScore} — how closely this matches YOUR taste. The ring is the overall score${dna.score != null ? ` (${dna.score})` : ''}; the blue TV means it’s from WatchVerdict.`}
+      title={`Your VERD1CT ${dna.tasteScore} — how closely this matches YOUR taste (0–100), learned from what you’ve rated. The blue TV means it’s from WatchVerdict.`}
     >
-      <Verd1ctBadge score={dna.tasteScore} rating={dna.score} px={38} />
+      <Verd1ctBadge score={dna.tasteScore} px={38} />
       <span className="flex min-w-0 flex-col leading-tight">
         <span className="text-[10px] font-black uppercase tracking-wide text-pink-100">Your VERD1CT</span>
-        <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">number = your taste · ring = overall</span>
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">your taste match</span>
       </span>
     </div>
   );
