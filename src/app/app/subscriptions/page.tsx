@@ -3,9 +3,10 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
 import { getSubscriptionValue, type ServiceValue } from '@/lib/subscriptionValue';
-import { isPro } from '@/lib/pro';
+import { isPro, proMemberCount } from '@/lib/pro';
 import { PRO_PRICE_LABEL, PLEDGE } from '@/lib/proPlan';
 import { PinkRibbon } from '@/components/PinkRibbon';
+import { ImpactCounter } from '@/components/ImpactCounter';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Are your subscriptions worth it?' };
@@ -27,6 +28,7 @@ export default async function SubscriptionsPage() {
   const region = regionFor(uid ? await getProfile(supabase, uid) : null);
   const v = await getSubscriptionValue(supabase, uid, region);
   const pro = uid ? await isPro(supabase, uid) : false;
+  const members = await proMemberCount();
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -81,6 +83,9 @@ export default async function SubscriptionsPage() {
               </div>
             </div>
           )}
+
+          {/* The pledge, made concrete — everyone sees the impact. */}
+          <ImpactCounter members={members} />
 
           {/* Per service */}
           <div className="space-y-2.5">
