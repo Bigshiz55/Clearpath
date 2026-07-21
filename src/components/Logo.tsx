@@ -56,9 +56,15 @@ export function Logo({
       {!compact && (
         <span className={`font-bold tracking-tight text-white ${word}`}>
           Watch
-          <span className="relative inline-grid align-baseline" aria-hidden>
-            <span className="[grid-area:1/1] wv-mark-a text-[#ff1493]">V<span className="text-white">Y</span>RDICT</span>
-            <span className="[grid-area:1/1] wv-mark-b text-[#ff1493]">VERD<span className="text-white">1</span>CT</span>
+          <span className="text-[#ff1493]" aria-hidden>
+            VERD
+            <span className="wv-iflip">
+              <span className="wv-iflip-inner">
+                <span className="wv-iflip-face">I</span>
+                <span className="wv-iflip-face wv-iflip-back">1</span>
+              </span>
+            </span>
+            CT
           </span>
           <span className="sr-only">Verdict</span>
         </span>
