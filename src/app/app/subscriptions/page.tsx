@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
 import { getSubscriptionValue, type ServiceValue } from '@/lib/subscriptionValue';
 import { isPro } from '@/lib/pro';
-import { PRO_PRICE_LABEL } from '@/lib/proPlan';
+import { PRO_PRICE_LABEL, PLEDGE } from '@/lib/proPlan';
+import { PinkRibbon } from '@/components/PinkRibbon';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Are your subscriptions worth it?' };
@@ -73,6 +74,9 @@ export default async function SubscriptionsPage() {
                     WatchVerdict Pro ({PRO_PRICE_LABEL}) unlocks <span className="text-white">AI-tuned verdicts</span>, <span className="text-white">household profiles</span>, bigger Live Court, and an <span className="text-white">ad-free grid</span> — so the services you keep actually get used.
                   </p>
                   <Link href="/app/pro" className="btn-primary mt-3 inline-flex">✨ Go Pro — {PRO_PRICE_LABEL}</Link>
+                  <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-pink-200">
+                    <PinkRibbon className="h-4 w-4 flex-none text-[#ff6fae]" /> ${PLEDGE.amountUsd}/mo of every membership goes to {PLEDGE.cause}
+                  </p>
                 </div>
               </div>
             </div>
