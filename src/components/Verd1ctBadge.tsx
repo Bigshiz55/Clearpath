@@ -105,7 +105,7 @@ export function Verd1ctBadge({
         <span
           style={{
             position: 'relative',
-            color: '#2f6bff', // WatchVerdict brand blue (brand-500)
+            color: '#0000ff', // pure blue
             fontWeight: 900,
             fontSize: Math.round(px * 0.5),
             lineHeight: 1,
