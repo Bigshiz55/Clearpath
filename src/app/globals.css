@@ -228,8 +228,16 @@ body {
   100%       { transform: rotateX(720deg); } /* back to I, seamless */
 }
 
+/* Promise bar — a slow light band sweeping across the top tagline strip so it
+   catches the eye without shouting. */
+@keyframes wv-promise-sheen {
+  0% { transform: translateX(-130%) skewX(-12deg); }
+  55%, 100% { transform: translateX(560%) skewX(-12deg); }
+}
+.wv-promise-sheen { animation: wv-promise-sheen 6.5s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
-  .wv-gavel, .wv-order, .wv-verdict-in, .wv-tile-sheen, .wv-tile-pulse { animation: none; }
+  .wv-gavel, .wv-order, .wv-verdict-in, .wv-tile-sheen, .wv-tile-pulse, .wv-promise-sheen { animation: none; }
   /* Rest on the "I" so the mark reads VERDICT with no motion. */
   .wv-iflip-inner { animation: none; }
 }

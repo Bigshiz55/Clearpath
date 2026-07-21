@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
+import { PromiseBar } from '@/components/PromiseBar';
 
 const FEATURES = [
   {
@@ -23,6 +24,7 @@ const FEATURES = [
 export default function LandingPage() {
   return (
     <div className="min-h-dvh">
+      <PromiseBar />
       <header className="container-page flex h-16 items-center justify-between">
         <Logo size="lg" />
         <div className="flex items-center gap-2">
