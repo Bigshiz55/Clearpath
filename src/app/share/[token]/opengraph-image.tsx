@@ -48,7 +48,7 @@ export default async function Image({ params }: { params: { token: string } }) {
             <span>Watch</span>
             <span style={{ color: '#ff1493' }}>V</span>
             <span style={{ color: '#ffffff' }}>Y</span>
-            <span style={{ color: '#ff1493' }}>rdict</span>
+            <span style={{ color: '#ff1493' }}>RDICT</span>
           </span>
         </div>
 
