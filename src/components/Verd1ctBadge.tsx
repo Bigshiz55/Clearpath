@@ -1,9 +1,9 @@
 /**
- * The VERD1CT score badge — the app's pink logo tile with your number in the
- * middle. A faint "V" reads through it (so, stripped of the number, it's the
- * mark), and a small blue TV sits top-left to signal the score comes from
- * WatchVerdict (the Watch vertical). Pure presentational; `px` scales it from
- * the title-page badge down to a grid-card corner chip.
+ * The VERD1CT score badge — a little pink retro TV set: rounded screen with two
+ * antennas poking out the top, a big number in the middle, and a bold "V"
+ * showing through behind it (so, stripped of the number, it reads as the mark).
+ * The whole shape says "WatchVerdict". Pure presentational; `px` is the TV
+ * screen size and scales it from the title-page badge to a grid chip.
  */
 export function Verd1ctBadge({
   score,
@@ -13,75 +13,90 @@ export function Verd1ctBadge({
   title,
 }: {
   score: number;
-  px?: number;
+  /** Draw the antennas (the "TV" cue). */
   tv?: boolean;
+  px?: number;
   className?: string;
   title?: string;
 }) {
-  const tvSize = Math.round(px * 0.36);
+  const antH = tv ? Math.round(px * 0.32) : 0; // antenna zone above the screen
+  const total = px + antH;
+  const rad = Math.round(px * 0.22);
+  const stroke = Math.max(1.6, px * 0.05);
+  const tipR = Math.max(1.8, px * 0.06);
+  const tipY = Math.max(antH * 0.16, tipR + 1);
+
   return (
     <span
       className={className}
       title={title ?? `Your VERD1CT: ${score} — from WatchVerdict`}
-      style={{
-        position: 'relative',
-        display: 'inline-grid',
-        placeItems: 'center',
-        flex: 'none',
-        width: px,
-        height: px,
-        borderRadius: '24%',
-        overflow: 'hidden',
-        background: 'linear-gradient(150deg,#a855f7,#ff1493 74%)',
-        boxShadow: '0 6px 16px -8px rgba(255,20,147,.7)',
-      }}
+      style={{ position: 'relative', display: 'inline-block', width: px, height: total, flex: 'none', verticalAlign: 'middle' }}
     >
-      {/* V watermark — the mark showing through behind the number */}
-      <span
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'grid',
-          placeItems: 'center',
-          color: '#fff',
-          opacity: 0.15,
-          fontWeight: 900,
-          fontSize: px * 1.05,
-          lineHeight: 1,
-        }}
-      >
-        V
-      </span>
-
-      {/* Small blue TV top-left — "this V score comes from WatchVerdict" */}
+      {/* Antennas rising from the top-center of the screen */}
       {tv && (
         <svg
           aria-hidden
-          width={tvSize}
-          height={tvSize}
-          viewBox="0 0 24 24"
+          width={px}
+          height={antH}
+          viewBox={`0 0 ${px} ${antH}`}
           fill="none"
-          style={{ position: 'absolute', top: Math.round(px * 0.06), left: Math.round(px * 0.08) }}
+          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
         >
-          <path d="M12 9 L8.5 5.2 M12 9 L15.5 5.2" stroke="#ffffff" strokeWidth="1.6" strokeLinecap="round" opacity="0.95" />
-          <rect x="3.4" y="9" width="17.2" height="11.6" rx="3" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.4" />
-          <circle cx="16.6" cy="14.8" r="1.3" fill="#ffffff" />
+          <path d={`M${px / 2} ${antH} L${px * 0.26} ${tipY}`} stroke="#cbd5e1" strokeWidth={stroke} strokeLinecap="round" />
+          <path d={`M${px / 2} ${antH} L${px * 0.74} ${tipY}`} stroke="#cbd5e1" strokeWidth={stroke} strokeLinecap="round" />
+          <circle cx={px * 0.26} cy={tipY} r={tipR} fill="#e2e8f0" />
+          <circle cx={px * 0.74} cy={tipY} r={tipR} fill="#e2e8f0" />
         </svg>
       )}
 
+      {/* The TV screen — the pink body with the number */}
       <span
         style={{
-          position: 'relative',
-          color: '#fff',
-          fontWeight: 800,
-          fontSize: Math.round(px * 0.4),
-          lineHeight: 1,
-          fontVariantNumeric: 'tabular-nums',
-          textShadow: '0 1px 2px rgba(70,0,40,.4)',
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          width: px,
+          height: px,
+          borderRadius: rad,
+          overflow: 'hidden',
+          display: 'grid',
+          placeItems: 'center',
+          background: 'linear-gradient(150deg,#a855f7,#ff1493 74%)',
+          boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.28), 0 6px 16px -8px rgba(255,20,147,.7)',
         }}
       >
-        {score}
+        {/* V watermark — more visible now */}
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'grid',
+            placeItems: 'center',
+            color: '#fff',
+            opacity: 0.34,
+            fontWeight: 900,
+            fontSize: px * 1.02,
+            lineHeight: 1,
+          }}
+        >
+          V
+        </span>
+
+        {/* Big number */}
+        <span
+          style={{
+            position: 'relative',
+            color: '#fff',
+            fontWeight: 800,
+            fontSize: Math.round(px * 0.5),
+            lineHeight: 1,
+            fontVariantNumeric: 'tabular-nums',
+            textShadow: '0 1px 3px rgba(70,0,40,.5)',
+          }}
+        >
+          {score}
+        </span>
       </span>
     </span>
   );
