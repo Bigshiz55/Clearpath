@@ -7,18 +7,27 @@
  */
 export function Verd1ctBadge({
   score,
+  rating,
   px = 44,
   tv = true,
   className = '',
   title,
 }: {
   score: number;
+  /** Optional 0–100 objective rating — fills the ring around the number (the "world's take"). */
+  rating?: number | null;
   px?: number;
   tv?: boolean;
   className?: string;
   title?: string;
 }) {
   const tvSize = Math.round(px * 0.36);
+  const showRing = typeof rating === 'number' && Number.isFinite(rating);
+  const inset = px * 0.085;
+  const rectSize = px - inset * 2;
+  const rr = Math.round(px * 0.19);
+  const sw = Math.max(2, Math.round(px * 0.07));
+  const fill = Math.max(0, Math.min(100, rating ?? 0));
   return (
     <span
       className={className}
@@ -53,6 +62,32 @@ export function Verd1ctBadge({
       >
         V
       </span>
+
+      {/* Ring around the number = the objective rating (the world's take). */}
+      {showRing && (
+        <svg
+          aria-hidden
+          width={px}
+          height={px}
+          viewBox={`0 0 ${px} ${px}`}
+          fill="none"
+          style={{ position: 'absolute', inset: 0 }}
+        >
+          <rect x={inset} y={inset} width={rectSize} height={rectSize} rx={rr} pathLength={100} stroke="rgba(255,255,255,0.24)" strokeWidth={sw} />
+          <rect
+            x={inset}
+            y={inset}
+            width={rectSize}
+            height={rectSize}
+            rx={rr}
+            pathLength={100}
+            stroke="#ffffff"
+            strokeWidth={sw}
+            strokeLinecap="round"
+            strokeDasharray={`${fill} 100`}
+          />
+        </svg>
+      )}
 
       {/* Small blue TV top-left — "this V score comes from WatchVerdict" */}
       {tv && (
