@@ -7,7 +7,7 @@ const MARK = (
   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
     <div style={{ width: 22, height: 22, borderRadius: 7, background: 'linear-gradient(135deg,#3b82f6,#7c5cff)' }} />
     <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: 0.3 }}>
-      Watch<span style={{ color: '#ff1493' }}>V<span style={{ color: '#ffffff' }}>3</span>RDICT</span>
+      Watch<span style={{ color: '#ff1493' }}>VERD<span style={{ color: '#ffffff' }}>1</span>CT</span>
     </span>
   </div>
 );

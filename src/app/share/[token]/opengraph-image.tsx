@@ -46,9 +46,9 @@ export default async function Image({ params }: { params: { token: string } }) {
           </div>
           <span style={{ display: 'flex' }}>
             <span>Watch</span>
-            <span style={{ color: '#ff1493' }}>V</span>
-            <span style={{ color: '#ffffff' }}>3</span>
-            <span style={{ color: '#ff1493' }}>RDICT</span>
+            <span style={{ color: '#ff1493' }}>VERD</span>
+            <span style={{ color: '#ffffff' }}>1</span>
+            <span style={{ color: '#ff1493' }}>CT</span>
           </span>
         </div>
 
