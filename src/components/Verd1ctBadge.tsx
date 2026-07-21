@@ -28,6 +28,20 @@ export function Verd1ctBadge({
   const tipR = Math.max(1.8, px * 0.06);
   const tipY = Math.max(antH * 0.16, tipR + 1);
 
+  // A black outline drawn with layered shadows — renders identically on every
+  // browser (incl. iOS Safari), unlike -webkit-text-stroke + paint-order.
+  const o = Math.max(1, px * 0.045);
+  const numberOutline = [
+    `${o}px 0 0 #000`,
+    `-${o}px 0 0 #000`,
+    `0 ${o}px 0 #000`,
+    `0 -${o}px 0 #000`,
+    `${o}px ${o}px 0 #000`,
+    `-${o}px ${o}px 0 #000`,
+    `${o}px -${o}px 0 #000`,
+    `-${o}px -${o}px 0 #000`,
+  ].join(', ');
+
   return (
     <span
       className={className}
@@ -110,10 +124,7 @@ export function Verd1ctBadge({
             fontSize: Math.round(px * 0.5),
             lineHeight: 1,
             fontVariantNumeric: 'tabular-nums',
-            WebkitTextStrokeWidth: `${Math.max(1.2, px * 0.045)}px`,
-            WebkitTextStrokeColor: '#ff1493', // hot pink outline
-            paintOrder: 'stroke fill',
-            textShadow: `0 0 ${Math.max(3, px * 0.12)}px rgba(255,20,147,.9), 0 1px 2px rgba(4,8,24,.55)`,
+            textShadow: numberOutline,
           }}
         >
           {score}
