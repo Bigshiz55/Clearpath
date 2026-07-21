@@ -66,7 +66,7 @@ export function Verd1ctBadge({
         </svg>
       )}
 
-      {/* The TV screen — the pink body with the number */}
+      {/* The TV screen — pink→blue body with the number */}
       <span
         style={{
           position: 'absolute',
@@ -78,8 +78,8 @@ export function Verd1ctBadge({
           overflow: 'hidden',
           display: 'grid',
           placeItems: 'center',
-          background: 'linear-gradient(150deg,#a855f7,#ff1493 74%)',
-          boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.28), 0 8px 18px -8px rgba(255,20,147,.7)',
+          background: 'linear-gradient(150deg,#ff1493,#0000ff)',
+          boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.28), 0 8px 18px -8px rgba(120,20,180,.7)',
         }}
       >
         {/* V watermark — bold and clearly visible behind the number */}
@@ -100,12 +100,12 @@ export function Verd1ctBadge({
           V
         </span>
 
-        {/* Big blue number with a solid black outline around the digits so it
-            reads clearly against the pink. */}
+        {/* Big white number with a solid black outline around the digits so it
+            reads clearly against the pink→blue screen. */}
         <span
           style={{
             position: 'relative',
-            color: '#0000ff', // pure blue
+            color: '#ffffff',
             fontWeight: 900,
             fontSize: Math.round(px * 0.5),
             lineHeight: 1,
