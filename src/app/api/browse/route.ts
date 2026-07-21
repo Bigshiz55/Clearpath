@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const MON = new Set<BrowseMonetization>(['all', 'flatrate', 'free', 'rent', 'buy']);
-const SORT = new Set<BrowseSort>(['popularity', 'rating', 'new']);
+const SORT = new Set<BrowseSort>(['foryou', 'popularity', 'rating', 'new']);
 
 function coerce(raw: unknown): BrowseQuery {
   const q = (raw ?? {}) as Partial<BrowseQuery>;
@@ -19,7 +19,7 @@ function coerce(raw: unknown): BrowseQuery {
     genreIds: nums(q.genreIds, 6),
     monetization: MON.has(q.monetization as BrowseMonetization) ? (q.monetization as BrowseMonetization) : 'all',
     minRating: typeof q.minRating === 'number' ? Math.max(0, Math.min(10, q.minRating)) : null,
-    sort: SORT.has(q.sort as BrowseSort) ? (q.sort as BrowseSort) : 'popularity',
+    sort: SORT.has(q.sort as BrowseSort) ? (q.sort as BrowseSort) : 'foryou',
     page: typeof q.page === 'number' && q.page > 0 ? Math.floor(q.page) : 1,
   };
 }

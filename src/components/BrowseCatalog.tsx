@@ -57,7 +57,7 @@ export function BrowseCatalog({
   const [genreIds, setGenreIds] = useState<number[]>([]);
   const [monetization, setMonetization] = useState<BrowseMonetization>('all');
   const [minRating, setMinRating] = useState(0);
-  const [sort, setSort] = useState<BrowseSort>('popularity');
+  const [sort, setSort] = useState<BrowseSort>('foryou');
   const [providerQuery, setProviderQuery] = useState('');
   const [showAllProviders, setShowAllProviders] = useState(false);
 
@@ -132,7 +132,7 @@ export function BrowseCatalog({
         <div className="flex flex-wrap items-center gap-2">
           <Seg value={mediaType} onChange={setMediaType} options={[{ v: 'movie', label: 'Movies' }, { v: 'tv', label: 'Shows' }]} />
           <Seg value={monetization} onChange={setMonetization} options={MONETIZATION} />
-          <Seg value={sort} onChange={setSort} options={[{ v: 'popularity', label: 'Popular' }, { v: 'rating', label: 'Top rated' }, { v: 'new', label: 'Newest' }]} />
+          <Seg value={sort} onChange={setSort} options={[{ v: 'foryou', label: '🧬 For me' }, { v: 'popularity', label: 'Popular' }, { v: 'rating', label: 'Top rated' }, { v: 'new', label: 'Newest' }]} />
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-400">Rating ≥</span>
             <input type="range" min={0} max={9} step={0.5} value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className="w-28 accent-gold-400" />

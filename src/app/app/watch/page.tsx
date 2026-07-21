@@ -91,9 +91,9 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
       <section>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">▶ Watch now</h1>
         <p className="mt-2 text-sm text-slate-300">
-          What you can actually watch right now — with where it’s streaming and your DNA Score on every title.
+          What you can actually watch right now — with where it’s streaming and your VERD1CT score on every title.
           <span className="font-semibold text-white"> Ready to watch</span> is your list, streamable now;
-          <span className="font-semibold text-white"> Browse everything</span> is the whole catalog.
+          <span className="font-semibold text-white"> Browse everything</span> lets you pick any service and see what’s on it, ranked for your taste — so you know if it’s worth keeping.
         </p>
       </section>
 

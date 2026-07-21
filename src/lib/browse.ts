@@ -4,9 +4,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MediaType } from '@/lib/types';
 import { discoverTitles, getProviderCatalog, type ProviderCatalogEntry } from '@/lib/tmdb/client';
 import { getProfile, regionFor } from '@/lib/profile';
+import { rankByDna } from '@/lib/dna';
 
 export type BrowseMonetization = 'all' | 'flatrate' | 'free' | 'rent' | 'buy';
-export type BrowseSort = 'popularity' | 'rating' | 'new';
+export type BrowseSort = 'foryou' | 'popularity' | 'rating' | 'new';
 
 export interface BrowseQuery {
   mediaType: MediaType;
@@ -55,6 +56,44 @@ export async function getBrowse(supabase: SupabaseClient, userId: string, q: Bro
   const profile = userId ? await getProfile(supabase, userId) : null;
   const region = regionFor(profile);
   const hasProviders = q.providerIds.length > 0;
+
+  // "For me" — pull a broad, quality candidate pool on the service, then rank it
+  // by the user's Taste-DNA so the best-for-you titles surface first. Paginate
+  // the ranked pool. Degrades to popularity order for guests / no-DNA users.
+  if (q.sort === 'foryou') {
+    const raw = (
+      await Promise.all(
+        [1, 2, 3].map((p) =>
+          discoverTitles(q.mediaType, {
+            region,
+            genreIds: q.genreIds,
+            providerIds: hasProviders ? q.providerIds : undefined,
+            monetization: monetizationParam(q.monetization, hasProviders),
+            minRating: q.minRating ?? undefined,
+            minVotes: 80,
+            sortBy: 'popularity.desc',
+            page: p,
+          }),
+        ),
+      )
+    ).flat();
+    const seen = new Set<string>();
+    const pool = raw.filter((t) => {
+      const k = `${t.mediaType}-${t.id}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    const ranked = await rankByDna(
+      supabase,
+      userId,
+      pool.map((t) => ({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })),
+      pool.length,
+    );
+    const PAGE = 20;
+    const start = (Math.max(1, q.page) - 1) * PAGE;
+    return ranked.items.slice(start, start + PAGE).map((t) => ({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath }));
+  }
 
   const items = await discoverTitles(q.mediaType, {
     region,
