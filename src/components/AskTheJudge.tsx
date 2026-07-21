@@ -41,9 +41,6 @@ const EXAMPLES = [
   'A bingeable show, all episodes out, 80%+ audience',
 ];
 
-function speakable(t: string): string {
-  return t.replace(/[^\p{L}\p{N}\s.,'’!?%-]/gu, '').replace(/\s+/g, ' ').trim();
-}
 function runtimeReadout(v: number): string {
   if (v >= 240) return 'Any length';
   const h = Math.floor(v / 60);
@@ -63,7 +60,6 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
   const [showFilters, setShowFilters] = useState(true);
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
-  const [speak, setSpeak] = useState(true);
   const [judgeName, setJudgeName] = useState('Judge Annie');
   const [judgeSrc, setJudgeSrc] = useState('/judge-annie.png');
   const nextId = useRef(1);
@@ -76,18 +72,6 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
 
   function say(text: string, items?: ResultItem[], role: 'you' | 'judge' = 'judge', verdict?: TitleVerdict) {
     setMsgs((m) => [...m, { id: nextId.current++, role, text, items, verdict }]);
-  }
-
-  function speakLine(text: string) {
-    if (!speak || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    try {
-      const u = new SpeechSynthesisUtterance(speakable(text));
-      u.rate = 1.02;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    } catch {
-      /* speech optional */
-    }
   }
 
   useEffect(() => {
@@ -146,7 +130,6 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
           `${v.title}${v.year ? ` (${v.year})` : ''} — my ruling: ${v.primaryCall} at ${v.matchScore} for you. ${v.oneLiner}` +
           (alts.length > 0 ? (skip ? ' Here’s why, and better picks below.' : ' Here’s the case — and a few more in the same lane.') : '');
         say(ruling, alts, 'judge', v);
-        speakLine(`${v.primaryCall} at ${v.matchScore}. ${v.title}.`);
         return;
       }
 
@@ -161,7 +144,6 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
       }
       if (data.relaxed) ruling += ` ${data.relaxed}`;
       say(ruling, items);
-      speakLine(items.length > 0 ? `${items.length} worth your night. Top pick, ${items[0]!.title}.` : `Nothing clears all of that. Loosen a rule and re-file.`);
     } catch {
       say('The court hit a snag pulling candidates. Try re-filing that in a moment.');
     } finally {
@@ -323,13 +305,6 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
             <div className="eyebrow">⚖️ The bench</div>
             <div className="truncate text-base font-bold text-white">{judgeName}</div>
           </div>
-          <button
-            onClick={() => { setSpeak((s) => !s); if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel(); }}
-            className="rounded-lg border border-white/12 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-white/10"
-            title={speak ? 'Judge reads rulings aloud' : 'Judge is muted'}
-          >
-            {speak ? '🔊 Voice on' : '🔇 Muted'}
-          </button>
         </div>
 
         <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">

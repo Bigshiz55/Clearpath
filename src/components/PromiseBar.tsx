@@ -18,10 +18,6 @@ export function PromiseBar({ rounded = false }: { rounded?: boolean }) {
         <span className="inline-flex items-center gap-1.5">
           <span aria-hidden>💸</span> Stop overpaying for streaming
         </span>
-        <span aria-hidden className="text-white/40">·</span>
-        <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden>🙌</span> We win you over with accuracy — not tricks
-        </span>
       </div>
       {/* moving sheen */}
       <span
