@@ -79,7 +79,7 @@ export function Verd1ctBadge({
           display: 'grid',
           placeItems: 'center',
           background: 'linear-gradient(150deg,#a855f7,#ff1493 74%)',
-          boxShadow: `0 0 0 ${Math.max(2, Math.round(px * 0.05))}px #000, inset 0 0 0 2px rgba(255,255,255,0.28), 0 8px 18px -8px rgba(255,20,147,.7)`,
+          boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.28), 0 8px 18px -8px rgba(255,20,147,.7)',
         }}
       >
         {/* V watermark — bold and clearly visible behind the number */}
@@ -100,7 +100,8 @@ export function Verd1ctBadge({
           V
         </span>
 
-        {/* Big number — electric WatchVerdict blue with a glow + dark outline so it pops on the pink */}
+        {/* Big blue number with a solid black outline around the digits so it
+            reads clearly against the pink. */}
         <span
           style={{
             position: 'relative',
@@ -109,7 +110,9 @@ export function Verd1ctBadge({
             fontSize: Math.round(px * 0.5),
             lineHeight: 1,
             fontVariantNumeric: 'tabular-nums',
-            textShadow: `0 0 ${Math.max(4, px * 0.16)}px rgba(56,189,248,.95), 0 0 ${Math.max(2, px * 0.07)}px rgba(56,189,248,.8), 0 1px 2px rgba(4,10,30,.85)`,
+            WebkitTextStrokeWidth: `${Math.max(1, px * 0.035)}px`,
+            WebkitTextStrokeColor: '#000',
+            paintOrder: 'stroke fill',
           }}
         >
           {score}
