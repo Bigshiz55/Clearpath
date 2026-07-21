@@ -12,15 +12,15 @@ export function PromiseBar({ rounded = false }: { rounded?: boolean }) {
         rounded ? 'rounded-2xl border border-white/15' : 'border-b border-white/15'
       }`}
     >
-      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 px-4 py-2 text-center text-[12.5px] font-extrabold tracking-tight text-white sm:text-sm">
-        <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden>🎯</span> Better recommendations
+      <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 px-4 py-2 text-center text-[12px] font-bold tracking-tight text-white/90 sm:text-[13px]">
+        {/* Lead promise — bigger, bolder, highlighted so it reads first. */}
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[15px] font-black tracking-tight text-white shadow-sm ring-1 ring-white/25 sm:text-base">
+          <span aria-hidden className="text-base sm:text-lg">🎯</span> Better recommendations
         </span>
-        <span aria-hidden className="text-white/45">·</span>
         <span className="inline-flex items-center gap-1.5">
           <span aria-hidden>🤝</span> Honest subscriptions
         </span>
-        <span aria-hidden className="text-white/45">·</span>
+        <span aria-hidden className="text-white/40">·</span>
         <span className="inline-flex items-center gap-1.5">
           <PinkRibbon className="h-3.5 w-3.5 text-white" /> Meaningful impact
         </span>
