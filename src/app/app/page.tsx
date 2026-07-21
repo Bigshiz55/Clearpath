@@ -14,6 +14,7 @@ import { TonightHome } from '@/components/TonightHome';
 import { InstallHint } from '@/components/InstallHint';
 import { getTonight } from '@/lib/tonight';
 import { ImpactCounter } from '@/components/ImpactCounter';
+import { PromiseBar } from '@/components/PromiseBar';
 import { proMemberCount } from '@/lib/pro';
 import type { VerdictTier } from '@/lib/types';
 
@@ -58,6 +59,9 @@ export default async function DiscoverPage() {
 
   return (
     <div className="space-y-8">
+      {/* The three promises, right at the top of the hub. */}
+      <PromiseBar rounded />
+
       {/* App-install nudge for testers — self-hides once installed/dismissed. */}
       <InstallHint />
 
