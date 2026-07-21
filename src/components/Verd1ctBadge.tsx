@@ -110,9 +110,10 @@ export function Verd1ctBadge({
             fontSize: Math.round(px * 0.5),
             lineHeight: 1,
             fontVariantNumeric: 'tabular-nums',
-            WebkitTextStrokeWidth: `${Math.max(1, px * 0.035)}px`,
-            WebkitTextStrokeColor: '#000',
+            WebkitTextStrokeWidth: `${Math.max(1.2, px * 0.045)}px`,
+            WebkitTextStrokeColor: '#ff1493', // hot pink outline
             paintOrder: 'stroke fill',
+            textShadow: `0 0 ${Math.max(3, px * 0.12)}px rgba(255,20,147,.9), 0 1px 2px rgba(4,8,24,.55)`,
           }}
         >
           {score}
