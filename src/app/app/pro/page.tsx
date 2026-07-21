@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { getEntitlement } from '@/lib/pro';
+import { getEntitlement, proMemberCount } from '@/lib/pro';
 import { serverEnv } from '@/lib/env';
 import { PRO_FEATURES, PRO_PRICE_LABEL, PLEDGE } from '@/lib/proPlan';
 import { ProUpgradeButton } from '@/components/ProUpgrade';
 import { PinkRibbon } from '@/components/PinkRibbon';
+import { ImpactCounter } from '@/components/ImpactCounter';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'WatchVerdict Pro' };
@@ -14,6 +15,7 @@ export default async function ProPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const ent = user ? await getEntitlement(supabase, user.id) : { pro: false, source: null, currentPeriodEnd: null };
   const isAdmin = !!user?.email && serverEnv.adminEmails().includes(user.email.toLowerCase());
+  const members = await proMemberCount();
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -26,6 +28,8 @@ export default async function ProPage() {
           Everything free stays free. Pro adds the smart, personal touches — {PRO_PRICE_LABEL}, cancel anytime.
         </p>
       </div>
+
+      <ImpactCounter members={members} />
 
       {ent.pro ? (
         <div className="card border-gold-400/40 bg-gold-500/[0.06] p-6 text-center">
