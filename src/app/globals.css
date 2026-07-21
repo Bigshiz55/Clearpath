@@ -203,13 +203,17 @@ body {
    front is the "I" (inherits pink), back is a white "1". Width comes from the
    in-flow front face, so nothing shifts as it turns. */
 .wv-iflip { display: inline-block; perspective: 320px; }
-.wv-iflip-inner { position: relative; display: inline-block; transform-style: preserve-3d; animation: wv-iflip 8s ease-in-out infinite; }
+.wv-iflip-inner { position: relative; display: inline-block; transform-style: preserve-3d; animation: wv-iflip 12s ease-in-out infinite; }
 .wv-iflip-face { backface-visibility: hidden; }
 .wv-iflip-back { position: absolute; left: 0; top: 0; transform: rotateY(180deg); color: #ffffff; }
+/* Even alternation: I → 1 → I → 1, equal ~2s holds, slow ~1s rolls between.
+   Ends at 720deg (= an I) so the loop is seamless. */
 @keyframes wv-iflip {
-  0%, 26%   { transform: rotateY(0deg); }   /* I, held ~2s */
-  38%, 62%  { transform: rotateY(180deg); } /* 1, held ~2s */
-  74%, 100% { transform: rotateY(360deg); } /* rolls back to I */
+  0%, 17%    { transform: rotateY(0deg); }   /* I */
+  25%, 42%   { transform: rotateY(180deg); } /* 1 */
+  50%, 67%   { transform: rotateY(360deg); } /* I */
+  75%, 92%   { transform: rotateY(540deg); } /* 1 */
+  100%       { transform: rotateY(720deg); } /* back to I, seamless */
 }
 
 @media (prefers-reduced-motion: reduce) {
