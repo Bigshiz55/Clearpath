@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
-import { getOnTvToday, getStreamingToday, enrichAiringsWithCritics, enrichAiringsWithTmdb } from '@/lib/onTv';
-import { OnTvTabs } from '@/components/OnTvTabs';
+import { getOnTvToday, enrichAiringsWithCritics, enrichAiringsWithTmdb } from '@/lib/onTv';
+import { OnTvGuide } from '@/components/OnTvGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
 import { TvDetective } from '@/components/TvDetective';
 
@@ -25,12 +25,9 @@ export default async function OnTvPage() {
 
   const now = new Date();
   const date = isoDate(now);
-  const [airingsRaw, streamingRaw] = await Promise.all([getOnTvToday(region, date), getStreamingToday(date)]);
+  const airingsRaw = await getOnTvToday(region, date);
   // Add IMDb / Rotten Tomatoes / Metacritic to the placards (cached, bounded).
-  const [airings, streaming] = await Promise.all([
-    enrichAiringsWithCritics(airingsRaw).then((a) => enrichAiringsWithTmdb(a)),
-    enrichAiringsWithCritics(streamingRaw).then((a) => enrichAiringsWithTmdb(a)),
-  ]);
+  const airings = await enrichAiringsWithCritics(airingsRaw).then((a) => enrichAiringsWithTmdb(a));
 
   // Which airings this user already has a reminder for (guarded pre-migration),
   // plus the upcoming ones to list at the top.
@@ -54,9 +51,9 @@ export default async function OnTvPage() {
       <section>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">📺 On TV today</h1>
         <p className="mt-2 text-sm text-slate-300">
-          What’s on live in {region} and what just dropped on streaming — channel, time, and rating. Filter to prime
-          time or a platform, sort by rating, and hit <span className="font-semibold text-white">Remind me</span> to get
-          a phone/PC notification <span className="font-semibold text-white">1 hour and 5 minutes before</span> it airs.
+          What’s on live in {region} — channel, time, and rating. Filter to prime time, sort by rating, and hit{' '}
+          <span className="font-semibold text-white">Remind me</span> to get a phone/PC notification{' '}
+          <span className="font-semibold text-white">1 hour and 5 minutes before</span> it airs.
         </p>
       </section>
 
@@ -64,7 +61,7 @@ export default async function OnTvPage() {
 
       {upcoming.length > 0 && <MyReminders initial={upcoming} />}
 
-      <OnTvTabs broadcast={airings} streaming={streaming} dateLabel={friendlyDate(now)} country={region} remindedIds={remindedIds} />
+      <OnTvGuide airings={airings} dateLabel={friendlyDate(now)} country={region} mode="broadcast" remindedIds={remindedIds} />
 
       <p className="text-[11px] text-slate-500">
         Listings from TVmaze’s community broadcast guide — real schedules, refreshed hourly. Coverage is best for
