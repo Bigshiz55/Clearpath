@@ -27,6 +27,72 @@ export type SignalCategory =
   | 'family'
   | 'other';
 
+/**
+ * The universal category layer. Visible chip LABELS vary by title (natural
+ * language: "Too many seasons", "Feels dated", "Leads have no chemistry"), but
+ * every reason rolls up to one of these fixed buckets so feedback is comparable
+ * ACROSS titles for analytics ("how often does pace kill a rec vs. tone?").
+ * This is a reporting rollup only — the Taste-DNA nudges still come from the
+ * specific reason codes (see dnaSignals.ts), never from these buckets, because
+ * two reasons in the same universal bucket can nudge different DNA axes.
+ *
+ * NOTE: `access` (cost / availability) is intentionally part of the schema for
+ * completeness, but we do NOT surface access chips yet — TitleMetaLite carries
+ * no per-title rental/subscription price, and fabricating one would violate the
+ * data-honesty rule. It stays reserved for when real access data exists.
+ */
+export type UniversalCategory =
+  | 'content'
+  | 'genre'
+  | 'tone'
+  | 'pace'
+  | 'quality'
+  | 'commitment'
+  | 'access'
+  | 'mood';
+
+/** Maps each fine-grained signal category to its universal reporting bucket. */
+const SIGNAL_TO_UNIVERSAL: Record<SignalCategory, UniversalCategory> = {
+  genre: 'genre',
+  scifi: 'genre',
+  supernatural: 'content',
+  violence: 'content',
+  story: 'content',
+  familiarity: 'content',
+  tone: 'tone',
+  pacing: 'pace',
+  runtime: 'commitment',
+  quality: 'quality',
+  ratings: 'quality',
+  cast: 'quality',
+  language: 'access',
+  mood: 'mood',
+  context: 'mood',
+  family: 'content',
+  other: 'content',
+};
+
+/**
+ * The distinct universal categories touched by a set of reason codes, in a
+ * stable order. Stamped onto feedback events so analytics can compare what
+ * kinds of things make recommendations miss — independent of the title-specific
+ * wording the user actually saw.
+ */
+export function universalCategoriesFor(codes: string[]): UniversalCategory[] {
+  const seen = new Set<UniversalCategory>();
+  const order: UniversalCategory[] = [];
+  for (const code of codes) {
+    const def = REASONS[code];
+    if (!def) continue;
+    const u = SIGNAL_TO_UNIVERSAL[def.category] ?? 'content';
+    if (!seen.has(u)) {
+      seen.add(u);
+      order.push(u);
+    }
+  }
+  return order;
+}
+
 /** Lightweight title metadata the chip selector reasons over. */
 export interface TitleMetaLite {
   mediaType: 'movie' | 'tv';
@@ -90,7 +156,21 @@ export const REASONS: Record<string, ReasonDef> = {
   not_with_kids: { code: 'not_with_kids', label: 'Not watching with kids', category: 'context', strength: 0.3, permanent: false, when: (m) => has(m, 'family', 'animation') },
   animation_not_my_thing: { code: 'animation_not_my_thing', label: 'Animation isn’t my thing', category: 'genre', strength: 0.7, permanent: true, when: (m) => has(m, 'animation') },
   too_generic: { code: 'too_generic', label: 'Too generic', category: 'story', strength: 0.4, permanent: true, when: (m) => has(m, 'action', 'adventure') },
-  too_unrealistic: { code: 'too_unrealistic', label: 'Too unrealistic', category: 'story', strength: 0.5, permanent: true, when: (m) => has(m, 'action', 'science fiction', 'fantasy') },
+  too_unrealistic: { code: 'too_unrealistic', label: 'Looks too unrealistic', category: 'story', strength: 0.5, permanent: true, when: (m) => has(m, 'action', 'science fiction', 'fantasy') },
+
+  // Natural, title-specific options (still map to a universal category below).
+  too_much_romance: { code: 'too_much_romance', label: 'Too much romance', category: 'tone', strength: 0.6, permanent: true, when: (m) => has(m, 'romance') },
+  too_wholesome: { code: 'too_wholesome', label: 'Too wholesome', category: 'tone', strength: 0.5, permanent: true, when: (m) => has(m, 'family', 'romance') },
+  simple_plot: { code: 'simple_plot', label: 'Looks too simple', category: 'story', strength: 0.5, permanent: true, when: (m) => has(m, 'mystery', 'crime') },
+  melodramatic: { code: 'melodramatic', label: 'Too melodramatic', category: 'tone', strength: 0.5, permanent: true, when: (m) => has(m, 'drama', 'romance') },
+  low_budget: { code: 'low_budget', label: 'Looks low-budget', category: 'quality', strength: 0.6, permanent: true, when: lowRated },
+  looks_familiar: { code: 'looks_familiar', label: 'Story feels familiar', category: 'story', strength: 0.4, permanent: true },
+  too_many_seasons: { code: 'too_many_seasons', label: 'Too many seasons', category: 'runtime', strength: 0.6, permanent: true, when: (m) => m.mediaType === 'tv' && (m.numberOfSeasons ?? 0) >= 4 },
+  too_many_episodes: { code: 'too_many_episodes', label: 'Too many episodes', category: 'runtime', strength: 0.5, permanent: true, when: (m) => m.mediaType === 'tv' && (m.numberOfSeasons ?? 0) >= 3 },
+  dont_start_series: { code: 'dont_start_series', label: 'Don’t want to start a series', category: 'context', strength: 0.3, permanent: false, when: (m) => m.mediaType === 'tv' },
+  no_chemistry: { code: 'no_chemistry', label: 'Leads have no chemistry', category: 'cast', strength: 0.5, permanent: true, when: (m) => has(m, 'romance', 'comedy') },
+  not_funny: { code: 'not_funny', label: 'Doesn’t look funny', category: 'quality', strength: 0.6, permanent: true, when: (m) => has(m, 'comedy') },
+  too_cheesy: { code: 'too_cheesy', label: 'Too cheesy', category: 'tone', strength: 0.5, permanent: true, when: (m) => has(m, 'comedy', 'romance', 'family') },
 
   // "Didn't like it" (watched) specifics.
   weak_story: { code: 'weak_story', label: 'Weak story', category: 'story', strength: 0.7, permanent: true },
@@ -128,10 +208,14 @@ const BUCKET_CANDIDATES: Record<ReasonBucket, string[]> = {
   // Title-specific (gated) reasons first, so the most applicable ones surface;
   // generic catch-alls fill in only when little else matches.
   not_for_me: [
-    'too_scary', 'supernatural', 'sci_fi', 'too_old', 'period_setting', 'subtitles', 'dubbed',
+    // Most title-specific (tightly gated) first — these surface only when the
+    // title's metadata matches, so the chips feel written for THIS pick.
+    'too_scary', 'supernatural', 'sci_fi', 'too_much_romance', 'too_wholesome', 'no_chemistry',
+    'not_funny', 'too_cheesy', 'melodramatic', 'too_many_seasons', 'too_many_episodes',
+    'simple_plot', 'low_budget', 'too_old', 'period_setting', 'subtitles', 'dubbed',
     'animation_not_my_thing', 'too_childish', 'too_violent', 'too_dark', 'too_slow', 'too_long',
-    'too_serious', 'too_silly', 'poor_ratings', 'not_my_genre', 'story_not_interesting',
-    'not_interested_subject', 'cast_dislike', 'predictable', 'already_seen_similar', 'too_generic', 'too_unrealistic',
+    'dont_start_series', 'too_serious', 'too_silly', 'poor_ratings', 'not_my_genre', 'story_not_interesting',
+    'not_interested_subject', 'cast_dislike', 'predictable', 'looks_familiar', 'already_seen_similar', 'too_generic', 'too_unrealistic',
   ],
   didnt_like: [
     'too_slow', 'predictable', 'weak_story', 'bad_characters', 'bad_acting', 'too_violent', 'too_dark',
@@ -172,4 +256,23 @@ export function reasonChipsFor(meta: TitleMetaLite | null, bucket: ReasonBucket,
 /** Codes → their display labels (for stored codes we render back). */
 export function labelFor(code: string): string {
   return REASONS[code]?.label ?? code;
+}
+
+/**
+ * A short, title-aware sub-heading for the Pass popover, so the first thing the
+ * user reads is framed by what they're passing on (a long series vs. a scary
+ * movie vs. an old pick) instead of one generic line. Falls back to a neutral
+ * prompt when metadata is missing.
+ */
+export function passHeadingFor(meta: TitleMetaLite | null): string {
+  if (!meta) return 'What made it miss?';
+  if (meta.mediaType === 'tv' && (meta.numberOfSeasons ?? 0) >= 4) return 'A lot of show to commit to — what’s the hesitation?';
+  if (has(meta, 'horror')) return 'Not feeling the scare? Tell us why.';
+  if (has(meta, 'romance')) return 'Not the romance for you? What missed?';
+  if (has(meta, 'comedy')) return 'Not your kind of funny? What missed?';
+  if (isForeign(meta)) return 'What made this one miss?';
+  if (has(meta, 'science fiction', 'sci-fi', 'fantasy')) return 'Not the world you want tonight? Why?';
+  if (isOld(meta)) return 'Not feeling this era? What missed?';
+  if (isLong(meta)) return 'Long haul on this one — what’s the hesitation?';
+  return 'What made it miss? Tap any that apply.';
 }

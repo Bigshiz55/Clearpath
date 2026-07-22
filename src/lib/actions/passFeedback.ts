@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { addToWatchlist, updateWatchlistItem, removeWatchlistItem, type ActionResult } from '@/lib/actions/watchlist';
 import { rateQuizTitle } from '@/lib/actions/quiz';
 import { axisSignalsFor } from '@/lib/feedback/dnaSignals';
+import { universalCategoriesFor } from '@/lib/feedback/reasons';
 
 export type FeedbackType = 'seen' | 'not_right_now' | 'not_for_me' | 'didnt_like' | 'removed_without_reason';
 
@@ -82,7 +83,7 @@ async function persistFeedback(
       tmdb_id: v.tmdbId,
       media_type: v.mediaType,
       feedback_type: v.feedbackType,
-      payload: { rating: v.rating ?? null, reasons: v.reasonCodes ?? [], source: v.source ?? null, position: v.position ?? null, matchScore: v.matchScore ?? null },
+      payload: { rating: v.rating ?? null, reasons: v.reasonCodes ?? [], categories: universalCategoriesFor(v.reasonCodes ?? []), source: v.source ?? null, position: v.position ?? null, matchScore: v.matchScore ?? null },
     });
   } catch {
     /* best-effort persistence */

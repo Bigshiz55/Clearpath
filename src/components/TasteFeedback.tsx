@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { submitPassFeedback, undoPassFeedback, recordAnalyticsEvent, type FeedbackType } from '@/lib/actions/passFeedback';
-import { reasonChipsFor, type TitleMetaLite } from '@/lib/feedback/reasons';
+import { reasonChipsFor, passHeadingFor, universalCategoriesFor, type TitleMetaLite } from '@/lib/feedback/reasons';
 import type { MediaType } from '@/lib/types';
 
 interface Chip { code: string; label: string }
@@ -12,6 +12,7 @@ interface Popover {
   top: number;
   width: number;
   lead?: string;
+  heading: string;
   chips: Chip[];
   score: number | null;
   bump: { from: number | null; to: number | null } | null;
@@ -110,7 +111,7 @@ export function TasteFeedback({
   async function apply(type: FeedbackType, codes: string[]) {
     if (timer.current) clearTimeout(timer.current);
     const from = pop?.score ?? null;
-    void recordAnalyticsEvent('pass_reason_chip_selected', { tmdbId, choice: type, reasons: codes }).catch(() => {});
+    void recordAnalyticsEvent('pass_reason_chip_selected', { tmdbId, choice: type, reasons: codes, categories: universalCategoriesFor(codes) }).catch(() => {});
     try {
       await submitPassFeedback({ ...base, feedbackType: type, reasonCodes: codes, rating: null, ...ctx });
     } catch {
@@ -160,7 +161,7 @@ export function TasteFeedback({
       .slice(0, 8)
       .map((c) => ({ code: c.code, label: c.label }));
     const highMatch = typeof matchScore === 'number' && matchScore >= 80;
-    setPop({ left, top, width, lead: highMatch ? 'This was a strong match for you.' : undefined, chips, score, bump: null });
+    setPop({ left, top, width, lead: highMatch ? 'This was a strong match for you.' : undefined, heading: passHeadingFor(meta), chips, score, bump: null });
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => close(true), 12000);
   }
@@ -214,7 +215,7 @@ export function TasteFeedback({
               ) : (
                 <>
                   {pop.lead && <div className="mt-0.5 text-[11px] font-semibold text-brand-200">{pop.lead}</div>}
-                  <div className="mt-0.5 text-[11px] text-slate-400">What made it miss? Tap any that apply.</div>
+                  <div className="mt-0.5 text-[11px] text-slate-400">{pop.heading}</div>
 
                   {/* Top ~8 title-specific reasons — 2-column box, multi-select (pink). */}
                   <div className="mt-2 grid grid-cols-2 gap-1.5">
