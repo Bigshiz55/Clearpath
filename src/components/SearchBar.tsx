@@ -55,6 +55,16 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
     router.push(`/app/ask?q=${encodeURIComponent(text.trim())}`);
   }
 
+  /** Reset the field so it's ready for the next search (after firing one, or via
+   *  the clear button). Without this the query lingered after you searched. */
+  function clearAll() {
+    setQ('');
+    setResults([]);
+    setPeople([]);
+    setError(null);
+    setOpen(false);
+  }
+
   function startVoice() {
     if (typeof window === 'undefined') return;
     const w = window as unknown as { webkitSpeechRecognition?: new () => never; SpeechRecognition?: new () => never };
@@ -157,17 +167,10 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
             e.preventDefault();
             // Enter always acts: a request goes to the judge; otherwise open the
             // top matching title; if there's no match yet, hand it to the judge.
-            if (looksLikeRequest(query)) {
-              fileWithJudge(query);
-              return;
-            }
-            const top = results[0];
-            if (top) {
-              setOpen(false);
-              router.push(`/app/title/${top.mediaType}/${top.id}`);
-            } else {
-              fileWithJudge(query);
-            }
+            const top = !looksLikeRequest(query) ? results[0] : null;
+            if (top) router.push(`/app/title/${top.mediaType}/${top.id}`);
+            else fileWithJudge(query);
+            clearAll(); // don't leave the query sitting in the box
           }}
           placeholder="Search by title, actor, genre, or platform…"
           className="w-full rounded-2xl border-2 border-white/25 bg-white/[0.07] py-4 pl-12 pr-11 text-base text-white outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:bg-white/[0.1] focus:ring-4 focus:ring-brand-500/25 shadow-[0_12px_40px_-14px_rgba(0,0,0,0.75)] min-h-[56px]"
@@ -176,7 +179,21 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
         {loading && (
           <span className="absolute right-12 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
         )}
-        {voiceSupported && (
+        {/* When the box has text, show a Clear (×) — tap to wipe it and search
+            again. When it's empty, the mic returns. */}
+        {q ? (
+          <button
+            type="button"
+            onClick={clearAll}
+            className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-slate-300 transition hover:bg-white/5 hover:text-white"
+            aria-label="Clear search"
+            title="Clear"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+            </svg>
+          </button>
+        ) : voiceSupported ? (
           <button
             type="button"
             onClick={listening ? stopVoice : startVoice}
@@ -191,7 +208,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
               <path d="M5 11a7 7 0 0 0 14 0M12 18v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </button>
-        )}
+        ) : null}
       </div>
 
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
