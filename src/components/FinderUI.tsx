@@ -10,7 +10,6 @@ import { JudgeBench } from '@/components/JudgeBench';
 import { MatchMark } from '@/components/MatchMark';
 import { type TileRatings } from '@/lib/ratings';
 import type { FinderQuery } from '@/lib/finder';
-import type { Judge } from '@/lib/sponsors';
 
 export interface WatcherOption {
   name: string;
@@ -156,12 +155,10 @@ function releasedReadout(years: number): string {
 export function FinderUI({
   hasServices,
   watchers = [],
-  initialJudge = null,
   embedded = false,
 }: {
   hasServices: boolean;
   watchers?: WatcherOption[];
-  initialJudge?: Judge | null;
   /** On the home screen the judge already lives elsewhere, so hide the bench. */
   embedded?: boolean;
 }) {
@@ -258,7 +255,7 @@ export function FinderUI({
 
         {/* Hero — the judge & the bench on the left, your plain-English ask on the right */}
         <div className={`grid gap-4 ${embedded ? '' : 'lg:grid-cols-2'}`}>
-        {!embedded && <JudgeBench initialJudge={initialJudge} big />}
+        {!embedded && <JudgeBench big />}
 
         <div className={embedded ? 'flex flex-col gap-3' : 'card flex flex-col gap-3 p-4'}>
           {!embedded && <div className="eyebrow-lg">⚖️ Try your case</div>}

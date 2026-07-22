@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
-import { getMyServices, getProfile, regionFor } from '@/lib/profile';
+import { getMyServices } from '@/lib/profile';
 import { listCrews } from '@/lib/actions/crews';
-import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
 
 export const dynamic = 'force-dynamic';
@@ -14,17 +13,6 @@ export default async function FinderPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const services = user ? await getMyServices(supabase, user.id) : [];
-
-  // Presiding judge (region/national default; local resolves client-side via GPS).
-  let judge: Judge | null = null;
-  if (user) {
-    try {
-      const profile = await getProfile(supabase, user.id);
-      judge = await getActiveJudge(supabase, { region: regionFor(profile), nowMs: Date.now() });
-    } catch {
-      /* sponsors optional / pre-migration */
-    }
-  }
 
   // Offer crew members as "who's watching" — dedup by name, need real taste.
   const watchers: WatcherOption[] = [];
@@ -53,7 +41,7 @@ export default async function FinderPage() {
         scored for you and showing exactly which of your rules it met. No black box, no “one guess,” no credits.
       </p>
       <div className="mt-6">
-        <FinderUI hasServices={services.length > 0} watchers={watchers} initialJudge={judge} />
+        <FinderUI hasServices={services.length > 0} watchers={watchers} />
       </div>
     </div>
   );

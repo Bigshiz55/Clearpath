@@ -7,7 +7,6 @@ import { PosterCard } from '@/components/PosterCard';
 import { JudgeVerdictCard } from '@/components/JudgeVerdictCard';
 import type { TitleVerdict } from '@/lib/askTypes';
 import { type TileRatings } from '@/lib/ratings';
-import { houseByKey, readHousePick } from '@/lib/houseJudges';
 import { naiveParseQuery, describeQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import type { FinderQuery } from '@/lib/finder';
 
@@ -46,8 +45,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
-  const [judgeName, setJudgeName] = useState('Judge Annie');
-  const [judgeSrc, setJudgeSrc] = useState('/judge-annie.png');
+  const [judgeName] = useState('Judge Verity');
   const nextId = useRef(1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
@@ -61,14 +59,11 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
   }
 
   useEffect(() => {
-    const dog = houseByKey(readHousePick() === 'waffles' ? 'waffles' : 'annie');
-    setJudgeName(dog.name);
-    setJudgeSrc(dog.src);
     setMsgs([
       {
         id: nextId.current++,
         role: 'judge',
-        text: `${dog.name} presiding. Tell me what you’re in the mood for — a vibe, a genre, a “like Mindhunter,” however you’d say it — and I’ll pull real titles, each scored for you. Need exact filters? That’s Forensic Search.`,
+        text: `Judge Verity presiding. Tell me what you’re in the mood for — a vibe, a genre, a “like Mindhunter,” however you’d say it — and I’ll pull real titles, each scored for you. Need exact filters? That’s Forensic Search.`,
       },
     ]);
   }, []);
@@ -186,7 +181,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
       {/* ============ The conversation ============ */}
       <div className="card flex h-[56vh] max-h-[620px] flex-col overflow-hidden p-0">
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
-          <RobedPortrait src={judgeSrc} size={44} />
+          <RobedPortrait emoji="🦉" size={44} accent="#f5c65a" />
           <div className="min-w-0 flex-1">
             <div className="eyebrow">⚖️ The bench</div>
             <div className="truncate text-base font-bold text-white">{judgeName}</div>

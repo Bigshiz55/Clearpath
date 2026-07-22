@@ -3,9 +3,6 @@ import { CloudCrews } from '@/components/CloudCrews';
 import { TogetherPlanner } from '@/components/TogetherPlanner';
 import { StartLiveCourt } from '@/components/StartLiveCourt';
 import { JudgeBench } from '@/components/JudgeBench';
-import { createClient } from '@/lib/supabase/server';
-import { getProfile, regionFor } from '@/lib/profile';
-import { getActiveJudge, type Judge } from '@/lib/sponsors';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -13,20 +10,6 @@ export const metadata: Metadata = {
 };
 
 export default async function TogetherPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  let judge: Judge | null = null;
-  if (user) {
-    try {
-      const profile = await getProfile(supabase, user.id);
-      judge = await getActiveJudge(supabase, { region: regionFor(profile), nowMs: Date.now() });
-    } catch {
-      /* sponsors optional / pre-migration */
-    }
-  }
-
   return (
     <div className="mx-auto max-w-xl">
       <h1 className="text-2xl font-bold text-white sm:text-3xl">👪 Tonight, Together</h1>
@@ -36,7 +19,7 @@ export default async function TogetherPage() {
       </p>
 
       <div className="mt-5">
-        <JudgeBench initialJudge={judge} />
+        <JudgeBench />
       </div>
 
       <section className="mt-6 rounded-2xl border border-brand-400/30 bg-brand-500/10 p-4">
