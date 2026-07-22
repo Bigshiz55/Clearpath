@@ -101,19 +101,6 @@ export function SeenVerdict({
       <button
         ref={firstRef}
         type="button"
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); verdict('disliked'); }}
-        disabled={done}
-        aria-label="Seen it — did not like it"
-        title="Seen it — did not like it"
-        className="relative grid h-9 w-full flex-1 place-items-center rounded-md border border-red-400/50 bg-red-500/15 text-red-100 transition hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:opacity-60"
-      >
-        <Glasses className="h-5 w-5" />
-        <span className="absolute bottom-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-white ring-1 ring-ink-900">
-          <ArrowDown className="h-2.5 w-2.5" />
-        </span>
-      </button>
-      <button
-        type="button"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); verdict('liked'); }}
         disabled={done}
         aria-label="Seen it — liked it"
@@ -123,6 +110,19 @@ export function SeenVerdict({
         <Glasses className="h-5 w-5" />
         <span className="absolute bottom-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-white ring-1 ring-ink-900">
           <ArrowUp className="h-2.5 w-2.5" />
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); verdict('disliked'); }}
+        disabled={done}
+        aria-label="Seen it — did not like it"
+        title="Seen it — did not like it"
+        className="relative grid h-9 w-full flex-1 place-items-center rounded-md border border-red-400/50 bg-red-500/15 text-red-100 transition hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:opacity-60"
+      >
+        <Glasses className="h-5 w-5" />
+        <span className="absolute bottom-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-white ring-1 ring-ink-900">
+          <ArrowDown className="h-2.5 w-2.5" />
         </span>
       </button>
     </>
