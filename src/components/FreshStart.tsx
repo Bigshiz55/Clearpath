@@ -6,13 +6,16 @@ import { createClient } from '@/lib/supabase/client';
 
 /**
  * A "start fresh" flow — signs out of any current session and mints a brand-new
- * anonymous guest, then drops you into the Taste Quiz with zero history. Share
- * the link so each person can build their own DNA clean on their own device.
- * Powers every clean-slate route (/fresh, /start) so they stay identical.
+ * anonymous guest, then drops you where `to` points (the Taste Quiz by default,
+ * or the cold-start home) with zero history. Share the link so each person can
+ * build their own DNA clean on their own device. Powers every clean-slate route
+ * (/fresh, /begin, /start, /newuser) so they stay identical.
  */
-export function FreshStart() {
+export function FreshStart({ to = '/app/quiz' }: { to?: string }) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
+  // Only ever redirect to an internal path (never an attacker-supplied URL).
+  const dest = to.startsWith('/') && !to.startsWith('//') ? to : '/app/quiz';
 
   useEffect(() => {
     let active = true;
@@ -26,7 +29,7 @@ export function FreshStart() {
           setErr(error.message);
           return;
         }
-        router.replace('/app/quiz');
+        router.replace(dest);
       } catch (e) {
         if (active) setErr(e instanceof Error ? e.message : 'Could not start a fresh session.');
       }
@@ -34,7 +37,7 @@ export function FreshStart() {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [router, dest]);
 
   return (
     <div className="grid min-h-dvh place-items-center p-6 text-center">
@@ -44,7 +47,7 @@ export function FreshStart() {
         {err && (
           <p className="mt-2 text-xs text-rose-300">
             {err} —{' '}
-            <a href="/app/quiz" className="underline">
+            <a href={dest} className="underline">
               continue anyway
             </a>
           </p>
