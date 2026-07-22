@@ -5,7 +5,7 @@ import { LikeHateGame } from './LikeHateGame';
 import { QuizGame } from './QuizGame';
 
 /** Taste-building: the fast Like/Nope game by default, or the finer 1–10 scale. */
-export function QuizModes() {
+export function QuizModes({ totalRated = 0 }: { totalRated?: number }) {
   const [mode, setMode] = useState<'quick' | 'scale'>('quick');
   return (
     <div className="mt-5">
@@ -23,7 +23,7 @@ export function QuizModes() {
           ★ Rate 1–10
         </button>
       </div>
-      {mode === 'quick' ? <LikeHateGame /> : <QuizGame />}
+      {mode === 'quick' ? <LikeHateGame totalRated={totalRated} /> : <QuizGame />}
     </div>
   );
 }
