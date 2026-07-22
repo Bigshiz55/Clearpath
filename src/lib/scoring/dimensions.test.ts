@@ -123,6 +123,14 @@ describe('dnaStrength', () => {
     const after = dnaStrengthExact({ ...base, engagement: (base.engagement ?? 0) + 1 });
     expect(after).toBeGreaterThan(before);
   });
+
+  it('front-loads: an early interaction moves the score more than a late one', () => {
+    const at = (n: number) => dnaStrengthExact({ pref: {}, weight: {}, samples: 0, engagement: n });
+    const earlyGain = at(3) - at(2); // 3rd interaction
+    const lateGain = at(81) - at(80); // 81st interaction
+    expect(earlyGain).toBeGreaterThan(lateGain);
+    expect(lateGain).toBeGreaterThan(0); // …but a late one still ticks up, never flat
+  });
 });
 
 describe('tasteDials', () => {

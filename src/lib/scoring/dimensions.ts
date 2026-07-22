@@ -182,23 +182,29 @@ export function dimensionMatch(dims: TitleDimensions, profile: DimensionProfile)
  */
 /** The unrounded score (0..100) — for the live "+0.35%" increments in the UI. */
 export function dnaStrengthExact(profile: DimensionProfile): number {
-  // Breadth: distinct titles judged — a smooth, ever-climbing curve.
+  // Three sources of evidence, all of which only ever accumulate:
+  //   breadth  — distinct titles judged (ratings)
+  //   depth    — total signal banked across the taste axes (ratings + reasons)
+  //   activity — every logged interaction, incl. reasons that map to no axis
+  //              (e.g. "not my genre") and quick actions, so ANY feedback counts.
   const samples = Number.isFinite(profile.samples) ? Math.max(0, profile.samples) : 0;
-  const breadth = 1 - Math.exp(-samples / 30);
-  // Depth: total taste evidence banked across every axis. Monotonic in each
-  // axis weight, so any added signal (rating or reason) only ever raises it.
   let totalW = 0;
   for (const k of DIMENSION_KEYS) {
     const w = profile.weight[k];
     if (typeof w === 'number' && Number.isFinite(w) && w > 0) totalW += w;
   }
-  const depth = 1 - Math.exp(-totalW / 420);
-  // Activity: every logged interaction (even reasons that map to no taste axis,
-  // like "not my genre") counts here, so ANY feedback the user gives produces a
-  // visible upward tick — never a "why am I even doing this?" flat/negative move.
   const engagement = Number.isFinite(profile.engagement) ? Math.max(0, profile.engagement ?? 0) : 0;
-  const activity = 1 - Math.exp(-engagement / 40);
-  return clamp100(100 * (0.4 * breadth + 0.4 * depth + 0.2 * activity));
+
+  // Pool it into one "how far along your DNA journey" quantity, then run it
+  // through a single front-loaded curve (1 − e^(−x)). Because the curve is
+  // concave, the SAME decision is worth a lot early and only a little later:
+  // the first handful of ratings/passes move the number several points each,
+  // while a power user's tap adds a fraction of a point. That matches how taste
+  // learning actually works — early signal is high-information, later signal
+  // just refines — and it keeps the score feeling *earned* rather than farmable.
+  // Monotonic in every input, so engaging can never lower or flatten it.
+  const evidence = samples + 0.8 * engagement + 0.06 * totalW;
+  return clamp100(100 * (1 - Math.exp(-evidence / 55)));
 }
 
 export function dnaStrength(profile: DimensionProfile): number {
