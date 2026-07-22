@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
+import { STREAMING_SERVICES } from '@/lib/services';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { PosterCard } from '@/components/PosterCard';
 import { JudgeBench } from '@/components/JudgeBench';
@@ -176,6 +178,28 @@ export function FinderUI({
     setText(v);
     setQ(naiveParseQuery(v));
   }
+
+  // Deep-link support: "State Your Case" (and links) can open the Finder pre-
+  // filled with a plain-English ask and/or an explicit provider, and auto-run —
+  // e.g. /app/finder?providers=9&q=…&run=1 for "something on Prime Video".
+  const searchParams = useSearchParams();
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current) return;
+    seeded.current = true;
+    const qText = searchParams.get('q');
+    const providers = searchParams.get('providers');
+    if (!qText && !providers) return;
+    const ids = (providers ?? '')
+      .split(',')
+      .map((s) => Number.parseInt(s, 10))
+      .filter((n) => Number.isFinite(n));
+    const seededQuery: FinderQuery = { ...naiveParseQuery(qText ?? ''), ...(ids.length ? { providerIds: ids } : {}) };
+    if (qText) setText(qText);
+    setQ(seededQuery);
+    if (searchParams.get('run') === '1') void find(seededQuery, qText ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   function set<K extends keyof FinderQuery>(key: K, val: FinderQuery[K]) {
     setQ((prev) => ({ ...prev, [key]: val }));
   }
@@ -185,7 +209,7 @@ export function FinderUI({
       genreIds: prev.genreIds.includes(id) ? prev.genreIds.filter((g) => g !== id) : [...prev.genreIds, id],
     }));
   }
-  async function find() {
+  async function find(qOverride?: FinderQuery, textOverride?: string) {
     setLoading(true);
     setError(null);
     try {
@@ -195,7 +219,7 @@ export function FinderUI({
         headers: { 'Content-Type': 'application/json' },
         // Send the raw ask too, so the server can parse it smartly (actor names,
         // counts, "over 70%", etc.). Falls back to the tools below when empty.
-        body: JSON.stringify({ query: q, text: text.trim(), watcher }),
+        body: JSON.stringify({ query: qOverride ?? q, text: (textOverride ?? text).trim(), watcher }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed');
@@ -210,8 +234,18 @@ export function FinderUI({
     }
   }
 
+  const providerFilterNames = (q.providerIds ?? [])
+    .map((id) => STREAMING_SERVICES.find((s) => s.id === id || s.ids.includes(id))?.name)
+    .filter((n): n is string => Boolean(n));
+
   return (
     <div className="space-y-5">
+      {(q.providerIds?.length ?? 0) > 0 && (
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-brand-400/40 bg-brand-500/10 px-3.5 py-2.5 text-sm text-brand-100">
+          <span>📺 Filtered to <b className="text-white">{providerFilterNames.join(', ') || 'your pick'}</b> — real availability from TMDB.</span>
+          <button onClick={() => set('providerIds', [])} className="flex-none text-xs font-semibold text-brand-200 underline underline-offset-2 hover:text-white">Clear</button>
+        </div>
+      )}
       {/* On the home screen, both ways to search live inside ONE outlined box —
           "say what you want" OR "build it by hand" — so it reads as two options
           in a single section. Elsewhere the wrapper is transparent (`contents`). */}
@@ -248,7 +282,7 @@ export function FinderUI({
               </button>
             ))}
           </div>
-          <button onClick={find} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
+          <button onClick={() => void find()} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
             {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
           </button>
         </div>
@@ -464,7 +498,7 @@ export function FinderUI({
           </button>
         </div>
 
-        <button onClick={find} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
+        <button onClick={() => void find()} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
           {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
         </button>
       </div>

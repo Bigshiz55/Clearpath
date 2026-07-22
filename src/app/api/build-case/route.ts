@@ -117,6 +117,59 @@ function detectAiringHorizon(text: string): number | null {
   return null;
 }
 
+/**
+ * Extract a specific title from a "where can I watch/stream X" or "is X on …"
+ * question, so we can route to that title's page (which shows every provider).
+ * Null when the text isn't a where-to-watch lookup, or the "title" is generic
+ * (e.g. "is there anything good on Netflix" → that's a platform browse, not a title).
+ */
+function extractWatchTitle(text: string): string | null {
+  const raw = text.trim().replace(/[?!.]+$/, '');
+  const low = ` ${raw.toLowerCase()} `;
+  const clean = (s: string): string | null => {
+    let title = s.trim().replace(/\s+on(\s+.*)?$/i, '').trim(); // drop trailing "on <platform>"
+    title = title.replace(/^(the movie|the show|the film)\s+/i, '').trim();
+    if (title.length < 2) return null;
+    if (/^(there|anything|something|any|a|an|some|it)\b/i.test(title)) return null; // generic, not a title
+    return title;
+  };
+  // "is <title> on <somewhere>" — availability check for a named title.
+  let m = raw.match(/^\s*is\s+(.+?)\s+on\s+[a-z0-9+.\s]+$/i);
+  if (m && m[1]) return clean(m[1]);
+  // "where/what/how/which can I (watch|stream|see|find) <title> [on …]"
+  const gate = /(where can i (watch|stream|see|find|get)|what (network|channel|service|platform|streaming)|how can i (watch|stream|see|get)|which (service|platform|channel|network))/i;
+  if (!gate.test(low)) return null;
+  m = raw.match(/(?:watch|stream|see|find|get)\s+(.+)$/i);
+  if (!m || !m[1]) return null;
+  return clean(m[1]);
+}
+
+/** Named streaming service → the TMDB provider id we filter on. Strong aliases
+ *  match anywhere; "bare" aliases (amazon/max/apple — risky words) only count
+ *  when used as a platform, i.e. right after "on". */
+function detectPlatform(text: string): { id: number; name: string } | null {
+  const t = ` ${text.toLowerCase()} `;
+  const table: { id: number; name: string; strong: RegExp; bare?: RegExp }[] = [
+    { id: 8, name: 'Netflix', strong: /\bnetflix\b/ },
+    { id: 9, name: 'Prime Video', strong: /\b(amazon prime|prime video|amazon video)\b/, bare: /\b(amazon|prime)\b/ },
+    { id: 337, name: 'Disney+', strong: /\b(disney\s*\+|disney plus)\b/, bare: /\bdisney\b/ },
+    { id: 1899, name: 'Max', strong: /\b(hbo max|hbo)\b/, bare: /\bmax\b/ },
+    { id: 15, name: 'Hulu', strong: /\bhulu\b/ },
+    { id: 531, name: 'Paramount+', strong: /\b(paramount\s*\+|paramount plus)\b/, bare: /\bparamount\b/ },
+    { id: 386, name: 'Peacock', strong: /\bpeacock\b/ },
+    { id: 350, name: 'Apple TV+', strong: /\b(apple tv\s*\+?|appletv)\b/, bare: /\bapple\b/ },
+    { id: 43, name: 'Starz', strong: /\bstarz\b/ },
+    { id: 37, name: 'Showtime', strong: /\bshowtime\b/ },
+    { id: 526, name: 'AMC+', strong: /\bamc\s*\+/ },
+    { id: 73, name: 'Tubi', strong: /\btubi\b/ },
+    { id: 300, name: 'Pluto TV', strong: /\bpluto\b/ },
+    { id: 207, name: 'The Roku Channel', strong: /\broku\b/ },
+  ];
+  for (const p of table) if (p.strong.test(t)) return { id: p.id, name: p.name };
+  for (const p of table) if (p.bare && new RegExp(`\\bon\\s+(?:the\\s+)?${p.bare.source}`).test(t)) return { id: p.id, name: p.name };
+  return null;
+}
+
 const AXIS_LEAN: Record<string, [string, string]> = {
   pacing: ['a slower burn', 'a faster pace'],
   darkness: ['a lighter tone', 'a darker tone'],
@@ -140,6 +193,30 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as { text?: unknown };
     const text = typeof body.text === 'string' ? body.text.slice(0, 600).trim() : '';
     if (text.length < 4) return NextResponse.json({ error: 'Tell us a bit about what you like.' }, { status: 400 });
+
+    // ── Pure lookup: "where can I stream <title>?" ──────────────────────────
+    // Answer it by opening that title's page (which lists every provider). No
+    // DNA writes — a where-to-watch question is not a statement of taste, so we
+    // must never mark the queried title as "loved".
+    const whereTitle = extractWatchTitle(text);
+    if (whereTitle) {
+      const hits = await searchTitles(whereTitle).catch(() => []);
+      const top = hits[0];
+      if (top) {
+        return NextResponse.json({
+          ok: true,
+          learned: false,
+          redirect: `/app/title/${top.mediaType}/${top.id}`,
+          summary: `Here’s where to stream ${top.title}${top.year ? ` (${top.year})` : ''}.`,
+        });
+      }
+      return NextResponse.json({
+        ok: true,
+        learned: false,
+        stay: true,
+        summary: `Couldn’t find “${whereTitle}” — try the 🔎 search up top.`,
+      });
+    }
 
     const parsed = (await parseWithAi(text)) ?? parseNaive(text);
 
@@ -197,18 +274,32 @@ export async function POST(request: Request) {
     if (uniquePhrases.length) parts.push(uniquePhrases.join(', '));
     if (parsed.likedTitles.length) parts.push(`loves ${parsed.likedTitles.slice(0, 3).join(', ')}`);
     const learned = byAxis.size > 0 || parsed.likedTitles.length > 0 || parsed.avoidTitles.length > 0;
+    const tasteLead = parts.length ? `Locked in ${parts.join(' · ')}. ` : '';
+
+    // If they named a streaming service ("find me something on Amazon Prime"),
+    // route to Forensic Search pre-filtered to that provider and auto-run. Their
+    // stated taste is folded in above and the results are still scored for them.
+    const platform = detectPlatform(text);
+    const wantsFind = /\b(find|show me|recommend|suggest|something|anything|browse|watch|good|what should i watch|what can i watch)\b/.test(` ${text.toLowerCase()} `) || /\bon\s+/.test(` ${text.toLowerCase()} `);
+    if (platform && wantsFind) {
+      return NextResponse.json({
+        ok: true,
+        learned,
+        redirect: `/app/finder?providers=${platform.id}&q=${encodeURIComponent(text.slice(0, 200))}&run=1`,
+        summary: `${tasteLead}Finding something on ${platform.name}, scored for you.`,
+      });
+    }
 
     // If they asked for something *coming on* soon, honour that constraint: send
     // them to the live TV guide windowed to the horizon they named, rather than
     // the generic Watch Now grid. Their stated taste is still folded in above.
     const horizon = detectAiringHorizon(text);
     if (horizon != null) {
-      const taste = parts.length ? `Locked in ${parts.join(' · ')}. ` : '';
       return NextResponse.json({
         ok: true,
         learned,
         redirect: `/app/tv?within=${horizon}`,
-        summary: `${taste}Here’s what’s coming on in the next ${horizon} hours.`,
+        summary: `${tasteLead}Here’s what’s coming on in the next ${horizon} hours.`,
       });
     }
 

@@ -32,8 +32,10 @@ export function BuildCaseBox() {
       toast.show(d.summary ? `⚖️ ${d.summary}` : 'Got it — building your Taste DNA. 🧬', 'success');
       setText('');
       // If the case included an actionable ask (e.g. "coming on in the next 12
-      // hours"), the server routes us to the right screen for it.
-      router.push(typeof d.redirect === 'string' ? d.redirect : '/app/watch');
+      // hours" or "something on Netflix"), the server routes us to the right
+      // screen. `stay` = a lookup that found nothing — keep them here with the note.
+      if (typeof d.redirect === 'string') router.push(d.redirect);
+      else if (!d.stay) router.push('/app/watch');
     } catch {
       toast.show('Could not read that — try again.', 'error');
     } finally {
