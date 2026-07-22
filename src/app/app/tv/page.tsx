@@ -90,7 +90,9 @@ export default async function OnTvPage({
       <section>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">
           {withinHours != null
-            ? `📺 ${filterLabel && !genreEmpty ? `${filterLabel} ` : ''}coming on in the next ${withinHours} hours`
+            ? genreEmpty
+              ? `📺 ${filterLabel ? `${titleCase(filterLabel)} ` : ''}on live TV`
+              : `📺 ${filterLabel ? `${filterLabel} ` : ''}coming on in the next ${withinHours} hours`
             : '📺 On TV today'}
         </h1>
         <p className="mt-2 text-sm text-slate-300">
@@ -116,12 +118,40 @@ export default async function OnTvPage({
 
       {withinHours != null && windowed ? (
         <>
-          {genreEmpty && (
-            <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-100">
-              No {filterLabel} on major {region} networks in the next {withinHours} hours — here’s everything that’s coming on instead.
-            </p>
+          {genreEmpty ? (
+            <>
+              {/* Honest empty-state: our live guide reads TVmaze's community
+                  broadcast schedule (strong for the big US networks, thin/none for
+                  cable and TV-movies). Don't dump unrelated shows as if they were
+                  the answer — say why, then point somewhere that can actually help. */}
+              <div className="rounded-2xl border border-amber-400/30 bg-amber-500/[0.07] p-4 text-center sm:p-5">
+                <div className="text-2xl" aria-hidden>📭</div>
+                <h2 className="mt-1 text-lg font-bold text-white">
+                  No {filterLabel || 'matches'} on live TV in the next {withinHours}h
+                </h2>
+                <p className="mx-auto mt-1.5 max-w-md text-sm text-slate-300">
+                  Our live guide reads real broadcast listings — strongest for major {region} networks
+                  (ABC, CBS, NBC, FOX, CW). It doesn’t reliably carry{' '}
+                  {network ? titleCase(network) : 'cable'}{movieOnly ? ' movies' : ''}, so rather than
+                  guess, we only show what we can actually confirm.
+                </p>
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  <Link href="/app/finder" className="rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-400">
+                    🔎 Find {movieOnly ? 'movies' : 'titles'} by streaming service
+                  </Link>
+                  <Link href="/app/watch" className="rounded-lg border border-white/15 px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+                    State a new case
+                  </Link>
+                </div>
+              </div>
+              <h2 className="pt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Meanwhile — actually coming on live TV
+              </h2>
+              <OnTvGuide airings={windowed} dateLabel={`Next ${withinHours} hours`} country={region} mode="broadcast" remindedIds={remindedIds} windowHours={withinHours} />
+            </>
+          ) : (
+            <OnTvGuide airings={windowed} dateLabel={`Next ${withinHours} hours`} country={region} mode="broadcast" remindedIds={remindedIds} windowHours={withinHours} />
           )}
-          <OnTvGuide airings={windowed} dateLabel={`Next ${withinHours} hours`} country={region} mode="broadcast" remindedIds={remindedIds} windowHours={withinHours} />
           <p className="text-sm">
             <Link href="/app/tv" className="font-semibold text-brand-300 hover:underline">See the full day’s guide →</Link>
           </p>
