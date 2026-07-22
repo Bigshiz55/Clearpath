@@ -43,7 +43,7 @@ const SYSTEM = `You convert a person's plain-English request for something to wa
 
 Fields:
 - mediaType: "movie" | "tv" | "any"
-- genres: array of genre names from: action, adventure, animation, comedy, crime, documentary, drama, family, fantasy, history, horror, music, mystery, romance, "science fiction", thriller, war, western
+- genres: array of genre names from: action, adventure, animation, comedy, crime, documentary, drama, family, fantasy, history, horror, music, mystery, reality, romance, "science fiction", thriller, war, western
 - excludeGenres: genre names to AVOID
 - keywords: array of short trope/subject/setting words (lowercase) that a movie database would tag, e.g. "heist", "time loop", "based on a true story", "corporate", "dystopia", "courtroom", "road trip", "revenge", "coming of age", "small town", "one location". Use these for specific vibes/tropes that aren't genres.
 - maxRuntimeMinutes: number (movies) if they mention a length limit ("under 2 hours" -> 120)

@@ -99,7 +99,7 @@ interface RawFb {
 
 const SYSTEM = `The user is looking at a list of movie/TV recommendations and telling you what to change about it. Convert their feedback into JSON adjustments. Understand negations and "too many X". Return ONLY a JSON object; omit fields you're unsure about.
 Fields:
-- excludeGenres: genre names to remove, chosen from: action, adventure, animation, comedy, crime, documentary, drama, family, fantasy, history, horror, music, mystery, romance, "science fiction", thriller, war, western. (e.g. "I don't like westerns" -> ["western"]; "too much violence / nothing scary" -> ["horror","war"])
+- excludeGenres: genre names to remove, chosen from: action, adventure, animation, comedy, crime, documentary, drama, family, fantasy, history, horror, music, mystery, reality, romance, "science fiction", thriller, war, western. (e.g. "I don't like westerns" -> ["western"]; "no reality tv" -> ["reality"]; "too much violence / nothing scary" -> ["horror","war"])
 - mediaType: "movie" if they want fewer shows / more movies; "tv" if the reverse; otherwise "any"
 - newerThanYears: a number, if they say the titles are too old or want newer ("too many old movies" -> 12)
 - wantOlder: true only if they explicitly want older / classic titles

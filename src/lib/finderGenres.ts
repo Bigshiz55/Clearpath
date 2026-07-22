@@ -15,6 +15,9 @@ export const GENRE_IDS: Record<string, number> = {
   music: 10402,
   mystery: 9648,
   romance: 10749,
+  reality: 10764, // TV-only TMDB genre
+  'reality tv': 10764,
+  'reality-tv': 10764,
   'science fiction': 878,
   'sci-fi': 878,
   scifi: 878,
@@ -34,6 +37,7 @@ export const GENRE_CHIPS: { key: string; label: string; id: number }[] = [
   { key: 'scifi', label: 'Sci-Fi', id: 878 },
   { key: 'horror', label: 'Horror', id: 27 },
   { key: 'romance', label: 'Romance', id: 10749 },
+  { key: 'reality', label: 'Reality TV', id: 10764 },
   { key: 'documentary', label: 'Documentary', id: 99 },
   { key: 'fantasy', label: 'Fantasy', id: 14 },
   { key: 'adventure', label: 'Adventure', id: 12 },
