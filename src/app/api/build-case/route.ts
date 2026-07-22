@@ -170,6 +170,92 @@ function detectPlatform(text: string): { id: number; name: string } | null {
   return null;
 }
 
+/** Canonical service name (as emitted by the multilingual intent parser) → TMDB id. */
+const SERVICE_IDS: Record<string, number> = {
+  netflix: 8, 'prime video': 9, 'disney+': 337, max: 1899, hulu: 15, 'paramount+': 531,
+  peacock: 386, 'apple tv+': 350, starz: 43, showtime: 37, 'amc+': 526, tubi: 73,
+  'pluto tv': 300, 'the roku channel': 207,
+};
+function platformByName(name: string | null | undefined): { id: number; name: string } | null {
+  if (!name) return null;
+  const id = SERVICE_IDS[name.toLowerCase().trim()];
+  return id ? { id, name } : null;
+}
+
+interface Intent {
+  kind: 'where_to_watch' | 'platform_find' | 'airing' | 'taste';
+  title: string | null;
+  platform: string | null;
+  horizonHours: number | null;
+}
+
+/**
+ * Language-agnostic intent classifier — the multilingual counterpart to the
+ * English regex fast-paths. gpt-4o-mini reads a request in ANY language (e.g.
+ * Simplified Chinese) and returns which action it is + the slots, so the same
+ * router can serve non-English input without brittle per-language keyword lists.
+ * Returns null on no key / timeout / bad output (caller then falls back to taste).
+ */
+async function parseIntentWithAi(text: string): Promise<Intent | null> {
+  const key = serverEnv.openaiKey();
+  if (!key) return null;
+  const system =
+    `Classify a movie/TV request (written in ANY language) into JSON. Return ONLY:\n` +
+    `{"kind":"where_to_watch"|"platform_find"|"airing"|"taste","title":string|null,"platform":string|null,"horizonHours":number|null}\n` +
+    `- where_to_watch: they ask where/how to stream a SPECIFIC named title. Put the title in "title", using its common ENGLISH title when you know it.\n` +
+    `- platform_find: they want something to watch ON a named streaming service. Set "platform" to EXACTLY one of: Netflix, Prime Video, Disney+, Max, Hulu, Paramount+, Peacock, Apple TV+, Starz, Showtime, AMC+, Tubi, Pluto TV, The Roku Channel.\n` +
+    `- airing: they want what's coming on / on TV within some hours. Set "horizonHours" (a number; "tonight" -> 6, unspecified -> 24).\n` +
+    `- taste: anything else (describing what they like or dislike).\n` +
+    `Examples:\n` +
+    `"在亚马逊上找点东西看" -> {"kind":"platform_find","title":null,"platform":"Prime Video","horizonHours":null}\n` +
+    `"大白鲨在哪个平台可以看" -> {"kind":"where_to_watch","title":"Jaws","platform":null,"horizonHours":null}\n` +
+    `"接下来3小时电视上有什么" -> {"kind":"airing","title":null,"platform":null,"horizonHours":3}\n` +
+    `"我喜欢烧脑的悬疑片，不喜欢太慢的" -> {"kind":"taste","title":null,"platform":null,"horizonHours":null}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0,
+        max_tokens: 120,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: text.slice(0, 400) },
+        ],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const r = JSON.parse(data.choices?.[0]?.message?.content ?? 'null') as Record<string, unknown> | null;
+    if (!r || typeof r !== 'object') return null;
+    const kind = r.kind;
+    if (kind !== 'where_to_watch' && kind !== 'platform_find' && kind !== 'airing' && kind !== 'taste') return null;
+    const hz = Number(r.horizonHours);
+    return {
+      kind,
+      title: typeof r.title === 'string' && r.title.trim() ? r.title.trim() : null,
+      platform: typeof r.platform === 'string' && r.platform.trim() ? r.platform.trim() : null,
+      horizonHours: Number.isFinite(hz) && hz > 0 ? Math.max(1, Math.min(48, hz)) : null,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Cheap check for non-Latin scripts (CJK here) — when present we let the LLM
+ *  classify intent, since the English regex fast-paths can't. Keeps the English
+ *  path byte-for-byte unchanged. */
+function hasNonLatinScript(text: string): boolean {
+  return /[㐀-鿿぀-ヿ가-힯]/.test(text);
+}
+
 const AXIS_LEAN: Record<string, [string, string]> = {
   pacing: ['a slower burn', 'a faster pace'],
   darkness: ['a lighter tone', 'a darker tone'],
@@ -194,11 +280,15 @@ export async function POST(request: Request) {
     const text = typeof body.text === 'string' ? body.text.slice(0, 600).trim() : '';
     if (text.length < 4) return NextResponse.json({ error: 'Tell us a bit about what you like.' }, { status: 400 });
 
+    // Non-Latin input (e.g. Simplified Chinese) can't hit the English regex
+    // fast-paths, so classify its intent with the LLM. English is untouched.
+    const aiIntent = hasNonLatinScript(text) ? await parseIntentWithAi(text) : null;
+
     // ── Pure lookup: "where can I stream <title>?" ──────────────────────────
     // Answer it by opening that title's page (which lists every provider). No
     // DNA writes — a where-to-watch question is not a statement of taste, so we
     // must never mark the queried title as "loved".
-    const whereTitle = extractWatchTitle(text);
+    const whereTitle = extractWatchTitle(text) ?? (aiIntent?.kind === 'where_to_watch' ? aiIntent.title : null);
     if (whereTitle) {
       const hits = await searchTitles(whereTitle).catch(() => []);
       const top = hits[0];
@@ -279,9 +369,11 @@ export async function POST(request: Request) {
     // If they named a streaming service ("find me something on Amazon Prime"),
     // route to Forensic Search pre-filtered to that provider and auto-run. Their
     // stated taste is folded in above and the results are still scored for them.
-    const platform = detectPlatform(text);
+    const engPlatform = detectPlatform(text);
     const wantsFind = /\b(find|show me|recommend|suggest|something|anything|browse|watch|good|what should i watch|what can i watch)\b/.test(` ${text.toLowerCase()} `) || /\bon\s+/.test(` ${text.toLowerCase()} `);
-    if (platform && wantsFind) {
+    // An explicit LLM platform_find needs no English "find" cue.
+    const platform = (aiIntent?.kind === 'platform_find' ? platformByName(aiIntent.platform) : null) ?? (engPlatform && wantsFind ? engPlatform : null);
+    if (platform) {
       return NextResponse.json({
         ok: true,
         learned,
@@ -293,7 +385,7 @@ export async function POST(request: Request) {
     // If they asked for something *coming on* soon, honour that constraint: send
     // them to the live TV guide windowed to the horizon they named, rather than
     // the generic Watch Now grid. Their stated taste is still folded in above.
-    const horizon = detectAiringHorizon(text);
+    const horizon = detectAiringHorizon(text) ?? (aiIntent?.kind === 'airing' ? aiIntent.horizonHours : null);
     if (horizon != null) {
       return NextResponse.json({
         ok: true,
