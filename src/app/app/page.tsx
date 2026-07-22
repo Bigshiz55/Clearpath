@@ -44,11 +44,6 @@ export default async function DiscoverPage() {
 
   const verdicts = (recent as RecentVerdict[] | null) ?? [];
 
-  // Total titles this account has reviewed — shown on the taste game.
-  const { count: reviewedCount } = await supabase
-    .from('verdicts')
-    .select('id', { count: 'exact', head: true });
-
   // A quick 48-hour scan of what's coming on TV, folded into recommendations.
   const upcomingTv = (await getUpcomingTv(regionFor(profile), Date.now()).catch(() => [])).slice(0, 12);
 
@@ -79,21 +74,26 @@ export default async function DiscoverPage() {
 
         {/* Quick search — a title, or a plain-English ask. */}
         <div className="mx-auto max-w-2xl">
-          <label className="mb-2 block text-center text-xl font-bold text-white sm:text-2xl">🔎 Search the Record</label>
+          <label className="mb-2 block text-center text-xl font-bold text-white sm:text-2xl">🔎 Search for a movie or show</label>
           <SearchBar />
         </div>
 
-        {/* WatchVerdict Mentalist — name a few faves, we read your viewing mind. */}
+        {/* Build Your Case — quick conversational input that seeds your Taste DNA.
+            (Powered by the WatchVerdict Mentalist engine.) */}
         <Link
           href="/app/mentalist"
           className="group mx-auto flex max-w-2xl items-center gap-4 rounded-2xl border border-brand-400/40 bg-gradient-to-r from-brand-500/20 via-fuchsia-500/15 to-transparent p-4 transition hover:border-brand-300/60 hover:-translate-y-0.5"
         >
-          <span className="text-3xl">🔮</span>
+          <span className="text-3xl">🧬</span>
           <span className="min-w-0 flex-1">
-            <span className="block text-base font-extrabold text-white sm:text-lg">WatchVerdict Mentalist</span>
-            <span className="block text-sm text-slate-300">Name 3–7 you love — we read your viewing mind and predict your next picks.</span>
+            <span className="block text-base font-extrabold text-white sm:text-lg">Build Your Case</span>
+            <span className="block text-sm text-slate-300">Tell us what you love, dislike, or avoid — name a few shows or movies and we’ll begin building your Taste DNA.</span>
+            <span className="mt-0.5 block text-[11px] text-slate-500">Powered by the WatchVerdict Mentalist</span>
           </span>
-          <span aria-hidden className="text-lg font-black text-brand-300 transition group-hover:translate-x-0.5">→</span>
+          <span className="hidden flex-none items-center gap-1 rounded-lg border border-brand-400/50 bg-brand-500/20 px-3 py-2 text-sm font-bold text-white transition group-hover:bg-brand-500/30 sm:inline-flex">
+            Start My Taste DNA →
+          </span>
+          <span aria-hidden className="text-lg font-black text-brand-300 transition group-hover:translate-x-0.5 sm:hidden">→</span>
         </Link>
 
         {/* Big, clear tiles — every area of the app, tap to go deeper. */}
@@ -101,10 +101,10 @@ export default async function DiscoverPage() {
           {([
             // Row 1 — rgb = the tile's accent colour (border/tint/arrow).
             { href: '/app/watch', icon: 'watch', title: 'Watch Now', sub: 'Your DNA picks, ranked', rgb: '244,63,94' },
-            { href: '/app/ask', icon: 'judge', title: 'Ask the Judge', sub: 'Say what you want to see', rgb: '245,158,11' },
+            { href: '/app/ask', icon: 'judge', title: 'Today’s Docket', sub: 'What you feel like watching right now', rgb: '245,158,11' },
             { href: '/app/finder', icon: 'search', title: 'Forensic Search', sub: 'Filter by genre, rating, length…', rgb: '99,102,241' },
             // Row 2
-            { href: '/app/quiz', icon: 'quiz', title: 'Taste Quiz', sub: `${reviewedCount ?? 0} rated — teach your taste`, rgb: '168,85,247' },
+            { href: '/app/quiz', icon: 'quiz', title: 'Complete My Case File', sub: 'Guided assessment · about 5 min', rgb: '168,85,247' },
             { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', rgb: '59,130,246' },
             { href: '/app/tv', icon: 'tv', title: 'TV Guide Decoder', sub: 'What’s on live — next 12/24/48h', rgb: '16,185,129' },
             // Row 3

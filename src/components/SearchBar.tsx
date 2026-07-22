@@ -169,7 +169,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
               fileWithJudge(query);
             }
           }}
-          placeholder="Search for a movie, show, actor, or director…"
+          placeholder="Search by title, actor, genre, or platform…"
           className="w-full rounded-2xl border-2 border-white/25 bg-white/[0.07] py-4 pl-12 pr-11 text-base text-white outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:bg-white/[0.1] focus:ring-4 focus:ring-brand-500/25 shadow-[0_12px_40px_-14px_rgba(0,0,0,0.75)] min-h-[56px]"
           aria-label="Search for a movie, show, actor, or director"
         />
