@@ -14,6 +14,15 @@ interface Item {
   posterUrl: string | null;
 }
 
+interface Rec {
+  id: number;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  year: number | null;
+  posterUrl: string | null;
+  because: string | null;
+}
+
 const GOAL = 50;
 type Choice = 'yes' | 'no' | 'maybe' | 'skip';
 const RATING: Record<Exclude<Choice, 'skip'>, number> = { yes: 9, maybe: 6, no: 2 };
@@ -33,6 +42,8 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [dry, setDry] = useState(false);
+  const [recs, setRecs] = useState<Rec[] | null>(null); // the end-of-round DNA reveal
+  const [recsFailed, setRecsFailed] = useState(false);
   const seen = useRef<Set<string>>(new Set());
   const fetching = useRef(false);
 
@@ -92,11 +103,27 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
     [phase, queue, idx],
   );
 
-  // Calculate → done, with a brief "crunching" beat.
+  // Calculate → done. Build the DNA reveal (up to 60 taste-matched titles) while
+  // a brief "crunching" beat plays, and only flip to the reveal once both the
+  // minimum beat and the fetch have finished, so it never flashes empty.
   useEffect(() => {
     if (phase !== 'calc') return;
-    const t = setTimeout(() => setPhase('done'), 1400);
-    return () => clearTimeout(t);
+    let active = true;
+    setRecs(null);
+    setRecsFailed(false);
+    const beat = new Promise<void>((res) => setTimeout(res, 1200));
+    const load = fetch('/api/recommendations?full=1', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!active) return;
+        if (d.error) setRecsFailed(true);
+        else setRecs((d.recommendations ?? []) as Rec[]);
+      })
+      .catch(() => active && setRecsFailed(true));
+    void Promise.all([beat, load]).then(() => active && setPhase('done'));
+    return () => {
+      active = false;
+    };
   }, [phase]);
 
   // Keyboard: → Yes · ← No · ↑ Maybe · ↓ Haven't seen.
@@ -113,6 +140,8 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
 
   function nextRound() {
     setRound(0);
+    setRecs(null);
+    setRecsFailed(false);
     setPhase('play');
   }
 
@@ -144,18 +173,57 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
   }
 
   if (phase === 'done') {
+    const hasRecs = recs != null && recs.length > 0;
     return (
       <div className="mt-5">
         {Banner}
-        <div className="card p-8 text-center">
-          <div className="text-4xl">🎯</div>
-          <h2 className="mt-3 text-xl font-bold text-white">Your taste just leveled up!</h2>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-slate-400">
-            <span className="font-bold text-white">{total}</span> ratings in the bank. Every round makes your recommendations more accurate — keep going, or go see them now.
-          </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button onClick={nextRound} className="btn-primary">⚡ Rate 50 more</button>
-            <Link href="/app" className="btn-secondary">See my recommendations →</Link>
+        <div className="card p-5 sm:p-7">
+          <div className="text-center">
+            <div className="text-4xl">🧬</div>
+            <h2 className="mt-3 text-xl font-bold text-white sm:text-2xl">Your DNA is built — here’s what to watch</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
+              Built from your <span className="font-bold text-white">{total}</span> ratings. These are the titles your
+              taste points to right now — the more you rate, the sharper they get.
+            </p>
+          </div>
+
+          {hasRecs ? (
+            <>
+              <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                {recs!.map((r) => (
+                  <Link key={`${r.mediaType}-${r.id}`} href={`/app/title/${r.mediaType}/${r.id}`} className="group block">
+                    <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 shadow-card transition group-hover:border-white/25 group-active:scale-95">
+                      <Poster posterUrl={r.posterUrl} title={r.title} />
+                    </div>
+                    <div className="mt-1 line-clamp-1 text-[11px] font-semibold text-white">{r.title}</div>
+                    {r.because ? (
+                      <div className="line-clamp-1 text-[10px] text-brand-200">♥ {r.because}</div>
+                    ) : (
+                      <div className="line-clamp-1 text-[10px] text-slate-500">Matched to your taste</div>
+                    )}
+                  </Link>
+                ))}
+              </div>
+              <p className="mt-3 text-center text-[11px] text-slate-500">
+                {recs!.length} picks · tap any to see your VERD1CT score and where to watch
+              </p>
+            </>
+          ) : recsFailed || (recs != null && recs.length === 0) ? (
+            <p className="mt-6 text-center text-sm text-slate-400">
+              Rate a handful more and your picks will fill in.{' '}
+              <Link href="/app/watch" className="text-brand-300 underline">Browse Watch Now →</Link>
+            </p>
+          ) : (
+            <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="aspect-[2/3] animate-pulse rounded-xl border border-white/10 bg-white/5" />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-7 flex flex-wrap justify-center gap-3">
+            <button onClick={nextRound} className="btn-primary">⚡ Rate 50 more — sharpen it</button>
+            <Link href="/app/watch" className="btn-secondary">Open Watch Now →</Link>
           </div>
         </div>
       </div>

@@ -5,7 +5,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = createClient();
     const {
@@ -15,7 +15,15 @@ export async function GET() {
       return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
     }
 
-    const recs = await getRecommendations(supabase, user.id);
+    // `?full=1` — the Taste Quiz payoff: a big, broad DNA reveal (~60 titles,
+    // more seeds, a lower fit floor, capped per seed for variety). Default stays
+    // the tight hub list.
+    const full = new URL(request.url).searchParams.get('full') === '1';
+    const recs = await getRecommendations(
+      supabase,
+      user.id,
+      full ? { limit: 60, seedLimit: 12, candidatePool: 72, minScore: 35, perSeedCap: 8 } : {},
+    );
     return NextResponse.json({
       recommendations: recs.map((r) => ({
         id: r.id,
