@@ -36,7 +36,6 @@ export default async function DiscoverPage() {
   const profile = user ? await getProfile(supabase, user.id) : null;
   const label = profile ? personalLabelFor(profile) : 'Your match';
   const tonight = await getTonight(supabase, user?.id ?? '', new Date());
-  const isGuest = user?.is_anonymous === true;
 
   const { data: recent } = await supabase
     .from('verdicts')
@@ -64,7 +63,7 @@ export default async function DiscoverPage() {
 
       {/* Welcome + 30-second tour, right at the top. (Vintage Mode now lives in
           the top nav, where the Simple-view toggle used to be.) */}
-      <TonightHome tonight={tonight} isGuest={isGuest} />
+      <TonightHome tonight={tonight} />
 
       {/* HERO — decide right here: search, ask, and every tool on one screen. */}
       <section className="animate-fade-up space-y-6">
