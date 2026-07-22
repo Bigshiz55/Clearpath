@@ -13,7 +13,6 @@ import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { InstallHint } from '@/components/InstallHint';
 import { getTonight } from '@/lib/tonight';
-import { PromiseBar } from '@/components/PromiseBar';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -61,9 +60,6 @@ export default async function DiscoverPage() {
           We earn your subscription. We don’t trick you into one.
         </p>
       </div>
-
-      {/* The three promises, right at the top of the hub. */}
-      <PromiseBar rounded />
 
       {/* App-install nudge for testers — self-hides once installed/dismissed. */}
       <InstallHint />

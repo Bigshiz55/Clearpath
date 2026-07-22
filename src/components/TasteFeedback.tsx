@@ -84,7 +84,21 @@ export function TasteFeedback({
   const [reasons, setReasons] = useState<string[]>([]);
   const [meta, setMeta] = useState<TitleMetaLite | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const openedAt = useRef(0);
+
+  // Remove the card from view. Prefer the grid's own handler; otherwise fade out
+  // the nearest card ancestor so the title always disappears when you pass on it.
+  function removeCard() {
+    if (onFlagged) { onFlagged(); return; }
+    const card = triggerRef.current?.closest('.card');
+    if (card instanceof HTMLElement) {
+      card.style.transition = 'opacity .3s ease, transform .3s ease';
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.96)';
+      window.setTimeout(() => { card.style.display = 'none'; }, 300);
+    }
+  }
 
   const ctx = { source, position, matchScore, sessionId, tmdbId, mediaType };
 
@@ -156,7 +170,7 @@ export function TasteFeedback({
 
     setOpen(false);
     if (!res.ok) { toast.show(res.error ?? 'Could not save.', 'error'); return; }
-    onFlagged?.();
+    removeCard();
     toast.show(TOAST[type], 'success', {
       label: 'Undo',
       onClick: () => {
@@ -180,6 +194,7 @@ export function TasteFeedback({
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={openModal}
         aria-label="Pass on this title"

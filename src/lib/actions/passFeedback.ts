@@ -1,11 +1,12 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { addToWatchlist, updateWatchlistItem, removeWatchlistItem, type ActionResult } from '@/lib/actions/watchlist';
 import { rateQuizTitle } from '@/lib/actions/quiz';
+import { axisSignalsFor } from '@/lib/feedback/dnaSignals';
 
 export type FeedbackType = 'seen' | 'not_right_now' | 'not_for_me' | 'didnt_like' | 'removed_without_reason';
 
@@ -140,12 +141,14 @@ export async function submitPassFeedback(input: PassFeedbackInput): Promise<Acti
         break;
       }
       case 'not_for_me': {
-        // Moderate negative — dropped so it leaves picks, low rating so the DNA
-        // learns "less like this" from its fingerprint.
+        // Leave the picks. With a SPECIFIC reason we DON'T apply a broad negative
+        // rating (that would wrongly teach "dislikes this genre") — only the
+        // targeted axis nudge below. With no reason, a moderate title-level
+        // negative so "less like this" still has something to learn from.
         const r = await addToWatchlist({ ...base, status: 'dropped' });
         if (!r.ok) return r;
         const itemId = (r.data as { itemId?: string } | undefined)?.itemId;
-        if (itemId) await updateWatchlistItem({ itemId, rating: 3 });
+        if (itemId && (v.reasonCodes?.length ?? 0) === 0) await updateWatchlistItem({ itemId, rating: 3 });
         affectedDna = true;
         break;
       }
@@ -168,11 +171,60 @@ export async function submitPassFeedback(input: PassFeedbackInput): Promise<Acti
     return { ok: false, error: e instanceof Error ? e.message : 'Could not save.' };
   }
 
+  // Targeted axis nudges from the specific reasons (never for not_right_now).
+  if (v.feedbackType !== 'not_right_now' && (v.reasonCodes?.length ?? 0) > 0) {
+    const applied = await applyAxisSignals(supabase, user.id, v.reasonCodes ?? [], v.feedbackType);
+    if (applied) affectedDna = true;
+  }
+
   await persistFeedback(supabase, user.id, v, watched, temporary);
 
   revalidatePath('/app');
   revalidatePath('/app/watch');
+  // The dimension profile is cached by tag and doesn't key on these signals — bust it.
+  revalidateTag(`dim-profile:${user.id}`);
   return { ok: true, affectedDna };
+}
+
+/**
+ * Fold reason-derived axis nudges into the user's running per-axis signal sums
+ * (read-modify-write; a title's specific reason moves only its axis). Best-effort
+ * — dormant until migration 0021 is applied. Returns whether anything was written.
+ */
+async function applyAxisSignals(
+  supabase: SupabaseClient,
+  userId: string,
+  codes: string[],
+  feedbackType: FeedbackType,
+): Promise<boolean> {
+  const signals = axisSignalsFor(codes, feedbackType);
+  if (signals.length === 0) return false;
+  const byAxis = new Map<string, { w: number; wv: number }>();
+  for (const s of signals) {
+    const e = byAxis.get(s.axis) ?? { w: 0, wv: 0 };
+    e.w += s.weight;
+    e.wv += s.weight * s.target;
+    byAxis.set(s.axis, e);
+  }
+  const axes = [...byAxis.keys()];
+  try {
+    const { data: existing } = await supabase
+      .from('dimension_signals')
+      .select('dimension_key, w_sum, wv_sum')
+      .eq('user_id', userId)
+      .in('dimension_key', axes);
+    const prev = new Map((existing ?? []).map((r) => [r.dimension_key as string, { w: r.w_sum as number, wv: r.wv_sum as number }]));
+    const now = new Date().toISOString();
+    const rows = axes.map((axis) => {
+      const add = byAxis.get(axis)!;
+      const p = prev.get(axis) ?? { w: 0, wv: 0 };
+      return { user_id: userId, dimension_key: axis, w_sum: p.w + add.w, wv_sum: p.wv + add.wv, updated_at: now };
+    });
+    const { error } = await supabase.from('dimension_signals').upsert(rows, { onConflict: 'user_id,dimension_key' });
+    return !error;
+  } catch {
+    return false; // table missing → feature dormant
+  }
 }
 
 /**

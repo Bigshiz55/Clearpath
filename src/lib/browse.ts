@@ -57,6 +57,19 @@ export async function getBrowse(supabase: SupabaseClient, userId: string, q: Bro
   const region = regionFor(profile);
   const hasProviders = q.providerIds.length > 0;
 
+  // Titles the user has already handled (seen / passed / dropped) never resurface.
+  const handled = new Set<string>();
+  if (userId) {
+    const { data } = await supabase
+      .from('watchlist_items')
+      .select('tmdb_id, media_type')
+      .eq('user_id', userId)
+      .in('status', ['watched', 'dropped']);
+    for (const r of data ?? []) handled.add(`${r.media_type === 'tv' ? 'tv' : 'movie'}-${r.tmdb_id}`);
+  }
+  const keep = <T extends { id: number; mediaType: MediaType }>(items: T[]) =>
+    handled.size === 0 ? items : items.filter((t) => !handled.has(`${t.mediaType}-${t.id}`));
+
   // "For me" — pull a broad, quality candidate pool on the service, then rank it
   // by the user's Taste-DNA so the best-for-you titles surface first. Paginate
   // the ranked pool. Degrades to popularity order for guests / no-DNA users.
@@ -92,7 +105,7 @@ export async function getBrowse(supabase: SupabaseClient, userId: string, q: Bro
     );
     const PAGE = 20;
     const start = (Math.max(1, q.page) - 1) * PAGE;
-    return ranked.items.slice(start, start + PAGE).map((t) => ({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath }));
+    return keep(ranked.items).slice(start, start + PAGE).map((t) => ({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath }));
   }
 
   const items = await discoverTitles(q.mediaType, {
@@ -107,7 +120,7 @@ export async function getBrowse(supabase: SupabaseClient, userId: string, q: Bro
     page: Math.max(1, Math.min(q.page, 500)),
   });
 
-  return items.map((t) => ({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath }));
+  return keep(items).map((t) => ({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath }));
 }
 
 /** Cached full provider catalog for a region — the breadth of services to filter by. */

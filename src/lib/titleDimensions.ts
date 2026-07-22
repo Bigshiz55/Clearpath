@@ -10,6 +10,9 @@ import {
   isValidDimensions,
   buildProfile,
   applyOverrides,
+  emptyAccumulator,
+  accumulate,
+  finalizeProfile,
   type TitleDimensions,
   type DimensionProfile,
   type DimensionOverrides,
@@ -194,7 +197,24 @@ async function computeUserProfile(userId: string): Promise<DimensionProfile> {
 
   const overrides = await getOverrides(admin, userId);
   const hasOverrides = Object.keys(overrides).length > 0;
-  if (rows.length === 0) return hasOverrides ? applyOverrides(empty, overrides) : empty;
+
+  // Targeted axis nudges from pass reasons (dormant until migration 0021).
+  let signals: DimensionSignalRow[] = [];
+  try {
+    const { data } = await admin.from('dimension_signals').select('dimension_key, w_sum, wv_sum').eq('user_id', userId);
+    signals = (data ?? []) as DimensionSignalRow[];
+  } catch {
+    signals = [];
+  }
+
+  const finish = (base: DimensionProfile) => (hasOverrides ? applyOverrides(base, overrides) : base);
+
+  if (rows.length === 0) {
+    if (signals.length === 0) return finish(empty);
+    const acc = emptyAccumulator();
+    foldSignals(acc, signals);
+    return finish(finalizeProfile(acc));
+  }
 
   const dimsByKey = await getCachedDimsBatch(admin, rows);
 
@@ -224,8 +244,35 @@ async function computeUserProfile(userId: string): Promise<DimensionProfile> {
       return dims ? { dims, rating: r.rating } : null;
     })
     .filter((x): x is { dims: TitleDimensions; rating: number } => x !== null);
-  const learned = buildProfile(pairs);
-  return hasOverrides ? applyOverrides(learned, overrides) : learned;
+
+  // Learned profile from rated titles + the targeted reason nudges, folded into
+  // one accumulator so both count as weighted evidence on their axes.
+  const acc = emptyAccumulator();
+  for (const p of pairs) accumulate(acc, p.dims, p.rating);
+  foldSignals(acc, signals);
+  return finish(finalizeProfile(acc));
+}
+
+interface DimensionSignalRow {
+  dimension_key: string;
+  w_sum: number;
+  wv_sum: number;
+}
+
+/** Fold reason-derived axis signals into a profile accumulator as extra evidence. */
+function foldSignals(
+  acc: { wSum: Record<string, number>; wvSum: Record<string, number> },
+  signals: DimensionSignalRow[],
+): void {
+  for (const s of signals) {
+    if (!DIMENSION_KEYS.includes(s.dimension_key)) continue;
+    if (typeof s.w_sum === 'number' && Number.isFinite(s.w_sum)) {
+      acc.wSum[s.dimension_key] = (acc.wSum[s.dimension_key] ?? 0) + s.w_sum;
+    }
+    if (typeof s.wv_sum === 'number' && Number.isFinite(s.wv_sum)) {
+      acc.wvSum[s.dimension_key] = (acc.wvSum[s.dimension_key] ?? 0) + s.wv_sum;
+    }
+  }
 }
 
 /**
