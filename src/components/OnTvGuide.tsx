@@ -58,14 +58,19 @@ export function OnTvGuide({
   country,
   mode = 'broadcast',
   remindedIds = [],
+  windowHours = null,
 }: {
   airings: Airing[];
   dateLabel: string;
   country: string;
   mode?: GuideMode;
   remindedIds?: number[];
+  /** When set, `airings` is already filtered to [now, now+N h]; present it as a
+   *  soonest-first "coming on in the next N hours" view (no prime-time filter). */
+  windowHours?: number | null;
 }) {
   const streaming = mode === 'streaming';
+  const windowed = windowHours != null;
   const [reminded, setReminded] = useState<Set<number>>(new Set(remindedIds));
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -101,7 +106,7 @@ export function OnTvGuide({
       setBusy(null);
     }
   }
-  const [time, setTime] = useState<TimeFilter>(streaming ? 'all' : 'primetime');
+  const [time, setTime] = useState<TimeFilter>(streaming || windowed ? 'all' : 'primetime');
   const [sort, setSort] = useState<SortFilter>(streaming ? 'rating' : 'time');
   const [media, setMedia] = useState<'all' | 'movie' | 'tv'>('all');
 
@@ -125,12 +130,15 @@ export function OnTvGuide({
   }, [airings, time, sort, nowMin, streaming, media]);
 
   // Highlights — best-rated picks (prime-time for broadcast; overall for streaming).
+  // In windowed mode the airings are already the curated next-N-hours set, so we
+  // keep them soonest-first (their given order) rather than re-filtering to prime time.
   const highlightPool = useMemo(() => {
+    if (windowed) return airings.filter((a) => !NOISE_TYPES.has(a.showType)).slice(0, 10);
     return airings
       .filter((a) => !NOISE_TYPES.has(a.showType) && a.rating != null && (streaming || (a.minutes >= 18 * 60 && a.minutes <= 23 * 60)))
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
       .slice(0, 10);
-  }, [airings, streaming]);
+  }, [airings, streaming, windowed]);
   const highlights = highlightPool.filter((a) => !hidden.has(a.id)).slice(0, 6);
 
   if (airings.length === 0) {
@@ -164,10 +172,15 @@ export function OnTvGuide({
       {highlights.length > 0 && (
         <section>
           <h2 className="mb-2 text-lg font-semibold text-white">
-            {streaming ? '✨ Best of today’s drops' : '✨ Tonight’s highlights'}
+            {windowed ? `⏰ Coming on in the next ${windowHours} hours` : streaming ? '✨ Best of today’s drops' : '✨ Tonight’s highlights'}
           </h2>
           <p className="mb-3 text-xs text-slate-400">
-            {streaming ? 'Highest-rated premieres on the major services' : 'Best-reviewed shows in prime time'} — rating is TVmaze’s community score.
+            {windowed
+              ? 'Real listings between now and then, soonest first'
+              : streaming
+                ? 'Highest-rated premieres on the major services'
+                : 'Best-reviewed shows in prime time'}{' '}
+            — rating is TVmaze’s community score.
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {highlights.map((a) => {
@@ -216,7 +229,7 @@ export function OnTvGuide({
       {/* Controls */}
       <div className="card space-y-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
-          {!streaming && (
+          {!streaming && !windowed && (
             <div className="inline-flex rounded-lg border border-white/12 bg-white/5 p-0.5">
               {([['primetime', 'Prime time'], ['nownext', 'Now & next'], ['all', 'All day']] as const).map(([v, label]) => (
                 <button key={v} onClick={() => setTime(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${time === v ? 'bg-brand-500 text-white shadow-glow' : 'text-slate-300 hover:text-white'}`}>{label}</button>

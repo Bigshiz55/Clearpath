@@ -31,7 +31,9 @@ export function BuildCaseBox() {
       if (d.error) { toast.show(d.error, 'error'); return; }
       toast.show(d.summary ? `⚖️ ${d.summary}` : 'Got it — building your Taste DNA. 🧬', 'success');
       setText('');
-      router.push('/app/watch');
+      // If the case included an actionable ask (e.g. "coming on in the next 12
+      // hours"), the server routes us to the right screen for it.
+      router.push(typeof d.redirect === 'string' ? d.redirect : '/app/watch');
     } catch {
       toast.show('Could not read that — try again.', 'error');
     } finally {
@@ -45,7 +47,7 @@ export function BuildCaseBox() {
         <span className="text-2xl" aria-hidden>⚖️</span>
         <div className="min-w-0">
           <div className="text-base font-extrabold text-white sm:text-lg">State Your Case</div>
-          <div className="text-sm text-slate-300">Just tell us what you like — in your own words. We’ll build your Taste DNA from it.</div>
+          <div className="text-sm text-slate-300">Tell us what you like — or ask for something specific, like “crime shows coming on in the next few hours.”</div>
         </div>
       </div>
       <textarea

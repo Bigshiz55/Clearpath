@@ -94,6 +94,29 @@ function parseNaive(text: string): Parsed {
   return { axes, likedTitles: [], avoidTitles: [] };
 }
 
+/**
+ * Detect when the case text is (also) an actionable "what's coming on / airing
+ * in the next N hours / tonight" request, and return the horizon in hours (so we
+ * can route to the live TV guide windowed to it). Null = no live-TV ask, so we
+ * fall through to the normal "build DNA → Watch Now" behaviour. Conservative on
+ * purpose: only an explicit airing cue or an explicit hour window routes away.
+ */
+function detectAiringHorizon(text: string): number | null {
+  const t = ` ${text.toLowerCase()} `;
+  // Explicit "(in the) next / within N hours" — almost always means scheduling.
+  const m =
+    t.match(/(?:next|within|in the next|coming up in)\s+(\d{1,2})\s*(?:hour|hr|h)\b/) ||
+    t.match(/\bnext\s+(\d{1,2})\s*(?:hour|hr|h)/);
+  if (m && m[1]) return Math.max(1, Math.min(48, Number(m[1])));
+  // A clear "on the air" cue, without a number.
+  const airing = /(coming on|what'?s on|whats on|on tv|on t\.v\.|\bairing\b|on right now|on the air|on later|live tv|on tonight|what'?s airing|on air)/.test(t);
+  if (airing) {
+    if (/\btonight\b|\bthis evening\b|\blater tonight\b/.test(t)) return 6; // the rest of the evening
+    return 24; // generic "what's on"
+  }
+  return null;
+}
+
 const AXIS_LEAN: Record<string, [string, string]> = {
   pacing: ['a slower burn', 'a faster pace'],
   darkness: ['a lighter tone', 'a darker tone'],
@@ -173,9 +196,23 @@ export async function POST(request: Request) {
     const parts: string[] = [];
     if (uniquePhrases.length) parts.push(uniquePhrases.join(', '));
     if (parsed.likedTitles.length) parts.push(`loves ${parsed.likedTitles.slice(0, 3).join(', ')}`);
-    const summary = parts.length ? `Locked in: ${parts.join(' · ')}.` : 'Got it — building your Taste DNA.';
     const learned = byAxis.size > 0 || parsed.likedTitles.length > 0 || parsed.avoidTitles.length > 0;
 
+    // If they asked for something *coming on* soon, honour that constraint: send
+    // them to the live TV guide windowed to the horizon they named, rather than
+    // the generic Watch Now grid. Their stated taste is still folded in above.
+    const horizon = detectAiringHorizon(text);
+    if (horizon != null) {
+      const taste = parts.length ? `Locked in ${parts.join(' · ')}. ` : '';
+      return NextResponse.json({
+        ok: true,
+        learned,
+        redirect: `/app/tv?within=${horizon}`,
+        summary: `${taste}Here’s what’s coming on in the next ${horizon} hours.`,
+      });
+    }
+
+    const summary = parts.length ? `Locked in: ${parts.join(' · ')}.` : 'Got it — building your Taste DNA.';
     return NextResponse.json({ ok: true, summary, learned });
   } catch {
     return NextResponse.json({ error: 'Could not read that — try again.' }, { status: 500 });
