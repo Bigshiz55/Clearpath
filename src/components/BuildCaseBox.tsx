@@ -63,21 +63,41 @@ export function BuildCaseBox() {
     if (!Ctor) return;
     const rec = new (Ctor as unknown as new () => Record<string, unknown>)() as Record<string, unknown> & {
       lang: string; interimResults: boolean; maxAlternatives: number;
-      onresult: (e: { results: Array<Array<{ transcript: string }>> }) => void;
-      onend: () => void; onerror: () => void; start: () => void; stop: () => void;
+      onresult: (e: { results: { length: number; [i: number]: { isFinal: boolean; [j: number]: { transcript: string } } } }) => void;
+      onend: () => void; onerror: (e: { error?: string }) => void; start: () => void; stop: () => void;
     };
     rec.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
-    rec.interimResults = false;
+    // Interim results so the box fills in live — important on iOS Safari, which
+    // often never delivers a "final" result but does stream interim text.
+    rec.interimResults = true;
     rec.maxAlternatives = 1;
     rec.onresult = (e) => {
-      const said = e.results?.[0]?.[0]?.transcript ?? '';
-      if (!said) return;
-      setText(said);
-      // Say it → route it: run the case straight away so voice feels one-shot.
-      void submit(said);
+      let finalText = '';
+      let interim = '';
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i];
+        const alt = r?.[0]?.transcript ?? '';
+        if (r?.isFinal) finalText += alt;
+        else interim += alt;
+      }
+      const shown = (finalText || interim).trim();
+      if (shown) setText(shown); // live preview as you speak
+      if (finalText.trim()) void submit(finalText.trim()); // route once a phrase finalizes
     };
     rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
+    rec.onerror = (e) => {
+      setListening(false);
+      const code = e?.error ?? 'error';
+      const msg =
+        code === 'not-allowed' || code === 'service-not-allowed'
+          ? zh ? '麦克风被拒绝——请在浏览器设置里允许麦克风。' : 'Microphone blocked — allow it in your browser/site settings.'
+          : code === 'language-not-supported'
+            ? zh ? '此设备/浏览器不支持中文语音识别——请改用键盘听写或直接粘贴。' : 'This device can’t do Chinese speech recognition — type/paste instead.'
+            : code === 'no-speech'
+              ? zh ? '没听到声音——请靠近麦克风再试一次。' : 'Didn’t catch any speech — try again, closer to the mic.'
+              : zh ? `语音出错：${code}` : `Voice error: ${code}`;
+      toast.show(msg, 'error');
+    };
     recognitionRef.current = rec;
     setListening(true);
     rec.start();
