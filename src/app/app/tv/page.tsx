@@ -19,6 +19,23 @@ function parseWithin(v: string | string[] | undefined): number | null {
   return Number.isFinite(n) ? Math.max(1, Math.min(48, n)) : null;
 }
 
+// Cable networks TVmaze can't see, but that publish their own public live
+// schedule. When we can't confirm a listing, we send people straight to the
+// source instead of pretending — honest and immediately useful.
+const NETWORK_SCHEDULES: { test: RegExp; name: string; url: string }[] = [
+  { test: /\b(lmn|lifetime movie)/, name: 'LMN (Lifetime Movies)', url: 'https://www.mylifetime.com/lmn/schedule' },
+  { test: /lifetime/, name: 'Lifetime', url: 'https://www.mylifetime.com/schedule' },
+  { test: /hallmark/, name: 'Hallmark', url: 'https://www.hallmarkchannel.com/schedule' },
+  { test: /\bamc\b/, name: 'AMC', url: 'https://www.amc.com/schedule' },
+  { test: /\busa\b/, name: 'USA Network', url: 'https://www.usanetwork.com/schedule' },
+  { test: /bravo/, name: 'Bravo', url: 'https://www.bravotv.com/schedule' },
+];
+function officialScheduleFor(net: string | null): { name: string; url: string } | null {
+  if (!net) return null;
+  const n = net.toLowerCase();
+  return NETWORK_SCHEDULES.find((s) => s.test.test(n)) ?? null;
+}
+
 function isoDate(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
@@ -48,6 +65,7 @@ export default async function OnTvPage({
   const titleCase = (s: string) => s.replace(/\b\w/g, (m) => m.toUpperCase());
   // A human label for the filters: "Lifetime comedy movies".
   const filterLabel = [network ? titleCase(network) : null, genre?.toLowerCase(), movieOnly ? 'movies' : null].filter(Boolean).join(' ');
+  const official = officialScheduleFor(network);
 
   const airingsRaw = await getOnTvToday(region, date);
   // Add IMDb / Rotten Tomatoes / Metacritic to the placards (cached, bounded).
@@ -136,7 +154,17 @@ export default async function OnTvPage({
                   guess, we only show what we can actually confirm.
                 </p>
                 <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  <Link href="/app/finder" className="rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-400">
+                  {official && (
+                    <a
+                      href={official.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-400"
+                    >
+                      📺 See {official.name}’s live schedule →
+                    </a>
+                  )}
+                  <Link href="/app/finder" className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition ${official ? 'border border-white/15 text-slate-200 hover:bg-white/10' : 'bg-brand-500 text-white hover:bg-brand-400'}`}>
                     🔎 Find {movieOnly ? 'movies' : 'titles'} by streaming service
                   </Link>
                   <Link href="/app/watch" className="rounded-lg border border-white/15 px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
