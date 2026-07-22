@@ -40,7 +40,7 @@ export default function LandingPage() {
       <main>
         <section className="container-page py-16 sm:py-24">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="chip mb-5 animate-fade-up">🍿 Stop scrolling. Get rolling.</span>
+            <span className="chip mb-5 animate-fade-up">🎬 Thousands of choices, one verdict.</span>
             <h1 className="animate-fade-up text-4xl font-extrabold tracking-tight text-white sm:text-6xl">
               Should you watch it?
               <span className="block bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">

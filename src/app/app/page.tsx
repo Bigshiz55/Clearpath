@@ -67,6 +67,9 @@ export default async function DiscoverPage() {
       {/* HERO — decide right here: search, ask, and every tool on one screen. */}
       <section className="animate-fade-up space-y-6">
         <div className="text-center">
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.2em] text-brand-300 sm:text-sm">
+            Thousands of choices, one verdict
+          </p>
           <h1 className="text-4xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl">
             Stop scrolling.{' '}
             <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">Get rolling.</span>

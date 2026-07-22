@@ -10,11 +10,11 @@ const siteUrl = publicEnv.siteUrl();
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'WatchVerdict — Should you watch it?',
+    default: 'WatchVerdict — Thousands of choices, one verdict',
     template: '%s · WatchVerdict',
   },
   description:
-    'Personalized movie & TV verdicts. Get a clear recommendation, a match score tuned to your taste, and where to watch it legally.',
+    'Thousands of choices, one verdict. Personalized movie & TV recommendations — a clear verdict, a match score tuned to your taste, and where to watch it legally.',
   applicationName: 'WatchVerdict',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
@@ -32,14 +32,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'WatchVerdict',
-    title: 'WatchVerdict — Should you watch it?',
-    description: 'Personalized movie & TV verdicts with a match score tuned to your taste.',
+    title: 'WatchVerdict — Thousands of choices, one verdict',
+    description: 'Thousands of choices, one verdict — personalized movie & TV recommendations with a match score tuned to your taste.',
     url: siteUrl,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'WatchVerdict',
-    description: 'Personalized movie & TV verdicts.',
+    title: 'WatchVerdict — Thousands of choices, one verdict',
+    description: 'Thousands of choices, one verdict.',
   },
 };
 
