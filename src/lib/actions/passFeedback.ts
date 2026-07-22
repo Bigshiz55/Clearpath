@@ -8,6 +8,9 @@ import { addToWatchlist, updateWatchlistItem, removeWatchlistItem, type ActionRe
 import { rateQuizTitle } from '@/lib/actions/quiz';
 import { axisSignalsFor } from '@/lib/feedback/dnaSignals';
 import { universalCategoriesFor } from '@/lib/feedback/reasons';
+import { getCachedDimensions, getTitleDimensions } from '@/lib/titleDimensions';
+import { getTitle } from '@/lib/tmdb/client';
+import type { MediaType } from '@/lib/types';
 
 export type FeedbackType = 'seen' | 'not_right_now' | 'not_for_me' | 'didnt_like' | 'removed_without_reason';
 
@@ -190,6 +193,13 @@ export async function submitPassFeedback(input: PassFeedbackInput): Promise<Acti
       if (applied) affectedDna = true;
     }
     await persistFeedback(supabase, user.id, v, watched, temporary);
+    // Front-load THIS title's content fingerprint so the rating→fingerprint
+    // learning lands on the very next profile build (a 👎 teaches "less like
+    // these axes," a 👍 "more") instead of waiting for the capped backfill.
+    // Cache-first and key-optional, so it's a no-op when the layer is dormant.
+    if (v.feedbackType === 'seen' || v.feedbackType === 'not_for_me' || v.feedbackType === 'didnt_like') {
+      void warmTitleFingerprint(v.tmdbId, v.mediaType).catch(() => {});
+    }
     revalidatePath('/app');
     revalidatePath('/app/watch');
     // The dimension profile is cached by tag and doesn't key on these signals — bust it.
@@ -198,6 +208,24 @@ export async function submitPassFeedback(input: PassFeedbackInput): Promise<Acti
     /* non-fatal — the pass itself is already recorded */
   }
   return { ok: true, affectedDna };
+}
+
+/**
+ * Ensure a just-judged title has a cached content fingerprint. Cache-first: if
+ * it's already classified we return immediately; only a brand-new title spends
+ * a one-time (globally-cached) classification. A no-op without an OpenAI key or
+ * the title_dimensions table, and fully best-effort — the profile backfill is
+ * still the guarantee, this just makes the learning land sooner.
+ */
+async function warmTitleFingerprint(tmdbId: number, mediaType: MediaType): Promise<void> {
+  try {
+    const cached = await getCachedDimensions([{ tmdb_id: tmdbId, media_type: mediaType }]);
+    if (cached.size > 0) return; // already fingerprinted — nothing to do
+    const meta = await getTitle(mediaType, tmdbId);
+    await getTitleDimensions(meta); // classifies once and stores, or no-ops when dormant
+  } catch {
+    /* best-effort — the capped backfill will classify it later */
+  }
 }
 
 /**
