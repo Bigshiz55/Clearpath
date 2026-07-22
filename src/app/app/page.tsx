@@ -81,6 +81,19 @@ export default async function DiscoverPage() {
           <SearchBar />
         </div>
 
+        {/* WatchVerdict Mentalist — name a few faves, we read your viewing mind. */}
+        <Link
+          href="/app/mentalist"
+          className="group mx-auto flex max-w-2xl items-center gap-4 rounded-2xl border border-brand-400/40 bg-gradient-to-r from-brand-500/20 via-fuchsia-500/15 to-transparent p-4 transition hover:border-brand-300/60 hover:-translate-y-0.5"
+        >
+          <span className="text-3xl">🔮</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-extrabold text-white sm:text-lg">WatchVerdict Mentalist</span>
+            <span className="block text-sm text-slate-300">Name 3–7 you love — we read your viewing mind and predict your next picks.</span>
+          </span>
+          <span aria-hidden className="text-lg font-black text-brand-300 transition group-hover:translate-x-0.5">→</span>
+        </Link>
+
         {/* Big, clear tiles — every area of the app, tap to go deeper. */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {([
