@@ -71,16 +71,21 @@ export default async function DiscoverPage() {
             Stop scrolling.{' '}
             <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">Get rolling.</span>
           </h1>
+          <p className="mx-auto mt-3 max-w-xl text-base text-slate-300 sm:text-lg">
+            Tell us what you’re in the mood for — in your own words — and we’ll build your verdict.
+          </p>
         </div>
 
-        {/* Quick search — a title, or a plain-English ask. */}
-        <div className="mx-auto max-w-2xl">
-          <label className="mb-2 block text-center text-xl font-bold text-white sm:text-2xl">🔎 Search for a movie or show</label>
+        {/* PRIMARY move — State Your Case: the plain-English ask is the hero. */}
+        <BuildCaseBox hero />
+
+        {/* SECONDARY — already know the title? A quiet, smaller search. */}
+        <div className="mx-auto max-w-xl">
+          <label className="mb-1.5 block text-center text-sm font-semibold text-slate-400">
+            Already know what you want? Search a title, actor, or platform
+          </label>
           <SearchBar />
         </div>
-
-        {/* State Your Case — just type what you like; we build the Taste DNA. */}
-        <BuildCaseBox />
 
         {/* Big, clear tiles — every area of the app, tap to go deeper. */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">

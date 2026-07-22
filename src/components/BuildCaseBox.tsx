@@ -12,7 +12,7 @@ import { useToast } from '@/components/Toast';
  * watch a title, something on a service, what's coming on) to the right screen.
  * (The title-by-title Mentalist is still one tap away.)
  */
-export function BuildCaseBox() {
+export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const [text, setText] = useState('');
@@ -51,12 +51,18 @@ export function BuildCaseBox() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl rounded-2xl border border-brand-400/40 bg-gradient-to-r from-brand-500/15 via-fuchsia-500/10 to-transparent p-4">
+    <div
+      className={
+        hero
+          ? 'mx-auto max-w-2xl rounded-3xl border-2 border-brand-400/50 bg-gradient-to-br from-brand-500/20 via-fuchsia-500/10 to-transparent p-5 shadow-[0_16px_50px_-16px_rgba(236,72,153,0.55)] sm:p-6'
+          : 'mx-auto max-w-2xl rounded-2xl border border-brand-400/40 bg-gradient-to-r from-brand-500/15 via-fuchsia-500/10 to-transparent p-4'
+      }
+    >
       <div className="flex items-center gap-3">
-        <span className="text-2xl" aria-hidden>⚖️</span>
+        <span className={hero ? 'text-3xl' : 'text-2xl'} aria-hidden>⚖️</span>
         <div className="min-w-0">
-          <div className="text-base font-extrabold text-white sm:text-lg">State Your Case</div>
-          <div className="text-sm text-slate-300">Tell us what you like — or ask for something specific, like “crime shows coming on in the next few hours.”</div>
+          <div className={hero ? 'text-xl font-black text-white sm:text-2xl' : 'text-base font-extrabold text-white sm:text-lg'}>State Your Case</div>
+          <div className={hero ? 'text-sm text-slate-200 sm:text-base' : 'text-sm text-slate-300'}>Tell us what you like — or ask for something specific, like “crime shows coming on in the next few hours.”</div>
         </div>
       </div>
       <textarea
@@ -66,21 +72,25 @@ export function BuildCaseBox() {
         rows={3}
         aria-label="Describe what you like to watch"
         placeholder="e.g. I love intelligent crime mysteries, but I avoid supernatural stories and anything too slow."
-        className="mt-3 w-full resize-none rounded-xl border border-white/15 bg-ink-950/70 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none"
+        className={
+          hero
+            ? 'mt-4 w-full resize-none rounded-xl border border-white/20 bg-ink-950/70 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none'
+            : 'mt-3 w-full resize-none rounded-xl border border-white/15 bg-ink-950/70 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none'
+        }
       />
       <div className="mt-2 flex items-center justify-between gap-3">
-        <Link href="/app/mentalist" className="text-xs text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline">
+        <Link href="/app/mentalist" className={hero ? 'text-sm text-slate-300 underline-offset-2 hover:text-white hover:underline' : 'text-xs text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline'}>
           Prefer to name titles you love? →
         </Link>
         <button
           onClick={() => void submit()}
           disabled={busy || text.trim().length < 4}
-          className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+          className={`btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-50 ${hero ? 'px-6 py-3 text-base' : ''}`}
         >
           {busy ? 'Building…' : 'Build my Taste DNA →'}
         </button>
       </div>
-      <p className="mt-1.5 text-[11px] text-slate-500">Powered by the WatchVerdict Mentalist</p>
+      <p className={hero ? 'mt-2 text-xs text-slate-400' : 'mt-1.5 text-[11px] text-slate-500'}>Powered by the WatchVerdict Mentalist</p>
     </div>
   );
 }
