@@ -1,10 +1,11 @@
 /**
- * Brand tagline with the VERD1CT glyph baked in — "verdict" echoes the wordmark
- * (pink letters + the signature white "1"), while "thousands of choices" is muted
- * so the thousands→one contrast lands. Decorative styling is aria-hidden; the
- * whole thing reads as plain "Thousands of choices, one verdict" for assistive
- * tech and search. Alignment/size come from `className` so it works as a logo
- * lockup (left) or a centered eyebrow.
+ * Brand tagline with the VERD1CT glyph baked in — "verdict" is pink (the
+ * wordmark colour) with the signature *spinning* 1 (the same I→1 split-flap
+ * flip as the logo), while "thousands of choices" is muted so the thousands→one
+ * contrast lands. Decorative styling is aria-hidden; the whole thing reads as
+ * plain "Thousands of choices, one verdict" for assistive tech and search.
+ * Alignment/size come from `className` (logo lockup on the left, or a centered
+ * eyebrow).
  */
 export function Tagline({ className = '' }: { className?: string }) {
   return (
@@ -12,10 +13,15 @@ export function Tagline({ className = '' }: { className?: string }) {
       <span aria-hidden>
         <span className="text-slate-400">Thousands of choices, </span>
         <span className="text-white">one </span>
-        <span className="font-black">
-          <span className="text-[#ff1493]">verd</span>
-          <span className="text-white">1</span>
-          <span className="text-[#ff1493]">ct</span>
+        <span className="font-black text-[#ff1493]">
+          verd
+          <span className="wv-iflip">
+            <span className="wv-iflip-inner">
+              <span className="wv-iflip-face">I</span>
+              <span className="wv-iflip-face wv-iflip-back">1</span>
+            </span>
+          </span>
+          ct
         </span>
       </span>
     </p>

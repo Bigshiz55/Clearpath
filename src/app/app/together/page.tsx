@@ -19,7 +19,7 @@ export default async function TogetherPage() {
       </p>
 
       <div className="mt-5">
-        <JudgeBench />
+        <JudgeBench big />
       </div>
 
       <section className="mt-6 rounded-2xl border border-brand-400/30 bg-brand-500/10 p-4">

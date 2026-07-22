@@ -156,14 +156,24 @@ export function TasteFeedback({
     void submitPassFeedback({ ...base, feedbackType: 'removed_without_reason', reasonCodes: [], rating: null, ...ctx }).catch(() => {});
 
     const [meta, score] = await Promise.all([fetchMeta(), fetchScore()]);
-    const chips: Chip[] = reasonChipsFor(meta, 'not_for_me', 8)
-      .filter((c) => c.code !== 'other')
-      .slice(0, 8)
-      .map((c) => ({ code: c.code, label: c.label }));
+    // Six reasons, spread ACROSS categories — no four flavors of "too long".
+    const raw = reasonChipsFor(meta, 'not_for_me', 12).filter((c) => c.code !== 'other');
+    const seenCat = new Set<string>();
+    const chips: Chip[] = [];
+    for (const c of raw) {
+      if (chips.length >= 6) break;
+      if (seenCat.has(c.category)) continue;
+      seenCat.add(c.category);
+      chips.push({ code: c.code, label: c.label });
+    }
+    for (const c of raw) { // top up if a title has few distinct categories
+      if (chips.length >= 6) break;
+      if (!chips.some((x) => x.code === c.code)) chips.push({ code: c.code, label: c.label });
+    }
     const highMatch = typeof matchScore === 'number' && matchScore >= 80;
     setPop({ left, top, width, lead: highMatch ? 'This was a strong match for you.' : undefined, heading: passHeadingFor(meta), chips, score, bump: null });
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => close(true), 12000);
+    timer.current = setTimeout(() => close(true), 7000);
   }
 
   const up = pop?.bump && pop.bump.to != null && pop.bump.from != null && pop.bump.to > pop.bump.from;
@@ -196,10 +206,20 @@ export function TasteFeedback({
           <div className="fixed z-[120] animate-fade-up" style={{ left: pop.left, top: pop.top, width: pop.width }} role="dialog" aria-label="Update your DNA">
             <div className="rounded-xl border-2 border-brand-400/70 bg-ink-900 p-3 shadow-2xl shadow-black/70 ring-1 ring-brand-500/30">
               <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-black tracking-tight" style={{ color: '#ff2e9a' }}>🧬 Update your DNA?</div>
-                {pop.score != null && !pop.bump && (
-                  <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-white">{pct(pop.score)}</span>
-                )}
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-300">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  Removed
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {pop.score != null && !pop.bump && (
+                    <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-white">{pct(pop.score)}</span>
+                  )}
+                  {!pop.bump && (
+                    <button type="button" onClick={() => close(true)} aria-label="Close" className="grid h-6 w-6 place-items-center rounded-md text-slate-400 transition hover:bg-white/10 hover:text-white">
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" /></svg>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {pop.bump ? (
@@ -214,8 +234,11 @@ export function TasteFeedback({
                 </div>
               ) : (
                 <>
+                  <div className="mt-1 text-sm font-black tracking-tight" style={{ color: '#ff2e9a' }}>
+                    🧬 Tune your DNA? <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">optional</span>
+                  </div>
                   {pop.lead && <div className="mt-0.5 text-[11px] font-semibold text-brand-200">{pop.lead}</div>}
-                  <div className="mt-0.5 text-[11px] text-slate-400">{pop.heading}</div>
+                  <div className="text-[11px] text-slate-400">{pop.heading}</div>
 
                   {/* Top ~8 title-specific reasons — 2-column box, multi-select (pink).
                       Taller tap targets (~46px) so they're comfortable on a phone. */}

@@ -68,7 +68,7 @@ export default async function DiscoverPage() {
       {/* HERO — decide right here: search, ask, and every tool on one screen. */}
       <section className="animate-fade-up space-y-6">
         <div className="text-center">
-          <Tagline className="mb-2 text-sm sm:text-base" />
+          <Tagline className="mb-2 text-base sm:text-xl" />
           <h1 className="text-4xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl">
             Stop scrolling.{' '}
             <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">Get rolling.</span>
@@ -89,6 +89,29 @@ export default async function DiscoverPage() {
           <SearchBar />
         </div>
 
+        {/* Featured — Decide Together (Live Court): the group "wow", given top
+            billing as a wide, prominent card above the rest of the tiles. */}
+        <Link
+          href="/app/together"
+          style={{
+            '--accent': '244,63,94',
+            background: 'linear-gradient(120deg, rgba(255,46,154,0.22), rgba(168,85,247,0.16) 55%, rgba(9,11,18,0.6))',
+            borderColor: 'rgba(255,46,154,0.4)',
+          } as React.CSSProperties}
+          className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/30 active:scale-[0.99] sm:gap-6 sm:p-6"
+        >
+          <span className="relative flex-none">
+            <span aria-hidden className="pointer-events-none absolute -inset-3 rounded-full opacity-60 blur-2xl" style={{ background: 'radial-gradient(circle, rgba(255,46,154,0.7), transparent 70%)' }} />
+            <TileIcon name="together" className="relative h-20 w-20 drop-shadow-[0_12px_26px_rgba(0,0,0,0.55)] transition-transform duration-300 group-hover:scale-[1.06] sm:h-24 sm:w-24" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-100">⚖️ Live Court</span>
+            <span className="mt-1.5 block text-2xl font-black tracking-tight text-white sm:text-3xl">Decide Together</span>
+            <span className="mt-0.5 block text-sm text-slate-200 sm:text-base">One verdict for the whole room — everyone votes from their own phone, the judge settles it.</span>
+          </span>
+          <span aria-hidden className="pointer-events-none flex-none text-2xl font-black text-brand-300 transition-transform duration-300 group-hover:translate-x-0.5 sm:text-3xl">→</span>
+        </Link>
+
         {/* Big, clear tiles — every area of the app, tap to go deeper. Cleaned to
             distinct destinations (no Ask/Easy-Mode dupes), bigger glowing icons. */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
@@ -100,7 +123,6 @@ export default async function DiscoverPage() {
             // Discovery
             { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', rgb: '59,130,246' },
             { href: '/app/tv', icon: 'tv', title: 'On TV Now', sub: 'What’s live — next 12/24/48h', rgb: '16,185,129' },
-            { href: '/app/together', icon: 'together', title: 'Decide Together', sub: 'One verdict for the room', rgb: '244,63,94' },
             // Your stuff
             { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', rgb: '14,165,233' },
             { href: '/app/subscriptions', icon: 'money', title: 'Subscription Check', sub: 'Where you overpay for streaming', rgb: '16,185,129' },

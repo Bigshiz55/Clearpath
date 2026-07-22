@@ -1,38 +1,35 @@
 import { RobedPortrait } from '@/components/RobedPortrait';
 
 /**
- * The presiding judge — one fixed, cool house judge. (The old judge *picker*
- * — Annie / Waffles / local sponsor — was removed; nobody was choosing.) An owl
- * in the robe: the classic symbol of a wise, impartial verdict, on-brand with
- * "we earn your subscription, we don't trick you."
+ * The presiding judge — one fixed, brand-coloured house judge (the gold sponsor
+ * look is gone). An owl in the robe: the classic symbol of a wise, impartial
+ * verdict, on-brand with "we don't trick you." Bigger + warmer for the Live
+ * Court moment.
  */
-const JUDGE = {
-  emoji: '🦉',
-  name: 'Judge Verity',
-  tagline: 'Presides over every verdict — no bias, no tricks.',
-  accent: '#f5c65a',
-};
+const ACCENT = '#ff2e9a'; // brand pink — matches the app theme, no more gold
 
 export function JudgeBench({ big = false }: { big?: boolean }) {
-  const size = big ? 104 : 70;
+  const size = big ? 128 : 76;
   return (
     <section
-      className="relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4"
-      style={{ borderColor: `${JUDGE.accent}44`, background: 'radial-gradient(120% 90% at 50% 4%, #2a1f10 0%, #1a1206 45%, #0a0703 100%)' }}
+      className={`relative flex items-center gap-4 overflow-hidden rounded-2xl border sm:gap-5 ${big ? 'p-5 sm:p-6' : 'p-4'}`}
+      style={{ borderColor: `${ACCENT}55`, background: 'radial-gradient(130% 100% at 50% 0%, rgba(255,46,154,0.22) 0%, rgba(168,85,247,0.14) 42%, rgba(9,11,18,0.65) 100%)' }}
     >
-      {/* Spotlight beam + faint seal — the lit courtroom feel. */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(60% 72% at 50% -8%, ${JUDGE.accent}33 0%, ${JUDGE.accent}10 34%, transparent 66%)` }} />
-      <div className="pointer-events-none absolute right-3 top-1 leading-none" style={{ color: JUDGE.accent, opacity: 0.08, fontSize: big ? 96 : 68 }} aria-hidden>⚖️</div>
+      {/* Spotlight + faint gavel seal. */}
+      <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(60% 74% at 30% -10%, ${ACCENT}3a 0%, ${ACCENT}12 36%, transparent 66%)` }} />
+      <div className="pointer-events-none absolute right-3 top-1 leading-none" style={{ color: ACCENT, opacity: 0.1, fontSize: big ? 120 : 72 }} aria-hidden>⚖️</div>
 
-      <div className="relative flex-none" style={{ filter: `drop-shadow(0 8px 22px ${JUDGE.accent}44)` }}>
-        <RobedPortrait emoji={JUDGE.emoji} size={size} accent={JUDGE.accent} />
+      <div className="relative flex-none" style={{ filter: `drop-shadow(0 12px 26px ${ACCENT}55)` }}>
+        <RobedPortrait emoji="🦉" size={size} accent={ACCENT} />
       </div>
       <div className="relative min-w-0">
-        <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: JUDGE.accent }}>
+        <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: ACCENT }}>
           ⚖️ Now presiding
         </div>
-        <div className={`font-black tracking-tight text-white ${big ? 'text-xl sm:text-2xl' : 'text-lg'}`}>{JUDGE.name}</div>
-        <div className={`text-slate-300 ${big ? 'text-sm' : 'text-xs'}`}>{JUDGE.tagline}</div>
+        <div className={`font-black tracking-tight text-white ${big ? 'text-2xl sm:text-3xl' : 'text-lg'}`}>Judge Verity</div>
+        <div className={`text-slate-200 ${big ? 'mt-0.5 text-sm sm:text-base' : 'text-xs'}`}>
+          Impartial and on your side — bring the room and I’ll settle it. <span className="font-semibold text-white">One verdict, no tricks.</span>
+        </div>
       </div>
     </section>
   );
