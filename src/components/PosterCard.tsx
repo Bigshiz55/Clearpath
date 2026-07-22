@@ -72,9 +72,14 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   const heading = (
     <>
       <div className="line-clamp-2 text-sm font-semibold text-white">{title}</div>
-      <div className="mt-0.5 text-xs text-slate-400">
-        {year ?? '—'}
-        {meta ? ` · ${meta}` : ''}
+      <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+        <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
+          {mediaType === 'movie' ? 'Movie' : 'TV'}
+        </span>
+        <span>
+          {year ?? '—'}
+          {meta ? ` · ${meta}` : ''}
+        </span>
       </div>
     </>
   );
@@ -83,15 +88,15 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   // the link (never nested inside it) so they may hold interactive controls.
   return (
     <div className="card group flex h-full flex-col overflow-hidden transition hover:border-white/20 hover:shadow-glow">
-      {/* Top bar — Movie/TV · ＋ · O. The score lives in the pink box below. */}
+      {/* One tidy action row, all four the same size and OFF the poster art:
+          ＋ Save · ✕ Pass · 👓↑ seen+liked · 👓↓ seen+disliked. The Movie/TV tag
+          moved down to the title line; the score lives in the pink box below. */}
       <div className="flex items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
-        <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
-          {mediaType === 'movie' ? 'Movie' : 'TV'}
-        </span>
-        <div className="flex flex-1 items-center gap-1.5">
-          {resolvedOverlay}
-          {feedback}
-        </div>
+        {resolvedOverlay}
+        {feedback}
+        {overlay !== null && saveId != null && (
+          <SeenVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+        )}
       </div>
       <div className="relative aspect-[2/3] overflow-hidden">
         {onOpen ? (
@@ -100,11 +105,6 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           <Link href={href} className="block h-full">{poster}</Link>
         ) : (
           poster
-        )}
-        {/* Already seen it? Two verdicts ride on top of the art — glasses + an
-            up/down arrow. Both clear the card; up/down teach the DNA honestly. */}
-        {overlay !== null && saveId != null && (
-          <SeenVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
         )}
       </div>
       <div className="flex flex-1 flex-col p-3">

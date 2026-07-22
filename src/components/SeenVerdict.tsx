@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { submitPassFeedback, recordAnalyticsEvent } from '@/lib/actions/passFeedback';
+import { useToast } from '@/components/Toast';
 import type { MediaType } from '@/lib/types';
 
 /** Glasses — the "you've seen this one" mark. Stroked, inherits currentColor. */
@@ -16,7 +17,6 @@ function Glasses({ className = '' }: { className?: string }) {
     </svg>
   );
 }
-
 function ArrowUp({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -33,11 +33,11 @@ function ArrowDown({ className = '' }: { className?: string }) {
 }
 
 /**
- * The two "I've seen this" verdicts that ride on TOP of the poster: the glasses
- * say "seen it," and the arrow says which way — up ("liked it") or down ("didn't
- * like it"). Both remove the card; up feeds the DNA a genuine positive rating,
- * down a genuine negative — so an already-watched title still teaches taste
- * instead of just cluttering the picks. Hover shows the plain-English label.
+ * The two "I've seen this" verdicts. They sit in the card's top button row (same
+ * size as Save / Pass) so nothing covers the poster: glasses = "seen it," the
+ * arrow says which way — up ("liked it") or down ("didn't like it"). Both remove
+ * the card; up feeds the DNA a genuine positive rating, down a genuine negative,
+ * so an already-watched title still teaches taste instead of cluttering the grid.
  */
 export function SeenVerdict({
   tmdbId,
@@ -62,13 +62,14 @@ export function SeenVerdict({
   matchScore?: number | null;
   sessionId?: string | null;
 }) {
-  const rootRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
+  const firstRef = useRef<HTMLButtonElement>(null);
   const busy = useRef(false);
-  const [done, setDone] = useState<null | 'liked' | 'disliked'>(null);
+  const [done, setDone] = useState(false);
 
   function fadeCard() {
     if (onFlagged) { onFlagged(); return; }
-    const card = rootRef.current?.closest('.card') as HTMLElement | null;
+    const card = firstRef.current?.closest('.card') as HTMLElement | null;
     if (card) {
       card.style.transition = 'opacity .3s ease, transform .3s ease';
       card.style.opacity = '0';
@@ -77,10 +78,10 @@ export function SeenVerdict({
     }
   }
 
-  async function verdict(kind: 'liked' | 'disliked') {
-    if (busy.current || done) return;
+  function verdict(kind: 'liked' | 'disliked') {
+    if (busy.current) return;
     busy.current = true;
-    setDone(kind);
+    setDone(true);
     const ctx = { source, position, matchScore, sessionId };
     const base = { tmdbId, mediaType, title, year, posterPath };
     void recordAnalyticsEvent('seen_verdict', { tmdbId, mediaType, kind, ...ctx }).catch(() => {});
@@ -91,49 +92,39 @@ export function SeenVerdict({
         ? { ...base, feedbackType: 'seen', reasonCodes: [], rating: 8, ...ctx }
         : { ...base, feedbackType: 'didnt_like', reasonCodes: [], rating: null, ...ctx },
     ).catch(() => {});
-    window.setTimeout(fadeCard, 850);
+    toast.show(kind === 'liked' ? '⚡ Seen it — liked. DNA boosted ↑' : 'Got it — seen it, not for you.', kind === 'liked' ? 'success' : 'info');
+    window.setTimeout(fadeCard, 260);
   }
 
   return (
-    <div ref={rootRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-center gap-1.5 bg-gradient-to-t from-black/80 via-black/35 to-transparent px-2 pb-2 pt-7">
-      {done ? (
-        <span
-          className={`pointer-events-none inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black shadow-lg ${
-            done === 'liked' ? 'bg-emerald-500/95 text-white' : 'bg-red-500/95 text-white'
-          }`}
-        >
-          <Glasses className="h-3.5 w-3.5" />
-          {done === 'liked' ? 'Seen it — liked' : 'Seen it — not for you'}
+    <>
+      <button
+        ref={firstRef}
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); verdict('liked'); }}
+        disabled={done}
+        aria-label="Seen it — liked it"
+        title="Seen it — liked it"
+        className="relative grid h-9 w-full flex-1 place-items-center rounded-md border border-emerald-400/50 bg-emerald-500/15 text-emerald-100 transition hover:bg-emerald-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-60"
+      >
+        <Glasses className="h-5 w-5" />
+        <span className="absolute bottom-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-white ring-1 ring-ink-900">
+          <ArrowUp className="h-2.5 w-2.5" />
         </span>
-      ) : (
-        <>
-          <button
-            type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); void verdict('liked'); }}
-            aria-label="Seen it — liked it"
-            title="Seen it — liked it"
-            className="pointer-events-auto relative grid h-9 w-9 place-items-center rounded-lg border border-emerald-400/50 bg-black/55 text-emerald-100 backdrop-blur transition hover:bg-emerald-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
-          >
-            <Glasses className="h-5 w-5" />
-            <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-white ring-2 ring-ink-900">
-              <ArrowUp className="h-2.5 w-2.5" />
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); void verdict('disliked'); }}
-            aria-label="Seen it — did not like it"
-            title="Seen it — did not like it"
-            className="pointer-events-auto relative grid h-9 w-9 place-items-center rounded-lg border border-red-400/50 bg-black/55 text-red-100 backdrop-blur transition hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
-          >
-            <Glasses className="h-5 w-5" />
-            <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-white ring-2 ring-ink-900">
-              <ArrowDown className="h-2.5 w-2.5" />
-            </span>
-          </button>
-          <span className="pointer-events-none ml-0.5 text-[10px] font-bold uppercase tracking-wide text-white/85 drop-shadow">Seen it?</span>
-        </>
-      )}
-    </div>
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); verdict('disliked'); }}
+        disabled={done}
+        aria-label="Seen it — did not like it"
+        title="Seen it — did not like it"
+        className="relative grid h-9 w-full flex-1 place-items-center rounded-md border border-red-400/50 bg-red-500/15 text-red-100 transition hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:opacity-60"
+      >
+        <Glasses className="h-5 w-5" />
+        <span className="absolute bottom-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-red-500 text-white ring-1 ring-ink-900">
+          <ArrowDown className="h-2.5 w-2.5" />
+        </span>
+      </button>
+    </>
   );
 }
