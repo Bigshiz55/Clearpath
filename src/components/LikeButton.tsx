@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { submitPassFeedback, recordAnalyticsEvent } from '@/lib/actions/passFeedback';
+import { submitPassFeedback, undoPassFeedback, recordAnalyticsEvent } from '@/lib/actions/passFeedback';
 import { useToast } from '@/components/Toast';
 import type { MediaType } from '@/lib/types';
 
@@ -36,18 +36,29 @@ export function LikeButton({
 }) {
   const toast = useToast();
   const ref = useRef<HTMLButtonElement>(null);
+  const cardEl = useRef<HTMLElement | null>(null);
   const busy = useRef(false);
   const [done, setDone] = useState(false);
 
   function fadeCard() {
     if (onFlagged) { onFlagged(); return; }
     const card = ref.current?.closest('.card') as HTMLElement | null;
+    cardEl.current = card;
     if (card) {
       card.style.transition = 'opacity .3s ease, transform .3s ease';
       card.style.opacity = '0';
       card.style.transform = 'scale(0.96)';
       window.setTimeout(() => { card.style.display = 'none'; }, 300);
     }
+  }
+
+  function undo() {
+    const c = cardEl.current;
+    if (c) { c.style.display = ''; c.style.opacity = '1'; c.style.transform = 'none'; }
+    busy.current = false;
+    setDone(false);
+    void recordAnalyticsEvent('like_undone', { tmdbId }).catch(() => {});
+    void undoPassFeedback({ tmdbId, mediaType }).catch(() => {});
   }
 
   function like(e: React.MouseEvent) {
@@ -61,7 +72,7 @@ export function LikeButton({
     void recordAnalyticsEvent('like_thumb', { tmdbId, mediaType, ...ctx }).catch(() => {});
     // A real positive rating (marks watched) so the DNA moves up right away.
     void submitPassFeedback({ ...base, feedbackType: 'seen', reasonCodes: [], rating: 8, ...ctx }).catch(() => {});
-    toast.show('⚡ DNA boosted — more like this ↑', 'success');
+    toast.show('⚡ DNA boosted — more like this ↑', 'success', { label: 'Undo', onClick: undo });
     window.setTimeout(fadeCard, 260);
   }
 
