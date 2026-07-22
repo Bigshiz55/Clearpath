@@ -44,9 +44,11 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
   const [dry, setDry] = useState(false);
   const [recs, setRecs] = useState<Rec[] | null>(null); // the end-of-round DNA reveal
   const [recsFailed, setRecsFailed] = useState(false);
-  const [fb, setFb] = useState(''); // feedback on the reveal, e.g. "no westerns"
+  const [fb, setFb] = useState(''); // current feedback line, e.g. "no westerns"
+  const [feedbackLog, setFeedbackLog] = useState<string[]>([]); // all notes, compounded
   const [refining, setRefining] = useState(false);
   const [note, setNote] = useState(''); // read-back of the applied filters
+  const [tuningDone, setTuningDone] = useState(false); // hides the floating bar
   const seen = useRef<Set<string>>(new Set());
   const fetching = useRef(false);
 
@@ -146,35 +148,48 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
     setRecs(null);
     setRecsFailed(false);
     setFb('');
+    setFeedbackLog([]);
     setNote('');
+    setTuningDone(false);
     setPhase('play');
   }
 
   // Recalculate the reveal from plain-English feedback ("too many old movies,
-  // I don't like westerns"). The server parses it into real genre/recency/type/
-  // length filters and reruns the recommender.
+  // I don't like westerns"). Feedback COMPOUNDS — every note you've given is
+  // re-sent so the filters stack — and the box clears after each pass so you can
+  // keep refining. The server parses it into real genre/recency/type/length
+  // filters and reruns the recommender.
   const recalc = useCallback(async () => {
     const text = fb.trim();
     if (!text || refining) return;
+    const combined = [...feedbackLog, text];
     setRefining(true);
     try {
       const r = await fetch('/api/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedback: text }),
+        body: JSON.stringify({ feedback: combined.join('. ') }),
         cache: 'no-store',
       });
       const d = await r.json();
       if (!d.error) {
-        setRecs((d.recommendations ?? []) as Rec[]);
-        setNote(typeof d.note === 'string' ? d.note : '');
+        const list = (d.recommendations ?? []) as Rec[];
+        if (list.length > 0) {
+          setRecs(list);
+          setFeedbackLog(combined);
+          setNote(typeof d.note === 'string' ? d.note : '');
+          setFb(''); // clear so you can add more feedback
+        } else {
+          // Don't blank the list — that combo was too strict. Let them loosen.
+          setNote('That combination left nothing — try loosening it.');
+        }
       }
     } catch {
       /* keep the current list on a transient failure */
     } finally {
       setRefining(false);
     }
-  }, [fb, refining]);
+  }, [fb, refining, feedbackLog]);
 
   // The one big promise, always on screen.
   const Banner = (
@@ -205,8 +220,9 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
 
   if (phase === 'done') {
     const hasRecs = recs != null && recs.length > 0;
+    const showBar = hasRecs && !tuningDone;
     return (
-      <div className="mt-5">
+      <div className={`mt-5 ${showBar ? 'pb-32' : ''}`}>
         {Banner}
         <div className="card p-5 sm:p-7">
           <div className="text-center">
@@ -220,38 +236,7 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
 
           {hasRecs ? (
             <>
-              {/* Tune the list in plain English, then recalculate. */}
-              <div className="mt-5 rounded-2xl border border-white/12 bg-white/[0.04] p-3">
-                <label htmlFor="rec-fb" className="block text-xs font-semibold text-slate-300">
-                  🎛️ Not quite right? Tell me what to change:
-                </label>
-                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                  <input
-                    id="rec-fb"
-                    value={fb}
-                    onChange={(e) => setFb(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') { e.preventDefault(); void recalc(); }
-                    }}
-                    placeholder="e.g. too many old movies, I don’t like westerns"
-                    className="min-w-0 flex-1 rounded-xl border border-white/15 bg-ink-900/60 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => void recalc()}
-                    disabled={refining || fb.trim().length === 0}
-                    className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {refining ? 'Recalculating…' : '↻ Recalculate'}
-                  </button>
-                </div>
-                {note && (
-                  <p className="mt-2 text-[11px] text-brand-200">
-                    Applied: <span className="font-semibold">{note}</span>
-                  </p>
-                )}
-              </div>
-
-              <div className={`mt-4 grid grid-cols-3 gap-3 transition-opacity sm:grid-cols-4 md:grid-cols-5 ${refining ? 'opacity-50' : ''}`}>
+              <div className={`mt-5 grid grid-cols-3 gap-3 transition-opacity sm:grid-cols-4 md:grid-cols-5 ${refining ? 'opacity-50' : ''}`}>
                 {recs!.map((r) => (
                   <Link key={`${r.mediaType}-${r.id}`} href={`/app/title/${r.mediaType}/${r.id}`} className="group block">
                     <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 shadow-card transition group-hover:border-white/25 group-active:scale-95">
@@ -288,6 +273,59 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
             <Link href="/app/watch" className="btn-secondary">Open Watch Now →</Link>
           </div>
         </div>
+
+        {/* Floating tuner — always in reach while you scroll the picks. Compounds
+            your feedback, clears after each pass, and locks in with Done. */}
+        {showBar && (
+          <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="mx-auto max-w-2xl rounded-2xl border border-white/15 bg-ink-900/95 p-3 shadow-2xl shadow-black/50 backdrop-blur">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-300">🎛️ Tell me what to change</span>
+                {note && (
+                  <span className={`ml-2 truncate text-[11px] ${note.startsWith('That') ? 'text-amber-300' : 'text-brand-200'}`}>
+                    {note.startsWith('That') ? note : `Applied: ${note}`}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  value={fb}
+                  onChange={(e) => setFb(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); void recalc(); }
+                  }}
+                  disabled={refining}
+                  placeholder="e.g. fewer old movies, no westerns"
+                  className="min-w-0 flex-1 rounded-xl border border-white/15 bg-ink-950/70 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none disabled:opacity-60"
+                />
+                <button
+                  onClick={() => void recalc()}
+                  disabled={refining || fb.trim().length === 0}
+                  className="btn-primary shrink-0 px-3 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {refining ? '…' : '↻ Recalculate'}
+                </button>
+                <button
+                  onClick={() => setTuningDone(true)}
+                  disabled={refining}
+                  className="btn-secondary shrink-0 px-3"
+                >
+                  ✓ Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reopen the tuner after Done. */}
+        {hasRecs && tuningDone && (
+          <button
+            onClick={() => setTuningDone(false)}
+            className="fixed bottom-4 right-4 z-40 rounded-full border border-white/15 bg-ink-900/95 px-4 py-2 text-sm font-semibold text-white shadow-2xl shadow-black/50 backdrop-blur"
+          >
+            🎛️ Tune picks
+          </button>
+        )}
       </div>
     );
   }
