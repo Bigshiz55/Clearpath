@@ -27,8 +27,15 @@ async function parseWithAi(text: string): Promise<Parsed | null> {
     `"avoid supernatural / no supernatural" -> realism high; "too slow / hate slow" -> pacing high; "dark/gritty" -> darkness high; ` +
     `"light/feel-good" -> darkness low; "no violence" -> violence low; "intelligent/smart/complex" -> complexity high; "funny" -> humor high. ` +
     `likedTitles / avoidTitles = specific show/movie names they name.\n` +
-    `Example: "I love intelligent crime mysteries, but I avoid supernatural stories and anything too slow" -> ` +
-    `{"axes":[{"key":"complexity","target":72,"confidence":0.7},{"key":"realism","target":82,"confidence":0.8},{"key":"pacing","target":70,"confidence":0.7}],"likedTitles":[],"avoidTitles":[]}`;
+    `Examples:\n` +
+    `"I love intelligent crime mysteries, but I avoid supernatural stories and anything too slow" -> ` +
+    `{"axes":[{"key":"complexity","target":72,"confidence":0.7},{"key":"realism","target":82,"confidence":0.8},{"key":"pacing","target":70,"confidence":0.7}],"likedTitles":[],"avoidTitles":[]}\n` +
+    `"Give me feel-good comedies, nothing scary or violent — loved Ted Lasso" -> ` +
+    `{"axes":[{"key":"humor","target":78,"confidence":0.8},{"key":"darkness","target":22,"confidence":0.7},{"key":"violence","target":15,"confidence":0.7},{"key":"suspense","target":25,"confidence":0.6}],"likedTitles":["Ted Lasso"],"avoidTitles":[]}\n` +
+    `"gritty character-driven dramas with real emotional weight, hate cheesy rom-coms" -> ` +
+    `{"axes":[{"key":"darkness","target":70,"confidence":0.7},{"key":"character","target":80,"confidence":0.8},{"key":"emotion","target":75,"confidence":0.7},{"key":"humor","target":30,"confidence":0.5},{"key":"romance","target":25,"confidence":0.6}],"likedTitles":[],"avoidTitles":[]}\n` +
+    `"fast action-packed blockbusters, big stakes, don't care about deep plots — like John Wick" -> ` +
+    `{"axes":[{"key":"pacing","target":85,"confidence":0.8},{"key":"stakes","target":78,"confidence":0.7},{"key":"complexity","target":30,"confidence":0.6}],"likedTitles":["John Wick"],"avoidTitles":[]}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
@@ -108,8 +115,11 @@ function detectAiringHorizon(text: string): number | null {
     t.match(/(?:next|within|in the next|coming up in)\s+(\d{1,2})\s*(?:hour|hr|h)\b/) ||
     t.match(/\bnext\s+(\d{1,2})\s*(?:hour|hr|h)/);
   if (m && m[1]) return Math.max(1, Math.min(48, Number(m[1])));
+  // Fuzzy windows people actually say.
+  if (/next\s+(?:a\s+)?couple(?:\s+of)?\s+hours/.test(t)) return 3;
+  if (/next\s+few\s+hours/.test(t)) return 4;
   // A clear "on the air" cue, without a number.
-  const airing = /(coming on|what'?s on|whats on|on tv|on t\.v\.|\bairing\b|on right now|on the air|on later|live tv|on tonight|what'?s airing|on air)/.test(t);
+  const airing = /(coming on|what'?s on|whats on|on tv|on t\.v\.|on television|\bairing\b|on right now|on the air|on later|live tv|on tonight|what'?s airing|what'?s playing|whats playing|showing tonight|playing tonight|on air|on the tube)/.test(t);
   if (airing) {
     if (/\btonight\b|\bthis evening\b|\blater tonight\b/.test(t)) return 6; // the rest of the evening
     return 24; // generic "what's on"
@@ -123,6 +133,31 @@ function detectAiringHorizon(text: string): number | null {
  * Null when the text isn't a where-to-watch lookup, or the "title" is generic
  * (e.g. "is there anything good on Netflix" → that's a platform browse, not a title).
  */
+/**
+ * Starter alias table (a hand-seeded cold-start for the "learned corrections"
+ * step): common shorthand/abbreviations that TMDB search resolves poorly on
+ * their own. Applied only to the where-to-watch title lookup. The data-driven
+ * version of this table grows from confirmed user corrections later.
+ */
+const TITLE_ALIASES: Record<string, string> = {
+  got: 'Game of Thrones',
+  lotr: 'The Lord of the Rings',
+  hp: 'Harry Potter',
+  atla: 'Avatar: The Last Airbender',
+  b99: 'Brooklyn Nine-Nine',
+  iasip: "It's Always Sunny in Philadelphia",
+  tlou: 'The Last of Us',
+  aot: 'Attack on Titan',
+  jjk: 'Jujutsu Kaisen',
+  mib: 'Men in Black',
+  'the office us': 'The Office',
+  'the shark movie': 'Jaws',
+};
+function normalizeTitleAlias(title: string): string {
+  const key = title.toLowerCase().trim().replace(/[?.!]+$/, '');
+  return TITLE_ALIASES[key] ?? title;
+}
+
 function extractWatchTitle(text: string): string | null {
   const raw = text.trim().replace(/[?!.]+$/, '');
   const low = ` ${raw.toLowerCase()} `;
@@ -136,10 +171,14 @@ function extractWatchTitle(text: string): string | null {
   // "is <title> on <somewhere>" — availability check for a named title.
   let m = raw.match(/^\s*is\s+(.+?)\s+on\s+[a-z0-9+.\s]+$/i);
   if (m && m[1]) return clean(m[1]);
-  // "where/what/how/which can I (watch|stream|see|find) <title> [on …]"
-  const gate = /(where can i (watch|stream|see|find|get)|what (network|channel|service|platform|streaming)|how can i (watch|stream|see|get)|which (service|platform|channel|network))/i;
+  // "where's <title> streaming/available/playing/showing" — title BEFORE the cue.
+  m = raw.match(/\bwhere(?:'s|s| is)?\s+(.+?)\s+(?:streaming|available|playing|showing)\b/i);
+  if (m && m[1]) return clean(m[1]);
+  // Gate: is this a where-to-watch question at all? (broadened phrasings)
+  const gate = /(where can i (watch|stream|see|find|get)|where to (watch|stream|find)|what (network|channel|service|platform|streaming)|which (service|platform|channel|network)|how (can|do) i (watch|stream|see|get)|who (has|streams|carries))/i;
   if (!gate.test(low)) return null;
-  m = raw.match(/(?:watch|stream|see|find|get)\s+(.+)$/i);
+  // "(verb) <title> [on …]" — verb precedes the title.
+  m = raw.match(/(?:watch|stream|see|find|get|has|carries|streams|streaming)\s+(.+)$/i);
   if (!m || !m[1]) return null;
   return clean(m[1]);
 }
@@ -223,7 +262,7 @@ export async function POST(request: Request) {
     // must never mark the queried title as "loved".
     const whereTitle = extractWatchTitle(text);
     if (whereTitle) {
-      const hits = await searchTitles(whereTitle).catch(() => []);
+      const hits = await searchTitles(normalizeTitleAlias(whereTitle)).catch(() => []);
       const top = hits[0];
       if (top) {
         await logCase('where_to_watch', `/app/title/${top.mediaType}/${top.id}`, { title: whereTitle });
