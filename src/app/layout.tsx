@@ -3,7 +3,6 @@ import './globals.css';
 import { publicEnv } from '@/lib/env';
 import { ToastProvider } from '@/components/Toast';
 import { ServiceWorker } from '@/components/ServiceWorker';
-import { DesktopViewExit } from '@/components/DesktopViewExit';
 
 const siteUrl = publicEnv.siteUrl();
 
@@ -66,7 +65,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <ToastProvider>{children}</ToastProvider>
-        <DesktopViewExit />
         <ServiceWorker />
       </body>
     </html>

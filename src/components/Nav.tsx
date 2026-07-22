@@ -62,14 +62,6 @@ export function Nav({
               <span aria-hidden className="text-base leading-none">⭐</span>
               <span className="hidden sm:inline">Pro</span>
             </Link>
-            <Link
-              href="/app/vintage"
-              title="Easy Mode — a big, simple, easy-to-read screen"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-amber-500/10 px-2.5 py-1.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/20"
-            >
-              <span aria-hidden className="text-lg leading-none">🧓</span>
-              <span className="hidden sm:inline">Easy mode</span>
-            </Link>
             {personalLabel && !isGuest && (
               <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 md:inline">
                 {personalLabel}

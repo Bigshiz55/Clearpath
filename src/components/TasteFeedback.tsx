@@ -68,6 +68,7 @@ export function TasteFeedback({
   const cardRef = useRef<HTMLElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pop, setPop] = useState<Popover | null>(null);
+  const [expanded, setExpanded] = useState(false); // opt-in: reasons show only if asked for
 
   const ctx = { source, position, matchScore, sessionId };
   const base = { tmdbId, mediaType, title, year, posterPath };
@@ -90,6 +91,15 @@ export function TasteFeedback({
     if (timer.current) clearTimeout(timer.current);
     if (remove) removeCardWithFade();
     setPop(null);
+    setExpanded(false);
+  }
+
+  // Opt in to the reasons — only shown if the user actually asks for them, and
+  // gets a longer window so they're not rushed once they've chosen to engage.
+  function expand() {
+    setExpanded(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => close(true), 12000);
   }
 
   async function fetchMeta(): Promise<TitleMetaLite | null> {
@@ -164,9 +174,10 @@ export function TasteFeedback({
       if (chips.length >= 4) break;
       if (!chips.some((x) => x.code === c.code)) chips.push({ code: c.code, label: c.label });
     }
+    setExpanded(false);
     setPop({ left, top, width, lead: undefined, heading: passHeadingFor(meta), chips, score, bump: null });
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => close(true), 6000);
+    timer.current = setTimeout(() => close(true), 5000);
   }
 
   const up = pop?.bump && pop.bump.to != null && pop.bump.from != null && pop.bump.to > pop.bump.from;
@@ -220,13 +231,23 @@ export function TasteFeedback({
                   </div>
                   <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-black text-emerald-200">⚡ DNA Boosted</div>
                 </div>
+              ) : !expanded ? (
+                /* Collapsed: the card's already gone. Just a small, ignorable
+                   offer to refine — tap it to help, or do nothing and it fades. */
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={expand}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-brand-400/40 bg-brand-500/20 px-3 py-2 text-xs font-bold text-brand-100 transition hover:bg-brand-500/30"
+                  >
+                    🧬 Improve my DNA
+                  </button>
+                  <button type="button" onClick={() => void undo()} className="text-[11px] font-semibold text-slate-400 underline-offset-2 hover:text-white hover:underline">Undo</button>
+                </div>
               ) : (
                 <>
-                  {/* One quiet, optional line — no headings, no score, no big button. */}
-                  <div className="mt-1 text-[11px] text-slate-400">Why? Tap one <span className="text-slate-500">(optional)</span></div>
-
-                  {/* Up to 4 title-specific reasons. Tapping one applies it right
-                      away — no multi-select, no separate "boost" step. */}
+                  <div className="mt-1 text-[11px] text-slate-400">What made it miss? Tap one</div>
+                  {/* Up to 4 title-specific reasons — tapping one applies instantly. */}
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {pop.chips.map((c) => (
                       <button
@@ -238,10 +259,6 @@ export function TasteFeedback({
                         {c.label}
                       </button>
                     ))}
-                  </div>
-
-                  <div className="mt-2 text-center">
-                    <button type="button" onClick={() => void undo()} className="text-[11px] font-semibold text-slate-400 underline-offset-2 hover:text-white hover:underline">Undo</button>
                   </div>
                 </>
               )}
