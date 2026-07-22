@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { PosterCard } from './PosterCard';
 import { SaveButton } from './SaveButton';
 import { ReasonText } from './ReasonText';
@@ -29,6 +30,7 @@ function fullReason(r: Rec): string | null {
 
 export function RecommendedForYou({ label }: { label?: string | null }) {
   const [recs, setRecs] = useState<Rec[] | null>(null);
+  const [cold, setCold] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
       .then((d) => {
         if (!active) return;
         if (d.error) setFailed(true);
-        else setRecs(d.recommendations ?? []);
+        else { setRecs(d.recommendations ?? []); setCold(!!d.cold); }
       })
       .catch(() => active && setFailed(true));
     return () => {
@@ -46,17 +48,35 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
     };
   }, []);
 
-  // Nothing to seed from yet (or a transient error): stay quiet, don't clutter.
   if (failed) return null;
-  if (recs && recs.length === 0) return null;
+
+  // Empty & new: don't go silent — invite them to build their DNA. Silence at
+  // the first moment wastes the onboarding; an honest nudge earns the next tap.
+  if (recs && recs.length === 0) {
+    return (
+      <section className="rounded-2xl border border-brand-400/30 bg-brand-500/10 p-5 text-center">
+        <div className="text-2xl">🧬</div>
+        <h2 className="mt-1 text-lg font-bold text-white">Your recommendations unlock fast</h2>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-slate-300">Rate a handful of titles and we’ll read your taste — then this fills with picks scored just for you, each with the reason it’s here.</p>
+        <Link href="/app/quiz" className="btn-primary mt-4 inline-flex">Build my Taste DNA →</Link>
+      </section>
+    );
+  }
 
   return (
     <section>
       <div className="mb-3">
-        <h2 className="text-lg font-semibold text-white">Recommended for you</h2>
-        <p className="text-xs text-slate-400">
-          Because of what you&apos;ve watched and rated · scored for {label ?? 'your match'}
-        </p>
+        <h2 className="text-lg font-semibold text-white">{cold ? 'Popular picks to start you off' : 'Recommended for you'}</h2>
+        {cold ? (
+          <p className="text-xs text-amber-200/90">
+            We’re still getting to know you — these are well-loved, not yet personalized.{' '}
+            <Link href="/app/quiz" className="font-semibold underline">Rate a few</Link> and this becomes truly yours.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-400">
+            Because of what you&apos;ve watched and rated · scored for {label ?? 'your match'}
+          </p>
+        )}
       </div>
 
       {!recs ? (

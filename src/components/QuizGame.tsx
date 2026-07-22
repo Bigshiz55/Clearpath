@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Poster } from './PosterCard';
+import { DnaMirror } from './DnaMirror';
 import { rateQuizTitle } from '@/lib/actions/quiz';
 
 interface Item {
@@ -130,22 +131,16 @@ export function QuizGame() {
   }
 
   if (done) {
+    // The payoff: don't *claim* the DNA got smarter — *show* it. The Mirror
+    // reflects their taste back and proves it with picks, then asks the one
+    // trust question that matters.
     return (
-      <div className="mt-8 card p-8 text-center">
-        <div className="text-4xl">🧬</div>
-        <h2 className="mt-3 text-xl font-bold text-white">Nice — you rated {rated} titles!</h2>
-        <p className="mx-auto mt-2 max-w-sm text-sm text-slate-400">
-          Your DNA just got smarter. Play as many rounds as you like — each one shows{' '}
-          <span className="text-slate-200">fresh titles</span> and keeps building your taste.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button onClick={() => { window.scrollTo({ top: 0 }); load(); }} className="btn-primary">
-            🔁 Play another round
-          </button>
-          <Link href="/app" className="btn-secondary">
-            See my recommendations →
-          </Link>
+      <div className="mt-6">
+        <div className="text-center">
+          <div className="text-4xl">🧬</div>
+          <h2 className="mt-2 text-xl font-bold text-white">You rated {rated} titles — here’s your read.</h2>
         </div>
+        <DnaMirror onReplay={() => { window.scrollTo({ top: 0 }); load(); }} />
       </div>
     );
   }

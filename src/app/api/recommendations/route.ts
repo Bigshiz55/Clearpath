@@ -40,7 +40,11 @@ export async function GET(request: Request) {
     // Default stays the tight hub list.
     const full = new URL(request.url).searchParams.get('full') === '1';
     const recs = await getRecommendations(supabase, user.id, full ? FULL_OPTS : {});
-    return NextResponse.json({ recommendations: shape(recs) });
+    // Cold start = we have picks but none are seeded from something you rated
+    // (no "because you liked …"). Let the UI say so honestly instead of faking
+    // a personalized read.
+    const cold = recs.length > 0 && recs.every((r) => !r.because);
+    return NextResponse.json({ recommendations: shape(recs), cold });
   } catch {
     return NextResponse.json({ error: 'Could not build recommendations right now.' }, { status: 500 });
   }
