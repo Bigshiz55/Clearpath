@@ -24,24 +24,30 @@ export function BuildCaseBox() {
   const [lang, setLang] = useState<Lang>('en');
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
+  const lastCase = useRef<{ id: string | null; at: number }>({ id: null, at: 0 });
 
   const voiceSupported =
     typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
 
-  async function submit(override?: string) {
+  async function submit(override?: string, src: 'text' | 'voice' = 'text') {
     const t = (override ?? text).trim();
     if (t.length < 4 || busy) return;
     setBusy(true);
     try {
+      // A resubmit within 90s is a likely rephrase → a weak "that missed" label
+      // on the previous parse (step 1 of the accuracy flywheel).
+      const now = Date.now();
+      const priorCaseId = lastCase.current.id && now - lastCase.current.at < 90_000 ? lastCase.current.id : null;
       const r = await fetch('/api/build-case', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: t }),
+        body: JSON.stringify({ text: t, source: src, lang, priorCaseId }),
       });
       const d = await r.json();
       if (d.error) { toast.show(d.error, 'error'); return; }
+      if (typeof d.caseId === 'string') lastCase.current = { id: d.caseId, at: Date.now() };
       toast.show(d.summary ? `⚖️ ${d.summary}` : 'Got it — building your Taste DNA. 🧬', 'success');
       setText('');
       // If the case included an actionable ask (e.g. "coming on in the next 12
@@ -82,7 +88,7 @@ export function BuildCaseBox() {
       }
       const shown = (finalText || interim).trim();
       if (shown) setText(shown); // live preview as you speak
-      if (finalText.trim()) void submit(finalText.trim()); // route once a phrase finalizes
+      if (finalText.trim()) void submit(finalText.trim(), 'voice'); // route once a phrase finalizes
     };
     rec.onend = () => setListening(false);
     rec.onerror = (e) => {

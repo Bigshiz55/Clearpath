@@ -276,9 +276,32 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
-    const body = (await request.json().catch(() => ({}))) as { text?: unknown };
+    const body = (await request.json().catch(() => ({}))) as { text?: unknown; source?: unknown; lang?: unknown; priorCaseId?: unknown };
     const text = typeof body.text === 'string' ? body.text.slice(0, 600).trim() : '';
     if (text.length < 4) return NextResponse.json({ error: 'Tell us a bit about what you like.' }, { status: 400 });
+
+    // ── Step 1 of the voice/intent flywheel ────────────────────────────────
+    // Log what we parsed a request as and how we routed it, plus a weak
+    // "reworded" label when a request is resubmitted quickly (a likely miss).
+    // This is the labeled substrate later steps mine (prompt few-shots, an alias
+    // table, a fine-tune) — collect now, improve later. Guarded so a missing
+    // table never blocks a response. NOTE: props include the raw text, so before
+    // scaling this needs a retention/consent policy (it can carry personal phrasing).
+    const caseId = crypto.randomUUID();
+    const source = body.source === 'voice' ? 'voice' : 'text';
+    const lang = typeof body.lang === 'string' ? body.lang.slice(0, 8) : 'en';
+    const priorCaseId = typeof body.priorCaseId === 'string' ? body.priorCaseId.slice(0, 64) : null;
+    const logCase = async (intentKind: string, route: string, extra: Record<string, unknown> = {}) => {
+      try {
+        const rows: { user_id: string; name: string; props: Record<string, unknown> }[] = [
+          { user_id: user.id, name: 'case_parsed', props: { caseId, source, lang, cjk: hasNonLatinScript(text), len: text.length, text: text.slice(0, 300), intentKind, route, ...extra } },
+        ];
+        if (priorCaseId) rows.push({ user_id: user.id, name: 'case_reworded', props: { caseId: priorCaseId, nextCaseId: caseId } });
+        await supabase.from('analytics_events').insert(rows);
+      } catch {
+        /* analytics_events missing (pre-migration) → skip logging */
+      }
+    };
 
     // Non-Latin input (e.g. Simplified Chinese) can't hit the English regex
     // fast-paths, so classify its intent with the LLM. English is untouched.
@@ -293,17 +316,21 @@ export async function POST(request: Request) {
       const hits = await searchTitles(whereTitle).catch(() => []);
       const top = hits[0];
       if (top) {
+        await logCase('where_to_watch', `/app/title/${top.mediaType}/${top.id}`, { title: whereTitle });
         return NextResponse.json({
           ok: true,
           learned: false,
+          caseId,
           redirect: `/app/title/${top.mediaType}/${top.id}`,
           summary: `Here’s where to stream ${top.title}${top.year ? ` (${top.year})` : ''}.`,
         });
       }
+      await logCase('where_to_watch_miss', 'stay', { title: whereTitle });
       return NextResponse.json({
         ok: true,
         learned: false,
         stay: true,
+        caseId,
         summary: `Couldn’t find “${whereTitle}” — try the 🔎 search up top.`,
       });
     }
@@ -374,9 +401,11 @@ export async function POST(request: Request) {
     // An explicit LLM platform_find needs no English "find" cue.
     const platform = (aiIntent?.kind === 'platform_find' ? platformByName(aiIntent.platform) : null) ?? (engPlatform && wantsFind ? engPlatform : null);
     if (platform) {
+      await logCase('platform_find', `/app/finder?providers=${platform.id}`, { platform: platform.name });
       return NextResponse.json({
         ok: true,
         learned,
+        caseId,
         redirect: `/app/finder?providers=${platform.id}&q=${encodeURIComponent(text.slice(0, 200))}&run=1`,
         summary: `${tasteLead}Finding something on ${platform.name}, scored for you.`,
       });
@@ -387,16 +416,19 @@ export async function POST(request: Request) {
     // the generic Watch Now grid. Their stated taste is still folded in above.
     const horizon = detectAiringHorizon(text) ?? (aiIntent?.kind === 'airing' ? aiIntent.horizonHours : null);
     if (horizon != null) {
+      await logCase('airing', `/app/tv?within=${horizon}`, { horizon });
       return NextResponse.json({
         ok: true,
         learned,
+        caseId,
         redirect: `/app/tv?within=${horizon}`,
         summary: `${tasteLead}Here’s what’s coming on in the next ${horizon} hours.`,
       });
     }
 
     const summary = parts.length ? `Locked in: ${parts.join(' · ')}.` : 'Got it — building your Taste DNA.';
-    return NextResponse.json({ ok: true, summary, learned });
+    await logCase('taste', 'watch', { axes: parsed.axes.length, liked: parsed.likedTitles.length, avoid: parsed.avoidTitles.length });
+    return NextResponse.json({ ok: true, summary, learned, caseId });
   } catch {
     return NextResponse.json({ error: 'Could not read that — try again.' }, { status: 500 });
   }
