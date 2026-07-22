@@ -87,7 +87,7 @@ export function SaveButton({
         type="button"
         onClick={toggle}
         disabled={busy}
-        aria-label={saved ? 'Remove from list' : 'Add to list'}
+        aria-label={saved ? 'Saved — remove from your list' : 'Save'}
         className={`items-center gap-1.5 rounded-lg border font-semibold transition ${
           wide ? 'flex w-full justify-center px-3 py-3 text-sm' : 'inline-flex px-2.5 py-1.5 text-xs'
         } ${
@@ -107,8 +107,8 @@ export function SaveButton({
       type="button"
       onClick={toggle}
       disabled={busy}
-      aria-label={saved ? 'Remove from list' : 'Add to list'}
-      title={saved ? 'Remove from your list' : 'Add to your list'}
+      aria-label={saved ? 'Saved — remove from your list' : 'Save'}
+      title={saved ? 'Saved — tap to remove' : 'Save'}
       className={`grid h-7 place-items-center rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-7'} ${
         saved
           ? 'border-brand-300 bg-brand-500'

@@ -3,14 +3,19 @@
 import { createContext, useContext, useCallback, useState, useRef } from 'react';
 
 type ToastKind = 'success' | 'error' | 'info';
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
 interface Toast {
   id: number;
   message: string;
   kind: ToastKind;
+  action?: ToastAction;
 }
 
 interface ToastApi {
-  show: (message: string, kind?: ToastKind) => void;
+  show: (message: string, kind?: ToastKind, action?: ToastAction) => void;
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -25,13 +30,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const counter = useRef(0);
 
-  const show = useCallback((message: string, kind: ToastKind = 'info') => {
+  const show = useCallback((message: string, kind: ToastKind = 'info', action?: ToastAction) => {
     const id = counter.current++;
-    setToasts((t) => [...t, { id, message, kind }]);
-    setTimeout(() => {
-      setToasts((t) => t.filter((x) => x.id !== id));
-    }, 4000);
+    setToasts((t) => [...t, { id, message, kind, action }]);
+    setTimeout(
+      () => {
+        setToasts((t) => t.filter((x) => x.id !== id));
+      },
+      action ? 6000 : 4000, // give actionable toasts (Undo) a longer window
+    );
   }, []);
+
+  const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
 
   return (
     <ToastContext.Provider value={{ show }}>
@@ -53,7 +63,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   : 'border-white/15 bg-ink-800/90 text-slate-100',
             ].join(' ')}
           >
-            {t.message}
+            <div className="flex items-center justify-between gap-3">
+              <span>{t.message}</span>
+              {t.action && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    t.action?.onClick();
+                    dismiss(t.id);
+                  }}
+                  className="flex-none rounded-lg border border-white/25 px-2.5 py-1 text-xs font-bold text-white transition hover:bg-white/10"
+                >
+                  {t.action.label}
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
