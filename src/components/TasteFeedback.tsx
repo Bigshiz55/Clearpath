@@ -178,7 +178,7 @@ export function TasteFeedback({
         title="Pass on this title"
         className={
           compact
-            ? `grid h-7 place-items-center rounded-md border border-red-400/50 bg-red-500/15 text-red-200 transition hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 ${wide ? 'w-full flex-1' : 'w-7'}`
+            ? `grid h-9 place-items-center rounded-md border border-red-400/50 bg-red-500/15 text-red-200 transition hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 ${wide ? 'w-full flex-1' : 'w-9'}`
             : `items-center gap-1 rounded-lg border border-red-400/50 bg-black/60 font-bold text-red-100 backdrop-blur transition hover:bg-red-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 ${wide ? 'flex w-full justify-center px-3 py-3 text-sm' : 'inline-flex px-2 py-1 text-[11px]'}`
         }
       >
@@ -217,8 +217,9 @@ export function TasteFeedback({
                   {pop.lead && <div className="mt-0.5 text-[11px] font-semibold text-brand-200">{pop.lead}</div>}
                   <div className="mt-0.5 text-[11px] text-slate-400">{pop.heading}</div>
 
-                  {/* Top ~8 title-specific reasons — 2-column box, multi-select (pink). */}
-                  <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  {/* Top ~8 title-specific reasons — 2-column box, multi-select (pink).
+                      Taller tap targets (~46px) so they're comfortable on a phone. */}
+                  <div className="mt-2 grid grid-cols-2 gap-2">
                     {pop.chips.map((c) => {
                       const on = selected.includes(c.code);
                       return (
@@ -227,7 +228,7 @@ export function TasteFeedback({
                           type="button"
                           aria-pressed={on}
                           onClick={() => toggle(c.code)}
-                          className={`rounded-lg border px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition ${
+                          className={`flex min-h-[46px] items-center justify-center rounded-lg border px-2.5 py-2 text-center text-xs font-semibold leading-tight transition ${
                             on ? 'border-brand-300 bg-brand-500/30 text-white shadow-[0_0_0_1px_rgba(255,46,154,0.5)]' : 'border-white/12 bg-white/[0.05] text-slate-200 hover:bg-white/10'
                           }`}
                         >
@@ -241,16 +242,16 @@ export function TasteFeedback({
                     type="button"
                     onClick={() => void apply('not_for_me', selected)}
                     disabled={selected.length === 0}
-                    className="mt-2.5 w-full rounded-lg bg-brand-500 py-2 text-xs font-black text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="mt-3 min-h-[48px] w-full rounded-lg bg-brand-500 py-3 text-sm font-black text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {selected.length ? `⚡ Boost my DNA (${selected.length})` : 'Tap a reason to boost'}
                   </button>
 
                   {/* Quick single-tap resolutions. */}
-                  <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px]">
-                    <button type="button" onClick={() => void apply('not_right_now', [])} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 font-medium text-slate-200 hover:bg-white/10">Not tonight</button>
-                    <button type="button" onClick={() => void apply('seen', [])} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 font-medium text-slate-200 hover:bg-white/10">Seen it</button>
-                    <button type="button" onClick={() => void undo()} className="rounded-full border border-white/25 px-2.5 py-1 font-bold text-white hover:bg-white/10">Undo</button>
+                  <div className="mt-2.5 flex items-center justify-center gap-2 text-xs">
+                    <button type="button" onClick={() => void apply('not_right_now', [])} className="min-h-[40px] flex-1 rounded-full border border-white/15 bg-white/5 px-2 py-2 font-medium text-slate-200 hover:bg-white/10">Not tonight</button>
+                    <button type="button" onClick={() => void apply('seen', [])} className="min-h-[40px] flex-1 rounded-full border border-white/15 bg-white/5 px-2 py-2 font-medium text-slate-200 hover:bg-white/10">Seen it</button>
+                    <button type="button" onClick={() => void undo()} className="min-h-[40px] flex-1 rounded-full border border-white/25 px-2 py-2 font-bold text-white hover:bg-white/10">Undo</button>
                   </div>
                 </>
               )}

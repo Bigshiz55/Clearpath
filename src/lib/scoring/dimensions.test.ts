@@ -5,6 +5,7 @@ import {
   buildProfile,
   dimensionMatch,
   dnaStrength,
+  dnaStrengthExact,
   topDials,
   tasteDials,
   applyOverrides,
@@ -95,11 +96,21 @@ describe('dnaStrength', () => {
     expect(many).toBeLessThanOrEqual(100);
   });
 
-  it('a decisive taste scores above a wishy-washy one at equal volume', () => {
-    const rows = (over: Partial<TitleDimensions>) => Array.from({ length: 20 }, () => ({ dims: withDims(over), rating: 9 }));
-    const decisive = dnaStrength(buildProfile(rows({ darkness: 98, humor: 2, pacing: 5 })));
-    const bland = dnaStrength(buildProfile(rows({ darkness: 52, humor: 48, pacing: 51 })));
-    expect(decisive).toBeGreaterThan(bland);
+  it('never drops when you add more taste evidence (e.g. a pass with a reason)', () => {
+    // A learned profile that leans hard toward comedy.
+    const base = buildProfile(
+      Array.from({ length: 12 }, () => ({ dims: withDims({ humor: 92, darkness: 18 }), rating: 9 })),
+    );
+    const before = dnaStrengthExact(base);
+    // Fold in an OPPOSING axis signal, exactly as a "too silly" pass would: more
+    // evidence on `humor`, pulling the lean back toward neutral. The score must
+    // still rise (or hold) — engaging can never lower it.
+    const after = dnaStrengthExact({
+      ...base,
+      pref: { ...base.pref },
+      weight: { ...base.weight, humor: (base.weight.humor ?? 0) + 6 },
+    });
+    expect(after).toBeGreaterThanOrEqual(before);
   });
 });
 

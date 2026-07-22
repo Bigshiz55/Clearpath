@@ -160,22 +160,33 @@ export function dimensionMatch(dims: TitleDimensions, profile: DimensionProfile)
 }
 
 /**
- * A single "Watch DNA" score, 0..100 — how developed a user's taste profile is.
- * Blends coverage (how many titles they've rated) with definition (how decisive
- * and well-evidenced their leans are). Grows as they rate more and their taste
- * sharpens. Cosmetic/motivational — never feeds title scoring.
+ * A single "Watch DNA" score, 0..100 — how much we've learned about a user's
+ * taste. It is deliberately a measure of *accumulated evidence*, not of how
+ * decisive the resulting leans are, so it only ever GROWS as you engage: every
+ * rating and every pass-with-a-reason adds signal on the axes, which can never
+ * pull the number down. (An earlier version rewarded decisiveness, so folding in
+ * an opposing signal — e.g. passing a title as "too silly" — could nudge a lean
+ * back toward neutral and make the score *drop*, which reads as a punishment for
+ * giving feedback. Evidence-based growth keeps the "⚡ Boost my DNA" promise
+ * honest.) Blends breadth (how many titles you've judged) with depth (total
+ * evidence gathered across the axes); both climb smoothly and never saturate
+ * hard, so increments stay visible for a long time. Cosmetic/motivational —
+ * never feeds title scoring, so the 7 scenarios are unaffected.
  */
 /** The unrounded score (0..100) — for the live "+0.35%" increments in the UI. */
 export function dnaStrengthExact(profile: DimensionProfile): number {
-  const coverage = Math.min(1, profile.samples / 50);
-  let sum = 0;
+  // Breadth: distinct titles judged — a smooth, ever-climbing curve.
+  const samples = Number.isFinite(profile.samples) ? Math.max(0, profile.samples) : 0;
+  const coverage = 1 - Math.exp(-samples / 30);
+  // Depth: total taste evidence banked across every axis. Monotonic in each
+  // axis weight, so any added signal (rating or reason) only ever raises it.
+  let totalW = 0;
   for (const k of DIMENSION_KEYS) {
-    const decisive = Math.abs(prefOf(profile, k) - 50) / 50; // 0..1
-    const evidence = Math.min(1, (profile.weight[k] ?? 0) / 12);
-    sum += decisive * evidence;
+    const w = profile.weight[k];
+    if (typeof w === 'number' && Number.isFinite(w) && w > 0) totalW += w;
   }
-  const definition = Math.min(1, (sum / DIMENSION_KEYS.length) * 3);
-  return clamp100(100 * (0.5 * coverage + 0.5 * definition));
+  const depth = 1 - Math.exp(-totalW / 420);
+  return clamp100(100 * (0.5 * coverage + 0.5 * depth));
 }
 
 export function dnaStrength(profile: DimensionProfile): number {
