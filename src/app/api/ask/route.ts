@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { runFinder, type FinderQuery, type Watcher } from '@/lib/finder';
-import { askJudgeTitle } from '@/lib/askJudge';
+import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
@@ -59,6 +59,26 @@ export async function POST(req: Request) {
     let query: FinderQuery;
     let limit = 8;
     const ai = text ? await parseAskWithAI(text) : null;
+
+    // 1.5) "More like X" — if the ask compares to a title ("shows like
+    // Mindhunter"), seed recommendations from THAT title's neighbors. Uses the
+    // LLM's reference when present, else a regex on the raw text (so it still
+    // works with no OpenAI key). Falls through to plain discovery on a miss.
+    const reference = (ai?.similarTo ?? '').trim() || (text ? extractReference(text) : null);
+    if (reference) {
+      const wantCount = text ? parseRequestedCount(text) : 10;
+      const similar = await askSimilarTo(supabase, user.id, reference, wantCount);
+      if (similar) {
+        return NextResponse.json({
+          kind: 'search',
+          query: similar.query,
+          scoredFor: similar.scoredFor,
+          relaxed: null,
+          items: similar.items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+        });
+      }
+    }
+
     if (ai) {
       query = ai.query;
       limit = ai.limit;

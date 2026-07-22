@@ -25,6 +25,7 @@ export const EMPTY_QUERY: FinderQuery = {
  *  says "here's how I read your case" so the parse is never a black box. Pure. */
 export function describeQuery(q: FinderQuery): string {
   const parts: string[] = [];
+  if (q.similarTo) parts.push(`more like ${q.similarTo}`);
   if (q.mediaType === 'movie') parts.push('movies');
   else if (q.mediaType === 'tv') parts.push('shows');
   for (const id of q.genreIds) parts.push(genreLabel(id).toLowerCase());

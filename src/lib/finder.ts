@@ -78,6 +78,9 @@ export interface FinderQuery {
   excludeGenreIds?: number[];
   /** TMDB keyword ids for trope/vibe filtering (heist, dystopia, feel-good…). */
   keywordIds?: number[];
+  /** A reference title the ask compared to ("shows like Mindhunter") — for the
+   *  read-back only; the "more like this" seeding happens in askSimilarTo. */
+  similarTo?: string;
 }
 
 export interface FinderItem {

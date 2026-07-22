@@ -1,6 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { searchTitles } from '@/lib/tmdb/client';
+import { searchTitles, getSimilar } from '@/lib/tmdb/client';
 import { getScoringData } from '@/lib/titleData';
 import { buildVerdict } from '@/lib/scoring';
 import { getProfile, getPersonalContext, regionFor, personalLabelFor } from '@/lib/profile';
@@ -10,7 +10,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import { deciderSearchUrl } from '@/lib/tmdb/meta-helpers';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { genreIdFromName } from '@/lib/finderGenres';
-import { runFinder } from '@/lib/finder';
+import { runFinder, type FinderItem, type FinderQuery } from '@/lib/finder';
 import type { TitleVerdict, AltItem, JudgeFactor } from '@/lib/askTypes';
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -45,6 +45,113 @@ function whereFrom(providers: { available: boolean; options: { providerName: str
   if (!providers || !providers.available) return null;
   const names = streamingNames(providers.options as never);
   return names.length ? names.slice(0, 3).join(', ') : null;
+}
+
+// Comparison cues: "shows like Mindhunter", "if I like Fargo", "in the vein of
+// Fargo". Ordered longest-first within each group; the bare "like" is last so a
+// specific cue wins when several are present.
+const REF_CUE =
+  /\b(?:in the vein of|reminds me of|if i (?:really )?(?:like|liked|enjoy|enjoyed|love|loved)|similar to|(?:something|stuff|shows?|movies?|a show|a movie|more|kinda|kind of|sort of|just|a lot) like|like the (?:show|movie)|like watching|like)\b/gi;
+
+/**
+ * Pull the reference title out of a "more like X" ask. Takes what follows the
+ * LAST comparison cue (so "shows I'd like if I like Fargo" → "Fargo"), then
+ * strips leading filler. Returns null when there's no comparison in the text.
+ */
+export function extractReference(text: string): string | null {
+  REF_CUE.lastIndex = 0;
+  let last: RegExpExecArray | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = REF_CUE.exec(text)) !== null) {
+    last = m;
+    if (m.index === REF_CUE.lastIndex) REF_CUE.lastIndex++;
+  }
+  if (!last) return null;
+  const tail = text
+    .slice(last.index + last[0].length)
+    .replace(/^\s*(?:to|the|a|an|watch|watching|some|something)\s+/i, '')
+    .replace(/[?!.]+\s*$/, '')
+    .trim();
+  return tail.length >= 2 ? tail : null;
+}
+
+/**
+ * "More like X" — resolve the reference title, pull TMDB's similar/recommended
+ * titles, and score each through the deterministic engine for this user. Real
+ * neighbors of what they named, best match first. Returns null when the title
+ * can't be confidently resolved, so the caller falls back to the plain Finder.
+ */
+export async function askSimilarTo(
+  supabase: SupabaseClient,
+  userId: string,
+  refText: string,
+  limit = 10,
+): Promise<{ query: FinderQuery; scoredFor: string; items: FinderItem[] } | null> {
+  const cleaned = cleanTitleText(refText);
+  if (cleaned.length < 2) return null;
+  const results = await searchTitles(cleaned).catch(() => []);
+  const matches = results.filter((r) => titleMatches(cleaned, r.title));
+  const seed = matches[0];
+  if (!seed) return null; // no confident title → not a "more like this" ask
+
+  const similar = await getSimilar(seed.mediaType, seed.id).catch(() => []);
+  if (similar.length === 0) return null;
+
+  const profile = await getProfile(supabase, userId);
+  const region = regionFor(profile);
+  const personal = await getPersonalContext(supabase, userId, null);
+  const scoredFor = profile ? personalLabelFor(profile) : 'Your match';
+
+  const { data: wl } = await supabase
+    .from('watchlist_items')
+    .select('tmdb_id, media_type, status')
+    .eq('user_id', userId);
+  const seen = new Set(
+    (wl ?? [])
+      .filter((r) => r.status === 'watched' || r.status === 'dropped')
+      .map((r) => `${r.media_type}-${r.tmdb_id}`),
+  );
+
+  const seedKey = `${seed.mediaType}-${seed.id}`;
+  const cands = similar
+    .filter((s) => `${s.mediaType}-${s.id}` !== seedKey && !seen.has(`${s.mediaType}-${s.id}`))
+    .slice(0, 16);
+
+  const scored = await Promise.all(
+    cands.map(async (c) => {
+      try {
+        const { meta, providers } = await getScoringData(c.mediaType, c.id, region);
+        const report = buildVerdict({ meta, providers, personal: { ...personal, collectionId: null } });
+        return {
+          id: c.id,
+          mediaType: c.mediaType,
+          title: meta.title,
+          year: meta.year,
+          posterPath: meta.posterPath,
+          matchScore: report.personal.score,
+          generalScore: report.general.score,
+          primaryCall: report.primaryCall,
+          reason: report.oneLiner,
+          where: whereFrom(providers),
+          receipts: [`${scoredFor.split(' ')[0]} ${report.personal.score}`, ...(meta.year ? [String(meta.year)] : [])],
+          deciderUrl: deciderSearchUrl(meta.title, meta.year),
+          ratings: tileRatingsFromScore(report.general),
+          imdbId: meta.imdbId ?? null,
+        } as FinderItem;
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  const items = scored
+    .filter((x): x is FinderItem => x !== null)
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, Math.max(1, Math.min(limit, 20)));
+  if (items.length === 0) return null;
+
+  const query: FinderQuery = { ...EMPTY_QUERY, mediaType: seed.mediaType, similarTo: seed.title };
+  return { query, scoredFor, items };
 }
 
 /**

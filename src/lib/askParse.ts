@@ -17,6 +17,9 @@ import { searchPeople, searchKeywords } from '@/lib/tmdb/client';
 export interface AiAsk {
   query: FinderQuery;
   limit: number;
+  /** A reference title the user compared to ("like Succession") — seeds a
+   *  "more like this" search instead of a plain filter query. */
+  similarTo?: string;
 }
 
 interface RawAi {
@@ -119,7 +122,8 @@ async function toQuery(raw: RawAi): Promise<AiAsk> {
   }
 
   const limit = typeof raw.count === 'number' && raw.count >= 1 && raw.count <= 20 ? Math.round(raw.count) : 8;
-  return { query: q, limit };
+  const similarTo = typeof raw.similarTo === 'string' && raw.similarTo.trim() ? raw.similarTo.trim() : undefined;
+  return { query: q, limit, similarTo };
 }
 
 const NUM_WORDS: Record<string, number> = {
