@@ -44,6 +44,9 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
   const [dry, setDry] = useState(false);
   const [recs, setRecs] = useState<Rec[] | null>(null); // the end-of-round DNA reveal
   const [recsFailed, setRecsFailed] = useState(false);
+  const [fb, setFb] = useState(''); // feedback on the reveal, e.g. "no westerns"
+  const [refining, setRefining] = useState(false);
+  const [note, setNote] = useState(''); // read-back of the applied filters
   const seen = useRef<Set<string>>(new Set());
   const fetching = useRef(false);
 
@@ -142,8 +145,36 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
     setRound(0);
     setRecs(null);
     setRecsFailed(false);
+    setFb('');
+    setNote('');
     setPhase('play');
   }
+
+  // Recalculate the reveal from plain-English feedback ("too many old movies,
+  // I don't like westerns"). The server parses it into real genre/recency/type/
+  // length filters and reruns the recommender.
+  const recalc = useCallback(async () => {
+    const text = fb.trim();
+    if (!text || refining) return;
+    setRefining(true);
+    try {
+      const r = await fetch('/api/recommendations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback: text }),
+        cache: 'no-store',
+      });
+      const d = await r.json();
+      if (!d.error) {
+        setRecs((d.recommendations ?? []) as Rec[]);
+        setNote(typeof d.note === 'string' ? d.note : '');
+      }
+    } catch {
+      /* keep the current list on a transient failure */
+    } finally {
+      setRefining(false);
+    }
+  }, [fb, refining]);
 
   // The one big promise, always on screen.
   const Banner = (
@@ -189,7 +220,38 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
 
           {hasRecs ? (
             <>
-              <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+              {/* Tune the list in plain English, then recalculate. */}
+              <div className="mt-5 rounded-2xl border border-white/12 bg-white/[0.04] p-3">
+                <label htmlFor="rec-fb" className="block text-xs font-semibold text-slate-300">
+                  🎛️ Not quite right? Tell me what to change:
+                </label>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    id="rec-fb"
+                    value={fb}
+                    onChange={(e) => setFb(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); void recalc(); }
+                    }}
+                    placeholder="e.g. too many old movies, I don’t like westerns"
+                    className="min-w-0 flex-1 rounded-xl border border-white/15 bg-ink-900/60 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => void recalc()}
+                    disabled={refining || fb.trim().length === 0}
+                    className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {refining ? 'Recalculating…' : '↻ Recalculate'}
+                  </button>
+                </div>
+                {note && (
+                  <p className="mt-2 text-[11px] text-brand-200">
+                    Applied: <span className="font-semibold">{note}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className={`mt-4 grid grid-cols-3 gap-3 transition-opacity sm:grid-cols-4 md:grid-cols-5 ${refining ? 'opacity-50' : ''}`}>
                 {recs!.map((r) => (
                   <Link key={`${r.mediaType}-${r.id}`} href={`/app/title/${r.mediaType}/${r.id}`} className="group block">
                     <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 shadow-card transition group-hover:border-white/25 group-active:scale-95">

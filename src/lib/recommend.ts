@@ -1,12 +1,14 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { MediaType, PrimaryCall, VerdictTier } from '@/lib/types';
+import type { MediaType, PrimaryCall, TitleMetadata, VerdictTier } from '@/lib/types';
 import { getSimilar, discoverByGenres } from '@/lib/tmdb/client';
 import { getScoringData } from '@/lib/titleData';
 import { buildVerdict } from '@/lib/scoring';
 import type { PersonalContext } from '@/lib/scoring/personal';
 import { getProfile, getPersonalContext, regionFor } from '@/lib/profile';
 import { tileRatingsFromScore, type TileRatings } from '@/lib/ratings';
+import { genreIdFromName } from '@/lib/finderGenres';
+import { NO_FILTERS, hasFilters, type RecFilters } from '@/lib/recFeedback';
 
 // Map each positive taste trait to TMDB genres, per media type, so the cold-start
 // pool reflects whatever profile the user has (Scott, Heather, Amy, …).
@@ -44,6 +46,24 @@ export interface RecommendOptions {
   minScore?: number;
   /** Max results attributed to any single seed, so the list stays varied. */
   perSeedCap?: number;
+  /** User feedback filters ("no westerns", "newer only") applied on recalculate. */
+  filters?: RecFilters;
+}
+
+/** Does this title fall foul of the user's feedback filters? (real metadata only) */
+function violatesFilters(meta: TitleMetadata, filters: RecFilters): boolean {
+  if (filters.mediaType !== 'any' && meta.mediaType !== filters.mediaType) return true;
+  if (filters.excludeGenreIds.length > 0) {
+    const ids = meta.genres.map((g) => genreIdFromName(g)).filter((n): n is number => n != null);
+    if (ids.some((id) => filters.excludeGenreIds.includes(id))) return true;
+  }
+  if (filters.minYear != null && (meta.year == null || meta.year < filters.minYear)) return true;
+  if (filters.maxYear != null && (meta.year == null || meta.year > filters.maxYear)) return true;
+  if (filters.maxRuntime != null) {
+    const rt = meta.mediaType === 'movie' ? meta.runtimeMinutes : meta.episodeRuntimeMinutes;
+    if (rt != null && rt > filters.maxRuntime) return true;
+  }
+  return false;
 }
 
 export interface Recommendation {
@@ -97,9 +117,11 @@ export async function getRecommendations(
 ): Promise<Recommendation[]> {
   const limit = opts.limit ?? RESULT_LIMIT;
   const seedLimit = opts.seedLimit ?? SEED_LIMIT;
-  const candidatePool = opts.candidatePool ?? CANDIDATES_TO_SCORE;
   const minScore = opts.minScore ?? MIN_SCORE;
   const perSeedCap = opts.perSeedCap ?? limit;
+  const filters = opts.filters ?? NO_FILTERS;
+  // With feedback filters on, score a wider pool so enough survive the cut.
+  const candidatePool = (opts.candidatePool ?? CANDIDATES_TO_SCORE) + (hasFilters(filters) ? 48 : 0);
 
   const profile = await getProfile(supabase, userId);
   const region = regionFor(profile);
@@ -137,7 +159,7 @@ export async function getRecommendations(
   let seeds = watched.filter((s) => (s.rating ?? 0) >= 7).slice(0, seedLimit);
   if (seeds.length === 0) seeds = watched.slice(0, seedLimit);
   // No watch history yet: recommend straight from the taste profile.
-  if (seeds.length === 0) return coldStartFromProfile(personal, region, exclude, minScore, limit);
+  if (seeds.length === 0) return coldStartFromProfile(personal, region, exclude, minScore, limit, filters);
 
   const pans = (watchedPans.data ?? []) as SeedRow[];
 
@@ -200,7 +222,7 @@ export async function getRecommendations(
 
   const scored = await Promise.all(
     candidates.map(({ c, net }) =>
-      scoreCandidate(c.id, c.mediaType, c.posterPath, region, personal, c.seedTitle).then((r) =>
+      scoreCandidate(c.id, c.mediaType, c.posterPath, region, personal, c.seedTitle, filters).then((r) =>
         r ? { r, strength: net } : null,
       ),
     ),
@@ -217,9 +239,11 @@ async function scoreCandidate(
   region: string,
   personal: PersonalContext,
   because: string | null,
+  filters: RecFilters = NO_FILTERS,
 ): Promise<Recommendation | null> {
   try {
     const { meta, providers } = await getScoringData(mediaType, id, region);
+    if (violatesFilters(meta, filters)) return null; // dropped by the user's feedback
     const report = buildVerdict({ meta, providers, personal });
     const topPos = report.personal.adjustments.find((a) => a.points > 0);
     return {
@@ -296,6 +320,7 @@ async function coldStartFromProfile(
   exclude: Set<string>,
   minScore: number,
   limit: number,
+  filters: RecFilters = NO_FILTERS,
 ): Promise<Recommendation[]> {
   const genres = genresFromRules(personal);
   const [movies, shows] = await Promise.all([
@@ -316,7 +341,7 @@ async function coldStartFromProfile(
     pool
       .slice(0, Math.max(CANDIDATES_TO_SCORE, limit))
       .map((d) =>
-        scoreCandidate(d.id, d.mediaType, d.posterPath, region, personal, null).then((r) =>
+        scoreCandidate(d.id, d.mediaType, d.posterPath, region, personal, null, filters).then((r) =>
           r ? { r, strength: 0 } : null,
         ),
       ),
