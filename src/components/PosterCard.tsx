@@ -89,14 +89,14 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   return (
     <div className="card group flex h-full flex-col overflow-hidden transition hover:border-white/20 hover:shadow-glow">
       {/* One tidy action row, all four the same size and OFF the poster art:
-          ＋ Save · ✕ Pass · 👓↑ seen+liked · 👓↓ seen+disliked. The Movie/TV tag
+          ✕ Pass · 👓↓ seen+disliked · 👓↑ seen+liked · ＋ Save. The Movie/TV tag
           moved down to the title line; the score lives in the pink box below. */}
       <div className="flex items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
-        {resolvedOverlay}
         {feedback}
         {overlay !== null && saveId != null && (
           <SeenVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
         )}
+        {resolvedOverlay}
       </div>
       <div className="relative aspect-[2/3] overflow-hidden">
         {onOpen ? (
