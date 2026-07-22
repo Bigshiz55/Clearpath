@@ -95,7 +95,7 @@ export function SeenVerdict({
   }
 
   return (
-    <div ref={rootRef} className="pointer-events-none absolute left-0 top-0 z-20 flex items-center gap-1.5 p-1.5">
+    <div ref={rootRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-center gap-1.5 bg-gradient-to-t from-black/80 via-black/35 to-transparent px-2 pb-2 pt-7">
       {done ? (
         <span
           className={`pointer-events-none inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black shadow-lg ${
@@ -131,6 +131,7 @@ export function SeenVerdict({
               <ArrowDown className="h-2.5 w-2.5" />
             </span>
           </button>
+          <span className="pointer-events-none ml-0.5 text-[10px] font-bold uppercase tracking-wide text-white/85 drop-shadow">Seen it?</span>
         </>
       )}
     </div>
