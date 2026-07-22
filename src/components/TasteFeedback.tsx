@@ -68,7 +68,6 @@ export function TasteFeedback({
   const cardRef = useRef<HTMLElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pop, setPop] = useState<Popover | null>(null);
-  const [selected, setSelected] = useState<string[]>([]);
 
   const ctx = { source, position, matchScore, sessionId };
   const base = { tmdbId, mediaType, title, year, posterPath };
@@ -101,10 +100,6 @@ export function TasteFeedback({
     } catch {
       return null;
     }
-  }
-
-  function toggle(code: string) {
-    setSelected((s) => (s.includes(code) ? s.filter((x) => x !== code) : [...s, code]));
   }
 
   // Apply a resolution: supersede the bare pass with a typed feedback + reasons.
@@ -150,7 +145,6 @@ export function TasteFeedback({
       top = Math.round(Math.max(8, Math.min(rect.top + 8, window.innerHeight - 330)));
     }
 
-    setSelected([]);
     // Record the decision (fully caught so a failed action can never crash).
     void recordAnalyticsEvent('pass_completed', { tmdbId, mediaType, choice: 'removed_without_reason', ...ctx }).catch(() => {});
     void submitPassFeedback({ ...base, feedbackType: 'removed_without_reason', reasonCodes: [], rating: null, ...ctx }).catch(() => {});
@@ -161,19 +155,18 @@ export function TasteFeedback({
     const seenCat = new Set<string>();
     const chips: Chip[] = [];
     for (const c of raw) {
-      if (chips.length >= 6) break;
+      if (chips.length >= 4) break;
       if (seenCat.has(c.category)) continue;
       seenCat.add(c.category);
       chips.push({ code: c.code, label: c.label });
     }
     for (const c of raw) { // top up if a title has few distinct categories
-      if (chips.length >= 6) break;
+      if (chips.length >= 4) break;
       if (!chips.some((x) => x.code === c.code)) chips.push({ code: c.code, label: c.label });
     }
-    const highMatch = typeof matchScore === 'number' && matchScore >= 80;
-    setPop({ left, top, width, lead: highMatch ? 'This was a strong match for you.' : undefined, heading: passHeadingFor(meta), chips, score, bump: null });
+    setPop({ left, top, width, lead: undefined, heading: passHeadingFor(meta), chips, score, bump: null });
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => close(true), 7000);
+    timer.current = setTimeout(() => close(true), 6000);
   }
 
   const up = pop?.bump && pop.bump.to != null && pop.bump.from != null && pop.bump.to > pop.bump.from;
@@ -210,16 +203,11 @@ export function TasteFeedback({
                   <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   Removed
                 </div>
-                <div className="flex items-center gap-1.5">
-                  {pop.score != null && !pop.bump && (
-                    <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-white">{pct(pop.score)}</span>
-                  )}
-                  {!pop.bump && (
-                    <button type="button" onClick={() => close(true)} aria-label="Close" className="grid h-6 w-6 place-items-center rounded-md text-slate-400 transition hover:bg-white/10 hover:text-white">
-                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" /></svg>
-                    </button>
-                  )}
-                </div>
+                {!pop.bump && (
+                  <button type="button" onClick={() => close(true)} aria-label="Close" className="grid h-6 w-6 place-items-center rounded-md text-slate-400 transition hover:bg-white/10 hover:text-white">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" /></svg>
+                  </button>
+                )}
               </div>
 
               {pop.bump ? (
@@ -234,47 +222,26 @@ export function TasteFeedback({
                 </div>
               ) : (
                 <>
-                  <div className="mt-1 text-sm font-black tracking-tight" style={{ color: '#ff2e9a' }}>
-                    🧬 Tune your DNA? <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">optional</span>
-                  </div>
-                  {pop.lead && <div className="mt-0.5 text-[11px] font-semibold text-brand-200">{pop.lead}</div>}
-                  <div className="text-[11px] text-slate-400">{pop.heading}</div>
+                  {/* One quiet, optional line — no headings, no score, no big button. */}
+                  <div className="mt-1 text-[11px] text-slate-400">Why? Tap one <span className="text-slate-500">(optional)</span></div>
 
-                  {/* Top ~8 title-specific reasons — 2-column box, multi-select (pink).
-                      Taller tap targets (~46px) so they're comfortable on a phone. */}
+                  {/* Up to 4 title-specific reasons. Tapping one applies it right
+                      away — no multi-select, no separate "boost" step. */}
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    {pop.chips.map((c) => {
-                      const on = selected.includes(c.code);
-                      return (
-                        <button
-                          key={c.code}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => toggle(c.code)}
-                          className={`flex min-h-[46px] items-center justify-center rounded-lg border px-2.5 py-2 text-center text-xs font-semibold leading-tight transition ${
-                            on ? 'border-brand-300 bg-brand-500/30 text-white shadow-[0_0_0_1px_rgba(255,46,154,0.5)]' : 'border-white/12 bg-white/[0.05] text-slate-200 hover:bg-white/10'
-                          }`}
-                        >
-                          {c.label}
-                        </button>
-                      );
-                    })}
+                    {pop.chips.map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => void apply('not_for_me', [c.code])}
+                        className="flex min-h-[44px] items-center justify-center rounded-lg border border-white/12 bg-white/[0.05] px-2.5 py-2 text-center text-xs font-semibold leading-tight text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/25 hover:text-white"
+                      >
+                        {c.label}
+                      </button>
+                    ))}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => void apply('not_for_me', selected)}
-                    disabled={selected.length === 0}
-                    className="mt-3 min-h-[48px] w-full rounded-lg bg-brand-500 py-3 text-sm font-black text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {selected.length ? `⚡ Boost my DNA (${selected.length})` : 'Tap a reason to boost'}
-                  </button>
-
-                  {/* Quick single-tap resolutions. */}
-                  <div className="mt-2.5 flex items-center justify-center gap-2 text-xs">
-                    <button type="button" onClick={() => void apply('not_right_now', [])} className="min-h-[40px] flex-1 rounded-full border border-white/15 bg-white/5 px-2 py-2 font-medium text-slate-200 hover:bg-white/10">Not tonight</button>
-                    <button type="button" onClick={() => void apply('seen', [])} className="min-h-[40px] flex-1 rounded-full border border-white/15 bg-white/5 px-2 py-2 font-medium text-slate-200 hover:bg-white/10">Seen it</button>
-                    <button type="button" onClick={() => void undo()} className="min-h-[40px] flex-1 rounded-full border border-white/25 px-2 py-2 font-bold text-white hover:bg-white/10">Undo</button>
+                  <div className="mt-2 text-center">
+                    <button type="button" onClick={() => void undo()} className="text-[11px] font-semibold text-slate-400 underline-offset-2 hover:text-white hover:underline">Undo</button>
                   </div>
                 </>
               )}

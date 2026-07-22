@@ -68,14 +68,11 @@ export default async function DiscoverPage() {
       {/* HERO — decide right here: search, ask, and every tool on one screen. */}
       <section className="animate-fade-up space-y-6">
         <div className="text-center">
-          <Tagline className="mb-2 text-lg sm:text-2xl" />
           <h1 className="text-4xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl">
             Stop scrolling.{' '}
             <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">Get rolling.</span>
           </h1>
-          <p className="mx-auto mt-3 max-w-xl text-base text-slate-300 sm:text-lg">
-            Tell us what you’re in the mood for — in your own words — and we’ll build your verdict.
-          </p>
+          <Tagline className="mt-4 text-2xl sm:text-4xl" />
         </div>
 
         {/* PRIMARY move — State Your Case: the plain-English ask is the hero. */}
