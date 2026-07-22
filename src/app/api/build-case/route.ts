@@ -111,10 +111,12 @@ function parseNaive(text: string): Parsed {
 function detectAiringHorizon(text: string): number | null {
   const t = ` ${text.toLowerCase()} `;
   // Explicit "(in the) next / within N hours" — almost always means scheduling.
-  const m =
-    t.match(/(?:next|within|in the next|coming up in)\s+(\d{1,2})\s*(?:hour|hr|h)\b/) ||
-    t.match(/\bnext\s+(\d{1,2})\s*(?:hour|hr|h)/);
+  const m = t.match(/(?:next|within|in the next|coming up in)\s+(\d{1,2})\s*(?:hours?|hrs?|h)\b/);
   if (m && m[1]) return Math.max(1, Math.min(48, Number(m[1])));
+  // Spelled-out numbers ("the next four hours").
+  const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+  const wm = t.match(/(?:next|within|in the next|coming up in)\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(?:hours?|hrs?|h)\b/);
+  if (wm && wm[1] && words[wm[1]]) return words[wm[1]]!;
   // Fuzzy windows people actually say.
   if (/next\s+(?:a\s+)?couple(?:\s+of)?\s+hours/.test(t)) return 3;
   if (/next\s+few\s+hours/.test(t)) return 4;
@@ -181,6 +183,32 @@ function extractWatchTitle(text: string): string | null {
   m = raw.match(/(?:watch|stream|see|find|get|has|carries|streams|streaming)\s+(.+)$/i);
   if (!m || !m[1]) return null;
   return clean(m[1]);
+}
+
+/** A genre named in the request → its TVmaze genre tag, for filtering live-TV
+ *  airings ("five comedies coming on…"). Null when no clear genre is named. */
+function detectGenre(text: string): string | null {
+  const t = ` ${text.toLowerCase()} `;
+  const table: [RegExp, string][] = [
+    [/\b(comed(y|ies)|sitcoms?|funny)\b/, 'Comedy'],
+    [/\b(dramas?)\b/, 'Drama'],
+    [/\b(crime)\b/, 'Crime'],
+    [/\b(thrillers?)\b/, 'Thriller'],
+    [/\b(horror|scary)\b/, 'Horror'],
+    [/\b(sci-?fi|science fiction)\b/, 'Science-Fiction'],
+    [/\b(rom-?coms?|romance|romantic)\b/, 'Romance'],
+    [/\b(myster(y|ies))\b/, 'Mystery'],
+    [/\b(action)\b/, 'Action'],
+    [/\b(reality)\b/, 'Reality'],
+    [/\b(sports?)\b/, 'Sports'],
+    [/\b(documentar(y|ies)|docs?)\b/, 'Documentary'],
+    [/\b(fantasy)\b/, 'Fantasy'],
+    [/\b(family|kids?|children'?s?)\b/, 'Family'],
+    [/\b(western)\b/, 'Western'],
+    [/\b(anime)\b/, 'Anime'],
+  ];
+  for (const [re, g] of table) if (re.test(t)) return g;
+  return null;
 }
 
 /** Named streaming service → the TMDB provider id we filter on. Strong aliases
@@ -364,13 +392,17 @@ export async function POST(request: Request) {
     // the generic Watch Now grid. Their stated taste is still folded in above.
     const horizon = detectAiringHorizon(text);
     if (horizon != null) {
-      await logCase('airing', `/app/tv?within=${horizon}`, { horizon });
+      const genre = detectGenre(text);
+      const genreQs = genre ? `&genre=${encodeURIComponent(genre)}` : '';
+      await logCase('airing', `/app/tv?within=${horizon}${genreQs}`, { horizon, genre });
       return NextResponse.json({
         ok: true,
         learned,
         caseId,
-        redirect: `/app/tv?within=${horizon}`,
-        summary: `${tasteLead}Here’s what’s coming on in the next ${horizon} hours.`,
+        redirect: `/app/tv?within=${horizon}${genreQs}`,
+        summary: genre
+          ? `${tasteLead}Here’s ${genre.toLowerCase()} coming on in the next ${horizon} hours.`
+          : `${tasteLead}Here’s what’s coming on in the next ${horizon} hours.`,
       });
     }
 

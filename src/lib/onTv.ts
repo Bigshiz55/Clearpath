@@ -305,6 +305,7 @@ export async function getUpcomingTv(
   country: string,
   nowMs: number,
   horizonMs: number = UPCOMING_TV_HORIZON_MS,
+  genre: string | null = null,
 ): Promise<Airing[]> {
   const clampedHorizon = Math.max(HOUR_MS, Math.min(horizonMs, UPCOMING_TV_HORIZON_MS));
   const horizon = nowMs + clampedHorizon;
@@ -315,11 +316,16 @@ export async function getUpcomingTv(
   const dates = Array.from({ length: spanDays }, (_, i) => isoDate(nowMs + i * DAY_MS));
   const perDay = await Promise.all(dates.map((d) => getOnTvToday(country, d)));
 
+  const wantGenre = genre ? genre.toLowerCase() : null;
   const upcoming = perDay
     .flat()
     .filter((a) => {
       const ms = Date.parse(a.airstamp);
-      return !NOISE_TYPES.has(a.showType) && ms >= nowMs && ms <= horizon;
+      if (NOISE_TYPES.has(a.showType) || ms < nowMs || ms > horizon) return false;
+      // Honor a requested genre ("comedies coming on…") against the show's real
+      // TVmaze genre tags. No match on that genre → not shown.
+      if (wantGenre && !a.genres.some((g) => g.toLowerCase() === wantGenre)) return false;
+      return true;
     });
 
   // Rank by rating (unrated last), keep a healthy set, then show in time order.
