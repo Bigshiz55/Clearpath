@@ -3,7 +3,7 @@ import type { MediaType } from '@/lib/types';
 import { AlgorithmScore } from './AlgorithmScore';
 import { SaveButton } from './SaveButton';
 import { TasteFeedback } from './TasteFeedback';
-import { SeenVerdict } from './SeenVerdict';
+import { LikeButton } from './LikeButton';
 
 interface PosterCardProps {
   href?: string;
@@ -88,15 +88,15 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   // the link (never nested inside it) so they may hold interactive controls.
   return (
     <div className="card group flex h-full flex-col overflow-hidden transition hover:border-white/20 hover:shadow-glow">
-      {/* One tidy action row, all four the same size and OFF the poster art:
-          ＋ Save · 👓↑ seen+liked · 👓↓ seen+disliked · ✕ Pass. The Movie/TV tag
-          moved down to the title line; the score lives in the pink box below. */}
+      {/* One tidy action row — a clean groove, all the same size and OFF the art:
+          👍 more like this · 👎 not for me · ＋ Save. The Movie/TV tag moved down to
+          the title line; the score lives in the pink box below. */}
       <div className="flex items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
-        {resolvedOverlay}
         {overlay !== null && saveId != null && (
-          <SeenVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+          <LikeButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
         )}
         {feedback}
+        {resolvedOverlay}
       </div>
       <div className="relative aspect-[2/3] overflow-hidden">
         {onOpen ? (
