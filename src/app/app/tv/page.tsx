@@ -29,7 +29,7 @@ function friendlyDate(d: Date): string {
 export default async function OnTvPage({
   searchParams,
 }: {
-  searchParams?: { within?: string | string[]; genre?: string | string[] };
+  searchParams?: { within?: string | string[]; genre?: string | string[]; network?: string | string[]; type?: string | string[] };
 }) {
   const supabase = createClient();
   const {
@@ -40,26 +40,32 @@ export default async function OnTvPage({
   const now = new Date();
   const date = isoDate(now);
   const withinHours = parseWithin(searchParams?.within);
-  const genreRaw = Array.isArray(searchParams?.genre) ? searchParams?.genre[0] : searchParams?.genre;
-  const genre = genreRaw ? genreRaw.slice(0, 24) : null;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
+  const genre = one(searchParams?.genre)?.slice(0, 24) ?? null;
+  const network = one(searchParams?.network)?.slice(0, 24) ?? null;
+  const movieOnly = one(searchParams?.type) === 'movie';
+  const hasFilter = !!(genre || network || movieOnly);
+  const titleCase = (s: string) => s.replace(/\b\w/g, (m) => m.toUpperCase());
+  // A human label for the filters: "Lifetime comedy movies".
+  const filterLabel = [network ? titleCase(network) : null, genre?.toLowerCase(), movieOnly ? 'movies' : null].filter(Boolean).join(' ');
 
   const airingsRaw = await getOnTvToday(region, date);
   // Add IMDb / Rotten Tomatoes / Metacritic to the placards (cached, bounded).
   const airings = await enrichAiringsWithCritics(airingsRaw).then((a) => enrichAiringsWithTmdb(a));
 
-  // When asked for a specific window ("comedies coming on in the next N hours"),
-  // build the real time- and genre-filtered set and enrich it the same way.
+  // When asked for a specific window ("Lifetime movies coming on tonight"), build
+  // the real time/genre/network/type-filtered set and enrich it the same way.
   const enrich = (a: Awaited<ReturnType<typeof getUpcomingTv>>) => enrichAiringsWithCritics(a).then(enrichAiringsWithTmdb);
   let windowed =
     withinHours != null
-      ? await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, genre))
+      ? await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, genre, network, movieOnly))
       : null;
-  // Genre named but nothing in that genre is on in-window — fall back to
-  // everything on, labeled honestly, rather than an empty screen.
+  // Filters named but nothing matched in-window — fall back to everything on,
+  // labeled honestly, rather than an empty screen.
   let genreEmpty = false;
-  if (withinHours != null && genre && windowed && windowed.length === 0) {
+  if (withinHours != null && hasFilter && windowed && windowed.length === 0) {
     genreEmpty = true;
-    windowed = await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, null));
+    windowed = await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, null, null, false));
   }
 
   // Which airings this user already has a reminder for (guarded pre-migration),
@@ -84,7 +90,7 @@ export default async function OnTvPage({
       <section>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">
           {withinHours != null
-            ? `📺 ${genre && !genreEmpty ? `${genre} ` : ''}coming on in the next ${withinHours} hours`
+            ? `📺 ${filterLabel && !genreEmpty ? `${filterLabel} ` : ''}coming on in the next ${withinHours} hours`
             : '📺 On TV today'}
         </h1>
         <p className="mt-2 text-sm text-slate-300">
@@ -112,7 +118,7 @@ export default async function OnTvPage({
         <>
           {genreEmpty && (
             <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-100">
-              No {genre?.toLowerCase()} on major {region} networks in the next {withinHours} hours — here’s everything that’s coming on instead.
+              No {filterLabel} on major {region} networks in the next {withinHours} hours — here’s everything that’s coming on instead.
             </p>
           )}
           <OnTvGuide airings={windowed} dateLabel={`Next ${withinHours} hours`} country={region} mode="broadcast" remindedIds={remindedIds} windowHours={withinHours} />

@@ -306,6 +306,8 @@ export async function getUpcomingTv(
   nowMs: number,
   horizonMs: number = UPCOMING_TV_HORIZON_MS,
   genre: string | null = null,
+  network: string | null = null,
+  movieOnly = false,
 ): Promise<Airing[]> {
   const clampedHorizon = Math.max(HOUR_MS, Math.min(horizonMs, UPCOMING_TV_HORIZON_MS));
   const horizon = nowMs + clampedHorizon;
@@ -317,6 +319,7 @@ export async function getUpcomingTv(
   const perDay = await Promise.all(dates.map((d) => getOnTvToday(country, d)));
 
   const wantGenre = genre ? genre.toLowerCase() : null;
+  const wantNet = network ? network.toLowerCase() : null;
   const upcoming = perDay
     .flat()
     .filter((a) => {
@@ -325,6 +328,10 @@ export async function getUpcomingTv(
       // Honor a requested genre ("comedies coming on…") against the show's real
       // TVmaze genre tags. No match on that genre → not shown.
       if (wantGenre && !a.genres.some((g) => g.toLowerCase() === wantGenre)) return false;
+      // Requested network ("on Lifetime") — match the channel name.
+      if (wantNet && !a.network.toLowerCase().includes(wantNet)) return false;
+      // Requested movies only ("Lifetime movies") — TVmaze tags movies as 'Movie'.
+      if (movieOnly && a.showType !== 'Movie') return false;
       return true;
     });
 

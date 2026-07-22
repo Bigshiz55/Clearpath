@@ -211,6 +211,39 @@ function detectGenre(text: string): string | null {
   return null;
 }
 
+/** A TV network named in the request ("Lifetime movies", "on Hallmark") → the
+ *  keyword we match against the airing's channel. Null when none named. */
+function detectNetwork(text: string): { key: string; name: string } | null {
+  const t = ` ${text.toLowerCase()} `;
+  const nets: [RegExp, string, string][] = [
+    [/\blifetime\b/, 'lifetime', 'Lifetime'],
+    [/\bhallmark\b/, 'hallmark', 'Hallmark'],
+    [/\bamc\b/, 'amc', 'AMC'],
+    [/\btnt\b/, 'tnt', 'TNT'],
+    [/\btbs\b/, 'tbs', 'TBS'],
+    [/\busa network\b|\busa\b/, 'usa', 'USA'],
+    [/\bbravo\b/, 'bravo', 'Bravo'],
+    [/\bfreeform\b/, 'freeform', 'Freeform'],
+    [/\bsyfy\b/, 'syfy', 'Syfy'],
+    [/\bhgtv\b/, 'hgtv', 'HGTV'],
+    [/\bhistory( channel)?\b/, 'history', 'History'],
+    [/\bfood network\b/, 'food network', 'Food Network'],
+    [/\bdiscovery\b/, 'discovery', 'Discovery'],
+    [/\btlc\b/, 'tlc', 'TLC'],
+    [/\ba&e\b/, 'a&e', 'A&E'],
+    [/\bcomedy central\b/, 'comedy central', 'Comedy Central'],
+    [/\bhbo\b/, 'hbo', 'HBO'],
+    [/\b(the )?cw\b/, 'cw', 'The CW'],
+    [/\bhallmark\b/, 'hallmark', 'Hallmark'],
+    [/\babc\b/, 'abc', 'ABC'],
+    [/\bcbs\b/, 'cbs', 'CBS'],
+    [/\bnbc\b/, 'nbc', 'NBC'],
+    [/\bfox\b/, 'fox', 'FOX'],
+  ];
+  for (const [re, key, name] of nets) if (re.test(t)) return { key, name };
+  return null;
+}
+
 /** Named streaming service → the TMDB provider id we filter on. Strong aliases
  *  match anywhere; "bare" aliases (amazon/max/apple — risky words) only count
  *  when used as a platform, i.e. right after "on". */
@@ -393,15 +426,23 @@ export async function POST(request: Request) {
     const horizon = detectAiringHorizon(text);
     if (horizon != null) {
       const genre = detectGenre(text);
-      const genreQs = genre ? `&genre=${encodeURIComponent(genre)}` : '';
-      await logCase('airing', `/app/tv?within=${horizon}${genreQs}`, { horizon, genre });
+      const network = detectNetwork(text);
+      const movieOnly = /\b(movies?|films?)\b/.test(` ${text.toLowerCase()} `);
+      const params = new URLSearchParams({ within: String(horizon) });
+      if (genre) params.set('genre', genre);
+      if (network) params.set('network', network.key);
+      if (movieOnly) params.set('type', 'movie');
+      const redirect = `/app/tv?${params.toString()}`;
+      await logCase('airing', redirect, { horizon, genre, network: network?.key ?? null, movieOnly });
+      // Read the filters back into the summary: "Lifetime comedy movies".
+      const what = [network?.name, genre?.toLowerCase(), movieOnly ? 'movies' : null].filter(Boolean).join(' ');
       return NextResponse.json({
         ok: true,
         learned,
         caseId,
-        redirect: `/app/tv?within=${horizon}${genreQs}`,
-        summary: genre
-          ? `${tasteLead}Here’s ${genre.toLowerCase()} coming on in the next ${horizon} hours.`
+        redirect,
+        summary: what
+          ? `${tasteLead}Here’s ${what} coming on in the next ${horizon} hours.`
           : `${tasteLead}Here’s what’s coming on in the next ${horizon} hours.`,
       });
     }
