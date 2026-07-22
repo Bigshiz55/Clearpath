@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { addToWatchlist, removeWatchlistItem } from '@/lib/actions/watchlist';
 import { useToast } from '@/components/Toast';
@@ -19,6 +19,8 @@ interface Props {
   wide?: boolean;
   /** Fires after a successful add — lets a list make room / advance. */
   onSaved?: () => void;
+  /** In recommendation feeds: once saved (handled), fade the card out of view. */
+  removeOnSave?: boolean;
 }
 
 export function SaveButton({
@@ -32,11 +34,26 @@ export function SaveButton({
   variant = 'overlay',
   wide = false,
   onSaved,
+  removeOnSave = false,
 }: Props) {
   const toast = useToast();
   const [saved, setSaved] = useState(initialSaved);
   const [itemId, setItemId] = useState<string | null>(initialItemId);
   const [busy, setBusy] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  // Saved in a recommendation feed = handled → fade the card out (brief beat so
+  // the bookmark-fill registers first). It won't be re-recommended on reload.
+  function hideCard() {
+    const card = btnRef.current?.closest('.card');
+    if (!(card instanceof HTMLElement)) return;
+    window.setTimeout(() => {
+      card.style.transition = 'opacity .3s ease, transform .3s ease';
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.96)';
+      window.setTimeout(() => { card.style.display = 'none'; }, 300);
+    }, 450);
+  }
 
   async function toggle(e: React.MouseEvent) {
     // These buttons usually sit inside a card <Link>; don't navigate on click.
@@ -62,6 +79,7 @@ export function SaveButton({
           setSaved(true);
           toast.show('Added to your list.', 'success');
           onSaved?.();
+          if (removeOnSave) hideCard();
         } else {
           toast.show(res.error ?? 'Sign in to save to your list.', 'error');
         }
@@ -84,6 +102,7 @@ export function SaveButton({
   if (variant === 'inline') {
     return (
       <button
+        ref={btnRef}
         type="button"
         onClick={toggle}
         disabled={busy}
@@ -104,6 +123,7 @@ export function SaveButton({
 
   return (
     <button
+      ref={btnRef}
       type="button"
       onClick={toggle}
       disabled={busy}

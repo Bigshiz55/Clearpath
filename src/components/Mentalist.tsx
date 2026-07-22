@@ -255,7 +255,7 @@ export function Mentalist() {
                   year={p.year}
                   mediaType={p.mediaType}
                   posterUrl={p.posterUrl}
-                  overlay={<SaveButton wide tmdbId={p.id} mediaType={p.mediaType} title={p.title} year={p.year} posterPath={p.posterPath} />}
+                  overlay={<SaveButton wide removeOnSave tmdbId={p.id} mediaType={p.mediaType} title={p.title} year={p.year} posterPath={p.posterPath} />}
                 >
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className="rounded-md bg-brand-500/20 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-brand-100">{p.match}% match</span>

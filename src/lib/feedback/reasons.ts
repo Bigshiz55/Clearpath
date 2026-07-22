@@ -58,7 +58,9 @@ const has = (m: TitleMetaLite, ...names: string[]) => {
 };
 const isLong = (m: TitleMetaLite) =>
   (m.runtimeMinutes ?? 0) >= 140 || (m.numberOfSeasons ?? 0) >= 4;
-const isOld = (m: TitleMetaLite) => m.year != null && m.year <= 2005;
+const NOW_YEAR = new Date().getFullYear();
+/** Old by RELEASE year (a dated pick), relative to now — not "period setting". */
+const isOld = (m: TitleMetaLite) => m.year != null && m.year <= NOW_YEAR - 18;
 const isForeign = (m: TitleMetaLite) => !m.englishNative;
 const lowRated = (m: TitleMetaLite) => m.voteAverage != null && m.voteAverage < 6.2;
 
@@ -66,20 +68,21 @@ const lowRated = (m: TitleMetaLite) => m.voteAverage != null && m.voteAverage < 
 export const REASONS: Record<string, ReasonDef> = {
   not_my_genre: { code: 'not_my_genre', label: 'Not my genre', category: 'genre', strength: 0.7, permanent: true },
   story_not_interesting: { code: 'story_not_interesting', label: 'Story doesn’t interest me', category: 'story', strength: 0.5, permanent: true },
-  too_violent: { code: 'too_violent', label: 'Too violent', category: 'violence', strength: 0.7, permanent: true, when: (m) => has(m, 'action', 'crime', 'war', 'thriller', 'horror') },
+  too_violent: { code: 'too_violent', label: 'Too violent', category: 'violence', strength: 0.7, permanent: true, when: (m) => has(m, 'action', 'war', 'horror', 'thriller') },
   too_dark: { code: 'too_dark', label: 'Too dark', category: 'tone', strength: 0.6, permanent: true, when: (m) => has(m, 'crime', 'thriller', 'drama', 'horror', 'war') },
-  too_scary: { code: 'too_scary', label: 'Too scary', category: 'tone', strength: 0.7, permanent: true, when: (m) => has(m, 'horror', 'thriller') },
-  supernatural: { code: 'supernatural', label: 'Supernatural', category: 'supernatural', strength: 0.8, permanent: true, when: (m) => has(m, 'horror', 'fantasy', 'mystery') },
-  sci_fi: { code: 'sci_fi', label: 'Too much science fiction', category: 'scifi', strength: 0.8, permanent: true, when: (m) => has(m, 'science fiction', 'sci-fi', 'fantasy') },
-  too_slow: { code: 'too_slow', label: 'Too slow', category: 'pacing', strength: 0.6, permanent: true, when: (m) => has(m, 'drama', 'history', 'romance', 'documentary') || isLong(m) },
+  too_scary: { code: 'too_scary', label: 'Too scary', category: 'tone', strength: 0.7, permanent: true, when: (m) => has(m, 'horror') },
+  supernatural: { code: 'supernatural', label: 'Supernatural', category: 'supernatural', strength: 0.8, permanent: true, when: (m) => has(m, 'horror', 'fantasy') },
+  sci_fi: { code: 'sci_fi', label: 'Too much sci-fi', category: 'scifi', strength: 0.8, permanent: true, when: (m) => has(m, 'science fiction', 'sci-fi') },
+  too_slow: { code: 'too_slow', label: 'Too slow', category: 'pacing', strength: 0.6, permanent: true, when: (m) => has(m, 'drama', 'history', 'romance', 'documentary', 'mystery') || isLong(m) },
   too_long: { code: 'too_long', label: 'Too long', category: 'runtime', strength: 0.7, permanent: true, when: isLong },
+  too_old: { code: 'too_old', label: 'Feels dated', category: 'genre', strength: 0.4, permanent: true, when: isOld },
   too_serious: { code: 'too_serious', label: 'Too serious', category: 'tone', strength: 0.5, permanent: true, when: (m) => has(m, 'drama', 'history', 'war') },
   too_silly: { code: 'too_silly', label: 'Too silly', category: 'tone', strength: 0.5, permanent: true, when: (m) => has(m, 'comedy', 'animation', 'family') },
   cast_dislike: { code: 'cast_dislike', label: 'Don’t like the cast', category: 'cast', strength: 0.6, permanent: true },
   poor_ratings: { code: 'poor_ratings', label: 'Poor ratings', category: 'ratings', strength: 0.5, permanent: true, when: lowRated },
   subtitles: { code: 'subtitles', label: 'Subtitles', category: 'language', strength: 0.7, permanent: true, when: isForeign },
   dubbed: { code: 'dubbed', label: 'Dubbed audio', category: 'language', strength: 0.6, permanent: true, when: isForeign },
-  period_setting: { code: 'period_setting', label: 'Period setting', category: 'genre', strength: 0.5, permanent: true, when: (m) => has(m, 'history', 'war') || isOld(m) },
+  period_setting: { code: 'period_setting', label: 'Period setting', category: 'genre', strength: 0.5, permanent: true, when: (m) => has(m, 'history', 'war') },
   already_seen_similar: { code: 'already_seen_similar', label: 'Already seen too many like it', category: 'familiarity', strength: 0.4, permanent: true },
   predictable: { code: 'predictable', label: 'Looks predictable', category: 'story', strength: 0.5, permanent: true },
   not_interested_subject: { code: 'not_interested_subject', label: 'Not interested in the subject', category: 'story', strength: 0.5, permanent: true },
@@ -122,11 +125,13 @@ export const REASONS: Record<string, ReasonDef> = {
 export type ReasonBucket = 'not_for_me' | 'didnt_like' | 'not_right_now' | 'seen_high' | 'seen_low';
 
 const BUCKET_CANDIDATES: Record<ReasonBucket, string[]> = {
+  // Title-specific (gated) reasons first, so the most applicable ones surface;
+  // generic catch-alls fill in only when little else matches.
   not_for_me: [
-    'not_my_genre', 'too_scary', 'supernatural', 'sci_fi', 'too_violent', 'too_dark', 'too_slow', 'too_long',
-    'too_serious', 'too_silly', 'period_setting', 'subtitles', 'dubbed', 'animation_not_my_thing', 'too_childish',
-    'too_generic', 'too_unrealistic', 'cast_dislike', 'poor_ratings', 'predictable', 'not_interested_subject',
-    'already_seen_similar', 'story_not_interesting',
+    'too_scary', 'supernatural', 'sci_fi', 'too_old', 'period_setting', 'subtitles', 'dubbed',
+    'animation_not_my_thing', 'too_childish', 'too_violent', 'too_dark', 'too_slow', 'too_long',
+    'too_serious', 'too_silly', 'poor_ratings', 'not_my_genre', 'story_not_interesting',
+    'not_interested_subject', 'cast_dislike', 'predictable', 'already_seen_similar', 'too_generic', 'too_unrealistic',
   ],
   didnt_like: [
     'too_slow', 'predictable', 'weak_story', 'bad_characters', 'bad_acting', 'too_violent', 'too_dark',

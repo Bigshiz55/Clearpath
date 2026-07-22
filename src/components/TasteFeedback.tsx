@@ -103,7 +103,7 @@ export function TasteFeedback({
 
   function barChoices(meta: TitleMetaLite | null): BarChoice[] {
     const out: BarChoice[] = [{ label: 'Not tonight', type: 'not_right_now', codes: [] }];
-    for (const r of reasonChipsFor(meta, 'not_for_me').filter((c) => c.code !== 'other').slice(0, 2)) {
+    for (const r of reasonChipsFor(meta, 'not_for_me').filter((c) => c.code !== 'other').slice(0, 3)) {
       out.push({ label: r.label, type: 'not_for_me', codes: [r.code] });
     }
     out.push({ label: 'Seen it', type: 'seen', codes: [] });
