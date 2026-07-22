@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
+import { Tagline } from '@/components/Tagline';
 import { PromiseBar } from '@/components/PromiseBar';
 
 const FEATURES = [
@@ -25,9 +26,13 @@ export default function LandingPage() {
   return (
     <div className="min-h-dvh">
       <PromiseBar />
-      <header className="container-page flex h-16 items-center justify-between">
-        <Logo size="lg" />
-        <div className="flex items-center gap-2">
+      <header className="container-page flex items-start justify-between py-3">
+        <div className="flex flex-col gap-1">
+          <Logo size="lg" />
+          {/* Tagline tucked under the wordmark — a proper logo lockup. */}
+          <Tagline className="pl-[3.75rem] text-sm sm:text-[15px]" />
+        </div>
+        <div className="flex items-center gap-2 pt-1.5">
           <Link href="/login" className="btn-ghost">
             Sign in
           </Link>
@@ -40,7 +45,6 @@ export default function LandingPage() {
       <main>
         <section className="container-page py-16 sm:py-24">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="chip mb-5 animate-fade-up">🎬 Thousands of choices, one verdict.</span>
             <h1 className="animate-fade-up text-4xl font-extrabold tracking-tight text-white sm:text-6xl">
               Should you watch it?
               <span className="block bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">
