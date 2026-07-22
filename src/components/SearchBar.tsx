@@ -157,9 +157,9 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
               fileWithJudge(query);
             }
           }}
-          placeholder="Search a title — or ask for what you want…"
+          placeholder="Search for a movie, show, actor, or director…"
           className="w-full rounded-2xl border-2 border-white/25 bg-white/[0.07] py-4 pl-12 pr-11 text-base text-white outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:bg-white/[0.1] focus:ring-4 focus:ring-brand-500/25 shadow-[0_12px_40px_-14px_rgba(0,0,0,0.75)] min-h-[56px]"
-          aria-label="Search for a movie or TV show, or describe what you want"
+          aria-label="Search for a movie, show, actor, or director"
         />
         {loading && (
           <span className="absolute right-12 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />

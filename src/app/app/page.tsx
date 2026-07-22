@@ -76,7 +76,7 @@ export default async function DiscoverPage() {
 
         {/* Quick search — a title, or a plain-English ask. */}
         <div className="mx-auto max-w-2xl">
-          <label className="mb-2 block text-center text-xl font-bold text-white sm:text-2xl">🔎 Search a title — or tell the judge what you want</label>
+          <label className="mb-2 block text-center text-xl font-bold text-white sm:text-2xl">🔎 Search the Record</label>
           <SearchBar />
         </div>
 
