@@ -26,7 +26,7 @@ export default async function QuizPage() {
       <p className="mt-2 text-sm text-slate-400">
         A poster pops up — call it <span className="font-semibold text-emerald-200">Yes</span>,{' '}
         <span className="font-semibold text-red-200">No</span>, <span className="font-semibold text-amber-200">Maybe</span>, or
-        Haven’t seen. Every 50 recalculates your algorithm, and the more you play the sharper it gets.
+        Haven’t seen. Every 30 recalculates your algorithm, and the more you play the sharper it gets.
       </p>
       <QuizModes totalRated={totalRated} />
     </div>

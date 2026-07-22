@@ -23,14 +23,14 @@ interface Rec {
   because: string | null;
 }
 
-const GOAL = 50;
+const GOAL = 30;
 type Choice = 'yes' | 'no' | 'maybe' | 'skip';
 const RATING: Record<Exclude<Choice, 'skip'>, number> = { yes: 9, maybe: 6, no: 2 };
 
 /**
  * Rapid taste game — one tile up top, four quick calls (Yes / No / Maybe / Haven't
- * seen) and it flies to the next. Each rating feeds your DNA. A round is 50; hit
- * 50 and it recalculates your algorithm. Endless — the more you play, the sharper
+ * seen) and it flies to the next. Each rating feeds your DNA. A round is 30; hit
+ * 30 and it recalculates your algorithm. Endless — the more you play, the sharper
  * your recommendations get. `totalRated` seeds the lifetime counter.
  */
 export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
@@ -269,7 +269,7 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
           )}
 
           <div className="mt-7 flex flex-wrap justify-center gap-3">
-            <button onClick={nextRound} className="btn-primary">⚡ Rate 50 more — sharpen it</button>
+            <button onClick={nextRound} className="btn-primary">⚡ Rate 30 more — sharpen it</button>
             <Link href="/app/watch" className="btn-secondary">Open Watch Now →</Link>
           </div>
         </div>
@@ -355,7 +355,7 @@ export function LikeHateGame({ totalRated = 0 }: { totalRated?: number }) {
     <div className="mt-5">
       {Banner}
 
-      {/* Round progress toward 50 */}
+      {/* Round progress toward 30 */}
       <div className="mb-1.5 flex items-center justify-between text-xs">
         <span className="font-semibold text-slate-300">This round: {round}/{GOAL}</span>
         <span className="text-slate-500">{GOAL - round} to recalc</span>
