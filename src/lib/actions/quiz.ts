@@ -71,8 +71,12 @@ export async function rateQuizTitle(
     // Snapshot a calibration training row (best-effort; never blocks the rating).
     await recordScoreSample(supabase, user.id, v.tmdbId, v.mediaType, 'US', v.rating);
 
+    // Refresh every surface a new rating should change: the hub + watchlist, the
+    // Watch Now recommendations (seeded from ratings), and the quiz counter.
     revalidatePath('/app');
+    revalidatePath('/app/watch');
     revalidatePath('/app/watchlist');
+    revalidatePath('/app/quiz');
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Failed to save.' };
