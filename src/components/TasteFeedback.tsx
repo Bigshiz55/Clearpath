@@ -7,16 +7,32 @@ import { reasonChipsFor, type TitleMetaLite } from '@/lib/feedback/reasons';
 import type { MediaType } from '@/lib/types';
 
 interface BarChoice { label: string; type: FeedbackType; codes: string[] }
-interface Popover { left: number; top: number; lead?: string; choices: BarChoice[] }
+interface Popover {
+  left: number;
+  top: number;
+  lead?: string;
+  choices: BarChoice[];
+  score: number | null; // current Taste-DNA strength
+  bump: { from: number | null; to: number | null } | null; // shown after a tap
+}
 
-const POP_W = 268;
+const POP_W = 300;
+
+async function fetchScore(): Promise<number | null> {
+  try {
+    const r = await fetch('/api/dna-score', { cache: 'no-store' });
+    const d = await r.json();
+    return typeof d.score === 'number' ? d.score : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
- * Pass control. Tapping it removes the title INSTANTLY (never a blocking modal)
- * and floats a small "Update your DNA?" popover RIGHT AT THE CARD with optional
- * one-tap, title-aware chips. Ignore it and the UI keeps moving; tap a chip and
- * it supersedes the pass with the right signal. A strong-match title adds a
- * "we're paying attention" lead (intelligent sampling).
+ * Pass control. Tapping removes the title INSTANTLY (never a blocking modal) and
+ * floats a bold "Update your DNA?" popover OFF TO THE SIDE of the card, showing
+ * your live Taste-DNA score so each tap visibly nudges it up. Contextual one-tap
+ * chips are optional; ignore them and the UI just keeps moving.
  */
 export function TasteFeedback({
   tmdbId,
@@ -101,9 +117,13 @@ export function TasteFeedback({
   }
 
   async function refine(type: FeedbackType, codes: string[]) {
-    closePop();
+    if (timer.current) clearTimeout(timer.current);
+    const from = pop?.score ?? null;
     void recordAnalyticsEvent('pass_reason_chip_selected', { tmdbId, choice: type, reasons: codes });
     await submitPassFeedback({ ...base, feedbackType: type, reasonCodes: codes, rating: null, ...ctx });
+    const to = await fetchScore();
+    setPop((p) => (p ? { ...p, bump: { from, to } } : p));
+    timer.current = setTimeout(() => setPop(null), 1900);
   }
 
   async function undo() {
@@ -117,14 +137,16 @@ export function TasteFeedback({
     e.preventDefault();
     e.stopPropagation();
 
-    // Anchor the popover to the card BEFORE it fades out of the layout.
-    const rect = triggerRef.current?.getBoundingClientRect();
+    // Anchor OFF TO THE SIDE of the card (right, or flip left near the edge).
+    const card = triggerRef.current?.closest('.card') as HTMLElement | null;
+    const rect = (card ?? triggerRef.current)?.getBoundingClientRect();
     let left = 12;
     let top = 12;
     if (rect) {
-      left = Math.max(8, Math.min(rect.right - POP_W, window.innerWidth - POP_W - 8));
-      top = rect.bottom + 8;
-      if (top + 170 > window.innerHeight) top = Math.max(8, rect.top - 176);
+      left = rect.right + 10;
+      if (left + POP_W > window.innerWidth - 8) left = rect.left - POP_W - 10; // flip to the left
+      left = Math.max(8, Math.min(left, window.innerWidth - POP_W - 8));
+      top = Math.max(8, Math.min(rect.top + 6, window.innerHeight - 210));
     }
 
     // 1) Accept the decision instantly.
@@ -132,13 +154,15 @@ export function TasteFeedback({
     void recordAnalyticsEvent('pass_completed', { tmdbId, mediaType, choice: 'removed_without_reason', ...ctx });
     void submitPassFeedback({ ...base, feedbackType: 'removed_without_reason', reasonCodes: [], rating: null, ...ctx });
 
-    // 2) Then float the optional, title-aware "why" right where the card was.
-    const meta = await fetchMeta();
+    // 2) Float the optional, title-aware "why" beside the card, with the DNA score.
+    const [meta, score] = await Promise.all([fetchMeta(), fetchScore()]);
     const highMatch = typeof matchScore === 'number' && matchScore >= 80;
-    setPop({ left, top, lead: highMatch ? 'This was a strong match for you.' : undefined, choices: barChoices(meta) });
+    setPop({ left, top, lead: highMatch ? 'This was a strong match for you.' : undefined, choices: barChoices(meta), score, bump: null });
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setPop(null), 7000);
+    timer.current = setTimeout(() => setPop(null), 8000);
   }
+
+  const up = pop?.bump && pop.bump.to != null && pop.bump.from != null && pop.bump.to > pop.bump.from;
 
   return (
     <>
@@ -171,31 +195,50 @@ export function TasteFeedback({
             role="dialog"
             aria-label="Update your DNA"
           >
-            <div className="rounded-2xl border border-brand-400/50 bg-ink-850/97 p-3 shadow-2xl shadow-black/50 ring-1 ring-brand-500/20 backdrop-blur">
-              <div className="text-sm font-black tracking-tight" style={{ color: '#ff2e9a' }}>
-                🧬 Update your DNA?
+            <div className="rounded-2xl border-2 border-brand-400/60 bg-ink-850/98 p-3.5 shadow-2xl shadow-black/60 ring-2 ring-brand-500/25 backdrop-blur">
+              {/* Header + live DNA score */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[15px] font-black tracking-tight" style={{ color: '#ff2e9a' }}>🧬 Update your DNA?</div>
+                {pop.score != null && !pop.bump && (
+                  <span className="rounded-lg bg-white/10 px-2 py-0.5 text-xs font-black tabular-nums text-white">{pop.score}</span>
+                )}
               </div>
-              {pop.lead && <div className="mt-0.5 text-[11px] font-semibold text-brand-200">{pop.lead}</div>}
-              <div className="mt-0.5 text-xs text-slate-300">Passed. What made it miss?</div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {pop.choices.map((c, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => void refine(c.type, c.codes)}
-                    className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200 transition hover:bg-white/10"
-                  >
-                    {c.label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => void undo()}
-                  className="rounded-full border border-white/25 px-2.5 py-1 text-xs font-bold text-white transition hover:bg-white/10"
-                >
-                  Undo
-                </button>
-              </div>
+
+              {pop.bump ? (
+                <div className="mt-2 flex flex-col items-center py-2 text-center">
+                  <div className="flex items-baseline gap-2 text-white">
+                    <span className="text-lg font-black tabular-nums text-slate-400">{pop.bump.from ?? '—'}</span>
+                    <span className="text-slate-500">→</span>
+                    <span className="text-3xl font-black tabular-nums" style={{ color: '#ff2e9a' }}>{pop.bump.to ?? '—'}</span>
+                    {up && <span className="text-emerald-300">↑</span>}
+                  </div>
+                  <div className="mt-1 text-xs font-semibold text-emerald-200">{up ? 'Your DNA got sharper 🧬' : 'Logged — thanks 🧬'}</div>
+                </div>
+              ) : (
+                <>
+                  {pop.lead && <div className="mt-0.5 text-[11px] font-semibold text-brand-200">{pop.lead}</div>}
+                  <div className="mt-0.5 text-xs text-slate-300">Passed. What made it miss?</div>
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {pop.choices.map((c, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => void refine(c.type, c.codes)}
+                        className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-white/10"
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => void undo()}
+                      className="rounded-full border border-white/25 px-2.5 py-1.5 text-xs font-bold text-white transition hover:bg-white/10"
+                    >
+                      Undo
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>,
           document.body,
