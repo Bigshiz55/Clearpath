@@ -208,7 +208,13 @@ async function computeUserProfile(userId: string): Promise<DimensionProfile> {
     signals = [];
   }
 
-  const finish = (base: DimensionProfile) => (hasOverrides ? applyOverrides(base, overrides) : base);
+  // Total feedback interactions — cosmetic only, so every pass/reason/quick-action
+  // shows a visible bump in the motivational DNA-strength number (never touches
+  // matching). Dormant/0 until migration 0020's events table exists.
+  const engagement = await countEngagement(admin, userId);
+
+  const finish = (base: DimensionProfile): DimensionProfile =>
+    hasOverrides ? { ...applyOverrides(base, overrides), engagement } : { ...base, engagement };
 
   if (rows.length === 0) {
     if (signals.length === 0) return finish(empty);
@@ -263,6 +269,20 @@ interface DimensionSignalRow {
   dimension_key: string;
   w_sum: number;
   wv_sum: number;
+}
+
+/** Count a user's logged feedback interactions (cosmetic DNA-strength input only).
+ *  Guarded: if the events table is missing (migration 0020 not applied) → 0. */
+async function countEngagement(admin: ReturnType<typeof createAdminClient>, userId: string): Promise<number> {
+  try {
+    const { count } = await admin
+      .from('recommendation_feedback_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    return typeof count === 'number' && count > 0 ? count : 0;
+  } catch {
+    return 0;
+  }
 }
 
 /** Fold reason-derived axis signals into a profile accumulator as extra evidence. */

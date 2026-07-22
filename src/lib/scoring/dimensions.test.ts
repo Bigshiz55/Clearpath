@@ -112,6 +112,17 @@ describe('dnaStrength', () => {
     });
     expect(after).toBeGreaterThanOrEqual(before);
   });
+
+  it('rises on any logged interaction, even one that maps to no taste axis', () => {
+    const base = buildProfile(
+      Array.from({ length: 8 }, () => ({ dims: withDims({ humor: 80 }), rating: 8 })),
+    );
+    const before = dnaStrengthExact(base);
+    // A "not my genre" pass adds no axis weight, but it IS engagement — the
+    // motivational score must still tick up so feedback never feels pointless.
+    const after = dnaStrengthExact({ ...base, engagement: (base.engagement ?? 0) + 1 });
+    expect(after).toBeGreaterThan(before);
+  });
 });
 
 describe('tasteDials', () => {

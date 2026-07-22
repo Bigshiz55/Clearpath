@@ -64,6 +64,13 @@ export interface DimensionProfile {
   samples: number;
   /** Axes the user has manually corrected/pinned (overlaid onto the learned values). */
   overrides?: DimensionOverrides;
+  /**
+   * Total feedback interactions this user has logged (passes, reasons, quick
+   * actions). COSMETIC ONLY — it feeds the motivational DNA-strength number so
+   * every interaction shows a visible bump, and is never read by matching,
+   * confidence, or ranking. Absent/0 for freshly-built profiles.
+   */
+  engagement?: number;
 }
 
 /** A user's manual correction of a dial: a pinned position and whether it's a hard limit. */
@@ -177,7 +184,7 @@ export function dimensionMatch(dims: TitleDimensions, profile: DimensionProfile)
 export function dnaStrengthExact(profile: DimensionProfile): number {
   // Breadth: distinct titles judged — a smooth, ever-climbing curve.
   const samples = Number.isFinite(profile.samples) ? Math.max(0, profile.samples) : 0;
-  const coverage = 1 - Math.exp(-samples / 30);
+  const breadth = 1 - Math.exp(-samples / 30);
   // Depth: total taste evidence banked across every axis. Monotonic in each
   // axis weight, so any added signal (rating or reason) only ever raises it.
   let totalW = 0;
@@ -186,7 +193,12 @@ export function dnaStrengthExact(profile: DimensionProfile): number {
     if (typeof w === 'number' && Number.isFinite(w) && w > 0) totalW += w;
   }
   const depth = 1 - Math.exp(-totalW / 420);
-  return clamp100(100 * (0.5 * coverage + 0.5 * depth));
+  // Activity: every logged interaction (even reasons that map to no taste axis,
+  // like "not my genre") counts here, so ANY feedback the user gives produces a
+  // visible upward tick — never a "why am I even doing this?" flat/negative move.
+  const engagement = Number.isFinite(profile.engagement) ? Math.max(0, profile.engagement ?? 0) : 0;
+  const activity = 1 - Math.exp(-engagement / 40);
+  return clamp100(100 * (0.4 * breadth + 0.4 * depth + 0.2 * activity));
 }
 
 export function dnaStrength(profile: DimensionProfile): number {
