@@ -6,7 +6,7 @@ import { getActiveJudge, type Judge } from '@/lib/sponsors';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Find it · WatchVerdict' };
+export const metadata: Metadata = { title: 'Forensic Search · WatchVerdict' };
 
 export default async function FinderPage() {
   const supabase = createClient();
@@ -46,7 +46,7 @@ export default async function FinderPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="text-2xl font-bold text-white sm:text-3xl">🔎 Find exactly what to watch</h1>
+      <h1 className="text-2xl font-bold text-white sm:text-3xl">🕵️ Forensic Search</h1>
       <p className="mt-2 text-sm text-slate-400">
         Say what you want in plain English — length, genre, how recent, a minimum match, English audio, on your
         services. You get a <span className="font-semibold text-slate-200">ranked set</span> of real titles, each

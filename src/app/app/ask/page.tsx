@@ -1,6 +1,4 @@
 import type { Metadata } from 'next';
-import { createClient } from '@/lib/supabase/server';
-import { getMyServices } from '@/lib/profile';
 import { AskTheJudge } from '@/components/AskTheJudge';
 import { TakeToCourtCard } from '@/components/TakeToCourtCard';
 
@@ -8,11 +6,6 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Ask the Judge · WatchVerdict' };
 
 export default async function AskPage({ searchParams }: { searchParams: { q?: string } }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const services = user ? await getMyServices(supabase, user.id) : [];
   const seed = typeof searchParams.q === 'string' ? searchParams.q.slice(0, 300) : null;
 
   return (
@@ -24,7 +17,7 @@ export default async function AskPage({ searchParams }: { searchParams: { q?: st
         </p>
       </div>
       <div className="mt-5">
-        <AskTheJudge hasServices={services.length > 0} seedQuery={seed} />
+        <AskTheJudge seedQuery={seed} />
       </div>
 
       <div className="mt-6">

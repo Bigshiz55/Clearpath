@@ -9,7 +9,6 @@ import type { TitleVerdict } from '@/lib/askTypes';
 import { type TileRatings } from '@/lib/ratings';
 import { houseByKey, readHousePick } from '@/lib/houseJudges';
 import { naiveParseQuery, describeQuery, EMPTY_QUERY } from '@/lib/finderParse';
-import { GENRE_CHIPS } from '@/lib/finderGenres';
 import type { FinderQuery } from '@/lib/finder';
 
 interface ResultItem {
@@ -41,23 +40,10 @@ const EXAMPLES = [
   'A bingeable show, all episodes out, 80%+ audience',
 ];
 
-function runtimeReadout(v: number): string {
-  if (v >= 240) return 'Any length';
-  const h = Math.floor(v / 60);
-  const m = v % 60;
-  return h > 0 ? `≤ ${h}h ${m ? `${m}m` : ''}`.trim() : `≤ ${m}m`;
-}
-function releasedReadout(years: number): string {
-  if (years <= 0) return 'Any year';
-  const from = new Date().getFullYear() - years;
-  return `${from} → now`;
-}
-
-export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: boolean; seedQuery?: string | null }) {
+export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
-  const [showFilters, setShowFilters] = useState(true);
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [judgeName, setJudgeName] = useState('Judge Annie');
@@ -82,7 +68,7 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
       {
         id: nextId.current++,
         role: 'judge',
-        text: `${dog.name} presiding. The constraints below are already set — tweak them, or just tell me in your own words and they'll follow along. Then file your case.`,
+        text: `${dog.name} presiding. Tell me what you’re in the mood for — a vibe, a genre, a “like Mindhunter,” however you’d say it — and I’ll pull real titles, each scored for you. Need exact filters? That’s Forensic Search.`,
       },
     ]);
   }, []);
@@ -94,15 +80,6 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
   function onText(v: string) {
     setInput(v);
     if (v.trim().length > 1) setQ(naiveParseQuery(v));
-  }
-  function set<K extends keyof FinderQuery>(key: K, val: FinderQuery[K]) {
-    setQ((prev) => ({ ...prev, [key]: val }));
-  }
-  function toggleGenre(id: number) {
-    setQ((prev) => ({
-      ...prev,
-      genreIds: prev.genreIds.includes(id) ? prev.genreIds.filter((g) => g !== id) : [...prev.genreIds, id],
-    }));
   }
 
   async function submit(rawText?: string, queryOverride?: FinderQuery) {
@@ -140,7 +117,7 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
         const top = items[0]!;
         ruling = `I read your case: ${read}. Ruling — ${items.length} title${items.length === 1 ? '' : 's'} worth your night. Top of the docket: ${top.title}${top.year ? ` (${top.year})` : ''} — ${top.primaryCall} at ${top.matchScore} match.`;
       } else {
-        ruling = `I read your case: ${read}. No title clears all of that. Loosen a constraint below — the match bar, or a genre — and re-file.`;
+        ruling = `I read your case: ${read}. No title clears all of that. Try rephrasing — broaden the genre or drop a requirement — and re-file. For exact filters, use Forensic Search.`;
       }
       if (data.relaxed) ruling += ` ${data.relaxed}`;
       say(ruling, items);
@@ -203,100 +180,9 @@ export function AskTheJudge({ hasServices, seedQuery = null }: { hasServices: bo
   }, [seedQuery]);
 
   const showExamples = msgs.length <= 1 && !loading;
-  const sinceYears = q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0;
 
   return (
     <div className="space-y-4">
-      {/* ============ Constraints — on by default; the first thing you decide ============ */}
-      <div className="card p-4">
-        <button onClick={() => setShowFilters((s) => !s)} className="flex w-full items-center justify-between">
-          <span className="eyebrow-lg">⚖️ Your constraints</span>
-          <span className="text-sm font-semibold text-brand-200">{showFilters ? 'Hide ▲' : 'Show ▼'}</span>
-        </button>
-        <p className="mt-1.5 text-sm text-slate-300">Set the ground rules — or just tell the judge and these follow along. On by default; ignore them if you like.</p>
-
-        {showFilters && (
-          <div className="mt-3 space-y-3">
-            <div className="flex flex-wrap gap-1.5">
-              {([['any', 'Any'], ['movie', 'Movies'], ['tv', 'Shows']] as const).map(([v, label]) => (
-                <button key={v} onClick={() => set('mediaType', v)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.mediaType === v ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {GENRE_CHIPS.map((g) => (
-                <button key={g.id} onClick={() => toggleGenre(g.id)} className={`rounded-lg border px-2.5 py-1 text-xs transition ${q.genreIds.includes(g.id) ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-                  {g.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Max length</span><span className="font-semibold text-brand-200">{runtimeReadout(q.maxRuntime ?? 240)}</span></div>
-                <input type="range" min={60} max={240} step={10} value={q.maxRuntime ?? 240} onChange={(e) => set('maxRuntime', Number(e.target.value) >= 240 ? null : Number(e.target.value))} className="w-full accent-brand-500" />
-              </div>
-              <div>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Released since</span><span className="font-semibold text-brand-200">{releasedReadout(sinceYears)}</span></div>
-                <input type="range" min={0} max={75} step={1} value={sinceYears} onChange={(e) => { const y = Number(e.target.value); set('sinceMonths', y === 0 ? null : y * 12); }} className="w-full accent-brand-500" />
-                <p className="mt-1 text-[11px] leading-snug text-slate-400">Drag left to reach classics — decades back, not just recent.</p>
-              </div>
-              <div>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">🍿 Popcorn meter</span><span className="font-semibold text-brand-200">{q.minAudience ? `${q.minAudience}%+` : 'Any'}</span></div>
-                <input type="range" min={0} max={95} step={5} value={q.minAudience ?? 0} onChange={(e) => set('minAudience', Number(e.target.value) === 0 ? null : Number(e.target.value))} className="w-full accent-brand-500" />
-                <p className="mt-1 text-[11px] leading-snug text-slate-400">The audience / Popcorn score (crowd rating).</p>
-              </div>
-              <div>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">IMDb rating</span><span className="font-semibold text-gold-400">{q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'}</span></div>
-                <input type="range" min={0} max={9} step={0.5} value={q.minImdb ?? 0} onChange={(e) => set('minImdb', Number(e.target.value) === 0 ? null : Number(e.target.value))} className="w-full accent-gold-400" />
-                <p className="mt-1 text-[11px] leading-snug text-slate-400">IMDb’s 0–10 star rating, when we have it.</p>
-              </div>
-              <div>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-slate-300">Your match at least</span><span className="font-semibold text-gold-400">{q.minMatch ? `${q.minMatch}+` : 'Any'}</span></div>
-                <input type="range" min={0} max={95} step={5} value={q.minMatch ?? 0} onChange={(e) => set('minMatch', Number(e.target.value) === 0 ? null : Number(e.target.value))} className="w-full accent-gold-400" />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => set('englishAudioOnly', !q.englishAudioOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.englishAudioOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-                {q.englishAudioOnly ? '✓ ' : ''}English audio
-              </button>
-              <button
-                onClick={() => set('streamItOnly', !q.streamItOnly)}
-                title="Only titles the judge rules Stream It — our “Watch It” verdict."
-                className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
-              >
-                {q.streamItOnly ? '✓ ' : ''}⚖️ “Stream It” verdicts only
-              </button>
-              {q.mediaType !== 'movie' && (
-                <button
-                  onClick={() => set('bingeableOnly', !q.bingeableOnly)}
-                  title="TV only: every episode of the latest season is already out — nothing left to wait on (vs. an ongoing, week-to-week release)."
-                  className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.bingeableOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
-                >
-                  {q.bingeableOnly ? '✓ ' : ''}📺 All episodes out
-                </button>
-              )}
-              <button onClick={() => set('onMyServices', !q.onMyServices)} disabled={!hasServices} title={hasServices ? '' : 'Add your services in Settings first'} className={`rounded-lg border px-3 py-1.5 text-sm transition disabled:opacity-40 ${q.onMyServices ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-                {q.onMyServices ? '✓ ' : ''}On my services
-              </button>
-            </div>
-
-            {/* Submit right here — no scrolling back to the chat to file the case. */}
-            <button
-              type="button"
-              onClick={() => submit()}
-              disabled={loading}
-              className="btn-primary mt-5 w-full py-3.5 text-base font-bold disabled:opacity-40"
-            >
-              ⚖️ File my case →
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* ============ The conversation ============ */}
       <div className="card flex h-[56vh] max-h-[620px] flex-col overflow-hidden p-0">
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">

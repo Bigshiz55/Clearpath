@@ -100,7 +100,7 @@ export default async function DiscoverPage() {
             // Row 1 — rgb = the tile's accent colour (border/tint/arrow).
             { href: '/app/watch', icon: 'watch', title: 'Watch Now', sub: 'Your DNA picks, ranked', rgb: '244,63,94' },
             { href: '/app/ask', icon: 'judge', title: 'Ask the Judge', sub: 'Say what you want to see', rgb: '245,158,11' },
-            { href: '/app/finder', icon: 'search', title: 'Custom Search', sub: 'Filter by genre, rating, length…', rgb: '99,102,241' },
+            { href: '/app/finder', icon: 'search', title: 'Forensic Search', sub: 'Filter by genre, rating, length…', rgb: '99,102,241' },
             // Row 2
             { href: '/app/quiz', icon: 'quiz', title: 'Taste Quiz', sub: `${reviewedCount ?? 0} rated — teach your taste`, rgb: '168,85,247' },
             { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', rgb: '59,130,246' },
