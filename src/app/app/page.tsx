@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictBadge } from '@/components/VerdictBadge';
 import { RecommendedForYou } from '@/components/RecommendedForYou';
+import { BuildCaseBox } from '@/components/BuildCaseBox';
 import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { InstallHint } from '@/components/InstallHint';
@@ -78,23 +79,8 @@ export default async function DiscoverPage() {
           <SearchBar />
         </div>
 
-        {/* Build Your Case — quick conversational input that seeds your Taste DNA.
-            (Powered by the WatchVerdict Mentalist engine.) */}
-        <Link
-          href="/app/mentalist"
-          className="group mx-auto flex max-w-2xl items-center gap-4 rounded-2xl border border-brand-400/40 bg-gradient-to-r from-brand-500/20 via-fuchsia-500/15 to-transparent p-4 transition hover:border-brand-300/60 hover:-translate-y-0.5"
-        >
-          <span className="text-3xl">🧬</span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-base font-extrabold text-white sm:text-lg">Build Your Case</span>
-            <span className="block text-sm text-slate-300">Tell us what you love, dislike, or avoid — name a few shows or movies and we’ll begin building your Taste DNA.</span>
-            <span className="mt-0.5 block text-[11px] text-slate-500">Powered by the WatchVerdict Mentalist</span>
-          </span>
-          <span className="hidden flex-none items-center gap-1 rounded-lg border border-brand-400/50 bg-brand-500/20 px-3 py-2 text-sm font-bold text-white transition group-hover:bg-brand-500/30 sm:inline-flex">
-            Start My Taste DNA →
-          </span>
-          <span aria-hidden className="text-lg font-black text-brand-300 transition group-hover:translate-x-0.5 sm:hidden">→</span>
-        </Link>
+        {/* State Your Case — just type what you like; we build the Taste DNA. */}
+        <BuildCaseBox />
 
         {/* Big, clear tiles — every area of the app, tap to go deeper. */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
