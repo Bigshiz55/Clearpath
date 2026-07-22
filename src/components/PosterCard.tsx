@@ -3,6 +3,7 @@ import type { MediaType } from '@/lib/types';
 import { AlgorithmScore } from './AlgorithmScore';
 import { SaveButton } from './SaveButton';
 import { TasteFeedback } from './TasteFeedback';
+import { SeenVerdict } from './SeenVerdict';
 
 interface PosterCardProps {
   href?: string;
@@ -99,6 +100,11 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           <Link href={href} className="block h-full">{poster}</Link>
         ) : (
           poster
+        )}
+        {/* Already seen it? Two verdicts ride on top of the art — glasses + an
+            up/down arrow. Both clear the card; up/down teach the DNA honestly. */}
+        {overlay !== null && saveId != null && (
+          <SeenVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
         )}
       </div>
       <div className="flex flex-1 flex-col p-3">
