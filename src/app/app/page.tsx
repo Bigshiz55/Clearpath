@@ -90,44 +90,51 @@ export default async function DiscoverPage() {
           <SearchBar />
         </div>
 
-        {/* Big, clear tiles — every area of the app, tap to go deeper. */}
+        {/* Big, clear tiles — every area of the app, tap to go deeper. Cleaned to
+            distinct destinations (no Ask/Easy-Mode dupes), bigger glowing icons. */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {([
-            // Row 1 — rgb = the tile's accent colour (border/tint/arrow).
+            // Core loop
             { href: '/app/watch', icon: 'watch', title: 'Watch Now', sub: 'Your DNA picks, ranked', rgb: '244,63,94' },
-            { href: '/app/ask', icon: 'judge', title: 'Today’s Docket', sub: 'What you feel like watching right now', rgb: '245,158,11' },
+            { href: '/app/quiz', icon: 'quiz', title: 'Take the Taste Quiz', sub: 'Rate a few · about 5 min', rgb: '168,85,247' },
             { href: '/app/finder', icon: 'search', title: 'Forensic Search', sub: 'Filter by genre, rating, length…', rgb: '99,102,241' },
-            // Row 2
-            { href: '/app/quiz', icon: 'quiz', title: 'Complete My Case File', sub: 'Guided assessment · about 5 min', rgb: '168,85,247' },
+            // Discovery
             { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', rgb: '59,130,246' },
-            { href: '/app/tv', icon: 'tv', title: 'TV Guide Decoder', sub: 'What’s on live — next 12/24/48h', rgb: '16,185,129' },
-            // Row 3
+            { href: '/app/tv', icon: 'tv', title: 'On TV Now', sub: 'What’s live — next 12/24/48h', rgb: '16,185,129' },
             { href: '/app/together', icon: 'together', title: 'Decide Together', sub: 'One verdict for the room', rgb: '244,63,94' },
+            // Your stuff
             { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', rgb: '14,165,233' },
             { href: '/app/subscriptions', icon: 'money', title: 'Subscription Check', sub: 'Where you overpay for streaming', rgb: '16,185,129' },
-            { href: '/app/vintage', icon: 'easy', title: 'Easy Mode', sub: 'Big & simple to read', rgb: '245,158,11' },
           ] as const).map((t) => (
             <Link
               key={t.href}
               href={t.href}
               style={{
                 '--accent': t.rgb,
-                background: 'linear-gradient(150deg, rgba(var(--accent),0.15), rgba(9,11,18,0.55))',
-                borderColor: 'rgba(var(--accent),0.30)',
+                background: 'linear-gradient(150deg, rgba(var(--accent),0.18), rgba(9,11,18,0.55))',
+                borderColor: 'rgba(var(--accent),0.32)',
               } as React.CSSProperties}
-              className="group relative flex min-h-[150px] flex-col justify-between overflow-hidden rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-1 hover:border-white/25 active:scale-[0.98] sm:min-h-[176px] sm:p-5"
+              className="group relative flex min-h-[168px] flex-col justify-between overflow-hidden rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-1 hover:border-white/25 active:scale-[0.98] sm:min-h-[200px] sm:p-5"
             >
-              <TileIcon
-                name={t.icon}
-                className="h-14 w-14 flex-none drop-shadow-[0_8px_18px_rgba(0,0,0,0.5)] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-[1.06] sm:h-[68px] sm:w-[68px]"
-              />
+              <span className="relative inline-flex flex-none">
+                {/* Soft accent glow so the icon pops. */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute -inset-3 rounded-full opacity-45 blur-2xl transition-opacity duration-300 group-hover:opacity-70"
+                  style={{ background: 'radial-gradient(circle, rgba(var(--accent),0.65), transparent 70%)' }}
+                />
+                <TileIcon
+                  name={t.icon}
+                  className="relative h-16 w-16 drop-shadow-[0_10px_22px_rgba(0,0,0,0.55)] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-[1.08] sm:h-[88px] sm:w-[88px]"
+                />
+              </span>
               <span className="mt-3">
-                <span className="block text-lg font-extrabold tracking-tight text-white sm:text-xl">{t.title}</span>
-                <span className="block text-sm text-slate-300/90">{t.sub}</span>
+                <span className="block text-lg font-extrabold leading-tight tracking-tight text-white sm:text-xl">{t.title}</span>
+                <span className="mt-0.5 block text-sm text-slate-300/90">{t.sub}</span>
               </span>
               <span
                 aria-hidden
-                className="pointer-events-none absolute bottom-4 right-4 text-lg font-black opacity-70 transition-transform duration-300 group-hover:translate-x-0.5 sm:bottom-5 sm:right-5"
+                className="pointer-events-none absolute bottom-4 right-4 text-xl font-black opacity-70 transition-transform duration-300 group-hover:translate-x-0.5 sm:bottom-5 sm:right-5"
                 style={{ color: 'rgb(var(--accent))' }}
               >
                 →
