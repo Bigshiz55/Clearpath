@@ -153,17 +153,26 @@ export async function submitPassFeedback(input: PassFeedbackInput): Promise<Acti
         break;
       }
       case 'removed_without_reason': {
-        // Light negative — just hide it from picks.
+        // A bare pass — just hide it from picks. NO rating, so no DNA ding; the
+        // learning comes from the optional reason chip, not the tap itself.
         const r = await addToWatchlist({ ...base, status: 'dropped' });
         if (!r.ok) return r;
-        const itemId = (r.data as { itemId?: string } | undefined)?.itemId;
-        if (itemId) await updateWatchlistItem({ itemId, rating: 4 });
-        affectedDna = true;
         break;
       }
       case 'not_right_now': {
-        // Temporary / contextual — deliberately NO watchlist write and NO DNA change.
+        // Temporary / contextual — NO DNA change. If a prior bare pass already
+        // dropped it, revert that so it can resurface later (truly "not tonight").
         temporary = true;
+        const { data: item } = await supabase
+          .from('watchlist_items')
+          .select('id, status')
+          .eq('user_id', user.id)
+          .eq('tmdb_id', v.tmdbId)
+          .eq('media_type', v.mediaType)
+          .maybeSingle();
+        if (item?.id && (item.status === 'dropped' || item.status === 'watched')) {
+          await removeWatchlistItem(item.id as string);
+        }
         break;
       }
     }
