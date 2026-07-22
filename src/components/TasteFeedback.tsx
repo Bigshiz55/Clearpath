@@ -119,8 +119,13 @@ export function TasteFeedback({
   async function refine(type: FeedbackType, codes: string[]) {
     if (timer.current) clearTimeout(timer.current);
     const from = pop?.score ?? null;
-    void recordAnalyticsEvent('pass_reason_chip_selected', { tmdbId, choice: type, reasons: codes });
-    await submitPassFeedback({ ...base, feedbackType: type, reasonCodes: codes, rating: null, ...ctx });
+    void recordAnalyticsEvent('pass_reason_chip_selected', { tmdbId, choice: type, reasons: codes }).catch(() => {});
+    // A server-action failure must never crash the page — swallow it here.
+    try {
+      await submitPassFeedback({ ...base, feedbackType: type, reasonCodes: codes, rating: null, ...ctx });
+    } catch {
+      /* keep the UI moving */
+    }
     finalizeRemove();
     const to = await fetchScore();
     setPop((p) => (p ? { ...p, bump: { from, to } } : p));
@@ -129,10 +134,14 @@ export function TasteFeedback({
 
   async function undo() {
     if (timer.current) clearTimeout(timer.current);
-    void recordAnalyticsEvent('pass_undone', { tmdbId });
+    void recordAnalyticsEvent('pass_undone', { tmdbId }).catch(() => {});
     restoreCard();
     setPop(null);
-    await undoPassFeedback({ tmdbId, mediaType });
+    try {
+      await undoPassFeedback({ tmdbId, mediaType });
+    } catch {
+      /* best-effort */
+    }
   }
 
   async function onPass(e: React.MouseEvent) {
@@ -152,8 +161,8 @@ export function TasteFeedback({
     }
 
     fadeCard();
-    void recordAnalyticsEvent('pass_completed', { tmdbId, mediaType, choice: 'removed_without_reason', ...ctx });
-    void submitPassFeedback({ ...base, feedbackType: 'removed_without_reason', reasonCodes: [], rating: null, ...ctx });
+    void recordAnalyticsEvent('pass_completed', { tmdbId, mediaType, choice: 'removed_without_reason', ...ctx }).catch(() => {});
+    void submitPassFeedback({ ...base, feedbackType: 'removed_without_reason', reasonCodes: [], rating: null, ...ctx }).catch(() => {});
 
     const [meta, score] = await Promise.all([fetchMeta(), fetchScore()]);
     const highMatch = typeof matchScore === 'number' && matchScore >= 80;

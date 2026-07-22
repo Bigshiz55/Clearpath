@@ -180,18 +180,22 @@ export async function submitPassFeedback(input: PassFeedbackInput): Promise<Acti
     return { ok: false, error: e instanceof Error ? e.message : 'Could not save.' };
   }
 
-  // Targeted axis nudges from the specific reasons (never for not_right_now).
-  if (v.feedbackType !== 'not_right_now' && (v.reasonCodes?.length ?? 0) > 0) {
-    const applied = await applyAxisSignals(supabase, user.id, v.reasonCodes ?? [], v.feedbackType);
-    if (applied) affectedDna = true;
+  // Everything past the core write is best-effort — it must NEVER throw, or the
+  // fire-and-forget call would surface as an app-crashing server-action error.
+  try {
+    // Targeted axis nudges from the specific reasons (never for not_right_now).
+    if (v.feedbackType !== 'not_right_now' && (v.reasonCodes?.length ?? 0) > 0) {
+      const applied = await applyAxisSignals(supabase, user.id, v.reasonCodes ?? [], v.feedbackType);
+      if (applied) affectedDna = true;
+    }
+    await persistFeedback(supabase, user.id, v, watched, temporary);
+    revalidatePath('/app');
+    revalidatePath('/app/watch');
+    // The dimension profile is cached by tag and doesn't key on these signals — bust it.
+    revalidateTag(`dim-profile:${user.id}`);
+  } catch {
+    /* non-fatal — the pass itself is already recorded */
   }
-
-  await persistFeedback(supabase, user.id, v, watched, temporary);
-
-  revalidatePath('/app');
-  revalidatePath('/app/watch');
-  // The dimension profile is cached by tag and doesn't key on these signals — bust it.
-  revalidateTag(`dim-profile:${user.id}`);
   return { ok: true, affectedDna };
 }
 
