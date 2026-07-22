@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { searchTitles, TmdbError, tmdbImage } from '@/lib/tmdb/client';
+import { searchTitles, searchPeople, TmdbError, tmdbImage } from '@/lib/tmdb/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const results = await searchTitles(parsed.data.q);
+    const [results, people] = await Promise.all([
+      searchTitles(parsed.data.q),
+      searchPeople(parsed.data.q).catch(() => []),
+    ]);
     return NextResponse.json({
       results: results.map((r) => ({
         id: r.id,
@@ -27,6 +30,12 @@ export async function GET(request: Request) {
         posterPath: r.posterPath,
         posterUrl: tmdbImage(r.posterPath, 'w185'),
         voteAverage: r.voteAverage,
+      })),
+      people: people.slice(0, 4).map((p) => ({
+        id: p.id,
+        name: p.name,
+        knownFor: p.knownFor,
+        profileUrl: tmdbImage(p.profilePath, 'w185'),
       })),
     });
   } catch (e) {

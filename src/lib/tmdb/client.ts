@@ -736,6 +736,92 @@ export async function getPersonNotable(
     });
 }
 
+export interface PersonCredit {
+  id: number;
+  mediaType: MediaType;
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+  voteCount: number;
+  popularity: number;
+  asDirector: boolean;
+  character: string | null;
+}
+
+export interface PersonDetail {
+  id: number;
+  name: string;
+  profilePath: string | null;
+  department: string | null; // Acting / Directing / …
+  biography: string | null;
+  credits: PersonCredit[]; // deduped, most-popular first
+}
+
+/**
+ * A person (actor/director) with their combined filmography — for the person
+ * page. One TMDB call (person + combined_credits). Cast roles and directing
+ * credits are merged and deduped; poster-less rows are dropped. Null if unknown.
+ */
+export async function getPerson(id: number): Promise<PersonDetail | null> {
+  interface Row {
+    id: number;
+    media_type?: string;
+    title?: string;
+    name?: string;
+    release_date?: string;
+    first_air_date?: string;
+    poster_path?: string | null;
+    vote_count?: number;
+    popularity?: number;
+    character?: string | null;
+    job?: string;
+  }
+  interface Raw {
+    id: number;
+    name?: string;
+    profile_path?: string | null;
+    known_for_department?: string;
+    biography?: string;
+    combined_credits?: { cast?: Row[]; crew?: Row[] };
+  }
+  const d = await tmdbFetch<Raw>(`/person/${id}`, {
+    language: 'en-US',
+    append_to_response: 'combined_credits',
+  }).catch(() => null);
+  if (!d || !d.name) return null;
+
+  const seen = new Set<number>();
+  const credits: PersonCredit[] = [];
+  const add = (r: Row, asDirector: boolean) => {
+    const mt = r.media_type;
+    if ((mt !== 'movie' && mt !== 'tv') || !r.poster_path || seen.has(r.id)) return;
+    seen.add(r.id);
+    credits.push({
+      id: r.id,
+      mediaType: mt,
+      title: (mt === 'movie' ? r.title : r.name) ?? 'Untitled',
+      year: yearFrom(mt === 'movie' ? r.release_date : r.first_air_date),
+      posterPath: r.poster_path ?? null,
+      voteCount: r.vote_count ?? 0,
+      popularity: typeof r.popularity === 'number' ? r.popularity : 0,
+      asDirector,
+      character: r.character && r.character.trim() !== '' ? r.character : null,
+    });
+  };
+  for (const r of d.combined_credits?.cast ?? []) add(r, false);
+  for (const r of d.combined_credits?.crew ?? []) if (r.job === 'Director') add(r, true);
+  credits.sort((a, b) => b.popularity - a.popularity || b.voteCount - a.voteCount);
+
+  return {
+    id: d.id,
+    name: d.name,
+    profilePath: d.profile_path ?? null,
+    department: d.known_for_department ?? null,
+    biography: d.biography && d.biography.trim() !== '' ? d.biography : null,
+    credits,
+  };
+}
+
 export interface FilmographyItem {
   id: number;
   title: string;

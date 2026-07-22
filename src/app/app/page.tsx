@@ -55,6 +55,13 @@ export default async function DiscoverPage() {
 
   return (
     <div className="space-y-8">
+      {/* The promise, front and center. */}
+      <div className="rounded-2xl border border-sky-400/40 bg-gradient-to-r from-sky-600 to-blue-700 px-5 py-5 text-center shadow-[0_10px_40px_-12px_rgba(37,99,235,0.6)]">
+        <p className="text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">
+          We earn your subscription. We don’t trick you into one.
+        </p>
+      </div>
+
       {/* The three promises, right at the top of the hub. */}
       <PromiseBar rounded />
 

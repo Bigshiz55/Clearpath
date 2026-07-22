@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { PosterCard } from './PosterCard';
+import { Poster, PosterCard } from './PosterCard';
 
 interface Result {
   id: number;
@@ -15,10 +16,18 @@ interface Result {
   voteAverage: number | null;
 }
 
+interface Person {
+  id: number;
+  name: string;
+  knownFor: string;
+  profileUrl: string | null;
+}
+
 export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
   const router = useRouter();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Result[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -89,6 +98,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
     const query = q.trim();
     if (query.length < 2) {
       setResults([]);
+      setPeople([]);
       setError(null);
       setLoading(false);
       return;
@@ -101,9 +111,11 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
         if (!res.ok) {
           setError(data.error ?? 'Search failed.');
           setResults([]);
+          setPeople([]);
         } else {
           setError(null);
           setResults(data.results ?? []);
+          setPeople(data.people ?? []);
           setOpen(true);
         }
       } catch {
@@ -184,26 +196,50 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
 
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
 
-      {open && results.length > 0 && (
+      {open && (results.length > 0 || people.length > 0) && (
         <div className="absolute z-30 mt-2 max-h-[75vh] w-full overflow-auto rounded-2xl border border-white/10 bg-ink-850/95 p-3 shadow-card backdrop-blur">
-          <div className="poster-grid" onClick={() => setOpen(false)}>
-            {results.map((r) => (
-              <PosterCard
-                key={`${r.mediaType}-${r.id}`}
-                href={`/app/title/${r.mediaType}/${r.id}`}
-                mediaType={r.mediaType}
-                tmdbId={r.id}
-                title={r.title}
-                year={r.year}
-                posterUrl={r.posterUrl}
-                posterPath={r.posterPath}
-              />
-            ))}
-          </div>
+          {people.length > 0 && (
+            <div className="mb-3" onClick={() => setOpen(false)}>
+              <div className="eyebrow mb-1.5 text-[11px]">People</div>
+              <div className="flex flex-col gap-1">
+                {people.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/app/person/${p.id}`}
+                    className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-white/10"
+                  >
+                    <span className="h-11 w-11 flex-none overflow-hidden rounded-full border border-white/10 bg-ink-800">
+                      <Poster posterUrl={p.profileUrl} title={p.name} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-white">{p.name}</span>
+                      {p.knownFor && <span className="block truncate text-xs text-slate-400">{p.knownFor}</span>}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          {results.length > 0 && (
+            <div className="poster-grid" onClick={() => setOpen(false)}>
+              {results.map((r) => (
+                <PosterCard
+                  key={`${r.mediaType}-${r.id}`}
+                  href={`/app/title/${r.mediaType}/${r.id}`}
+                  mediaType={r.mediaType}
+                  tmdbId={r.id}
+                  title={r.title}
+                  year={r.year}
+                  posterUrl={r.posterUrl}
+                  posterPath={r.posterPath}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {open && !loading && q.trim().length >= 2 && results.length === 0 && !error && (
+      {open && !loading && q.trim().length >= 2 && results.length === 0 && people.length === 0 && !error && (
         <div className="absolute z-30 mt-2 w-full rounded-2xl border border-white/10 bg-ink-850/95 p-4 text-sm text-slate-400 shadow-card">
           No matches for “{q}”. Try a different spelling or the original title.
         </div>
