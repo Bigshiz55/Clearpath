@@ -13,6 +13,7 @@ export type TileIconName =
   | 'tv'
   | 'together'
   | 'watchlist'
+  | 'money'
   | 'easy';
 
 function G({ id, from, to, v }: { id: string; from: string; to: string; v?: boolean }) {
@@ -135,6 +136,19 @@ export function TileIcon({ name, className = 'h-11 w-11' }: { name: TileIconName
           <Gloss />
           <path d="M8 5.5h8a1 1 0 0 1 1 1V19l-5-3-5 3V6.5a1 1 0 0 1 1-1z" fill="#fff" />
           <path d="M10 10.4l1.6 1.6 3-3" stroke="#2563eb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </>,
+      );
+    case 'money': // wallet with a dollar coin
+      return svg(
+        <>
+          <defs><G id="ti-money" from="#34d399" to="#059669" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-money)" />
+          <Gloss />
+          <g fill="none" stroke="#fff" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="5" y="7.5" width="14" height="10" rx="2.5" fill="#fff" fillOpacity="0.22" />
+            <circle cx="15.5" cy="12.5" r="1.4" fill="#fff" stroke="none" />
+            <path d="M12 9.7v5.6M13.4 10.6c-.5-.6-2.8-.7-2.8.6 0 1.2 2.8.6 2.8 1.8 0 1.3-2.3 1.2-2.8.6" />
+          </g>
         </>,
       );
     case 'easy': // reading glasses

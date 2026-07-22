@@ -96,6 +96,7 @@ export default async function DiscoverPage() {
             // Row 3
             { href: '/app/together', icon: 'together', title: 'Decide Together', sub: 'One verdict for the room', rgb: '244,63,94' },
             { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', rgb: '14,165,233' },
+            { href: '/app/subscriptions', icon: 'money', title: 'Subscription Check', sub: 'Where you overpay for streaming', rgb: '16,185,129' },
             { href: '/app/vintage', icon: 'easy', title: 'Easy Mode', sub: 'Big & simple to read', rgb: '245,158,11' },
           ] as const).map((t) => (
             <Link
