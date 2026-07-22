@@ -6,13 +6,13 @@ import { submitPassFeedback, undoPassFeedback, recordAnalyticsEvent, type Feedba
 import { reasonChipsFor, type TitleMetaLite } from '@/lib/feedback/reasons';
 import type { MediaType } from '@/lib/types';
 
-interface BarChoice { label: string; type: FeedbackType; codes: string[] }
+interface Chip { code: string; label: string }
 interface Popover {
   left: number;
   top: number;
   width: number;
   lead?: string;
-  choices: BarChoice[];
+  chips: Chip[];
   score: number | null;
   bump: { from: number | null; to: number | null } | null;
 }
@@ -30,10 +30,11 @@ async function fetchScore(): Promise<number | null> {
 const pct = (n: number | null | undefined) => (n == null ? '—' : `${n.toFixed(2)}%`);
 
 /**
- * Pass control. Tapping records the decision and floats a compact, SOLID
- * "Update your DNA?" popover ON TOP of the card — the card STAYS put while you
- * answer, and only fades out when the box does. The live Taste-DNA score is
- * shown to two decimals so each optional reason's tiny increment is visible.
+ * Pass control. Tapping records the decision and floats a SOLID "Update your
+ * DNA?" popover ON TOP of the card (which stays put while you answer). It auto-
+ * picks the top ~8 title-specific reasons in a 2-column box; tap any to
+ * multi-select (they turn pink), then Apply. The live Taste-DNA score is shown
+ * to two decimals so each boost is visible.
  */
 export function TasteFeedback({
   tmdbId,
@@ -66,13 +67,13 @@ export function TasteFeedback({
   const cardRef = useRef<HTMLElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pop, setPop] = useState<Popover | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
 
   const ctx = { source, position, matchScore, sessionId };
   const base = { tmdbId, mediaType, title, year, posterPath };
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  // Remove the card WITH a fade — only ever called once the popover is done.
   function removeCardWithFade() {
     if (onFlagged) { onFlagged(); cardRef.current = null; return; }
     const c = cardRef.current;
@@ -101,16 +102,12 @@ export function TasteFeedback({
     }
   }
 
-  function barChoices(meta: TitleMetaLite | null): BarChoice[] {
-    const out: BarChoice[] = [{ label: 'Not tonight', type: 'not_right_now', codes: [] }];
-    for (const r of reasonChipsFor(meta, 'not_for_me').filter((c) => c.code !== 'other').slice(0, 3)) {
-      out.push({ label: r.label, type: 'not_for_me', codes: [r.code] });
-    }
-    out.push({ label: 'Seen it', type: 'seen', codes: [] });
-    return out;
+  function toggle(code: string) {
+    setSelected((s) => (s.includes(code) ? s.filter((x) => x !== code) : [...s, code]));
   }
 
-  async function refine(type: FeedbackType, codes: string[]) {
+  // Apply a resolution: supersede the bare pass with a typed feedback + reasons.
+  async function apply(type: FeedbackType, codes: string[]) {
     if (timer.current) clearTimeout(timer.current);
     const from = pop?.score ?? null;
     void recordAnalyticsEvent('pass_reason_chip_selected', { tmdbId, choice: type, reasons: codes }).catch(() => {});
@@ -120,13 +117,11 @@ export function TasteFeedback({
       /* keep moving */
     }
     const to = await fetchScore();
-    // Show the increment; the card stays visible behind the box until it closes.
     setPop((p) => (p ? { ...p, bump: { from, to } } : p));
     timer.current = setTimeout(() => close(true), 1900);
   }
 
   async function undo() {
-    // Undo = the card was never removed; just close the box and reverse the data.
     if (timer.current) clearTimeout(timer.current);
     cardRef.current = null;
     setPop(null);
@@ -142,28 +137,32 @@ export function TasteFeedback({
     e.preventDefault();
     e.stopPropagation();
 
-    // Position the box ON TOP of the card; the card stays visible while answering.
     const card = triggerRef.current?.closest('.card') as HTMLElement | null;
     cardRef.current = card;
     const rect = (card ?? triggerRef.current)?.getBoundingClientRect();
     let left = 12;
     let top = 12;
-    let width = 260;
+    let width = 288;
     if (rect) {
-      width = Math.round(Math.min(300, Math.max(216, rect.width - 8)));
+      width = Math.round(Math.min(320, Math.max(240, rect.width - 8)));
       left = Math.round(Math.max(8, Math.min(rect.left + (rect.width - width) / 2, window.innerWidth - width - 8)));
-      top = Math.round(Math.max(8, Math.min(rect.top + 8, window.innerHeight - 250)));
+      top = Math.round(Math.max(8, Math.min(rect.top + 8, window.innerHeight - 330)));
     }
 
-    // Record the decision (fire-and-forget, fully caught so it can never crash).
+    setSelected([]);
+    // Record the decision (fully caught so a failed action can never crash).
     void recordAnalyticsEvent('pass_completed', { tmdbId, mediaType, choice: 'removed_without_reason', ...ctx }).catch(() => {});
     void submitPassFeedback({ ...base, feedbackType: 'removed_without_reason', reasonCodes: [], rating: null, ...ctx }).catch(() => {});
 
     const [meta, score] = await Promise.all([fetchMeta(), fetchScore()]);
+    const chips: Chip[] = reasonChipsFor(meta, 'not_for_me', 8)
+      .filter((c) => c.code !== 'other')
+      .slice(0, 8)
+      .map((c) => ({ code: c.code, label: c.label }));
     const highMatch = typeof matchScore === 'number' && matchScore >= 80;
-    setPop({ left, top, width, lead: highMatch ? 'This was a strong match for you.' : undefined, choices: barChoices(meta), score, bump: null });
+    setPop({ left, top, width, lead: highMatch ? 'This was a strong match for you.' : undefined, chips, score, bump: null });
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => close(true), 8000);
+    timer.current = setTimeout(() => close(true), 12000);
   }
 
   const up = pop?.bump && pop.bump.to != null && pop.bump.from != null && pop.bump.to > pop.bump.from;
@@ -203,7 +202,7 @@ export function TasteFeedback({
               </div>
 
               {pop.bump ? (
-                <div className="flex flex-col items-center py-2 text-center">
+                <div className="flex flex-col items-center py-3 text-center">
                   <div className="flex items-baseline gap-1.5 text-white">
                     <span className="text-sm font-black tabular-nums text-slate-400">{pct(pop.bump.from)}</span>
                     <span className="text-slate-500">→</span>
@@ -215,25 +214,42 @@ export function TasteFeedback({
               ) : (
                 <>
                   {pop.lead && <div className="mt-0.5 text-[11px] font-semibold text-brand-200">{pop.lead}</div>}
-                  <div className="mt-0.5 text-[11px] text-slate-400">Passed. What made it miss?</div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {pop.choices.map((c, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => void refine(c.type, c.codes)}
-                        className="rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-slate-200 transition hover:bg-white/12"
-                      >
-                        {c.label}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => void undo()}
-                      className="rounded-full border border-white/25 px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-white/10"
-                    >
-                      Undo
-                    </button>
+                  <div className="mt-0.5 text-[11px] text-slate-400">What made it miss? Tap any that apply.</div>
+
+                  {/* Top ~8 title-specific reasons — 2-column box, multi-select (pink). */}
+                  <div className="mt-2 grid grid-cols-2 gap-1.5">
+                    {pop.chips.map((c) => {
+                      const on = selected.includes(c.code);
+                      return (
+                        <button
+                          key={c.code}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => toggle(c.code)}
+                          className={`rounded-lg border px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition ${
+                            on ? 'border-brand-300 bg-brand-500/30 text-white shadow-[0_0_0_1px_rgba(255,46,154,0.5)]' : 'border-white/12 bg-white/[0.05] text-slate-200 hover:bg-white/10'
+                          }`}
+                        >
+                          {c.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void apply('not_for_me', selected)}
+                    disabled={selected.length === 0}
+                    className="mt-2.5 w-full rounded-lg bg-brand-500 py-2 text-xs font-black text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {selected.length ? `⚡ Boost my DNA (${selected.length})` : 'Tap a reason to boost'}
+                  </button>
+
+                  {/* Quick single-tap resolutions. */}
+                  <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px]">
+                    <button type="button" onClick={() => void apply('not_right_now', [])} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 font-medium text-slate-200 hover:bg-white/10">Not tonight</button>
+                    <button type="button" onClick={() => void apply('seen', [])} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 font-medium text-slate-200 hover:bg-white/10">Seen it</button>
+                    <button type="button" onClick={() => void undo()} className="rounded-full border border-white/25 px-2.5 py-1 font-bold text-white hover:bg-white/10">Undo</button>
                   </div>
                 </>
               )}
