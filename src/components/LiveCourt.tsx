@@ -129,7 +129,12 @@ export function LiveCourt({ code }: { code: string }) {
   async function savePicks(next: Pick[], pid = participantId) {
     try { localStorage.setItem(`court_picks_${code}`, JSON.stringify(next)); } catch { /* ignore */ }
     if (!pid) return;
-    await supabase.rpc('court_set_picks', { p_code: code, p_participant: pid, p_picks: next }).then(() => refresh());
+    try {
+      await supabase.rpc('court_set_picks', { p_code: code, p_participant: pid, p_picks: next });
+      refresh();
+    } catch {
+      /* the local copy is already saved; a sync retry happens on the next change */
+    }
   }
   function addPick(h: SearchHit) {
     if (picks.length >= 8 || picks.some((p) => keyOf(p) === keyOf(h))) return;

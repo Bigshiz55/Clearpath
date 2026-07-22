@@ -27,11 +27,13 @@ async function fetchScore(): Promise<number | null> {
   }
 }
 
+const pct = (n: number | null | undefined) => (n == null ? '—' : `${n.toFixed(2)}%`);
+
 /**
- * Pass control. Tapping fades the title out (never a blocking modal) and floats
- * a compact, SOLID "Update your DNA?" popover within the passed card's own slot
- * (its space is held open so the popover never drifts onto a neighbor), showing
- * your live Taste-DNA score so each optional reason visibly nudges it up.
+ * Pass control. Tapping records the decision and floats a compact, SOLID
+ * "Update your DNA?" popover ON TOP of the card — the card STAYS put while you
+ * answer, and only fades out when the box does. The live Taste-DNA score is
+ * shown to two decimals so each optional reason's tiny increment is visible.
  */
 export function TasteFeedback({
   tmdbId,
@@ -61,7 +63,7 @@ export function TasteFeedback({
   sessionId?: string | null;
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const fadedCard = useRef<HTMLElement | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pop, setPop] = useState<Popover | null>(null);
 
@@ -70,30 +72,22 @@ export function TasteFeedback({
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  // Fade the card but KEEP its space while the popover is open, so the popover
-  // stays over its own slot instead of the neighbour that would slide in.
-  function fadeCard() {
-    const card = triggerRef.current?.closest('.card');
-    if (card instanceof HTMLElement) {
-      fadedCard.current = card;
-      card.style.transition = 'opacity .25s ease';
-      card.style.opacity = '0';
-      card.style.pointerEvents = 'none';
+  // Remove the card WITH a fade — only ever called once the popover is done.
+  function removeCardWithFade() {
+    if (onFlagged) { onFlagged(); cardRef.current = null; return; }
+    const c = cardRef.current;
+    if (c) {
+      c.style.transition = 'opacity .3s ease, transform .3s ease';
+      c.style.opacity = '0';
+      c.style.transform = 'scale(0.96)';
+      window.setTimeout(() => { c.style.display = 'none'; }, 300);
+      cardRef.current = null;
     }
   }
-  function finalizeRemove() {
-    if (onFlagged) { onFlagged(); fadedCard.current = null; return; }
-    const card = fadedCard.current;
-    if (card) { card.style.display = 'none'; fadedCard.current = null; }
-  }
-  function restoreCard() {
-    const card = fadedCard.current;
-    if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; fadedCard.current = null; }
-  }
 
-  function dismiss(remove: boolean) {
+  function close(remove: boolean) {
     if (timer.current) clearTimeout(timer.current);
-    if (remove) finalizeRemove();
+    if (remove) removeCardWithFade();
     setPop(null);
   }
 
@@ -120,23 +114,23 @@ export function TasteFeedback({
     if (timer.current) clearTimeout(timer.current);
     const from = pop?.score ?? null;
     void recordAnalyticsEvent('pass_reason_chip_selected', { tmdbId, choice: type, reasons: codes }).catch(() => {});
-    // A server-action failure must never crash the page — swallow it here.
     try {
       await submitPassFeedback({ ...base, feedbackType: type, reasonCodes: codes, rating: null, ...ctx });
     } catch {
-      /* keep the UI moving */
+      /* keep moving */
     }
-    finalizeRemove();
     const to = await fetchScore();
+    // Show the increment; the card stays visible behind the box until it closes.
     setPop((p) => (p ? { ...p, bump: { from, to } } : p));
-    timer.current = setTimeout(() => setPop(null), 1800);
+    timer.current = setTimeout(() => close(true), 1900);
   }
 
   async function undo() {
+    // Undo = the card was never removed; just close the box and reverse the data.
     if (timer.current) clearTimeout(timer.current);
-    void recordAnalyticsEvent('pass_undone', { tmdbId }).catch(() => {});
-    restoreCard();
+    cardRef.current = null;
     setPop(null);
+    void recordAnalyticsEvent('pass_undone', { tmdbId }).catch(() => {});
     try {
       await undoPassFeedback({ tmdbId, mediaType });
     } catch {
@@ -148,8 +142,9 @@ export function TasteFeedback({
     e.preventDefault();
     e.stopPropagation();
 
-    // Sit within the card's own footprint (its space is held open below).
+    // Position the box ON TOP of the card; the card stays visible while answering.
     const card = triggerRef.current?.closest('.card') as HTMLElement | null;
+    cardRef.current = card;
     const rect = (card ?? triggerRef.current)?.getBoundingClientRect();
     let left = 12;
     let top = 12;
@@ -160,7 +155,7 @@ export function TasteFeedback({
       top = Math.round(Math.max(8, Math.min(rect.top + 8, window.innerHeight - 250)));
     }
 
-    fadeCard();
+    // Record the decision (fire-and-forget, fully caught so it can never crash).
     void recordAnalyticsEvent('pass_completed', { tmdbId, mediaType, choice: 'removed_without_reason', ...ctx }).catch(() => {});
     void submitPassFeedback({ ...base, feedbackType: 'removed_without_reason', reasonCodes: [], rating: null, ...ctx }).catch(() => {});
 
@@ -168,7 +163,7 @@ export function TasteFeedback({
     const highMatch = typeof matchScore === 'number' && matchScore >= 80;
     setPop({ left, top, width, lead: highMatch ? 'This was a strong match for you.' : undefined, choices: barChoices(meta), score, bump: null });
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => dismiss(true), 8000);
+    timer.current = setTimeout(() => close(true), 8000);
   }
 
   const up = pop?.bump && pop.bump.to != null && pop.bump.from != null && pop.bump.to > pop.bump.from;
@@ -199,24 +194,23 @@ export function TasteFeedback({
         typeof document !== 'undefined' &&
         createPortal(
           <div className="fixed z-[120] animate-fade-up" style={{ left: pop.left, top: pop.top, width: pop.width }} role="dialog" aria-label="Update your DNA">
-            {/* Fully opaque so the poster never bleeds through. */}
             <div className="rounded-xl border-2 border-brand-400/70 bg-ink-900 p-3 shadow-2xl shadow-black/70 ring-1 ring-brand-500/30">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-black tracking-tight" style={{ color: '#ff2e9a' }}>🧬 Update your DNA?</div>
                 {pop.score != null && !pop.bump && (
-                  <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-white">{pop.score}</span>
+                  <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-white">{pct(pop.score)}</span>
                 )}
               </div>
 
               {pop.bump ? (
                 <div className="flex flex-col items-center py-2 text-center">
                   <div className="flex items-baseline gap-1.5 text-white">
-                    <span className="text-base font-black tabular-nums text-slate-400">{pop.bump.from ?? '—'}</span>
+                    <span className="text-sm font-black tabular-nums text-slate-400">{pct(pop.bump.from)}</span>
                     <span className="text-slate-500">→</span>
-                    <span className="text-2xl font-black tabular-nums" style={{ color: '#ff2e9a' }}>{pop.bump.to ?? '—'}</span>
+                    <span className="text-xl font-black tabular-nums" style={{ color: '#ff2e9a' }}>{pct(pop.bump.to)}</span>
                     {up && <span className="text-emerald-300">↑</span>}
                   </div>
-                  <div className="mt-0.5 text-[11px] font-semibold text-emerald-200">{up ? 'DNA got sharper 🧬' : 'Logged — thanks 🧬'}</div>
+                  <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-black text-emerald-200">⚡ DNA Boosted</div>
                 </div>
               ) : (
                 <>

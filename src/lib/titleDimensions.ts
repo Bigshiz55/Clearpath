@@ -182,6 +182,7 @@ async function computeUserProfile(userId: string): Promise<DimensionProfile> {
   } catch {
     return empty;
   }
+  try {
   // Rated titles the user has actually judged (quiz, feedback, manual ratings).
   const { data: rated } = await admin
     .from('watchlist_items')
@@ -251,6 +252,11 @@ async function computeUserProfile(userId: string): Promise<DimensionProfile> {
   for (const p of pairs) accumulate(acc, p.dims, p.rating);
   foldSignals(acc, signals);
   return finish(finalizeProfile(acc));
+  } catch {
+    // A profile-build failure must never take down a page render (esp. during a
+    // server action's revalidation re-render) — degrade to the neutral profile.
+    return empty;
+  }
 }
 
 interface DimensionSignalRow {

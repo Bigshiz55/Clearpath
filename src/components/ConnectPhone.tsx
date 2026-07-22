@@ -22,7 +22,9 @@ export function ConnectPhone() {
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    getQuickAddToken().then((r) => (r.ok && r.token ? setToken(r.token) : setError(r.error ?? 'Failed.')));
+    getQuickAddToken()
+      .then((r) => (r.ok && r.token ? setToken(r.token) : setError(r.error ?? 'Failed.')))
+      .catch(() => setError('Failed.'));
   }, []);
 
   const endpoint = token ? `${origin}/api/quick-add?token=${token}&q=` : '';

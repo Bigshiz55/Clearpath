@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserDimensionProfile } from '@/lib/titleDimensions';
-import { dnaStrength } from '@/lib/scoring/dimensions';
+import { dnaStrengthExact } from '@/lib/scoring/dimensions';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +22,7 @@ export async function GET() {
       .not('rating', 'is', null);
 
     const profile = await getUserDimensionProfile(supabase, user.id, count ?? 0);
-    return NextResponse.json({ score: dnaStrength(profile) });
+    return NextResponse.json({ score: dnaStrengthExact(profile) });
   } catch {
     return NextResponse.json({ score: 0 });
   }

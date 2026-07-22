@@ -165,7 +165,8 @@ export function dimensionMatch(dims: TitleDimensions, profile: DimensionProfile)
  * and well-evidenced their leans are). Grows as they rate more and their taste
  * sharpens. Cosmetic/motivational — never feeds title scoring.
  */
-export function dnaStrength(profile: DimensionProfile): number {
+/** The unrounded score (0..100) — for the live "+0.35%" increments in the UI. */
+export function dnaStrengthExact(profile: DimensionProfile): number {
   const coverage = Math.min(1, profile.samples / 50);
   let sum = 0;
   for (const k of DIMENSION_KEYS) {
@@ -174,7 +175,11 @@ export function dnaStrength(profile: DimensionProfile): number {
     sum += decisive * evidence;
   }
   const definition = Math.min(1, (sum / DIMENSION_KEYS.length) * 3);
-  return clamp100(Math.round(100 * (0.5 * coverage + 0.5 * definition)));
+  return clamp100(100 * (0.5 * coverage + 0.5 * definition));
+}
+
+export function dnaStrength(profile: DimensionProfile): number {
+  return Math.round(dnaStrengthExact(profile));
 }
 
 /** The axes the user cares most about (decisive + backed by evidence), for "your taste dials". */
