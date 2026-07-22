@@ -14,14 +14,14 @@ export function Tagline({ className = '' }: { className?: string }) {
         <span className="text-slate-400">Thousands of choices, </span>
         <span className="text-white">one </span>
         <span className="font-black text-[#ff1493]">
-          verd
+          VERD
           <span className="wv-iflip">
             <span className="wv-iflip-inner">
               <span className="wv-iflip-face">I</span>
               <span className="wv-iflip-face wv-iflip-back">1</span>
             </span>
           </span>
-          ct
+          CT
         </span>
       </span>
     </p>

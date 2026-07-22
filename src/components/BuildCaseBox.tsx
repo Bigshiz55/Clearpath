@@ -79,8 +79,8 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         }
       />
       <div className="mt-2 flex items-center justify-between gap-3">
-        <Link href="/app/mentalist" className={hero ? 'text-sm text-slate-300 underline-offset-2 hover:text-white hover:underline' : 'text-xs text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline'}>
-          Prefer to name titles you love? →
+        <Link href="/app/mentalist" className={hero ? 'text-sm font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline' : 'text-xs font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline'}>
+          Or just name a few shows you love — we’ll figure out your taste →
         </Link>
         <button
           onClick={() => void submit()}
@@ -90,7 +90,6 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
           {busy ? 'Building…' : 'Build my Taste DNA →'}
         </button>
       </div>
-      <p className={hero ? 'mt-2 text-xs text-slate-400' : 'mt-1.5 text-[11px] text-slate-500'}>Powered by the WatchVerdict Mentalist</p>
     </div>
   );
 }

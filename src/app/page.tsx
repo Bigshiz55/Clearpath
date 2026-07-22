@@ -30,7 +30,7 @@ export default function LandingPage() {
         <div className="flex flex-col gap-1">
           <Logo size="lg" />
           {/* Tagline tucked under the wordmark — a proper logo lockup. */}
-          <Tagline className="pl-[3.75rem] text-sm sm:text-[15px]" />
+          <Tagline className="pl-[3.75rem] text-base sm:text-lg" />
         </div>
         <div className="flex items-center gap-2 pt-1.5">
           <Link href="/login" className="btn-ghost">
