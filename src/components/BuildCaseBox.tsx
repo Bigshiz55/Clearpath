@@ -80,22 +80,48 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
           : 'mx-auto max-w-2xl rounded-2xl border border-brand-400/40 bg-gradient-to-r from-brand-500/15 via-fuchsia-500/10 to-transparent p-4'
       }
     >
-      <div className="flex items-start gap-3">
-        <span className={hero ? 'text-3xl' : 'text-2xl'} aria-hidden>⚖️</span>
+      {/* Compact header — a title + ONE short line (no screen-tall preamble). */}
+      <div className="flex items-start gap-2.5 sm:gap-3">
+        <span className={hero ? 'text-2xl sm:text-3xl' : 'text-2xl'} aria-hidden>⚖️</span>
         <div className="min-w-0">
-          <div className={hero ? 'text-xl font-black text-white sm:text-2xl' : 'text-base font-extrabold text-white sm:text-lg'}>State Your Case</div>
-          <div className={hero ? 'text-sm font-medium text-slate-100 sm:text-base' : 'text-sm text-slate-300'}>
-            Describe your taste — or ask for something specific: what’s on <span className="font-semibold text-white">live TV</span>, <span className="font-semibold text-white">where to stream</span> a title, or what’s good <span className="font-semibold text-white">on a service</span>.
+          <div className={hero ? 'text-lg font-black text-white sm:text-2xl' : 'text-base font-extrabold text-white sm:text-lg'}>State Your Case</div>
+          <div className={hero ? 'text-sm font-medium text-slate-200 sm:text-base' : 'text-sm text-slate-300'}>
+            Describe your taste — or ask what’s on <span className="font-semibold text-white">live TV</span>, <span className="font-semibold text-white">where to stream</span> a title, or what’s good <span className="font-semibold text-white">on a service</span>.
           </div>
-          <Link href="/app/mentalist" className={`mt-1.5 inline-block font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline ${hero ? 'text-sm' : 'text-xs'}`}>
-            Or just name a few shows you love — we’ll figure out your taste →
-          </Link>
         </div>
       </div>
 
-      {/* Tappable examples — one per kind of question, so the range is obvious.
-          Live-TV listings lead so it's clear we show what's actually on. */}
-      <div className="mt-3">
+      {/* PRIMARY action first — the input + gavel sit directly under the title, so
+          on a phone you can type a request without scrolling past the examples. */}
+      <textarea
+        ref={boxRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}
+        rows={3}
+        aria-label="Describe what you like to watch"
+        placeholder="e.g. I love clever comedies and thrillers with a twist — but nothing too slow or gory."
+        className={
+          hero
+            ? 'mt-3 w-full resize-none rounded-xl border border-white/20 bg-ink-950/70 px-4 py-3 text-base font-medium text-white placeholder:text-slate-400 focus:border-brand-400 focus:outline-none'
+            : 'mt-3 w-full resize-none rounded-xl border border-white/15 bg-ink-950/70 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none'
+        }
+      />
+      {/* Full-width on narrow phones (never lopsided / floating to one side);
+          intrinsic-width and right-aligned from `sm` up. */}
+      <div className="mt-2.5 flex flex-col sm:flex-row sm:justify-end">
+        <button
+          onClick={() => void submit()}
+          disabled={busy || text.trim().length < 4}
+          className={`wv-cta-3d w-full disabled:cursor-not-allowed sm:w-auto ${hero ? 'px-8 py-3 text-lg' : 'px-5 py-2.5 text-sm'}`}
+        >
+          {busy ? 'Ruling…' : 'Hit the gavel →'}
+        </button>
+      </div>
+
+      {/* SECONDARY — tappable examples (wrap naturally) + the by-title path, below
+          the primary input so they never push the CTA off-screen. */}
+      <div className="mt-3.5">
         <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Try one — tap to fill</div>
         <div className="flex flex-wrap gap-1.5">
           {EXAMPLES.map((ex) => (
@@ -109,32 +135,9 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
             </button>
           ))}
         </div>
-      </div>
-
-      <textarea
-        ref={boxRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}
-        rows={3}
-        aria-label="Describe what you like to watch"
-        placeholder="e.g. I love clever comedies and thrillers with a twist — but nothing too slow or gory."
-        className={
-          hero
-            ? 'mt-3 w-full resize-none rounded-xl border border-white/20 bg-ink-950/70 px-4 py-3.5 text-base font-medium text-white placeholder:text-slate-400 focus:border-brand-400 focus:outline-none'
-            : 'mt-3 w-full resize-none rounded-xl border border-white/15 bg-ink-950/70 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none'
-        }
-      />
-      {/* Full-width on narrow phones (never lopsided / floating to one side);
-          intrinsic-width and right-aligned from `sm` up. */}
-      <div className="mt-3 flex flex-col sm:flex-row sm:justify-end">
-        <button
-          onClick={() => void submit()}
-          disabled={busy || text.trim().length < 4}
-          className={`wv-cta-3d w-full disabled:cursor-not-allowed sm:w-auto ${hero ? 'px-8 py-3.5 text-lg' : 'px-5 py-2.5 text-sm'}`}
-        >
-          {busy ? 'Ruling…' : 'Hit the gavel →'}
-        </button>
+        <Link href="/app/mentalist" className={`mt-2 inline-block font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline ${hero ? 'text-sm' : 'text-xs'}`}>
+          Or just name a few shows you love — we’ll figure out your taste →
+        </Link>
       </div>
     </div>
   );

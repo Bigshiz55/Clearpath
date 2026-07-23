@@ -46,15 +46,23 @@ export function Logo({
   compact?: boolean;
   size?: 'md' | 'lg';
 }) {
-  const box = size === 'lg' ? 'h-14 w-14 rounded-2xl' : 'h-9 w-9 rounded-xl';
-  const inner = size === 'lg' ? 'h-11 w-11' : 'h-7 w-7';
-  const word = size === 'lg' ? 'text-2xl sm:text-3xl' : 'text-lg';
+  // The mark shrinks on phones so it never crowds the wordmark out of the header
+  // (the `lg` mark was a fixed 56px, which on a 320–390px header pushed the
+  // nowrap wordmark past the edge and clipped it to "WatchVERD_CT").
+  const box = size === 'lg' ? 'h-10 w-10 rounded-xl sm:h-14 sm:w-14 sm:rounded-2xl' : 'h-9 w-9 rounded-xl';
+  const inner = size === 'lg' ? 'h-8 w-8 sm:h-11 sm:w-11' : 'h-7 w-7';
+  // The wordmark stays on ONE line (nowrap) but its size is fluid via clamp(), so
+  // it scales DOWN to fit a narrow phone instead of overflowing/clipping, and back
+  // up on wider screens. `md` keeps the static small size.
+  const wordStyle: React.CSSProperties | undefined =
+    size === 'lg' ? { fontSize: 'clamp(1.05rem, 4.6vw, 1.875rem)' } : undefined;
+  const word = size === 'lg' ? 'leading-none' : 'text-lg';
 
   return (
-    <Link href={href} className="group inline-flex items-center gap-2.5">
+    <Link href={href} className="group inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
       <LogoMark box={box} inner={inner} />
       {!compact && (
-        <span className={`whitespace-nowrap font-bold tracking-tight text-white ${word}`}>
+        <span className={`whitespace-nowrap font-bold tracking-tight text-white ${word}`} style={wordStyle}>
           Watch
           <span className="text-[#ff1493]" aria-hidden>
             VERD

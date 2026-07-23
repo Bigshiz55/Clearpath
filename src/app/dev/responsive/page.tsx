@@ -1,18 +1,34 @@
 import { notFound } from 'next/navigation';
 import { RatingsStrip } from '@/components/RatingsStrip';
 import { BuildCaseBox } from '@/components/BuildCaseBox';
+import { Logo } from '@/components/Logo';
+import { Avatar } from '@/components/Avatar';
+import { ViewModeToggle } from '@/components/ViewModeToggle';
+import { MobileNav } from '@/components/nav/MobileNav';
+import type { NavLink } from '@/components/nav/MoreMenu';
 import type { TileRatings } from '@/lib/ratings';
 import type { MediaType } from '@/lib/types';
 
 /**
- * Responsive test harness — renders the real responsive primitives (the shared
- * `.poster-grid` / `.card` / `.ratings-grid` system, `RatingsStrip`, the card
- * action bar, and the real `BuildCaseBox` "State Your Case" panel) with controlled
- * test data (long titles, missing ratings, all ratings, long platform names). It
- * needs NO auth or TMDB, so Playwright can drive it deterministically at every
- * viewport. Gated behind RESPONSIVE_HARNESS=1 so it never ships in normal builds.
+ * Responsive test harness — renders the REAL mobile primitives so Playwright drives
+ * the actual components, not stand-ins: the real `Logo` in a header that mirrors
+ * `Nav` (item 1: logo must never clip), the real `BuildCaseBox` hero (item 7), the
+ * shared single-column `.poster-grid` of verdict cards (item 2), the priority
+ * `RatingsStrip` metric rows (item 3), the card action bar (item 4), and the real
+ * `MobileNav` fixed bottom bar with the page reserving space for it (item 8).
+ * Controlled data (long titles, missing ratings, all ratings, long platforms) with
+ * NO auth/TMDB, so it's deterministic at every viewport. RESPONSIVE_HARNESS=1 gated.
  */
 export const dynamic = 'force-dynamic';
+
+const PRIMARY: NavLink[] = [
+  { href: '/app', label: 'Home' },
+  { href: '/app/watch', label: 'Watch' },
+  { href: '/app/new', label: 'New' },
+  { href: '/app/on-tv', label: 'TV' },
+  { href: '/app/watchlist', label: 'List' },
+];
+const SECONDARY: NavLink[] = [{ href: '/app/dna', label: 'Your Watch DNA' }, { href: '/app/settings', label: 'Settings' }];
 
 const R = (o: Partial<TileRatings>): TileRatings => ({
   standardScore: 77, audience: null, rtAudience: null, tomatometer: null, imdb: null, metacritic: null, ...o,
@@ -34,8 +50,7 @@ const CARDS: CardSpec[] = [
 function HarnessCard({ c }: { c: CardSpec }) {
   return (
     <div data-testid="card" className="card group flex h-full flex-col overflow-hidden">
-      {/* action bar — three equal-width, 44px-tall For / Pass / Save buttons.
-          Tighter vertical padding on phones (mirrors PosterCard). */}
+      {/* action bar — three equal-width, 44px-tall For / Pass / Save buttons */}
       <div className="flex items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1 sm:py-1.5">
         <button data-testid="action" type="button" className="flex h-11 w-full min-w-0 flex-1 items-center justify-center gap-0.5 rounded-md border border-emerald-400/50 bg-emerald-500/15 text-xs font-bold text-emerald-100">For</button>
         <button data-testid="action" type="button" className="flex h-11 w-full min-w-0 flex-1 items-center justify-center gap-0.5 rounded-md border border-red-400/50 bg-red-500/15 text-xs font-bold text-red-200">Pass</button>
@@ -49,7 +64,7 @@ function HarnessCard({ c }: { c: CardSpec }) {
           <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">{c.mediaType === 'movie' ? 'Movie' : 'TV'}</span>
           <span className="truncate">{c.year ?? '—'}{c.platform ? ` · ${c.platform}` : ''}</span>
         </div>
-        {/* verdict panel */}
+        {/* verdict panel — score dominant, then the ruling, then metric rows */}
         <div data-testid="verdict" className="mt-2 rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 px-2 py-2">
           <div className="flex items-center gap-2.5">
             <span className="grid h-11 w-11 flex-none place-items-center rounded-[24%] bg-black/40 text-xl font-black text-white">{c.score ?? '—'}</span>
@@ -68,7 +83,26 @@ function HarnessCard({ c }: { c: CardSpec }) {
 export default function ResponsiveHarness() {
   if (process.env.RESPONSIVE_HARNESS !== '1') notFound();
   return (
-    <div className="min-h-dvh pb-[calc(4.75rem+env(safe-area-inset-bottom))]">
+    // Reserve space for the fixed bottom nav exactly like the real app layout, so
+    // the overlap test is meaningful.
+    <div className="min-h-dvh pb-[calc(4.75rem+env(safe-area-inset-bottom))] sm:pb-0">
+      {/* Real header, mirroring Nav.tsx structure (logo + compact right controls). */}
+      <header data-testid="site-header" className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[env(safe-area-inset-top)] backdrop-blur">
+        <div className="container-page flex h-16 items-center justify-between gap-2 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-6">
+            <Logo href="/dev/responsive" size="lg" />
+          </div>
+          <div className="flex items-center gap-2">
+            <ViewModeToggle />
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-gold-400/50 bg-gold-500/10 px-2.5 py-1.5 text-sm font-semibold text-gold-100">
+              <span aria-hidden className="text-base leading-none">⭐</span>
+              <span className="hidden sm:inline">Pro</span>
+            </span>
+            <Avatar label="🍿" px={34} />
+          </div>
+        </div>
+      </header>
+
       <main className="container-page py-6">
         <h1 className="mb-4 text-lg font-black text-white">Responsive Harness</h1>
 
@@ -82,12 +116,9 @@ export default function ResponsiveHarness() {
           </div>
         </section>
       </main>
-      {/* a fixed bottom bar mirroring the real MobileNav, to test content clearance */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-ink-950/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:hidden">
-        {['Home', 'Watch', 'New', 'TV', 'More'].map((l) => (
-          <span key={l} className="flex flex-1 flex-col items-center gap-0.5 px-1 py-1 text-[11px] text-slate-300">{l}</span>
-        ))}
-      </nav>
+
+      {/* The REAL fixed bottom nav (phones only). */}
+      <MobileNav primary={PRIMARY} secondary={SECONDARY} />
     </div>
   );
 }

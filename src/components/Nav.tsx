@@ -40,8 +40,8 @@ export function Nav({
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[env(safe-area-inset-top)] backdrop-blur">
-        <div className="container-page flex h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-6">
+        <div className="container-page flex h-16 items-center justify-between gap-2 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-6">
             <Logo href="/app" size="lg" />
             <nav className="hidden items-center gap-1 sm:flex">
               {PRIMARY.map((l) => (

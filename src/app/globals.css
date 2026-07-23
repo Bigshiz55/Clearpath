@@ -89,16 +89,18 @@ body {
   }
   .ontv-viewbar::-webkit-scrollbar { display: none; }
 
-  /* The one poster-grid used across the app. It switches columns on ACTUAL
-     available width, not an assumption: `auto-fit` + `minmax(min(100%, 10rem))`
-     yields ONE full-width card on very small phones (≤~360px content) and TWO
-     only once each card has ≥~160px of usable width (≥~375px). From `sm` up it
-     fills wider tracks so desktop density is unchanged. */
+  /* The one poster-grid used across the app.
+     PHONE (<600px): a TRUE single column — one full-width verdict card per row,
+     never two squeezed side by side. Each card gets the full content width so the
+     score, ratings, and actions have real room (no horizontal compression).
+     ≥600px: multi-column density returns, sized by actual track width so nothing
+     squeezes below readability. This 600px cut is the mobile/desktop boundary the
+     whole layout keys off. */
   .poster-grid {
     @apply grid gap-4;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+    grid-template-columns: 1fr;
   }
-  @media (min-width: 640px) {
+  @media (min-width: 600px) {
     .poster-grid {
       grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     }
@@ -349,7 +351,7 @@ body {
    scoreboard / split-flap: front is the "I", back is a white "1". */
 .wv-iflip {
   display: inline-block;
-  width: 0.64em;
+  width: 0.7em;
   text-align: center;
   perspective: 420px;
   color: #ffffff; /* accent stays white on both the I and the 1 */
