@@ -1,0 +1,116 @@
+{
+  "en-US": {
+    "discover": {
+      "detective": {
+        "nextHours": "next {hours} hours",
+        "ratingsUnavailable": "Ratings not available yet",
+        "scanWindow": "Scan window",
+        "onTheCase": "On the case! Turn on notifications in Settings so we can ping you before it airs.",
+        "onTheCaseSet": "On the case — we’ll ping you 1 hour and 5 minutes before it starts. 🕵️",
+        "heading": "TV Guide Detective",
+        "introA": "One tap and I’ll comb the ",
+        "introB": " of TV listings and hand you a shortlist worth recording or catching live — with the time, the channel, and every rating I can dig up.",
+        "howFarAhead": "How far ahead?",
+        "scanning": "🔎 On the case… scanning listings",
+        "scanCta": "🔎 Scan the {label}",
+        "trailCold": "The trail went cold — nothing notable in the {label}. Try a wider window or check back later.",
+        "allSeen": "You’ve been through them all. Scan again or widen the window for more.",
+        "caseFile": {
+          "one": "Case file · {count} worth your time",
+          "other": "Case file · {count} worth your time"
+        },
+        "remindAirTitle": "Get a notification 1 hour and 5 minutes before it airs",
+        "addedPulled": "Added to your list — pulled in another pick.",
+        "scanAgain": "🔄 Scan again",
+        "whenToday": "Today · {time}",
+        "whenTomorrow": "Tomorrow · {time}",
+        "whenDay": "{day} · {time}",
+        "couldNotSetReminder": "Could not set the reminder.",
+        "somethingWrong": "Something went wrong. Please try again.",
+        "rtCritics": "Rotten Tomatoes (critics)",
+        "tvmazeScore": "TVmaze community score",
+        "turnOn": "Turn on",
+        "dismiss": "Dismiss",
+        "remindOn": "🔔 On",
+        "remindBtn": "🔔 Remind",
+        "tvPlaceholder": "TV"
+      }
+    }
+  },
+  "es-419": {
+    "discover": {
+      "detective": {
+        "nextHours": "próximas {hours} horas",
+        "ratingsUnavailable": "Valoraciones aún no disponibles",
+        "scanWindow": "Ventana de búsqueda",
+        "onTheCase": "¡En el caso! Activa las notificaciones en Ajustes para avisarte antes de la emisión.",
+        "onTheCaseSet": "En el caso — te avisamos 1 hora y 5 minutos antes de que empiece. 🕵️",
+        "heading": "Detective de la guía de TV",
+        "introA": "Con un toque rastreo las ",
+        "introB": " de programación y te entrego una lista corta que vale la pena grabar o ver en vivo — con la hora, el canal y todas las valoraciones que encuentre.",
+        "howFarAhead": "¿Qué tan adelante?",
+        "scanning": "🔎 En el caso… rastreando la programación",
+        "scanCta": "🔎 Rastrear las {label}",
+        "trailCold": "La pista se enfrió — nada notable en las {label}. Prueba una ventana más amplia o vuelve luego.",
+        "allSeen": "Ya los viste todos. Rastrea de nuevo o amplía la ventana para ver más.",
+        "caseFile": {
+          "one": "Expediente · {count} que vale tu tiempo",
+          "other": "Expediente · {count} que valen tu tiempo"
+        },
+        "remindAirTitle": "Recibe una notificación 1 hora y 5 minutos antes de la emisión",
+        "addedPulled": "Agregado a tu lista — traímos otra opción.",
+        "scanAgain": "🔄 Rastrear de nuevo",
+        "whenToday": "Hoy · {time}",
+        "whenTomorrow": "Mañana · {time}",
+        "whenDay": "{day} · {time}",
+        "couldNotSetReminder": "No se pudo crear el recordatorio.",
+        "somethingWrong": "Algo salió mal. Inténtalo de nuevo.",
+        "rtCritics": "Rotten Tomatoes (crítica)",
+        "tvmazeScore": "Puntaje comunitario de TVmaze",
+        "turnOn": "Activar",
+        "dismiss": "Descartar",
+        "remindOn": "🔔 Activo",
+        "remindBtn": "🔔 Recordar",
+        "tvPlaceholder": "TV"
+      }
+    }
+  },
+  "zh-Hans": {
+    "discover": {
+      "detective": {
+        "nextHours": "接下来 {hours} 小时",
+        "ratingsUnavailable": "暂无评分",
+        "scanWindow": "扫描窗口",
+        "onTheCase": "接手调查！请在设置中开启通知，以便在播出前提醒你。",
+        "onTheCaseSet": "接手调查 — 我们会在开始前 1 小时 5 分钟提醒你。🕵️",
+        "heading": "电视指南侦探",
+        "introA": "一键，我就会梳理",
+        "introB": "的电视节目单，为你递上一份值得录制或直播观看的精选 — 附上时间、频道和我能找到的每一项评分。",
+        "howFarAhead": "往后看多久？",
+        "scanning": "🔎 接手调查…正在扫描节目单",
+        "scanCta": "🔎 扫描{label}",
+        "trailCold": "线索断了 — {label}内没有值得关注的内容。试试更大的窗口或稍后再来。",
+        "allSeen": "你已经看完了所有。重新扫描或扩大窗口以获取更多。",
+        "caseFile": {
+          "one": "案卷 · {count} 部值得一看",
+          "other": "案卷 · {count} 部值得一看"
+        },
+        "remindAirTitle": "在播出前 1 小时 5 分钟收到通知",
+        "addedPulled": "已加入你的列表 — 又为你拉来一部。",
+        "scanAgain": "🔄 重新扫描",
+        "whenToday": "今天 · {time}",
+        "whenTomorrow": "明天 · {time}",
+        "whenDay": "{day} · {time}",
+        "couldNotSetReminder": "无法设置提醒。",
+        "somethingWrong": "出错了，请重试。",
+        "rtCritics": "烂番茄（影评人）",
+        "tvmazeScore": "TVmaze 社区评分",
+        "turnOn": "开启",
+        "dismiss": "关闭",
+        "remindOn": "🔔 已开",
+        "remindBtn": "🔔 提醒",
+        "tvPlaceholder": "电视"
+      }
+    }
+  }
+}

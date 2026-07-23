@@ -3,12 +3,15 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
+import { useI18n, useT } from '@/i18n/I18nProvider';
 import { CardDna } from '@/components/CardDna';
 import { SaveButton } from '@/components/SaveButton';
 import { TasteFeedback } from '@/components/TasteFeedback';
 import type { MediaType } from '@/lib/types';
 
 const VISIBLE = 12; // show a window of the pool; hiding one slides the next in
+
+type Translate = (key: string, params?: Record<string, string | number>) => string;
 
 interface Pick {
   id: number;
@@ -28,35 +31,37 @@ interface Pick {
   mediaType: MediaType | null;
 }
 
-function whenLabel(iso: string): string {
+function whenLabel(iso: string, t: Translate, locale: string): string {
   const d = new Date(iso);
   const now = new Date();
   // Force 12-hour AM/PM regardless of the device/server locale.
   const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  if (d.toDateString() === now.toDateString()) return `Today · ${time}`;
-  if (new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString()) return `Tomorrow · ${time}`;
-  return `${d.toLocaleDateString('en-US', { weekday: 'long' })} · ${time}`;
+  if (d.toDateString() === now.toDateString()) return t('discover.detective.whenToday', { time });
+  if (new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString()) return t('discover.detective.whenTomorrow', { time });
+  const day = d.toLocaleDateString(locale, { weekday: 'long' });
+  return t('discover.detective.whenDay', { day, time });
 }
 
 function Ratings({ p }: { p: Pick }) {
+  const t = useT();
   const has = p.tvmaze != null || p.imdb != null || p.rottenTomatoes != null || p.metascore != null;
-  if (!has) return <div className="text-xs text-slate-500">Ratings not available yet</div>;
+  if (!has) return <div className="text-xs text-slate-500">{t('discover.detective.ratingsUnavailable')}</div>;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm font-bold tabular-nums">
       {p.rottenTomatoes != null && (
-        <span className={p.rottenTomatoes >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {p.rottenTomatoes}%</span>
+        <span className={p.rottenTomatoes >= 60 ? 'text-red-300' : 'text-emerald-300'} title={t('discover.detective.rtCritics')}>🍅 {p.rottenTomatoes}%</span>
       )}
       {p.imdb != null && <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {p.imdb.toFixed(1)}</span>}
-      {p.tvmaze != null && <span className="text-gold-300" title="TVmaze community score">★ {p.tvmaze.toFixed(1)}</span>}
+      {p.tvmaze != null && <span className="text-gold-300" title={t('discover.detective.tvmazeScore')}>★ {p.tvmaze.toFixed(1)}</span>}
     </div>
   );
 }
 
 type Horizon = 12 | 24 | 48;
 const HORIZONS: Horizon[] = [12, 24, 48];
-const horizonLabel = (h: Horizon) => `next ${h} hours`;
 
 export function TvDetective() {
+  const { t, plural, locale } = useI18n();
   const [state, setState] = useState<'idle' | 'scanning' | 'done'>('idle');
   const [hours, setHours] = useState<Horizon>(48);
   const [picks, setPicks] = useState<Pick[]>([]);
@@ -64,11 +69,17 @@ export function TvDetective() {
   const [hidden, setHidden] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeSettings, setNoticeSettings] = useState(false);
+
+  const horizonLabel = (h: Horizon) => t('discover.detective.nextHours', { hours: h });
 
   // Triage: drop a pick and let the next reserve item slide into view.
   function remove(id: number, note?: string) {
     setHidden((s) => new Set(s).add(id));
-    if (note) setNotice(note);
+    if (note) {
+      setNotice(note);
+      setNoticeSettings(false);
+    }
   }
 
   async function scan(h: Horizon = hours) {
@@ -95,7 +106,7 @@ export function TvDetective() {
   }
 
   const HorizonToggle = (
-    <div className="inline-flex rounded-xl border border-white/15 bg-ink-900/60 p-1" role="group" aria-label="Scan window">
+    <div className="inline-flex rounded-xl border border-white/15 bg-ink-900/60 p-1" role="group" aria-label={t('discover.detective.scanWindow')}>
       {HORIZONS.map((h) => (
         <button
           key={h}
@@ -126,14 +137,22 @@ export function TvDetective() {
       } else {
         const r = await setTvReminder({ airingId: p.id, showName: p.showName, network: p.network, airstamp: p.airstamp, url: '/app/tv' });
         if (!r.ok) {
-          setNotice(r.error ?? 'Could not set the reminder.');
+          setNotice(r.error ?? t('discover.detective.couldNotSetReminder'));
+          setNoticeSettings(false);
           return;
         }
         setReminded((s) => new Set(s).add(p.id));
-        setNotice(r.needsNotifications ? 'On the case! Turn on notifications in Settings so we can ping you before it airs.' : 'On the case — we’ll ping you 1 hour and 5 minutes before it starts. 🕵️');
+        if (r.needsNotifications) {
+          setNotice(t('discover.detective.onTheCase'));
+          setNoticeSettings(true);
+        } else {
+          setNotice(t('discover.detective.onTheCaseSet'));
+          setNoticeSettings(false);
+        }
       }
     } catch {
-      setNotice('Something went wrong. Please try again.');
+      setNotice(t('discover.detective.somethingWrong'));
+      setNoticeSettings(false);
     } finally {
       setBusy(null);
     }
@@ -144,18 +163,17 @@ export function TvDetective() {
       <div className="flex items-start gap-4">
         <span className="text-4xl" aria-hidden>🕵️</span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold text-white sm:text-xl">TV Guide Detective</h2>
+          <h2 className="text-lg font-bold text-white sm:text-xl">{t('discover.detective.heading')}</h2>
           <p className="mt-1 text-sm text-slate-300">
-            One tap and I’ll comb the <span className="font-semibold text-white">{horizonLabel(hours)}</span> of TV listings and
-            hand you a shortlist worth recording or catching live — with the time, the channel, and every rating I can dig up.
+            {t('discover.detective.introA')}<span className="font-semibold text-white">{horizonLabel(hours)}</span>{t('discover.detective.introB')}
           </p>
           <div className="mt-3">
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">How far ahead?</div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{t('discover.detective.howFarAhead')}</div>
             {HorizonToggle}
           </div>
           {state !== 'done' && (
             <button onClick={() => scan()} disabled={state === 'scanning'} className="btn-primary mt-4 px-5 py-2.5 disabled:opacity-70">
-              {state === 'scanning' ? '🔎 On the case… scanning listings' : `🔎 Scan the ${horizonLabel(hours)}`}
+              {state === 'scanning' ? t('discover.detective.scanning') : t('discover.detective.scanCta', { label: horizonLabel(hours) })}
             </button>
           )}
         </div>
@@ -165,8 +183,8 @@ export function TvDetective() {
         <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-brand-400/40 bg-brand-500/10 px-4 py-3 text-sm text-brand-100">
           <span>{notice}</span>
           <span className="flex flex-none items-center gap-3">
-            {notice.includes('Settings') && <Link href="/app/settings" className="font-bold underline">Turn on</Link>}
-            <button onClick={() => setNotice(null)} aria-label="Dismiss" className="text-lg leading-none">×</button>
+            {noticeSettings && <Link href="/app/settings" className="font-bold underline">{t('discover.detective.turnOn')}</Link>}
+            <button onClick={() => setNotice(null)} aria-label={t('discover.detective.dismiss')} className="text-lg leading-none">×</button>
           </span>
         </div>
       )}
@@ -176,12 +194,12 @@ export function TvDetective() {
         return (
         <div className="mt-5">
           {picks.length === 0 ? (
-            <p className="text-sm text-slate-400">The trail went cold — nothing notable in the {horizonLabel(hours)}. Try a wider window or check back later.</p>
+            <p className="text-sm text-slate-400">{t('discover.detective.trailCold', { label: horizonLabel(hours) })}</p>
           ) : visible.length === 0 ? (
-            <p className="text-sm text-slate-400">You’ve been through them all. Scan again or widen the window for more.</p>
+            <p className="text-sm text-slate-400">{t('discover.detective.allSeen')}</p>
           ) : (
             <>
-              <div className="mb-3 text-sm font-bold uppercase tracking-wide text-brand-300">Case file · {visible.length} worth your time</div>
+              <div className="mb-3 text-sm font-bold uppercase tracking-wide text-brand-300">{plural('discover.detective.caseFile', visible.length, { count: visible.length })}</div>
               <div className="space-y-3">
                 {visible.map((p) => {
                   const ep = [
@@ -199,7 +217,7 @@ export function TvDetective() {
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={p.image} alt="" loading="lazy" className="h-full w-full object-cover" />
                           ) : (
-                            <div className="grid h-full w-full place-items-center text-xs text-slate-500">TV</div>
+                            <div className="grid h-full w-full place-items-center text-xs text-slate-500">{t('discover.detective.tvPlaceholder')}</div>
                           )}
                         </div>
 
@@ -207,9 +225,9 @@ export function TvDetective() {
                           onClick={() => toggle(p)}
                           disabled={busy === p.id}
                           className={`flex w-full items-center justify-center gap-1.5 rounded-xl border py-3 text-sm font-bold transition disabled:opacity-50 ${reminded.has(p.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-brand-400/50 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25'}`}
-                          title="Get a notification 1 hour and 5 minutes before it airs"
+                          title={t('discover.detective.remindAirTitle')}
                         >
-                          {reminded.has(p.id) ? '🔔 On' : '🔔 Remind'}
+                          {reminded.has(p.id) ? t('discover.detective.remindOn') : t('discover.detective.remindBtn')}
                         </button>
                         {p.tmdbId && p.mediaType && (
                           <>
@@ -221,7 +239,7 @@ export function TvDetective() {
                               posterPath={null}
                               variant="inline"
                               wide
-                              onSaved={() => remove(p.id, 'Added to your list — pulled in another pick.')}
+                              onSaved={() => remove(p.id, t('discover.detective.addedPulled'))}
                             />
                             <TasteFeedback
                               tmdbId={p.tmdbId}
@@ -240,7 +258,7 @@ export function TvDetective() {
                       <div className="flex min-w-0 flex-1 flex-col">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-lg border border-brand-400/40 bg-brand-500/20 px-2.5 py-1 text-base font-black text-brand-100">
-                            {whenLabel(p.airstamp)}
+                            {whenLabel(p.airstamp, t, locale)}
                           </span>
                           <span className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-base font-bold text-white">
                             📺 {p.network}
@@ -265,7 +283,7 @@ export function TvDetective() {
                   );
                 })}
               </div>
-              <button onClick={() => scan()} className="mt-4 text-sm font-bold text-brand-300 hover:text-brand-200">🔄 Scan again</button>
+              <button onClick={() => scan()} className="mt-4 text-sm font-bold text-brand-300 hover:text-brand-200">{t('discover.detective.scanAgain')}</button>
             </>
           )}
         </div>

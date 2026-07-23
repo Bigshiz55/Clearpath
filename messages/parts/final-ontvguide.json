@@ -1,0 +1,173 @@
+{
+  "en-US": {
+    "discover": {
+      "onTvGuide": {
+        "couldNotSetReminder": "Could not set the reminder.",
+        "somethingWrong": "Something went wrong. Please try again.",
+        "reminderSetNotif": "Reminder set! Turn on notifications in Settings so we can ping you 1 hour and 5 minutes before.",
+        "reminderSet": "Reminder set — we’ll ping you 1 hour and 5 minutes before it starts. ⏰",
+        "turnOn": "Turn on",
+        "dismiss": "Dismiss",
+        "highlightsWindow": "⏰ Coming on in the next {hours} hours",
+        "highlightsStreaming": "✨ Best of today’s drops",
+        "highlightsBroadcast": "✨ Tonight’s highlights",
+        "subWindow": "Real listings between now and then, soonest first",
+        "subStreaming": "Highest-rated premieres on the major services",
+        "subBroadcast": "Best-reviewed shows in prime time",
+        "ratingSuffix": "— rating is TVmaze’s community score.",
+        "emptyStreamingHeading": "No major streaming premieres today",
+        "emptyBroadcastHeading": "No listings right now",
+        "emptyStreamingBody": "Nothing new dropped on the big services today — check back tomorrow.",
+        "emptyBroadcastBody": "We couldn’t load today’s {country} broadcast schedule. It refreshes hourly — check back shortly.",
+        "primeTime": "Prime time",
+        "nowNext": "Now & next",
+        "allDay": "All day",
+        "all": "All",
+        "movies": "Movies",
+        "shows": "Shows",
+        "byTime": "By time",
+        "defaultSort": "Default",
+        "topRated": "Top rated",
+        "premieres": {
+          "one": "{count} premiere",
+          "other": "{count} premieres"
+        },
+        "airings": {
+          "one": "{count} airing",
+          "other": "{count} airings"
+        },
+        "localTimes": "times are each channel’s local broadcast time",
+        "listEmpty": "Nothing on right now for that view — try a different time window or type.",
+        "today": "Today",
+        "tomorrow": "Tomorrow",
+        "newLabel": "New",
+        "on": "On",
+        "remind": "Remind",
+        "tvBadge": "TV",
+        "am": "AM",
+        "pm": "PM",
+        "rottenTomatoes": "Rotten Tomatoes",
+        "remindTitle": "Get a phone/PC notification 1 hour and 5 minutes before it airs",
+        "calendarTitle": "Or add it to your calendar",
+        "calendarText": "{show} on {network}",
+        "calendarDetails": "On {network}. Added from WatchVerdict.",
+        "tvmazeScore": "TVmaze community score",
+        "rtCritics": "Rotten Tomatoes (critics)"
+      }
+    }
+  },
+  "es-419": {
+    "discover": {
+      "onTvGuide": {
+        "couldNotSetReminder": "No se pudo crear el recordatorio.",
+        "somethingWrong": "Algo salió mal. Inténtalo de nuevo.",
+        "reminderSetNotif": "¡Recordatorio creado! Activa las notificaciones en Ajustes para avisarte 1 hora y 5 minutos antes.",
+        "reminderSet": "Recordatorio creado — te avisamos 1 hora y 5 minutos antes de que empiece. ⏰",
+        "turnOn": "Activar",
+        "dismiss": "Descartar",
+        "highlightsWindow": "⏰ En las próximas {hours} horas",
+        "highlightsStreaming": "✨ Lo mejor de hoy",
+        "highlightsBroadcast": "✨ Destacados de esta noche",
+        "subWindow": "Programación real de aquí a entonces, lo más pronto primero",
+        "subStreaming": "Estrenos mejor valorados en los grandes servicios",
+        "subBroadcast": "Series mejor reseñadas en horario estelar",
+        "ratingSuffix": "— la valoración es el puntaje comunitario de TVmaze.",
+        "emptyStreamingHeading": "Hoy no hay grandes estrenos de streaming",
+        "emptyBroadcastHeading": "Sin programación por ahora",
+        "emptyStreamingBody": "Hoy no llegó nada nuevo a los grandes servicios — vuelve mañana.",
+        "emptyBroadcastBody": "No pudimos cargar la programación de {country} de hoy. Se actualiza cada hora — vuelve en un rato.",
+        "primeTime": "Horario estelar",
+        "nowNext": "Ahora y luego",
+        "allDay": "Todo el día",
+        "all": "Todo",
+        "movies": "Películas",
+        "shows": "Series",
+        "byTime": "Por hora",
+        "defaultSort": "Predeterminado",
+        "topRated": "Mejor valorado",
+        "premieres": {
+          "one": "{count} estreno",
+          "other": "{count} estrenos"
+        },
+        "airings": {
+          "one": "{count} emisión",
+          "other": "{count} emisiones"
+        },
+        "localTimes": "las horas son la hora local de emisión de cada canal",
+        "listEmpty": "Nada en este momento para esa vista — prueba otra franja horaria o tipo.",
+        "today": "Hoy",
+        "tomorrow": "Mañana",
+        "newLabel": "Nuevo",
+        "on": "Activo",
+        "remind": "Recordar",
+        "tvBadge": "TV",
+        "am": "a.m.",
+        "pm": "p.m.",
+        "rottenTomatoes": "Rotten Tomatoes",
+        "remindTitle": "Recibe una notificación en teléfono/PC 1 hora y 5 minutos antes de la emisión",
+        "calendarTitle": "O agrégalo a tu calendario",
+        "calendarText": "{show} en {network}",
+        "calendarDetails": "En {network}. Agregado desde WatchVerdict.",
+        "tvmazeScore": "Puntaje comunitario de TVmaze",
+        "rtCritics": "Rotten Tomatoes (crítica)"
+      }
+    }
+  },
+  "zh-Hans": {
+    "discover": {
+      "onTvGuide": {
+        "couldNotSetReminder": "无法设置提醒。",
+        "somethingWrong": "出错了，请重试。",
+        "reminderSetNotif": "提醒已设！请在设置中开启通知，以便我们在 1 小时 5 分钟前提醒你。",
+        "reminderSet": "提醒已设 — 我们会在开始前 1 小时 5 分钟提醒你。⏰",
+        "turnOn": "开启",
+        "dismiss": "关闭",
+        "highlightsWindow": "⏰ 接下来 {hours} 小时内播出",
+        "highlightsStreaming": "✨ 今日上新精选",
+        "highlightsBroadcast": "✨ 今晚亮点",
+        "subWindow": "从现在到那时的真实节目单，最快的在前",
+        "subStreaming": "主要服务上评分最高的首播",
+        "subBroadcast": "黄金时段口碑最好的剧集",
+        "ratingSuffix": "— 评分为 TVmaze 社区评分。",
+        "emptyStreamingHeading": "今天没有重要的流媒体首播",
+        "emptyBroadcastHeading": "目前没有节目单",
+        "emptyStreamingBody": "今天主要服务上没有新内容 — 明天再来看看。",
+        "emptyBroadcastBody": "无法加载 {country} 今天的广播节目单。它每小时刷新 — 稍后再来看看。",
+        "primeTime": "黄金时段",
+        "nowNext": "现在与稍后",
+        "allDay": "全天",
+        "all": "全部",
+        "movies": "电影",
+        "shows": "剧集",
+        "byTime": "按时间",
+        "defaultSort": "默认",
+        "topRated": "高评分",
+        "premieres": {
+          "one": "{count} 部首播",
+          "other": "{count} 部首播"
+        },
+        "airings": {
+          "one": "{count} 场播出",
+          "other": "{count} 场播出"
+        },
+        "localTimes": "时间为各频道当地播出时间",
+        "listEmpty": "这个视图目前没有内容 — 试试其他时段或类型。",
+        "today": "今天",
+        "tomorrow": "明天",
+        "newLabel": "新",
+        "on": "已开",
+        "remind": "提醒",
+        "tvBadge": "TV",
+        "am": "上午",
+        "pm": "下午",
+        "rottenTomatoes": "烂番茄",
+        "remindTitle": "在播出前 1 小时 5 分钟收到手机/电脑通知",
+        "calendarTitle": "或添加到你的日历",
+        "calendarText": "{network} 的 {show}",
+        "calendarDetails": "在 {network}。来自 WatchVerdict。",
+        "tvmazeScore": "TVmaze 社区评分",
+        "rtCritics": "烂番茄（影评人）"
+      }
+    }
+  }
+}

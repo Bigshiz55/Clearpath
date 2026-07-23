@@ -1,0 +1,38 @@
+{
+  "en-US": {
+    "title": {
+      "interview": {
+        "heading": "10-second check-in",
+        "blurb": "A couple of quick taps and your taste profile gets sharper — this is the stuff no ratings site knows about you.",
+        "nudged": "Noted — I’ll ease off {traits} for you. Edit anytime in Settings.",
+        "thanks": "Thanks — that sharpens your taste profile.",
+        "couldNotSave": "Couldn’t save.",
+        "skip": "Skip"
+      }
+    }
+  },
+  "es-419": {
+    "title": {
+      "interview": {
+        "heading": "Registro de 10 segundos",
+        "blurb": "Un par de toques rápidos y tu perfil de gustos se afina: esto es lo que ningún sitio de reseñas sabe de ti.",
+        "nudged": "Anotado: bajaré la intensidad de {traits} para ti. Edítalo cuando quieras en Ajustes.",
+        "thanks": "Gracias: eso afina tu perfil de gustos.",
+        "couldNotSave": "No se pudo guardar.",
+        "skip": "Omitir"
+      }
+    }
+  },
+  "zh-Hans": {
+    "title": {
+      "interview": {
+        "heading": "10 秒回访",
+        "blurb": "轻点几下，你的口味画像就会更精准——这是任何评分网站都不了解你的地方。",
+        "nudged": "已记下——我会为你减少 {traits}。随时可在设置中修改。",
+        "thanks": "谢谢——这让你的口味画像更精准了。",
+        "couldNotSave": "无法保存。",
+        "skip": "跳过"
+      }
+    }
+  }
+}
