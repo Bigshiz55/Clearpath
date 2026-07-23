@@ -51,9 +51,10 @@ export default async function DiscoverPage() {
 
   return (
     <div className="space-y-8">
-      {/* The promise, front and center. */}
-      <div className="rounded-2xl border border-sky-400/40 bg-gradient-to-r from-sky-600 to-blue-700 px-5 py-5 text-center shadow-[0_10px_40px_-12px_rgba(37,99,235,0.6)]">
-        <p className="text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">
+      {/* The promise — a calm supporting strip so it frames the hero ask below
+          rather than competing with it for attention. */}
+      <div className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-2.5 text-center">
+        <p className="text-sm font-semibold tracking-tight text-sky-100 sm:text-base">
           We earn your subscription. We don’t trick you into one.
         </p>
       </div>
@@ -86,27 +87,25 @@ export default async function DiscoverPage() {
           <SearchBar />
         </div>
 
-        {/* Featured — Decide Together (Live Court): the group "wow", given top
-            billing as a wide, prominent card above the rest of the tiles. */}
+        {/* Decide Together (Live Court) — a supporting strip. It also lives in
+            the primary nav now, so it no longer needs hero-scale billing here;
+            kept as a compact, on-brand entry so the ask box stays dominant. */}
         <Link
           href="/app/together"
           style={{
             '--accent': '244,63,94',
-            background: 'linear-gradient(120deg, rgba(255,46,154,0.22), rgba(168,85,247,0.16) 55%, rgba(9,11,18,0.6))',
-            borderColor: 'rgba(255,46,154,0.4)',
+            background: 'linear-gradient(120deg, rgba(255,46,154,0.16), rgba(168,85,247,0.12) 55%, rgba(9,11,18,0.5))',
+            borderColor: 'rgba(255,46,154,0.32)',
           } as React.CSSProperties}
-          className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/30 active:scale-[0.99] sm:gap-6 sm:p-6"
+          className="group relative flex items-center gap-3 overflow-hidden rounded-xl border p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/25 active:scale-[0.99] sm:gap-4"
         >
-          <span className="relative flex-none">
-            <span aria-hidden className="pointer-events-none absolute -inset-3 rounded-full opacity-60 blur-2xl" style={{ background: 'radial-gradient(circle, rgba(255,46,154,0.7), transparent 70%)' }} />
-            <TileIcon name="together" className="relative h-20 w-20 drop-shadow-[0_12px_26px_rgba(0,0,0,0.55)] transition-transform duration-300 group-hover:scale-[1.06] sm:h-24 sm:w-24" />
-          </span>
+          <TileIcon name="together" className="h-11 w-11 flex-none drop-shadow-[0_8px_18px_rgba(0,0,0,0.5)] transition-transform duration-300 group-hover:scale-[1.06] sm:h-12 sm:w-12" />
           <span className="min-w-0 flex-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-100">⚖️ Live Court</span>
-            <span className="mt-1.5 block text-2xl font-black tracking-tight text-white sm:text-3xl">Decide Together</span>
-            <span className="mt-0.5 block text-sm text-slate-200 sm:text-base">One verdict for the whole room — everyone votes from their own phone, the judge settles it.</span>
+            <span className="text-[11px] font-bold uppercase tracking-wide text-brand-100">⚖️ Live Court</span>
+            <span className="block text-base font-black tracking-tight text-white sm:text-lg">Decide Together</span>
+            <span className="line-clamp-1 block text-xs text-slate-300 sm:text-sm">One verdict for the whole room — everyone votes from their own phone.</span>
           </span>
-          <span aria-hidden className="pointer-events-none flex-none text-2xl font-black text-brand-300 transition-transform duration-300 group-hover:translate-x-0.5 sm:text-3xl">→</span>
+          <span aria-hidden className="pointer-events-none flex-none text-xl font-black text-brand-300 transition-transform duration-300 group-hover:translate-x-0.5">→</span>
         </Link>
 
         {/* Big, clear tiles — every area of the app, tap to go deeper. Cleaned to
