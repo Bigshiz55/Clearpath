@@ -12,6 +12,9 @@ import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { genreIdFromName } from '@/lib/finderGenres';
 import { runFinder, type FinderItem, type FinderQuery } from '@/lib/finder';
 import type { TitleVerdict, AltItem, JudgeFactor } from '@/lib/askTypes';
+import { getCachedDimensions } from '@/lib/titleDimensions';
+import { rankSeedSimilar } from '@/lib/search/seedSimilarity';
+import { canonicalKey, type SeedTitle } from '@/lib/search/titleDna';
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
 
@@ -112,17 +115,32 @@ export async function askSimilarTo(
       .map((r) => `${r.media_type}-${r.tmdb_id}`),
   );
 
-  const seedKey = `${seed.mediaType}-${seed.id}`;
-  const cands = similar
-    .filter((s) => `${s.mediaType}-${s.id}` !== seedKey && !seen.has(`${s.mediaType}-${s.id}`))
-    .slice(0, 16);
+  // Only drop titles the user has already handled here; the SEED itself and any
+  // canonical duplicate are excluded later by canonical identity (not a bare id),
+  // so an alternate/re-release record of the seed can't slip through.
+  const cands = similar.filter((s) => !seen.has(`${s.mediaType}-${s.id}`)).slice(0, 16);
+
+  // Title-DNA for the gate: genres + keywords come free from metadata; the 15-axis
+  // fingerprint is read cache-only (no LLM at request time) — missing fingerprints
+  // degrade gracefully (the gate then relies on genres + keyword anchors).
+  const seedData = await getScoringData(seed.mediaType, seed.id, region).catch(() => null);
+  const dims = await getCachedDimensions([
+    { tmdb_id: seed.id, media_type: seed.mediaType },
+    ...cands.map((c) => ({ tmdb_id: c.id, media_type: c.mediaType })),
+  ]).catch(() => new Map());
+  const seedDna: SeedTitle = {
+    canonicalId: canonicalKey({ title: seed.title, year: seed.year ?? null, mediaType: seed.mediaType }),
+    tmdbId: seed.id, title: seed.title, year: seed.year ?? null, mediaType: seed.mediaType,
+    genres: seedData?.meta.genres ?? [], keywords: seedData?.meta.keywords ?? [],
+    dims: dims.get(`${seed.mediaType}-${seed.id}`) ?? {}, collectionId: null, dimsConfidence: 0.9,
+  };
 
   const scored = await Promise.all(
     cands.map(async (c) => {
       try {
         const { meta, providers } = await getScoringData(c.mediaType, c.id, region);
         const report = buildVerdict({ meta, providers, personal: { ...personal, collectionId: null } });
-        return {
+        const item = {
           id: c.id,
           mediaType: c.mediaType,
           title: meta.title,
@@ -138,16 +156,31 @@ export async function askSimilarTo(
           ratings: tileRatingsFromScore(report.general),
           imdbId: meta.imdbId ?? null,
         } as FinderItem;
+        const dna: SeedTitle & { personalScore: number } = {
+          canonicalId: canonicalKey({ title: meta.title, year: meta.year, mediaType: c.mediaType }),
+          tmdbId: c.id, title: meta.title, year: meta.year, mediaType: c.mediaType,
+          genres: meta.genres ?? [], keywords: meta.keywords ?? [],
+          dims: dims.get(`${c.mediaType}-${c.id}`) ?? {}, collectionId: null,
+          personalScore: report.personal.score,
+        };
+        return { item, dna };
       } catch {
         return null;
       }
     }),
   );
 
-  const items = scored
-    .filter((x): x is FinderItem => x !== null)
-    .sort((a, b) => b.matchScore - a.matchScore)
-    .slice(0, Math.max(1, Math.min(limit, 20)));
+  const pairs = scored.filter((x): x is { item: FinderItem; dna: SeedTitle & { personalScore: number } } => x !== null);
+
+  // The seed-similarity qualification gate: canonical seed/duplicate exclusion +
+  // shared-anchor / contradiction gate applied BEFORE personalization. Personal
+  // fit ranks only the survivors — it can never rescue a candidate that fails the
+  // gate. We return FEWER results rather than pad with weak matches.
+  const ranked = rankSeedSimilar(seedDna, pairs.map((p) => p.dna), {
+    requestedCount: Math.max(1, Math.min(limit, 20)),
+  });
+  const byCanonical = new Map(pairs.map((p) => [p.dna.canonicalId, p.item]));
+  const items = ranked.items.map((r) => byCanonical.get(r.canonicalId)).filter((x): x is FinderItem => x != null);
   if (items.length === 0) return null;
 
   const query: FinderQuery = { ...EMPTY_QUERY, mediaType: seed.mediaType, similarTo: seed.title };
