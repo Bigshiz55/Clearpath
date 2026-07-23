@@ -1,3 +1,7 @@
+'use client';
+
+import { useT } from '@/i18n/I18nProvider';
+
 /** A judge portrait wearing a black robe with a white collar — the face (a dog
  *  photo or a sponsor emoji) sits in a ring above the robe. */
 export function RobedPortrait({
@@ -5,7 +9,7 @@ export function RobedPortrait({
   emoji,
   size,
   accent = '#f5c65a',
-  alt = 'The presiding judge',
+  alt,
 }: {
   src?: string;
   emoji?: string | null;
@@ -13,6 +17,8 @@ export function RobedPortrait({
   accent?: string;
   alt?: string;
 }) {
+  const t = useT();
+  const altText = alt ?? t('together.presidingJudgeAlt');
   const robeW = Math.round(size * 1.75);
   return (
     <div className="relative flex-none" style={{ width: size, height: Math.round(size * 1.4) }}>
@@ -44,7 +50,7 @@ export function RobedPortrait({
           </div>
         ) : src ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt={alt} className="h-full w-full object-cover" />
+          <img src={src} alt={altText} className="h-full w-full object-cover" />
         ) : null}
       </div>
     </div>

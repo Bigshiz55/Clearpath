@@ -343,7 +343,7 @@ function FinalistCard({ f, onVeto, busy }: { f: Finalist; onVeto: () => void; bu
       <div className="flex gap-3">
         <div className="relative h-32 w-[86px] flex-none overflow-hidden rounded-xl border border-white/10 bg-ink-800">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {f.posterUrl ? <img src={f.posterUrl} alt="" className="h-full w-full object-cover" /> : <div className="grid h-full w-full place-items-center text-xs text-slate-500">No art</div>}
+          {f.posterUrl ? <img src={f.posterUrl} alt="" className="h-full w-full object-cover" /> : <div className="grid h-full w-full place-items-center text-xs text-slate-500">{t('together.noArt')}</div>}
           <span className="absolute left-1 top-1 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-black text-white">{medal} #{f.rank}</span>
         </div>
         <div className="flex min-w-0 flex-1 flex-col">

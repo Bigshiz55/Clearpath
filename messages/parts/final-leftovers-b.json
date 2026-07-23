@@ -1,0 +1,47 @@
+{
+  "en-US": {
+    "nav": {
+      "proUpsell": "WatchVerdict Pro — AI-tuned verdicts, household profiles & more",
+      "account": "Account",
+      "accountPro": "Account · Pro member",
+      "yourAccount": "Your account",
+      "yourAccountPro": "Your account · Pro member"
+    },
+    "together": {
+      "noArt": "No art"
+    },
+    "card": {
+      "matchTooltip": "Your personal match — the algorithm scores this title against your taste, separate from critics and the crowd."
+    }
+  },
+  "es-419": {
+    "nav": {
+      "proUpsell": "WatchVerdict Pro — veredictos ajustados con IA, perfiles del hogar y más",
+      "account": "Cuenta",
+      "accountPro": "Cuenta · Miembro Pro",
+      "yourAccount": "Tu cuenta",
+      "yourAccountPro": "Tu cuenta · Miembro Pro"
+    },
+    "together": {
+      "noArt": "Sin imagen"
+    },
+    "card": {
+      "matchTooltip": "Tu coincidencia personal: el algoritmo evalúa este título según tu gusto, aparte de la crítica y el público."
+    }
+  },
+  "zh-Hans": {
+    "nav": {
+      "proUpsell": "WatchVerdict Pro — AI 调校的评判、家庭档案等更多功能",
+      "account": "账户",
+      "accountPro": "账户 · Pro 会员",
+      "yourAccount": "你的账户",
+      "yourAccountPro": "你的账户 · Pro 会员"
+    },
+    "together": {
+      "noArt": "无海报"
+    },
+    "card": {
+      "matchTooltip": "你的个人契合度 — 算法依据你的口味为此影视评分，独立于影评人和大众。"
+    }
+  }
+}

@@ -182,7 +182,7 @@ export function BrowseCatalog({
             })}
             {!providerQuery && providers.length > 18 && (
               <button onClick={() => setShowAllProviders((v) => !v)} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-300 hover:text-brand-200">
-                {showAllProviders ? 'Fewer' : `+${providers.length - 18} more`}
+                {showAllProviders ? tr('discover.browse.fewer') : tr('discover.browse.moreProviders', { count: providers.length - 18 })}
               </button>
             )}
           </div>
@@ -195,7 +195,7 @@ export function BrowseCatalog({
           {Array.from({ length: 12 }).map((_, i) => <div key={i} className="aspect-[2/3] animate-pulse rounded-2xl bg-white/5" />)}
         </div>
       ) : items.length === 0 ? (
-        <p className="text-sm text-slate-400">Nothing matches those filters. Loosen the price, rating, or service and try again.</p>
+        <p className="text-sm text-slate-400">{tr('discover.browse.emptyFilters')}</p>
       ) : (
         <>
           <div className="poster-grid">
@@ -215,10 +215,10 @@ export function BrowseCatalog({
           <div className="flex justify-center pt-2">
             {!done ? (
               <button onClick={loadMore} disabled={loading} className="btn-secondary px-6 disabled:opacity-50">
-                {loading ? 'Loading…' : 'Load more'}
+                {loading ? tr('discover.browse.loading') : tr('discover.browse.loadMore')}
               </button>
             ) : (
-              <span className="text-xs text-slate-500">That’s everything for these filters.</span>
+              <span className="text-xs text-slate-500">{tr('discover.browse.everything')}</span>
             )}
           </div>
         </>

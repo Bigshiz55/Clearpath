@@ -83,7 +83,7 @@ export function Nav({
             <ViewModeToggle />
             <Link
               href="/app/pro"
-              title="WatchVerdict Pro — AI-tuned verdicts, household profiles & more"
+              title={t('nav.proUpsell')}
               className="inline-flex items-center gap-1.5 rounded-lg border border-gold-400/50 bg-gold-500/10 px-2.5 py-1.5 text-sm font-semibold text-gold-100 transition hover:bg-gold-500/20"
             >
               <span aria-hidden className="text-base leading-none">⭐</span>
@@ -101,8 +101,8 @@ export function Nav({
                 <SignOutButton className="btn-secondary hidden sm:inline-flex" />
                 <Link
                   href="/app/settings"
-                  aria-label={`Account${pro ? ' · Pro member' : ''}`}
-                  title={pro ? 'Your account · Pro member' : 'Your account'}
+                  aria-label={pro ? t('nav.accountPro') : t('nav.account')}
+                  title={pro ? t('nav.yourAccountPro') : t('nav.yourAccount')}
                   className="ml-0.5 inline-flex"
                 >
                   <Avatar label={avatarLabel} px={34} pro={pro} />

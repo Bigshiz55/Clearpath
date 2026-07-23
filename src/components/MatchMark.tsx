@@ -6,9 +6,12 @@
  */
 import { useT } from '@/i18n/I18nProvider';
 
-
-export const MATCH_TOOLTIP =
-  'Your personal match — the algorithm scores this title against your taste, separate from critics and the crowd.';
+/** The translated match-mark tooltip, for any consumer that needs the copy on
+ *  its own (e.g. as a `title`/`aria` string) rather than the rendered mark. */
+export function useMatchTooltip(): string {
+  const t = useT();
+  return t('card.matchTooltip');
+}
 
 export function MatchMark({
   className = '',
