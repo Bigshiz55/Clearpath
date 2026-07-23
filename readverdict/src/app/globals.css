@@ -27,6 +27,20 @@ body {
   @apply bg-obsidian-950 font-sans text-ivory-100 antialiased;
   background-image: theme('backgroundImage.verdict-radial');
   background-attachment: fixed;
+  text-rendering: optimizeLegibility;
+}
+
+/* Editorial defaults: display headings render in the serif face. */
+h1,
+h2,
+h3 {
+  @apply font-display;
+  text-wrap: balance;
+}
+
+/* A comfortable measure for long-form copy. */
+p {
+  text-wrap: pretty;
 }
 
 * {
@@ -57,5 +71,34 @@ body {
 
   .link-quiet {
     @apply text-signal-300 underline-offset-4 transition hover:text-signal-400 hover:underline;
+  }
+
+  /* Shimmering placeholder block for loading states. */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-obsidian-800;
+  }
+  .skeleton::after {
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    content: '';
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
+  }
+
+  /* Long-form reading column. */
+  .prose-read {
+    @apply max-w-prose font-display text-lg leading-relaxed text-ivory-200;
+  }
+  .prose-read p + p {
+    @apply mt-4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    @apply animate-none;
   }
 }

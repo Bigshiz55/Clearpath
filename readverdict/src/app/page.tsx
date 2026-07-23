@@ -1,6 +1,8 @@
-import Link from 'next/link';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { VerdictBadge } from '@/components/ui/VerdictBadge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Chip } from '@/components/ui/Chip';
 
 const AREAS = [
   {
@@ -25,6 +27,14 @@ const AREAS = [
   },
 ];
 
+const PREVIEW_CHIPS = [
+  'Psychological thriller',
+  'Under 350 pages',
+  'Fast pacing',
+  'Standalone',
+  'No supernatural',
+];
+
 export default function HomePage() {
   return (
     <div className="animate-fade-up space-y-16">
@@ -32,7 +42,7 @@ export default function HomePage() {
         <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-brass-400">
           Part of the Verdict family
         </p>
-        <h1 className="max-w-3xl font-display text-4xl font-bold leading-[1.08] tracking-tight text-ivory-50 sm:text-6xl">
+        <h1 className="max-w-3xl font-display text-display-lg font-bold text-ivory-50">
           The right book.
           <br />
           <span className="text-brass-400">Not more books.</span>
@@ -44,12 +54,12 @@ export default function HomePage() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Link href="/ask" className="btn-brass">
+          <Button href="/ask" size="lg">
             Ask ReadVerdict
-          </Link>
-          <Link href="/discover" className="btn-ghost">
+          </Button>
+          <Button href="/discover" variant="secondary" size="lg">
             Explore Discover
-          </Link>
+          </Button>
         </div>
 
         <p className="mt-6 text-sm text-ivory-400">
@@ -63,7 +73,7 @@ export default function HomePage() {
         <h2 id="preview-heading" className="sr-only">
           What a verdict looks like
         </h2>
-        <div className="card p-6">
+        <Card padding="lg">
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs uppercase tracking-[0.18em] text-ivory-400">
               Example verdict layout
@@ -74,20 +84,18 @@ export default function HomePage() {
             “A fast, twisty thriller under 350 pages, standalone, nothing
             supernatural.”
           </p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs">
-            {['Psychological thriller', 'Under 350 pages', 'Fast pacing', 'Standalone', 'No supernatural'].map(
-              (chip) => (
-                <span key={chip} className="pill">
-                  {chip}
-                </span>
-              ),
-            )}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {PREVIEW_CHIPS.map((chip) => (
+              <Chip key={chip} tone="brass">
+                {chip}
+              </Chip>
+            ))}
           </div>
           <p className="mt-4 text-sm text-ivory-400">
             The interpretation chips above are editable — you stay in control of
             what ReadVerdict understood. Live results arrive in Phase 4.
           </p>
-        </div>
+        </Card>
       </section>
 
       <section aria-labelledby="areas-heading">
@@ -98,16 +106,17 @@ export default function HomePage() {
         />
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {AREAS.map((a) => (
-            <Link
-              key={a.href}
-              href={a.href}
-              className="card group p-6 transition hover:border-brass-500/40"
-            >
-              <h3 className="font-display text-xl font-semibold text-ivory-50 group-hover:text-brass-300">
-                {a.title}
-              </h3>
-              <p className="mt-2 text-ivory-300">{a.body}</p>
-            </Link>
+            <Card key={a.href} as="article" interactive padding="none">
+              <a
+                href={a.href}
+                className="block rounded-2xl p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-brass-300"
+              >
+                <h3 className="font-display text-xl font-semibold text-ivory-50">
+                  {a.title}
+                </h3>
+                <p className="mt-2 text-ivory-300">{a.body}</p>
+              </a>
+            </Card>
           ))}
         </div>
       </section>

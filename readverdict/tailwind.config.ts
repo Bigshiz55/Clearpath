@@ -57,7 +57,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        // Editorial display serif (system stack for now; Phase 2 may license a face).
+        // Editorial display serif (system stack; a licensed face can drop in later).
         display: ['Georgia', 'Cambria', 'Times New Roman', 'ui-serif', 'serif'],
         sans: [
           'ui-sans-serif',
@@ -70,6 +70,12 @@ const config: Config = {
           'sans-serif',
         ],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      fontSize: {
+        // Fluid editorial display scale (clamped so it never overflows mobile).
+        'display-sm': ['clamp(1.85rem, 1.4rem + 2.2vw, 2.6rem)', { lineHeight: '1.1', letterSpacing: '-0.015em' }],
+        'display-md': ['clamp(2.3rem, 1.6rem + 3.4vw, 3.4rem)', { lineHeight: '1.06', letterSpacing: '-0.02em' }],
+        'display-lg': ['clamp(2.8rem, 1.6rem + 5.4vw, 4.6rem)', { lineHeight: '1.02', letterSpacing: '-0.025em' }],
       },
       borderRadius: {
         xl: '0.9rem',
@@ -92,9 +98,13 @@ const config: Config = {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 0.4s ease-out both',
+        shimmer: 'shimmer 1.6s infinite',
       },
     },
   },

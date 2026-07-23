@@ -96,9 +96,18 @@ Deterministic ordering, so behavior is testable by the Search Lab (Phase 11):
   - Desktop: Ask · Discover · My Books · Read Together · Profile
   - Mobile: Home · Ask · My Books · Together · Profile
   - Secondary (from Profile): Reader DNA
-- **UI primitives**: `Container`, `PageHeader`, `EmptyState` (honest,
-  phase-labeled), `VerdictBadge`.
-- **States**: global `loading`, `error`, and `not-found`.
+- **Component library** (`src/components/ui/`, Phase 2): `Button` (polymorphic
+  button/link, 4 variants × 3 sizes), `Card`, `Chip` + editable
+  `InterpretationChip`, `Field`/`Input`/`Textarea`, `Avatar` (deterministic
+  tint), `Skeleton` family, `Spinner`, `StatusPill`, `ScoreDial`, `Rating`,
+  `SegmentedControl`, `Divider`, `VisuallyHidden`, plus `Container`,
+  `PageHeader`, `EmptyState`, `ErrorState`, `VerdictBadge`. Pure logic behind
+  the visual components lives in `src/lib/ui/` (initials, dial geometry, star
+  breakdown) and is unit-tested.
+- **States**: global `loading` (Spinner), `error`, `not-found`; inline
+  `EmptyState`/`ErrorState`/skeletons for section-level states.
+- **Style guide**: `/style-guide` renders the whole library (noindex, not in
+  the product nav) for visual verification.
 
 ## 7. Data & auth _(planned — Phase 5)_
 
@@ -146,8 +155,9 @@ holdout, live-observation. Deterministic fixtures; strict cost controls.
 | Area | State |
 | --- | --- |
 | Stack, configs, gates (typecheck/lint/test/build) | **Real** |
-| Design tokens, responsive shell, navigation | **Real** |
-| Verdict tier taxonomy + `cn` util (+ tests) | **Real** |
+| Design tokens, typography, responsive shell, navigation | **Real** |
+| Component library + `/style-guide` | **Real** |
+| Verdict tier taxonomy, `cn`, UI logic helpers (+ 19 tests) | **Real** |
 | Supabase client scaffolding (null until configured) | **Real (inert)** |
 | Ask / Discover / My Books / Together / Reader DNA pages | **Honest placeholders** |
 | Book data, DNA stores, pipeline, availability, i18n, analytics, Search Lab | **Planned** (Phases 3–11) |

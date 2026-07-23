@@ -10,12 +10,13 @@ tuned to your taste, your time, your format, and who you're reading with.
 It is deliberately **not** a catalog, a popularity feed, or a Goodreads clone.
 Its job is to _reduce_ choice to the right next read.
 
-> **Status: Phase 1 — durable foundation.** This repository is the project
-> baseline: stack, brand tokens, responsive app shell, Supabase-ready
-> architecture, tests, and a green production build. Feature surfaces
-> (Ask, Discover, My Books, Read Together, Reader DNA) are present as
-> **honest, phase-labeled placeholders** — they never fabricate book data.
-> See [`ARCHITECTURE.md`](./ARCHITECTURE.md) and the phased plan below.
+> **Status: Phase 2 complete — brand & application shell.** On top of the Phase 1
+> foundation, this adds a deepened design-token/typography system, a reusable
+> **component library** (`src/components/ui/`), interaction previews, and a
+> living **style guide** at `/style-guide`. Feature surfaces (Ask, Discover,
+> My Books, Read Together, Reader DNA) remain **honest, phase-labeled
+> placeholders** — they never fabricate book data. See
+> [`ARCHITECTURE.md`](./ARCHITECTURE.md) and the phased plan below.
 
 ## Stack
 
@@ -69,7 +70,12 @@ src/
     layout.tsx             # Root layout → AppShell
   components/
     nav/                   # AppShell, responsive nav (desktop bar + mobile tabs)
-    ui/                    # Container, PageHeader, EmptyState, VerdictBadge
+    ui/                    # Component library — Button, Card, Chip,
+                           #   InterpretationChip, Field/Input/Textarea, Avatar,
+                           #   Skeleton, Spinner, StatusPill, ScoreDial, Rating,
+                           #   SegmentedControl, Divider, VerdictBadge, states…
+    ask/                   # Ask-surface previews (InterpretationPreview)
+    styleguide/            # Interactive style-guide demos
     icons.tsx
   config/nav.ts            # Canonical navigation (desktop vs mobile subsets)
   lib/
@@ -98,8 +104,8 @@ test/shims/                # server-only shim for the Vitest runner
 
 ## Phased build plan
 
-1. **Durable foundation** ← _this repository_
-2. Brand & application shell
+1. **Durable foundation** ✅
+2. **Brand & application shell** ✅ ← _current_
 3. Core book data (canonical models, Book DNA, provenance)
 4. Ask ReadVerdict (Search DNA parser, results, Full Verdict)
 5. Reader DNA

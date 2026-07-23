@@ -1,10 +1,19 @@
 import type { Metadata } from 'next';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { StatusPill, type BookStatus } from '@/components/ui/StatusPill';
 
 export const metadata: Metadata = { title: 'My Books' };
 
-const STATUSES = ['Saved', 'Interested', 'Reading', 'Finished', 'DNF', 'Paused', 'Want to reread'];
+const STATUSES: BookStatus[] = [
+  'Saved',
+  'Interested',
+  'Reading',
+  'Finished',
+  'DNF',
+  'Paused',
+  'Want to reread',
+];
 
 export default function MyBooksPage() {
   return (
@@ -17,9 +26,7 @@ export default function MyBooksPage() {
 
       <div className="flex flex-wrap gap-2">
         {STATUSES.map((s) => (
-          <span key={s} className="pill">
-            {s}
-          </span>
+          <StatusPill key={s} status={s} />
         ))}
       </div>
 
