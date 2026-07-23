@@ -1,24 +1,21 @@
 import Link from 'next/link';
-import { SearchBar } from '@/components/SearchBar';
 
 export default function NotFound() {
   return (
-    <div className="mx-auto max-w-xl py-16 text-center">
-      <h1 className="font-serif text-3xl font-bold text-paper-50">
-        We couldn’t find that page
-      </h1>
-      <p className="mt-3 text-paper-200">
-        The book or page you’re after isn’t here. Try searching for a title or
-        author instead.
+    <div className="mx-auto max-w-lg py-16 text-center">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brass-400">404</p>
+      <h1 className="mt-2 font-display text-3xl font-bold text-ivory-50">Page not found</h1>
+      <p className="mt-3 text-ivory-300">
+        That page doesn’t exist yet. Head back and ask ReadVerdict instead.
       </p>
-      <div className="mt-8">
-        <SearchBar autoFocus />
-      </div>
-      <p className="mt-6 text-sm">
-        <Link href="/" className="link-quiet">
-          ← Back home
+      <div className="mt-8 flex justify-center gap-3">
+        <Link href="/" className="btn-ghost">
+          Home
         </Link>
-      </p>
+        <Link href="/ask" className="btn-brass">
+          Ask ReadVerdict
+        </Link>
+      </div>
     </div>
   );
 }

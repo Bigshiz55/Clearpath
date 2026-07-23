@@ -1,56 +1,64 @@
 import type { Config } from 'tailwindcss';
 
+/**
+ * ReadVerdict design tokens — part of the Verdict product family.
+ * Direction: premium, editorial, cinematic-but-for-books. Deep warm-obsidian
+ * surfaces, ivory type, a brass "verdict" accent, and a restrained signal blue.
+ * Not a library aesthetic; not a bookstore.
+ */
 const config: Config = {
+  darkMode: 'class',
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Warm "reading room" palette — paper, ink, and a bookmark accent.
-        paper: {
-          50: '#fbf7ef',
-          100: '#f4ecdd',
-          200: '#e8dbc2',
+        // Warm near-black surface ramp.
+        obsidian: {
+          950: '#08080a',
+          900: '#0d0d10',
+          850: '#121319',
+          800: '#181a22',
+          700: '#22242f',
+          600: '#2e313f',
+          500: '#3d4152',
         },
-        ink: {
-          950: '#0c0a07',
-          900: '#14110b',
-          850: '#1b1710',
-          800: '#241f16',
-          700: '#332b1f',
-          600: '#4a3f2e',
-          500: '#6b5c44',
+        // Ivory / parchment type ramp.
+        ivory: {
+          50: '#fbfaf6',
+          100: '#f3f1e9',
+          200: '#e3e0d3',
+          300: '#c9c5b4',
+          400: '#a6a292',
         },
-        accent: {
-          50: '#fff5ec',
-          100: '#ffe6d1',
-          200: '#f9c9a3',
-          300: '#f6b587',
-          400: '#ef944f',
-          500: '#e2762a',
-          600: '#c15d18',
-          700: '#974714',
+        // Brass — the editorial "Verdict" accent.
+        brass: {
+          50: '#fbf3df',
+          100: '#f6e6ba',
+          300: '#e6c877',
+          400: '#d8b154',
+          500: '#c6963a',
+          600: '#a2792c',
+          700: '#7c5d23',
         },
-        leaf: {
-          400: '#7cba6b',
-          500: '#57a24a',
+        // Restrained signal blue for interactive/link states.
+        signal: {
+          300: '#8fb8ff',
+          400: '#5f93f5',
+          500: '#3d73e0',
+          600: '#2c58b8',
         },
+        // Verdict tiers (working terminology).
         verdict: {
-          must: '#3fa34d',
-          strong: '#6bbf59',
-          worth: '#a8c256',
-          possible: '#e0b83c',
-          low: '#e08a3c',
-          skip: '#d1685c',
+          must: '#3fb27f', // Must Read
+          strong: '#79c06a', // Strong Yes
+          worth: '#c6b24a', // Worth a Look
+          maybe: '#d59440', // Maybe
+          pass: '#c96f63', // Probably Pass
         },
       },
       fontFamily: {
-        serif: [
-          'ui-serif',
-          'Georgia',
-          'Cambria',
-          'Times New Roman',
-          'serif',
-        ],
+        // Editorial display serif (system stack for now; Phase 2 may license a face).
+        display: ['Georgia', 'Cambria', 'Times New Roman', 'ui-serif', 'serif'],
         sans: [
           'ui-sans-serif',
           'system-ui',
@@ -61,14 +69,23 @@ const config: Config = {
           'Arial',
           'sans-serif',
         ],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      borderRadius: {
+        xl: '0.9rem',
+        '2xl': '1.25rem',
       },
       boxShadow: {
-        book: '0 10px 40px -12px rgba(0,0,0,0.55)',
-        spine: 'inset 3px 0 6px -3px rgba(0,0,0,0.5)',
+        card: '0 12px 40px -16px rgba(0,0,0,0.7)',
+        ring: '0 0 0 1px rgba(255,255,255,0.05)',
+        brass: '0 8px 30px -10px rgba(198,150,58,0.45)',
       },
       backgroundImage: {
-        'reading-radial':
-          'radial-gradient(1100px 560px at 82% -12%, rgba(226,118,42,0.14), transparent), radial-gradient(820px 460px at 0% 0%, rgba(87,162,74,0.08), transparent)',
+        'verdict-radial':
+          'radial-gradient(1200px 600px at 85% -10%, rgba(198,150,58,0.12), transparent), radial-gradient(900px 520px at 0% 0%, rgba(61,115,224,0.08), transparent)',
+      },
+      maxWidth: {
+        content: '72rem',
       },
       keyframes: {
         'fade-up': {

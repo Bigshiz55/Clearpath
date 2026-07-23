@@ -6,41 +6,56 @@
   color-scheme: dark;
 }
 
-html,
-body {
-  min-height: 100%;
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 body {
-  @apply bg-ink-950 text-paper-100 antialiased;
-  background-image: theme('backgroundImage.reading-radial');
+  @apply bg-obsidian-950 font-sans text-ivory-100 antialiased;
+  background-image: theme('backgroundImage.verdict-radial');
   background-attachment: fixed;
 }
 
-/* Thin, unobtrusive scrollbars that suit the dark reading-room theme. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: theme('colors.ink.600') transparent;
+  scrollbar-color: theme('colors.obsidian.600') transparent;
 }
 
 ::selection {
-  @apply bg-accent-500/40 text-paper-50;
+  @apply bg-brass-500/40 text-ivory-50;
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-ink-700/70 bg-ink-900/70 shadow-book backdrop-blur;
+    @apply rounded-2xl border border-obsidian-700/70 bg-obsidian-900/70 shadow-card backdrop-blur;
   }
 
   .pill {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-700 bg-ink-850 px-3 py-1 text-xs font-medium text-paper-200;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-obsidian-600 bg-obsidian-850 px-3 py-1 text-xs font-medium text-ivory-200;
   }
 
-  .btn-accent {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-accent-500 px-5 py-3 font-semibold text-ink-950 transition hover:bg-accent-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-300;
+  .btn-brass {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brass-500 px-5 py-3 font-semibold text-obsidian-950 shadow-brass transition hover:bg-brass-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brass-300 focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian-950;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-obsidian-600 px-5 py-3 font-semibold text-ivory-100 transition hover:border-obsidian-500 hover:bg-obsidian-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brass-300;
   }
 
   .link-quiet {
-    @apply text-accent-300 underline-offset-4 transition hover:text-accent-200 hover:underline;
+    @apply text-signal-300 underline-offset-4 transition hover:text-signal-400 hover:underline;
   }
 }

@@ -1,44 +1,40 @@
-# ReadVerdict 📚✓
+# ReadVerdict
 
-Should you read it? Search any book and get a clear **ReadVerdict** — a
-transparent 0–100 score, honest signals about length and availability, and where
-to read it. A books companion to WatchVerdict, powered by
-[Open Library](https://openlibrary.org).
+**The right book. Not more books.**
 
-> **Runs with zero configuration.** Open Library is a free, key-less public API,
-> so `npm ci && npm run dev` is all you need — no secrets, no accounts.
+ReadVerdict is an intelligent book-recommendation **decision service** in the
+Verdict product family. You describe what you want — in words or by voice — and
+it returns a short, ranked set with a clear verdict and the reasons behind it,
+tuned to your taste, your time, your format, and who you're reading with.
 
-## Highlights
+It is deliberately **not** a catalog, a popularity feed, or a Goodreads clone.
+Its job is to _reduce_ choice to the right next read.
 
-- **Transparent, deterministic score.** A pure engine (`src/lib/scoring/`)
-  blends four interpretable components — reader **acclaim**, **popularity**,
-  **readability**, and **staying power** — into one honest 0–100 number. Every
-  input is shown on the verdict page. Fully unit-tested (26 tests), never any
-  I/O.
-- **Confidence-weighted acclaim.** Ratings are weighted by sample size: a 5-star
-  average from 3 ratings never outranks a 4.3 from 900. Thin evidence shrinks
-  toward a neutral prior and is labelled low-confidence.
-- **Honest data.** Ratings, availability, edition counts, and page counts come
-  straight from Open Library. Missing data is labelled unavailable — never
-  fabricated.
-- **Clear call.** Read it / Maybe / Skip, with the specific reasons for and
-  against, reading signals, and where you can legally get the book.
-- **No account needed.** Public, read-only, server-rendered.
+> **Status: Phase 1 — durable foundation.** This repository is the project
+> baseline: stack, brand tokens, responsive app shell, Supabase-ready
+> architecture, tests, and a green production build. Feature surfaces
+> (Ask, Discover, My Books, Read Together, Reader DNA) are present as
+> **honest, phase-labeled placeholders** — they never fabricate book data.
+> See [`ARCHITECTURE.md`](./ARCHITECTURE.md) and the phased plan below.
 
 ## Stack
 
-Next.js 14 (App Router) · TypeScript (strict) · Tailwind · Vitest · Open Library
-API.
+- **Next.js 14** (App Router) · **TypeScript** (strict, `noUncheckedIndexedAccess`)
+- **Tailwind CSS** design tokens (Verdict-family theme)
+- **Supabase-ready** architecture (`@supabase/ssr`) — wired to degrade gracefully
+  until configured
+- **Vitest** unit tests · **ESLint** (`next/core-web-vitals`) · **Prettier**
 
-## Local development
+## Getting started
 
 ```bash
 npm ci
-npm run dev        # http://localhost:3000
+cp .env.example .env.local   # optional — the app runs and builds with no keys
+npm run dev                  # http://localhost:3000
 ```
 
-Optionally copy `.env.example` to `.env.local` to set an Open Library contact
-string for the outbound `User-Agent`. Nothing else is required.
+No secrets are required to run the Phase 1 foundation. Supabase and external
+providers activate only once their keys are present in `.env.local`.
 
 ## Scripts
 
@@ -47,66 +43,80 @@ string for the outbound `User-Agent`. Nothing else is required.
 | `npm run dev` | Dev server |
 | `npm run build` | Production build |
 | `npm start` | Serve the production build |
-| `npm run lint` | ESLint (next/core-web-vitals) |
+| `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Vitest unit tests |
+| `npm run format` | Prettier check |
 
-Run all gates before committing:
+Run the full gate suite before every commit:
 
 ```bash
 npm run typecheck && npm run lint && npm test && npm run build
 ```
 
-## Architecture
+## Project structure
 
 ```
 src/
+  app/                     # App Router routes
+    page.tsx               #   Home (positioning + verdict-layout preview)
+    ask/                   #   Ask ReadVerdict (center of the product)
+    discover/  my-books/   #   Core areas
+    together/  profile/
+    reader-dna/            #   Secondary area
+    loading|error|not-found.tsx
+    globals.css
+    layout.tsx             # Root layout → AppShell
+  components/
+    nav/                   # AppShell, responsive nav (desktop bar + mobile tabs)
+    ui/                    # Container, PageHeader, EmptyState, VerdictBadge
+    icons.tsx
+  config/nav.ts            # Canonical navigation (desktop vs mobile subsets)
   lib/
-    scoring/            # PURE deterministic engine — no I/O, unit-tested
-      acclaim.ts        #   confidence-weighted rating blend
-      general.ts        #   the 0–100 ReadVerdict Score
-      verdict.ts        #   tier, call, signals, reasons, reading options
-      *.test.ts         #   26 tests; fixtures in fixtures.ts
-    books/
-      openLibrary.ts    # server-only Open Library client (search + work detail)
-      cover.ts          # client-safe cover URL helper
-    format.ts           # pure display helpers (reading time, bands)
-    types.ts            # shared domain types
-    env.ts              # runtime env access (never at build time)
-  app/
-    page.tsx            # home + search box
-    search/page.tsx     # results grid
-    book/[workId]/page.tsx  # the verdict page
-  components/           # ScoreDial, BookCover, BookCard, SearchBar, …
+    env.ts                 # Runtime env access (never at build time)
+    supabase/              # server + browser clients (null until configured)
+    verdict/tiers.ts       # PURE, tested verdict-tier taxonomy
+    utils/cn.ts            # PURE, tested classname helper
+test/shims/                # server-only shim for the Vitest runner
 ```
 
-### Design rules (mirrored from WatchVerdict)
+## Design & product principles (enforced from day one)
 
-- **The deterministic engine is authoritative.** All scoring lives in
-  `src/lib/scoring/` — pure, no I/O, unit-tested. It is what the verdict relies
-  on. If you touch it, update the tests.
-- **Secrets stay server-only.** The full Open Library client is `server-only`;
-  only the pure cover-URL helper is client-safe. ReadVerdict needs no secrets,
-  but the boundary is kept regardless.
-- **Env is validated at runtime, not build time** (`src/lib/env.ts`), so
-  `next build` works without configuration.
-- **Data honesty.** Never fabricate a rating, page count, or availability. When
-  Open Library data is missing, the UI and engine label it unavailable.
+- **Reduce choice, don't expand it.** Return fewer, better matches over a padded
+  grid.
+- **Never fabricate data.** Placeholders state what's coming; they don't invent
+  ratings, availability, or book attributes.
+- **Four separate models** — Book DNA, Reader DNA, Reading Session DNA, Search
+  DNA — never collapsed into one score. (See `ARCHITECTURE.md`.)
+- **Secrets are server-only.** `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`,
+  provider keys never get a `NEXT_PUBLIC_` prefix.
+- **Env validated at runtime, not build time**, so `next build` works with no
+  configuration.
+- **Accessible & responsive** — semantic HTML, keyboard support, visible focus,
+  reduced-motion support, 44px+ touch targets, safe-area insets, no
+  color-only signals.
 
-## The score, briefly
+## Phased build plan
 
-```
-ReadVerdict Score =
-    0.42 · acclaim        (confidence-weighted reader ratings)
-  + 0.20 · popularity     (log-scaled reading-log reach)
-  + 0.20 · readability    (length commitment + availability)
-  + 0.18 · stayingPower   (editions in print + endurance over time)
-```
+1. **Durable foundation** ← _this repository_
+2. Brand & application shell
+3. Core book data (canonical models, Book DNA, provenance)
+4. Ask ReadVerdict (Search DNA parser, results, Full Verdict)
+5. Reader DNA
+6. My Books
+7. Read Together
+8. Availability & services
+9. Internationalization (English · LatAm Spanish · Simplified Chinese)
+10. Analytics & privacy
+11. ReadVerdict Search Lab (automated evaluation & regression)
+12. Verification
 
-Each component is clamped to 0–100. Age-based signals take a reference year so
-the score is deterministic and testable.
+Each phase ends with: tests, production build, commit, and an honest status
+report — never "done" on the basis of written code alone.
 
-## Attribution
+## Backup & source control
 
-Book data, covers, and ratings from **Open Library** (Internet Archive). Shown
-as reported, with attribution, in the app footer and on every verdict page.
+This project keeps a full local git history. Durable off-machine backup
+(a private GitHub repository) is pending destination authorization — see the
+Phase 1 status report. Until then, ZIP checkpoints are produced after each
+major phase.

@@ -20,7 +20,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# env
+# env — never commit real secrets
 .env
 .env.local
 .env*.local
@@ -30,3 +30,9 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# test / coverage
+/coverage
+
+# local checkpoints
+/checkpoints
