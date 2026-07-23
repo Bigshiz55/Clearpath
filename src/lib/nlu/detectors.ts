@@ -74,6 +74,28 @@ export function detectAiringHorizon(text: string): number | null {
 }
 
 /**
+ * A more liberal temporal-window reader for use ONLY when another broadcast
+ * signal is present (e.g. a named linear network). `detectAiringHorizon` stays
+ * deliberately conservative — a bare "tonight" with no cue there means taste,
+ * not the guide. But "AMC movies later tonight" names a linear channel, so the
+ * temporal word is enough to mean broadcast. Returns a horizon in hours, or null.
+ */
+export function detectTemporalHorizon(text: string): number | null {
+  const strong = detectAiringHorizon(text);
+  if (strong != null) return strong;
+  const t = ` ${text.toLowerCase()} `;
+  if (/\b(right now|on now)\b/.test(t)) return 3;
+  if (/\btomorrow night\b/.test(t)) return 24;
+  if (/\btomorrow\b/.test(t)) return 24;
+  if (/\bthis weekend\b/.test(t)) return 48;
+  if (/\blater tonight\b|\bthis evening\b|\btonight\b|\blater today\b/.test(t)) return 6;
+  if (/\bthis afternoon\b/.test(t)) return 6;
+  // Clock times ("after 8", "at 8pm", "by 9", "before 10") → rest of the evening.
+  if (/\b(after|at|by|before|around)\s+\d{1,2}(:\d{2})?\s*(pm|am|o'?clock)?\b/.test(t)) return 6;
+  return null;
+}
+
+/**
  * Starter alias table (a hand-seeded cold-start for the "learned corrections"
  * step): common shorthand/abbreviations that TMDB search resolves poorly on
  * their own. Applied only to the where-to-watch title lookup. The data-driven

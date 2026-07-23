@@ -19,6 +19,7 @@
 import { naiveParseQuery } from '@/lib/finderParse';
 import {
   detectAiringHorizon,
+  detectTemporalHorizon,
   detectGenre,
   detectNetwork,
   detectPlatform,
@@ -137,7 +138,8 @@ export function normalize(rawQuery: string, opts: NormalizeOptions = {}): Normal
   const platform = detectPlatform(rawQuery);
   const network = detectNetwork(rawQuery);
   const tvGenre = detectGenre(rawQuery);
-  const horizon = detectAiringHorizon(rawQuery);
+  // Mirror the route: a named linear network + a temporal cue is a broadcast ask.
+  const horizon = detectAiringHorizon(rawQuery) ?? (network ? detectTemporalHorizon(rawQuery) : null);
   const watchTitle = extractWatchTitle(rawQuery);
   const count = extractCount(rawQuery);
 

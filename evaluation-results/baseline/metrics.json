@@ -1,12 +1,12 @@
 {
   "cases": 500,
-  "passRate": 0.84,
-  "composite": 0.9068288397609239,
+  "passRate": 0.888,
+  "composite": 0.9126902935089776,
   "categoryScores": {
     "hardPrecision": 0.8945333333333347,
-    "parsing": 0.8529166666666679,
+    "parsing": 0.8824166666666678,
     "recall": 1,
-    "ranking": 0.9177608654712843,
+    "ranking": 0.9175681342115529,
     "response": 0.843333333333329,
     "reliability": 1
   },
@@ -24,22 +24,22 @@
   "noResultHonesty": 1,
   "top1PersonalizationAccuracy": 0.6666666666666666,
   "top3PersonalizationQuality": 0.6666666666666666,
-  "meanNdcg": 0.9996180280794434,
+  "meanNdcg": 0.9998312212943663,
   "meanMrr": 0.6666666666666666,
-  "parseFieldAccuracy": 0.8738333333333322,
-  "intentAccuracy": 0.832,
+  "parseFieldAccuracy": 0.8848333333333321,
+  "intentAccuracy": 0.88,
   "latency": {
-    "p50": 0.22805700000003526,
-    "p95": 0.9132900000000745,
-    "p99": 2.2483839999999873,
-    "mean": 0.3711038040000001
+    "p50": 0.2901930000000448,
+    "p95": 0.9251070000000254,
+    "p99": 2.57940700000006,
+    "mean": 0.4395488620000017
   },
   "failuresByCategory": {
-    "speech_transcription": 24,
+    "speech_transcription": 17,
     "query_normalization": 4,
     "intent_classification": 20,
     "entity_extraction": 9,
-    "time_interpretation": 23,
+    "time_interpretation": 6,
     "conversational_context": 0,
     "ambiguity_handling": 0,
     "candidate_retrieval": 0,

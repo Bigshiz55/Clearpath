@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   detectAiringHorizon,
+  detectTemporalHorizon,
   extractWatchTitle,
   normalizeTitleAlias,
   detectGenre,
@@ -37,6 +38,31 @@ describe('detectAiringHorizon', () => {
   it('KNOWN-BUG: no clock-time parsing', () => {
     expect(detectAiringHorizon("what's on at 8pm")).toBe(24); // matches "what's on", ignores 8pm
     expect(detectAiringHorizon('anything good after 8')).toBeNull();
+  });
+});
+
+describe('detectTemporalHorizon (liberal — used only alongside a named network)', () => {
+  it('reads bare temporal cues that detectAiringHorizon deliberately ignores', () => {
+    // These return null from the conservative detector...
+    expect(detectAiringHorizon('AMC movies later tonight')).toBeNull();
+    expect(detectAiringHorizon('Hallmark mysteries tomorrow')).toBeNull();
+    // ...but the liberal reader recognizes them (the caller gates on a network).
+    expect(detectTemporalHorizon('AMC movies later tonight')).toBe(6);
+    expect(detectTemporalHorizon('a movie tonight')).toBe(6);
+    expect(detectTemporalHorizon('Hallmark mysteries tomorrow')).toBe(24);
+    expect(detectTemporalHorizon('something tomorrow night')).toBe(24);
+    expect(detectTemporalHorizon('a movie right now')).toBe(3);
+    expect(detectTemporalHorizon('a movie this weekend')).toBe(48);
+  });
+  it('reads clock times as the rest of the evening', () => {
+    expect(detectTemporalHorizon('after 8 tonight')).toBe(6);
+    expect(detectTemporalHorizon('at 9pm')).toBe(6);
+  });
+  it('defers to the conservative detector for explicit windows', () => {
+    expect(detectTemporalHorizon('in the next 3 hours')).toBe(3);
+  });
+  it('returns null when no temporal cue at all', () => {
+    expect(detectTemporalHorizon('a good crime thriller')).toBeNull();
   });
 });
 

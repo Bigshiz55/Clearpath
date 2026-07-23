@@ -7,6 +7,7 @@ import { searchTitles } from '@/lib/tmdb/client';
 import { rateQuizTitle } from '@/lib/actions/quiz';
 import {
   detectAiringHorizon,
+  detectTemporalHorizon,
   extractWatchTitle,
   normalizeTitleAlias,
   detectGenre,
@@ -263,10 +264,14 @@ export async function POST(request: Request) {
     // If they asked for something *coming on* soon, honour that constraint: send
     // them to the live TV guide windowed to the horizon they named, rather than
     // the generic Watch Now grid. Their stated taste is still folded in above.
-    const horizon = detectAiringHorizon(text);
+    // A named linear network + a temporal cue ("AMC movies later tonight") is a
+    // broadcast ask even without an explicit airing phrase; fall back to the
+    // liberal temporal reader in that case only, so bare "tonight" alone still
+    // means taste.
+    const network = detectNetwork(text);
+    const horizon = detectAiringHorizon(text) ?? (network ? detectTemporalHorizon(text) : null);
     if (horizon != null) {
       const genre = detectGenre(text);
-      const network = detectNetwork(text);
       const movieOnly = /\b(movies?|films?)\b/.test(` ${text.toLowerCase()} `);
       const params = new URLSearchParams({ within: String(horizon) });
       if (genre) params.set('genre', genre);
