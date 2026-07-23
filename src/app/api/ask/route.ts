@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     if (reference) {
       const wantCount = text ? parseRequestedCount(text) : 10;
       const similar = await askSimilarTo(supabase, user.id, reference, wantCount);
-      if (similar) {
+      if (similar && similar.kind === 'similar') {
         return NextResponse.json({
           kind: 'search',
           query: similar.query,
@@ -77,6 +77,27 @@ export async function POST(req: Request) {
           items: similar.items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
         });
       }
+      // A resolved similar request that qualified ZERO candidates returns an
+      // honest no-close-matches state — it is NEVER silently handed to the
+      // ungated Finder. Broader, personally-appealing titles are returned in a
+      // clearly-labelled separate field, never blended with similar results.
+      if (similar && similar.kind === 'no_close_matches') {
+        return NextResponse.json({
+          kind: 'no_close_matches',
+          scoredFor: similar.scoredFor,
+          interpretation: similar.noClose.interpretation,
+          reason: similar.noClose.reason,
+          gateBreakdown: similar.noClose.gateBreakdown,
+          candidatesConsidered: similar.noClose.candidatesConsidered,
+          broadenOptions: similar.noClose.broadenOptions,
+          message: similar.noClose.message,
+          broaderAlternatives: similar.broaderAlternatives.map((i) => ({
+            ...i, posterUrl: tmdbImage(i.posterPath, 'w342'), label: 'broader_alternative',
+          })),
+        });
+      }
+      // similar === null → the reference title couldn't be resolved at all, so
+      // this was not a similar-to request; fall through to plain discovery.
     }
 
     if (ai) {

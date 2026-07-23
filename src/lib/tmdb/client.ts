@@ -529,6 +529,7 @@ export async function getTitle(
     overview: detail.overview ?? '',
     genres: (detail.genres ?? []).map((g) => g.name),
     keywords,
+    collectionId: detail.belongs_to_collection?.id ?? null,
     posterPath: detail.poster_path ?? null,
     backdropPath: detail.backdrop_path ?? null,
     runtimeMinutes: mediaType === 'movie' ? detail.runtime ?? null : null,

@@ -15,6 +15,23 @@ import type { TitleVerdict, AltItem, JudgeFactor } from '@/lib/askTypes';
 import { getCachedDimensions } from '@/lib/titleDimensions';
 import { rankSeedSimilar } from '@/lib/search/seedSimilarity';
 import { canonicalKey, type SeedTitle } from '@/lib/search/titleDna';
+import { classifySimilar, type NoCloseMatches } from '@/lib/search/similarResponse';
+import type { MediaType } from '@/lib/types';
+
+/** Result of a similar-to-title request: qualified similar items, or an honest
+ *  no-close-matches state (never a silent ungated-Finder fallback), or null when
+ *  the reference title couldn't be resolved at all. */
+export type SimilarResult =
+  | { kind: 'similar'; query: FinderQuery; scoredFor: string; items: FinderItem[] }
+  | {
+      kind: 'no_close_matches';
+      scoredFor: string;
+      seedTitle: string;
+      seedMediaType: MediaType;
+      noClose: NoCloseMatches;
+      /** Personally-appealing titles that are explicitly NOT close matches. */
+      broaderAlternatives: FinderItem[];
+    };
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
 
@@ -89,7 +106,8 @@ export async function askSimilarTo(
   userId: string,
   refText: string,
   limit = 10,
-): Promise<{ query: FinderQuery; scoredFor: string; items: FinderItem[] } | null> {
+  lens: string | null = null,
+): Promise<SimilarResult | null> {
   const cleaned = cleanTitleText(refText);
   if (cleaned.length < 2) return null;
   const results = await searchTitles(cleaned).catch(() => []);
@@ -132,7 +150,7 @@ export async function askSimilarTo(
     canonicalId: canonicalKey({ title: seed.title, year: seed.year ?? null, mediaType: seed.mediaType }),
     tmdbId: seed.id, title: seed.title, year: seed.year ?? null, mediaType: seed.mediaType,
     genres: seedData?.meta.genres ?? [], keywords: seedData?.meta.keywords ?? [],
-    dims: dims.get(`${seed.mediaType}-${seed.id}`) ?? {}, collectionId: null, dimsConfidence: 0.9,
+    dims: dims.get(`${seed.mediaType}-${seed.id}`) ?? {}, collectionId: seedData?.meta.collectionId ?? null, dimsConfidence: 0.9,
   };
 
   const scored = await Promise.all(
@@ -160,7 +178,7 @@ export async function askSimilarTo(
           canonicalId: canonicalKey({ title: meta.title, year: meta.year, mediaType: c.mediaType }),
           tmdbId: c.id, title: meta.title, year: meta.year, mediaType: c.mediaType,
           genres: meta.genres ?? [], keywords: meta.keywords ?? [],
-          dims: dims.get(`${c.mediaType}-${c.id}`) ?? {}, collectionId: null,
+          dims: dims.get(`${c.mediaType}-${c.id}`) ?? {}, collectionId: meta.collectionId ?? null,
           personalScore: report.personal.score,
         };
         return { item, dna };
@@ -178,13 +196,49 @@ export async function askSimilarTo(
   // gate. We return FEWER results rather than pad with weak matches.
   const ranked = rankSeedSimilar(seedDna, pairs.map((p) => p.dna), {
     requestedCount: Math.max(1, Math.min(limit, 20)),
+    lens: lens ?? undefined,
   });
   const byCanonical = new Map(pairs.map((p) => [p.dna.canonicalId, p.item]));
   const items = ranked.items.map((r) => byCanonical.get(r.canonicalId)).filter((x): x is FinderItem => x != null);
-  if (items.length === 0) return null;
 
   const query: FinderQuery = { ...EMPTY_QUERY, mediaType: seed.mediaType, similarTo: seed.title };
-  return { query, scoredFor, items };
+
+  const classified = classifySimilar(seed.title, lens, ranked);
+  if (classified.kind === 'similar') {
+    return { kind: 'similar', query, scoredFor, items };
+  }
+
+  // Zero candidates qualified. We do NOT silently hand the request to the ungated
+  // Finder. We return an honest no-close-matches state, and — clearly labelled as
+  // BROADER ALTERNATIVES, not close matches — offer personally-appealing titles in
+  // the seed's genres. The gate breakdown records which gate eliminated candidates.
+  const seedGenreIds = (seedData?.meta.genres ?? [])
+    .map((n) => genreIdFromName(n))
+    .filter((n): n is number => n != null)
+    .slice(0, 2);
+  let broaderAlternatives: FinderItem[] = [];
+  try {
+    const alt = await runFinder(
+      supabase,
+      userId,
+      { ...EMPTY_QUERY, mediaType: seed.mediaType, genreIds: seedGenreIds },
+      null,
+    );
+    broaderAlternatives = alt.items
+      .filter((i) => canonicalKey({ title: i.title, year: i.year ?? null, mediaType: i.mediaType }) !== seedDna.canonicalId)
+      .slice(0, Math.max(1, Math.min(limit, 8)));
+  } catch {
+    /* broader alternatives are a bonus; the honest no-match state still stands */
+  }
+
+  return {
+    kind: 'no_close_matches',
+    scoredFor,
+    seedTitle: seed.title,
+    seedMediaType: seed.mediaType,
+    noClose: classified,
+    broaderAlternatives,
+  };
 }
 
 /**

@@ -1,20 +1,20 @@
 {
   "baseline": {
     "label": "baseline",
-    "total": 7,
+    "total": 8,
     "passed": 1,
-    "failed": 6,
+    "failed": 7,
     "criticalCounts": {
       "seedLeak": 2,
       "duplicate": 0,
-      "contradictionLeak": 9,
+      "contradictionLeak": 12,
       "hallucination": 0
     },
     "franchiseViolations": 3,
     "recallMisses": 8,
     "bySplit": {
       "dev": {
-        "total": 5,
+        "total": 6,
         "passed": 1
       },
       "holdout": {
@@ -25,8 +25,8 @@
   },
   "gated": {
     "label": "gated",
-    "total": 7,
-    "passed": 7,
+    "total": 8,
+    "passed": 8,
     "failed": 0,
     "criticalCounts": {
       "seedLeak": 0,
@@ -38,8 +38,8 @@
     "recallMisses": 0,
     "bySplit": {
       "dev": {
-        "total": 5,
-        "passed": 5
+        "total": 6,
+        "passed": 6
       },
       "holdout": {
         "total": 2,
@@ -50,7 +50,7 @@
   "baselineCritical": {
     "seedLeak": 2,
     "duplicate": 0,
-    "contradictionLeak": 9,
+    "contradictionLeak": 12,
     "hallucination": 0
   },
   "gatedCritical": {

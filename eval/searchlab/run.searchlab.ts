@@ -108,7 +108,14 @@ describe(`Search Lab (${MODE})`, () => {
       expect(summary.franchiseViolations, 'franchise cap').toBe(0);
       // Genuine matches must still surface (no over-filtering).
       expect(summary.recallMisses, 'genuine-match recall').toBe(0);
-      void results;
+      // Zero-qualified cases must return NO similar items and a populated gate
+      // breakdown (proving an honest no-close-matches state, not padding).
+      for (const gc of GOLD_CASES.filter((c) => c.expectZeroQualified)) {
+        const r = results.find((x) => x.caseId === gc.id);
+        expect(r, gc.id).toBeTruthy();
+        expect(r!.result.items.length, `${gc.id} must qualify zero`).toBe(0);
+        expect(Object.keys(r!.result.traces.length ? { x: 1 } : {}).length, `${gc.id} considered candidates`).toBeGreaterThan(0);
+      }
     });
   }
 

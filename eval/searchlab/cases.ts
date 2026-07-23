@@ -19,6 +19,8 @@ export interface GoldCase {
   allowFranchise: boolean;
   excludeFranchise?: boolean;
   allowSeed: boolean;
+  /** When true, the gate MUST qualify zero candidates (honest no-close-matches). */
+  expectZeroQualified?: boolean;
   expect: {
     /** Canonical ids that MUST be excluded (seed + canonical duplicates). */
     excludedCanonical: string[];
@@ -113,6 +115,14 @@ export const GOLD_CASES: GoldCase[] = [
     ],
     expect: { excludedCanonical: [], mustFail: [], mustQualify: ['rocky-1976'], maxFranchiseTop5: 5 },
   }),
+
+  // ---- Zero-qualified: every neighbour is a contradiction → NO similar items ----
+  {
+    id: 'rocky.zero_qualified', split: 'dev', fixtureKey: 'rocky_zero', intent: 'similar_to',
+    utterances: [{ lang: 'en', text: 'movies exactly like Rocky' }, { lang: 'es', text: 'películas exactamente como Rocky' }, { lang: 'zh', text: '和《洛奇》一模一样的电影' }],
+    requestedCount: 5, allowFranchise: false, allowSeed: false, expectZeroQualified: true,
+    expect: { excludedCanonical: [], mustFail: ['edward-scissorhands-1990', 'the-shape-of-water-2017', 'la-la-land-2016'], mustQualify: [], maxFranchiseTop5: 0 },
+  },
 
   // ---- HOLDOUT (different seeds; not used to design the gate) ----
   {

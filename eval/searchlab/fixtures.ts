@@ -152,8 +152,16 @@ export interface SeedFixture {
   candidates: FixtureTitle[];
 }
 
+/** A seed whose only provider "neighbours" are contradictions — the zero-qualified
+ *  case: the gate must return NO similar items (honest no-close-matches), never
+ *  padding with these. */
+export const ROCKY_ONLY_CONTRADICTIONS: FixtureTitle[] = ROCKY_CANDIDATES.filter((c) =>
+  ['edward-scissorhands-1990', 'the-shape-of-water-2017', 'la-la-land-2016'].includes(c.canonicalId),
+);
+
 export const DEV_FIXTURES: SeedFixture[] = [
   { key: 'rocky', seed: ROCKY_SEED, candidates: ROCKY_CANDIDATES },
+  { key: 'rocky_zero', seed: ROCKY_SEED, candidates: ROCKY_ONLY_CONTRADICTIONS },
 ];
 export const HOLDOUT_FIXTURES: SeedFixture[] = [
   { key: 'jaws', seed: JAWS_SEED, candidates: JAWS_CANDIDATES },

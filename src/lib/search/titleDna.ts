@@ -70,3 +70,54 @@ export function canonicalKey(t: Pick<SeedTitle, 'title' | 'year' | 'mediaType'>)
 export function knownAxisCount(dims: Partial<Record<string, number>>): number {
   return DNA_AXES.filter((a) => typeof dims[a] === 'number').length;
 }
+
+// ── Franchise / canonical identity ─────────────────────────────────────────
+/** The relationship between a candidate and the seed. */
+export type FranchiseRelation =
+  | 'same_canonical' // literally the seed work (same identity)
+  | 'canonical_duplicate' // a different record of the SAME work (re-release/edition)
+  | 'franchise' // same collection / franchise family
+  | 'similar' // unrelated work that happens to be a candidate
+  | 'unknown'; // franchise membership could not be reliably determined
+/** How the relationship was established. `inferred` (title-text) is low-confidence
+ *  and must never independently trigger production filtering. */
+export type IdentitySource = 'known' | 'inferred' | 'unknown';
+
+export interface FranchiseAssessment {
+  relation: FranchiseRelation;
+  identity: IdentitySource;
+}
+
+/** Conservative title-text franchise hint — a shared distinctive leading title,
+ *  e.g. "Rocky" ⊂ "Rocky II". Low-confidence fallback ONLY. */
+function titleTextFranchiseHint(a: SeedTitle, b: SeedTitle): boolean {
+  const na = a.title.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const nb = b.title.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (na.length < 4 || nb.length < 4 || na === nb) return false;
+  const [short, long] = na.length <= nb.length ? [na, nb] : [nb, na];
+  // The longer title must START with the shorter distinctive title (e.g. rocky → rockyii).
+  return short.length >= 4 && long.startsWith(short);
+}
+
+/**
+ * Determine the seed↔candidate franchise/identity relationship, preferring the
+ * reliable provider collection id and falling back to canonical identity, then to
+ * a low-confidence title-text hint (recorded but not filter-triggering).
+ */
+export function franchiseAssessment(seed: SeedTitle, cand: SeedTitle): FranchiseAssessment {
+  const sk = canonicalKey(seed);
+  const ck = canonicalKey(cand);
+  if (sk === ck) {
+    return { relation: seed.tmdbId === cand.tmdbId ? 'same_canonical' : 'canonical_duplicate', identity: 'known' };
+  }
+  const seedCol = seed.collectionId ?? null;
+  const candCol = cand.collectionId ?? null;
+  if (seedCol != null && candCol != null) {
+    // Both franchise identities known → reliable relation.
+    return { relation: seedCol === candCol ? 'franchise' : 'similar', identity: 'known' };
+  }
+  // At least one collection id is missing → we cannot reliably know franchise
+  // membership. A title-text hint is recorded as *inferred* (never filters).
+  if (titleTextFranchiseHint(seed, cand)) return { relation: 'franchise', identity: 'inferred' };
+  return { relation: 'unknown', identity: 'unknown' };
+}
