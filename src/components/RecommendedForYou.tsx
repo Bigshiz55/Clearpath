@@ -49,7 +49,7 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
         <div className="text-2xl">🧬</div>
         <h2 className="mt-1 text-lg font-bold text-white">Your recommendations unlock fast</h2>
         <p className="mx-auto mt-1 max-w-sm text-sm text-slate-300">Rate a handful of titles and we’ll read your taste — then this fills with picks scored just for you, each with the reason it’s here.</p>
-        <Link href="/app/quiz" className="btn-primary mt-4 inline-flex">Build my Taste DNA →</Link>
+        <Link href="/app/quiz" className="btn-primary mt-4 inline-flex">Build my VERD1CT DNA →</Link>
       </section>
     );
   }

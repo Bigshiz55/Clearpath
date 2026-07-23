@@ -5,16 +5,6 @@ import { submitPassFeedback, recordAnalyticsEvent } from '@/lib/actions/passFeed
 import { DnaBurst } from '@/components/DnaBurst';
 import type { MediaType } from '@/lib/types';
 
-async function fetchDnaScore(): Promise<number | null> {
-  try {
-    const r = await fetch('/api/dna-score', { cache: 'no-store' });
-    const d = await r.json();
-    return typeof d.score === 'number' ? d.score : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * 👎 "Not for me." The negative half of the card's yes/no groove: one tap records
  * a genuine negative and pops the DNA-recalculating burst in the center of the
@@ -51,7 +41,6 @@ export function TasteFeedback({
   const busy = useRef(false);
   const [done, setDone] = useState(false);
   const [burst, setBurst] = useState<{ cx: number; cy: number } | null>(null);
-  const [score, setScore] = useState<number | null>(null);
 
   const ctx = { source, position, matchScore, sessionId };
   const base = { tmdbId, mediaType, title, year, posterPath };
@@ -79,7 +68,6 @@ export function TasteFeedback({
     void recordAnalyticsEvent('dislike_thumb', { tmdbId, mediaType, ...ctx }).catch(() => {});
     // not_for_me with no reason applies a moderate title-level negative (rating 3).
     void submitPassFeedback({ ...base, feedbackType: 'not_for_me', reasonCodes: [], rating: null, ...ctx }).catch(() => {});
-    void fetchDnaScore().then((s) => setScore(s));
   }
 
   return (
@@ -106,7 +94,7 @@ export function TasteFeedback({
         </svg>
         {compact ? wide && <span className="text-[10px] font-black uppercase tracking-wide">Pass</span> : ' Not for me'}
       </button>
-      {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind="down" target={score} onDone={() => { fadeCard(); setBurst(null); }} />}
+      {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind="down" onDone={() => { fadeCard(); setBurst(null); }} />}
     </>
   );
 }

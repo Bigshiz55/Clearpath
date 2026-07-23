@@ -181,6 +181,19 @@ body {
 .wv-order { animation: wv-order-flash 1.7s ease-out both; }
 .wv-verdict-in { animation: wv-verdict-in 0.5s ease-out both; }
 
+/* Twisting DNA helix + pulsing halo for the "VERD1CT DNA updating" burst. */
+@keyframes wv-dna-twist {
+  0%   { transform: rotateY(0deg) scale(1); }
+  50%  { transform: rotateY(180deg) scale(1.14); }
+  100% { transform: rotateY(360deg) scale(1); }
+}
+.wv-dna-twist { display: inline-block; animation: wv-dna-twist 1.3s ease-in-out infinite; }
+@keyframes wv-dna-halo {
+  0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(0.8); }
+  50%      { opacity: 0.85; transform: translate(-50%, -50%) scale(1.25); }
+}
+.wv-dna-halo { animation: wv-dna-halo 1.3s ease-in-out infinite; }
+
 /* Chunky 3D "verdict" CTA — raised with a hard edge, crisp bold text, and a
    satisfying press-down on tap. */
 .wv-cta-3d {

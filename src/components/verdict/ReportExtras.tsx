@@ -110,7 +110,7 @@ function iconFor(name: string): { node: React.ReactNode; label: string } {
     case 'Metacritic':
       return { label: 'Metacritic', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#00ce7a] text-[11px] font-black text-emerald-950">M</span> };
     case 'TMDB Audience':
-      return { label: 'audience', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#0d253f] text-[8px] font-black text-[#90cea1]">TMDB</span> };
+      return { label: 'audience', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#faa71a] text-base">🍿</span> };
     case 'Metacritic Users':
       return { label: 'MC users', node: <span className="grid h-7 w-7 place-items-center rounded-md border border-[#00ce7a]/60 text-[11px] font-black text-[#00ce7a]">M</span> };
     default:

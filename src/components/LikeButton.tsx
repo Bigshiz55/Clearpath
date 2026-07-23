@@ -5,16 +5,6 @@ import { submitPassFeedback, recordAnalyticsEvent } from '@/lib/actions/passFeed
 import { DnaBurst } from '@/components/DnaBurst';
 import type { MediaType } from '@/lib/types';
 
-async function fetchDnaScore(): Promise<number | null> {
-  try {
-    const r = await fetch('/api/dna-score', { cache: 'no-store' });
-    const d = await r.json();
-    return typeof d.score === 'number' ? d.score : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * 👍 "More like this." A single positive verdict in the card's action row. On tap
  * it feeds the Taste-DNA a genuine positive rating and pops the DNA-recalculating
@@ -47,7 +37,6 @@ export function LikeButton({
   const busy = useRef(false);
   const [done, setDone] = useState(false);
   const [burst, setBurst] = useState<{ cx: number; cy: number } | null>(null);
-  const [score, setScore] = useState<number | null>(null);
 
   function fadeCard() {
     if (onFlagged) { onFlagged(); return; }
@@ -74,7 +63,6 @@ export function LikeButton({
     void recordAnalyticsEvent('like_thumb', { tmdbId, mediaType, ...ctx }).catch(() => {});
     // A real positive rating (marks watched) so the DNA moves up right away.
     void submitPassFeedback({ ...base, feedbackType: 'seen', reasonCodes: [], rating: 8, ...ctx }).catch(() => {});
-    void fetchDnaScore().then((s) => setScore(s));
   }
 
   return (
@@ -97,7 +85,7 @@ export function LikeButton({
         </svg>
         <span className="text-[10px] font-black uppercase tracking-wide">For</span>
       </button>
-      {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind="up" target={score} onDone={() => { fadeCard(); setBurst(null); }} />}
+      {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind="up" onDone={() => { fadeCard(); setBurst(null); }} />}
     </>
   );
 }

@@ -119,7 +119,7 @@ export function QuizGame() {
         <div className="text-4xl">🎉</div>
         <h2 className="mt-3 text-xl font-bold text-white">You’ve rated everything we had!</h2>
         <p className="mx-auto mt-2 max-w-sm text-sm text-slate-400">
-          Your DNA is well-fed. Fresh popular titles rotate in over time — check back soon, or
+          Your VERD1CT DNA is well-fed. Fresh popular titles rotate in over time — check back soon, or
           keep rating from search and the release wall.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">

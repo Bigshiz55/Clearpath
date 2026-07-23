@@ -57,7 +57,7 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
       {rankedReady.items.length > 0 && (
         <section>
           <h2 className="mb-1 text-lg font-semibold text-white">
-            {rankedReady.personalized ? '🧬 Ready to watch — ranked by your DNA' : '▶ Ready to watch'}
+            {rankedReady.personalized ? '🧬 Ready to watch — ranked by your VERD1CT DNA' : '▶ Ready to watch'}
           </h2>
           <p className="mb-3 text-xs text-slate-400">From your watchlist — where each one’s streaming right now.</p>
           <WatchNowGrid items={rankedReady.items} />
@@ -92,7 +92,7 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
             </h2>
             <p className="mb-3 text-xs text-slate-400">
               {rankedMore.personalized
-                ? 'Ranked by your Taste-DNA — tap any to see where to watch.'
+                ? 'Ranked by your VERD1CT DNA — tap any to see where to watch.'
                 : 'Trending titles you can stream right now — tap any for where to watch.'}
             </p>
             <div className="poster-grid">

@@ -24,6 +24,7 @@ import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
 import { SaveButton } from '@/components/SaveButton';
 import { TasteFeedback } from '@/components/TasteFeedback';
+import { LikeButton } from '@/components/LikeButton';
 import { CardDna } from '@/components/CardDna';
 import type { Airing } from '@/lib/onTv';
 
@@ -213,6 +214,15 @@ export function OnTvGuide({
               const resolved = a.tmdbId != null && a.mediaType != null;
               return (
                 <div key={a.id} className="card flex flex-col overflow-hidden">
+                  {/* Action row on top of the placard — For · Pass · Save — the
+                      same groove as every other card in the app. */}
+                  {resolved && (
+                    <div className="flex items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
+                      <LikeButton tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onFlagged={() => remove(a.id)} />
+                      <TasteFeedback compact wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onFlagged={() => remove(a.id)} />
+                      <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onSaved={() => remove(a.id)} />
+                    </div>
+                  )}
                   {resolved ? (
                     <Link href={`/app/title/${a.mediaType}/${a.tmdbId}`} className="block aspect-[2/3] overflow-hidden bg-ink-800">{poster}</Link>
                   ) : (
@@ -232,12 +242,6 @@ export function OnTvGuide({
                     )}
                     <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
                     {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
-                    {resolved && (
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <SaveButton tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} wide onSaved={() => remove(a.id)} />
-                        <TasteFeedback compact wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onFlagged={() => remove(a.id)} />
-                      </div>
-                    )}
                   </div>
                 </div>
               );

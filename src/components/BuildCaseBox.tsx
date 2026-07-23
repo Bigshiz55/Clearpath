@@ -52,7 +52,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
       const d = await r.json();
       if (d.error) { toast.show(d.error, 'error'); return; }
       if (typeof d.caseId === 'string') lastCase.current = { id: d.caseId, at: Date.now() };
-      toast.show(d.summary ? `⚖️ ${d.summary}` : 'Got it — building your Taste DNA. 🧬', 'success');
+      toast.show(d.summary ? `⚖️ ${d.summary}` : 'Got it — building your VERD1CT DNA. 🧬', 'success');
       setText('');
       // If the case included an actionable ask (e.g. "coming on in the next 12
       // hours" or "something on Netflix"), the server routes us to the right

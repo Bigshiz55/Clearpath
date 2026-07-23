@@ -174,7 +174,7 @@ export function Mentalist() {
 
         <div className="mt-4 flex items-center gap-3">
           <button onClick={() => void readMind()} disabled={seeds.length < MIN || reading} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">
-            {reading ? '🧬 Building your case…' : '🧬 Start my Taste DNA'}
+            {reading ? '🧬 Building your case…' : '🧬 Start my VERD1CT DNA'}
           </button>
           <span className="text-xs text-slate-500">{seeds.length}/{MAX} added{seeds.length < MIN ? ` · ${MIN - seeds.length} more to go` : ''}</span>
         </div>

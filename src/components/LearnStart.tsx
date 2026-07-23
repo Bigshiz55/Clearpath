@@ -54,7 +54,7 @@ export function LearnStart() {
       <div>
         <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
         <p className="mt-4 text-sm text-slate-300">Setting up your learning session — this one remembers.</p>
-        <p className="mt-1 text-xs text-slate-500">Keep making picks and your Taste DNA sharpens over time.</p>
+        <p className="mt-1 text-xs text-slate-500">Keep making picks and your VERD1CT DNA sharpens over time.</p>
         {err && (
           <p className="mt-2 text-xs text-rose-300">
             {err} — <a href="/app" className="underline">continue anyway</a>
