@@ -33,7 +33,8 @@
     "search-lab:compare": "node eval/searchlab/cli.mjs compare",
     "search-lab:calibrate": "vitest run --config eval/searchlab/calibration/vitest.calibration.config.ts",
     "search-lab:audit": "vitest run --config eval/searchlab/audit/vitest.audit.config.ts",
-    "search-lab:benchmark": "vitest run --config eval/searchlab/benchmark/vitest.benchmark.config.ts"
+    "search-lab:benchmark": "vitest run --config eval/searchlab/benchmark/vitest.benchmark.config.ts",
+    "search-lab:clarify": "vitest run --config eval/searchlab/clarify/vitest.clarify.config.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

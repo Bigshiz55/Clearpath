@@ -8,6 +8,7 @@ import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askP
 import { understandIntent } from '@/lib/search/retrieval/intent';
 import { expandQueries } from '@/lib/search/retrieval/expand';
 import { recover } from '@/lib/search/retrieval/recovery';
+import { clarify } from '@/lib/search/clarify/engine';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -52,6 +53,28 @@ export async function POST(req: Request) {
 
     // 1) If they named a specific title, put THAT on trial (full verdict + reasons).
     const text = typeof body.text === 'string' ? body.text.slice(0, 300) : '';
+
+    // 0) Clarification Engine (feature-flagged; default OFF so production is
+    // unchanged). Runs before search: only a LOW-confidence ambiguous query is
+    // intercepted with a single localized tap-clarification. High/medium proceed
+    // to the normal flow. Localized to the caller's locale (body.locale) or the
+    // detected query language. Pure + non-breaking.
+    if (process.env.CLARIFY_ENGINE === '1' && text.trim()) {
+      const appLocale = typeof (body as { locale?: unknown }).locale === 'string' ? (body as { locale: string }).locale : null;
+      const c = clarify(text, { appLocale });
+      if (c.decision.action === 'clarify') {
+        return NextResponse.json({
+          kind: 'clarification',
+          locale: c.locale,
+          dir: c.dir,
+          heading: c.clarification!.heading,
+          options: c.clarification!.options,           // localized tap targets, canonical meaningKey/intent attached
+          canonicalIntents: c.decision.options.map((o) => ({ intent: o.intent, meaningKey: o.meaningKey, confidence: o.confidence })),
+          topConfidence: c.decision.topConfidence,
+        });
+      }
+    }
+
     if (text.trim()) {
       const titled = await askJudgeTitle(supabase, user.id, text);
       if (titled) return NextResponse.json({ kind: 'title', ...titled });
