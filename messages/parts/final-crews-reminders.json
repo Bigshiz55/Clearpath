@@ -1,0 +1,173 @@
+{
+  "en-US": {
+    "together": {
+      "crews": {
+        "loading": "Loading synced juries…",
+        "loadFailed": "Failed to load.",
+        "failed": "Failed.",
+        "namePrompt": "Name this jury (e.g. Friday movie night)",
+        "inviteFailed": "Failed to build invite.",
+        "pickFailed": "Could not find a pick.",
+        "networkError": "Network error.",
+        "setupTitle": "One-time setup for synced juries",
+        "setupBody1": "Run the migration ",
+        "setupBody2": " in your Supabase SQL editor, then refresh. Until then, the on-device juries below work fully.",
+        "openSqlEditor": "Open Supabase SQL editor ↗",
+        "newJury": "+ New synced jury",
+        "invite": "📱 Invite (QR)",
+        "deleteConfirm": "Delete this jury?",
+        "delete": "Delete",
+        "noPeople": "No one yet — add people or share the QR to have them join.",
+        "guest": "guest",
+        "remove": "Remove",
+        "namePlaceholder": "Name",
+        "loves": "Loves",
+        "hardNos": "Hard no’s",
+        "add": "Add",
+        "cancel": "Cancel",
+        "addPerson": "+ Add a person",
+        "nightsLogged": {
+          "one": "{count} night logged",
+          "other": "{count} nights logged"
+        },
+        "lovedTogether": "Loved together: {titles}",
+        "anything": "Anything",
+        "movies": "Movies",
+        "tv": "TV",
+        "finding": "Finding your pick…",
+        "findPick": "🍿 Find our pick ({count})",
+        "tasteCourt": "⚖️ Hold a 90-Second Taste Court",
+        "tonightsPick": "Tonight’s pick",
+        "logged": "Logged to {name}’s DNA ✓",
+        "howdItGo": "How’d it go:",
+        "scanToJoin": "Scan to join this jury",
+        "copyLink": "Copy link",
+        "close": "Close"
+      }
+    },
+    "account": {
+      "reminders": {
+        "heading": "🔔 Your reminders",
+        "notice": "We’ll notify you 1 hour and 5 minutes before each one starts.",
+        "today": "Today {time}",
+        "tomorrow": "Tomorrow {time}",
+        "dateLabel": "{day} · {time}",
+        "cancel": "Cancel"
+      }
+    }
+  },
+  "es-419": {
+    "together": {
+      "crews": {
+        "loading": "Cargando jurados sincronizados…",
+        "loadFailed": "No se pudo cargar.",
+        "failed": "No se pudo.",
+        "namePrompt": "Nombra este jurado (p. ej. noche de películas del viernes)",
+        "inviteFailed": "No se pudo crear la invitación.",
+        "pickFailed": "No se pudo encontrar una opción.",
+        "networkError": "Error de red.",
+        "setupTitle": "Configuración única para jurados sincronizados",
+        "setupBody1": "Ejecuta la migración ",
+        "setupBody2": " en tu editor SQL de Supabase y luego actualiza. Hasta entonces, los jurados en el dispositivo de abajo funcionan por completo.",
+        "openSqlEditor": "Abrir el editor SQL de Supabase ↗",
+        "newJury": "+ Nuevo jurado sincronizado",
+        "invite": "📱 Invitar (QR)",
+        "deleteConfirm": "¿Eliminar este jurado?",
+        "delete": "Eliminar",
+        "noPeople": "Nadie todavía: agrega personas o comparte el QR para que se unan.",
+        "guest": "invitado",
+        "remove": "Quitar",
+        "namePlaceholder": "Nombre",
+        "loves": "Le encanta",
+        "hardNos": "Rotundos no",
+        "add": "Agregar",
+        "cancel": "Cancelar",
+        "addPerson": "+ Agregar una persona",
+        "nightsLogged": {
+          "one": "{count} noche registrada",
+          "other": "{count} noches registradas"
+        },
+        "lovedTogether": "Les encantó juntos: {titles}",
+        "anything": "Cualquiera",
+        "movies": "Películas",
+        "tv": "TV",
+        "finding": "Buscando tu opción…",
+        "findPick": "🍿 Encontrar nuestra opción ({count})",
+        "tasteCourt": "⚖️ Celebra un Tribunal de Gustos de 90 segundos",
+        "tonightsPick": "La opción de esta noche",
+        "logged": "Registrado en el ADN de {name} ✓",
+        "howdItGo": "¿Cómo estuvo?",
+        "scanToJoin": "Escanea para unirte a este jurado",
+        "copyLink": "Copiar enlace",
+        "close": "Cerrar"
+      }
+    },
+    "account": {
+      "reminders": {
+        "heading": "🔔 Tus recordatorios",
+        "notice": "Te avisaremos 1 hora y 5 minutos antes de que empiece cada uno.",
+        "today": "Hoy {time}",
+        "tomorrow": "Mañana {time}",
+        "dateLabel": "{day} · {time}",
+        "cancel": "Cancelar"
+      }
+    }
+  },
+  "zh-Hans": {
+    "together": {
+      "crews": {
+        "loading": "正在加载同步评审团…",
+        "loadFailed": "加载失败。",
+        "failed": "操作失败。",
+        "namePrompt": "为这个评审团命名（例如：周五电影之夜）",
+        "inviteFailed": "无法生成邀请。",
+        "pickFailed": "找不到合适的选择。",
+        "networkError": "网络错误。",
+        "setupTitle": "同步评审团的一次性设置",
+        "setupBody1": "运行迁移 ",
+        "setupBody2": "，在你的 Supabase SQL 编辑器中执行，然后刷新。在此之前，下方的本地评审团可完全使用。",
+        "openSqlEditor": "打开 Supabase SQL 编辑器 ↗",
+        "newJury": "+ 新建同步评审团",
+        "invite": "📱 邀请（二维码）",
+        "deleteConfirm": "删除这个评审团？",
+        "delete": "删除",
+        "noPeople": "还没有人——添加成员或分享二维码让他们加入。",
+        "guest": "访客",
+        "remove": "移除",
+        "namePlaceholder": "姓名",
+        "loves": "喜欢",
+        "hardNos": "绝对不要",
+        "add": "添加",
+        "cancel": "取消",
+        "addPerson": "+ 添加成员",
+        "nightsLogged": {
+          "one": "已记录 {count} 晚",
+          "other": "已记录 {count} 晚"
+        },
+        "lovedTogether": "一起爱看：{titles}",
+        "anything": "任意",
+        "movies": "电影",
+        "tv": "电视剧",
+        "finding": "正在寻找你的选择…",
+        "findPick": "🍿 找出我们的选择（{count}）",
+        "tasteCourt": "⚖️ 举行 90 秒品味法庭",
+        "tonightsPick": "今晚之选",
+        "logged": "已记录到 {name} 的 DNA ✓",
+        "howdItGo": "感觉怎么样：",
+        "scanToJoin": "扫码加入这个评审团",
+        "copyLink": "复制链接",
+        "close": "关闭"
+      }
+    },
+    "account": {
+      "reminders": {
+        "heading": "🔔 你的提醒",
+        "notice": "我们会在每个节目开始前 1 小时和 5 分钟提醒你。",
+        "today": "今天 {time}",
+        "tomorrow": "明天 {time}",
+        "dateLabel": "{day} · {time}",
+        "cancel": "取消"
+      }
+    }
+  }
+}

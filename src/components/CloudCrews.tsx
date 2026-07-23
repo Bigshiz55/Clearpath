@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useI18n } from '@/i18n/I18nProvider';
 import type { PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
 import {
@@ -31,6 +32,7 @@ function Chip({ label, active, tone, onClick }: { label: string; active: boolean
 }
 
 export function CloudCrews() {
+  const { t, plural } = useI18n();
   const [crews, setCrews] = useState<Crew[] | null>(null);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export function CloudCrews() {
   async function reload() {
     const res = await listCrews();
     if (res.needsSetup) { setNeedsSetup(true); setCrews([]); return; }
-    if (!res.ok) { setErr(res.error ?? 'Failed to load.'); setCrews([]); return; }
+    if (!res.ok) { setErr(res.error ?? t('together.crews.loadFailed')); setCrews([]); return; }
     setNeedsSetup(false);
     setCrews(res.crews ?? []);
     if (selId && !(res.crews ?? []).some((c) => c.id === selId)) setSelId(null);
@@ -67,13 +69,13 @@ export function CloudCrews() {
   const selected = crews?.find((c) => c.id === selId) ?? null;
 
   async function onCreate() {
-    const name = window.prompt('Name this jury (e.g. Friday movie night)');
+    const name = window.prompt(t('together.crews.namePrompt'));
     if (!name?.trim()) return;
     setBusy(true);
     const res = await createCrew(name.trim());
     setBusy(false);
     if (res.needsSetup) setNeedsSetup(true);
-    else if (!res.ok) setErr(res.error ?? 'Failed.');
+    else if (!res.ok) setErr(res.error ?? t('together.crews.failed'));
     else await reload();
   }
 
@@ -82,7 +84,7 @@ export function CloudCrews() {
     setBusy(true);
     const res = await addCrewPerson({ crewId: selected.id, name: pName.trim(), love: pLove, avoid: pAvoid });
     setBusy(false);
-    if (!res.ok) { setErr(res.error ?? 'Failed.'); return; }
+    if (!res.ok) { setErr(res.error ?? t('together.crews.failed')); return; }
     setPName(''); setPLove([]); setPAvoid([]); setAdding(false);
     await reload();
   }
@@ -93,7 +95,7 @@ export function CloudCrews() {
     const res = await getCrewInvite(selected.id, window.location.origin);
     setBusy(false);
     if (res.ok && res.url && res.qrSvg) setInvite({ url: res.url, qrSvg: res.qrSvg });
-    else setErr(res.error ?? 'Failed to build invite.');
+    else setErr(res.error ?? t('together.crews.inviteFailed'));
   }
 
   async function findPick() {
@@ -109,9 +111,9 @@ export function CloudCrews() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) setErr(data.error ?? 'Could not find a pick.');
+      if (!res.ok) setErr(data.error ?? t('together.crews.pickFailed'));
       else setPicks(data.picks ?? []);
-    } catch { setErr('Network error.'); }
+    } catch { setErr(t('together.crews.networkError')); }
     finally { setPicking(false); }
   }
 
@@ -126,16 +128,15 @@ export function CloudCrews() {
   }
 
   if (crews === null) {
-    return <div className="mt-3 text-sm text-slate-400">Loading synced juries…</div>;
+    return <div className="mt-3 text-sm text-slate-400">{t('together.crews.loading')}</div>;
   }
 
   if (needsSetup) {
     return (
       <div className="card p-4">
-        <div className="text-sm font-semibold text-white">One-time setup for synced juries</div>
+        <div className="text-sm font-semibold text-white">{t('together.crews.setupTitle')}</div>
         <p className="mt-1 text-xs text-slate-400">
-          Run the migration <code className="text-slate-300">supabase/migrations/0003_crews.sql</code> in your
-          Supabase SQL editor, then refresh. Until then, the on-device juries below work fully.
+          {t('together.crews.setupBody1')}<code className="text-slate-300">supabase/migrations/0003_crews.sql</code>{t('together.crews.setupBody2')}
         </p>
         <a
           href="https://supabase.com/dashboard/project/vajgviraxigkwlvysxfz/sql/new"
@@ -143,14 +144,14 @@ export function CloudCrews() {
           rel="noopener noreferrer"
           className="btn-secondary mt-3 inline-flex text-sm"
         >
-          Open Supabase SQL editor ↗
+          {t('together.crews.openSqlEditor')}
         </a>
       </div>
     );
   }
 
-  const toggle = (list: PreferenceTrait[], set: (v: PreferenceTrait[]) => void, t: PreferenceTrait) =>
-    set(list.includes(t) ? list.filter((x) => x !== t) : [...list, t]);
+  const toggle = (list: PreferenceTrait[], set: (v: PreferenceTrait[]) => void, trait: PreferenceTrait) =>
+    set(list.includes(trait) ? list.filter((x) => x !== trait) : [...list, trait]);
 
   return (
     <div className="space-y-4">
@@ -163,7 +164,7 @@ export function CloudCrews() {
             {c.name}{c.dna.nights > 0 ? <span className="ml-1 text-[10px] text-slate-400">· {c.dna.nights}</span> : null}
           </button>
         ))}
-        <button onClick={onCreate} disabled={busy} className="btn-secondary text-sm">+ New synced jury</button>
+        <button onClick={onCreate} disabled={busy} className="btn-secondary text-sm">{t('together.crews.newJury')}</button>
       </div>
 
       {selected && (
@@ -171,49 +172,49 @@ export function CloudCrews() {
           <div className="flex items-center justify-between">
             <div className="font-bold text-white">🧬 {selected.name}</div>
             <div className="flex gap-2">
-              <button onClick={onInvite} disabled={busy} className="rounded-lg border border-brand-400/40 bg-brand-500/15 px-2.5 py-1 text-xs font-semibold text-brand-100">📱 Invite (QR)</button>
-              <button onClick={async () => { if (confirm('Delete this jury?')) { await deleteCrew(selected.id); await reload(); } }} className="text-[11px] text-slate-500 hover:text-red-300">Delete</button>
+              <button onClick={onInvite} disabled={busy} className="rounded-lg border border-brand-400/40 bg-brand-500/15 px-2.5 py-1 text-xs font-semibold text-brand-100">{t('together.crews.invite')}</button>
+              <button onClick={async () => { if (confirm(t('together.crews.deleteConfirm'))) { await deleteCrew(selected.id); await reload(); } }} className="text-[11px] text-slate-500 hover:text-red-300">{t('together.crews.delete')}</button>
             </div>
           </div>
 
           {/* People */}
           <div className="mt-3 space-y-1.5">
-            {selected.people.length === 0 && <div className="text-xs text-slate-400">No one yet — add people or share the QR to have them join.</div>}
+            {selected.people.length === 0 && <div className="text-xs text-slate-400">{t('together.crews.noPeople')}</div>}
             {selected.people.map((p) => (
               <div key={p.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
                 <div className="min-w-0 flex-1">
                   <span className="font-semibold text-white">{p.name}</span>
-                  {p.isGuest && <span className="ml-1 text-[10px] uppercase text-brand-300">guest</span>}
+                  {p.isGuest && <span className="ml-1 text-[10px] uppercase text-brand-300">{t('together.crews.guest')}</span>}
                   <span className="ml-2 truncate text-xs text-slate-400">
-                    {p.love.length ? `♥ ${p.love.map((t) => humanTrait(t as PreferenceTrait)).join(', ')}` : ''}
-                    {p.avoid.length ? ` · ✗ ${p.avoid.map((t) => humanTrait(t as PreferenceTrait)).join(', ')}` : ''}
+                    {p.love.length ? `♥ ${p.love.map((tr) => humanTrait(tr as PreferenceTrait)).join(', ')}` : ''}
+                    {p.avoid.length ? ` · ✗ ${p.avoid.map((tr) => humanTrait(tr as PreferenceTrait)).join(', ')}` : ''}
                   </span>
                 </div>
-                <button onClick={async () => { await removeCrewPerson(p.id); await reload(); }} className="text-[11px] text-slate-500 hover:text-red-300">Remove</button>
+                <button onClick={async () => { await removeCrewPerson(p.id); await reload(); }} className="text-[11px] text-slate-500 hover:text-red-300">{t('together.crews.remove')}</button>
               </div>
             ))}
           </div>
 
           {adding ? (
             <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-              <input value={pName} onChange={(e) => setPName(e.target.value)} placeholder="Name" className="input" maxLength={40} />
-              <div className="mt-2 text-xs font-semibold text-emerald-200">Loves</div>
-              <div className="mt-1 flex flex-wrap gap-1.5">{LOVABLE.map((t) => <Chip key={t} label={humanTrait(t)} tone="love" active={pLove.includes(t)} onClick={() => toggle(pLove, setPLove, t)} />)}</div>
-              <div className="mt-2 text-xs font-semibold text-red-200">Hard no’s</div>
-              <div className="mt-1 flex flex-wrap gap-1.5">{AVOIDABLE.map((t) => <Chip key={t} label={humanTrait(t)} tone="avoid" active={pAvoid.includes(t)} onClick={() => toggle(pAvoid, setPAvoid, t)} />)}</div>
+              <input value={pName} onChange={(e) => setPName(e.target.value)} placeholder={t('together.crews.namePlaceholder')} className="input" maxLength={40} />
+              <div className="mt-2 text-xs font-semibold text-emerald-200">{t('together.crews.loves')}</div>
+              <div className="mt-1 flex flex-wrap gap-1.5">{LOVABLE.map((tr) => <Chip key={tr} label={humanTrait(tr)} tone="love" active={pLove.includes(tr)} onClick={() => toggle(pLove, setPLove, tr)} />)}</div>
+              <div className="mt-2 text-xs font-semibold text-red-200">{t('together.crews.hardNos')}</div>
+              <div className="mt-1 flex flex-wrap gap-1.5">{AVOIDABLE.map((tr) => <Chip key={tr} label={humanTrait(tr)} tone="avoid" active={pAvoid.includes(tr)} onClick={() => toggle(pAvoid, setPAvoid, tr)} />)}</div>
               <div className="mt-3 flex gap-2">
-                <button onClick={onAddPerson} disabled={busy || !pName.trim()} className="btn-primary text-sm">Add</button>
-                <button onClick={() => setAdding(false)} className="btn-ghost text-sm">Cancel</button>
+                <button onClick={onAddPerson} disabled={busy || !pName.trim()} className="btn-primary text-sm">{t('together.crews.add')}</button>
+                <button onClick={() => setAdding(false)} className="btn-ghost text-sm">{t('together.crews.cancel')}</button>
               </div>
             </div>
           ) : (
-            <button onClick={() => setAdding(true)} className="btn-ghost mt-2 text-sm">+ Add a person</button>
+            <button onClick={() => setAdding(true)} className="btn-ghost mt-2 text-sm">{t('together.crews.addPerson')}</button>
           )}
 
           {/* DNA */}
           {selected.dna.nights > 0 && (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
-              <div className="text-xs text-slate-400">{selected.dna.nights} nights logged</div>
+              <div className="text-xs text-slate-400">{plural('together.crews.nightsLogged', selected.dna.nights)}</div>
               {Object.keys(selected.dna.lovedGenres).length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {Object.entries(selected.dna.lovedGenres).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([g, n]) => (
@@ -221,23 +222,23 @@ export function CloudCrews() {
                   ))}
                 </div>
               )}
-              {selected.dna.lovedTitles.length > 0 && <div className="mt-2 text-xs text-slate-300">Loved together: {selected.dna.lovedTitles.slice(0, 6).map((t) => t.title).join(' · ')}</div>}
+              {selected.dna.lovedTitles.length > 0 && <div className="mt-2 text-xs text-slate-300">{t('together.crews.lovedTogether', { titles: selected.dna.lovedTitles.slice(0, 6).map((lt) => lt.title).join(' · ') })}</div>}
             </div>
           )}
 
           {/* Pick */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {(['any', 'movie', 'tv'] as const).map((t) => (
-              <button key={t} onClick={() => setMediaType(t)} className={`rounded-full border px-3 py-1 text-xs font-medium ${mediaType === t ? 'border-brand-400/50 bg-brand-500/20 text-brand-100' : 'border-white/15 bg-white/5 text-slate-300'}`}>
-                {t === 'any' ? 'Anything' : t === 'movie' ? 'Movies' : 'TV'}
+            {(['any', 'movie', 'tv'] as const).map((m) => (
+              <button key={m} onClick={() => setMediaType(m)} className={`rounded-full border px-3 py-1 text-xs font-medium ${mediaType === m ? 'border-brand-400/50 bg-brand-500/20 text-brand-100' : 'border-white/15 bg-white/5 text-slate-300'}`}>
+                {m === 'any' ? t('together.crews.anything') : m === 'movie' ? t('together.crews.movies') : t('together.crews.tv')}
               </button>
             ))}
           </div>
           <button onClick={findPick} disabled={picking || selected.people.length === 0} className="btn-primary mt-3 w-full py-3">
-            {picking ? 'Finding your pick…' : `🍿 Find our pick (${selected.people.length})`}
+            {picking ? t('together.crews.finding') : t('together.crews.findPick', { count: selected.people.length })}
           </button>
           <button onClick={() => setCourtOpen(true)} disabled={selected.people.length < 2} className="btn-secondary mt-2 w-full">
-            ⚖️ Hold a 90-Second Taste Court
+            {t('together.crews.tasteCourt')}
           </button>
 
           {picks && picks.length > 0 && (
@@ -252,7 +253,7 @@ export function CloudCrews() {
                         {p.posterUrl ? <img src={p.posterUrl} alt="" className="h-full w-full object-cover" /> : null}
                       </Link>
                       <div className="min-w-0 flex-1">
-                        {i === 0 && <div className="text-[11px] font-bold uppercase text-brand-300">Tonight’s pick</div>}
+                        {i === 0 && <div className="text-[11px] font-bold uppercase text-brand-300">{t('together.crews.tonightsPick')}</div>}
                         <Link href={`/app/title/${p.mediaType}/${p.id}`}><h4 className="font-bold text-white">{p.title} {p.year ? <span className="font-normal text-slate-400">({p.year})</span> : null}</h4></Link>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
                           <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${p.anyVeto ? 'border-red-400/40 bg-red-500/15 text-red-100' : p.minScore >= 75 ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100' : 'border-yellow-400/40 bg-yellow-500/15 text-yellow-100'}`}>{p.verdict}</span>
@@ -266,9 +267,9 @@ export function CloudCrews() {
                     </div>
                     {i === 0 && (
                       <div className="mt-2 flex items-center gap-2">
-                        {logged.has(key) ? <span className="text-[11px] text-slate-400">Logged to {selected.name}’s DNA ✓</span> : (
+                        {logged.has(key) ? <span className="text-[11px] text-slate-400">{t('together.crews.logged', { name: selected.name })}</span> : (
                           <>
-                            <span className="text-[11px] text-slate-400">How’d it go:</span>
+                            <span className="text-[11px] text-slate-400">{t('together.crews.howdItGo')}</span>
                             <button onClick={() => onLog(p, 'loved')} className="rounded border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-100">👍</button>
                             <button onClick={() => onLog(p, 'fine')} className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-slate-200">😐</button>
                             <button onClick={() => onLog(p, 'nope')} className="rounded border border-red-400/40 bg-red-500/15 px-2 py-0.5 text-[11px] text-red-100">👎</button>
@@ -302,12 +303,12 @@ export function CloudCrews() {
       {invite && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setInvite(null)}>
           <div className="card max-w-sm p-6 text-center" onClick={(e) => e.stopPropagation()}>
-            <div className="text-sm font-bold text-white">Scan to join this jury</div>
+            <div className="text-sm font-bold text-white">{t('together.crews.scanToJoin')}</div>
             <div className="mx-auto mt-3 h-56 w-56 rounded-xl bg-white p-2" dangerouslySetInnerHTML={{ __html: invite.qrSvg }} />
             <p className="mt-3 break-all text-xs text-slate-400">{invite.url}</p>
             <div className="mt-4 flex justify-center gap-2">
-              <button onClick={() => navigator.clipboard?.writeText(invite.url)} className="btn-secondary text-sm">Copy link</button>
-              <button onClick={() => setInvite(null)} className="btn-ghost text-sm">Close</button>
+              <button onClick={() => navigator.clipboard?.writeText(invite.url)} className="btn-secondary text-sm">{t('together.crews.copyLink')}</button>
+              <button onClick={() => setInvite(null)} className="btn-ghost text-sm">{t('together.crews.close')}</button>
             </div>
           </div>
         </div>
