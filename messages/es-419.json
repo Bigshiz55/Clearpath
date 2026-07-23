@@ -42,5 +42,34 @@
     "couldNotRemove": "No se pudo quitar.",
     "signInToSave": "Inicia sesión para guardar en tu lista.",
     "somethingWrong": "Algo salió mal."
+  },
+  "verdict": {
+    "header": "El veredicto",
+    "yourVerdict": "Tu VERD1CT",
+    "tier": {
+      "mustWatch": "Imprescindible",
+      "strongWatch": "Muy recomendable",
+      "worthWatching": "Vale la pena",
+      "possibleWatch": "Quizás",
+      "lowPriority": "Baja prioridad",
+      "skip": "Sáltala"
+    },
+    "call": {
+      "watch": "VÉLA",
+      "worth": "QUIZÁS",
+      "uncertain": "INDECISO",
+      "skip": "SÁLTALA",
+      "wildcard": "COMODÍN"
+    },
+    "primaryCall": {
+      "watchIt": "VÉLA",
+      "maybe": "QUIZÁS",
+      "skipIt": "SÁLTALA"
+    },
+    "disposition": {
+      "strict": "Lista fija",
+      "possible": "Lista posible",
+      "skip": "Sáltala"
+    }
   }
 }

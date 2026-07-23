@@ -42,5 +42,34 @@
     "couldNotRemove": "无法移除。",
     "signInToSave": "登录后即可保存到你的列表。",
     "somethingWrong": "出错了。"
+  },
+  "verdict": {
+    "header": "裁决",
+    "yourVerdict": "你的 VERD1CT",
+    "tier": {
+      "mustWatch": "必看",
+      "strongWatch": "强烈推荐",
+      "worthWatching": "值得一看",
+      "possibleWatch": "可以考虑",
+      "lowPriority": "优先级低",
+      "skip": "跳过"
+    },
+    "call": {
+      "watch": "去看",
+      "worth": "也许",
+      "uncertain": "难说",
+      "skip": "跳过",
+      "wildcard": "冷门之选"
+    },
+    "primaryCall": {
+      "watchIt": "去看",
+      "maybe": "也许",
+      "skipIt": "跳过"
+    },
+    "disposition": {
+      "strict": "必看清单",
+      "possible": "备选清单",
+      "skip": "跳过"
+    }
   }
 }

@@ -42,5 +42,34 @@
     "couldNotRemove": "Could not remove.",
     "signInToSave": "Sign in to save to your list.",
     "somethingWrong": "Something went wrong."
+  },
+  "verdict": {
+    "header": "The verdict",
+    "yourVerdict": "Your VERD1CT",
+    "tier": {
+      "mustWatch": "Must Watch",
+      "strongWatch": "Strong Watch",
+      "worthWatching": "Worth Watching",
+      "possibleWatch": "Possible Watch",
+      "lowPriority": "Low Priority",
+      "skip": "Skip"
+    },
+    "call": {
+      "watch": "STREAM IT",
+      "worth": "MAYBE",
+      "uncertain": "TOSS-UP",
+      "skip": "SKIP IT",
+      "wildcard": "WILDCARD"
+    },
+    "primaryCall": {
+      "watchIt": "WATCH IT",
+      "maybe": "MAYBE",
+      "skipIt": "SKIP IT"
+    },
+    "disposition": {
+      "strict": "Strict Watchlist",
+      "possible": "Possible Watchlist",
+      "skip": "Skip"
+    }
   }
 }
