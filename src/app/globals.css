@@ -178,43 +178,43 @@ body {
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 .wv-gavel { animation: wv-gavel-strike 1.5s cubic-bezier(0.3, 0.7, 0.2, 1) both; transform-origin: 80% 80%; }
-/* Repeating slam for the "Hit the gavel" button while it's ruling. */
-.wv-gavel-slam { animation: wv-gavel-strike 0.85s cubic-bezier(0.3, 0.7, 0.2, 1) infinite; transform-origin: 78% 80%; }
 .wv-order { animation: wv-order-flash 1.7s ease-out both; }
-
-/* The BIG gavel that drops in and physically slams the submit button. */
-@keyframes wv-gavel-drop {
-  0%   { transform: translate(-50%, -150%) rotate(-52deg); opacity: 0; }
-  32%  { transform: translate(-50%, -150%) rotate(-52deg); opacity: 1; }
-  60%  { transform: translate(-50%, -34%) rotate(10deg); }   /* strike */
-  73%  { transform: translate(-50%, -66%) rotate(-8deg); }   /* rebound */
-  88%  { transform: translate(-50%, -40%) rotate(4deg); }
-  100% { transform: translate(-50%, -46%) rotate(0deg); opacity: 1; }
-}
-.wv-gavel-drop { animation: wv-gavel-drop 0.62s cubic-bezier(0.3, 0.7, 0.2, 1) both; transform-origin: 62% 62%; }
-/* The button reacts to the strike — a quick press-and-settle. */
-@keyframes wv-btn-impact {
-  0%, 55% { transform: scale(1); }
-  62%     { transform: scale(0.93); }
-  80%     { transform: scale(1.02); }
-  100%    { transform: scale(1); }
-}
-.wv-btn-impact { animation: wv-btn-impact 0.62s ease-out both; }
-/* The shock ring that flashes out on impact. */
-@keyframes wv-strike-ring {
-  0%, 55% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
-  64%     { opacity: 0.9; transform: translate(-50%, -50%) scale(1); }
-  100%    { opacity: 0; transform: translate(-50%, -50%) scale(1.7); }
-}
-.wv-strike-ring { animation: wv-strike-ring 0.62s ease-out both; }
-/* A full-screen flash at the moment the gavel lands. */
-@keyframes wv-screen-flash {
-  0%, 54% { opacity: 0; }
-  62%     { opacity: 0.42; }
-  100%    { opacity: 0; }
-}
-.wv-screen-flash { animation: wv-screen-flash 0.62s ease-out both; }
 .wv-verdict-in { animation: wv-verdict-in 0.5s ease-out both; }
+
+/* Chunky 3D "verdict" CTA — raised with a hard edge, crisp bold text, and a
+   satisfying press-down on tap. */
+.wv-cta-3d {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: 0.005em;
+  border-radius: 14px;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  background-image: linear-gradient(180deg, #6d8bff 0%, #3f57e6 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.18),
+    0 6px 0 #2a37a8,
+    0 12px 22px -8px rgba(63, 87, 230, 0.7);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.wv-cta-3d:hover { filter: brightness(1.06); }
+.wv-cta-3d:active:not(:disabled) {
+  transform: translateY(5px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 1px 0 #2a37a8,
+    0 4px 10px -6px rgba(63, 87, 230, 0.7);
+}
+.wv-cta-3d:disabled {
+  opacity: 0.5;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 5px 0 #2a37a8;
+}
 
 /* Home-tile ambient sheen — a slow light band that drifts across each tile so
    the hub feels alive on touch devices (where hover never fires). */
