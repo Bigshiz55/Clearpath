@@ -191,29 +191,29 @@ body {
   color: #fff;
   font-weight: 900;
   letter-spacing: 0.005em;
-  border-radius: 14px;
+  border-radius: 18px;
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-  background-image: linear-gradient(180deg, #6d8bff 0%, #3f57e6 100%);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  background-image: linear-gradient(180deg, #ff62b6 0%, #ff1493 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.18),
-    0 6px 0 #2a37a8,
-    0 12px 22px -8px rgba(63, 87, 230, 0.7);
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -3px 7px rgba(120, 0, 60, 0.25),
+    0 8px 0 #b30d6b,
+    0 16px 26px -8px rgba(255, 20, 147, 0.7);
   transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .wv-cta-3d:hover { filter: brightness(1.06); }
 .wv-cta-3d:active:not(:disabled) {
-  transform: translateY(5px);
+  transform: translateY(7px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    0 1px 0 #2a37a8,
-    0 4px 10px -6px rgba(63, 87, 230, 0.7);
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 1px 0 #b30d6b,
+    0 5px 12px -6px rgba(255, 20, 147, 0.7);
 }
 .wv-cta-3d:disabled {
   opacity: 0.5;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 5px 0 #2a37a8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 7px 0 #b30d6b;
 }
 
 /* Home-tile ambient sheen — a slow light band that drifts across each tile so
