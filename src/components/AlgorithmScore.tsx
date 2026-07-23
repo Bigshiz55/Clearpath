@@ -9,9 +9,11 @@ import { CardRatings } from './CardRatings';
 import { useT } from '@/i18n/I18nProvider';
 
 /**
- * The one pink "algorithm" box on every card. It folds the user's DNA together
+ * The one pink "verdict" box on every card. It folds the user's DNA together
  * with every rating (RT, audience, IMDb) into a single 0–100 score and a plain
- * "will you like it?" answer, with the source ratings shown prominently beneath.
+ * "will you like it?" call, followed by one short, honest reason and the source
+ * ratings beneath. Kept deliberately calm: pink is the only brand colour here,
+ * the call carries the one semantic accent, everything else is muted.
  */
 export function AlgorithmScore({
   mediaType,
@@ -43,32 +45,54 @@ export function AlgorithmScore({
   const score = personal ? dna!.score : dna?.score ?? objectiveScore;
   const v = score != null ? scoreVerdict(score) : null;
 
+  // One short, honest "why" — derived only from signals we actually have, never
+  // invented. Personalized cards say so (and how settled the read is); guests /
+  // unrated titles get the honest objective descriptor. No per-title claim is
+  // made that the grid payload can't back up.
+  const whyKey =
+    score == null
+      ? null
+      : personal
+        ? dna!.confidence >= 0.6
+          ? 'strongTaste'
+          : dna!.confidence < 0.35
+            ? 'learning'
+            : 'yourTaste'
+        : 'blend';
+
   return (
     <div
-      className={`rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 px-2 py-2 shadow-[0_0_16px_rgba(244,63,94,0.28)] ${className}`}
+      className={`rounded-xl border border-pink-400/40 bg-gradient-to-br from-pink-500/20 to-rose-500/10 px-2.5 py-2.5 shadow-[0_4px_16px_-8px_rgba(244,63,94,0.55)] ${className}`}
       title={t('title.algoTip')}
     >
-      {/* The VERD1CT badge (number + TV) beside the ruling (Stream It / …). */}
+      {/* Row 1 — the score badge beside the one call (Stream It / Maybe / …).
+          The call may wrap to a second line on the narrowest cards rather than
+          clip, so a long localized label ("STREAM IT" / "SÁLTALA") stays whole. */}
       <div className="flex items-center gap-2.5">
         {score != null ? (
           <Verd1ctBadge score={score} px={44} />
         ) : (
-          <span className="grid h-11 w-11 flex-none place-items-center rounded-[24%] bg-white/10 text-xl font-black text-slate-400">—</span>
+          <span aria-hidden className="grid h-11 w-11 flex-none place-items-center rounded-[24%] bg-white/10 text-xl font-black text-slate-400">—</span>
         )}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {v && (
-            <span className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-sm font-black tracking-tight ${v.visual.badge}`}>
+            <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-black uppercase leading-tight tracking-tight ${v.visual.badge}`}>
               {t(`verdict.call.${v.visual.key}`)}
             </span>
           )}
-          <div className="mt-1 text-[10px] font-black uppercase tracking-wide text-pink-100/90">
-            {personal ? t('verdict.yourVerdict') : 'WatchVerdict'}
-            {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 ? t('title.dotLearning') : ''}
-          </div>
         </div>
       </div>
 
-      {/* The source ratings that feed the score — shown prominently. */}
+      {/* Row 2 — one short reason on its own full-width line, replacing the old
+          "YOUR VERD1CT" label. 🧬 (not colour) flags a personalized read for a11y. */}
+      {whyKey && (
+        <div className="mt-1.5 line-clamp-1 text-[11px] font-semibold leading-snug text-pink-50/85">
+          {whyKey !== 'blend' && <span aria-hidden className="mr-0.5">🧬</span>}
+          {t(`card.why.${whyKey}`)}
+        </div>
+      )}
+
+      {/* Row 3 — the source ratings that feed the score. */}
       <CardRatings mediaType={mediaType} tmdbId={tmdbId} title={title} year={year} hideCall className="mt-2" />
     </div>
   );

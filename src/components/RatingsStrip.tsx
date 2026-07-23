@@ -8,9 +8,11 @@ function tomatoColor(pct: number): string {
 }
 
 /** A compact row of the real ratings for a title — shown right on the card so
- *  you don't have to open it: Tomatometer, audience, IMDb, Metacritic, and a
- *  Decider link. Renders only the sources we actually have (audience is TMDB's;
- *  RT's own popcorn score isn't in our data feed).
+ *  you don't have to open it: Rotten Tomatoes critics, audience, and IMDb.
+ *  Rendered as a fixed three-column grid so each source keeps its own cell and
+ *  nothing (IMDb especially) is ever clipped or pushed out on a narrow card.
+ *  Sources we don't have degrade to a muted "–" in place, so the row never
+ *  collapses into an awkward gap.
  *
  *  When `mediaType`/`tmdbId` are supplied, the leading call becomes the DNA-driven
  *  WatchCall (personalized when the user has rated enough, objective otherwise).
@@ -39,7 +41,7 @@ export function RatingsStrip({
 }) {
   const t = useT();
   if (loading) {
-    return <div className={`h-4 w-24 animate-pulse rounded bg-white/10 ${className}`} />;
+    return <div className={`h-9 w-full animate-pulse rounded-lg bg-white/[0.06] ${className}`} />;
   }
 
   // Our own Stream It / Skip It call, on every card. Derived from the blended
@@ -82,42 +84,61 @@ export function RatingsStrip({
         </div>
       )}
 
-      {/* Line 2 — all three source ratings on one line, sized up for legibility:
-          no pills on 🍅/🍿 (just icon + value) so tomato, popcorn and IMDb fit. */}
-      <div className="flex items-center gap-2.5 text-sm font-black tabular-nums">
-        <RatingChip
-          label="🍅"
+      {/* The three external sources — a fixed 3-column grid so each keeps an
+          equal, aligned cell that can't clip its neighbour. Icon/label on top,
+          value beneath, so even at iPhone-SE two-column widths the value has the
+          full cell to itself. Missing sources show a muted "–" in place. */}
+      <div
+        role="group"
+        aria-label={t('card.rate.groupAria')}
+        className="grid grid-cols-3 items-end gap-1"
+      >
+        <RatingCell
+          icon="🍅"
           value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
           tone={ratings.tomatometer != null ? tomatoColor(ratings.tomatometer) : ''}
-          title={t('title.tomatometerTip')}
+          ariaLabel={ratings.tomatometer != null ? t('card.rate.criticAria', { score: ratings.tomatometer }) : t('card.rate.criticNaAria')}
         />
-        <RatingChip
-          label="🍿"
+        <RatingCell
+          icon="🍿"
           value={popcorn != null ? `${popcorn}%` : null}
           tone={popcorn != null ? 'text-amber-200' : ''}
-          title={ratings.rtAudience != null ? t('title.rtAudienceTip') : t('title.popcornTip')}
+          ariaLabel={popcorn != null ? t('card.rate.audienceAria', { score: popcorn }) : t('card.rate.audienceNaAria')}
         />
-        <span
-          className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
-          title={t('title.imdbTip')}
-        >
-          <span className="text-[10px] font-black opacity-80">IMDb</span> {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
-        </span>
+        <ImdbCell
+          value={ratings.imdb != null ? ratings.imdb.toFixed(1) : null}
+          ariaLabel={ratings.imdb != null ? t('card.rate.imdbAria', { score: ratings.imdb.toFixed(1) }) : t('card.rate.imdbNaAria')}
+        />
       </div>
     </div>
   );
 }
 
-/** One source rating — icon + value, dimmed to "–" when unavailable. No pill, so
- *  all three ratings fit one line in a narrow card. */
-function RatingChip({ label, value, tone, title }: { label: string; value: string | null; tone: string; title: string }) {
+/** One RT source cell — emoji label over the value. A missing source keeps its
+ *  cell (so the grid stays aligned) and reads as a dimmed "–". */
+function RatingCell({ icon, value, tone, ariaLabel }: { icon: string; value: string | null; tone: string; ariaLabel: string }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap ${value != null ? tone : 'text-slate-500'}`}
-      title={title}
-    >
-      <span aria-hidden className="text-base leading-none">{label}</span>
-      {value ?? '–'}
+    <span className="flex flex-col items-center gap-0.5" role="img" aria-label={ariaLabel}>
+      <span aria-hidden className="text-sm leading-none">{icon}</span>
+      <span className={`text-sm font-black leading-none tabular-nums ${value != null ? tone : 'text-slate-500'}`}>{value ?? '–'}</span>
+    </span>
+  );
+}
+
+/** The IMDb cell — the recognisable gold wordmark over the /10 value, always in
+ *  its own column so it is never clipped, faded out, or reduced to a bare dash
+ *  when a score exists. Missing IMDb keeps the cell with a muted wordmark. */
+function ImdbCell({ value, ariaLabel }: { value: string | null; ariaLabel: string }) {
+  const present = value != null;
+  return (
+    <span className="flex flex-col items-center gap-0.5" role="img" aria-label={ariaLabel}>
+      <span
+        aria-hidden
+        className={`rounded px-1 text-[9px] font-black leading-tight tracking-tight ${present ? 'bg-[#f5c518] text-black' : 'bg-white/10 text-slate-400'}`}
+      >
+        IMDb
+      </span>
+      <span className={`text-sm font-black leading-none tabular-nums ${present ? 'text-gold-300' : 'text-slate-500'}`}>{value ?? '–'}</span>
     </span>
   );
 }

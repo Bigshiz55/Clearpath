@@ -76,7 +76,7 @@ export function LikeButton({
         disabled={done}
         aria-label={t('card.forHint')}
         title={t('card.forHint')}
-        className="flex h-9 w-full min-w-0 flex-1 items-center justify-center gap-0.5 rounded-md border border-emerald-400/50 bg-emerald-500/15 text-emerald-100 transition hover:bg-emerald-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-60"
+        className="flex h-11 min-h-[44px] w-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md border border-emerald-400/50 bg-emerald-500/15 text-emerald-100 transition hover:bg-emerald-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-60"
       >
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="m14 13-7.4 7.4a2.12 2.12 0 0 1-3-3L11 10" />
@@ -85,7 +85,7 @@ export function LikeButton({
           <path d="m9 7 8 8" />
           <path d="m21 11-8-8" />
         </svg>
-        <span className="text-[10px] font-black uppercase tracking-wide">{t('card.for')}</span>
+        <span className="text-[9px] font-black uppercase tracking-wide">{t('card.for')}</span>
       </button>
       {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind="up" onDone={() => { fadeCard(); setBurst(null); }} />}
     </>

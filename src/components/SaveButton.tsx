@@ -131,14 +131,14 @@ export function SaveButton({
       disabled={busy}
       aria-label={saved ? t('card.savedHint') : t('card.saveHint')}
       title={saved ? t('card.savedHint') : t('card.saveHint')}
-      className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-9'} ${
+      className={`flex min-w-0 items-center justify-center gap-0.5 rounded-md border text-white transition ${wide ? 'h-11 min-h-[44px] w-full flex-1 flex-col' : 'h-9 w-9'} ${
         saved
           ? 'border-brand-300 bg-brand-500'
           : 'border-brand-400/60 bg-brand-500/35 hover:bg-brand-500/60'
       }`}
     >
       {icon}
-      {wide && <span className="text-[10px] font-black uppercase tracking-wide">{saved ? t('card.saved') : t('card.save')}</span>}
+      {wide && <span className="text-[9px] font-black uppercase tracking-wide">{saved ? t('card.saved') : t('card.save')}</span>}
     </button>
   );
 }

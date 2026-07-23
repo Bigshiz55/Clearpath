@@ -95,7 +95,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
       {/* One tidy action row — a clean groove, all the same size and OFF the art:
           👍 more like this · 👎 not for me · ＋ Save. The Movie/TV tag moved down to
           the title line; the score lives in the pink box below. */}
-      <div className="flex items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
+      <div className="flex items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
         {overlay !== null && saveId != null && (
           <LikeButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
         )}
@@ -122,7 +122,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         {/* One pink box: the algorithm score (your DNA + every rating) + will-you-
             like-it call, with the ratings underneath. */}
         {saveId != null && (
-          <AlgorithmScore mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-2" />
+          <AlgorithmScore mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-2.5" />
         )}
         {children}
       </div>

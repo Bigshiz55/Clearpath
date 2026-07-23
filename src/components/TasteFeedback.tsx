@@ -83,7 +83,7 @@ export function TasteFeedback({
         title={t('card.passHint')}
         className={
           compact
-            ? `flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-md border border-red-400/50 bg-red-500/15 text-red-200 transition hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:opacity-60 ${wide ? 'w-full flex-1' : 'w-9'}`
+            ? `flex min-w-0 items-center justify-center gap-0.5 rounded-md border border-red-400/50 bg-red-500/15 text-red-200 transition hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:opacity-60 ${wide ? 'h-11 min-h-[44px] w-full flex-1 flex-col' : 'h-9 w-9'}`
             : `items-center gap-1 rounded-lg border border-red-400/50 bg-black/60 font-bold text-red-100 backdrop-blur transition hover:bg-red-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:opacity-60 ${wide ? 'flex w-full justify-center px-3 py-3 text-sm' : 'inline-flex px-2 py-1 text-[11px]'}`
         }
       >
@@ -94,7 +94,7 @@ export function TasteFeedback({
           <path d="m9 7 8 8" />
           <path d="m21 11-8-8" />
         </svg>
-        {compact ? wide && <span className="text-[10px] font-black uppercase tracking-wide">{t('card.pass')}</span> : ` ${t('card.passHint')}`}
+        {compact ? wide && <span className="text-[9px] font-black uppercase tracking-wide">{t('card.pass')}</span> : ` ${t('card.passHint')}`}
       </button>
       {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind="down" onDone={() => { fadeCard(); setBurst(null); }} />}
     </>
