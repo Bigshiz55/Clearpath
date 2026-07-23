@@ -39,10 +39,6 @@
         "fantasy": "Fantasy",
         "adventure": "Adventure"
       },
-      "toast": {
-        "couldNotSetReminder": "Could not set the reminder.",
-        "somethingWrong": "Something went wrong. Please try again."
-      },
       "new": {
         "heading": "🆕 New releases",
         "intro": "The freshest movies and shows — fine-tune by type, timing, platform, and rating, then tap any poster for a quick look with the trailer. Every title is one tap from its full verdict.",
@@ -62,10 +58,6 @@
         "quickLook": "Quick look at {title}",
         "emptyUpcoming": "No upcoming titles match these filters yet. Try “All platforms”, or switch back to Out now.",
         "emptyDefault": "Nothing matched these filters. Try “All platforms” or a different sort."
-      },
-      "newForYou": {
-        "heading": "New for you",
-        "matched": "Fresh releases matched to {label}"
       },
       "onTv": {
         "headingToday": "📺 On TV today",
@@ -151,15 +143,6 @@
         "remindAirTitle": "Get a notification 1 hour and 5 minutes before it airs",
         "addedPulled": "Added to your list — pulled in another pick.",
         "scanAgain": "🔄 Scan again"
-      },
-      "easyOnTv": {
-        "reminderSetNotif": "Reminder set! Turn on notifications in Settings so we can ping you before it starts.",
-        "reminderSet": "Reminder set — we’ll ping you 1 hour and 5 minutes before. ⏰",
-        "checking": "Checking what’s on…",
-        "nothingUpcoming": "Nothing notable coming up right now.",
-        "fullGuide": "See the full TV guide",
-        "heading": "📡 Good things coming up on TV",
-        "sub": "The next few days — tap 🔔 to be reminded before it starts."
       },
       "watch": {
         "readyRanked": "🧬 Ready to watch — ranked by your VERD1CT DNA",
@@ -321,10 +304,6 @@
         "fantasy": "Fantasía",
         "adventure": "Aventura"
       },
-      "toast": {
-        "couldNotSetReminder": "No se pudo crear el recordatorio.",
-        "somethingWrong": "Algo salió mal. Inténtalo de nuevo."
-      },
       "new": {
         "heading": "🆕 Novedades",
         "intro": "Las películas y series más recientes — ajústalas por tipo, fecha, plataforma y valoración, y toca cualquier póster para un vistazo rápido con el tráiler. Cada título está a un toque de su veredicto completo.",
@@ -344,10 +323,6 @@
         "quickLook": "Vistazo rápido a {title}",
         "emptyUpcoming": "Aún no hay próximos títulos con estos filtros. Prueba “Todas” o vuelve a Ya disponible.",
         "emptyDefault": "Nada coincide con estos filtros. Prueba “Todas” u otro orden."
-      },
-      "newForYou": {
-        "heading": "Nuevo para ti",
-        "matched": "Estrenos que encajan con {label}"
       },
       "onTv": {
         "headingToday": "📺 Hoy en TV",
@@ -433,15 +408,6 @@
         "remindAirTitle": "Recibe una notificación 1 hora y 5 minutos antes de la emisión",
         "addedPulled": "Agregado a tu lista — traímos otra opción.",
         "scanAgain": "🔄 Rastrear de nuevo"
-      },
-      "easyOnTv": {
-        "reminderSetNotif": "¡Recordatorio creado! Activa las notificaciones en Ajustes para avisarte antes de que empiece.",
-        "reminderSet": "Recordatorio creado — te avisamos 1 hora y 5 minutos antes. ⏰",
-        "checking": "Viendo qué hay…",
-        "nothingUpcoming": "Nada notable por ahora.",
-        "fullGuide": "Ver la guía de TV completa",
-        "heading": "📡 Cosas buenas por venir en TV",
-        "sub": "Los próximos días — toca 🔔 para que te avisemos antes de que empiece."
       },
       "watch": {
         "readyRanked": "🧬 Listo para ver — ordenado por tu ADN VERD1CT",
@@ -603,10 +569,6 @@
         "fantasy": "奇幻",
         "adventure": "冒险"
       },
-      "toast": {
-        "couldNotSetReminder": "无法设置提醒。",
-        "somethingWrong": "出错了，请重试。"
-      },
       "new": {
         "heading": "🆕 新上线",
         "intro": "最新的电影和剧集 — 按类型、时间、平台和评分细调，再点任意海报即可快速预览并看预告片。每部作品都只需一点即可看到完整评断。",
@@ -626,10 +588,6 @@
         "quickLook": "快速查看 {title}",
         "emptyUpcoming": "目前没有符合这些筛选的即将上线作品。试试“全部平台”，或切回现已上线。",
         "emptyDefault": "没有符合这些筛选的内容。试试“全部平台”或换个排序。"
-      },
-      "newForYou": {
-        "heading": "为你推荐的新片",
-        "matched": "与{label}匹配的新片"
       },
       "onTv": {
         "headingToday": "📺 今日电视",
@@ -715,15 +673,6 @@
         "remindAirTitle": "在播出前 1 小时 5 分钟收到通知",
         "addedPulled": "已加入你的列表 — 又为你拉来一部。",
         "scanAgain": "🔄 重新扫描"
-      },
-      "easyOnTv": {
-        "reminderSetNotif": "提醒已设！请在设置中开启通知，以便在开始前提醒你。",
-        "reminderSet": "提醒已设 — 我们会在开始前 1 小时 5 分钟提醒你。⏰",
-        "checking": "正在查看有什么节目…",
-        "nothingUpcoming": "目前没有值得关注的节目。",
-        "fullGuide": "查看完整电视指南",
-        "heading": "📡 电视上即将上映的好节目",
-        "sub": "接下来几天 — 点 🔔 即可在开始前收到提醒。"
       },
       "watch": {
         "readyRanked": "🧬 可看了 — 按你的 VERD1CT DNA 排序",

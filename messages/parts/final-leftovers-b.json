@@ -12,6 +12,11 @@
     },
     "card": {
       "matchTooltip": "Your personal match — the algorithm scores this title against your taste, separate from critics and the crowd."
+    },
+    "discover": {
+      "browse": {
+        "fewer": "Fewer"
+      }
     }
   },
   "es-419": {
@@ -27,6 +32,11 @@
     },
     "card": {
       "matchTooltip": "Tu coincidencia personal: el algoritmo evalúa este título según tu gusto, aparte de la crítica y el público."
+    },
+    "discover": {
+      "browse": {
+        "fewer": "Menos"
+      }
     }
   },
   "zh-Hans": {
@@ -42,6 +52,11 @@
     },
     "card": {
       "matchTooltip": "你的个人契合度 — 算法依据你的口味为此影视评分，独立于影评人和大众。"
+    },
+    "discover": {
+      "browse": {
+        "fewer": "收起"
+      }
     }
   }
 }
