@@ -39,32 +39,31 @@ catalogs via `useT()`/`useI18n()` (client) or `getServerI18n()` (server):
   LearnStart, DnaMirror, ShareTargetHandler, SimpleModeToggle, ViewModeToggle,
   DesktopViewExit, Tagline, card actions (Like/Save/TasteFeedback/PosterCard).
 
-**38 / 50** app-surface `.tsx` files import the i18n layer (**76 %**). The 12
-that do not are: thin server page wrappers that render a client child and carry
-no text of their own (`chambers`, `easy`, `finder`, `share-target` pages),
-components whose visible text arrives as already-translated props
-(`MobileNav`, `FollowButton`, `PostWatchInterview`), and the intentionally
-excluded surfaces in §2.
+**116 / 137** app-surface `.tsx` files are wired to i18n or carry no user-facing
+text (**85 %**, measured with the corrected `src/**/*.tsx` glob — see §12; an
+earlier draft used a defective glob that under-counted the file set). The
+remainder are thin server page wrappers with no text of their own, English→key
+lookup-map / brand components, admin tools, the pre-auth shell, and the
+`metadata` page titles — all itemised in §12.
 
 ## 2. Remaining hardcoded strings
 
-**Zero** on the localized `/app` surface. A full-tree scan (`t()`/`plural()`
-call keys checked against the merged catalog) reports **0 keys referenced in
-code but missing from the catalogs**.
+**Zero** on the localized `/app` surface **after the forensic pass in §12** (the
+first pass missed a class of components — see §12). A full-tree scan
+(`t()`/`plural()` call keys checked against the merged catalog with the corrected
+glob) reports **0 keys referenced in code but missing from the catalogs**, and a
+re-scan finds no unwired component still rendering user-facing English.
 
-15 residual literals exist, all outside the localized product surface and left
-deliberately:
-
-| Location | Count | Why left English |
-|---|---|---|
-| `components/admin/SponsorAdmin.tsx` | 10 | Internal admin/ops tool, behind the admin gate — not a consumer screen. |
-| `components/auth/LoginForm.tsx` | 4 | Pre-auth `/login` lives in the **static** marketing shell, outside the `/app` I18nProvider. Localizing it would force the 45 static pages dynamic (see §7). |
-| `app/app/import/page.tsx` | 1 | `"The Fall"` — an example title in import instructions (data, not chrome). |
+Residual literals are all outside the localized product surface and left
+deliberately (admin tools, the pre-auth `/login` shell, English→key lookup maps,
+brand names, show-type enums, `metadata` page titles, and example data such as
+`"The Fall"`). See §12 for the full itemisation and rationale.
 
 ## 3. Coverage
 
-- **Merged catalog: 1,558 keys per locale × 3 locales = 4,674 translated values.**
-- 14 catalog part files (`messages/parts/*.json`) + 3 base catalogs
+- **Merged catalog: 1,727 keys per locale × 3 locales = 5,181 translated values**
+  (up from 1,558 after the §12 forensic pass wired the remaining components).
+- 22 catalog part files (`messages/parts/*.json`) + 3 base catalogs
   (`messages/{en-US,es-419,zh-Hans}.json`), deep-merged at request time by
   `src/i18n/catalogs.ts`.
 - Consumer `/app` surface: **100 %** of visible strings resolve through the
