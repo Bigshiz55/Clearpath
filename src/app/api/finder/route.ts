@@ -61,6 +61,17 @@ export async function POST(req: Request) {
       query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
       if (text) limit = parseRequestedCount(text);
     }
+    // An explicit provider from the deep-link — e.g. tapping "Best movies on
+    // Netflix" sends ?providers=8 → body.query.providerIds=[8] — must survive AI
+    // parsing. The AI fills genre/mood from the free text but doesn't read the
+    // named platform, so without this the Netflix filter is silently dropped and
+    // results leak in from every service. The named platform wins.
+    if (body.query) {
+      const clientProviders = coerceQuery(body.query).providerIds;
+      if (clientProviders && clientProviders.length && !(query.providerIds && query.providerIds.length)) {
+        query.providerIds = clientProviders;
+      }
+    }
     // Guarantee the actor filter regardless of AI (fuzzy, so misspellings match).
     if (text && (!query.castIds || query.castIds.length === 0)) {
       const pid = await resolvePersonId(text);

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useCallback, useState, useRef } from 'react';
 
-type ToastKind = 'success' | 'error' | 'info';
+type ToastKind = 'success' | 'error' | 'info' | 'verdict';
 interface ToastAction {
   label: string;
   onClick: () => void;
@@ -54,7 +54,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       () => {
         setToasts((t) => t.filter((x) => x.id !== id));
       },
-      action ? 6000 : 4000, // give actionable toasts (Undo) a longer window
+      action ? 6000 : kind === 'verdict' ? 3000 : 4000, // give actionable toasts (Undo) a longer window
     );
   }, []);
 
@@ -97,12 +97,36 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         </div>
       )}
       {children}
+      {/* Verdict toasts — the "here comes your ruling" moment — pop dead-center
+          in the signature pink so they're impossible to miss. */}
+      {toasts.some((t) => t.kind === 'verdict') && (
+        <div
+          className="pointer-events-none fixed inset-0 z-[102] flex items-center justify-center px-6"
+          aria-live="polite"
+          role="status"
+        >
+          {toasts
+            .filter((t) => t.kind === 'verdict')
+            .slice(-1)
+            .map((t) => (
+              <div
+                key={t.id}
+                className="pointer-events-auto flex w-full max-w-md animate-fade-up items-center gap-3 rounded-2xl border border-pink-300/60 bg-gradient-to-b from-[#ff62b6] to-[#ff1493] px-5 py-4 text-center text-base font-black text-white shadow-[0_12px_40px_-8px_rgba(255,20,147,0.7)] ring-1 ring-white/20"
+              >
+                <span className="text-2xl" aria-hidden>⚖️</span>
+                <span className="min-w-0 flex-1 leading-snug drop-shadow-sm">{t.message}</span>
+              </div>
+            ))}
+        </div>
+      )}
       <div
         className="pointer-events-none fixed inset-x-0 bottom-4 z-[100] flex flex-col items-center gap-2 px-4"
         aria-live="polite"
         role="status"
       >
-        {toasts.map((t) => (
+        {toasts
+          .filter((t) => t.kind !== 'verdict')
+          .map((t) => (
           <div
             key={t.id}
             className={[
