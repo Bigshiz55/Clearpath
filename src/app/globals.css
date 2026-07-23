@@ -59,6 +59,36 @@ body {
     }
   }
 
+  /* Wide container for data-dense pages (On TV) — uses the available viewport up
+     to ~1600px instead of collapsing into a narrow centered column, with
+     comfortable responsive gutters and safe-area insets. */
+  .container-wide {
+    @apply mx-auto w-full;
+    max-width: 1600px;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+  @media (min-width: 640px) {
+    .container-wide { padding-left: max(1.5rem, env(safe-area-inset-left)); padding-right: max(1.5rem, env(safe-area-inset-right)); }
+  }
+  @media (min-width: 1280px) {
+    .container-wide { padding-left: max(2rem, env(safe-area-inset-left)); padding-right: max(2rem, env(safe-area-inset-right)); }
+  }
+
+  /* On TV card rail: full-width cards on phones, more columns as width allows —
+     driven by actual width so nothing squeezes below readability. */
+  .ontv-rail {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  }
+  /* Horizontally scrollable filter/view bar for mobile; wraps to a row on desktop. */
+  .ontv-viewbar {
+    @apply flex gap-2 overflow-x-auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ontv-viewbar::-webkit-scrollbar { display: none; }
+
   /* The one poster-grid used across the app. It switches columns on ACTUAL
      available width, not an assumption: `auto-fit` + `minmax(min(100%, 10rem))`
      yields ONE full-width card on very small phones (≤~360px content) and TWO

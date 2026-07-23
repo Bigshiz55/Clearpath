@@ -13,7 +13,7 @@ const PRIMARY: NavLink[] = [
   { href: '/app', label: 'Home' },
   { href: '/app/watch', label: 'Watch Now' },
   { href: '/app/new', label: 'New' },
-  { href: '/app/tv', label: 'On TV' },
+  { href: '/app/on-tv', label: 'On TV' },
   { href: '/app/watchlist', label: 'Watchlist' },
 ];
 const SECONDARY: NavLink[] = [
