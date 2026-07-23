@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+body {
+  @apply bg-obsidian-950 font-sans text-ivory-100 antialiased;
+  background-image: theme('backgroundImage.verdict-radial');
+  background-attachment: fixed;
+  text-rendering: optimizeLegibility;
+}
+
+/* Editorial defaults: display headings render in the serif face. */
+h1,
+h2,
+h3 {
+  @apply font-display;
+  text-wrap: balance;
+}
+
+/* A comfortable measure for long-form copy. */
+p {
+  text-wrap: pretty;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: theme('colors.obsidian.600') transparent;
+}
+
+::selection {
+  @apply bg-brass-500/40 text-ivory-50;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-obsidian-700/70 bg-obsidian-900/70 shadow-card backdrop-blur;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-obsidian-600 bg-obsidian-850 px-3 py-1 text-xs font-medium text-ivory-200;
+  }
+
+  .btn-brass {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brass-500 px-5 py-3 font-semibold text-obsidian-950 shadow-brass transition hover:bg-brass-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brass-300 focus-visible:ring-offset-2 focus-visible:ring-offset-obsidian-950;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-obsidian-600 px-5 py-3 font-semibold text-ivory-100 transition hover:border-obsidian-500 hover:bg-obsidian-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brass-300;
+  }
+
+  .link-quiet {
+    @apply text-signal-300 underline-offset-4 transition hover:text-signal-400 hover:underline;
+  }
+
+  /* Shimmering placeholder block for loading states. */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-obsidian-800;
+  }
+  .skeleton::after {
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    content: '';
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
+  }
+
+  /* Long-form reading column. */
+  .prose-read {
+    @apply max-w-prose font-display text-lg leading-relaxed text-ivory-200;
+  }
+  .prose-read p + p {
+    @apply mt-4;
+  }
+
+  /* ---- Courtroom / editorial motifs ---- */
+
+  /* A fine hairline rule, as on a legal document. */
+  .rule-fine {
+    @apply h-px w-full border-0 bg-gradient-to-r from-transparent via-copper-500/40 to-transparent;
+  }
+
+  /* Exhibit label — a small tab used to mark evidence sections. */
+  .exhibit-label {
+    @apply inline-flex items-center gap-1.5 rounded-sm border border-copper-500/40 bg-copper-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-copper-300;
+  }
+
+  /* Docket number / file stamp. */
+  .docket {
+    @apply font-mono text-[11px] uppercase tracking-[0.22em] text-ivory-400;
+  }
+
+  /* Embossed seal ring for verdict moments. */
+  .seal {
+    @apply grid place-items-center rounded-full border border-gold-400/50 bg-gold-400/5 shadow-seal;
+  }
+
+  /* File-stamp motif — angled, weathered evidence stamp. */
+  .file-stamp {
+    @apply inline-flex -rotate-3 items-center rounded border-2 border-oxblood-500/70 px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.15em] text-oxblood-400;
+  }
+
+  /* Subtle paper grain for parchment surfaces (courtroom cards). */
+  .paper-grain {
+    background-image:
+      radial-gradient(rgba(124, 41, 56, 0.015) 1px, transparent 1px),
+      radial-gradient(rgba(18, 60, 50, 0.02) 1px, transparent 1px);
+    background-size: 3px 3px, 4px 4px;
+    background-position: 0 0, 1px 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    @apply animate-none;
+  }
+}
