@@ -292,6 +292,11 @@ function detectNetwork(text: string): { key: string; name: string } | null {
     [/\bgsn\b|\bgame show network\b/, 'gsn', 'Game Show Network'],
     [/\breelz\b/, 'reelz', 'Reelz'],
     [/\bmotortrend\b/, 'motortrend', 'MotorTrend'],
+    [/\btravel channel\b/, 'travel', 'Travel Channel'],
+    [/\bscience channel\b/, 'science', 'Science Channel'],
+    [/\bcmt\b/, 'cmt', 'CMT'],
+    [/\bpop tv\b/, 'pop', 'Pop'],
+    [/\bovation\b/, 'ovation', 'Ovation'],
     // Premium
     [/\bcinemax\b/, 'cinemax', 'Cinemax'],
     [/\bshowtime\b/, 'showtime', 'Showtime'],

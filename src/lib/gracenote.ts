@@ -37,33 +37,89 @@ interface GnChannel {
   events?: GnEvent[];
 }
 
-/** Requested-network key → the Gracenote call-sign prefix and a display name. */
+/**
+ * Requested-network key → the Gracenote call-sign pattern and a display name.
+ * Keys match `detectNetwork`'s keys so any channel a user names routes here.
+ * Ordered specific-before-general so the reverse lookup (labeling an arbitrary
+ * channel) picks the right name — e.g. LMN before Lifetime, ESPN2 before ESPN,
+ * FXX before FX. Call signs come from the real DirecTV national lineup; the
+ * trailing P/HD are feed/quality suffixes. Broadcast (ABC/CBS/NBC/FOX/CW) is
+ * left to TVmaze, which labels local affiliates and carries ratings.
+ */
 const GN_NETS: { key: string; re: RegExp; name: string }[] = [
+  // Movie & entertainment cable
   { key: 'lmn', re: /^LMN/i, name: 'LMN' },
-  // "Lifetime movies" should sweep LMN too — it *is* the Lifetime Movie Network.
-  { key: 'lifetime', re: /^(LIFE|LMN)/i, name: 'Lifetime' },
-  { key: 'hallmark', re: /^(HALL|HMM|HMYS)/i, name: 'Hallmark' },
+  { key: 'lifetime', re: /^(LIFE|LMN)/i, name: 'Lifetime' }, // "Lifetime movies" sweeps LMN too
+  { key: 'hallmark', re: /^(HALLP|HALL|HMYS|HFM)/i, name: 'Hallmark' },
   { key: 'amc', re: /^AMC/i, name: 'AMC' },
   { key: 'usa', re: /^USA/i, name: 'USA Network' },
   { key: 'tnt', re: /^TNT/i, name: 'TNT' },
   { key: 'tbs', re: /^TBS/i, name: 'TBS' },
   { key: 'fxx', re: /^FXX/i, name: 'FXX' },
-  { key: 'fx', re: /^FX(?!X)/i, name: 'FX' },
+  { key: 'fxm', re: /^FXM/i, name: 'FXM' },
+  { key: 'fx', re: /^FXP/i, name: 'FX' },
   { key: 'bravo', re: /^BRAVO/i, name: 'Bravo' },
   { key: 'syfy', re: /^SYFY/i, name: 'Syfy' },
-  { key: 'freeform', re: /^FREE/i, name: 'Freeform' },
-  { key: 'hgtv', re: /^HGTV/i, name: 'HGTV' },
-  { key: 'food network', re: /^FOOD/i, name: 'Food Network' },
-  { key: 'discovery', re: /^DISC/i, name: 'Discovery' },
-  { key: 'tlc', re: /^TLC/i, name: 'TLC' },
-  { key: 'history', re: /^HIST/i, name: 'History' },
-  { key: 'a&e', re: /^AE/i, name: 'A&E' },
+  { key: 'freeform', re: /^(FREFRM|FRFM|FREE)/i, name: 'Freeform' },
+  { key: 'paramount network', re: /^PARP/i, name: 'Paramount Network' },
+  { key: 'comedy central', re: /^(COMEDY|CCHDP)/i, name: 'Comedy Central' },
+  { key: 'tv land', re: /^TVLAND/i, name: 'TV Land' },
+  { key: 'pop', re: /^POPP/i, name: 'Pop' },
+  { key: 'we tv', re: /^WEP/i, name: 'WE tv' },
+  { key: 'own', re: /^OWN/i, name: 'OWN' },
+  { key: 'oxygen', re: /^OXYG/i, name: 'Oxygen' },
+  { key: 'bet', re: /^BETP/i, name: 'BET' },
+  { key: 'mtv', re: /^MTVP/i, name: 'MTV' },
+  { key: 'vh1', re: /^VH1/i, name: 'VH1' },
+  { key: 'cmt', re: /^CMT/i, name: 'CMT' },
+  { key: 'ifc', re: /^IFC/i, name: 'IFC' },
+  { key: 'sundance', re: /^SUNDAN/i, name: 'SundanceTV' },
   { key: 'tcm', re: /^TCM/i, name: 'TCM' },
-  { key: 'paramount network', re: /^PAR/i, name: 'Paramount Network' },
-  { key: 'comedy central', re: /^COM/i, name: 'Comedy Central' },
-  { key: 'mtv', re: /^MTV/i, name: 'MTV' },
-  { key: 'bet', re: /^BET/i, name: 'BET' },
+  { key: 'ovation', re: /^OVATION/i, name: 'Ovation' },
+  // Lifestyle / factual
+  { key: 'hgtv', re: /^HGTV/i, name: 'HGTV' },
+  { key: 'cooking channel', re: /^COOK/i, name: 'Cooking Channel' },
+  { key: 'food network', re: /^FOOD/i, name: 'Food Network' },
+  { key: 'discovery', re: /^DSC/i, name: 'Discovery' },
+  { key: 'tlc', re: /^TLC/i, name: 'TLC' },
+  { key: 'history', re: /^(HIST|HSTRY)/i, name: 'History' },
+  { key: 'a&e', re: /^AETV/i, name: 'A&E' },
+  { key: 'geographic', re: /^(NGC|NGWILD)/i, name: 'National Geographic' },
+  { key: 'animal planet', re: /^APL/i, name: 'Animal Planet' },
+  { key: 'bbc america', re: /^BBCA/i, name: 'BBC America' },
+  { key: 'investigation discovery', re: /^ID/i, name: 'Investigation Discovery' },
+  { key: 'travel', re: /^TRAV/i, name: 'Travel Channel' },
+  { key: 'science', re: /^SCI/i, name: 'Science Channel' },
+  // Kids
+  { key: 'cartoon network', re: /^TOON/i, name: 'Cartoon Network' },
+  { key: 'nickelodeon', re: /^NIKP/i, name: 'Nickelodeon' },
+  { key: 'disney', re: /^(DISN|DXD)/i, name: 'Disney Channel' },
+  // Games
+  { key: 'gsn', re: /^GSN/i, name: 'GSN' },
+  { key: 'reelz', re: /^REELZ/i, name: 'Reelz' },
+  // News
+  { key: 'cnn', re: /^CNN/i, name: 'CNN' },
+  { key: 'fox news', re: /^FNC/i, name: 'Fox News' },
+  { key: 'fox business', re: /^FBN/i, name: 'Fox Business' },
+  { key: 'msnbc', re: /^MSNOW/i, name: 'MSNBC' },
+  { key: 'cnbc', re: /^CNBC/i, name: 'CNBC' },
+  { key: 'hln', re: /^HLN/i, name: 'HLN' },
+  { key: 'newsnation', re: /^(NEWSNTN|NWSNT)/i, name: 'NewsNation' },
+  // Sports
+  { key: 'espn2', re: /^ESPN2/i, name: 'ESPN2' },
+  { key: 'espnu', re: /^ESPNU/i, name: 'ESPNU' },
+  { key: 'espn', re: /^ESPN(HD)?$/i, name: 'ESPN' },
+  { key: 'fs1', re: /^FS1/i, name: 'FS1' },
+  { key: 'fs2', re: /^FS2/i, name: 'FS2' },
+  { key: 'fox sports', re: /^FS[12]/i, name: 'Fox Sports' },
+  { key: 'golf channel', re: /^GOLF/i, name: 'Golf Channel' },
+  { key: 'tennis channel', re: /^TENNIS/i, name: 'Tennis Channel' },
+  { key: 'nfl network', re: /^NFLNET/i, name: 'NFL Network' },
+  { key: 'mlb network', re: /^MLBN/i, name: 'MLB Network' },
+  { key: 'cbs sports', re: /^CBSSN/i, name: 'CBS Sports' },
+  // Premium
   { key: 'hbo', re: /^HBO/i, name: 'HBO' },
+  { key: 'cinemax', re: /^(MAXP|MPLEX)/i, name: 'Cinemax' },
   { key: 'showtime', re: /^SHO/i, name: 'Showtime' },
   { key: 'starz', re: /^(STARZ|STZ)/i, name: 'Starz' },
 ];
