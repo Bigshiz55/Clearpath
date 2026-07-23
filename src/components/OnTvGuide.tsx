@@ -1,17 +1,24 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { tmdbImage, type TmdbImageSize } from '@/lib/tmdb/image';
 
 /** Poster art comes from the canonical TMS CDN; if it fails to load, swap to the
  *  mirror once, then give up (hide) so we never loop or show a broken icon. */
 function posterFallback(e: React.SyntheticEvent<HTMLImageElement>): void {
   const img = e.currentTarget;
-  if (img.dataset.fb) {
-    img.style.display = 'none';
+  if (img.src.includes('zap2it.tmsimg.com')) {
+    img.src = img.src.replace('zap2it.tmsimg.com', 'demo.tmsimg.com');
     return;
   }
-  img.dataset.fb = '1';
-  img.src = img.src.replace('zap2it.tmsimg.com', 'demo.tmsimg.com');
+  img.style.display = 'none';
+}
+
+/** The card poster: the listing's own art (Gracenote/TVmaze), else the TMDB
+ *  poster once the title has been resolved — so cable movies still get a placard
+ *  even when the channel's feed carries no thumbnail. */
+function posterSrcFor(a: { image: string | null; posterPath?: string | null }, size: TmdbImageSize = 'w342'): string | null {
+  return a.image ?? tmdbImage(a.posterPath ?? null, size);
 }
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
@@ -196,9 +203,10 @@ export function OnTvGuide({
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {highlights.map((a) => {
-              const poster = a.image ? (
+              const posterSrc = posterSrcFor(a);
+              const poster = posterSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={a.image} alt="" loading="lazy" onError={posterFallback} className="h-full w-full object-cover" />
+                <img src={posterSrc} alt="" loading="lazy" onError={posterFallback} className="h-full w-full object-cover" />
               ) : (
                 <div className="grid h-full w-full place-items-center p-2 text-center text-[11px] text-slate-400">{a.showName}</div>
               );
@@ -292,9 +300,9 @@ export function OnTvGuide({
                   <div className="mt-2 line-clamp-2 rounded-lg border border-brand-400/30 bg-brand-500/15 px-2 py-1.5 text-sm font-bold leading-tight text-brand-100 sm:text-base">{a.network}</div>
                 </div>
                 <div className="h-20 w-14 flex-none overflow-hidden rounded-md border border-white/10 bg-ink-800">
-                  {a.image ? (
+                  {posterSrcFor(a, 'w185') ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={a.image} alt="" loading="lazy" onError={posterFallback} className="h-full w-full object-cover" />
+                    <img src={posterSrcFor(a, 'w185')!} alt="" loading="lazy" onError={posterFallback} className="h-full w-full object-cover" />
                   ) : (
                     <div className="grid h-full w-full place-items-center text-[9px] text-slate-500">TV</div>
                   )}
