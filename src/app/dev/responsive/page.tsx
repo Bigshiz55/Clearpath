@@ -34,13 +34,15 @@ const CARDS: CardSpec[] = [
 function HarnessCard({ c }: { c: CardSpec }) {
   return (
     <div data-testid="card" className="card group flex h-full flex-col overflow-hidden">
-      {/* action bar — three equal-width, 44px-tall For / Pass / Save buttons */}
-      <div className="flex items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
+      {/* action bar — three equal-width, 44px-tall For / Pass / Save buttons.
+          Tighter vertical padding on phones (mirrors PosterCard). */}
+      <div className="flex items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1 sm:py-1.5">
         <button data-testid="action" type="button" className="flex h-11 w-full min-w-0 flex-1 items-center justify-center gap-0.5 rounded-md border border-emerald-400/50 bg-emerald-500/15 text-xs font-bold text-emerald-100">For</button>
         <button data-testid="action" type="button" className="flex h-11 w-full min-w-0 flex-1 items-center justify-center gap-0.5 rounded-md border border-red-400/50 bg-red-500/15 text-xs font-bold text-red-200">Pass</button>
         <button data-testid="action" type="button" className="flex h-11 w-full min-w-0 flex-1 items-center justify-center gap-0.5 rounded-md border border-white/20 bg-white/10 text-xs font-bold text-white">＋ Save</button>
       </div>
-      <div className="relative aspect-[2/3] overflow-hidden bg-gradient-to-br from-ink-700 to-ink-850" />
+      {/* Shorter 3:4 poster on phones, full 2:3 from sm up (mirrors PosterCard). */}
+      <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-ink-700 to-ink-850 sm:aspect-[2/3]" />
       <div className="flex flex-1 flex-col p-3">
         <div data-testid="title" className="line-clamp-2 text-sm font-semibold text-white">{c.title}</div>
         <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">

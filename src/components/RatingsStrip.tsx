@@ -80,43 +80,53 @@ export function RatingsStrip({
         </div>
       )}
 
-      {/* Line 2 — source ratings in an equal-width, auto-fitting grid (`.ratings-grid`).
-          Available sources lay across the card and WRAP to a second row on a very
-          narrow card rather than clipping — IMDb is never pushed off the edge.
-          A source with no score is omitted cleanly (no awkward dash). */}
-      <div className="ratings-grid text-sm font-black tabular-nums">
-        {ratings.tomatometer != null && (
-          <RatingChip label="🍅" value={`${ratings.tomatometer}%`} tone={tomatoColor(ratings.tomatometer)} title="Rotten Tomatoes — Tomatometer (critics)" />
-        )}
-        {popcorn != null && (
-          <RatingChip
-            label="🍿"
-            value={`${popcorn}%`}
-            tone="text-amber-200"
-            title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
-          />
-        )}
-        {ratings.imdb != null && (
-          <span
-            data-rating="imdb"
-            className="inline-flex min-w-0 items-center justify-center gap-1 rounded bg-[#f5c518] px-1.5 py-0.5 text-black"
-            title="IMDb rating"
-          >
-            <span className="text-[10px] font-black opacity-80">IMDb</span> {ratings.imdb.toFixed(1)}
-          </span>
-        )}
-        {ratings.metacritic != null && (
-          <RatingChip label="Ⓜ" value={`${ratings.metacritic}`} tone="text-teal-200" title="Metacritic Metascore" />
-        )}
-      </div>
+      {/* Source ratings, laid out by PRIORITY so the score stays dominant and no
+          metric ever competes with another for horizontal room:
+            Row 1 — 🍅 critics + 🍿 audience (the two % scores).
+            Row 2 — ★ IMDb (+ Metacritic) on its OWN row, so IMDb can never be
+                    squeezed or clipped by the % scores next to it.
+          Each chip is content-sized with `whitespace-nowrap`, so a label is never
+          truncated; a source with no score is omitted cleanly. */}
+      {(ratings.tomatometer != null || popcorn != null) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-black tabular-nums">
+          {ratings.tomatometer != null && (
+            <RatingChip data-rating="critics" label="🍅" value={`${ratings.tomatometer}%`} tone={tomatoColor(ratings.tomatometer)} title="Rotten Tomatoes — Tomatometer (critics)" />
+          )}
+          {popcorn != null && (
+            <RatingChip
+              data-rating="audience"
+              label="🍿"
+              value={`${popcorn}%`}
+              tone="text-amber-200"
+              title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
+            />
+          )}
+        </div>
+      )}
+      {(ratings.imdb != null || ratings.metacritic != null) && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-black tabular-nums">
+          {ratings.imdb != null && (
+            <span
+              data-rating="imdb"
+              className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-[#f5c518] px-1.5 py-0.5 leading-none text-black"
+              title="IMDb rating"
+            >
+              <span className="text-[10px] font-black opacity-80">IMDb</span> {ratings.imdb.toFixed(1)}
+            </span>
+          )}
+          {ratings.metacritic != null && (
+            <RatingChip data-rating="metacritic" label="Ⓜ" value={`${ratings.metacritic}`} tone="text-teal-200" title="Metacritic Metascore" />
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 /** One source rating — icon + full value, content-sized so it never truncates. */
-function RatingChip({ label, value, tone, title }: { label: string; value: string; tone: string; title: string }) {
+function RatingChip({ label, value, tone, title, ...rest }: { label: string; value: string; tone: string; title: string } & React.HTMLAttributes<HTMLSpanElement>) {
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap ${tone}`} title={title}>
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap ${tone}`} title={title} {...rest}>
       <span aria-hidden className="text-base leading-none">{label}</span>
       {value}
     </span>
