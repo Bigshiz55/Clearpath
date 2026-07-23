@@ -26,3 +26,8 @@ next-env.d.ts
 npm-debug.log*
 .vercel
 *.tsbuildinfo
+
+# WatchVerdict eval framework — ephemeral run outputs (baseline is kept)
+/evaluation-results/runs/
+/evaluation-results/latest.json
+/eval/gold/regression.json

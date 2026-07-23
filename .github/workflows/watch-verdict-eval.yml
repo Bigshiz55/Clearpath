@@ -1,0 +1,76 @@
+name: WatchVerdict Voice-Search Eval
+
+# Runs the smoke + regression evaluation on PRs that touch the search, ranking,
+# personalization, scheduling, catalog, profile, or voice/NLU surfaces. Fails the
+# check on a critical regression and uploads the report as an artifact.
+#
+# The full 25k stress suite is intentionally NOT part of the required PR check.
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/nlu/**'
+      - 'src/lib/finderParse.ts'
+      - 'src/lib/finder.ts'
+      - 'src/lib/askParse.ts'
+      - 'src/lib/scoring/**'
+      - 'src/lib/dna.ts'
+      - 'src/lib/titleDimensions.ts'
+      - 'src/lib/onTv.ts'
+      - 'src/lib/gracenote.ts'
+      - 'src/lib/tvGrid.ts'
+      - 'src/lib/services.ts'
+      - 'src/app/api/build-case/**'
+      - 'src/app/api/finder/**'
+      - 'src/app/api/ask/**'
+      - 'eval/**'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Eval mode (smoke|standard|full|regression)'
+        default: 'standard'
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+
+      # Evaluator self-tests + the app unit suite (protects the framework).
+      - name: Evaluator self-tests
+        run: npm run eval:selftest
+
+      # Smoke run — fast signal (report-only, does not fail on findings).
+      - name: Smoke eval
+        run: node eval/cli.mjs smoke
+
+      # Regression + baseline comparison — FAILS on any critical regression.
+      - name: Regression eval (asserts thresholds)
+        run: node eval/cli.mjs regression
+
+      - name: Compare vs committed baseline
+        if: always()
+        run: node eval/cli.mjs compare || true
+
+      - name: PR summary
+        if: always()
+        run: |
+          LATEST=$(ls -td evaluation-results/runs/*/ | head -1)
+          echo "## WatchVerdict Voice-Search Eval" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat "${LATEST}report.md" 2>/dev/null | head -60 >> "$GITHUB_STEP_SUMMARY" || echo "no report" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: watch-verdict-eval-report
+          path: evaluation-results/runs/
+          retention-days: 14

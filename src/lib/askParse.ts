@@ -126,17 +126,10 @@ async function toQuery(raw: RawAi): Promise<AiAsk> {
   return { query: q, limit, similarTo };
 }
 
-const NUM_WORDS: Record<string, number> = {
-  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-};
-
-/** A requested result count from the ask ("five …" → 5). Default 8. */
-export function parseRequestedCount(text: string): number {
-  const m = text.toLowerCase().match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})\b/);
-  if (!m || !m[1]) return 8;
-  const n = NUM_WORDS[m[1]] ?? Number.parseInt(m[1], 10);
-  return Number.isFinite(n) && n >= 1 && n <= 20 ? n : 8;
-}
+/** A requested result count from the ask ("five …" → 5). Default 8.
+ *  Re-exported from the pure NLU module so build-case/ask/finder share one
+ *  parser and the evaluation framework can grade it offline. */
+export { parseRequestedCount } from '@/lib/nlu/detectors';
 
 // Words that are never part of a person's name — stripped before we treat the
 // remainder as a candidate name to look up (TMDB's search fixes misspellings).

@@ -13,7 +13,19 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "eval:selftest": "vitest run eval",
+    "eval:watchverdict": "node eval/cli.mjs",
+    "eval:watchverdict:smoke": "node eval/cli.mjs smoke",
+    "eval:watchverdict:standard": "node eval/cli.mjs standard",
+    "eval:watchverdict:full": "node eval/cli.mjs full",
+    "eval:watchverdict:stress": "node eval/cli.mjs stress",
+    "eval:watchverdict:regression": "node eval/cli.mjs regression",
+    "eval:watchverdict:holdout": "node eval/cli.mjs holdout",
+    "eval:watchverdict:live": "node eval/cli.mjs live",
+    "eval:watchverdict:baseline": "node eval/cli.mjs baseline",
+    "eval:watchverdict:compare": "node eval/cli.mjs compare",
+    "eval:watchverdict:optimize": "node eval/cli.mjs optimize"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
