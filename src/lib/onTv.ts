@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getCriticRatings } from '@/lib/omdb';
 import { findTmdbByImdb } from '@/lib/tmdb/client';
+import { getGracenoteAirings } from '@/lib/gracenote';
 import type { MediaType } from '@/lib/types';
 
 /**
@@ -334,6 +335,25 @@ export async function getUpcomingTv(
       if (movieOnly && a.showType !== 'Movie') return false;
       return true;
     });
+
+  // TVmaze is broadcast-only, so a cable network ("on Lifetime") or a movies-only
+  // ask comes back thin or empty. For those, pull the real listing from Gracenote's
+  // full US grid (cable + movie typing) and prefer a time-ordered union — this is
+  // what makes "Lifetime movies tonight" actually return Lifetime movies. US only.
+  const wantGracenote = country === 'US' && !!(network || movieOnly);
+  if (wantGracenote) {
+    const grid = await getGracenoteAirings(nowMs, clampedHorizon, { network, movieOnly }).catch(() => []);
+    const merged = [...upcoming, ...grid];
+    const byKey = new Set<string>();
+    return merged
+      .filter((a) => {
+        if (wantGenre && !a.genres.some((g) => g.toLowerCase() === wantGenre)) return false;
+        const k = `${a.showName.toLowerCase()}|${a.airstamp}`;
+        return byKey.has(k) ? false : (byKey.add(k), true);
+      })
+      .sort((a, b) => Date.parse(a.airstamp) - Date.parse(b.airstamp))
+      .slice(0, 60);
+  }
 
   // Rank by rating (unrated last), keep a healthy set, then show in time order.
   const ranked = [...upcoming].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 30);
