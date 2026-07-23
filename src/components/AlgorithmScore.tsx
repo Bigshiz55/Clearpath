@@ -5,17 +5,18 @@ import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
 import { Verd1ctBadge } from './Verd1ctBadge';
+import { CardRatings } from './CardRatings';
 
 /**
  * The one pink "algorithm" box on every card. It folds the user's DNA together
  * with every rating (RT, audience, IMDb) into a single 0–100 score and a plain
- * "will you like it?" answer. We ride on our OWN number here — the individual
- * third-party critic badges are intentionally not shown on the card, so Your
- * VERD1CT stands alone (the ratings still feed the score under the hood).
+ * "will you like it?" answer, with the source ratings shown prominently beneath.
  */
 export function AlgorithmScore({
   mediaType,
   tmdbId,
+  title,
+  year,
   objectiveScore = null,
   className = '',
 }: {
@@ -64,6 +65,9 @@ export function AlgorithmScore({
           </div>
         </div>
       </div>
+
+      {/* The source ratings that feed the score — shown prominently. */}
+      <CardRatings mediaType={mediaType} tmdbId={tmdbId} title={title} year={year} hideCall className="mt-2" />
     </div>
   );
 }

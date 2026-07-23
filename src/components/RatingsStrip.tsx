@@ -80,9 +80,9 @@ export function RatingsStrip({
         </div>
       )}
 
-      {/* Line 2 — all three source ratings on one line: no pills on 🍅/🍿 (just
-          icon + value) so tomato, popcorn and IMDb always fit together. */}
-      <div className="flex items-center gap-1.5 text-[10px] font-bold tabular-nums">
+      {/* Line 2 — all three source ratings on one line, sized up for legibility:
+          no pills on 🍅/🍿 (just icon + value) so tomato, popcorn and IMDb fit. */}
+      <div className="flex items-center gap-2.5 text-sm font-black tabular-nums">
         <RatingChip
           label="🍅"
           value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
@@ -96,10 +96,10 @@ export function RatingsStrip({
           title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
         />
         <span
-          className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded px-1 py-0.5 text-[10px] ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
+          className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
           title="IMDb rating"
         >
-          <span className="text-[8px] font-black opacity-80">IMDb</span> {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
+          <span className="text-[10px] font-black opacity-80">IMDb</span> {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
         </span>
       </div>
     </div>
@@ -111,10 +111,10 @@ export function RatingsStrip({
 function RatingChip({ label, value, tone, title }: { label: string; value: string | null; tone: string; title: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-0.5 whitespace-nowrap ${value != null ? tone : 'text-slate-500'}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap ${value != null ? tone : 'text-slate-500'}`}
       title={title}
     >
-      <span aria-hidden className="text-xs leading-none">{label}</span>
+      <span aria-hidden className="text-base leading-none">{label}</span>
       {value ?? '–'}
     </span>
   );

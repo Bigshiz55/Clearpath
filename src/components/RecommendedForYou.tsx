@@ -20,12 +20,10 @@ interface Rec {
   matchReason: string | null;
 }
 
-/** One complete reason — never two half-lines. Joins the "because you liked X"
- *  seed and the match rationale into a single sentence. */
+/** The card's short "why" tag. We ride on the DNA verdict, so we no longer lead
+ *  with a "Because you liked X" seed — just the match rationale, when we have one. */
 function fullReason(r: Rec): string | null {
-  const because = r.because ? `Because you liked ${r.because}` : null;
-  if (because && r.matchReason) return `${because} — ${r.matchReason}`;
-  return because ?? r.matchReason ?? null;
+  return r.matchReason ?? null;
 }
 
 export function RecommendedForYou({ label }: { label?: string | null }) {

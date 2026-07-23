@@ -16,12 +16,10 @@ import { tmdbImage } from '@/lib/tmdb/image';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Watch now · WatchVerdict' };
 
-/** One complete "why this" line — joins the seed ("because you liked X") and the
- *  matched trait into a single sentence (never two half-lines). */
+/** The card's short "why" tag. We ride on the DNA verdict now, so we drop the
+ *  "Because you liked X" seed — just the matched trait, when we have one. */
 function fullReason(r: Recommendation): string | null {
-  const because = r.because ? `Because you liked ${r.because}` : null;
-  if (because && r.matchReason) return `${because} — ${r.matchReason}`;
-  return because ?? r.matchReason ?? null;
+  return r.matchReason ?? null;
 }
 
 export default async function WatchNowPage({ searchParams }: { searchParams?: { type?: string } }) {
