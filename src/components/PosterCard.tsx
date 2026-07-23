@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import type { MediaType } from '@/lib/types';
 import { AlgorithmScore } from './AlgorithmScore';
@@ -5,6 +7,7 @@ import { SaveButton } from './SaveButton';
 import { TasteFeedback } from './TasteFeedback';
 import { LikeButton } from './LikeButton';
 import { MediaTag } from './MediaTag';
+import { useT } from '@/i18n/I18nProvider';
 
 interface PosterCardProps {
   href?: string;
@@ -27,12 +30,13 @@ interface PosterCardProps {
 }
 
 export function Poster({ posterUrl, title, className = '' }: { posterUrl?: string | null; title: string; className?: string }) {
+  const t = useT();
   if (posterUrl) {
     // eslint-disable-next-line @next/next/no-img-element
     return (
       <img
         src={posterUrl}
-        alt={`Poster for ${title}`}
+        alt={t('card.posterAlt', { title })}
         loading="lazy"
         className={`h-full w-full object-cover ${className}`}
       />
@@ -49,6 +53,7 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
 }
 
 export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen }: PosterCardProps) {
+  const t = useT();
   const poster = (
     <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04]" />
   );
@@ -99,7 +104,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
       </div>
       <div className="relative aspect-[2/3] overflow-hidden">
         {onOpen ? (
-          <button type="button" onClick={onOpen} className="block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
+          <button type="button" onClick={onOpen} className="block h-full w-full text-left" aria-label={t('card.quickLook', { title })}>{poster}</button>
         ) : href ? (
           <Link href={href} className="block h-full">{poster}</Link>
         ) : (

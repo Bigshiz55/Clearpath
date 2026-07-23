@@ -1,3 +1,7 @@
+'use client';
+
+import { useT } from '@/i18n/I18nProvider';
+
 /**
  * The VERD1CT score badge — a little pink retro TV set: rounded screen with two
  * antennas poking out the top, a big number in the middle, and a bold "V"
@@ -19,6 +23,7 @@ export function Verd1ctBadge({
   className?: string;
   title?: string;
 }) {
+  const t = useT();
   const antH = tv ? Math.round(px * 0.32) : 0; // antenna zone above the screen
   const footH = tv ? Math.round(px * 0.14) : 0; // little legs below the screen
   const total = antH + px + footH;
@@ -51,7 +56,7 @@ export function Verd1ctBadge({
   return (
     <span
       className={className}
-      title={title ?? `Your VERD1CT: ${score} — from WatchVerdict`}
+      title={title ?? t('card.share.badgeTitle', { score })}
       style={{ position: 'relative', display: 'inline-block', width: px, height: total, flex: 'none', verticalAlign: 'middle' }}
     >
       {/* Antennas rising from the top-center of the screen */}

@@ -1,0 +1,107 @@
+{
+  "en-US": {
+    "card": {
+      "movie": "Movie",
+      "tv": "TV",
+      "quickLook": "Quick look at {title}",
+      "posterAlt": "Poster for {title}",
+      "watchabilityPersonal": "Watchability {score}/100 — your DNA blended with every rating. This drives the {call} call and the ranking order.",
+      "watchabilityObjective": "Watchability {score}/100 — every rating blended. Rate a few titles and your DNA starts weighting it. Drives the ranking order.",
+      "share": {
+        "badgeTitle": "Your VERD1CT: {score} — from WatchVerdict",
+        "myTaste": "My taste",
+        "loves": "Loves",
+        "stillFiguring": "Still figuring it out",
+        "hardNo": "Hard no",
+        "tagline": "Stop scrolling. Get rolling.",
+        "wrappedLabel": "{month} · Wrapped",
+        "watched": "watched",
+        "avgRating": "★ {avg} avg rating",
+        "topPicks": "Your top picks",
+        "myMonth": "My month on WatchVerdict",
+        "theVerdict": "⚖️ The Verdict",
+        "settledBy": "Settled by WatchVerdict",
+        "myWatchDna": "My Watch DNA 🧬",
+        "tier": {
+          "elite": "Elite",
+          "sharp": "Sharp",
+          "forming": "Forming",
+          "new": "New"
+        },
+        "rated": "{count} rated",
+        "finishRate": "{pct}% finish rate",
+        "whatsYours": "What’s yours?"
+      }
+    }
+  },
+  "es-419": {
+    "card": {
+      "movie": "Película",
+      "tv": "TV",
+      "quickLook": "Vistazo rápido a {title}",
+      "posterAlt": "Póster de {title}",
+      "watchabilityPersonal": "Nivel de visionado {score}/100 — tu DNA combinado con todas las calificaciones. Esto determina la decisión {call} y el orden de clasificación.",
+      "watchabilityObjective": "Nivel de visionado {score}/100 — todas las calificaciones combinadas. Califica algunos títulos y tu DNA empezará a influir. Determina el orden de clasificación.",
+      "share": {
+        "badgeTitle": "Tu VERD1CT: {score} — de WatchVerdict",
+        "myTaste": "Mi gusto",
+        "loves": "Me encanta",
+        "stillFiguring": "Aún lo estoy descubriendo",
+        "hardNo": "Rotundo no",
+        "tagline": "Deja de deslizar. Ponte en marcha.",
+        "wrappedLabel": "{month} · Resumen",
+        "watched": "vistos",
+        "avgRating": "★ {avg} calificación promedio",
+        "topPicks": "Tus favoritos",
+        "myMonth": "Mi mes en WatchVerdict",
+        "theVerdict": "⚖️ El veredicto",
+        "settledBy": "Resuelto por WatchVerdict",
+        "myWatchDna": "Mi Watch DNA 🧬",
+        "tier": {
+          "elite": "Élite",
+          "sharp": "Agudo",
+          "forming": "En formación",
+          "new": "Nuevo"
+        },
+        "rated": "{count} calificados",
+        "finishRate": "{pct}% de finalización",
+        "whatsYours": "¿Cuál es el tuyo?"
+      }
+    }
+  },
+  "zh-Hans": {
+    "card": {
+      "movie": "电影",
+      "tv": "TV",
+      "quickLook": "快速查看《{title}》",
+      "posterAlt": "《{title}》的海报",
+      "watchabilityPersonal": "可看度 {score}/100 — 你的 DNA 与所有评分融合。这决定了 {call} 判定和排序顺序。",
+      "watchabilityObjective": "可看度 {score}/100 — 所有评分融合。给几部作品评分，你的 DNA 就会开始参与加权。决定排序顺序。",
+      "share": {
+        "badgeTitle": "你的 VERD1CT：{score} — 来自 WatchVerdict",
+        "myTaste": "我的口味",
+        "loves": "喜欢",
+        "stillFiguring": "还在摸索中",
+        "hardNo": "坚决不看",
+        "tagline": "别再刷了，开始看吧。",
+        "wrappedLabel": "{month} · 总结",
+        "watched": "已看",
+        "avgRating": "★ {avg} 平均评分",
+        "topPicks": "你的最爱",
+        "myMonth": "我在 WatchVerdict 的这个月",
+        "theVerdict": "⚖️ 判决",
+        "settledBy": "由 WatchVerdict 裁定",
+        "myWatchDna": "我的 Watch DNA 🧬",
+        "tier": {
+          "elite": "顶尖",
+          "sharp": "敏锐",
+          "forming": "形成中",
+          "new": "新手"
+        },
+        "rated": "已评 {count} 部",
+        "finishRate": "{pct}% 完成率",
+        "whatsYours": "你的呢？"
+      }
+    }
+  }
+}

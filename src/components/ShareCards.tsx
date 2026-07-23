@@ -79,71 +79,74 @@ const shell: React.CSSProperties = {
 };
 
 export function TasteCardArt({ label, loves, avoids }: { label: string; loves: string[]; avoids: string[] }) {
+  const t = useT();
   return (
     <div style={{ ...shell, minHeight: 420, background: 'radial-gradient(120% 100% at 0% 0%, #16234a 0%, #0b1020 60%)' }}>
       {MARK}
-      <div style={{ marginTop: 26, fontSize: 12, letterSpacing: 2, color: '#8b95ad', textTransform: 'uppercase' }}>My taste</div>
+      <div style={{ marginTop: 26, fontSize: 12, letterSpacing: 2, color: '#8b95ad', textTransform: 'uppercase' }}>{t('card.share.myTaste')}</div>
       <div style={{ marginTop: 4, fontSize: 30, fontWeight: 900, lineHeight: 1.05 }}>{label}</div>
 
-      <div style={{ marginTop: 22, fontSize: 12, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: 1 }}>Loves</div>
+      <div style={{ marginTop: 22, fontSize: 12, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: 1 }}>{t('card.share.loves')}</div>
       <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {(loves.length ? loves : ['Still figuring it out']).map((t) => (
-          <span key={t} style={{ fontSize: 13, padding: '5px 10px', borderRadius: 999, background: 'rgba(16,185,129,.18)', color: '#a7f3d0' }}>{t}</span>
+        {(loves.length ? loves : [t('card.share.stillFiguring')]).map((tag) => (
+          <span key={tag} style={{ fontSize: 13, padding: '5px 10px', borderRadius: 999, background: 'rgba(16,185,129,.18)', color: '#a7f3d0' }}>{tag}</span>
         ))}
       </div>
 
       {avoids.length > 0 && (
         <>
-          <div style={{ marginTop: 18, fontSize: 12, fontWeight: 700, color: '#fca5a5', textTransform: 'uppercase', letterSpacing: 1 }}>Hard no</div>
+          <div style={{ marginTop: 18, fontSize: 12, fontWeight: 700, color: '#fca5a5', textTransform: 'uppercase', letterSpacing: 1 }}>{t('card.share.hardNo')}</div>
           <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {avoids.map((t) => (
-              <span key={t} style={{ fontSize: 13, padding: '5px 10px', borderRadius: 999, background: 'rgba(239,68,68,.16)', color: '#fecaca' }}>{t}</span>
+            {avoids.map((tag) => (
+              <span key={tag} style={{ fontSize: 13, padding: '5px 10px', borderRadius: 999, background: 'rgba(239,68,68,.16)', color: '#fecaca' }}>{tag}</span>
             ))}
           </div>
         </>
       )}
 
-      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>Stop scrolling. Get rolling. · clearpath-pearl-chi.vercel.app</div>
+      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>{t('card.share.tagline')} · clearpath-pearl-chi.vercel.app</div>
     </div>
   );
 }
 
 export function WrappedCardArt({ monthLabel, watched, avgRating, top }: { monthLabel: string; watched: number; avgRating: number | null; top: { title: string; rating: number | null }[] }) {
+  const t = useT();
   return (
     <div style={{ ...shell, minHeight: 460, background: 'radial-gradient(120% 100% at 100% 0%, #2a1747 0%, #0b1020 60%)' }}>
       {MARK}
-      <div style={{ marginTop: 24, fontSize: 12, letterSpacing: 2, color: '#8b95ad', textTransform: 'uppercase' }}>{monthLabel} · Wrapped</div>
+      <div style={{ marginTop: 24, fontSize: 12, letterSpacing: 2, color: '#8b95ad', textTransform: 'uppercase' }}>{t('card.share.wrappedLabel', { month: monthLabel })}</div>
       <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <span style={{ fontSize: 56, fontWeight: 900, lineHeight: 1 }}>{watched}</span>
-        <span style={{ fontSize: 16, color: '#c7d0e4' }}>watched</span>
+        <span style={{ fontSize: 16, color: '#c7d0e4' }}>{t('card.share.watched')}</span>
       </div>
       {avgRating != null && (
-        <div style={{ marginTop: 4, fontSize: 15, color: '#fcd34d' }}>★ {avgRating.toFixed(1)} avg rating</div>
+        <div style={{ marginTop: 4, fontSize: 15, color: '#fcd34d' }}>{t('card.share.avgRating', { avg: avgRating.toFixed(1) })}</div>
       )}
 
       {top.length > 0 && (
         <>
-          <div style={{ marginTop: 22, fontSize: 12, fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: 1 }}>Your top picks</div>
+          <div style={{ marginTop: 22, fontSize: 12, fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: 1 }}>{t('card.share.topPicks')}</div>
           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {top.map((t, i) => (
+            {top.map((pick, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <span style={{ fontSize: 15, fontWeight: 700 }}>{i + 1}. {t.title}</span>
-                {t.rating != null && <span style={{ fontSize: 13, color: '#fcd34d' }}>★ {t.rating}</span>}
+                <span style={{ fontSize: 15, fontWeight: 700 }}>{i + 1}. {pick.title}</span>
+                {pick.rating != null && <span style={{ fontSize: 13, color: '#fcd34d' }}>★ {pick.rating}</span>}
               </div>
             ))}
           </div>
         </>
       )}
-      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>My month on WatchVerdict · clearpath-pearl-chi.vercel.app</div>
+      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>{t('card.share.myMonth')} · clearpath-pearl-chi.vercel.app</div>
     </div>
   );
 }
 
 export function CourtCardArt({ title, oneLiner, members }: { title: string; oneLiner: string; members: { name: string; score: number }[] }) {
+  const t = useT();
   return (
     <div style={{ ...shell, minHeight: 420, background: 'radial-gradient(120% 100% at 50% 0%, #10233f 0%, #0b1020 62%)' }}>
       {MARK}
-      <div style={{ marginTop: 24, fontSize: 12, letterSpacing: 3, color: '#7dd3fc', textTransform: 'uppercase' }}>⚖️ The Verdict</div>
+      <div style={{ marginTop: 24, fontSize: 12, letterSpacing: 3, color: '#7dd3fc', textTransform: 'uppercase' }}>{t('card.share.theVerdict')}</div>
       <div style={{ marginTop: 6, fontSize: 30, fontWeight: 900, lineHeight: 1.05 }}>{title}</div>
       <div style={{ marginTop: 12, fontSize: 15, color: '#c7d0e4', lineHeight: 1.35 }}>{oneLiner}</div>
 
@@ -152,7 +155,7 @@ export function CourtCardArt({ title, oneLiner, members }: { title: string; oneL
           <span key={m.name} style={{ fontSize: 13, padding: '5px 10px', borderRadius: 999, background: 'rgba(255,255,255,.08)' }}>{m.name} {m.score}</span>
         ))}
       </div>
-      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>Settled by WatchVerdict · clearpath-pearl-chi.vercel.app</div>
+      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>{t('card.share.settledBy')} · clearpath-pearl-chi.vercel.app</div>
     </div>
   );
 }
@@ -176,14 +179,23 @@ export function WatchDnaCardArt({
   rated: number;
   dnaScore?: number;
 }) {
+  const t = useT();
   const tier =
-    dnaScore == null ? '' : dnaScore >= 75 ? 'Elite' : dnaScore >= 50 ? 'Sharp' : dnaScore >= 25 ? 'Forming' : 'New';
+    dnaScore == null
+      ? ''
+      : dnaScore >= 75
+        ? t('card.share.tier.elite')
+        : dnaScore >= 50
+          ? t('card.share.tier.sharp')
+          : dnaScore >= 25
+            ? t('card.share.tier.forming')
+            : t('card.share.tier.new');
   return (
     <div style={{ ...shell, width: 360, minHeight: 520, background: 'radial-gradient(130% 100% at 0% 0%, #2a1747 0%, #10233f 45%, #0b1020 75%)' }}>
       {MARK}
       <div style={{ marginTop: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 12, letterSpacing: 2, color: '#c4b5fd', textTransform: 'uppercase' }}>My Watch DNA 🧬</div>
+          <div style={{ fontSize: 12, letterSpacing: 2, color: '#c4b5fd', textTransform: 'uppercase' }}>{t('card.share.myWatchDna')}</div>
           <div style={{ marginTop: 4, fontSize: 32, fontWeight: 900, lineHeight: 1.03 }}>{title}</div>
         </div>
         {dnaScore != null && (
@@ -203,7 +215,7 @@ export function WatchDnaCardArt({
             >
               <span style={{ fontSize: 24, fontWeight: 900, lineHeight: 1, color: '#fff' }}>{dnaScore}</span>
             </div>
-            <div style={{ marginTop: 4, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.6, color: '#c4b5fd', textTransform: 'uppercase' }}>DNA · {tier}</div>
+            <div style={{ marginTop: 4, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.6, color: '#c4b5fd', textTransform: 'uppercase' }}>{`DNA · ${tier}`}</div>
           </div>
         )}
       </div>
@@ -211,8 +223,8 @@ export function WatchDnaCardArt({
 
       {traits.length > 0 && (
         <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {traits.map((t) => (
-            <span key={t} style={{ fontSize: 12, fontWeight: 700, padding: '5px 10px', borderRadius: 999, background: 'rgba(255,255,255,.10)', color: '#e8edf7' }}>{t}</span>
+          {traits.map((trait) => (
+            <span key={trait} style={{ fontSize: 12, fontWeight: 700, padding: '5px 10px', borderRadius: 999, background: 'rgba(255,255,255,.10)', color: '#e8edf7' }}>{trait}</span>
           ))}
         </div>
       )}
@@ -234,10 +246,10 @@ export function WatchDnaCardArt({
 
       <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div style={{ fontSize: 12, color: '#5f6b85' }}>
-          {rated} rated{finishRate != null ? ` · ${Math.round(finishRate * 100)}% finish rate` : ''}
+          {t('card.share.rated', { count: rated })}{finishRate != null ? ` · ${t('card.share.finishRate', { pct: Math.round(finishRate * 100) })}` : ''}
           <div style={{ marginTop: 2 }}>clearpath-pearl-chi.vercel.app</div>
         </div>
-        <div style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>What’s yours?</div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>{t('card.share.whatsYours')}</div>
       </div>
     </div>
   );
