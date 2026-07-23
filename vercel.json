@@ -6,6 +6,7 @@
   "regions": ["iad1"],
   "crons": [
     { "path": "/api/cron/daily-scan", "schedule": "0 13 * * *" },
-    { "path": "/api/cron/classify", "schedule": "0 8 * * *" }
+    { "path": "/api/cron/classify", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/tv-grid", "schedule": "0 * * * *" }
   ]
 }

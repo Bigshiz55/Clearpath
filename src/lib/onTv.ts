@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import { getCriticRatings } from '@/lib/omdb';
 import { findTmdbByImdb } from '@/lib/tmdb/client';
 import { getGracenoteAirings } from '@/lib/gracenote';
+import { getStoredGridAirings } from '@/lib/tvGrid';
 import type { MediaType } from '@/lib/types';
 
 /**
@@ -342,7 +343,11 @@ export async function getUpcomingTv(
   // what makes "Lifetime movies tonight" actually return Lifetime movies. US only.
   const wantGracenote = country === 'US' && !!(network || movieOnly);
   if (wantGracenote) {
-    const grid = await getGracenoteAirings(nowMs, clampedHorizon, { network, movieOnly }).catch(() => []);
+    // DB-first: read the hourly-refreshed grid from our own table (fast, no
+    // upstream call). Only if it's empty (before the first refresh, or the table
+    // isn't there yet) do we fetch Gracenote live.
+    let grid = await getStoredGridAirings(nowMs, clampedHorizon, { network, movieOnly }).catch(() => []);
+    if (grid.length === 0) grid = await getGracenoteAirings(nowMs, clampedHorizon, { network, movieOnly }).catch(() => []);
     const merged = [...upcoming, ...grid];
     const byKey = new Set<string>();
     return merged

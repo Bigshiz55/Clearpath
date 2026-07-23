@@ -1,0 +1,35 @@
+name: Refresh TV grid
+
+# Plan-independent hourly refresh of the cached national TV grid. Vercel Cron on
+# the Hobby plan only runs daily, so this GitHub Action guarantees hourly refresh
+# regardless of plan by pinging the protected cron endpoint.
+#
+# Requires two repository secrets (Settings → Secrets and variables → Actions):
+#   SITE_URL     e.g. https://verd1ct.com  (no trailing slash)
+#   CRON_SECRET  the same value set as the CRON_SECRET env var on the deployment
+#
+# GitHub may delay scheduled runs under load; the app also self-heals on read.
+
+on:
+  schedule:
+    - cron: '0 * * * *' # top of every hour (UTC)
+  workflow_dispatch: {}
+
+concurrency:
+  group: tv-grid-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping refresh endpoint
+        run: |
+          if [ -z "${{ secrets.SITE_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "SITE_URL and CRON_SECRET repo secrets are required."; exit 1
+          fi
+          code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.SITE_URL }}/api/cron/tv-grid")
+          echo "HTTP $code"; cat /tmp/out.json || true
+          test "$code" = "200"

@@ -132,7 +132,7 @@ function displayNetwork(callSign: string): string {
 }
 
 const etFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false });
-function etTime(iso: string): { time: string; minutes: number } {
+export function etTime(iso: string): { time: string; minutes: number } {
   try {
     const parts = etFmt.formatToParts(new Date(iso));
     const hh = parts.find((p) => p.type === 'hour')?.value ?? '00';
@@ -143,8 +143,17 @@ function etTime(iso: string): { time: string; minutes: number } {
   }
 }
 
+/** A friendly network name for any call sign (used when storing the full grid). */
+export function networkNameFor(callSign: string): string {
+  return displayNetwork(callSign);
+}
+/** The canonical filter key for a call sign, or null when it's an unmapped channel. */
+export function networkKeyFor(callSign: string): string | null {
+  return GN_NETS.find((n) => n.re.test(callSign))?.key ?? null;
+}
+
 /** Stable positive int id from call sign + start (for React keys and reminders). */
-function hashId(s: string): number {
+export function hashId(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return Math.abs(h) || 1;
@@ -255,4 +264,54 @@ export async function getGracenoteAirings(
     }
   }
   return out.sort((a, b) => Date.parse(a.airstamp) - Date.parse(b.airstamp));
+}
+
+export interface GridRow {
+  callSign: string;
+  network: string;
+  networkKey: string | null;
+  showName: string;
+  airstamp: string; // ISO UTC
+  runtime: number | null;
+  isMovie: boolean;
+}
+
+/**
+ * The ENTIRE grid (all channels, no filter) over the window, normalized for
+ * storage — used by the hourly refresh job. Fetches fresh (bypasses the
+ * per-block request cache) since the whole point is to pull new data. Empty on
+ * total failure; a failed block just contributes nothing.
+ */
+export async function fetchGridForStore(nowMs: number, horizonMs: number): Promise<GridRow[]> {
+  const startSec = Math.floor(nowMs / HOUR_MS) * (HOUR_MS / 1000);
+  const spanHours = Math.ceil(horizonMs / HOUR_MS);
+  const blockTimes: number[] = [];
+  for (let off = 0; off < spanHours; off += BLOCK_HOURS) blockTimes.push(startSec + off * 3600);
+  const blocks = await Promise.all(blockTimes.map((t) => fetchBlockRaw(t).catch(() => [] as GnChannel[])));
+  const out: GridRow[] = [];
+  const seen = new Set<string>();
+  for (const channels of blocks) {
+    for (const c of channels) {
+      const cs = c.callSign ?? '';
+      if (!cs) continue;
+      const key0 = GN_NETS.find((n) => n.re.test(cs));
+      for (const e of c.events ?? []) {
+        if (!e.startTime) continue;
+        const k = `${cs}|${e.startTime}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        const dur = Number.parseInt(e.duration ?? '', 10);
+        out.push({
+          callSign: cs,
+          network: key0 ? key0.name : displayNetwork(cs),
+          networkKey: key0?.key ?? null,
+          showName: e.program?.title ?? 'Untitled',
+          airstamp: e.startTime,
+          runtime: Number.isFinite(dur) ? dur : null,
+          isMovie: (e.filter ?? []).includes('filter-movie'),
+        });
+      }
+    }
+  }
+  return out;
 }
