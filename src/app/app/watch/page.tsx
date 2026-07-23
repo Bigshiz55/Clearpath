@@ -16,12 +16,6 @@ import { tmdbImage } from '@/lib/tmdb/image';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Watch now · WatchVerdict' };
 
-/** The card's short "why" tag. We ride on the DNA verdict now, so we drop the
- *  "Because you liked X" seed — just the matched trait, when we have one. */
-function fullReason(r: Recommendation): string | null {
-  return r.matchReason ?? null;
-}
-
 export default async function WatchNowPage({ searchParams }: { searchParams?: { type?: string } }) {
   // Deep link from the simple version: /app/watch?type=tv opens straight into the
   // Browse tab filtered to the chosen media type.
@@ -77,22 +71,17 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
             <Link href="/app/quiz" className="text-brand-300 hover:underline">Taste Quiz</Link>, the sharper this gets. Tap any for where to watch.
           </p>
           <div className="poster-grid">
-            {recs.map((r) => {
-              const reason = fullReason(r);
-              return (
-                <PosterCard
-                  key={`${r.mediaType}-${r.id}`}
-                  href={`/app/title/${r.mediaType}/${r.id}`}
-                  title={r.title}
-                  year={r.year}
-                  mediaType={r.mediaType}
-                  posterUrl={tmdbImage(r.posterPath, 'w342')}
-                  overlay={<SaveButton wide removeOnSave tmdbId={r.id} mediaType={r.mediaType} title={r.title} year={r.year} posterPath={r.posterPath} />}
-                >
-                  {reason ? <p className="mt-2 line-clamp-2 text-[11px] text-slate-400">{reason}</p> : null}
-                </PosterCard>
-              );
-            })}
+            {recs.map((r) => (
+              <PosterCard
+                key={`${r.mediaType}-${r.id}`}
+                href={`/app/title/${r.mediaType}/${r.id}`}
+                title={r.title}
+                year={r.year}
+                mediaType={r.mediaType}
+                posterUrl={tmdbImage(r.posterPath, 'w342')}
+                overlay={<SaveButton wide removeOnSave tmdbId={r.id} mediaType={r.mediaType} title={r.title} year={r.year} posterPath={r.posterPath} />}
+              />
+            ))}
           </div>
         </section>
       ) : (

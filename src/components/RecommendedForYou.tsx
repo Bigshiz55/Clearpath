@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PosterCard } from './PosterCard';
 import { SaveButton } from './SaveButton';
-import { ReasonText } from './ReasonText';
 
 interface Rec {
   id: number;
@@ -18,12 +17,6 @@ interface Rec {
   primaryCall: string;
   because: string | null;
   matchReason: string | null;
-}
-
-/** The card's short "why" tag. We ride on the DNA verdict, so we no longer lead
- *  with a "Because you liked X" seed — just the match rationale, when we have one. */
-function fullReason(r: Rec): string | null {
-  return r.matchReason ?? null;
 }
 
 export function RecommendedForYou({ label }: { label?: string | null }) {
@@ -107,21 +100,7 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
                   posterPath={r.posterPath}
                 />
               }
-            >
-              {(() => {
-                // The call now lives in the DNA-driven badge (card top bar +
-                // ratings row), so here we keep only the reason — the "why this
-                // is on your list" that the call can't express on its own.
-                const reason = fullReason(r);
-                if (!reason) return null;
-                return (
-                  <div className="mt-2">
-                    {/* One complete sentence; tap/click to expand the full text. */}
-                    <ReasonText text={reason} className="text-[11px] text-slate-400" />
-                  </div>
-                );
-              })()}
-            </PosterCard>
+            />
           ))}
         </div>
       )}
