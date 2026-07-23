@@ -34,8 +34,9 @@ interface GnEvent {
 }
 
 // Gracenote/TMS poster art CDN. The event's `thumbnail` is an asset id; the CDN
-// resizes on the fly with ?w=. This is what fills the placards.
-const IMG_BASE = 'https://demo.tmsimg.com/assets';
+// resizes on the fly with ?w=. We serve the canonical host; the guide swaps to
+// the mirror (demo.tmsimg.com) client-side if it ever fails to load.
+const IMG_BASE = 'https://zap2it.tmsimg.com/assets';
 function imageUrl(thumb: string | undefined): string | null {
   if (!thumb || !/^[\w-]+$/.test(thumb)) return null;
   return `${IMG_BASE}/${thumb}.jpg?w=360`;

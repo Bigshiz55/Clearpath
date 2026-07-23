@@ -1,6 +1,18 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+
+/** Poster art comes from the canonical TMS CDN; if it fails to load, swap to the
+ *  mirror once, then give up (hide) so we never loop or show a broken icon. */
+function posterFallback(e: React.SyntheticEvent<HTMLImageElement>): void {
+  const img = e.currentTarget;
+  if (img.dataset.fb) {
+    img.style.display = 'none';
+    return;
+  }
+  img.dataset.fb = '1';
+  img.src = img.src.replace('zap2it.tmsimg.com', 'demo.tmsimg.com');
+}
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
 import { SaveButton } from '@/components/SaveButton';
@@ -186,7 +198,7 @@ export function OnTvGuide({
             {highlights.map((a) => {
               const poster = a.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={a.image} alt="" loading="lazy" className="h-full w-full object-cover" />
+                <img src={a.image} alt="" loading="lazy" onError={posterFallback} className="h-full w-full object-cover" />
               ) : (
                 <div className="grid h-full w-full place-items-center p-2 text-center text-[11px] text-slate-400">{a.showName}</div>
               );
@@ -282,7 +294,7 @@ export function OnTvGuide({
                 <div className="h-20 w-14 flex-none overflow-hidden rounded-md border border-white/10 bg-ink-800">
                   {a.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={a.image} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    <img src={a.image} alt="" loading="lazy" onError={posterFallback} className="h-full w-full object-cover" />
                   ) : (
                     <div className="grid h-full w-full place-items-center text-[9px] text-slate-500">TV</div>
                   )}
