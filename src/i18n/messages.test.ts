@@ -69,12 +69,18 @@ describe('no English leakage in translated catalogs', () => {
   // Values that are intentionally identical across locales (brand, trademarks,
   // acronyms) are allow-listed so the leakage guard stays meaningful.
   const ALLOW = new Set(['Pro', 'VERD1CT', 'DNA', 'IMDb', 'TV', 'OK']);
+  // Strip {placeholders} before judging leakage: a pure format string like
+  // "{day} {time}" is identical across locales by design, and the letters that
+  // survive are only the interpolation names, not user-facing English.
+  const stripPlaceholders = (s: string): string => s.replace(/\{\w+\}/g, '');
   it('zh-Hans values are not accidental English copies', () => {
     const leaks = keys(en)
       .filter((k) => {
         const e = get(en, k);
         const z = get(zh, k);
-        return e && z && e === z && !ALLOW.has(e) && /^[\x00-\x7F]+$/.test(z) && /[a-zA-Z]{3,}/.test(z);
+        if (!e || !z || e !== z || ALLOW.has(e)) return false;
+        const bare = stripPlaceholders(z);
+        return /^[\x00-\x7F]+$/.test(z) && /[a-zA-Z]{3,}/.test(bare);
       });
     expect(leaks, `Untranslated in zh-Hans: ${leaks.join(', ')}`).toEqual([]);
   });
