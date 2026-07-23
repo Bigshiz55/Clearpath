@@ -25,7 +25,7 @@ const CHANNELS: Channel[] = [
   CH('ESPN', 'ESPN', 'ESPN', '32'), // sports — must be filtered
 ];
 
-interface Spec { id: string; title: string; ch: string; type: string; genres: string[]; runtime: number; offsetMin: number; new?: boolean; repeat?: boolean; serialized?: boolean; restart?: boolean; onDemand?: boolean; ratings?: Program['ratings']; artwork?: string | null; ep?: { s: number; n: number; title: string }; rating?: string }
+interface Spec { id: string; title: string; ch: string; type: string; genres: string[]; runtime: number; offsetMin: number; new?: boolean; repeat?: boolean; serialized?: boolean; restart?: boolean; onDemand?: boolean; ratings?: Program['ratings']; artwork?: string | null; ep?: { s: number; n: number; title: string }; rating?: string; country?: string[]; origLang?: string; audio?: string[]; subs?: string[] }
 
 const SPECS: Spec[] = [
   { id: 'show:castle', title: 'Castle', ch: 'CBS', type: 'Scripted', genres: ['Comedy', 'Crime'], runtime: 60, offsetMin: -18, serialized: false, restart: false, onDemand: true, ratings: { imdb: 8.1, rt: 84, audience: 88 }, ep: { s: 3, n: 7, title: 'Almost Famous' }, rating: 'TV-14' },
@@ -36,6 +36,11 @@ const SPECS: Spec[] = [
   { id: 'movie:doc', title: 'Deep Ocean', ch: 'PBS', type: 'Documentary', genres: ['Documentary'], runtime: 55, offsetMin: 45, artwork: null, rating: 'TV-PG' },
   { id: 'show:new1', title: 'Precinct 9', ch: 'CBS', type: 'Scripted', genres: ['Crime', 'Drama'], runtime: 60, offsetMin: 60, new: true, ratings: { imdb: 7.9 }, ep: { s: 1, n: 3, title: 'Cold Open' }, rating: 'TV-14' },
   { id: 'movie:late', title: 'Midnight Run Redux', ch: 'AMC', type: 'Movie', genres: ['Action', 'Comedy'], runtime: 110, offsetMin: 200, ratings: { imdb: 7.0 }, rating: 'R' },
+  // International productions — foreign original language WITH a verified English dub
+  // (included) and one subtitle-only (excluded when English audio is required).
+  { id: 'show:dk', title: 'The Bridge (Broen)', ch: 'FX', type: 'Scripted', genres: ['Crime', 'Thriller'], runtime: 60, offsetMin: 30, new: true, serialized: true, ratings: { imdb: 8.6 }, ep: { s: 4, n: 2, title: 'Crossing' }, rating: 'TV-MA', country: ['Denmark', 'Sweden'], origLang: 'Danish', audio: ['Danish', 'English'], subs: ['English'] },
+  { id: 'show:es', title: 'Gran Hotel', ch: 'HALL', type: 'Scripted', genres: ['Drama', 'Mystery'], runtime: 60, offsetMin: 80, ratings: { imdb: 8.2 }, ep: { s: 1, n: 5, title: 'La Carta' }, rating: 'TV-14', country: ['Spain'], origLang: 'Spanish', audio: ['Spanish', 'English'], subs: ['English'] },
+  { id: 'show:fr', title: 'Spiral (Engrenages)', ch: 'PBS', type: 'Scripted', genres: ['Crime', 'Drama'], runtime: 60, offsetMin: 130, ratings: { imdb: 8.4 }, ep: { s: 6, n: 1, title: 'Nouvelle Affaire' }, rating: 'TV-MA', country: ['France'], origLang: 'French', audio: ['French'], subs: ['English'] }, // subtitle-only → excluded under English-audio
   { id: 'sport:game', title: 'Monday Night Matchup', ch: 'ESPN', type: 'Sports', genres: ['Sports'], runtime: 180, offsetMin: -30 }, // filtered everywhere
 ];
 
@@ -53,6 +58,8 @@ function build(now: number): { airings: Airing[]; programs: Record<string, Progr
       synopsis: `${s.title} — a ${s.genres.join('/').toLowerCase()} ${mediaType}.`,
       artwork: s.artwork === undefined ? `https://image.example/${s.id}.jpg` : s.artwork,
       ratings: s.ratings ?? null, cast: [], runtime: s.runtime, contentWarnings: [], contentRating: s.rating ?? null,
+      countryOfOrigin: s.country ?? ['USA'], originalLanguage: s.origLang ?? 'English',
+      availableAudioLanguages: s.audio ?? ['English'], availableSubtitleLanguages: s.subs ?? [],
     };
     airings.push({
       id: `${s.ch}:${s.id}:${start}`, contentId: s.id, channelId: s.ch,

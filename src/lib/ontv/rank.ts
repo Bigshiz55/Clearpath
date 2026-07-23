@@ -9,6 +9,7 @@
 import type { Program, Channel, Airing, ScheduleQuery, VerdictBand, MatchExplanation, AiringStatus } from './types';
 import { DEFAULT_EXCLUDED_EVENT_TYPES, isSportsProgram, isSportsChannel } from './sports';
 import { airingStatus, inDateScope, hhmmToMinutes, localParts } from './time';
+import { hasEnglishAudio } from '@/lib/lang/international';
 
 export interface TasteProfile {
   id: string;
@@ -64,6 +65,10 @@ export function applyHardFilters(items: Candidate[], q: ScheduleQuery, ctx: Rank
     if (q.familyFriendly && program.genres.some((g) => FAMILY_UNSAFE.has(g.toLowerCase()))) return false;
     if (q.noHorror && program.genres.some((g) => g.toLowerCase() === 'horror')) return false;
     if (q.maxRuntime != null && program.runtime != null && program.runtime > q.maxRuntime) return false;
+    // English audio = a VERIFIED English AUDIO TRACK (never "originally English").
+    // A foreign-original title WITH an English dub passes; a subtitle-only title is
+    // excluded. Foreign original language is NEVER itself a reason to exclude.
+    if (q.englishAudioOnly && program.availableAudioLanguages.length > 0 && !hasEnglishAudio(program)) return false;
     return true;
   });
 }

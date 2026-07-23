@@ -43,6 +43,14 @@ export interface Program {
   runtime: number | null;  // minutes
   contentWarnings: string[];
   contentRating: string | null; // e.g. "TV-14", "PG-13"
+  /** Where it was originally produced (country names or ISO codes). */
+  countryOfOrigin: string[];
+  /** The language it was ORIGINALLY produced in (may be non-English — never a
+   *  reason to exclude). */
+  originalLanguage: string | null;
+  /** Audio tracks the provider offers in-region (the ONLY basis for "English audio"). */
+  availableAudioLanguages: string[];
+  availableSubtitleLanguages: string[];
 }
 
 export interface Airing {

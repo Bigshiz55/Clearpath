@@ -160,6 +160,39 @@ hard-filtered result).
 - A single NL-search result stretches its rail column wide — cosmetic; a max-column
   cap is a trivial follow-up.
 
+## International discovery correction (foreign-language + English dub = INCLUDE)
+
+Corrected the language logic so foreign-original content is **actively sought**, not
+filtered out. The distinction is now explicit and enforced:
+
+- `originalLanguage` = the production language (Danish/Spanish/French/…); **never a
+  reason to exclude**.
+- `availableAudioLanguages` = the provider's audio tracks — the **only** basis for
+  "English audio". A verified English **audio track** ≠ "originally English".
+
+Module `src/lib/lang/international.ts` (pure, tested — `international.test.ts`, 17
+cases):
+- `assessEnglishAudio` — FOREIGN + English dub → INCLUDE; FOREIGN + English
+  **subtitles only** → EXCLUDE when English audio is required, with reason *"English
+  subtitles available, but no English audio track verified"*; originally-English →
+  allowed but not dominating.
+- `discoverInternational` — seeks foreign originals, requires verified English audio
+  when asked, ranks by taste, applies **geographic diversity as a soft round-robin**
+  by original language (never forcing a weak match — taste + audio win), and **caps
+  originally-English titles** so they can't dominate a foreign-prioritized request.
+- `originLine` → the UI string *"Originally in Spanish — English audio available"*
+  (or *"— subtitles only"*).
+
+Wired into On TV: `Program` now carries `countryOfOrigin` / `originalLanguage` /
+`availableAudioLanguages` / `availableSubtitleLanguages`; the `englishAudioOnly` hard
+filter uses **verified audio** (a Danish show with an English dub passes; a
+French subtitle-only show is excluded — never excluded for being non-English). The
+program card surfaces the origin line. Mock data includes Danish/Spanish (dubbed,
+included) and French (subtitle-only, excluded under English-audio) titles. Tests
+assert all mandated cases (Danish/Spanish/French dubs included; subtitle-only
+excluded; foreign original never rejected; English-original doesn't dominate;
+country + language shown; a useful country mix).
+
 ## External API / account requirements
 
 Production listings need the existing Gracenote grid access (lineup id) + TVmaze

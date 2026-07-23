@@ -1,5 +1,6 @@
 import type { PersonalizedAiring } from '@/lib/ontv/types';
 import { clockLabel } from '@/lib/ontv/time';
+import { isForeignOriginal, englishDubAvailable, originLine } from '@/lib/lang/international';
 
 /**
  * On TV program card — presentational, responsive, container-aware. Shows only the
@@ -58,6 +59,14 @@ export function ProgramCard({ item, tz, now, locale = 'en-US' }: { item: Persona
         </div>
 
         {meta && <p className="line-clamp-1 text-xs text-slate-400">{meta}</p>}
+
+        {/* International origin: original language + verified English-audio status.
+            Foreign original language is surfaced, never hidden. */}
+        {isForeignOriginal(p.originalLanguage) && (
+          <p className="line-clamp-1 text-[11px] font-semibold text-sky-300" title={originLine(p.originalLanguage, englishDubAvailable(p))}>
+            {p.countryOfOrigin[0] ? `${p.countryOfOrigin[0]} · ` : ''}{originLine(p.originalLanguage, englishDubAvailable(p))}
+          </p>
+        )}
 
         {onNow ? (
           <div className="mt-0.5">

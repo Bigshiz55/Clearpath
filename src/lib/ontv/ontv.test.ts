@@ -10,7 +10,7 @@ const TZ = 'America/New_York';
 const NOW = Date.parse('2026-03-09T20:30:00-04:00'); // 8:30pm ET (after the DST spring-forward)
 
 const ch = (o: Partial<Channel> & { id: string }): Channel => ({ name: o.id, callSign: o.id, logo: null, network: o.id, channelNumber: null, region: 'US', providerIds: ['ota'], isFavorite: false, isHidden: false, ...o });
-const prog = (o: Partial<Program> & { id: string; title: string }): Program => ({ episodeTitle: null, mediaType: 'tv', eventType: 'episode', seasonNumber: null, episodeNumber: null, genres: [], synopsis: null, artwork: null, ratings: null, cast: [], runtime: 60, contentWarnings: [], contentRating: null, ...o });
+const prog = (o: Partial<Program> & { id: string; title: string }): Program => ({ episodeTitle: null, mediaType: 'tv', eventType: 'episode', seasonNumber: null, episodeNumber: null, genres: [], synopsis: null, artwork: null, ratings: null, cast: [], runtime: 60, contentWarnings: [], contentRating: null, countryOfOrigin: ['USA'], originalLanguage: 'English', availableAudioLanguages: ['English'], availableSubtitleLanguages: [], ...o });
 const air = (o: Partial<Airing> & { id: string; contentId: string; channelId: string; startAt: string; endAt: string }): Airing => ({ isLive: true, isNew: false, isRepeat: false, restartAvailable: false, onDemandAvailable: false, streamingLaterAvailable: false, sourceUpdatedAt: new Date(NOW).toISOString(), ...o });
 const at = (min: number) => new Date(NOW + min * 60000).toISOString();
 
@@ -114,6 +114,28 @@ describe('ranking — hard filters before Your Match; never overridden', () => {
     const cold: TasteProfile = { id: 'new', sampleSize: 1, genreAffinity: {}, dislikedGenres: [], favoriteNetworks: [] };
     const m = yourMatch(prog({ id: 'x', title: 'X', genres: ['Drama'], ratings: { imdb: 8 } }), ch({ id: 'CBS' }), cold);
     expect(m.explanation.generalQuality).toBe(true);
+  });
+});
+
+describe('English-audio filter = verified audio track, not original language', () => {
+  const ctx: RankContext = { now: NOW, tz: TZ, userChannelIds: new Set(), userProviderIds: new Set() };
+  const taste: TasteProfile = { id: 'me', sampleSize: 5, genreAffinity: {}, dislikedGenres: [], favoriteNetworks: [] };
+  const items: Candidate[] = [
+    { airing: air({ id: 'dk', contentId: 'dk', channelId: 'FX', startAt: at(-5), endAt: at(55) }), program: prog({ id: 'dk', title: 'The Bridge', genres: ['Crime'], countryOfOrigin: ['Denmark'], originalLanguage: 'Danish', availableAudioLanguages: ['Danish', 'English'], availableSubtitleLanguages: ['English'] }), channel: ch({ id: 'FX' }) },
+    { airing: air({ id: 'es', contentId: 'es', channelId: 'HALL', startAt: at(-5), endAt: at(55) }), program: prog({ id: 'es', title: 'Gran Hotel', genres: ['Drama'], countryOfOrigin: ['Spain'], originalLanguage: 'Spanish', availableAudioLanguages: ['Spanish', 'English'] }), channel: ch({ id: 'HALL' }) },
+    { airing: air({ id: 'fr', contentId: 'fr', channelId: 'PBS', startAt: at(-5), endAt: at(55) }), program: prog({ id: 'fr', title: 'Spiral', genres: ['Crime'], countryOfOrigin: ['France'], originalLanguage: 'French', availableAudioLanguages: ['French'], availableSubtitleLanguages: ['English'] }), channel: ch({ id: 'PBS' }) },
+  ];
+  it('includes foreign-original shows with an English dub, excludes subtitle-only, never rejects for non-English original', () => {
+    const q: ScheduleQuery = { ...parseScheduleQuery('what is on right now with english audio').query, englishAudioOnly: true };
+    const out = applyHardFilters(items, q, ctx);
+    const ids = out.map((c) => c.program.id);
+    expect(ids).toContain('dk'); // Danish + English dub → included
+    expect(ids).toContain('es'); // Spanish + English dub → included
+    expect(ids).not.toContain('fr'); // French, subtitle-only → excluded under English audio
+  });
+  it('without an English-audio requirement, the subtitle-only foreign show is kept', () => {
+    const q: ScheduleQuery = { ...parseScheduleQuery('what is on right now').query };
+    expect(applyHardFilters(items, q, ctx).map((c) => c.program.id)).toContain('fr');
   });
 });
 
