@@ -1,16 +1,16 @@
 {
   "cases": 500,
-  "passRate": 0.986,
-  "composite": 0.9267826744613583,
+  "passRate": 0.99,
+  "composite": 0.9280493411280247,
   "categoryScores": {
-    "hardPrecision": 0.8945333333333348,
-    "parsing": 0.9484166666666669,
+    "hardPrecision": 0.8953333333333349,
+    "parsing": 0.951083333333333,
     "recall": 1,
-    "ranking": 0.922196705640124,
-    "response": 0.8429999999999956,
+    "ranking": 0.922996705640124,
+    "response": 0.8463333333333286,
     "reliability": 1
   },
-  "hardFailureRate": 0.01,
+  "hardFailureRate": 0.006,
   "hallucinationRate": 0,
   "wrongTimeWindowRate": 0,
   "wrongNetworkOrPlatformRate": 0.002,
@@ -26,17 +26,17 @@
   "top3PersonalizationQuality": 0.6666666666666666,
   "meanNdcg": 0.9998251718783937,
   "meanMrr": 0.6666666666666666,
-  "parseFieldAccuracy": 0.900833333333333,
+  "parseFieldAccuracy": 0.9061666666666672,
   "intentAccuracy": 0.996,
   "latency": {
-    "p50": 0.31863399999997455,
-    "p95": 1.0644969999999603,
-    "p99": 3.2788400000000593,
-    "mean": 0.5329727860000023
+    "p50": 0.2483869999999797,
+    "p95": 1.0769410000000335,
+    "p99": 3.7165109999999686,
+    "mean": 0.42768893199999863
   },
   "failuresByCategory": {
     "speech_transcription": 1,
-    "query_normalization": 4,
+    "query_normalization": 2,
     "intent_classification": 0,
     "entity_extraction": 1,
     "time_interpretation": 1,

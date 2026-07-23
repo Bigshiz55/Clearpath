@@ -7,6 +7,8 @@ import {
   detectGenre,
   detectNetwork,
   detectPlatform,
+  extractCount,
+  parseRequestedCount,
 } from './detectors';
 
 // Characterization tests: these freeze the *current* production behaviour of
@@ -38,6 +40,20 @@ describe('detectAiringHorizon', () => {
   it('KNOWN-BUG: no clock-time parsing', () => {
     expect(detectAiringHorizon("what's on at 8pm")).toBe(24); // matches "what's on", ignores 8pm
     expect(detectAiringHorizon('anything good after 8')).toBeNull();
+  });
+});
+
+describe('count parsing', () => {
+  it('reads explicit numbers and words', () => {
+    expect(extractCount('give me five movies')).toBe(5);
+    expect(extractCount('show me 3 shows')).toBe(3);
+    expect(extractCount('a good movie')).toBeNull();
+    expect(parseRequestedCount('a good movie')).toBe(8); // default
+  });
+  it('reads fuzzy spoken counts "a couple"/"a few"', () => {
+    expect(extractCount('a couple of movies on Netflix')).toBe(2);
+    expect(extractCount('show me a few thrillers')).toBe(3);
+    expect(parseRequestedCount('a couple of movies')).toBe(2);
   });
 });
 

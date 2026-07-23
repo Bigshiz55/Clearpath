@@ -1,18 +1,18 @@
 {
-  "runId": "20260723T113023Z",
+  "runId": "20260723T113247Z",
   "mode": "standard",
   "split": "development",
   "seed": null,
   "cases": 500,
-  "passRate": 0.986,
-  "composite": 0.9267826744613583,
+  "passRate": 0.99,
+  "composite": 0.9280493411280247,
   "passed": false,
   "criticalBreaches": [
     {
       "metric": "hardViolationRate",
-      "value": 0.01,
+      "value": 0.006,
       "threshold": 0.005
     }
   ],
-  "generatedAt": "2026-07-23T11:30:23.930Z"
+  "generatedAt": "2026-07-23T11:32:47.235Z"
 }

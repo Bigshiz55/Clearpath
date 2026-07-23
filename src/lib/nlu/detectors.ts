@@ -25,24 +25,32 @@ const NUM_WORDS: Record<string, number> = {
 /** The default result count when none is stated. Mirrors askParse. */
 export const DEFAULT_COUNT = 8;
 
-/** A requested result count from the ask ("five …" → 5). Default 8.
- *  Extracted verbatim from askParse so build-case/ask/finder share one parser. */
-export function parseRequestedCount(text: string): number {
-  const m = text.toLowerCase().match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})\b/);
-  if (!m || !m[1]) return DEFAULT_COUNT;
-  const n = NUM_WORDS[m[1]] ?? Number.parseInt(m[1], 10);
-  return Number.isFinite(n) && n >= 1 && n <= 20 ? n : DEFAULT_COUNT;
+/** Fuzzy spoken counts people actually say. Checked before the numeric parse so
+ *  "a couple of movies" → 2 rather than falling through to the default. */
+function fuzzyCount(text: string): number | null {
+  const t = ` ${text.toLowerCase()} `;
+  if (/\b(a\s+)?couple\b/.test(t)) return 2;
+  if (/\b(a\s+)?few\b/.test(t)) return 3;
+  return null;
 }
 
 /** Like parseRequestedCount but returns null when no count word/number is
  *  present (so the evaluator can distinguish "user said nothing" from a
- *  defaulted 8). Same first-number semantics — reproduces the known bug where
- *  "last 5 years" is misread as a count. */
+ *  defaulted 8). Reads "a couple"/"a few" too; otherwise first-number semantics
+ *  (which still reproduces the known "last 5 years" → 5 misread). */
 export function extractCount(text: string): number | null {
+  const fuzzy = fuzzyCount(text);
+  if (fuzzy != null) return fuzzy;
   const m = text.toLowerCase().match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})\b/);
   if (!m || !m[1]) return null;
   const n = NUM_WORDS[m[1]] ?? Number.parseInt(m[1], 10);
   return Number.isFinite(n) && n >= 1 && n <= 20 ? n : null;
+}
+
+/** A requested result count from the ask ("five …" → 5, "a couple" → 2).
+ *  Default 8. Shared by build-case/ask/finder. */
+export function parseRequestedCount(text: string): number {
+  return extractCount(text) ?? DEFAULT_COUNT;
 }
 
 /**
