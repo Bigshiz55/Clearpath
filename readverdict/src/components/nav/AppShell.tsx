@@ -36,10 +36,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <Link
-            href="/ask"
+            href="/search"
             className="hidden rounded-lg bg-brass-500 px-4 py-2 text-sm font-semibold text-obsidian-950 shadow-brass transition hover:bg-brass-400 md:inline-flex"
           >
-            Ask ReadVerdict
+            Put a book on trial
           </Link>
         </Container>
       </header>

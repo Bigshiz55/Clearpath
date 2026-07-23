@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { AppShell } from '@/components/nav/AppShell';
+import { StoreProvider } from '@/lib/store/StoreProvider';
 import { siteUrl } from '@/lib/env';
 import './globals.css';
 
@@ -30,7 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body>
-        <AppShell>{children}</AppShell>
+        <StoreProvider>
+          <AppShell>{children}</AppShell>
+        </StoreProvider>
       </body>
     </html>
   );

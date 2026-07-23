@@ -2,29 +2,23 @@ import type { NavIcon } from '@/config/nav';
 
 const paths: Record<NavIcon, React.ReactNode> = {
   home: <path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1v-8.5Z" />,
-  ask: (
+  search: (
     <>
-      <path d="M12 3a5 5 0 0 0-5 5v3a5 5 0 0 0 10 0V8a5 5 0 0 0-5-5Z" />
-      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-3.2-3.2" />
     </>
   ),
-  discover: (
+  courtroom: (
     <>
-      <circle cx="12" cy="12" r="8" />
-      <path d="m14.5 9.5-2 5-5 2 2-5 5-2Z" />
+      <path d="M12 3v18M7 21h10" />
+      <path d="M5 8l4-2 4 2M5 8l2 4h-4l2-4ZM19 8l-4-2M19 8l2 4h-4l2-4Z" />
+      <path d="M9 6l6-3" />
     </>
   ),
   books: (
     <>
       <path d="M4 5.5C6.5 4.3 9.5 4.3 12 5.5v13c-2.5-1.2-5.5-1.2-8 0v-13Z" />
       <path d="M20 5.5C17.5 4.3 14.5 4.3 12 5.5v13c2.5-1.2 5.5-1.2 8 0v-13Z" />
-    </>
-  ),
-  together: (
-    <>
-      <circle cx="8" cy="9" r="3" />
-      <circle cx="16" cy="9" r="3" />
-      <path d="M3 20c0-2.8 2.2-5 5-5s5 2.2 5 5M13 20c0-2.8 2.2-5 5-5s3 1 3 1" />
     </>
   ),
   profile: (

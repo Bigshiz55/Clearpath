@@ -1,56 +1,50 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { SECONDARY_NAV } from '@/config/nav';
+import { ImportPanel } from '@/components/import/ImportPanel';
+import { DataControls } from '@/components/profile/DataControls';
 
 export const metadata: Metadata = { title: 'Profile' };
-
-const SETTINGS = [
-  'Reader DNA',
-  'Friends',
-  'Reading-service value',
-  'Badges',
-  'Language & Region',
-  'Privacy & Data',
-  'Account settings',
-];
 
 export default function ProfilePage() {
   return (
     <div className="animate-fade-up space-y-8">
       <PageHeader
         eyebrow="Profile"
-        title="You, and how ReadVerdict sees you"
-        description="Your identity, preferences, privacy controls, and the secondary areas of the app."
+        title="You, and your data"
+        description="Import your reading history, tune your Reader DNA, and control your data. No account required to start."
       />
 
-      <nav aria-label="Secondary" className="grid gap-2 sm:grid-cols-2">
-        {SECONDARY_NAV.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="card flex items-center justify-between p-4 transition hover:border-brass-500/40"
-          >
-            <span className="font-medium text-ivory-100">{item.label}</span>
-            <span aria-hidden className="text-ivory-400">→</span>
-          </Link>
-        ))}
-      </nav>
+      <section>
+        <div className="mb-3 flex items-center gap-3">
+          <span className="exhibit-label">Import</span>
+          <h2 className="font-display text-xl font-semibold text-ivory-50">Import your reading history</h2>
+        </div>
+        <p className="mb-3 text-sm text-ivory-300">
+          Upload an official Goodreads or StoryGraph export, or paste a list. The raw rows are preserved,
+          duplicates are flagged, and nothing low-confidence is added silently.
+        </p>
+        <ImportPanel />
+      </section>
 
-      <div className="flex flex-wrap gap-2">
-        {SETTINGS.map((s) => (
-          <span key={s} className="pill">
-            {s}
-          </span>
-        ))}
-      </div>
+      <section>
+        <div className="mb-3 flex items-center gap-3">
+          <span className="exhibit-label">Reader DNA</span>
+          <h2 className="font-display text-xl font-semibold text-ivory-50">Tune your profile</h2>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/onboarding" className="btn-brass">Take the Reader Interview</Link>
+          <Link href="/reader-dna" className="btn-ghost">View Reader DNA</Link>
+        </div>
+      </section>
 
-      <EmptyState
-        phase="Phase 5 / 10"
-        title="Sign-in and privacy controls coming"
-        body="Accounts (Supabase Auth), personalization controls, and understandable privacy settings — analytics, personalization, voice-transcript retention, data export, deletion, and Reader DNA reset — arrive in Phase 5 and Phase 10."
-      />
+      <section>
+        <div className="mb-3 flex items-center gap-3">
+          <span className="exhibit-label">Privacy</span>
+          <h2 className="font-display text-xl font-semibold text-ivory-50">Data &amp; privacy</h2>
+        </div>
+        <DataControls />
+      </section>
     </div>
   );
 }

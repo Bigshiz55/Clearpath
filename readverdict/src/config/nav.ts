@@ -1,15 +1,13 @@
-// Single source of truth for primary navigation. Desktop and mobile expose
-// different subsets/orders per the product spec, but both reference these
-// canonical destinations.
+// Single source of truth for primary navigation. The product is trial-centric:
+// search a book → put it on trial → get the verdict.
 
 export type NavIcon =
   | 'home'
-  | 'ask'
-  | 'discover'
+  | 'search'
+  | 'courtroom'
   | 'books'
-  | 'together'
-  | 'profile'
-  | 'dna';
+  | 'dna'
+  | 'profile';
 
 export interface NavItem {
   href: string;
@@ -17,25 +15,24 @@ export interface NavItem {
   icon: NavIcon;
 }
 
-/** Desktop top navigation: Ask · Discover · My Books · Read Together · Profile. */
+/** Desktop top navigation. */
 export const DESKTOP_NAV: readonly NavItem[] = [
-  { href: '/ask', label: 'Ask', icon: 'ask' },
-  { href: '/discover', label: 'Discover', icon: 'discover' },
+  { href: '/search', label: 'Search', icon: 'search' },
+  { href: '/courtroom', label: 'Courtroom', icon: 'courtroom' },
   { href: '/my-books', label: 'My Books', icon: 'books' },
-  { href: '/together', label: 'Read Together', icon: 'together' },
+  { href: '/reader-dna', label: 'Reader DNA', icon: 'dna' },
   { href: '/profile', label: 'Profile', icon: 'profile' },
 ] as const;
 
-/** Mobile bottom navigation: Home · Ask · My Books · Together · Profile. */
+/** Mobile bottom navigation. */
 export const MOBILE_NAV: readonly NavItem[] = [
   { href: '/', label: 'Home', icon: 'home' },
-  { href: '/ask', label: 'Ask', icon: 'ask' },
+  { href: '/search', label: 'Search', icon: 'search' },
+  { href: '/courtroom', label: 'Courtroom', icon: 'courtroom' },
   { href: '/my-books', label: 'My Books', icon: 'books' },
-  { href: '/together', label: 'Together', icon: 'together' },
   { href: '/profile', label: 'Profile', icon: 'profile' },
 ] as const;
 
-/** Secondary destinations surfaced from Profile / elsewhere. */
 export const SECONDARY_NAV: readonly NavItem[] = [
   { href: '/reader-dna', label: 'Reader DNA', icon: 'dna' },
 ] as const;
