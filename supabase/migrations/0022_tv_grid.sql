@@ -12,9 +12,16 @@ create table if not exists public.tv_grid (
   airstamp     timestamptz not null,         -- UTC start
   runtime      integer,                      -- minutes
   is_movie     boolean     not null default false,
+  image        text,                         -- poster art (TMS/Gracenote CDN)
+  summary      text,                         -- short synopsis
   refreshed_at timestamptz not null default now(),
   unique (call_sign, airstamp)
 );
+
+-- Re-run safe: add the art/synopsis columns if an earlier version of this table
+-- already exists without them.
+alter table public.tv_grid add column if not exists image   text;
+alter table public.tv_grid add column if not exists summary text;
 
 create index if not exists tv_grid_airstamp_idx    on public.tv_grid (airstamp);
 create index if not exists tv_grid_network_key_idx on public.tv_grid (network_key);

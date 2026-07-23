@@ -25,6 +25,8 @@ interface TvGridDbRow {
   airstamp: string;
   runtime: number | null;
   is_movie: boolean;
+  image: string | null;
+  summary: string | null;
   refreshed_at: string;
 }
 
@@ -45,8 +47,8 @@ function toAiring(r: TvGridDbRow): Airing {
     showType: r.is_movie ? 'Movie' : 'Series',
     genres: [],
     rating: null,
-    image: null,
-    summary: null,
+    image: r.image ?? null,
+    summary: r.summary ?? null,
     imdb: null,
   };
 }
@@ -80,6 +82,8 @@ export async function refreshTvGrid(): Promise<{ ok: boolean; rows: number; erro
     airstamp: r.airstamp,
     runtime: r.runtime,
     is_movie: r.isMovie,
+    image: r.image,
+    summary: r.summary,
     refreshed_at: refreshedAt,
   }));
 
@@ -120,7 +124,7 @@ export async function getStoredGridAirings(
   try {
     let q = admin
       .from('tv_grid')
-      .select('call_sign, network, network_key, show_name, airstamp, runtime, is_movie, refreshed_at')
+      .select('call_sign, network, network_key, show_name, airstamp, runtime, is_movie, image, summary, refreshed_at')
       .gte('airstamp', from)
       .lte('airstamp', to)
       .order('airstamp', { ascending: true })

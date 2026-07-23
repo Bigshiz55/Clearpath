@@ -29,7 +29,16 @@ interface GnEvent {
   startTime?: string; // ISO UTC
   duration?: string; // minutes (string)
   filter?: string[]; // e.g. ["filter-movie"], ["filter-news"]
-  program?: { title?: string } | null;
+  thumbnail?: string; // TMS image asset id, e.g. "p27366651_v_v13_aa"
+  program?: { title?: string; shortDesc?: string; releaseYear?: string } | null;
+}
+
+// Gracenote/TMS poster art CDN. The event's `thumbnail` is an asset id; the CDN
+// resizes on the fly with ?w=. This is what fills the placards.
+const IMG_BASE = 'https://demo.tmsimg.com/assets';
+function imageUrl(thumb: string | undefined): string | null {
+  if (!thumb || !/^[\w-]+$/.test(thumb)) return null;
+  return `${IMG_BASE}/${thumb}.jpg?w=360`;
 }
 interface GnChannel {
   callSign?: string;
@@ -256,8 +265,8 @@ export async function getGracenoteAirings(
           showType: isMovie ? 'Movie' : 'Series',
           genres: [],
           rating: null,
-          image: null,
-          summary: null,
+          image: imageUrl(e.thumbnail),
+          summary: e.program?.shortDesc ?? null,
           imdb: null,
         });
       }
@@ -274,6 +283,8 @@ export interface GridRow {
   airstamp: string; // ISO UTC
   runtime: number | null;
   isMovie: boolean;
+  image: string | null;
+  summary: string | null;
 }
 
 /**
@@ -309,6 +320,8 @@ export async function fetchGridForStore(nowMs: number, horizonMs: number): Promi
           airstamp: e.startTime,
           runtime: Number.isFinite(dur) ? dur : null,
           isMovie: (e.filter ?? []).includes('filter-movie'),
+          image: imageUrl(e.thumbnail),
+          summary: e.program?.shortDesc ?? null,
         });
       }
     }
