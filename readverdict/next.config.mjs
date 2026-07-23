@@ -9,7 +9,7 @@ const nextConfig = {
       { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
       {
         key: 'Permissions-Policy',
-        // Microphone stays available for the voice-friendly "Ask" surface.
+        // Microphone stays available for voice search.
         value: 'camera=(), geolocation=()',
       },
       {
@@ -21,7 +21,7 @@ const nextConfig = {
       { source: '/:path*', headers: securityHeaders },
       // Never cache authenticated responses once auth lands.
       {
-        source: '/(ask|my-books|together|profile|reader-dna)/:path*',
+        source: '/(search|courtroom|my-books|reader-dna|onboarding|profile)/:path*',
         headers: [{ key: 'Cache-Control', value: 'private, no-store' }],
       },
     ];
