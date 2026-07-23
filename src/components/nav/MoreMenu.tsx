@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useT } from '@/i18n/I18nProvider';
 
 export interface NavLink {
   href: string;
@@ -15,6 +16,7 @@ export function MoreMenu({ links }: { links: NavLink[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const t = useT();
 
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
@@ -36,7 +38,7 @@ export function MoreMenu({ links }: { links: NavLink[] }) {
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        More <span className={`ml-0.5 inline-block transition ${open ? 'rotate-180' : ''}`}>▾</span>
+        {t('nav.more')} <span className={`ml-0.5 inline-block transition ${open ? 'rotate-180' : ''}`}>▾</span>
       </button>
       {open && (
         <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-white/10 bg-ink-850 p-1 shadow-card">

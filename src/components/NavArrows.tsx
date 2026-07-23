@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useT } from '@/i18n/I18nProvider';
 
 /**
  * A single contextual "Back" affordance for /app screens.
@@ -18,6 +19,7 @@ import { useEffect, useState } from 'react';
 export function NavArrows() {
   const router = useRouter();
   const pathname = usePathname();
+  const t = useT();
   const [canBack, setCanBack] = useState(false);
   const onHome = pathname === '/app';
 
@@ -33,9 +35,9 @@ export function NavArrows() {
         type="button"
         onClick={() => router.back()}
         className="btn-ghost inline-flex items-center gap-1.5 text-slate-300"
-        aria-label="Go back to the previous page"
+        aria-label={t('nav.back')}
       >
-        <span aria-hidden className="text-lg leading-none">←</span> Back
+        <span aria-hidden className="text-lg leading-none">←</span> {t('nav.back')}
       </button>
     </div>
   );

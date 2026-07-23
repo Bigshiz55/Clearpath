@@ -4,6 +4,9 @@ import { getProfile, ensureGuestProfile, personalLabelFor, getAvatar } from '@/l
 import { isPro } from '@/lib/pro';
 import { Nav } from '@/components/Nav';
 import { NavArrows } from '@/components/NavArrows';
+import { getServerI18n, ENGLISH_MESSAGES } from '@/i18n/server';
+import { I18nProvider } from '@/i18n/I18nProvider';
+import { HtmlLang } from '@/i18n/HtmlLang';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,16 +47,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const sha = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7) || 'dev';
   const ref = process.env.VERCEL_GIT_COMMIT_REF ?? '';
 
+  const i18n = getServerI18n();
+
   return (
-    <div className="min-h-dvh pb-20 sm:pb-0">
-      <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} pro={pro} avatarLabel={avatarLabel} />
-      <main className="container-page py-6">
-        <NavArrows />
-        {children}
-        <div className="mt-10 text-center text-[10px] tracking-wide text-slate-600">
-          build {sha}{ref ? ` · ${ref.replace(/^.*\//, '')}` : ''}
-        </div>
-      </main>
-    </div>
+    <I18nProvider locale={i18n.locale} messages={i18n.messages} fallback={ENGLISH_MESSAGES}>
+      <HtmlLang lang={i18n.language} />
+      <div className="min-h-dvh pb-20 sm:pb-0">
+        <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} pro={pro} avatarLabel={avatarLabel} />
+        <main className="container-page py-6">
+          <NavArrows />
+          {children}
+          <div className="mt-10 text-center text-[10px] tracking-wide text-slate-600">
+            build {sha}{ref ? ` · ${ref.replace(/^.*\//, '')}` : ''}
+          </div>
+        </main>
+      </div>
+    </I18nProvider>
   );
 }

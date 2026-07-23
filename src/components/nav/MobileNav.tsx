@@ -7,7 +7,7 @@ import type { NavLink } from './MoreMenu';
 
 /** Mobile bottom bar: primary links inline + a "More" sheet for the rest, so the
  *  bar never gets crowded past the point of usability. */
-export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondary: NavLink[] }) {
+export function MobileNav({ primary, secondary, moreLabel = 'More' }: { primary: NavLink[]; secondary: NavLink[]; moreLabel?: string }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -53,7 +53,7 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
           aria-haspopup="menu"
           aria-expanded={open}
         >
-          More
+          {moreLabel}
         </button>
       </nav>
     </>
