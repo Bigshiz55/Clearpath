@@ -25,7 +25,12 @@
     "eval:watchverdict:live": "node eval/cli.mjs live",
     "eval:watchverdict:baseline": "node eval/cli.mjs baseline",
     "eval:watchverdict:compare": "node eval/cli.mjs compare",
-    "eval:watchverdict:optimize": "node eval/cli.mjs optimize"
+    "eval:watchverdict:optimize": "node eval/cli.mjs optimize",
+    "search-lab:baseline": "node eval/searchlab/cli.mjs baseline",
+    "search-lab:gated": "node eval/searchlab/cli.mjs gated",
+    "search-lab:regression": "node eval/searchlab/cli.mjs regression",
+    "search-lab:holdout": "node eval/searchlab/cli.mjs holdout",
+    "search-lab:compare": "node eval/searchlab/cli.mjs compare"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
