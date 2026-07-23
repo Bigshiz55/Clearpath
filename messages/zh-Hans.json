@@ -1,0 +1,27 @@
+{
+  "nav": {
+    "ask": "问一问",
+    "discover": "发现",
+    "onTv": "电视节目",
+    "saved": "已保存",
+    "together": "一起选",
+    "home": "首页",
+    "profile": "我的",
+    "more": "更多",
+    "newReleases": "新片上架",
+    "watchDna": "你的观影 DNA",
+    "chambers": "我的法庭",
+    "subscriptionCheck": "订阅检查",
+    "friends": "好友",
+    "reminders": "我的提醒",
+    "back": "返回",
+    "pro": "Pro"
+  },
+  "common": {
+    "languageRegion": "语言与地区",
+    "language": "语言",
+    "region": "地区",
+    "save": "保存",
+    "cancel": "取消"
+  }
+}

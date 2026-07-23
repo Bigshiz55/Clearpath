@@ -1,0 +1,27 @@
+{
+  "nav": {
+    "ask": "Ask",
+    "discover": "Discover",
+    "onTv": "On TV",
+    "saved": "Saved",
+    "together": "Together",
+    "home": "Home",
+    "profile": "Profile",
+    "more": "More",
+    "newReleases": "New Releases",
+    "watchDna": "Your Watch DNA",
+    "chambers": "Chambers",
+    "subscriptionCheck": "Subscription check",
+    "friends": "Friends",
+    "reminders": "My reminders",
+    "back": "Back",
+    "pro": "Pro"
+  },
+  "common": {
+    "languageRegion": "Language & Region",
+    "language": "Language",
+    "region": "Region",
+    "save": "Save",
+    "cancel": "Cancel"
+  }
+}

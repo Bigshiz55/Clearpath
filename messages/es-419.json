@@ -1,0 +1,27 @@
+{
+  "nav": {
+    "ask": "Preguntar",
+    "discover": "Descubrir",
+    "onTv": "En TV",
+    "saved": "Guardados",
+    "together": "En grupo",
+    "home": "Inicio",
+    "profile": "Perfil",
+    "more": "Más",
+    "newReleases": "Novedades",
+    "watchDna": "Tu ADN de cine",
+    "chambers": "Tu despacho",
+    "subscriptionCheck": "Revisar suscripciones",
+    "friends": "Amigos",
+    "reminders": "Mis recordatorios",
+    "back": "Atrás",
+    "pro": "Pro"
+  },
+  "common": {
+    "languageRegion": "Idioma y región",
+    "language": "Idioma",
+    "region": "Región",
+    "save": "Guardar",
+    "cancel": "Cancelar"
+  }
+}
