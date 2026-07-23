@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { qrForUrl } from '@/lib/actions/qr';
 import { getMyTaste, type MyTaste } from '@/lib/actions/profile';
+import { CourtInviteBox } from '@/components/court/CourtInviteBox';
 
 const MOODS = [
   { key: 'any', label: 'Anything', emoji: '🎬' }, { key: 'light', label: 'Light', emoji: '🌤️' },
@@ -50,18 +51,13 @@ export function LiveCourt({ code }: { code: string }) {
   const [gaveled, setGaveled] = useState(false);
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Canonical court URL generated from the active court id (same-origin, HTTPS in
+  // production) — this is the invite link shared/copied.
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/court/${code}` : '';
   async function showQr() {
     if (!shareUrl) return;
+    if (qr) { setQr(null); return; } // toggle off
     setQr(await qrForUrl(shareUrl));
-  }
-  async function invite() {
-    if (!shareUrl) return;
-    const share = (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share;
-    if (share) {
-      try { await share({ title: 'Join my WatchVerdict Court', text: 'Help us pick what to watch — tap to join:', url: shareUrl }); return; } catch { /* cancelled */ }
-    }
-    try { await navigator.clipboard?.writeText(shareUrl); setErr(null); } catch { /* ignore */ }
   }
 
   useEffect(() => {
@@ -260,15 +256,7 @@ export function LiveCourt({ code }: { code: string }) {
             ))}
           </div>
 
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
-            <div className="text-xs font-semibold text-slate-300">Invite the others</div>
-            <div className="mt-2 flex items-center justify-center gap-2">
-              <button onClick={invite} className="btn-primary text-sm">📨 Send invite</button>
-              <button onClick={showQr} className="btn-secondary text-sm">{qr ? 'Hide QR' : 'QR code'}</button>
-            </div>
-            {qr && <div className="mx-auto mt-3 h-44 w-44 rounded-lg bg-white p-2" dangerouslySetInnerHTML={{ __html: qr }} />}
-            <p className="mt-2 break-all text-[11px] text-slate-400">{shareUrl}</p>
-          </div>
+          <CourtInviteBox url={shareUrl} qr={qr} onToggleQr={showQr} />
 
           {err && <p className="mt-3 text-xs text-red-300">{err}</p>}
 
