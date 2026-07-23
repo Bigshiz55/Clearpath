@@ -86,6 +86,10 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   function hitGavel() {
     if (busy || text.trim().length < 4) return;
     setSlam(true);
+    // A sharp "thwack" buzz timed to the strike (Android; a no-op on iOS Safari).
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      window.setTimeout(() => navigator.vibrate?.([0, 35, 25, 15]), 350);
+    }
     void submit().finally(() => setSlam(false));
   }
 
@@ -143,15 +147,17 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         <Link href="/app/mentalist" className={hero ? 'text-sm font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline' : 'text-xs font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline'}>
           Or just name a few shows you love — we’ll figure out your taste →
         </Link>
+        {/* Full-screen flash the instant the gavel lands. */}
+        {slam && <div aria-hidden className="wv-screen-flash pointer-events-none fixed inset-0 z-[200] bg-white" />}
         <div className="relative shrink-0">
           {slam && (
             <>
               {/* The big gavel that drops in and slams the button. */}
-              <span aria-hidden className="wv-gavel-drop pointer-events-none absolute left-1/2 top-0 z-20 text-white drop-shadow-[0_10px_16px_rgba(0,0,0,0.6)]">
-                <Gavel className="h-16 w-16" />
+              <span aria-hidden className="wv-gavel-drop pointer-events-none absolute left-1/2 top-0 z-20 text-white drop-shadow-[0_12px_20px_rgba(0,0,0,0.65)]">
+                <Gavel className="h-24 w-24" />
               </span>
               {/* Shock ring on impact. */}
-              <span aria-hidden className="wv-strike-ring pointer-events-none absolute left-1/2 top-1/2 z-10 h-14 w-14 rounded-full border-[3px] border-brand-200" />
+              <span aria-hidden className="wv-strike-ring pointer-events-none absolute left-1/2 top-1/2 z-10 h-20 w-20 rounded-full border-[3px] border-brand-200" />
             </>
           )}
           <button
