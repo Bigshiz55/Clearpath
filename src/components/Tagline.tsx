@@ -12,8 +12,8 @@ export function Tagline({ className = '' }: { className?: string }) {
     <p className={`font-bold tracking-tight ${className}`} aria-label="Thousands of choices, one verdict">
       <span aria-hidden>
         <span className="text-slate-400">Thousands of choices, </span>
-        <span className="text-white">one </span>
-        <span className="font-black text-[#ff1493]">
+        <span className="whitespace-nowrap text-white">one </span>
+        <span className="inline-block whitespace-nowrap font-black text-[#ff1493]">
           VERD
           <span className="wv-iflip">
             <span className="wv-iflip-inner">
