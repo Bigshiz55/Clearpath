@@ -1,165 +1,130 @@
 # ReadVerdict — Architecture
 
-This document is the durable design reference. Phase 1 establishes the skeleton;
-later phases fill it in. Where something is **not yet built**, it is labeled
-_(planned — Phase N)_ so this file never overstates what exists.
+The durable design reference. Where something is mocked or planned it is labelled
+so this file never overstates what exists. Companion docs live in [`docs/`](./docs).
 
 ## 1. Product thesis
 
-ReadVerdict is a **decision service**, not a catalog. Every surface exists to
-answer one question:
+A **decision service**, not a catalog. One question: *is this book worth
+committing my next several hours to?* The signature experience puts each book
+**on trial** and returns a decisive **verdict**. Guardrails hold everywhere:
+prefer fewer qualified results; never let popularity substitute for relevance;
+never fabricate a statistic.
 
-> _"What should I read next, given exactly what I asked for, my durable taste,
-> how much time and attention I have, the format I prefer, what I can access,
-> and who I may be reading with?"_
+## 2. The four models (kept separate)
 
-Design consequences that hold from Phase 1:
-
-- Prefer **fewer, qualified** results over a padded grid.
-- **Never fabricate** book data (ratings, availability, attributes). Missing
-  data is labeled, not invented.
-- Popularity is never a substitute for relevance; a persuasive explanation
-  never rescues a weak match.
-
-## 2. The four DNA models (kept separate on purpose)
-
-These are **never** collapsed into a single score or embedding. Phase 1 defines
-the vocabulary; the schemas and stores arrive in Phases 3–5.
-
-| Model | Question it answers | Lifetime | Phase |
+| Model | Question | Lifetime | Where |
 | --- | --- | --- | --- |
-| **Book DNA** | What is objectively true about this book? | Durable per title | 3 |
-| **Reader DNA** | What are this reader's durable preferences? | Durable per user | 5 |
-| **Reading Session DNA** | What does the reader want _right now_? | Ephemeral per request/session | 4 |
-| **Search DNA** | What does the current request _mean_? | Ephemeral per request | 4 |
+| **Book DNA** | What is true about this book? | Durable per work | `domain/book.ts`, inferred in `dna/inferBookDna.ts` |
+| **Reader DNA** | The reader's durable taste? | Durable per user | `domain/readerDna.ts` |
+| **Reading Session DNA** | What they want right now? | Ephemeral | (modeled via Reading Appeal + session context) |
+| **Search DNA** | What the request means? | Ephemeral | (query normalization; expands in a later pass) |
 
-Each Book DNA attribute carries: stable identifier, value, **salience**,
-**confidence**, evidence source, provenance, and last-updated time. Attributes
-are never invented to justify an explanation.
+They are never collapsed into one embedding.
 
-Reader DNA distinguishes **explicit** vs **inferred** signals and tracks
-confidence per dimension — it must never display false confidence from a small
-sample. A single click is not a permanent preference.
+## 3. Data model & honesty (Phase 3)
 
-Reading Session DNA (temporary: "quick read", "audiobook for driving", a page
-cap, a mood) must **not** silently promote itself into durable Reader DNA.
+- **Work vs Edition** (`domain/book.ts`): a conceptual work owns many editions
+  (hardcover/paperback/ebook/audiobook/translation) that differ in identifiers,
+  page counts, narrators, publishers, dates, availability, and covers.
+- **Provenance & confidence** (`domain/provenance.ts`, `confidence.ts`): every
+  externally-sourced or derived field is a `SourcedValue<T>` carrying source,
+  original value, timestamps, region/edition scope, an evidence **status**
+  (`confirmed | sourced | user-supplied | inferred | estimated | ai-generated |
+  insufficient`), and a 0–1 **confidence**. Conflicts are **preserved, never
+  overwritten** (`resolveConflict` picks a winner by source priority and keeps
+  the losers).
+- **ISBN** (`domain/isbn.ts`): validation + 10↔13 conversion + canonicalization,
+  the backbone of edition identity.
+- **Entity resolution** (`domain/entityResolution.ts`): matches by identifiers
+  and a confidence blend of title/author/year — and **never merges similar
+  titles without a shared author**. See [`docs/DATA_MODEL.md`](./docs/DATA_MODEL.md).
 
-## 3. Verdict taxonomy
+## 4. Providers & imports (Phase 4)
 
-Working tiers (subject to product review), defined in
-[`src/lib/verdict/tiers.ts`](./src/lib/verdict/tiers.ts) and unit-tested:
+- **Adapter interface** (`providers/types.ts`) with an honest `DataState`
+  (`no_data | provider_failure | genuine_zero | insufficient_sample | …`) so
+  "unavailable" is never rendered as zero.
+- **Registry** (`providers/registry.ts`): caching, retries with backoff,
+  cross-provider fallback, health — time/sleep injected for deterministic tests.
+- **Open Library** real adapter (keyless, server-only) + **labelled mock**
+  fallback. Normalization maps a `ProviderBook` → domain `Work`+`Edition` with
+  provenance. New vendors slot in as adapters — see
+  [`docs/PROVIDERS.md`](./docs/PROVIDERS.md).
+- **Imports** (`import/`): RFC-4180 CSV parser; Goodreads & StoryGraph mappers;
+  ISBN/title lists; duplicate detection; raw rows preserved. See
+  [`docs/IMPORT.md`](./docs/IMPORT.md).
 
-`Must Read` › `Strong Yes` › `Worth a Look` › `Maybe` › `Probably Pass`
+## 5. Reader DNA (Phases 3 & 5)
 
-`tierForScore()` maps a personalized 0–100 score to a tier; the mapping is
-total, monotonic, and clamps out-of-range/NaN input.
+31 evolving dimensions, each a `DimensionState` (value, confidence, evidence
+count, supporting/contradicting, stability, user-confirmed). Observations fold in
+via an evidence-weighted mean; confidence rises with agreeing evidence and never
+overstates thin data; users can confirm/correct any dimension; explanations are
+evidence-grounded. See [`docs/READER_DNA.md`](./docs/READER_DNA.md).
 
-## 4. Book similarity _(planned — Phase 4)_
+## 6. The Book Trial & prediction (Phases 5–6)
 
-"Books like this" must not reduce to genre, popularity, same author, or a single
-embedding. Similarity is expressed through explicit **lenses** — same story
-structure, same emotional payoff, same prose feeling, same narrative voice, same
-mystery construction, same reading commitment, etc.
+Pure, deterministic, explainable (`trial/`):
 
-Rules that will be enforced:
+- **match** — Reader DNA × Book DNA alignment → 1–100 score with signed per-axis
+  contributions (`match` targets vs `ceiling` tolerances) and coverage-based
+  confidence.
+- **predict** — a transparent weighted-heuristic **finish probability / DNF
+  risk** with hook point, struggle point, and +/- factors; qualitative and
+  low-confidence when evidence is thin (explicitly **not** a trained-ML claim).
+- **trial** — composes defendant, personalized charges, prosecution, defense,
+  evidence (each status-tagged), witnesses, jury, verdict (13 decisive calls),
+  and sentence. Data we lack (completion/DNF/cohort) is `insufficient` with a
+  null value; the jury is `modeled-similarity`, never a fake N–M tally.
+- **crossExamination** — spoiler-gated Q&A distinguishing inference from sourced
+  fact; refuses to fabricate.
 
-- Exclude the seed book unless inclusion is requested.
-- A high Reader DNA score cannot rescue a book that fails a required
-  seed-similarity threshold.
-- Return fewer books rather than padding with weak matches.
+## 7. Persistence (local now, Supabase-ready)
 
-## 5. Recommendation pipeline _(planned — Phase 4)_
+`store/` is a React context + pure reducer + `localStorage`, holding Reader DNA,
+library, appeals, events, consent — so the whole product works with **no
+credentials**. The same shapes map onto the Supabase tables in
+`supabase/migrations/0001_init.sql` (RLS on every user table); a server-backed
+repository can replace the local one behind the same hooks once auth is
+configured. See [`docs/PRIVACY.md`](./docs/PRIVACY.md).
 
-Deterministic ordering, so behavior is testable by the Search Lab (Phase 11):
+## 8. Application surfaces (Phases 9–12)
 
-1. Interpret the request → **Search DNA**
-2. Resolve titles / authors / series / entities
-3. Identify hard constraints
-4. Retrieve candidates from multiple sources
-5. Verify metadata
-6. Apply hard constraints
-7. Apply seed-book similarity qualification
-8. Apply contradiction penalties
-9. Remove unqualified candidates
-10. Apply Reader DNA
-11. Apply Reading Session DNA
-12. Apply diversity & series controls
-13. Rank valid candidates
-14. Generate evidence-grounded explanations
+Mobile-first shell (`components/nav/AppShell.tsx`): desktop top bar + fixed
+mobile tab bar, skip link, safe-area, reduced motion. Routes: **Home, Search,
+Courtroom, Trial, My Books, Reader DNA, Onboarding, Profile** (+ internal
+`/style-guide`). Real state coverage: loading (skeletons), empty, error, low
+confidence, import preview/success, provider failure, no-match.
 
-## 6. Application shell (Phase 1 — built)
+## 9. Analytics, consent & evaluation (Phases 8, 10, 14)
 
-- **Root layout** (`src/app/layout.tsx`) wraps everything in `AppShell`.
-- **`AppShell`** provides a skip link, a sticky desktop top bar, and a fixed
-  mobile bottom tab bar (hidden on desktop), with safe-area padding.
-- **Navigation** is defined once in `src/config/nav.ts`:
-  - Desktop: Ask · Discover · My Books · Read Together · Profile
-  - Mobile: Home · Ask · My Books · Together · Profile
-  - Secondary (from Profile): Reader DNA
-- **Component library** (`src/components/ui/`, Phase 2): `Button` (polymorphic
-  button/link, 4 variants × 3 sizes), `Card`, `Chip` + editable
-  `InterpretationChip`, `Field`/`Input`/`Textarea`, `Avatar` (deterministic
-  tint), `Skeleton` family, `Spinner`, `StatusPill`, `ScoreDial`, `Rating`,
-  `SegmentedControl`, `Divider`, `VisuallyHidden`, plus `Container`,
-  `PageHeader`, `EmptyState`, `ErrorState`, `VerdictBadge`. Pure logic behind
-  the visual components lives in `src/lib/ui/` (initials, dial geometry, star
-  breakdown) and is unit-tested.
-- **States**: global `loading` (Spinner), `error`, `not-found`; inline
-  `EmptyState`/`ErrorState`/skeletons for section-level states.
-- **Style guide**: `/style-guide` renders the whole library (noindex, not in
-  the product nav) for visual verification.
+- **Taxonomy** (`analytics/events.ts`): semantic events with versions and
+  allow-listed props; `validateEvent` strips forbidden keys (passwords, tokens,
+  email, payment, private exclusions, raw audio). The store's `track()` enforces
+  it **and respects consent** (analytics off by default).
+- **Search Lab** (`lib/lab/`): synthetic reader archetypes × book fixtures run
+  through the real engine; quality metrics + hard-constraint expectations as
+  regression guardrails; `npm run search-lab:*`.
 
-## 7. Data & auth _(planned — Phase 5)_
+## 10. Visual identity
 
-- Supabase clients exist now (`src/lib/supabase/{server,client}.ts`) and return
-  `null` until configured, so the UI renders unauthenticated without crashing.
-- When auth lands: verify identity with `supabase.auth.getUser()` (never trust
-  `getSession()` alone); protect the app surfaces via middleware; enforce RLS on
-  every user table.
+A literary Verdict-family system distinct from WatchVerdict: Deep Library Green +
+Dark Ink surfaces, warm parchment type, burnished copper and evidence gold
+accents, oxblood for objections; editorial serif display + legible sans; subtle
+courtroom motifs (fine rules, exhibit labels, docket stamps, embossed seals).
+Tokens in `tailwind.config.ts`; legacy Phase-2 token names are aliased so the
+whole app adopts the identity without churn.
 
-## 8. Secrets & environment
+## 11. Engineering
 
-- Runtime-only env access (`src/lib/env.ts`) — never read at import/build time,
-  so `next build` needs no configuration.
-- Server-only secrets (`SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, provider
-  keys) never receive a `NEXT_PUBLIC_` prefix and never enter client modules.
-- Server-only modules begin with `import 'server-only'`.
+Strict TS (`noUncheckedIndexedAccess`), runtime env validation (`validateEnv`),
+feature flags (`flags.ts`), server-only secrets, incremental migrations with RLS,
+deterministic pure engines with **88 unit/integration tests**. The data model is
+written to eventually support other Verdict products (shared accounts, consent,
+provenance, taste vectors) while keeping book-specific data book-specific.
 
-## 9. Internationalization _(planned — Phase 9)_
+## 12. Real vs mock vs planned
 
-Architecture will keep these axes **independent**: interface language, search
-language, content language, market region, timezone, currency. Changing language
-must not change region or currency. Internal identifiers are language-neutral.
-Target locales: English, neutral Latin American Spanish, Simplified Chinese.
-
-## 10. Analytics & privacy _(planned — Phase 10)_
-
-Semantic events (not raw clicks) with unique IDs, anonymous/user/session IDs,
-consent state, event versions, and language-neutral names. Never recorded:
-passwords, payment details, tokens, private group exclusions, raw voice audio by
-default, or sensitive inferred traits. Privacy controls include data export,
-deletion, Reader DNA reset, and search-history deletion.
-
-## 11. ReadVerdict Search Lab _(planned — Phase 11)_
-
-A permanent automated evaluation system: generate realistic searches → run the
-real engine → capture score traces → validate hard constraints → grade
-relevance → diagnose failures → add confirmed failures to regression tests →
-compare against a baseline → run hidden holdout tests → reject critical
-regressions → produce reviewable reports. It **never** merges or deploys
-automatically. Modes: smoke, standard, full, stress, mutation, regression,
-holdout, live-observation. Deterministic fixtures; strict cost controls.
-
-## 12. What is real vs. scaffold today
-
-| Area | State |
-| --- | --- |
-| Stack, configs, gates (typecheck/lint/test/build) | **Real** |
-| Design tokens, typography, responsive shell, navigation | **Real** |
-| Component library + `/style-guide` | **Real** |
-| Verdict tier taxonomy, `cn`, UI logic helpers (+ 19 tests) | **Real** |
-| Supabase client scaffolding (null until configured) | **Real (inert)** |
-| Ask / Discover / My Books / Together / Reader DNA pages | **Honest placeholders** |
-| Book data, DNA stores, pipeline, availability, i18n, analytics, Search Lab | **Planned** (Phases 3–11) |
-
-Nothing in the current build fetches or fabricates real book data.
+See [`docs/KNOWN_LIMITATIONS.md`](./docs/KNOWN_LIMITATIONS.md) and
+[`PHASE_REPORT.md`](./PHASE_REPORT.md) for the authoritative matrix.

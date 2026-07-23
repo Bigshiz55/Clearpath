@@ -1,128 +1,111 @@
 # ReadVerdict
 
-**The right book. Not more books.**
+**The decision engine for what you read next.**
 
-ReadVerdict is an intelligent book-recommendation **decision service** in the
-Verdict product family. You describe what you want — in words or by voice — and
-it returns a short, ranked set with a clear verdict and the reasons behind it,
-tuned to your taste, your time, your format, and who you're reading with.
+> Goodreads records what happened. StoryGraph analyzes your patterns.
+> **ReadVerdict makes the call.** Every book gets a personalized trial — and you
+> get the verdict.
 
-It is deliberately **not** a catalog, a popularity feed, or a Goodreads clone.
-Its job is to _reduce_ choice to the right next read.
+ReadVerdict is a book-discovery and reading-decision platform in the Verdict
+product family. It answers one question better than anything else: **“Is this
+book worth committing my next several hours to?”** Its signature experience puts
+every book **on trial** — charges, prosecution, defense, evidence, a jury, and a
+decisive verdict — all grounded in real evidence and your reading taste.
 
-> **Status: Phase 2 complete — brand & application shell.** On top of the Phase 1
-> foundation, this adds a deepened design-token/typography system, a reusable
-> **component library** (`src/components/ui/`), interaction previews, and a
-> living **style guide** at `/style-guide`. Feature surfaces (Ask, Discover,
-> My Books, Read Together, Reader DNA) remain **honest, phase-labeled
-> placeholders** — they never fabricate book data. See
-> [`ARCHITECTURE.md`](./ARCHITECTURE.md) and the phased plan below.
+## Status
+
+Phases 1–16 of the build are implemented locally and **run without any external
+credentials**. The app uses **real Open Library data**, a **local (browser)
+persistence layer** so the full flow works with no account, and honest
+low-confidence behavior everywhere data is thin. See
+[`docs/KNOWN_LIMITATIONS.md`](./docs/KNOWN_LIMITATIONS.md) for exactly what is
+real, mocked, or credential-blocked, and [`PHASE_REPORT.md`](./PHASE_REPORT.md)
+for the per-phase completion report.
+
+**Not deployed.** Local completion only, per project direction.
+
+## What works locally, end to end
+
+- Take the **Reader Interview** → your **Reader DNA** is built with per-dimension
+  confidence.
+- **Import** a Goodreads/StoryGraph CSV, or paste a title/ISBN list → preview,
+  duplicate detection, commit to your library.
+- **Search** any book (real Open Library) → open a personalized **Book Trial**.
+- See a **decisive verdict** immediately (Read it / Borrow / Sample / Skip / …),
+  a **finish-probability prediction**, the charges, both sides of the case, and
+  evidence — every item tagged _confirmed / sourced / inferred / insufficient_.
+- Ask **spoiler-controlled cross-examination** questions.
+- Mark a book started, **file a Reading Appeal**, mark finished or DNF with a
+  reason → your **Reader DNA updates** and the next verdict reflects it.
+- **Share** a spoiler-free verdict card; **export or delete** all your data.
 
 ## Stack
 
-- **Next.js 14** (App Router) · **TypeScript** (strict, `noUncheckedIndexedAccess`)
-- **Tailwind CSS** design tokens (Verdict-family theme)
-- **Supabase-ready** architecture (`@supabase/ssr`) — wired to degrade gracefully
-  until configured
-- **Vitest** unit tests · **ESLint** (`next/core-web-vitals`) · **Prettier**
+Next.js 14 (App Router) · TypeScript (strict) · Tailwind (literary design
+tokens) · Vitest · Open Library API · Supabase-ready (migrations + clients,
+inert until configured).
 
 ## Getting started
 
 ```bash
 npm ci
-cp .env.example .env.local   # optional — the app runs and builds with no keys
+cp .env.example .env.local   # optional — the app runs and builds with NO keys
 npm run dev                  # http://localhost:3000
 ```
 
-No secrets are required to run the Phase 1 foundation. Supabase and external
-providers activate only once their keys are present in `.env.local`.
+Suggested first run: **Home → Empanel your jury (interview) → Search “The Silent
+Patient” → open the trial.**
 
 ## Scripts
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Dev server |
-| `npm run build` | Production build |
-| `npm start` | Serve the production build |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Vitest unit tests |
-| `npm run format` | Prettier check |
+| `npm run dev` / `build` / `start` | Dev / production build / serve |
+| `npm run lint` · `typecheck` · `test` | Gates |
+| `npm run search-lab:smoke` | Verdict-quality regression guardrails |
+| `npm run search-lab:full` | Full synthetic-scenario grid |
 
-Run the full gate suite before every commit:
+Full gate suite:
 
 ```bash
 npm run typecheck && npm run lint && npm test && npm run build
 ```
 
-## Project structure
+## Where things live
 
 ```
 src/
-  app/                     # App Router routes
-    page.tsx               #   Home (positioning + verdict-layout preview)
-    ask/                   #   Ask ReadVerdict (center of the product)
-    discover/  my-books/   #   Core areas
-    together/  profile/
-    reader-dna/            #   Secondary area
-    loading|error|not-found.tsx
-    globals.css
-    layout.tsx             # Root layout → AppShell
-  components/
-    nav/                   # AppShell, responsive nav (desktop bar + mobile tabs)
-    ui/                    # Component library — Button, Card, Chip,
-                           #   InterpretationChip, Field/Input/Textarea, Avatar,
-                           #   Skeleton, Spinner, StatusPill, ScoreDial, Rating,
-                           #   SegmentedControl, Divider, VerdictBadge, states…
-    ask/                   # Ask-surface previews (InterpretationPreview)
-    styleguide/            # Interactive style-guide demos
-    icons.tsx
-  config/nav.ts            # Canonical navigation (desktop vs mobile subsets)
+  app/                    # routes: home, search, courtroom, trial/[workId],
+                          #   my-books, reader-dna, onboarding, profile
+    actions/books.ts      # server actions: real provider search
+  components/             # trial/, search/, books/, onboarding/, dna/, import/,
+                          #   profile/, courtroom/, ui/ (design system)
   lib/
-    env.ts                 # Runtime env access (never at build time)
-    supabase/              # server + browser clients (null until configured)
-    verdict/tiers.ts       # PURE, tested verdict-tier taxonomy
-    utils/cn.ts            # PURE, tested classname helper
-test/shims/                # server-only shim for the Vitest runner
+    domain/               # PURE: confidence, provenance, isbn, book (Work vs
+                          #   Edition), readerDna, entityResolution — tested
+    providers/            # provider interface, registry, Open Library, mock
+    import/               # CSV parser, Goodreads/StoryGraph/list mappers
+    onboarding/           # Reader Interview → observations
+    dna/                  # Book DNA inference
+    trial/                # match, predict (DNF), trial composer, cross-exam
+    store/                # local persistence (reducer + React provider)
+    analytics/            # event taxonomy
+    lab/                  # Search Lab evaluation harness
+supabase/migrations/      # incremental SQL schema (RLS)
+docs/                     # data model, Reader DNA, providers, import, privacy…
 ```
 
-## Design & product principles (enforced from day one)
+## Principles (enforced in code and tests)
 
-- **Reduce choice, don't expand it.** Return fewer, better matches over a padded
-  grid.
-- **Never fabricate data.** Placeholders state what's coming; they don't invent
-  ratings, availability, or book attributes.
+- **Reduce the choice, don’t expand it** — a small, decisive answer, not a feed.
+- **Never fabricate** ratings, completion/DNF rates, cohort stats, quotes, or
+  availability. Missing data is labelled _insufficient_; the jury is explicitly
+  _modeled similarity_, never a fake tally.
+- **Provenance & confidence travel with every sourced field.**
 - **Four separate models** — Book DNA, Reader DNA, Reading Session DNA, Search
-  DNA — never collapsed into one score. (See `ARCHITECTURE.md`.)
-- **Secrets are server-only.** `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`,
-  provider keys never get a `NEXT_PUBLIC_` prefix.
-- **Env validated at runtime, not build time**, so `next build` works with no
-  configuration.
-- **Accessible & responsive** — semantic HTML, keyboard support, visible focus,
-  reduced-motion support, 44px+ touch targets, safe-area insets, no
-  color-only signals.
+  DNA — never collapsed into one score.
+- **Secrets are server-only**; env is validated at runtime, not build time.
+- **Accessible & mobile-first** — semantic HTML, keyboard, focus, reduced motion,
+  44px targets, no color-only meaning.
 
-## Phased build plan
-
-1. **Durable foundation** ✅
-2. **Brand & application shell** ✅ ← _current_
-3. Core book data (canonical models, Book DNA, provenance)
-4. Ask ReadVerdict (Search DNA parser, results, Full Verdict)
-5. Reader DNA
-6. My Books
-7. Read Together
-8. Availability & services
-9. Internationalization (English · LatAm Spanish · Simplified Chinese)
-10. Analytics & privacy
-11. ReadVerdict Search Lab (automated evaluation & regression)
-12. Verification
-
-Each phase ends with: tests, production build, commit, and an honest status
-report — never "done" on the basis of written code alone.
-
-## Backup & source control
-
-This project keeps a full local git history. Durable off-machine backup
-(a private GitHub repository) is pending destination authorization — see the
-Phase 1 status report. Until then, ZIP checkpoints are produced after each
-major phase.
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design.
