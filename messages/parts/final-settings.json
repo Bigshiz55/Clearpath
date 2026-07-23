@@ -1,0 +1,284 @@
+{
+  "en-US": {
+    "account": {
+      "settings": {
+        "heading": "Settings",
+        "saving": "Saving…",
+        "admin": {
+          "sponsoredJudges": "⚖️ Sponsored Judges — Admin",
+          "sponsorsDesc": "Add and manage sponsors, and see coupon-claim conversions."
+        },
+        "profile": {
+          "heading": "Profile",
+          "displayName": "Display name",
+          "personalLabel": "Personal match label",
+          "personalLabelPlaceholder": "Scott Match",
+          "viewingCountry": "Viewing country",
+          "signedInAs": "Signed in as {email}",
+          "save": "Save profile"
+        },
+        "prefs": {
+          "heading": "Taste & preferences",
+          "loadScottPreset": "Load Scott preset",
+          "avoidLabel": "Avoid (penalized when defining)",
+          "loveLabel": "Love (boosted)",
+          "save": "Save preferences"
+        },
+        "services": {
+          "heading": "My services & channels",
+          "descPre": "Pick everything you have — streaming apps, premium channels (Hallmark, Acorn, BritBox…), and your live-TV or cable box (Verizon Fios, Xfinity, YouTube TV…). On-demand picks flag what’s",
+          "freeBadge": "✓ free on a plan you have",
+          "descPost": " vs. a rental. Live-TV/cable boxes are recorded for your reference (they aren’t on-demand catalogs, so they don’t filter results).",
+          "searchPlaceholder": "Search 500+ services & channels — e.g. Hallmark, Acorn, ESPN, Xfinity…",
+          "searchAria": "Search services and channels",
+          "noMatch": "No match for “{query}”. Try a shorter name.",
+          "save": "Save services",
+          "selected": "{count} selected",
+          "fallbackName": "Service #{id}"
+        },
+        "friends": {
+          "heading": "Friends & public profile",
+          "handlePre": "Your handle is",
+          "handlePost": "— share it so friends can follow you.",
+          "setUsername": "Set a username above so friends can find and follow you.",
+          "sharePublicly": "Share my verdicts publicly",
+          "sharePubliclyDesc": "People who follow you (and anyone who opens your profile) can see your recent verdicts. Off by default."
+        },
+        "display": {
+          "heading": "Display",
+          "desc": "Simple view makes everything bigger and easier to read and tap — great for older eyes or a TV across the room. It’s saved on this device and toggles off just as easily."
+        },
+        "notifications": {
+          "heading": "Notifications",
+          "desc": "Get a ping when something’s actually worth opening the app for — a new pick that fits you, a show you’re watching drops an episode, or your Docket’s about to reset. Off until you turn it on, per device."
+        },
+        "digest": {
+          "heading": "Daily new-release digest",
+          "desc": "Each morning we scan new movie & TV releases and surface the ones that match your taste under “New for you”.",
+          "scanDaily": "Scan new releases daily",
+          "scanDailyDesc": "Turn off to stop building your “New for you” list.",
+          "minScoreLabel": "Only show matches at or above",
+          "moreTitles": "More titles (40%)",
+          "onlyBest": "Only the best (95%)",
+          "save": "Save digest settings"
+        },
+        "shares": {
+          "heading": "Share links",
+          "empty": "You haven’t shared any verdicts yet.",
+          "active": "Active",
+          "deactivated": "Deactivated",
+          "expires": "· expires {date}",
+          "deactivate": "Deactivate"
+        },
+        "danger": {
+          "heading": "Delete account",
+          "desc": "Permanently deletes your account, watchlists, verdicts, preferences, and share links. This cannot be undone.",
+          "deleteMy": "Delete my account",
+          "deleting": "Deleting…",
+          "confirmDelete": "Yes, permanently delete",
+          "cancel": "Cancel"
+        },
+        "toast": {
+          "publicOn": "Your verdicts are now visible to followers.",
+          "publicOff": "Your activity is private again.",
+          "failed": "Failed.",
+          "servicesSaved": "Services saved.",
+          "profileSaved": "Profile saved.",
+          "preferencesSaved": "Preferences saved.",
+          "scottPreset": "Scott preset loaded — remember to save.",
+          "digestSaved": "Digest settings saved.",
+          "shareDeactivated": "Share link deactivated.",
+          "deleteFailed": "Failed to delete account."
+        }
+      }
+    }
+  },
+  "es-419": {
+    "account": {
+      "settings": {
+        "heading": "Configuración",
+        "saving": "Guardando…",
+        "admin": {
+          "sponsoredJudges": "⚖️ Jueces patrocinados — Administración",
+          "sponsorsDesc": "Agrega y administra patrocinadores, y consulta las conversiones de canje de cupones."
+        },
+        "profile": {
+          "heading": "Perfil",
+          "displayName": "Nombre visible",
+          "personalLabel": "Etiqueta de coincidencia personal",
+          "personalLabelPlaceholder": "Scott Match",
+          "viewingCountry": "País de visualización",
+          "signedInAs": "Sesión iniciada como {email}",
+          "save": "Guardar perfil"
+        },
+        "prefs": {
+          "heading": "Gustos y preferencias",
+          "loadScottPreset": "Cargar preajuste de Scott",
+          "avoidLabel": "Evitar (penalizado cuando es determinante)",
+          "loveLabel": "Me encanta (potenciado)",
+          "save": "Guardar preferencias"
+        },
+        "services": {
+          "heading": "Mis servicios y canales",
+          "descPre": "Elige todo lo que tengas: apps de streaming, canales premium (Hallmark, Acorn, BritBox…) y tu TV en vivo o decodificador de cable (Verizon Fios, Xfinity, YouTube TV…). Las opciones on-demand indican lo que está",
+          "freeBadge": "✓ gratis en un plan que tienes",
+          "descPost": " frente a un alquiler. Los decodificadores de TV en vivo o cable se registran como referencia (no son catálogos on-demand, así que no filtran los resultados).",
+          "searchPlaceholder": "Busca entre más de 500 servicios y canales, p. ej. Hallmark, Acorn, ESPN, Xfinity…",
+          "searchAria": "Buscar servicios y canales",
+          "noMatch": "No hay coincidencias para “{query}”. Prueba con un nombre más corto.",
+          "save": "Guardar servicios",
+          "selected": "{count} seleccionados",
+          "fallbackName": "Servicio n.º {id}"
+        },
+        "friends": {
+          "heading": "Amigos y perfil público",
+          "handlePre": "Tu usuario es",
+          "handlePost": "— compártelo para que tus amigos te sigan.",
+          "setUsername": "Define un nombre de usuario arriba para que tus amigos te encuentren y te sigan.",
+          "sharePublicly": "Compartir mis veredictos públicamente",
+          "sharePubliclyDesc": "Las personas que te siguen (y cualquiera que abra tu perfil) pueden ver tus veredictos recientes. Desactivado de forma predeterminada."
+        },
+        "display": {
+          "heading": "Pantalla",
+          "desc": "La vista sencilla hace que todo sea más grande y fácil de leer y tocar: ideal para ojos mayores o para una TV al otro lado de la sala. Se guarda en este dispositivo y se desactiva con la misma facilidad."
+        },
+        "notifications": {
+          "heading": "Notificaciones",
+          "desc": "Recibe un aviso cuando de verdad valga la pena abrir la app: una nueva recomendación que encaja contigo, un episodio nuevo de una serie que sigues o cuando tu Docket está por reiniciarse. Desactivado hasta que lo actives, por dispositivo."
+        },
+        "digest": {
+          "heading": "Resumen diario de estrenos",
+          "desc": "Cada mañana revisamos los nuevos estrenos de cine y TV y mostramos los que encajan con tu gusto en “Nuevo para ti”.",
+          "scanDaily": "Revisar estrenos a diario",
+          "scanDailyDesc": "Desactívalo para dejar de armar tu lista de “Nuevo para ti”.",
+          "minScoreLabel": "Mostrar solo coincidencias iguales o superiores a",
+          "moreTitles": "Más títulos (40%)",
+          "onlyBest": "Solo lo mejor (95%)",
+          "save": "Guardar ajustes del resumen"
+        },
+        "shares": {
+          "heading": "Enlaces para compartir",
+          "empty": "Aún no has compartido ningún veredicto.",
+          "active": "Activo",
+          "deactivated": "Desactivado",
+          "expires": "· vence {date}",
+          "deactivate": "Desactivar"
+        },
+        "danger": {
+          "heading": "Eliminar cuenta",
+          "desc": "Elimina de forma permanente tu cuenta, listas de pendientes, veredictos, preferencias y enlaces para compartir. Esto no se puede deshacer.",
+          "deleteMy": "Eliminar mi cuenta",
+          "deleting": "Eliminando…",
+          "confirmDelete": "Sí, eliminar permanentemente",
+          "cancel": "Cancelar"
+        },
+        "toast": {
+          "publicOn": "Tus veredictos ahora son visibles para tus seguidores.",
+          "publicOff": "Tu actividad vuelve a ser privada.",
+          "failed": "Error.",
+          "servicesSaved": "Servicios guardados.",
+          "profileSaved": "Perfil guardado.",
+          "preferencesSaved": "Preferencias guardadas.",
+          "scottPreset": "Preajuste de Scott cargado: recuerda guardar.",
+          "digestSaved": "Ajustes del resumen guardados.",
+          "shareDeactivated": "Enlace para compartir desactivado.",
+          "deleteFailed": "No se pudo eliminar la cuenta."
+        }
+      }
+    }
+  },
+  "zh-Hans": {
+    "account": {
+      "settings": {
+        "heading": "设置",
+        "saving": "保存中…",
+        "admin": {
+          "sponsoredJudges": "⚖️ 赞助评审 — 管理",
+          "sponsorsDesc": "添加和管理赞助商，并查看优惠券领取的转化情况。"
+        },
+        "profile": {
+          "heading": "个人资料",
+          "displayName": "显示名称",
+          "personalLabel": "个人匹配标签",
+          "personalLabelPlaceholder": "Scott 匹配",
+          "viewingCountry": "观看国家/地区",
+          "signedInAs": "已登录为 {email}",
+          "save": "保存个人资料"
+        },
+        "prefs": {
+          "heading": "口味与偏好",
+          "loadScottPreset": "加载 Scott 预设",
+          "avoidLabel": "回避（作为主导元素时扣分）",
+          "loveLabel": "喜爱（加分）",
+          "save": "保存偏好"
+        },
+        "services": {
+          "heading": "我的服务与频道",
+          "descPre": "选择你拥有的一切——流媒体应用、付费频道（Hallmark、Acorn、BritBox…），以及你的电视直播或有线电视盒（Verizon Fios、Xfinity、YouTube TV…）。点播选项会标出哪些是",
+          "freeBadge": "✓ 在你已有的套餐中免费",
+          "descPost": "，哪些是租借。电视直播／有线电视盒仅作记录供你参考（它们不是点播目录，因此不会筛选结果）。",
+          "searchPlaceholder": "搜索 500 多个服务与频道——例如 Hallmark、Acorn、ESPN、Xfinity…",
+          "searchAria": "搜索服务与频道",
+          "noMatch": "找不到与“{query}”匹配的结果。试试更短的名称。",
+          "save": "保存服务",
+          "selected": "已选择 {count} 个",
+          "fallbackName": "服务 #{id}"
+        },
+        "friends": {
+          "heading": "好友与公开资料",
+          "handlePre": "你的用户名是",
+          "handlePost": "——把它分享出去，让好友关注你。",
+          "setUsername": "在上方设置用户名，好友才能找到并关注你。",
+          "sharePublicly": "公开分享我的裁决",
+          "sharePubliclyDesc": "关注你的人（以及打开你资料的任何人）都能看到你最近的裁决。默认关闭。"
+        },
+        "display": {
+          "heading": "显示",
+          "desc": "简约视图让一切更大、更易于阅读和点按——非常适合上了年纪的眼睛或房间另一头的电视。它保存在本设备上，也能同样轻松地关闭。"
+        },
+        "notifications": {
+          "heading": "通知",
+          "desc": "只有在真正值得打开应用时才会收到提醒——一条适合你的新推荐、你在追的剧集更新，或你的 Docket 即将重置。默认关闭，需你在每台设备上开启。"
+        },
+        "digest": {
+          "heading": "每日新片速递",
+          "desc": "每天早晨，我们会扫描新的电影和电视剧上线，并在“为你精选”中呈现符合你口味的内容。",
+          "scanDaily": "每天扫描新上线内容",
+          "scanDailyDesc": "关闭后将不再生成你的“为你精选”列表。",
+          "minScoreLabel": "仅显示匹配度不低于",
+          "moreTitles": "更多片名（40%）",
+          "onlyBest": "只看最佳（95%）",
+          "save": "保存速递设置"
+        },
+        "shares": {
+          "heading": "分享链接",
+          "empty": "你还没有分享任何裁决。",
+          "active": "有效",
+          "deactivated": "已停用",
+          "expires": "· {date} 到期",
+          "deactivate": "停用"
+        },
+        "danger": {
+          "heading": "删除账户",
+          "desc": "永久删除你的账户、观看清单、裁决、偏好和分享链接。此操作无法撤销。",
+          "deleteMy": "删除我的账户",
+          "deleting": "删除中…",
+          "confirmDelete": "是的，永久删除",
+          "cancel": "取消"
+        },
+        "toast": {
+          "publicOn": "你的裁决现在对关注者可见。",
+          "publicOff": "你的动态又变为私密了。",
+          "failed": "失败。",
+          "servicesSaved": "服务已保存。",
+          "profileSaved": "个人资料已保存。",
+          "preferencesSaved": "偏好已保存。",
+          "scottPreset": "已加载 Scott 预设——记得保存。",
+          "digestSaved": "速递设置已保存。",
+          "shareDeactivated": "分享链接已停用。",
+          "deleteFailed": "删除账户失败。"
+        }
+      }
+    }
+  }
+}

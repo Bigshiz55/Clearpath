@@ -1,0 +1,155 @@
+{
+  "en-US": {
+    "discover": {
+      "watchlist": {
+        "filters": {
+          "favorites": "⭐ Favorites"
+        },
+        "status": {
+          "all": "All",
+          "strict": "Strict",
+          "possible": "Possible",
+          "watching": "Watching",
+          "watched": "Watched",
+          "paused": "Paused",
+          "dropped": "Dropped"
+        },
+        "filterPlaceholder": "Filter by title…",
+        "filterAriaLabel": "Filter watchlist by title",
+        "sortAriaLabel": "Sort watchlist",
+        "sort": {
+          "added": "Recently added",
+          "watched": "Recently watched",
+          "title": "Title A–Z",
+          "rating": "Your rating"
+        },
+        "view": {
+          "grid": "Grid",
+          "list": "List",
+          "gridAria": "Grid view",
+          "listAria": "List view"
+        },
+        "empty": "Nothing matches these filters.",
+        "statusForAria": "Status for {title}",
+        "remove": "Remove",
+        "fav": {
+          "addAria": "Add to Favorites",
+          "removeAria": "Remove from Favorites"
+        },
+        "media": {
+          "movie": "Movie",
+          "tv": "TV"
+        },
+        "toast": {
+          "couldNotUpdate": "Could not update.",
+          "couldNotRemove": "Could not remove.",
+          "addedFav": "Added to Favorites ⭐",
+          "removedFav": "Removed from Favorites.",
+          "removed": "Removed."
+        }
+      }
+    }
+  },
+  "es-419": {
+    "discover": {
+      "watchlist": {
+        "filters": {
+          "favorites": "⭐ Favoritos"
+        },
+        "status": {
+          "all": "Todos",
+          "strict": "Imperdibles",
+          "possible": "Posibles",
+          "watching": "Viendo",
+          "watched": "Vistos",
+          "paused": "En pausa",
+          "dropped": "Abandonados"
+        },
+        "filterPlaceholder": "Filtrar por título…",
+        "filterAriaLabel": "Filtrar la lista por título",
+        "sortAriaLabel": "Ordenar la lista",
+        "sort": {
+          "added": "Agregados recientemente",
+          "watched": "Vistos recientemente",
+          "title": "Título A–Z",
+          "rating": "Tu calificación"
+        },
+        "view": {
+          "grid": "Cuadrícula",
+          "list": "Lista",
+          "gridAria": "Vista de cuadrícula",
+          "listAria": "Vista de lista"
+        },
+        "empty": "Nada coincide con estos filtros.",
+        "statusForAria": "Estado de {title}",
+        "remove": "Quitar",
+        "fav": {
+          "addAria": "Agregar a Favoritos",
+          "removeAria": "Quitar de Favoritos"
+        },
+        "media": {
+          "movie": "Película",
+          "tv": "Serie"
+        },
+        "toast": {
+          "couldNotUpdate": "No se pudo actualizar.",
+          "couldNotRemove": "No se pudo quitar.",
+          "addedFav": "Agregado a Favoritos ⭐",
+          "removedFav": "Quitado de Favoritos.",
+          "removed": "Eliminado."
+        }
+      }
+    }
+  },
+  "zh-Hans": {
+    "discover": {
+      "watchlist": {
+        "filters": {
+          "favorites": "⭐ 收藏"
+        },
+        "status": {
+          "all": "全部",
+          "strict": "必看",
+          "possible": "可能看",
+          "watching": "在看",
+          "watched": "看过",
+          "paused": "暂停",
+          "dropped": "弃看"
+        },
+        "filterPlaceholder": "按标题筛选…",
+        "filterAriaLabel": "按标题筛选待看列表",
+        "sortAriaLabel": "排序待看列表",
+        "sort": {
+          "added": "最近添加",
+          "watched": "最近观看",
+          "title": "标题 A–Z",
+          "rating": "你的评分"
+        },
+        "view": {
+          "grid": "网格",
+          "list": "列表",
+          "gridAria": "网格视图",
+          "listAria": "列表视图"
+        },
+        "empty": "没有符合这些筛选条件的内容。",
+        "statusForAria": "{title} 的状态",
+        "remove": "移除",
+        "fav": {
+          "addAria": "加入收藏",
+          "removeAria": "从收藏中移除"
+        },
+        "media": {
+          "movie": "电影",
+          "tv": "剧集"
+        },
+        "toast": {
+          "couldNotUpdate": "无法更新。",
+          "couldNotRemove": "无法移除。",
+          "addedFav": "已加入收藏 ⭐",
+          "removedFav": "已从收藏中移除。",
+          "removed": "已移除。"
+        }
+      }
+    }
+  }
+}

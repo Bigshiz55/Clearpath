@@ -1,0 +1,113 @@
+{
+  "en-US": {
+    "misc": {
+      "onboarding": {
+        "welcomeTitle": "Welcome — let’s set you up",
+        "welcomeBody": "This takes about a minute. You can change anything later.",
+        "displayName": "Display name",
+        "username": "Username",
+        "usernameHint": "3–24 lowercase letters, numbers, or underscores.",
+        "viewingCountry": "Viewing country",
+        "viewingCountryHint": "Used to show where you can watch things legally.",
+        "continue": "Continue",
+        "back": "Back",
+        "errDisplayName": "Enter a display name.",
+        "errUsername": "Pick a valid username.",
+        "errSave": "Could not save.",
+        "allSet": "You’re all set!",
+        "tasteTitle": "What’s your taste?",
+        "tasteBody": "Pick as many or as few as you like — or skip and tune later.",
+        "presetPrefix": "Use the ",
+        "presetSuffix": " preset",
+        "presetDesc": "Grounded crime & detective boosts; big penalties for supernatural, sci-fi, fantasy, noir & slow burns.",
+        "genresToAvoid": "Genres to avoid",
+        "genresToAvoidHint": "(penalized when it’s a defining trait)",
+        "thingsYouLove": "Things you love",
+        "thingsYouLoveHint": "(boosted)",
+        "channelsTitle": "Which channels do you have?",
+        "channelsBody": "Tap every service you subscribe to. These are the only ones shown on your search screen — you can add or remove them anytime in Settings.",
+        "selectedSkip": {
+          "one": "{count} selected · you can skip this and set it later.",
+          "other": "{count} selected · you can skip this and set it later."
+        },
+        "finish": "Finish & start watching",
+        "saving": "Saving…",
+        "skipForNow": "Skip for now"
+      }
+    }
+  },
+  "es-419": {
+    "misc": {
+      "onboarding": {
+        "welcomeTitle": "Bienvenido: vamos a configurarte",
+        "welcomeBody": "Esto toma alrededor de un minuto. Puedes cambiar todo más tarde.",
+        "displayName": "Nombre para mostrar",
+        "username": "Nombre de usuario",
+        "usernameHint": "De 3 a 24 letras minúsculas, números o guiones bajos.",
+        "viewingCountry": "País de visualización",
+        "viewingCountryHint": "Se usa para mostrar dónde puedes ver contenido de forma legal.",
+        "continue": "Continuar",
+        "back": "Atrás",
+        "errDisplayName": "Ingresa un nombre para mostrar.",
+        "errUsername": "Elige un nombre de usuario válido.",
+        "errSave": "No se pudo guardar.",
+        "allSet": "¡Todo listo!",
+        "tasteTitle": "¿Cuál es tu gusto?",
+        "tasteBody": "Elige tantas o tan pocas como quieras, o sáltalo y ajústalo más tarde.",
+        "presetPrefix": "Usar el ",
+        "presetSuffix": " preajuste",
+        "presetDesc": "Refuerzos para crímenes realistas y detectives; grandes penalizaciones para lo sobrenatural, ciencia ficción, fantasía, cine negro y tramas de ritmo lento.",
+        "genresToAvoid": "Géneros a evitar",
+        "genresToAvoidHint": "(penalizados cuando es un rasgo definitorio)",
+        "thingsYouLove": "Cosas que te encantan",
+        "thingsYouLoveHint": "(reforzadas)",
+        "channelsTitle": "¿Qué canales tienes?",
+        "channelsBody": "Toca cada servicio al que estés suscrito. Estos son los únicos que se muestran en tu pantalla de búsqueda; puedes agregarlos o quitarlos cuando quieras en Configuración.",
+        "selectedSkip": {
+          "one": "{count} seleccionado · puedes saltarte esto y configurarlo más tarde.",
+          "other": "{count} seleccionados · puedes saltarte esto y configurarlo más tarde."
+        },
+        "finish": "Finalizar y empezar a ver",
+        "saving": "Guardando…",
+        "skipForNow": "Saltar por ahora"
+      }
+    }
+  },
+  "zh-Hans": {
+    "misc": {
+      "onboarding": {
+        "welcomeTitle": "欢迎 — 我们来帮你设置",
+        "welcomeBody": "这大约需要一分钟。你之后可以随时更改任何内容。",
+        "displayName": "显示名称",
+        "username": "用户名",
+        "usernameHint": "3 到 24 个小写字母、数字或下划线。",
+        "viewingCountry": "观看所在国家/地区",
+        "viewingCountryHint": "用于显示你可以在哪里合法观看内容。",
+        "continue": "继续",
+        "back": "返回",
+        "errDisplayName": "请输入显示名称。",
+        "errUsername": "请选择一个有效的用户名。",
+        "errSave": "无法保存。",
+        "allSet": "全部搞定！",
+        "tasteTitle": "你的口味是什么？",
+        "tasteBody": "想选多少就选多少，也可以跳过，稍后再调整。",
+        "presetPrefix": "使用 ",
+        "presetSuffix": " 预设",
+        "presetDesc": "增强写实犯罪与侦探类；对超自然、科幻、奇幻、黑色电影和慢热节奏施加较大惩罚。",
+        "genresToAvoid": "想避开的类型",
+        "genresToAvoidHint": "（当它是决定性特征时会被扣分）",
+        "thingsYouLove": "你喜欢的东西",
+        "thingsYouLoveHint": "（加分）",
+        "channelsTitle": "你拥有哪些频道？",
+        "channelsBody": "点选你订阅的每项服务。只有这些会显示在你的搜索界面上 — 你可以随时在设置中添加或移除它们。",
+        "selectedSkip": {
+          "one": "已选择 {count} 个 · 你可以跳过这一步，稍后再设置。",
+          "other": "已选择 {count} 个 · 你可以跳过这一步，稍后再设置。"
+        },
+        "finish": "完成并开始观看",
+        "saving": "正在保存…",
+        "skipForNow": "暂时跳过"
+      }
+    }
+  }
+}

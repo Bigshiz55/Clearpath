@@ -7,6 +7,7 @@ import { humanTrait } from '@/lib/scoring/traits';
 import { saveOnboarding } from '@/lib/actions/profile';
 import { STREAMING_SERVICES } from '@/lib/services';
 import { useToast } from '@/components/Toast';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const AVOIDABLE: PreferenceTrait[] = ['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn'];
 const LOVABLE: PreferenceTrait[] = ['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer'];
@@ -27,6 +28,7 @@ const REGIONS = [
 export function OnboardingForm({ defaultName }: { defaultName: string }) {
   const router = useRouter();
   const toast = useToast();
+  const { t, plural } = useI18n();
   const [step, setStep] = useState(1);
   const [displayName, setDisplayName] = useState(defaultName);
   const [username, setUsername] = useState('');
@@ -68,11 +70,11 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
     });
     setLoading(false);
     if (!res.ok) {
-      setError(res.error ?? 'Could not save.');
+      setError(res.error ?? t('misc.onboarding.errSave'));
       setStep(1);
       return;
     }
-    toast.show('You’re all set!', 'success');
+    toast.show(t('misc.onboarding.allSet'), 'success');
     router.push('/app');
     router.refresh();
   }
@@ -90,15 +92,15 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
       {step === 1 && (
         <div className="space-y-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Welcome — let’s set you up</h1>
-            <p className="mt-1 text-sm text-slate-400">This takes about a minute. You can change anything later.</p>
+            <h1 className="text-2xl font-bold text-white">{t('misc.onboarding.welcomeTitle')}</h1>
+            <p className="mt-1 text-sm text-slate-400">{t('misc.onboarding.welcomeBody')}</p>
           </div>
           <div>
-            <label className="label" htmlFor="name">Display name</label>
+            <label className="label" htmlFor="name">{t('misc.onboarding.displayName')}</label>
             <input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="input" placeholder="Scott" />
           </div>
           <div>
-            <label className="label" htmlFor="username">Username</label>
+            <label className="label" htmlFor="username">{t('misc.onboarding.username')}</label>
             <input
               id="username"
               value={username}
@@ -106,28 +108,28 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
               className="input"
               placeholder="scott"
             />
-            <p className="mt-1 text-xs text-slate-500">3–24 lowercase letters, numbers, or underscores.</p>
+            <p className="mt-1 text-xs text-slate-500">{t('misc.onboarding.usernameHint')}</p>
           </div>
           <div>
-            <label className="label" htmlFor="region">Viewing country</label>
+            <label className="label" htmlFor="region">{t('misc.onboarding.viewingCountry')}</label>
             <select id="region" value={region} onChange={(e) => setRegion(e.target.value)} className="input">
               {REGIONS.map(([code, name]) => (
                 <option key={code} value={code}>{name}</option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-slate-500">Used to show where you can watch things legally.</p>
+            <p className="mt-1 text-xs text-slate-500">{t('misc.onboarding.viewingCountryHint')}</p>
           </div>
           {error && <p className="text-sm text-red-300">{error}</p>}
           <button
             onClick={() => {
-              if (!displayName.trim()) return setError('Enter a display name.');
-              if (!/^[a-z0-9_]{3,24}$/.test(username)) return setError('Pick a valid username.');
+              if (!displayName.trim()) return setError(t('misc.onboarding.errDisplayName'));
+              if (!/^[a-z0-9_]{3,24}$/.test(username)) return setError(t('misc.onboarding.errUsername'));
               setError(null);
               setStep(2);
             }}
             className="btn-primary w-full"
           >
-            Continue
+            {t('misc.onboarding.continue')}
           </button>
         </div>
       )}
@@ -135,16 +137,16 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
       {step === 2 && (
         <div className="space-y-5">
           <div>
-            <h1 className="text-2xl font-bold text-white">What’s your taste?</h1>
-            <p className="mt-1 text-sm text-slate-400">Pick as many or as few as you like — or skip and tune later.</p>
+            <h1 className="text-2xl font-bold text-white">{t('misc.onboarding.tasteTitle')}</h1>
+            <p className="mt-1 text-sm text-slate-400">{t('misc.onboarding.tasteBody')}</p>
           </div>
 
           {isScott && (
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-400/40 bg-brand-500/10 p-3">
               <input type="checkbox" checked={usePreset} onChange={(e) => setUsePreset(e.target.checked)} className="mt-1 h-5 w-5 accent-brand-500" />
               <span className="text-sm text-slate-200">
-                Use the <strong>Scott</strong> preset
-                <span className="block text-xs text-slate-400">Grounded crime & detective boosts; big penalties for supernatural, sci-fi, fantasy, noir & slow burns.</span>
+                {t('misc.onboarding.presetPrefix')}<strong>Scott</strong>{t('misc.onboarding.presetSuffix')}
+                <span className="block text-xs text-slate-400">{t('misc.onboarding.presetDesc')}</span>
               </span>
             </label>
           )}
@@ -152,7 +154,7 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
           {!usePreset && (
             <>
               <div>
-                <div className="label">Genres to avoid <span className="text-slate-500">(penalized when it’s a defining trait)</span></div>
+                <div className="label">{t('misc.onboarding.genresToAvoid')} <span className="text-slate-500">{t('misc.onboarding.genresToAvoidHint')}</span></div>
                 <div className="flex flex-wrap gap-2">
                   {AVOIDABLE.map((t) => (
                     <button key={t} onClick={() => toggle(avoid, t, setAvoid)} className={`chip border ${avoid.has(t) ? 'chip-active' : ''}`}>
@@ -162,7 +164,7 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
                 </div>
               </div>
               <div>
-                <div className="label">Things you love <span className="text-slate-500">(boosted)</span></div>
+                <div className="label">{t('misc.onboarding.thingsYouLove')} <span className="text-slate-500">{t('misc.onboarding.thingsYouLoveHint')}</span></div>
                 <div className="flex flex-wrap gap-2">
                   {LOVABLE.map((t) => (
                     <button key={t} onClick={() => toggle(love, t, setLove)} className={`chip border ${love.has(t) ? 'chip-active' : ''}`}>
@@ -177,9 +179,9 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
           {error && <p className="text-sm text-red-300">{error}</p>}
 
           <div className="flex gap-2">
-            <button onClick={() => setStep(1)} className="btn-ghost">Back</button>
+            <button onClick={() => setStep(1)} className="btn-ghost">{t('misc.onboarding.back')}</button>
             <button onClick={() => setStep(3)} className="btn-primary flex-1">
-              Continue
+              {t('misc.onboarding.continue')}
             </button>
           </div>
         </div>
@@ -188,11 +190,8 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
       {step === 3 && (
         <div className="space-y-5">
           <div>
-            <h1 className="text-2xl font-bold text-white">Which channels do you have?</h1>
-            <p className="mt-1 text-sm text-slate-400">
-              Tap every service you subscribe to. These are the only ones shown on your search screen — you can add or
-              remove them anytime in Settings.
-            </p>
+            <h1 className="text-2xl font-bold text-white">{t('misc.onboarding.channelsTitle')}</h1>
+            <p className="mt-1 text-sm text-slate-400">{t('misc.onboarding.channelsBody')}</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -213,18 +212,18 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
               );
             })}
           </div>
-          <p className="text-xs text-slate-500">{services.size} selected · you can skip this and set it later.</p>
+          <p className="text-xs text-slate-500">{plural('misc.onboarding.selectedSkip', services.size, {})}</p>
 
           {error && <p className="text-sm text-red-300">{error}</p>}
 
           <div className="flex gap-2">
-            <button onClick={() => setStep(2)} className="btn-ghost">Back</button>
+            <button onClick={() => setStep(2)} className="btn-ghost">{t('misc.onboarding.back')}</button>
             <button onClick={submit} disabled={loading} className="btn-primary flex-1">
-              {loading ? 'Saving…' : 'Finish & start watching'}
+              {loading ? t('misc.onboarding.saving') : t('misc.onboarding.finish')}
             </button>
           </div>
           <button onClick={submit} disabled={loading} className="w-full text-center text-xs text-slate-500 hover:text-slate-300">
-            Skip for now
+            {t('misc.onboarding.skipForNow')}
           </button>
         </div>
       )}

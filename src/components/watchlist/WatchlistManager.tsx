@@ -6,6 +6,7 @@ import { Poster } from '@/components/PosterCard';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { updateWatchlistItem, removeWatchlistItem } from '@/lib/actions/watchlist';
 import { useToast } from '@/components/Toast';
+import { useT } from '@/i18n/I18nProvider';
 import type { WatchlistStatus, MediaType } from '@/lib/types';
 
 export interface WatchlistItem {
@@ -23,15 +24,7 @@ export interface WatchlistItem {
   watched_at: string | null;
 }
 
-const STATUSES: { value: WatchlistStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'strict', label: 'Strict' },
-  { value: 'possible', label: 'Possible' },
-  { value: 'watching', label: 'Watching' },
-  { value: 'watched', label: 'Watched' },
-  { value: 'paused', label: 'Paused' },
-  { value: 'dropped', label: 'Dropped' },
-];
+const STATUSES: (WatchlistStatus | 'all')[] = ['all', 'strict', 'possible', 'watching', 'watched', 'paused', 'dropped'];
 
 const STATUS_OPTIONS: WatchlistStatus[] = ['strict', 'possible', 'watching', 'watched', 'paused', 'dropped'];
 
@@ -39,6 +32,7 @@ type SortKey = 'added' | 'watched' | 'title' | 'rating';
 
 export function WatchlistManager({ items: initial }: { items: WatchlistItem[] }) {
   const toast = useToast();
+  const t = useT();
   const [items, setItems] = useState(initial);
   const [filter, setFilter] = useState<WatchlistStatus | 'all'>('all');
   const [favOnly, setFavOnly] = useState(false);
@@ -65,17 +59,21 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
   async function changeStatus(id: string, status: WatchlistStatus) {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)));
     const res = await updateWatchlistItem({ itemId: id, status });
-    if (!res.ok) toast.show(res.error ?? 'Could not update.', 'error');
+    if (!res.ok) toast.show(res.error ?? t('discover.watchlist.toast.couldNotUpdate'), 'error');
   }
 
   async function toggleFav(item: WatchlistItem) {
     const next = item.priority >= 1 ? 0 : 1;
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, priority: next } : i)));
     const res = await updateWatchlistItem({ itemId: item.id, priority: next });
-    if (res.ok) toast.show(next ? 'Added to Favorites ⭐' : 'Removed from Favorites.', next ? 'success' : 'info');
+    if (res.ok)
+      toast.show(
+        next ? t('discover.watchlist.toast.addedFav') : t('discover.watchlist.toast.removedFav'),
+        next ? 'success' : 'info',
+      );
     else {
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, priority: item.priority } : i)));
-      toast.show(res.error ?? 'Could not update.', 'error');
+      toast.show(res.error ?? t('discover.watchlist.toast.couldNotUpdate'), 'error');
     }
   }
 
@@ -85,9 +83,9 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
     const res = await removeWatchlistItem(id);
     if (!res.ok) {
       setItems(prev);
-      toast.show(res.error ?? 'Could not remove.', 'error');
+      toast.show(res.error ?? t('discover.watchlist.toast.couldNotRemove'), 'error');
     } else {
-      toast.show('Removed.', 'info');
+      toast.show(t('discover.watchlist.toast.removed'), 'info');
     }
   }
 
@@ -108,18 +106,18 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
             className={`chip border ${favOnly ? 'border-gold-400/60 bg-gold-500/15 text-gold-200' : ''}`}
             aria-pressed={favOnly}
           >
-            ⭐ Favorites
+            {t('discover.watchlist.filters.favorites')}
             <span className="ml-1 text-[10px] text-slate-500">{favCount}</span>
           </button>
           <span className="mx-1 h-5 w-px bg-white/10" aria-hidden />
           {STATUSES.map((s) => (
             <button
-              key={s.value}
-              onClick={() => setFilter(s.value)}
-              className={`chip border ${filter === s.value ? 'chip-active' : ''}`}
+              key={s}
+              onClick={() => setFilter(s)}
+              className={`chip border ${filter === s ? 'chip-active' : ''}`}
             >
-              {s.label}
-              <span className="ml-1 text-[10px] text-slate-500">{counts[s.value] ?? 0}</span>
+              {t(`discover.watchlist.status.${s}`)}
+              <span className="ml-1 text-[10px] text-slate-500">{counts[s] ?? 0}</span>
             </button>
           ))}
         </div>
@@ -127,42 +125,42 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter by title…"
+            placeholder={t('discover.watchlist.filterPlaceholder')}
             className="input max-w-xs flex-1"
-            aria-label="Filter watchlist by title"
+            aria-label={t('discover.watchlist.filterAriaLabel')}
           />
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
             className="input max-w-[10rem]"
-            aria-label="Sort watchlist"
+            aria-label={t('discover.watchlist.sortAriaLabel')}
           >
-            <option value="added">Recently added</option>
-            <option value="watched">Recently watched</option>
-            <option value="title">Title A–Z</option>
-            <option value="rating">Your rating</option>
+            <option value="added">{t('discover.watchlist.sort.added')}</option>
+            <option value="watched">{t('discover.watchlist.sort.watched')}</option>
+            <option value="title">{t('discover.watchlist.sort.title')}</option>
+            <option value="rating">{t('discover.watchlist.sort.rating')}</option>
           </select>
           <div className="ml-auto flex overflow-hidden rounded-xl border border-white/10">
             <button
               onClick={() => setView('grid')}
               className={`px-3 py-2 text-sm ${view === 'grid' ? 'bg-brand-500 text-white' : 'text-slate-300'}`}
-              aria-label="Grid view"
+              aria-label={t('discover.watchlist.view.gridAria')}
             >
-              Grid
+              {t('discover.watchlist.view.grid')}
             </button>
             <button
               onClick={() => setView('list')}
               className={`px-3 py-2 text-sm ${view === 'list' ? 'bg-brand-500 text-white' : 'text-slate-300'}`}
-              aria-label="List view"
+              aria-label={t('discover.watchlist.view.listAria')}
             >
-              List
+              {t('discover.watchlist.view.list')}
             </button>
           </div>
         </div>
       </div>
 
       {visible.length === 0 ? (
-        <p className="py-10 text-center text-sm text-slate-400">Nothing matches these filters.</p>
+        <p className="py-10 text-center text-sm text-slate-400">{t('discover.watchlist.empty')}</p>
       ) : view === 'grid' ? (
         <div className="poster-grid">
           {visible.map((item) => (
@@ -187,7 +185,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
                   value={item.status}
                   onChange={(e) => changeStatus(item.id, e.target.value as WatchlistStatus)}
                   className="mt-2 w-full rounded-lg border border-white/10 bg-ink-900 px-2 py-1.5 text-xs text-slate-200"
-                  aria-label={`Status for ${item.title}`}
+                  aria-label={t('discover.watchlist.statusForAria', { title: item.title })}
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s} value={s}>
@@ -196,7 +194,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
                   ))}
                 </select>
                 <button onClick={() => remove(item.id)} className="mt-1 w-full text-xs text-slate-500 hover:text-red-300">
-                  Remove
+                  {t('discover.watchlist.remove')}
                 </button>
               </div>
             </div>
@@ -214,7 +212,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
                   {item.title}
                 </Link>
                 <div className="text-xs text-slate-400">
-                  {item.year ?? '—'} · {item.media_type === 'movie' ? 'Movie' : 'TV'}
+                  {item.year ?? '—'} · {item.media_type === 'movie' ? t('discover.watchlist.media.movie') : t('discover.watchlist.media.tv')}
                   {item.rating ? ` · ★${item.rating}/10` : ''}
                 </div>
               </div>
@@ -223,7 +221,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
                 value={item.status}
                 onChange={(e) => changeStatus(item.id, e.target.value as WatchlistStatus)}
                 className="rounded-lg border border-white/10 bg-ink-900 px-2 py-1.5 text-xs text-slate-200"
-                aria-label={`Status for ${item.title}`}
+                aria-label={t('discover.watchlist.statusForAria', { title: item.title })}
               >
                 {STATUS_OPTIONS.map((s) => (
                   <option key={s} value={s}>
@@ -232,7 +230,7 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
                 ))}
               </select>
               <button onClick={() => remove(item.id)} className="text-xs text-slate-500 hover:text-red-300">
-                Remove
+                {t('discover.watchlist.remove')}
               </button>
             </div>
           ))}
@@ -244,13 +242,15 @@ export function WatchlistManager({ items: initial }: { items: WatchlistItem[] })
 
 /** A tap-to-favorite star. Filled gold when on, hollow otherwise. */
 function FavStar({ on, onClick }: { on: boolean; onClick: () => void }) {
+  const t = useT();
+  const label = on ? t('discover.watchlist.fav.removeAria') : t('discover.watchlist.fav.addAria');
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={on}
-      aria-label={on ? 'Remove from Favorites' : 'Add to Favorites'}
-      title={on ? 'Remove from Favorites' : 'Add to Favorites'}
+      aria-label={label}
+      title={label}
       className={`grid h-7 w-7 flex-none place-items-center rounded-md border transition ${
         on
           ? 'border-gold-400/60 bg-gold-500/20 text-gold-300'

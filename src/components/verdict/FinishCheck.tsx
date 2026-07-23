@@ -1,4 +1,5 @@
 import type { RiskAssessment } from '@/lib/finish';
+import { getServerI18n } from '@/i18n/server';
 
 const STYLE: Record<Exclude<RiskAssessment['level'], 'unknown'>, { ring: string; text: string; icon: string }> = {
   low: { ring: 'border-emerald-400/40 bg-emerald-500/10', text: 'text-emerald-200', icon: '✅' },
@@ -7,6 +8,7 @@ const STYLE: Record<Exclude<RiskAssessment['level'], 'unknown'>, { ring: string;
 };
 
 export function FinishCheck({ assessment }: { assessment: RiskAssessment }) {
+  const { t } = getServerI18n();
   if (assessment.level === 'unknown') return null;
   const s = STYLE[assessment.level];
 
@@ -27,7 +29,7 @@ export function FinishCheck({ assessment }: { assessment: RiskAssessment }) {
             </div>
           )}
           <p className="mt-2 text-[11px] text-slate-500">
-            Straight from your own watch history — a measured fact about you, not a prediction we invented.
+            {t('title.extras.finishCheckNote')}
           </p>
         </div>
       </div>

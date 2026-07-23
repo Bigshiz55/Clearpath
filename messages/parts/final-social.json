@@ -1,0 +1,26 @@
+{
+  "en-US": {
+    "account": {
+      "social": {
+        "findPlaceholder": "find someone by username",
+        "view": "View"
+      }
+    }
+  },
+  "es-419": {
+    "account": {
+      "social": {
+        "findPlaceholder": "busca a alguien por nombre de usuario",
+        "view": "Ver"
+      }
+    }
+  },
+  "zh-Hans": {
+    "account": {
+      "social": {
+        "findPlaceholder": "按用户名查找某人",
+        "view": "查看"
+      }
+    }
+  }
+}

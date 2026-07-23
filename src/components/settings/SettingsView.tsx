@@ -10,6 +10,7 @@ import { setPublicActivity } from '@/lib/actions/social';
 import { deactivateShare } from '@/lib/actions/share';
 import { deleteAccount } from '@/lib/actions/account';
 import { useToast } from '@/components/Toast';
+import { useT } from '@/i18n/I18nProvider';
 import { STREAMING_SERVICES, LIVE_TV_PROVIDERS } from '@/lib/services';
 import { EnableNotifications } from '@/components/EnableNotifications';
 import { SimpleModeToggle } from '@/components/SimpleModeToggle';
@@ -45,6 +46,7 @@ export function SettingsView(props: {
 }) {
   const router = useRouter();
   const toast = useToast();
+  const t = useT();
 
   const [services, setServices] = useState<Set<number>>(new Set(props.myServices));
   const [savingServices, setSavingServices] = useState(false);
@@ -99,7 +101,7 @@ export function SettingsView(props: {
   const serviceName = (id: number): string =>
     POPULAR_SERVICES.find((s) => s.id === id)?.name ??
     catalog.find((c) => c.id === id)?.name ??
-    `Service #${id}`;
+    t('account.settings.services.fallbackName', { id });
 
   // What to show: on a search, every matching real service + live-TV option;
   // otherwise the popular set plus anything already selected (so picks from a
@@ -130,11 +132,11 @@ export function SettingsView(props: {
     const res = await setPublicActivity({ on });
     setSavingPublic(false);
     if (res.ok) {
-      toast.show(on ? 'Your verdicts are now visible to followers.' : 'Your activity is private again.', 'success');
+      toast.show(on ? t('account.settings.toast.publicOn') : t('account.settings.toast.publicOff'), 'success');
       router.refresh();
     } else {
       setPublicOn(!on);
-      toast.show(res.error ?? 'Failed.', 'error');
+      toast.show(res.error ?? t('account.settings.toast.failed'), 'error');
     }
   }
 
@@ -151,7 +153,7 @@ export function SettingsView(props: {
     setSavingServices(true);
     const res = await updateMyServices({ services: Array.from(services) });
     setSavingServices(false);
-    toast.show(res.ok ? 'Services saved.' : res.error ?? 'Failed.', res.ok ? 'success' : 'error');
+    toast.show(res.ok ? t('account.settings.toast.servicesSaved') : res.error ?? t('account.settings.toast.failed'), res.ok ? 'success' : 'error');
     if (res.ok) router.refresh();
   }
 
@@ -185,7 +187,7 @@ export function SettingsView(props: {
     setSavingProfile(true);
     const res = await updateProfile({ displayName, region, personalLabel });
     setSavingProfile(false);
-    toast.show(res.ok ? 'Profile saved.' : res.error ?? 'Failed.', res.ok ? 'success' : 'error');
+    toast.show(res.ok ? t('account.settings.toast.profileSaved') : res.error ?? t('account.settings.toast.failed'), res.ok ? 'success' : 'error');
     if (res.ok) router.refresh();
   }
 
@@ -199,21 +201,21 @@ export function SettingsView(props: {
       rules: rules.map((r) => ({ trait: r.trait, weight: r.weight, requiresDefining: r.requiresDefining, label: r.label })),
     });
     setSavingRules(false);
-    toast.show(res.ok ? 'Preferences saved.' : res.error ?? 'Failed.', res.ok ? 'success' : 'error');
+    toast.show(res.ok ? t('account.settings.toast.preferencesSaved') : res.error ?? t('account.settings.toast.failed'), res.ok ? 'success' : 'error');
     if (res.ok) router.refresh();
   }
 
   async function loadScottPreset() {
     setAvoid(new Set(SCOTT_RULES.filter((r) => r.weight < 0).map((r) => r.trait)));
     setLove(new Set(SCOTT_RULES.filter((r) => r.weight > 0).map((r) => r.trait)));
-    toast.show('Scott preset loaded — remember to save.', 'info');
+    toast.show(t('account.settings.toast.scottPreset'), 'info');
   }
 
   async function saveDigest() {
     setSavingDigest(true);
     const res = await updateDigestPrefs({ dailyDigest, digestMinScore: minScore });
     setSavingDigest(false);
-    toast.show(res.ok ? 'Digest settings saved.' : res.error ?? 'Failed.', res.ok ? 'success' : 'error');
+    toast.show(res.ok ? t('account.settings.toast.digestSaved') : res.error ?? t('account.settings.toast.failed'), res.ok ? 'success' : 'error');
     if (res.ok) router.refresh();
   }
 
@@ -221,9 +223,9 @@ export function SettingsView(props: {
     const res = await deactivateShare(token);
     if (res.ok) {
       setShares((prev) => prev.map((s) => (s.token === token ? { ...s, isActive: false } : s)));
-      toast.show('Share link deactivated.', 'info');
+      toast.show(t('account.settings.toast.shareDeactivated'), 'info');
     } else {
-      toast.show(res.error ?? 'Failed.', 'error');
+      toast.show(res.error ?? t('account.settings.toast.failed'), 'error');
     }
   }
 
@@ -235,13 +237,13 @@ export function SettingsView(props: {
       router.push('/');
       router.refresh();
     } else {
-      toast.show(res.error ?? 'Failed to delete account.', 'error');
+      toast.show(res.error ?? t('account.settings.toast.deleteFailed'), 'error');
     }
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold text-white sm:text-3xl">Settings</h1>
+      <h1 className="text-2xl font-bold text-white sm:text-3xl">{t('account.settings.heading')}</h1>
 
       {props.isAdmin && (
         <a
@@ -249,8 +251,8 @@ export function SettingsView(props: {
           className="flex items-center justify-between rounded-xl border border-gold-400/40 bg-gold-500/10 p-4 transition hover:bg-gold-500/20"
         >
           <span>
-            <span className="block font-semibold text-gold-400">⚖️ Sponsored Judges — Admin</span>
-            <span className="block text-sm text-slate-400">Add and manage sponsors, and see coupon-claim conversions.</span>
+            <span className="block font-semibold text-gold-400">{t('account.settings.admin.sponsoredJudges')}</span>
+            <span className="block text-sm text-slate-400">{t('account.settings.admin.sponsorsDesc')}</span>
           </span>
           <span className="text-gold-400">→</span>
         </a>
@@ -258,19 +260,19 @@ export function SettingsView(props: {
 
       {/* Profile */}
       <section className="card p-5">
-        <h2 className="text-lg font-semibold text-white">Profile</h2>
+        <h2 className="text-lg font-semibold text-white">{t('account.settings.profile.heading')}</h2>
         <div className="mt-4 space-y-4">
           <div>
-            <label className="label" htmlFor="dn">Display name</label>
+            <label className="label" htmlFor="dn">{t('account.settings.profile.displayName')}</label>
             <input id="dn" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="input" />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="label" htmlFor="pl">Personal match label</label>
-              <input id="pl" value={personalLabel} onChange={(e) => setPersonalLabel(e.target.value)} className="input" placeholder="Scott Match" />
+              <label className="label" htmlFor="pl">{t('account.settings.profile.personalLabel')}</label>
+              <input id="pl" value={personalLabel} onChange={(e) => setPersonalLabel(e.target.value)} className="input" placeholder={t('account.settings.profile.personalLabelPlaceholder')} />
             </div>
             <div>
-              <label className="label" htmlFor="rg">Viewing country</label>
+              <label className="label" htmlFor="rg">{t('account.settings.profile.viewingCountry')}</label>
               <select id="rg" value={region} onChange={(e) => setRegion(e.target.value)} className="input">
                 {REGIONS.map((r) => (
                   <option key={r} value={r}>{r}</option>
@@ -279,11 +281,11 @@ export function SettingsView(props: {
             </div>
           </div>
           <div className="text-xs text-slate-500">
-            Signed in as {props.email}
+            {t('account.settings.profile.signedInAs', { email: props.email })}
             {props.username ? ` · @${props.username}` : ''}
           </div>
           <button onClick={saveProfile} disabled={savingProfile} className="btn-primary">
-            {savingProfile ? 'Saving…' : 'Save profile'}
+            {savingProfile ? t('account.settings.saving') : t('account.settings.profile.save')}
           </button>
         </div>
       </section>
@@ -291,12 +293,12 @@ export function SettingsView(props: {
       {/* Preferences */}
       <section className="card p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Taste & preferences</h2>
-          <button onClick={loadScottPreset} className="text-xs text-brand-300 hover:underline">Load Scott preset</button>
+          <h2 className="text-lg font-semibold text-white">{t('account.settings.prefs.heading')}</h2>
+          <button onClick={loadScottPreset} className="text-xs text-brand-300 hover:underline">{t('account.settings.prefs.loadScottPreset')}</button>
         </div>
         <div className="mt-4 space-y-4">
           <div>
-            <div className="label">Avoid (penalized when defining)</div>
+            <div className="label">{t('account.settings.prefs.avoidLabel')}</div>
             <div className="flex flex-wrap gap-2">
               {AVOIDABLE.map((t) => (
                 <button key={t} onClick={() => toggle(avoid, t, setAvoid)} className={`chip border ${avoid.has(t) ? 'chip-active' : ''}`}>
@@ -306,7 +308,7 @@ export function SettingsView(props: {
             </div>
           </div>
           <div>
-            <div className="label">Love (boosted)</div>
+            <div className="label">{t('account.settings.prefs.loveLabel')}</div>
             <div className="flex flex-wrap gap-2">
               {LOVABLE.map((t) => (
                 <button key={t} onClick={() => toggle(love, t, setLove)} className={`chip border ${love.has(t) ? 'chip-active' : ''}`}>
@@ -316,27 +318,25 @@ export function SettingsView(props: {
             </div>
           </div>
           <button onClick={saveRules} disabled={savingRules} className="btn-primary">
-            {savingRules ? 'Saving…' : 'Save preferences'}
+            {savingRules ? t('account.settings.saving') : t('account.settings.prefs.save')}
           </button>
         </div>
       </section>
 
       {/* My streaming services */}
       <section className="card p-5">
-        <h2 className="text-lg font-semibold text-white">My services &amp; channels</h2>
+        <h2 className="text-lg font-semibold text-white">{t('account.settings.services.heading')}</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Pick everything you have — streaming apps, premium channels (Hallmark, Acorn, BritBox…), and your live-TV or
-          cable box (Verizon Fios, Xfinity, YouTube TV…). On-demand picks flag what’s{' '}
-          <span className="font-semibold text-emerald-300">✓ free on a plan you have</span> vs. a rental. Live-TV/cable
-          boxes are recorded for your reference (they aren’t on-demand catalogs, so they don’t filter results).
+          {t('account.settings.services.descPre')}{' '}
+          <span className="font-semibold text-emerald-300">{t('account.settings.services.freeBadge')}</span>{t('account.settings.services.descPost')}
         </p>
 
         <input
           value={svcQuery}
           onChange={(e) => setSvcQuery(e.target.value)}
-          placeholder="Search 500+ services & channels — e.g. Hallmark, Acorn, ESPN, Xfinity…"
+          placeholder={t('account.settings.services.searchPlaceholder')}
           className="input mt-4"
-          aria-label="Search services and channels"
+          aria-label={t('account.settings.services.searchAria')}
         />
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -356,36 +356,37 @@ export function SettingsView(props: {
             </button>
           ))}
           {svcQ && shownServices.length === 0 && (
-            <p className="text-sm text-slate-400">No match for “{svcQuery}”. Try a shorter name.</p>
+            <p className="text-sm text-slate-400">{t('account.settings.services.noMatch', { query: svcQuery })}</p>
           )}
         </div>
 
         <div className="mt-4 flex items-center gap-3">
           <button onClick={saveServices} disabled={savingServices} className="btn-primary">
-            {savingServices ? 'Saving…' : 'Save services'}
+            {savingServices ? t('account.settings.saving') : t('account.settings.services.save')}
           </button>
-          <span className="text-xs text-slate-400">{services.size} selected</span>
+          <span className="text-xs text-slate-400">{t('account.settings.services.selected', { count: services.size })}</span>
         </div>
       </section>
 
       {/* Friends / public activity */}
       <section className="card p-5">
-        <h2 className="text-lg font-semibold text-white">Friends &amp; public profile</h2>
+        <h2 className="text-lg font-semibold text-white">{t('account.settings.friends.heading')}</h2>
         <p className="mt-1 text-sm text-slate-400">
           {props.username ? (
             <>
-              Your handle is <span className="font-semibold text-slate-200">@{props.username}</span> — share it so
-              friends can follow you.
+              {t('account.settings.friends.handlePre')}{' '}
+              <span className="font-semibold text-slate-200">@{props.username}</span>{' '}
+              {t('account.settings.friends.handlePost')}
             </>
           ) : (
-            <>Set a username above so friends can find and follow you.</>
+            <>{t('account.settings.friends.setUsername')}</>
           )}
         </p>
         <label className="mt-4 flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
           <span className="text-sm text-slate-200">
-            Share my verdicts publicly
+            {t('account.settings.friends.sharePublicly')}
             <span className="block text-xs text-slate-500">
-              People who follow you (and anyone who opens your profile) can see your recent verdicts. Off by default.
+              {t('account.settings.friends.sharePubliclyDesc')}
             </span>
           </span>
           <input
@@ -400,10 +401,9 @@ export function SettingsView(props: {
 
       {/* Accessibility / Simple view */}
       <section className="card p-5">
-        <h2 className="text-lg font-semibold text-white">Display</h2>
+        <h2 className="text-lg font-semibold text-white">{t('account.settings.display.heading')}</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Simple view makes everything bigger and easier to read and tap — great for older eyes or a TV across the
-          room. It’s saved on this device and toggles off just as easily.
+          {t('account.settings.display.desc')}
         </p>
         <div className="mt-4">
           <SimpleModeToggle variant="full" />
@@ -412,10 +412,9 @@ export function SettingsView(props: {
 
       {/* Notifications */}
       <section className="card p-5">
-        <h2 className="text-lg font-semibold text-white">Notifications</h2>
+        <h2 className="text-lg font-semibold text-white">{t('account.settings.notifications.heading')}</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Get a ping when something’s actually worth opening the app for — a new pick that fits you, a show you’re
-          watching drops an episode, or your Docket’s about to reset. Off until you turn it on, per device.
+          {t('account.settings.notifications.desc')}
         </p>
         <div className="mt-4">
           <EnableNotifications />
@@ -424,16 +423,15 @@ export function SettingsView(props: {
 
       {/* Daily digest */}
       <section className="card p-5">
-        <h2 className="text-lg font-semibold text-white">Daily new-release digest</h2>
+        <h2 className="text-lg font-semibold text-white">{t('account.settings.digest.heading')}</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Each morning we scan new movie &amp; TV releases and surface the ones that match your taste
-          under “New for you”.
+          {t('account.settings.digest.desc')}
         </p>
         <div className="mt-4 space-y-4">
           <label className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
             <span className="text-sm text-slate-200">
-              Scan new releases daily
-              <span className="block text-xs text-slate-500">Turn off to stop building your “New for you” list.</span>
+              {t('account.settings.digest.scanDaily')}
+              <span className="block text-xs text-slate-500">{t('account.settings.digest.scanDailyDesc')}</span>
             </span>
             <input
               type="checkbox"
@@ -444,7 +442,7 @@ export function SettingsView(props: {
           </label>
           <div>
             <label className="label" htmlFor="min">
-              Only show matches at or above <span className="font-bold text-brand-200">{minScore}%</span>
+              {t('account.settings.digest.minScoreLabel')} <span className="font-bold text-brand-200">{minScore}%</span>
             </label>
             <input
               id="min"
@@ -457,21 +455,21 @@ export function SettingsView(props: {
               className="w-full accent-brand-500"
             />
             <div className="flex justify-between text-[11px] text-slate-500">
-              <span>More titles (40%)</span>
-              <span>Only the best (95%)</span>
+              <span>{t('account.settings.digest.moreTitles')}</span>
+              <span>{t('account.settings.digest.onlyBest')}</span>
             </div>
           </div>
           <button onClick={saveDigest} disabled={savingDigest} className="btn-primary">
-            {savingDigest ? 'Saving…' : 'Save digest settings'}
+            {savingDigest ? t('account.settings.saving') : t('account.settings.digest.save')}
           </button>
         </div>
       </section>
 
       {/* Shares */}
       <section className="card p-5">
-        <h2 className="text-lg font-semibold text-white">Share links</h2>
+        <h2 className="text-lg font-semibold text-white">{t('account.settings.shares.heading')}</h2>
         {shares.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-400">You haven’t shared any verdicts yet.</p>
+          <p className="mt-2 text-sm text-slate-400">{t('account.settings.shares.empty')}</p>
         ) : (
           <ul className="mt-3 divide-y divide-white/5">
             {shares.map((s) => (
@@ -479,13 +477,13 @@ export function SettingsView(props: {
                 <div className="min-w-0">
                   <div className="line-clamp-1 text-sm font-medium text-white">{s.title}</div>
                   <div className="text-xs text-slate-500">
-                    {s.isActive ? 'Active' : 'Deactivated'}
-                    {s.expiresAt ? ` · expires ${new Date(s.expiresAt).toLocaleDateString()}` : ''}
+                    {s.isActive ? t('account.settings.shares.active') : t('account.settings.shares.deactivated')}
+                    {s.expiresAt ? ` ${t('account.settings.shares.expires', { date: new Date(s.expiresAt).toLocaleDateString() })}` : ''}
                   </div>
                 </div>
                 {s.isActive && (
                   <button onClick={() => revoke(s.token)} className="btn-ghost text-red-300 hover:bg-red-500/10">
-                    Deactivate
+                    {t('account.settings.shares.deactivate')}
                   </button>
                 )}
               </li>
@@ -496,22 +494,21 @@ export function SettingsView(props: {
 
       {/* Danger zone */}
       <section className="card border-red-500/20 p-5">
-        <h2 className="text-lg font-semibold text-red-200">Delete account</h2>
+        <h2 className="text-lg font-semibold text-red-200">{t('account.settings.danger.heading')}</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Permanently deletes your account, watchlists, verdicts, preferences, and share links. This
-          cannot be undone.
+          {t('account.settings.danger.desc')}
         </p>
         {!confirmDelete ? (
           <button onClick={() => setConfirmDelete(true)} className="btn-secondary mt-4 border-red-500/40 text-red-200">
-            Delete my account
+            {t('account.settings.danger.deleteMy')}
           </button>
         ) : (
           <div className="mt-4 flex flex-wrap gap-2">
             <button onClick={doDelete} disabled={deleting} className="btn bg-red-500 text-white hover:bg-red-400">
-              {deleting ? 'Deleting…' : 'Yes, permanently delete'}
+              {deleting ? t('account.settings.danger.deleting') : t('account.settings.danger.confirmDelete')}
             </button>
             <button onClick={() => setConfirmDelete(false)} className="btn-ghost">
-              Cancel
+              {t('account.settings.danger.cancel')}
             </button>
           </div>
         )}

@@ -12,6 +12,7 @@ import { BrowseCatalog } from '@/components/BrowseCatalog';
 import { PosterCard } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
 import { tmdbImage } from '@/lib/tmdb/image';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Watch now · WatchVerdict' };
@@ -20,6 +21,7 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
   // Deep link from the simple version: /app/watch?type=tv opens straight into the
   // Browse tab filtered to the chosen media type.
   const wantType = searchParams?.type === 'tv' ? 'tv' : searchParams?.type === 'movie' ? 'movie' : null;
+  const { t } = getServerI18n();
   const supabase = createClient();
   const {
     data: { user },
@@ -57,18 +59,18 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
       {rankedReady.items.length > 0 && (
         <section>
           <h2 className="mb-1 text-lg font-semibold text-white">
-            {rankedReady.personalized ? '🧬 Ready to watch — ranked by your VERD1CT DNA' : '▶ Ready to watch'}
+            {rankedReady.personalized ? t('discover.watch.readyRanked') : t('discover.watch.ready')}
           </h2>
-          <p className="mb-3 text-xs text-slate-400">From your watchlist — where each one’s streaming right now.</p>
+          <p className="mb-3 text-xs text-slate-400">{t('discover.watch.readyNote')}</p>
           <WatchNowGrid items={rankedReady.items} />
         </section>
       )}
       {recs.length > 0 ? (
         <section>
-          <h2 className="mb-1 text-lg font-semibold text-white">🧬 Recommended for you</h2>
+          <h2 className="mb-1 text-lg font-semibold text-white">{t('discover.watch.recommended')}</h2>
           <p className="mb-3 text-xs text-slate-400">
-            Seeded from the titles you rated highest — the more you rate in the{' '}
-            <Link href="/app/quiz" className="text-brand-300 hover:underline">Taste Quiz</Link>, the sharper this gets. Tap any for where to watch.
+            {t('discover.watch.recSeededA')}
+            <Link href="/app/quiz" className="text-brand-300 hover:underline">{t('discover.watch.tasteQuiz')}</Link>{t('discover.watch.recSeededB')}
           </p>
           <div className="poster-grid">
             {recs.map((r) => (
@@ -88,12 +90,12 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
         rankedMore && rankedMore.items.length > 0 && (
           <section>
             <h2 className="mb-1 text-lg font-semibold text-white">
-              {rankedMore.personalized ? '🧬 Recommended for you' : '🍿 Popular right now'}
+              {rankedMore.personalized ? t('discover.watch.recommended') : t('discover.watch.popularNow')}
             </h2>
             <p className="mb-3 text-xs text-slate-400">
               {rankedMore.personalized
-                ? 'Ranked by your VERD1CT DNA — tap any to see where to watch.'
-                : 'Trending titles you can stream right now — tap any for where to watch.'}
+                ? t('discover.watch.rankedDna')
+                : t('discover.watch.trending')}
             </p>
             <div className="poster-grid">
               {rankedMore.items.map((t) => (
@@ -117,11 +119,11 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
   return (
     <div className="space-y-6">
       <section>
-        <h1 className="text-2xl font-bold text-white sm:text-3xl">▶ Watch now</h1>
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">{t('discover.watch.heading')}</h1>
         <p className="mt-2 text-sm text-slate-300">
-          What you can actually watch right now — with where it’s streaming and your VERD1CT score on every title.
-          <span className="font-semibold text-white"> Ready to watch</span> is your list, streamable now;
-          <span className="font-semibold text-white"> Browse everything</span> lets you pick any service and see what’s on it, ranked for your taste — so you know if it’s worth keeping.
+          {t('discover.watch.subA')}
+          <span className="font-semibold text-white">{t('discover.watch.readyToWatch')}</span>{t('discover.watch.subB')}
+          <span className="font-semibold text-white">{t('discover.watch.browseEverything')}</span>{t('discover.watch.subC')}
         </p>
       </section>
 
@@ -132,8 +134,7 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
       />
 
       <p className="text-[11px] text-slate-500">
-        Availability from TMDB / JustWatch for {region} — real data, refreshed periodically, never guaranteed
-        current. We only show titles we can confirm are watchable.
+        {t('discover.watch.footer', { region })}
       </p>
     </div>
   );
