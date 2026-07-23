@@ -5,20 +5,17 @@ import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
 import { Verd1ctBadge } from './Verd1ctBadge';
-import { CardRatings } from './CardRatings';
 
 /**
  * The one pink "algorithm" box on every card. It folds the user's DNA together
  * with every rating (RT, audience, IMDb) into a single 0–100 score and a plain
- * "will you like it?" answer, with the individual ratings shown underneath. This
- * replaces the old split treatment (a DNA call up top + a separate DNA row),
- * which read as two competing DNA numbers.
+ * "will you like it?" answer. We ride on our OWN number here — the individual
+ * third-party critic badges are intentionally not shown on the card, so Your
+ * VERD1CT stands alone (the ratings still feed the score under the hood).
  */
 export function AlgorithmScore({
   mediaType,
   tmdbId,
-  title,
-  year,
   objectiveScore = null,
   className = '',
 }: {
@@ -67,9 +64,6 @@ export function AlgorithmScore({
           </div>
         </div>
       </div>
-
-      {/* The ratings that feed the score, on the same card. */}
-      <CardRatings mediaType={mediaType} tmdbId={tmdbId} title={title} year={year} hideCall className="mt-2" />
     </div>
   );
 }
