@@ -316,6 +316,16 @@ export function detectPlatform(text: string): { id: number; name: string } | nul
     { id: 300, name: 'Pluto TV', strong: /\bpluto\b/ },
     { id: 207, name: 'The Roku Channel', strong: /\broku\b/ },
   ];
+  // Self-correction: "...on Netflix, actually make that Prime" → prefer the
+  // platform named right after the correction cue. Bare aliases count here
+  // (the correction makes the platform explicit) even without a leading "on".
+  const corr = t.match(
+    /\b(?:actually|no,?\s*wait|scratch that|i mean|on second thought|make it|make that|change (?:it|that) to|rather|instead)\b[\s,]*(?:make (?:it|that)\s+)?([a-z0-9+ ]{2,18})/,
+  );
+  if (corr && corr[1]) {
+    const seg = ` ${corr[1]} `;
+    for (const p of table) if (p.strong.test(seg) || (p.bare && p.bare.test(seg))) return { id: p.id, name: p.name };
+  }
   for (const p of table) if (p.strong.test(t)) return { id: p.id, name: p.name };
   for (const p of table) if (p.bare && new RegExp(`\\bon\\s+(?:the\\s+)?${p.bare.source}`).test(t)) return { id: p.id, name: p.name };
   return null;

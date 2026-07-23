@@ -146,4 +146,10 @@ describe('detectPlatform', () => {
   it('KNOWN-BUG: hbo maps to Max streaming id, not the HBO linear channel', () => {
     expect(detectPlatform('on HBO')).toEqual({ id: 1899, name: 'Max' });
   });
+  it('honours a self-correction — prefers the platform named after the cue', () => {
+    expect(detectPlatform('movies on Netflix, actually make that Prime')).toEqual({ id: 9, name: 'Prime Video' });
+    expect(detectPlatform('on Netflix, no wait, Hulu')).toEqual({ id: 15, name: 'Hulu' });
+    // No correction cue → first platform still wins.
+    expect(detectPlatform('best movies on Netflix')).toEqual({ id: 8, name: 'Netflix' });
+  });
 });
