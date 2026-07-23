@@ -71,5 +71,126 @@
       "possible": "备选清单",
       "skip": "跳过"
     }
+  },
+  "dims": {
+    "pacing": {
+      "label": "节奏",
+      "low": "慢热",
+      "high": "快节奏"
+    },
+    "darkness": {
+      "label": "基调",
+      "low": "轻松愉快",
+      "high": "黑暗沉重"
+    },
+    "warmth": {
+      "label": "温情",
+      "low": "愤世嫉俗",
+      "high": "充满希望"
+    },
+    "humor": {
+      "label": "幽默",
+      "low": "严肃",
+      "high": "喜剧为主"
+    },
+    "suspense": {
+      "label": "紧张感",
+      "low": "低张力",
+      "high": "扣人心弦"
+    },
+    "emotion": {
+      "label": "情感强度",
+      "low": "轻松",
+      "high": "催人泪下"
+    },
+    "complexity": {
+      "label": "复杂度",
+      "low": "轻松易看",
+      "high": "烧脑"
+    },
+    "realism": {
+      "label": "真实感",
+      "low": "奇幻",
+      "high": "写实"
+    },
+    "character": {
+      "label": "侧重",
+      "low": "情节驱动",
+      "high": "人物驱动"
+    },
+    "stakes": {
+      "label": "格局",
+      "low": "私人化",
+      "high": "史诗"
+    },
+    "morality": {
+      "label": "道德清晰度",
+      "low": "黑白分明",
+      "high": "道德灰色"
+    },
+    "violence": {
+      "label": "尺度",
+      "low": "温和",
+      "high": "残酷"
+    },
+    "attention": {
+      "label": "专注度",
+      "low": "可当背景",
+      "high": "需要专注"
+    },
+    "serialized": {
+      "label": "结构",
+      "low": "单元剧",
+      "high": "连续剧"
+    },
+    "romance": {
+      "label": "爱情",
+      "low": "无",
+      "high": "核心"
+    }
+  },
+  "dna": {
+    "tierLearning": "仍在学习",
+    "tierWeak": "轻微倾向",
+    "tierModerate": "中等",
+    "tierStrong": "强烈",
+    "yours": "你的",
+    "youSetThis": "你的设置",
+    "avoid": "避免",
+    "samples": {
+      "one": "{count} 部作品 · {pct}% 把握",
+      "other": "{count} 部作品 · {pct}% 把握"
+    },
+    "close": "收起",
+    "edit": "编辑",
+    "adjust": "调整",
+    "setYour": "设置你的{label}",
+    "dealbreaker": "设为硬性要求 — 强力避开另一端",
+    "saving": "保存中…",
+    "save": "保存",
+    "resetLearned": "恢复为学习结果",
+    "couldNotSave": "无法保存。",
+    "couldNotClear": "无法清除。"
+  },
+  "personality": {
+    "header": "你的观影人格",
+    "title": {
+      "slowBurnNoir": "慢热黑色片迷",
+      "moralGrayZone": "道德灰色地带",
+      "prestigePurist": "精品剧纯粹主义者",
+      "thrillSeeker": "刺激追求者",
+      "epicEscapist": "史诗逃避者",
+      "feelsChaser": "情感追逐者",
+      "genreExplorer": "类型探索者",
+      "groundedRealist": "写实主义者",
+      "comfortWatcher": "治愈系观众",
+      "easyStreamer": "轻松刷剧党",
+      "romantic": "浪漫主义者",
+      "stillCalibrating": "仍在校准"
+    }
+  },
+  "dnaPage": {
+    "heading": "你的观影 DNA",
+    "subtitle": "根据你的评分学习到的口味——你偏爱的维度和观看方式。"
   }
 }

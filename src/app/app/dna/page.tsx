@@ -7,9 +7,26 @@ import { tasteDials, dnaStrength } from '@/lib/scoring/dimensions';
 import { describePersonality } from '@/lib/scoring/personality';
 import { ShareCard, WatchDnaCardArt } from '@/components/ShareCards';
 import { TasteDials } from '@/components/TasteDials';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Your Watch DNA' };
+
+/** English archetype title → stable catalog key (the pure engine stays English). */
+const PERSONALITY_KEY: Record<string, string> = {
+  'The Slow-Burn Noir': 'slowBurnNoir',
+  'The Moral Gray-Zone': 'moralGrayZone',
+  'The Prestige Purist': 'prestigePurist',
+  'The Thrill Seeker': 'thrillSeeker',
+  'The Epic Escapist': 'epicEscapist',
+  'The Feels Chaser': 'feelsChaser',
+  'The Genre Explorer': 'genreExplorer',
+  'The Grounded Realist': 'groundedRealist',
+  'The Comfort Watcher': 'comfortWatcher',
+  'The Easy Streamer': 'easyStreamer',
+  'The Romantic': 'romantic',
+  'Still Calibrating': 'stillCalibrating',
+};
 
 function pct(n: number | null): string {
   return n == null ? '—' : `${Math.round(n * 100)}%`;
@@ -26,13 +43,17 @@ export default async function WatchDnaPage() {
   const persona = describePersonality(profile);
   const dnaScore = dnaStrength(profile);
 
+  const { t } = getServerI18n();
+  const personaTitleKey = PERSONALITY_KEY[persona.title];
+  const personaTitle = personaTitleKey ? t(`personality.title.${personaTitleKey}`) : persona.title;
+
   const ready = profile.samples >= 3;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-white sm:text-3xl">🧬 Your Watch DNA</h1>
-        <p className="mt-1 text-sm text-slate-400">Your taste, learned from what you rate — the axes you lean on and how you watch.</p>
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-white sm:text-3xl">🧬 {t('dnaPage.heading')}</h1>
+        <p className="mt-1 text-sm text-slate-400">{t('dnaPage.subtitle')}</p>
       </div>
 
       {/* Personality */}
@@ -40,8 +61,8 @@ export default async function WatchDnaPage() {
         <div className="bg-gradient-to-br from-brand-500/20 via-fuchsia-500/10 to-transparent p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="text-xs font-bold uppercase tracking-[0.15em] text-brand-300">Your watch personality</div>
-              <h2 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">{persona.title}</h2>
+              <div className="text-xs font-bold uppercase tracking-[0.15em] text-brand-300">{t('personality.header')}</div>
+              <h2 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">{personaTitle}</h2>
             </div>
             <DnaScoreBadge score={dnaScore} />
           </div>
