@@ -18,6 +18,13 @@ export const equityPositionSchema = z.object({
   costBasis: z.number().optional(),
 });
 
+/** User-selected analysis preferences (all optional; "auto" = model decides). */
+export const preferencesSchema = z.object({
+  bias: z.enum(["auto", "neutral", "bullish", "bearish"]).default("auto"),
+  riskAppetite: z.enum(["conservative", "moderate", "aggressive"]).default("conservative"),
+});
+export type Preferences = z.infer<typeof preferencesSchema>;
+
 export const portfolioSchema = z.object({
   cash: z.number().nonnegative(),
   equities: z.array(equityPositionSchema).default([]),

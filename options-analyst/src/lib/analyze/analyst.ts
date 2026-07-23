@@ -1,7 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import type { Portfolio } from "@/lib/portfolio";
+import type { Portfolio, Preferences } from "@/lib/portfolio";
 import type { ChainSnapshot, ContractRow } from "@/lib/market/yahoo";
 import type { PortfolioGreeksReport } from "@/lib/analyze/portfolioGreeks";
 import { analysisSchema, type Analysis } from "@/lib/analyze/schema";
@@ -32,6 +32,8 @@ function trimChain(chain: ChainSnapshot, windowPct = 0.15) {
     iv_rv_ratio: chain.ivRvRatio,
     expected_move_dollars: chain.expectedMove,
     median_ntm_spread_pct: chain.medianSpreadPct,
+    next_earnings_date: chain.nextEarningsDate,
+    earnings_before_expiration: chain.earningsBeforeExpiration,
     calls: near(chain.calls),
     puts: near(chain.puts),
   };
@@ -41,6 +43,7 @@ export async function runAnalysis(
   portfolio: Portfolio,
   greeks: PortfolioGreeksReport,
   chains: ChainSnapshot[],
+  preferences: Preferences,
 ): Promise<Analysis> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -53,6 +56,7 @@ export async function runAnalysis(
 
   const userPayload = {
     as_of: new Date().toISOString(),
+    preferences,
     portfolio,
     computed_portfolio_greeks: greeks,
     market_data: chains.map((c) => trimChain(c)),

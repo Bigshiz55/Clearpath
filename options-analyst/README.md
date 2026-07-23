@@ -55,6 +55,29 @@ requires `ANTHROPIC_API_KEY` (server-only; never exposed to the client).
 - `npm run typecheck` — strict TypeScript
 - `npm run build` — production build
 
+## Analysis preferences
+
+Two dropdowns steer the analyst without ever loosening the risk rules:
+
+- **Directional bias** — auto / neutral / bullish / bearish tilt for new trades
+- **Risk appetite** — conservative / moderate / aggressive sizing and structure selection
+  (naked calls and undefined risk stay off-limits at every setting)
+
+The analyst is also **earnings-aware**: each symbol's next earnings date is fetched when
+available, and the model must flag (or avoid) short-premium positions that hold through a
+report.
+
+## Deploying (Vercel)
+
+1. Import the repo at [vercel.com/new](https://vercel.com/new). If the app lives in a
+   subfolder, set **Root Directory** to `options-analyst`.
+2. Add one environment variable: `ANTHROPIC_API_KEY`.
+3. Deploy. `vercel.json` already raises the analyze route's timeout to 120s.
+
+Note: some serverless egress IPs are rate-limited by Yahoo (see Troubleshooting). If quotes
+come back empty in production, they'll still work locally — or front the market routes with a
+small cache/proxy.
+
 ## API
 
 - `GET /api/market?symbols=SPY,AAPL` — delayed quotes

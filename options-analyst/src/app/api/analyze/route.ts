@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod/v4";
-import { portfolioSchema } from "@/lib/portfolio";
+import { portfolioSchema, preferencesSchema } from "@/lib/portfolio";
 import { getChainSnapshot, type ChainSnapshot } from "@/lib/market/yahoo";
 import { computePortfolioGreeks } from "@/lib/analyze/portfolioGreeks";
 import { AnalystConfigError, runAnalysis } from "@/lib/analyze/analyst";
@@ -12,6 +12,7 @@ export const maxDuration = 120;
 const bodySchema = z.object({
   portfolio: portfolioSchema,
   watchlist: z.array(z.string().min(1).max(10)).max(10).default([]),
+  preferences: preferencesSchema.default({ bias: "auto", riskAppetite: "conservative" }),
 });
 
 export async function POST(req: NextRequest) {
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { portfolio, watchlist } = body;
+  const { portfolio, watchlist, preferences } = body;
   const tickers = new Set<string>([
     ...portfolio.equities.map((e) => e.ticker.toUpperCase()),
     ...portfolio.options.map((o) => o.ticker.toUpperCase()),
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const greeks = await computePortfolioGreeks(portfolio, chains);
-    const analysis = await runAnalysis(portfolio, greeks, [...chains.values()]);
+    const analysis = await runAnalysis(portfolio, greeks, [...chains.values()], preferences);
     return NextResponse.json({
       analysis,
       computed: { greeks, dataUnavailableFor: failures },

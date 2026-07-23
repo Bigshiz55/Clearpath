@@ -79,6 +79,10 @@ export interface ChainSnapshot {
   expectedMove: number | null;
   /** Median relative bid-ask spread near the money (liquidity gauge). */
   medianSpreadPct: number | null;
+  /** Next confirmed earnings date (ISO), when the source provides one. */
+  nextEarningsDate: string | null;
+  /** True when the next earnings report lands on or before this expiration. */
+  earningsBeforeExpiration: boolean | null;
 }
 
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
@@ -127,7 +131,7 @@ export async function getChainSnapshot(
       expirations[expirations.length - 1];
   }
 
-  const [detail, quote, history] = await Promise.all([
+  const [detail, quote, history, summary] = await Promise.all([
     yahooFinance.options(symbol, { date: chosen }, { validateResult: false }) as Promise<any>,
     yahooFinance.quote(symbol),
     yahooFinance
@@ -135,6 +139,9 @@ export async function getChainSnapshot(
         period1: new Date(now - 95 * 24 * 3600 * 1000),
         interval: "1d",
       })
+      .catch(() => null),
+    yahooFinance
+      .quoteSummary(symbol, { modules: ["calendarEvents"] }, { validateResult: false })
       .catch(() => null),
   ]);
 
@@ -152,6 +159,14 @@ export async function getChainSnapshot(
   const rv = realizedVol(closes);
   const T = Math.max(chosen.getTime() - now, 0) / (365 * 24 * 3600 * 1000);
 
+  // Earliest upcoming earnings date, when Yahoo provides one.
+  const earningsRaw: unknown[] = (summary as any)?.calendarEvents?.earnings?.earningsDate ?? [];
+  const earningsTimes = earningsRaw
+    .map((d) => new Date(d as any).getTime())
+    .filter((t) => Number.isFinite(t) && t >= now - 24 * 3600 * 1000)
+    .sort((a, b) => a - b);
+  const nextEarnings = earningsTimes.length ? new Date(earningsTimes[0]) : null;
+
   return {
     symbol: symbol.toUpperCase(),
     spot,
@@ -165,5 +180,9 @@ export async function getChainSnapshot(
     ivRvRatio: iv != null && rv != null && rv > 0 ? iv / rv : null,
     expectedMove: iv != null ? expectedMove(spot, iv, T) : null,
     medianSpreadPct: medianSpreadPct([...calls, ...puts], spot),
+    nextEarningsDate: nextEarnings ? isoDate(nextEarnings) : null,
+    earningsBeforeExpiration: nextEarnings
+      ? nextEarnings.getTime() <= chosen.getTime() + 24 * 3600 * 1000
+      : null,
   };
 }

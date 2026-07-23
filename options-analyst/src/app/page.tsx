@@ -6,6 +6,10 @@ import type { Analysis } from "@/lib/analyze/schema";
 
 const STORAGE_KEY = "options-analyst:portfolio";
 const WATCHLIST_KEY = "options-analyst:watchlist";
+const PREFS_KEY = "options-analyst:prefs";
+
+type Bias = "auto" | "neutral" | "bullish" | "bearish";
+type RiskAppetite = "conservative" | "moderate" | "aggressive";
 
 interface Quote {
   symbol: string;
@@ -42,6 +46,8 @@ const fmt = (x: number | null | undefined, digits = 2) =>
 export default function Home() {
   const [portfolioText, setPortfolioText] = useState("");
   const [watchlist, setWatchlist] = useState("SPY");
+  const [bias, setBias] = useState<Bias>("auto");
+  const [riskAppetite, setRiskAppetite] = useState<RiskAppetite>("conservative");
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [quotesError, setQuotesError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
@@ -55,6 +61,13 @@ export default function Home() {
     );
     const wl = localStorage.getItem(WATCHLIST_KEY);
     if (wl) setWatchlist(wl);
+    try {
+      const prefs = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}");
+      if (prefs.bias) setBias(prefs.bias);
+      if (prefs.riskAppetite) setRiskAppetite(prefs.riskAppetite);
+    } catch {
+      /* ignore corrupt prefs */
+    }
   }, []);
 
   const parsed = useMemo(() => {
@@ -103,6 +116,7 @@ export default function Home() {
     setResult(null);
     localStorage.setItem(STORAGE_KEY, portfolioText);
     localStorage.setItem(WATCHLIST_KEY, watchlist);
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ bias, riskAppetite }));
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -113,6 +127,7 @@ export default function Home() {
             .split(",")
             .map((s) => s.trim().toUpperCase())
             .filter(Boolean),
+          preferences: { bias, riskAppetite },
         }),
       });
       const data = await res.json();
@@ -191,6 +206,39 @@ export default function Home() {
               </tbody>
             </table>
           )}
+        </div>
+
+        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-slate-400">
+            Analysis preferences
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-slate-400">
+              Directional bias
+              <select
+                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 p-2 text-sm text-slate-200 outline-none focus:border-sky-600"
+                value={bias}
+                onChange={(e) => setBias(e.target.value as Bias)}
+              >
+                <option value="auto">Auto (let the data decide)</option>
+                <option value="neutral">Neutral</option>
+                <option value="bullish">Bullish</option>
+                <option value="bearish">Bearish</option>
+              </select>
+            </label>
+            <label className="text-xs text-slate-400">
+              Risk appetite
+              <select
+                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 p-2 text-sm text-slate-200 outline-none focus:border-sky-600"
+                value={riskAppetite}
+                onChange={(e) => setRiskAppetite(e.target.value as RiskAppetite)}
+              >
+                <option value="conservative">Conservative</option>
+                <option value="moderate">Moderate</option>
+                <option value="aggressive">Aggressive (still defined-risk)</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <button
