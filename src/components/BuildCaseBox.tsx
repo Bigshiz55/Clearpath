@@ -41,6 +41,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   const toast = useToast();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [slam, setSlam] = useState(false);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const lastCase = useRef<{ id: string | null; at: number }>({ id: null, at: 0 });
 
@@ -77,6 +78,15 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  // The gavel is the trigger: dropping it in and striking the button IS the
+  // submit. It slams (0.62s) while the case is read; the min-slam floor keeps us
+  // from navigating before the strike lands.
+  function hitGavel() {
+    if (busy || text.trim().length < 4) return;
+    setSlam(true);
+    void submit().finally(() => setSlam(false));
   }
 
   return (
@@ -133,23 +143,25 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         <Link href="/app/mentalist" className={hero ? 'text-sm font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline' : 'text-xs font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline'}>
           Or just name a few shows you love — we’ll figure out your taste →
         </Link>
-        <button
-          onClick={() => void submit()}
-          disabled={busy || text.trim().length < 4}
-          className={`btn-primary inline-flex shrink-0 items-center gap-1.5 text-white disabled:cursor-not-allowed ${hero ? 'px-6 py-3 text-base font-black disabled:opacity-80' : 'disabled:opacity-60'}`}
-        >
-          {busy ? (
+        <div className="relative shrink-0">
+          {slam && (
             <>
-              <Gavel className="wv-gavel-slam h-5 w-5" />
-              Ruling…
-            </>
-          ) : (
-            <>
-              Hit the gavel
-              <Gavel className="h-4 w-4" />
+              {/* The big gavel that drops in and slams the button. */}
+              <span aria-hidden className="wv-gavel-drop pointer-events-none absolute left-1/2 top-0 z-20 text-white drop-shadow-[0_10px_16px_rgba(0,0,0,0.6)]">
+                <Gavel className="h-16 w-16" />
+              </span>
+              {/* Shock ring on impact. */}
+              <span aria-hidden className="wv-strike-ring pointer-events-none absolute left-1/2 top-1/2 z-10 h-14 w-14 rounded-full border-[3px] border-brand-200" />
             </>
           )}
-        </button>
+          <button
+            onClick={hitGavel}
+            disabled={busy || text.trim().length < 4}
+            className={`btn-primary inline-flex items-center gap-1.5 text-white disabled:cursor-not-allowed ${slam ? 'wv-btn-impact' : ''} ${hero ? 'px-6 py-3 text-base font-black disabled:opacity-80' : 'disabled:opacity-60'}`}
+          >
+            {busy ? 'Ruling…' : (<>Hit the gavel <Gavel className="h-4 w-4" /></>)}
+          </button>
+        </div>
       </div>
     </div>
   );
