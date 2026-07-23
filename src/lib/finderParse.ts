@@ -55,8 +55,11 @@ export function naiveParseQuery(input: string): FinderQuery {
   const t = ` ${input.toLowerCase()} `;
   const q: FinderQuery = { ...EMPTY_QUERY, genreIds: [] };
 
-  // Media type.
-  const wantsTv = /\b(show|series|tv|season|seasons|episodes?)\b/.test(t);
+  // Media type. "show" is a TV signal only as a *noun* — the request verb
+  // "show me/us/them" must not count, or "show me movies" flips to 'any' and
+  // leaks TV. Strip the verb usage, then look for a remaining "show".
+  const noVerbShow = t.replace(/\bshows?\s+(me|us|them)\b/g, ' ');
+  const wantsTv = /\b(show|shows|series|tv|season|seasons|episodes?)\b/.test(noVerbShow);
   const wantsMovie = /\b(movie|film|flick)s?\b/.test(t);
   q.mediaType = wantsTv && !wantsMovie ? 'tv' : wantsMovie && !wantsTv ? 'movie' : 'any';
 

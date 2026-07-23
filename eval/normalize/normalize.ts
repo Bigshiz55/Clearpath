@@ -50,7 +50,9 @@ function detectContentTypes(t: string, mediaType: string): ContentType[] {
   if (/\b(episodes?)\b/.test(t)) out.add('episode');
   if (/\b(live tv|on tv|on television|airing|channel)\b/.test(t)) out.add('live_tv');
   if (mediaType === 'movie' || /\b(movies?|films?|flicks?)\b/.test(t)) out.add('movie');
-  if (mediaType === 'tv' || /\b(shows?|series|sitcoms?)\b/.test(t)) out.add('tv');
+  // "show" only as a noun (mirrors naiveParseQuery) — strip the verb "show me/us".
+  const noVerbShow = t.replace(/\bshows?\s+(me|us|them)\b/g, ' ');
+  if (mediaType === 'tv' || /\b(show|shows|series|sitcoms?)\b/.test(noVerbShow)) out.add('tv');
   return [...out];
 }
 

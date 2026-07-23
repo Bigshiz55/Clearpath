@@ -2,6 +2,19 @@ import { describe, it, expect } from 'vitest';
 import { naiveParseQuery, describeQuery } from './finderParse';
 
 describe('Finder natural-language parsing (no AI needed)', () => {
+  // Regression: the request verb "show me/us/them" must not be read as a TV
+  // signal (it was flipping "show me movies" to mediaType 'any' and leaking TV
+  // into movie-only requests). Discovered by the voice-search eval framework.
+  it('does not treat "show me" as a TV request', () => {
+    expect(naiveParseQuery('Show me three movies on Hulu.').mediaType).toBe('movie');
+    expect(naiveParseQuery('show me the best films on Netflix').mediaType).toBe('movie');
+  });
+  it('still reads "show" as a TV noun', () => {
+    expect(naiveParseQuery('a few shows on Netflix').mediaType).toBe('tv');
+    expect(naiveParseQuery('show me a good show on Disney+').mediaType).toBe('tv');
+    expect(naiveParseQuery('Show me one show on Netflix.').mediaType).toBe('tv');
+  });
+
   it('parses the flagship example correctly', () => {
     const q = naiveParseQuery(
       'a movie that is under 140 minutes long, is a crime thriller, it’s been out within the last 24 months, and it gave a watch verdict of 80+',
