@@ -523,7 +523,27 @@ export async function POST(request: Request) {
       });
     }
 
-    const summary = parts.length ? `Locked in: ${parts.join(' · ')}.` : 'Got it — building your Taste DNA.';
+    // A request to be SHOWN titles that names a genre/mood ("a family movie",
+    // "a good scary movie", "the best comedies") — send them to Forensic Search,
+    // which filters + ranks real titles for their taste, instead of the generic
+    // Watch Now grid. Airing/platform/where-to-watch asks were handled above; a
+    // pure "I love X, avoid Y" (no find verb) still just builds the DNA. Requires
+    // BOTH a genre/media word and a find intent so we don't hijack taste-building.
+    const findWords = /\b(movies?|films?|shows?|series|documentar(y|ies)|comed(y|ies)|funny|scary|horror|thrillers?|family|kids?|action|adventure|dramas?|romance|romantic|rom-?com|sci-?fi|fantasy|animated|anime|western|musical|feel-?good|myster(y|ies)|crime|suspense|tearjerker|date night)\b/i;
+    const findVerb = /\b(find|show me|recommend|suggest|to watch|good|great|best|binge|worth watching)\b/i;
+    if (findWords.test(text) && findVerb.test(text)) {
+      const redirect = `/app/finder?q=${encodeURIComponent(text.slice(0, 200))}&run=1`;
+      await logCase('find', redirect, { axes: parsed.axes.length });
+      return NextResponse.json({
+        ok: true,
+        learned,
+        caseId,
+        redirect,
+        summary: `${tasteLead}Pulling the best matches, scored for your taste.`,
+      });
+    }
+
+    const summary = parts.length ? `Locked in: ${parts.join(' · ')}.` : 'Got it — building your VERD1CT DNA.';
     await logCase('taste', 'watch', { axes: parsed.axes.length, liked: parsed.likedTitles.length, avoid: parsed.avoidTitles.length });
     return NextResponse.json({ ok: true, summary, learned, caseId });
   } catch {
