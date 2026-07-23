@@ -7,11 +7,19 @@ repository into its own **private** repository.
 
 - **Target:** `Bigshiz55/readverdict` (private). GitHub repo names are
   case-insensitive; a private `Bigshiz55/ReadVerdict` already exists and is the
-  destination.
-- **Note:** This environment’s GitHub App **cannot create repositories**
-  (`POST /user/repos` → `403 Resource not accessible by integration`), so a brand
-  new repo could not be minted here. The migration targets the existing private
-  repo via the authorized `add_repo` connection.
+  intended destination.
+- **Automated push could not be completed from this environment.** Two blockers,
+  both hard:
+  1. The GitHub App **cannot create repositories**
+     (`POST /user/repos` → `403 Resource not accessible by integration`).
+  2. The `add_repo` connection to the existing private repo was **not granted at
+     the tool-approval layer**, and the GitHub MCP is otherwise hard-scoped to
+     `bigshiz55/clearpath` (writes to `readverdict` are denied).
+- **Resolution — history-preserving hand-off:** the migration is delivered as a
+  **git bundle** (`readverdict.bundle`) carrying the full migration branch and
+  its complete history, plus a source ZIP. You complete the one-line push from a
+  machine that holds your GitHub credentials (see “Hand-off” below). Nothing in
+  the existing repositories is modified.
 
 ## Branch migrated
 
@@ -20,7 +28,27 @@ repository into its own **private** repository.
 - **Migration branch:** `rv-migrate`, produced by
   `git subtree split --prefix=readverdict`, which rewrites history so the project
   sits at the repository root.
-- **Pushed to private repo as:** `main`.
+- **To be pushed to the private repo as:** `main` (by you, via the bundle).
+
+## Hand-off — how to complete the push (one time, from your machine)
+
+```bash
+# 1. Clone the delivered bundle (full history, project at root):
+git clone -b rv-migrate readverdict.bundle readverdict
+cd readverdict
+git branch -m rv-migrate main          # name it main
+
+# 2. Point it at your private repo and push:
+git remote set-url origin https://github.com/Bigshiz55/readverdict.git
+git push -u origin main
+
+# 3. Verify it builds independently:
+npm ci && npm run typecheck && npm run lint && npm test && npm run build
+npm run dev            # http://localhost:3000
+```
+
+If `Bigshiz55/readverdict` does not resolve, create an empty private repo of that
+name first (GitHub → New repository → Private → no README), then run step 2.
 
 ## Commit history — PRESERVED
 
@@ -99,12 +127,14 @@ The migration branch was extracted to a clean directory with no shared parent
 
 ## Remaining risks
 
+- **The final push is performed by you**, from the delivered bundle — this
+  environment could not push to the private repo (create = 403; add_repo not
+  granted; MCP scoped to `clearpath`).
 - The destination is the **pre-existing** `Bigshiz55/ReadVerdict`. If it already
-  contained unrelated content, the migration pushes `rv-migrate` as `main`;
-  inspect before force-updating. (Contents are checked on connection before any
-  write.)
-- Push to the private repo depends on the `add_repo` connection being approved
-  (the GitHub App cannot create repos here).
+  contains unrelated content, `git push -u origin main` will be rejected as a
+  non-fast-forward — **inspect it first**; only force-push (`--force-with-lease`)
+  if you intend to replace it. Nothing is overwritten without your explicit
+  action.
 
 ## Rollback instructions
 
