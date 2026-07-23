@@ -143,19 +143,12 @@ export default async function DiscoverPage() {
                 />
                 <TileIcon
                   name={t.icon}
-                  className="relative h-16 w-16 drop-shadow-[0_10px_22px_rgba(0,0,0,0.55)] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-[1.08] sm:h-[88px] sm:w-[88px]"
+                  className="relative h-[72px] w-[72px] drop-shadow-[0_10px_22px_rgba(0,0,0,0.55)] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-[1.08] sm:h-24 sm:w-24"
                 />
               </span>
               <span className="mt-3">
-                <span className="block text-lg font-extrabold leading-tight tracking-tight text-white sm:text-xl">{t.title}</span>
-                <span className="mt-0.5 block text-sm text-slate-300/90">{t.sub}</span>
-              </span>
-              <span
-                aria-hidden
-                className="pointer-events-none absolute bottom-4 right-4 text-xl font-black opacity-70 transition-transform duration-300 group-hover:translate-x-0.5 sm:bottom-5 sm:right-5"
-                style={{ color: 'rgb(var(--accent))' }}
-              >
-                →
+                <span className="block text-xl font-black leading-tight tracking-tight text-white sm:text-2xl">{t.title}</span>
+                <span className="mt-0.5 block text-sm font-semibold text-slate-300">{t.sub}</span>
               </span>
             </Link>
           ))}

@@ -112,7 +112,7 @@ export function Verd1ctBadge({
           boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.28), 0 8px 18px -8px rgba(255,20,147,.7)',
         }}
       >
-        {/* V watermark — bold and clearly visible behind the number */}
+        {/* V watermark — blue, bold, clearly visible behind the number */}
         <span
           aria-hidden
           style={{
@@ -120,8 +120,8 @@ export function Verd1ctBadge({
             inset: 0,
             display: 'grid',
             placeItems: 'center',
-            color: 'rgba(0,0,0,0.3)',
-            WebkitTextStroke: `${Math.max(1, px * 0.02)}px rgba(0,0,0,0.35)`,
+            color: 'rgba(79,134,255,0.62)',
+            WebkitTextStroke: `${Math.max(1, px * 0.02)}px rgba(37,71,161,0.6)`,
             fontWeight: 900,
             fontSize: px * 1.05,
             lineHeight: 1,

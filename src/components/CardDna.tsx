@@ -31,7 +31,7 @@ export function CardDna({ mediaType, tmdbId, className = '' }: { mediaType: Medi
     >
       <Verd1ctBadge score={dna.tasteScore} px={38} />
       <span className="flex min-w-0 flex-col leading-tight">
-        <span className="text-[10px] font-black uppercase tracking-wide text-pink-100">Your VERD1CT</span>
+        <span className="text-[10px] font-black uppercase tracking-wide text-pink-100">Your VERD<span style={{ color: '#ff1493' }}>1</span>CT</span>
         <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">your taste match</span>
       </span>
     </div>

@@ -60,7 +60,7 @@ export function AlgorithmScore({
             </span>
           )}
           <div className="mt-1 text-[10px] font-black uppercase tracking-wide text-pink-100/90">
-            {personal ? 'Your VERD1CT' : 'WatchVerdict'}
+            {personal ? (<>Your VERD<span style={{ color: '#ff1493' }}>1</span>CT</>) : 'WatchVerdict'}
             {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 ? ' · learning' : ''}
           </div>
         </div>
