@@ -21,10 +21,10 @@ function whenLabel(
   const sameDay = d.toDateString() === now.toDateString();
   const tomorrow = new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString();
   const time = d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
-  if (sameDay) return t('account.reminders.today', { time });
-  if (tomorrow) return t('account.reminders.tomorrow', { time });
+  if (sameDay) return t('account.remindersList.today', { time });
+  if (tomorrow) return t('account.remindersList.tomorrow', { time });
   const day = d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
-  return t('account.reminders.dateLabel', { day, time });
+  return t('account.remindersList.dateLabel', { day, time });
 }
 
 export function MyReminders({ initial }: { initial: ReminderRow[] }) {
@@ -48,8 +48,8 @@ export function MyReminders({ initial }: { initial: ReminderRow[] }) {
 
   return (
     <section className="card p-4">
-      <h2 className="mb-1 text-lg font-semibold text-white">{t('account.reminders.heading')}</h2>
-      <p className="mb-3 text-xs text-slate-400">{t('account.reminders.notice')}</p>
+      <h2 className="mb-1 text-lg font-semibold text-white">{t('account.remindersList.heading')}</h2>
+      <p className="mb-3 text-xs text-slate-400">{t('account.remindersList.notice')}</p>
       <div className="space-y-2">
         {rows.map((r) => (
           <div key={r.airingId} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
@@ -64,7 +64,7 @@ export function MyReminders({ initial }: { initial: ReminderRow[] }) {
               disabled={busy === r.airingId}
               className="flex-none rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
             >
-              {t('account.reminders.cancel')}
+              {t('account.remindersList.cancel')}
             </button>
           </div>
         ))}

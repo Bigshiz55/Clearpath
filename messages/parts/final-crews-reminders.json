@@ -46,7 +46,7 @@
       }
     },
     "account": {
-      "reminders": {
+      "remindersList": {
         "heading": "🔔 Your reminders",
         "notice": "We’ll notify you 1 hour and 5 minutes before each one starts.",
         "today": "Today {time}",
@@ -103,7 +103,7 @@
       }
     },
     "account": {
-      "reminders": {
+      "remindersList": {
         "heading": "🔔 Tus recordatorios",
         "notice": "Te avisaremos 1 hora y 5 minutos antes de que empiece cada uno.",
         "today": "Hoy {time}",
@@ -160,7 +160,7 @@
       }
     },
     "account": {
-      "reminders": {
+      "remindersList": {
         "heading": "🔔 你的提醒",
         "notice": "我们会在每个节目开始前 1 小时和 5 分钟提醒你。",
         "today": "今天 {time}",
