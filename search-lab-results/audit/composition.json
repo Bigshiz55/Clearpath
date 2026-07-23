@@ -1,0 +1,27 @@
+{
+  "total": 52,
+  "byCategory": {
+    "exact_match": 5,
+    "punctuation": 4,
+    "subtitle": 4,
+    "international_title": 4,
+    "alternate_title": 1,
+    "one_word": 5,
+    "close_but_wrong": 9,
+    "title_with_year": 3,
+    "sequel": 2,
+    "prequel": 1,
+    "franchise_collection": 2,
+    "remake": 2,
+    "reboot": 1,
+    "tv_vs_movie": 2,
+    "tmdb_conflict": 2,
+    "obscure": 3,
+    "no_confident_match": 2
+  },
+  "byKind": {
+    "resolution": 33,
+    "identity": 15,
+    "similarity": 4
+  }
+}

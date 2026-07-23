@@ -8,6 +8,7 @@
  * production supplies real values from the cached `title_dimensions` fingerprint
  * rather than any invented metadata.
  */
+import { normTitle, titleTokens } from './titleMatch';
 
 /** The 15 interpretable fingerprint axes (mirrors DIMENSIONS in scoring). */
 export const DNA_AXES = [
@@ -60,9 +61,11 @@ export function pole(v: number): -1 | 0 | 1 {
 
 /** Canonical identity key: same work → same key regardless of TMDB record.
  *  Movies: normalized title + release year. TV: normalized title. This is what
- *  seed exclusion and duplicate exclusion compare (never a bare TMDB id). */
+ *  seed exclusion and duplicate exclusion compare (never a bare TMDB id).
+ *  Normalization is the shared, diacritic-insensitive `normTitle` so resolution
+ *  and identity never disagree (e.g. "Amélie" and "Amelie" collapse together). */
 export function canonicalKey(t: Pick<SeedTitle, 'title' | 'year' | 'mediaType'>): string {
-  const norm = t.title.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '');
+  const norm = normTitle(t.title);
   return t.mediaType === 'movie' && t.year != null ? `movie:${norm}:${t.year}` : `${t.mediaType}:${norm}`;
 }
 
@@ -88,15 +91,22 @@ export interface FranchiseAssessment {
   identity: IdentitySource;
 }
 
-/** Conservative title-text franchise hint — a shared distinctive leading title,
- *  e.g. "Rocky" ⊂ "Rocky II". Low-confidence fallback ONLY. */
+/** Conservative title-text franchise hint — the shorter title must be a strict
+ *  WHOLE-WORD leading token run of the longer, e.g. ["Rocky"] ⊂ ["Rocky","II"].
+ *  Word-boundary aware so "The Ring" does NOT hint a franchise with "The Ringer".
+ *  Low-confidence fallback ONLY (never independently triggers filtering). */
 function titleTextFranchiseHint(a: SeedTitle, b: SeedTitle): boolean {
-  const na = a.title.toLowerCase().replace(/[^a-z0-9]+/g, '');
-  const nb = b.title.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const ta = titleTokens(a.title);
+  const tb = titleTokens(b.title);
+  const na = ta.join('');
+  const nb = tb.join('');
   if (na.length < 4 || nb.length < 4 || na === nb) return false;
-  const [short, long] = na.length <= nb.length ? [na, nb] : [nb, na];
-  // The longer title must START with the shorter distinctive title (e.g. rocky → rockyii).
-  return short.length >= 4 && long.startsWith(short);
+  const [short, long] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
+  // Strict leading-token prefix: the longer must have extra tokens beyond a full
+  // whole-token match of the shorter (so "ring" ≠ "ringer" ⇒ no hint).
+  if (short.length === 0 || short.length >= long.length) return false;
+  for (let i = 0; i < short.length; i++) if (short[i] !== long[i]) return false;
+  return short.join('').length >= 4;
 }
 
 /**
@@ -108,7 +118,14 @@ export function franchiseAssessment(seed: SeedTitle, cand: SeedTitle): Franchise
   const sk = canonicalKey(seed);
   const ck = canonicalKey(cand);
   if (sk === ck) {
-    return { relation: seed.tmdbId === cand.tmdbId ? 'same_canonical' : 'canonical_duplicate', identity: 'known' };
+    if (seed.tmdbId === cand.tmdbId) return { relation: 'same_canonical', identity: 'known' };
+    // Same normalized title+year, different TMDB record. If BOTH carry a known
+    // collection id and they DIFFER, these are provably distinct works that merely
+    // share a title (a TMDB identity collision) — not a duplicate of the seed.
+    const sc = seed.collectionId ?? null;
+    const cc = cand.collectionId ?? null;
+    if (sc != null && cc != null && sc !== cc) return { relation: 'similar', identity: 'known' };
+    return { relation: 'canonical_duplicate', identity: 'known' };
   }
   const seedCol = seed.collectionId ?? null;
   const candCol = cand.collectionId ?? null;

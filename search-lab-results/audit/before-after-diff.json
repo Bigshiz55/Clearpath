@@ -1,0 +1,182 @@
+[
+  {
+    "id": "intl-amelie",
+    "category": "international_title",
+    "query": "Amelie",
+    "expected": "accept",
+    "before": {
+      "accepts": false,
+      "decision": "reject",
+      "relation": null,
+      "fp": false,
+      "fn": true
+    },
+    "after": {
+      "accepts": true,
+      "decision": "accept",
+      "relation": null,
+      "fp": false,
+      "fn": false
+    }
+  },
+  {
+    "id": "intl-amelie-accent",
+    "category": "international_title",
+    "query": "Amélie",
+    "expected": "accept",
+    "before": {
+      "accepts": false,
+      "decision": "reject",
+      "relation": null,
+      "fp": false,
+      "fn": true
+    },
+    "after": {
+      "accepts": true,
+      "decision": "accept",
+      "relation": null,
+      "fp": false,
+      "fn": false
+    }
+  },
+  {
+    "id": "intl-ytu",
+    "category": "international_title",
+    "query": "Y Tu Mama Tambien",
+    "expected": "accept",
+    "before": {
+      "accepts": false,
+      "decision": "reject",
+      "relation": null,
+      "fp": false,
+      "fn": true
+    },
+    "after": {
+      "accepts": true,
+      "decision": "accept",
+      "relation": null,
+      "fp": false,
+      "fn": false
+    }
+  },
+  {
+    "id": "wrong-saw-warsaw",
+    "category": "close_but_wrong",
+    "query": "Saw",
+    "expected": "reject",
+    "before": {
+      "accepts": true,
+      "decision": "accept",
+      "relation": null,
+      "fp": true,
+      "fn": false
+    },
+    "after": {
+      "accepts": false,
+      "decision": "reject",
+      "relation": null,
+      "fp": false,
+      "fn": false
+    }
+  },
+  {
+    "id": "wrong-ted-wanted",
+    "category": "close_but_wrong",
+    "query": "Ted",
+    "expected": "reject",
+    "before": {
+      "accepts": true,
+      "decision": "accept",
+      "relation": null,
+      "fp": true,
+      "fn": false
+    },
+    "after": {
+      "accepts": false,
+      "decision": "reject",
+      "relation": null,
+      "fp": false,
+      "fn": false
+    }
+  },
+  {
+    "id": "wrong-her-butcher",
+    "category": "close_but_wrong",
+    "query": "Her",
+    "expected": "reject",
+    "before": {
+      "accepts": true,
+      "decision": "accept",
+      "relation": null,
+      "fp": true,
+      "fn": false
+    },
+    "after": {
+      "accepts": false,
+      "decision": "reject",
+      "relation": null,
+      "fp": false,
+      "fn": false
+    }
+  },
+  {
+    "id": "wrong-ring-ringer",
+    "category": "close_but_wrong",
+    "query": "The Ring",
+    "expected": "reject",
+    "before": {
+      "accepts": true,
+      "decision": "accept",
+      "relation": null,
+      "fp": true,
+      "fn": false
+    },
+    "after": {
+      "accepts": false,
+      "decision": "reject",
+      "relation": null,
+      "fp": false,
+      "fn": false
+    }
+  },
+  {
+    "id": "wrong-cars-carsington",
+    "category": "close_but_wrong",
+    "query": "Cars",
+    "expected": "reject",
+    "before": {
+      "accepts": true,
+      "decision": "accept",
+      "relation": null,
+      "fp": true,
+      "fn": false
+    },
+    "after": {
+      "accepts": false,
+      "decision": "reject",
+      "relation": null,
+      "fp": false,
+      "fn": false
+    }
+  },
+  {
+    "id": "conflict-collections",
+    "category": "tmdb_conflict",
+    "query": "Same title, different franchises",
+    "expected": "reject",
+    "before": {
+      "accepts": false,
+      "decision": "exclude",
+      "relation": "canonical_duplicate",
+      "fp": false,
+      "fn": false
+    },
+    "after": {
+      "accepts": false,
+      "decision": "reject",
+      "relation": "similar",
+      "fp": false,
+      "fn": false
+    }
+  }
+]

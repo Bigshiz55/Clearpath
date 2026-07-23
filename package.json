@@ -31,7 +31,8 @@
     "search-lab:regression": "node eval/searchlab/cli.mjs regression",
     "search-lab:holdout": "node eval/searchlab/cli.mjs holdout",
     "search-lab:compare": "node eval/searchlab/cli.mjs compare",
-    "search-lab:calibrate": "vitest run --config eval/searchlab/calibration/vitest.calibration.config.ts"
+    "search-lab:calibrate": "vitest run --config eval/searchlab/calibration/vitest.calibration.config.ts",
+    "search-lab:audit": "vitest run --config eval/searchlab/audit/vitest.audit.config.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

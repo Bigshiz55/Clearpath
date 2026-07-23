@@ -16,6 +16,7 @@ import { getCachedDimensions } from '@/lib/titleDimensions';
 import { rankSeedSimilar } from '@/lib/search/seedSimilarity';
 import { canonicalKey, type SeedTitle } from '@/lib/search/titleDna';
 import { classifySimilar, type NoCloseMatches } from '@/lib/search/similarResponse';
+import { titleMatches } from '@/lib/search/titleMatch';
 import type { MediaType } from '@/lib/types';
 
 /** Result of a similar-to-title request: qualified similar items, or an honest
@@ -33,8 +34,6 @@ export type SimilarResult =
       broaderAlternatives: FinderItem[];
     };
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
-
 /** Strip season/series noise so "wisting season 2" resolves to "wisting". */
 function cleanTitleText(text: string): string {
   return text
@@ -43,13 +42,6 @@ function cleanTitleText(text: string): string {
     .replace(/\b(series|episodes?|the show|show|tv)\b/gi, '')
     .replace(/[?!.]+$/g, '')
     .trim();
-}
-
-function titleMatches(cleaned: string, resultTitle: string): boolean {
-  const a = norm(cleaned);
-  const b = norm(resultTitle);
-  if (a.length < 3 || b.length < 3) return false;
-  return a === b || a.includes(b) || b.includes(a);
 }
 
 /** Only treat the input as a named-title lookup when it isn't a constraint

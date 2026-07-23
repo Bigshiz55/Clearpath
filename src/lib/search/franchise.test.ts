@@ -53,4 +53,45 @@ describe('franchise identity', () => {
     const franchiseInTop5 = out.items.filter((i) => ['Rocky II', 'Rocky III'].includes(i.title)).length;
     expect(franchiseInTop5).toBeLessThanOrEqual(1);
   });
+
+  // ── regression: title-text hint must be WORD-BOUNDARY aware (audit D3) ──
+  it('does NOT infer a franchise from a sub-word title prefix', () => {
+    // "The Ring" ⊄ "The Ringer" — different works that share a leading word only.
+    const a = franchiseAssessment(seed({ title: 'The Ring', year: 2002, collectionId: null }), seed({ title: 'The Ringer', year: 2005, collectionId: null }));
+    expect(a).toEqual({ relation: 'unknown', identity: 'unknown' });
+  });
+  it('still infers a franchise from a whole-token leading prefix', () => {
+    const a = franchiseAssessment(
+      seed({ title: 'Blade Runner', year: 1982, collectionId: null }),
+      seed({ title: 'Blade Runner 2049', year: 2017, collectionId: null }),
+    );
+    expect(a).toEqual({ relation: 'franchise', identity: 'inferred' });
+  });
+
+  // ── regression: same title+year but DIFFERENT known collections → similar (D4) ──
+  it('classifies a same-title TMDB collision with differing collections as similar, not duplicate', () => {
+    const a = franchiseAssessment(
+      seed({ title: 'The Mummy', year: 1999, tmdbId: 564, collectionId: 1733 }),
+      seed({ title: 'The Mummy', year: 1999, tmdbId: 999564, collectionId: 8091 }),
+    );
+    expect(a).toEqual({ relation: 'similar', identity: 'known' });
+  });
+
+  // ── diacritic-insensitive canonical identity (audit D2) ──
+  it('collapses accented and unaccented spellings to the same canonical key', () => {
+    expect(canonicalKey({ title: 'Amélie', year: 2001, mediaType: 'movie' }))
+      .toBe(canonicalKey({ title: 'Amelie', year: 2001, mediaType: 'movie' }));
+  });
+
+  // ── documented residual: same-name distinct TV shows over-collapse (SAFE dir) ──
+  it('over-collapses same-name TV works to canonical_duplicate (conservative, excludes — never surfaces wrong content)', () => {
+    const a = franchiseAssessment(
+      seed({ title: 'The Office', year: 2005, tmdbId: 2316, mediaType: 'tv', collectionId: null }),
+      seed({ title: 'The Office', year: 2001, tmdbId: 2996, mediaType: 'tv', collectionId: null }),
+    );
+    // NOT same_canonical (different tmdb id) and NOT a spurious franchise link; the
+    // conservative duplicate classification only ever removes a candidate.
+    expect(a.relation).toBe('canonical_duplicate');
+    expect(a.identity).toBe('known');
+  });
 });
