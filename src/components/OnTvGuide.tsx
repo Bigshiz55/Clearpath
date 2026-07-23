@@ -226,8 +226,8 @@ export function OnTvGuide({
                     {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
                     {resolved && (
                       <div className="mt-2 flex items-center gap-1.5">
-                        <SaveButton tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={null} posterPath={null} wide onSaved={() => remove(a.id)} />
-                        <TasteFeedback compact wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={null} posterPath={null} onFlagged={() => remove(a.id)} />
+                        <SaveButton tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} wide onSaved={() => remove(a.id)} />
+                        <TasteFeedback compact wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onFlagged={() => remove(a.id)} />
                       </div>
                     )}
                   </div>

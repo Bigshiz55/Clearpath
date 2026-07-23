@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
-import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb } from '@/lib/onTv';
+import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle } from '@/lib/onTv';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
 import { TvDetective } from '@/components/TvDetective';
@@ -73,7 +73,11 @@ export default async function OnTvPage({
 
   // When asked for a specific window ("Lifetime movies coming on tonight"), build
   // the real time/genre/network/type-filtered set and enrich it the same way.
-  const enrich = (a: Awaited<ReturnType<typeof getUpcomingTv>>) => enrichAiringsWithCritics(a).then(enrichAiringsWithTmdb);
+  // Broadcast airings resolve TMDB via their imdb id; the Gracenote cable movies
+  // have no imdb id, so also resolve those by an exact title+year search — that's
+  // what gives the cable placards a Save button and a DNA score.
+  const enrich = (a: Awaited<ReturnType<typeof getUpcomingTv>>) =>
+    enrichAiringsWithCritics(a).then(enrichAiringsWithTmdb).then(enrichAiringsWithTmdbByTitle);
   let windowed =
     withinHours != null
       ? await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, genre, network, movieOnly))

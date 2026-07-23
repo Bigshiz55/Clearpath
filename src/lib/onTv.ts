@@ -1,7 +1,7 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getCriticRatings } from '@/lib/omdb';
-import { findTmdbByImdb } from '@/lib/tmdb/client';
+import { findTmdbByImdb, searchTitles, type SearchResultItem } from '@/lib/tmdb/client';
 import { getGracenoteAirings } from '@/lib/gracenote';
 import { getStoredGridAirings } from '@/lib/tvGrid';
 import type { MediaType } from '@/lib/types';
@@ -35,9 +35,12 @@ export interface Airing {
   criticImdb?: number | null; // 0..10
   criticRt?: number | null; // 0..100
   criticMeta?: number | null; // 0..100
-  // Resolved TMDB id (from the imdb id) — powers Save / Remove / DNA on the card.
+  // Resolved TMDB id (from the imdb id, or a title+year search) — powers Save /
+  // Remove / DNA on the card.
   tmdbId?: number | null;
   mediaType?: MediaType | null;
+  posterPath?: string | null; // TMDB poster path once resolved (for saved thumbnails)
+  year?: number | null; // release year (Gracenote) — disambiguates the TMDB match
 }
 
 interface TvmazeShow {
@@ -171,6 +174,65 @@ export async function enrichAiringsWithTmdb(airings: Airing[], cap = 14): Promis
   return airings.map((a) => {
     const r = resolved.get(a.id);
     return r ? { ...a, tmdbId: r.id, mediaType: r.mediaType } : a;
+  });
+}
+
+const normTitle = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Pick a TMDB movie match for a listing title — CONSERVATIVE on purpose: only a
+ * result whose title matches exactly (normalized) counts, so we never attach the
+ * wrong film to a Save. When a year is known, prefer a match within ±1 year;
+ * otherwise the most popular exact-title movie. Null when nothing matches
+ * cleanly (the card just stays informational).
+ */
+function pickTitleMatch(results: SearchResultItem[], title: string, year: number | null): SearchResultItem | null {
+  const nt = normTitle(title);
+  const exact = results.filter((r) => r.mediaType === 'movie' && normTitle(r.title) === nt);
+  if (exact.length === 0) return null;
+  const byPop = (a: SearchResultItem, b: SearchResultItem) => (b.popularity ?? 0) - (a.popularity ?? 0);
+  if (year != null) {
+    const near = exact.filter((m) => m.year != null && Math.abs(m.year - year) <= 1);
+    if (near.length) return [...near].sort(byPop)[0]!;
+  }
+  return [...exact].sort(byPop)[0]!;
+}
+
+/** Cached title→TMDB resolution (7d) so we search each unique title at most once. */
+function resolveTmdbByTitle(title: string, year: number | null): Promise<{ id: number; mediaType: MediaType; posterPath: string | null } | null> {
+  const key = `${title.toLowerCase()}|${year ?? ''}`;
+  return unstable_cache(
+    async () => {
+      const results = await searchTitles(title).catch(() => [] as SearchResultItem[]);
+      const m = pickTitleMatch(results, title, year);
+      return m ? { id: m.id, mediaType: m.mediaType, posterPath: m.posterPath } : null;
+    },
+    ['tmdb-by-title', key],
+    { revalidate: 60 * 60 * 24 * 7 },
+  )();
+}
+
+/**
+ * Resolve TMDB ids for MOVIE airings that have no imdb id (i.e. the Gracenote
+ * cable listings), by an exact title+year search — so cable movies get a Save
+ * button and a DNA score like the broadcast cards. Bounded and best-effort; a
+ * title we can't match cleanly is left as-is. No-op without a TMDB key.
+ */
+export async function enrichAiringsWithTmdbByTitle(airings: Airing[], cap = 14): Promise<Airing[]> {
+  const targets = airings
+    .filter((a) => a.tmdbId == null && a.showType === 'Movie' && a.showName && a.showName !== 'Untitled')
+    .slice(0, cap);
+  if (targets.length === 0) return airings;
+  const resolved = new Map<number, { id: number; mediaType: MediaType; posterPath: string | null }>();
+  await Promise.all(
+    targets.map(async (a) => {
+      const m = await resolveTmdbByTitle(a.showName, a.year ?? null).catch(() => null);
+      if (m) resolved.set(a.id, m);
+    }),
+  );
+  return airings.map((a) => {
+    const m = resolved.get(a.id);
+    return m ? { ...a, tmdbId: m.id, mediaType: m.mediaType, posterPath: m.posterPath } : a;
   });
 }
 

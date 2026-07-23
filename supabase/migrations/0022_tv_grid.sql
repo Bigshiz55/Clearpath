@@ -14,6 +14,7 @@ create table if not exists public.tv_grid (
   is_movie     boolean     not null default false,
   image        text,                         -- poster art (TMS/Gracenote CDN)
   summary      text,                         -- short synopsis
+  year         integer,                      -- release year (disambiguates TMDB)
   refreshed_at timestamptz not null default now(),
   unique (call_sign, airstamp)
 );
@@ -22,6 +23,7 @@ create table if not exists public.tv_grid (
 -- already exists without them.
 alter table public.tv_grid add column if not exists image   text;
 alter table public.tv_grid add column if not exists summary text;
+alter table public.tv_grid add column if not exists year    integer;
 
 create index if not exists tv_grid_airstamp_idx    on public.tv_grid (airstamp);
 create index if not exists tv_grid_network_key_idx on public.tv_grid (network_key);

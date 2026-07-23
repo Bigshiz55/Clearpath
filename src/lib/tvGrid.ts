@@ -27,6 +27,7 @@ interface TvGridDbRow {
   is_movie: boolean;
   image: string | null;
   summary: string | null;
+  year: number | null;
   refreshed_at: string;
 }
 
@@ -50,6 +51,7 @@ function toAiring(r: TvGridDbRow): Airing {
     image: r.image ?? null,
     summary: r.summary ?? null,
     imdb: null,
+    year: r.year ?? null,
   };
 }
 
@@ -84,6 +86,7 @@ export async function refreshTvGrid(): Promise<{ ok: boolean; rows: number; erro
     is_movie: r.isMovie,
     image: r.image,
     summary: r.summary,
+    year: r.year,
     refreshed_at: refreshedAt,
   }));
 
@@ -124,7 +127,7 @@ export async function getStoredGridAirings(
   try {
     let q = admin
       .from('tv_grid')
-      .select('call_sign, network, network_key, show_name, airstamp, runtime, is_movie, image, summary, refreshed_at')
+      .select('call_sign, network, network_key, show_name, airstamp, runtime, is_movie, image, summary, year, refreshed_at')
       .gte('airstamp', from)
       .lte('airstamp', to)
       .order('airstamp', { ascending: true })

@@ -251,6 +251,7 @@ export async function getGracenoteAirings(
         if (seen.has(key)) continue;
         seen.add(key);
         const { time, minutes } = etTime(e.startTime);
+        const yr = Number.parseInt(e.program?.releaseYear ?? '', 10);
         out.push({
           id: hashId(key),
           time,
@@ -269,6 +270,7 @@ export async function getGracenoteAirings(
           image: imageUrl(e.thumbnail),
           summary: e.program?.shortDesc ?? null,
           imdb: null,
+          year: Number.isFinite(yr) ? yr : null,
         });
       }
     }
@@ -286,6 +288,7 @@ export interface GridRow {
   isMovie: boolean;
   image: string | null;
   summary: string | null;
+  year: number | null;
 }
 
 /**
@@ -313,6 +316,7 @@ export async function fetchGridForStore(nowMs: number, horizonMs: number): Promi
         if (seen.has(k)) continue;
         seen.add(k);
         const dur = Number.parseInt(e.duration ?? '', 10);
+        const yr = Number.parseInt(e.program?.releaseYear ?? '', 10);
         out.push({
           callSign: cs,
           network: key0 ? key0.name : displayNetwork(cs),
@@ -323,6 +327,7 @@ export async function fetchGridForStore(nowMs: number, horizonMs: number): Promi
           isMovie: (e.filter ?? []).includes('filter-movie'),
           image: imageUrl(e.thumbnail),
           summary: e.program?.shortDesc ?? null,
+          year: Number.isFinite(yr) ? yr : null,
         });
       }
     }
