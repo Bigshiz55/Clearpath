@@ -129,13 +129,14 @@ export function SaveButton({
       disabled={busy}
       aria-label={saved ? 'Saved — remove from your list' : 'Save'}
       title={saved ? 'Saved — tap to remove' : 'Save'}
-      className={`grid h-9 place-items-center rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-9'} ${
+      className={`flex h-9 items-center justify-center gap-1 rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-9'} ${
         saved
           ? 'border-brand-300 bg-brand-500'
           : 'border-brand-400/60 bg-brand-500/35 hover:bg-brand-500/60'
       }`}
     >
       {icon}
+      {wide && <span className="text-[10px] font-black uppercase tracking-wide">{saved ? 'Saved' : 'Save'}</span>}
     </button>
   );
 }

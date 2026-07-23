@@ -84,20 +84,16 @@ export function LikeButton({
       disabled={done}
       aria-label="For it — more like this"
       title="For it — more like this"
-      className="grid h-9 w-full flex-1 place-items-center rounded-md border border-emerald-400/50 bg-emerald-500/15 text-emerald-100 transition hover:bg-emerald-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-60"
+      className="flex h-9 w-full flex-1 items-center justify-center gap-1 rounded-md border border-emerald-400/50 bg-emerald-500/15 text-emerald-100 transition hover:bg-emerald-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:opacity-60"
     >
-      <span aria-hidden className="relative grid place-items-center">
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="m14 13-7.4 7.4a2.12 2.12 0 0 1-3-3L11 10" />
-          <path d="m16 16 6-6" />
-          <path d="m8 8 6-6" />
-          <path d="m9 7 8 8" />
-          <path d="m21 11-8-8" />
-        </svg>
-        <span className="absolute -bottom-1 -right-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-500 text-white ring-1 ring-ink-900">
-          <svg viewBox="0 0 24 24" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 13l4 4L19 7" /></svg>
-        </span>
-      </span>
+      <svg viewBox="0 0 24 24" className="h-4 w-4 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="m14 13-7.4 7.4a2.12 2.12 0 0 1-3-3L11 10" />
+        <path d="m16 16 6-6" />
+        <path d="m8 8 6-6" />
+        <path d="m9 7 8 8" />
+        <path d="m21 11-8-8" />
+      </svg>
+      <span className="text-[10px] font-black uppercase tracking-wide">For</span>
     </button>
   );
 }
