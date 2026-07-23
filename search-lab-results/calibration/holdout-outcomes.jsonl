@@ -1,0 +1,14 @@
+{"id":"goodfellas~paddington2","category":"contradiction","genreBucket":"crime","expected":"reject","passed":false,"reason":"hard_contradiction_grounded_vs_fantastical","outcome":"TN"}
+{"id":"the_shallows~jaws","category":"positive","genreBucket":"thriller","expected":"qualify","passed":true,"reason":null,"outcome":"TP"}
+{"id":"shawshank~saw","category":"broad_similarity","genreBucket":"prison_drama","expected":"reject","passed":false,"reason":"insufficient_seed_similarity","outcome":"TN"}
+{"id":"batman_begins~dark_knight","category":"positive","genreBucket":"superhero","expected":"qualify","passed":true,"reason":null,"outcome":"TP"}
+{"id":"palm_springs~martyrs","category":"contradiction","genreBucket":"timeloop","expected":"reject","passed":false,"reason":"no_defining_shared_anchor","outcome":"TN"}
+{"id":"dunkirk~saving_ryan","category":"positive","genreBucket":"war","expected":"qualify","passed":true,"reason":null,"outcome":"TP"}
+{"id":"notting_hill~hereditary","category":"contradiction","genreBucket":"romcom","expected":"reject","passed":false,"reason":"no_defining_shared_anchor","outcome":"TN"}
+{"id":"ozark~breaking_bad","category":"positive","genreBucket":"tv_crime","expected":"qualify","passed":true,"reason":null,"outcome":"TP"}
+{"id":"la_casa_de_papel~volver","category":"broad_similarity","genreBucket":"spanish","expected":"reject","passed":false,"reason":"no_defining_shared_anchor","outcome":"TN"}
+{"id":"parasite~crouching_tiger","category":"contradiction","genreBucket":"east_asian","expected":"reject","passed":false,"reason":"insufficient_seed_similarity","outcome":"TN"}
+{"id":"the_intouchables~amelie","category":"broad_similarity","genreBucket":"french","expected":"reject","passed":false,"reason":"insufficient_seed_similarity","outcome":"TN"}
+{"id":"whiplash~space_jam","category":"contradiction","genreBucket":"music_drama","expected":"reject","passed":false,"reason":"hard_contradiction_grounded_vs_fantastical","outcome":"TN"}
+{"id":"the_road_warrior~mad_max","category":"positive","genreBucket":"action","expected":"qualify","passed":true,"reason":null,"outcome":"TP"}
+{"id":"free_solo~finding_nemo","category":"contradiction","genreBucket":"documentary","expected":"reject","passed":false,"reason":"hard_contradiction_grounded_vs_fantastical","outcome":"TN"}

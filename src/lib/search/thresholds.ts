@@ -19,7 +19,10 @@ export interface SeedSimilarityThresholds {
   defaultFranchiseCap: number;
 }
 
-/** Provisional defaults — the values Phase 4 shipped, pending calibration. */
+/** Provisional defaults — the values Phase 4 shipped, tuned only on Rocky-like
+ *  cases. RETAINED for reference: the calibration sweep showed this point leaks
+ *  contradictions on a broader set (critical-contradiction rate 0.214 on the
+ *  calibration split). Do NOT use in production. */
 export const THRESHOLDS_V1_PROVISIONAL: SeedSimilarityThresholds = {
   version: 'v1-provisional',
   minAnchor: 0.28,
@@ -29,5 +32,28 @@ export const THRESHOLDS_V1_PROVISIONAL: SeedSimilarityThresholds = {
   defaultFranchiseCap: 1,
 };
 
-/** The config the production gate uses. Swap to a calibrated version once frozen. */
-export const ACTIVE_THRESHOLDS: SeedSimilarityThresholds = THRESHOLDS_V1_PROVISIONAL;
+/**
+ * v1-calibrated — selected by the calibration sweep (eval/searchlab/calibration)
+ * on the CALIBRATION split only, then confirmed on the frozen CAL_HOLDOUT split
+ * (scored once) and the frozen Search Lab regression suite. Versus provisional it
+ * removes ALL contradiction leaks and false-qualifications (precision 1.0, F1 0.944,
+ * critical-contradiction rate 0) at a recall cost of two thin cross-language
+ * positives, which correctly fall through to the honest broader-alternatives path
+ * rather than being mislabelled "similar". Selection artifacts + rationale:
+ * search-lab-results/calibration/report.md and docs/search-dna-decisions-1-2-3.md.
+ *
+ * Still flagged for a LARGER human-audited calibration set before final production
+ * sign-off (the sweep set is an initial reviewed sample), but it is a strict,
+ * evidence-backed improvement over provisional and is what the gate now uses.
+ */
+export const THRESHOLDS_V1_CALIBRATED: SeedSimilarityThresholds = {
+  version: 'v1-calibrated',
+  minAnchor: 0.4,
+  maxContradiction: 0.42,
+  hardRealismGap: 40,
+  minConfidence: 0.4,
+  defaultFranchiseCap: 1,
+};
+
+/** The config the production gate uses. */
+export const ACTIVE_THRESHOLDS: SeedSimilarityThresholds = THRESHOLDS_V1_CALIBRATED;
