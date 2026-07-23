@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import en from '../../messages/en-US.json';
-import es from '../../messages/es-419.json';
-import zh from '../../messages/zh-Hans.json';
+import { CATALOGS } from './catalogs';
+
+// Validate the MERGED catalogs (base + every messages/parts/*.json), so any
+// screen namespace added as a part is held to the same completeness /
+// interpolation-parity / no-leakage bar as the base.
+const en = CATALOGS['en-US'];
+const es = CATALOGS['es-419'];
+const zh = CATALOGS['zh-Hans'];
 
 /** Flatten a nested messages object into dot-path keys. */
 function keys(obj: unknown, prefix = ''): string[] {

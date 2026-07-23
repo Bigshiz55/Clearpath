@@ -2,17 +2,9 @@ import 'server-only';
 import { cookies, headers } from 'next/headers';
 import { negotiateLocale, translate, plural, type Messages } from './translate';
 import { LOCALE_COOKIE, BASE_LANGUAGE, DEFAULT_VOICE_LOCALE, type UiLocale } from './config';
-import en from '../../messages/en-US.json';
-import es from '../../messages/es-419.json';
-import zh from '../../messages/zh-Hans.json';
+import { CATALOGS, ENGLISH_MESSAGES } from './catalogs';
 
-const CATALOGS: Record<UiLocale, Messages> = {
-  'en-US': en as Messages,
-  'es-419': es as Messages,
-  'zh-Hans': zh as Messages,
-};
-
-export const ENGLISH_MESSAGES = en as Messages;
+export { ENGLISH_MESSAGES };
 
 /** Resolve the active UI locale for this request (cookie → Accept-Language →
  *  default). Signed-in overrides (profiles.ui_locale) are layered in by the
