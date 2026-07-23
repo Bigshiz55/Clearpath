@@ -13,14 +13,28 @@ import { useToast } from '@/components/Toast';
  * (The title-by-title Mentalist is still one tap away.)
  */
 // The kinds of things you can ask — one per router capability. Tapping a chip
-// drops the example into the box so it's obvious what VERD1CT can do.
+// drops the example into the box so it's obvious what VERD1CT can do. The live-TV
+// listing asks are first so it's clear we know what's actually on right now.
 const EXAMPLES: { hint: string; text: string }[] = [
-  { hint: '🎯 Your taste', text: 'I love smart crime mysteries, but I avoid supernatural stories and anything too slow.' },
-  { hint: '📺 On live TV', text: 'Lifetime movies coming on tonight' },
+  { hint: '📺 On live TV', text: "What's on Lifetime tonight" },
   { hint: '⏱️ Coming up', text: 'Comedies coming on in the next 4 hours' },
+  { hint: '🎯 Your taste', text: 'I love smart crime mysteries, but I avoid supernatural stories and anything too slow.' },
   { hint: '🔎 Where to stream', text: 'Where can I watch Jaws?' },
   { hint: '▶️ On a service', text: "Something great on Netflix I haven't seen" },
 ];
+
+/** The gavel — slams while the ruling is being handed down. */
+function Gavel({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m14 13-7.4 7.4a2.12 2.12 0 0 1-3-3L11 10" />
+      <path d="m16 16 6-6" />
+      <path d="m8 8 6-6" />
+      <path d="m9 7 8 8" />
+      <path d="m21 11-8-8" />
+    </svg>
+  );
+}
 
 export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   const router = useRouter();
@@ -34,6 +48,9 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
     const t = text.trim();
     if (t.length < 4 || busy) return;
     setBusy(true);
+    // Let the gavel finish its slam even on a fast response — the "ruling" beat
+    // is part of the brand, so we never navigate before it lands.
+    const minSlam = new Promise((res) => setTimeout(res, 720));
     try {
       // A resubmit within 90s is a likely rephrase → a weak "that missed" label
       // on the previous parse (step 1 of the accuracy flywheel).
@@ -45,6 +62,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         body: JSON.stringify({ text: t, source: 'text', lang: 'en', priorCaseId }),
       });
       const d = await r.json();
+      await minSlam;
       if (d.error) { toast.show(d.error, 'error'); return; }
       if (typeof d.caseId === 'string') lastCase.current = { id: d.caseId, at: Date.now() };
       toast.show(d.summary ? `⚖️ ${d.summary}` : 'Got it — building your Taste DNA. 🧬', 'success');
@@ -79,18 +97,22 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         </div>
       </div>
 
-      {/* Tappable examples — one per kind of question, so the range is obvious. */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {EXAMPLES.map((ex) => (
-          <button
-            key={ex.hint}
-            type="button"
-            onClick={() => { setText(ex.text); boxRef.current?.focus(); }}
-            className="rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white"
-          >
-            {ex.hint}
-          </button>
-        ))}
+      {/* Tappable examples — one per kind of question, so the range is obvious.
+          Live-TV listings lead so it's clear we show what's actually on. */}
+      <div className="mt-3">
+        <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Try one — tap to fill</div>
+        <div className="flex flex-wrap gap-1.5">
+          {EXAMPLES.map((ex) => (
+            <button
+              key={ex.hint}
+              type="button"
+              onClick={() => { setText(ex.text); boxRef.current?.focus(); }}
+              className="rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white"
+            >
+              {ex.hint}
+            </button>
+          ))}
+        </div>
       </div>
 
       <textarea
@@ -114,9 +136,19 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         <button
           onClick={() => void submit()}
           disabled={busy || text.trim().length < 4}
-          className={`btn-primary shrink-0 text-white disabled:cursor-not-allowed ${hero ? 'px-6 py-3 text-base font-black disabled:opacity-70' : 'disabled:opacity-50'}`}
+          className={`btn-primary inline-flex shrink-0 items-center gap-1.5 text-white disabled:cursor-not-allowed ${hero ? 'px-6 py-3 text-base font-black disabled:opacity-80' : 'disabled:opacity-60'}`}
         >
-          {busy ? 'Deliberating…' : 'Hit the gavel →'}
+          {busy ? (
+            <>
+              <Gavel className="wv-gavel-slam h-5 w-5" />
+              Ruling…
+            </>
+          ) : (
+            <>
+              Hit the gavel
+              <Gavel className="h-4 w-4" />
+            </>
+          )}
         </button>
       </div>
     </div>
