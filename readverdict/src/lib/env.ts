@@ -32,3 +32,36 @@ export function supabaseServiceRoleKey(): string | undefined {
 export function openAiKey(): string | undefined {
   return read('OPENAI_API_KEY');
 }
+
+export interface EnvIssue {
+  key: string;
+  message: string;
+  severity: 'error' | 'warning';
+}
+
+/**
+ * Validate environment at RUNTIME (never at import/build), so `next build`
+ * always succeeds with no configuration. Returns issues rather than throwing,
+ * so a partially-configured deployment degrades gracefully. Only validates the
+ * SHAPE of values that are present.
+ */
+export function validateEnv(): { ok: boolean; issues: EnvIssue[] } {
+  const issues: EnvIssue[] = [];
+  const url = read('NEXT_PUBLIC_SUPABASE_URL');
+  const anon = read('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  const service = read('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (url && !/^https?:\/\//.test(url)) {
+    issues.push({ key: 'NEXT_PUBLIC_SUPABASE_URL', message: 'must be an http(s) URL', severity: 'error' });
+  }
+  // Partial Supabase config is a warning — the app still runs unauthenticated.
+  const supabaseParts = [url, anon, service].filter(Boolean).length;
+  if (supabaseParts > 0 && supabaseParts < 2) {
+    issues.push({ key: 'SUPABASE_*', message: 'Supabase is partially configured; auth stays disabled', severity: 'warning' });
+  }
+  const site = read('NEXT_PUBLIC_SITE_URL');
+  if (site && !/^https?:\/\//.test(site)) {
+    issues.push({ key: 'NEXT_PUBLIC_SITE_URL', message: 'must be an http(s) URL', severity: 'warning' });
+  }
+  return { ok: issues.every((i) => i.severity !== 'error'), issues };
+}

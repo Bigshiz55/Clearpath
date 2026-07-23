@@ -12,6 +12,7 @@ import {
 import type { Observation } from '@/lib/domain/readerDna';
 import type { DnfReason, UserBookStatus } from '@/lib/domain/userBook';
 import { reducer, initialLocalState, STATE_VERSION, type StoreAction } from './reducer';
+import { validateEvent } from '@/lib/analytics/events';
 import type { AnalyticsEvent, BookRef, LibraryEntry, LocalState } from './types';
 
 const STORAGE_KEY = 'readverdict.state.v1';
@@ -141,8 +142,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           },
         });
       },
-      track(name, props = {}, version = 1) {
-        const event: AnalyticsEvent = { id: uid('evt'), name, version, props, at: now() };
+      track(name, props = {}, version) {
+        // Respect analytics consent, and enforce the event taxonomy (strips any
+        // forbidden or non-allow-listed props before anything is stored).
+        if (!state.consent.analytics) return;
+        const v = validateEvent(name, props);
+        const event: AnalyticsEvent = {
+          id: uid('evt'),
+          name: v.name,
+          version: version ?? v.version,
+          props: v.props,
+          at: now(),
+        };
         dispatch({ type: 'record-event', event });
       },
       setConsent(patch) {
