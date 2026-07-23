@@ -1,10 +1,15 @@
 import type { Config } from 'tailwindcss';
 
 /**
- * ReadVerdict design tokens — part of the Verdict product family.
- * Direction: premium, editorial, cinematic-but-for-books. Deep warm-obsidian
- * surfaces, ivory type, a brass "verdict" accent, and a restrained signal blue.
- * Not a library aesthetic; not a bookstore.
+ * ReadVerdict design tokens — part of the Verdict product family, but with its
+ * own literary identity: a private library, a first-edition book, a judicial
+ * chamber. Deep library green + dark ink surfaces, warm parchment type,
+ * burnished copper and evidence gold accents, oxblood for objections.
+ *
+ * Legacy token names from the Phase 2 shell (obsidian/ivory/brass/signal) are
+ * preserved as aliases pointing at the new palette, so existing components adopt
+ * the new identity without markup changes. New courtroom surfaces use the
+ * semantic names (library/parchment/copper/gold/oxblood/sage/stone).
  */
 const config: Config = {
   darkMode: 'class',
@@ -12,48 +17,102 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Warm near-black surface ramp.
+        // Deep Library Green — the brand primary.
+        library: {
+          700: '#0c2b23',
+          600: '#0f342b',
+          500: '#123C32',
+          400: '#1c5446',
+          300: '#2f7a66',
+        },
+        // Dark Ink neutral surface ramp (dark mode base).
+        ink: {
+          950: '#0b100e',
+          900: '#0e1512',
+          850: '#121a16',
+          800: '#17201D',
+          700: '#212c27',
+          600: '#2c3832',
+          500: '#3c4a43',
+        },
+        // Warm parchment / paper / stone (light surfaces & type on dark).
+        parchment: {
+          50: '#FBF8F1', // soft paper
+          100: '#F5EFE3', // warm parchment
+          200: '#ede4d2',
+          300: '#D7D0C5', // neutral stone
+          400: '#b7ae9f',
+          500: '#8f8677',
+        },
+        copper: {
+          50: '#f7ead9',
+          100: '#eed4b8',
+          300: '#d59a6a',
+          400: '#c07a44',
+          500: '#B56F3B', // burnished copper
+          600: '#97592d',
+          700: '#734425',
+        },
+        gold: {
+          50: '#f7eccf',
+          100: '#eed8a3',
+          300: '#d8b968',
+          400: '#C69A45', // evidence gold
+          500: '#ac8231',
+          600: '#876527',
+        },
+        oxblood: {
+          400: '#9a3a49',
+          500: '#7C2938', // oxblood accent
+          600: '#651f2c',
+        },
+        sage: {
+          300: '#b3c4b0',
+          400: '#9CAF9B', // muted sage
+          500: '#7e947d',
+          600: '#63795f',
+        },
+        stone: '#D7D0C5',
+
+        // ---- Legacy aliases (Phase 2 components) → new palette ----
         obsidian: {
-          950: '#08080a',
-          900: '#0d0d10',
-          850: '#121319',
-          800: '#181a22',
-          700: '#22242f',
-          600: '#2e313f',
-          500: '#3d4152',
+          950: '#0b100e',
+          900: '#0e1512',
+          850: '#121a16',
+          800: '#17201D',
+          700: '#212c27',
+          600: '#2c3832',
+          500: '#3c4a43',
         },
-        // Ivory / parchment type ramp.
         ivory: {
-          50: '#fbfaf6',
-          100: '#f3f1e9',
-          200: '#e3e0d3',
-          300: '#c9c5b4',
-          400: '#a6a292',
+          50: '#FBF8F1',
+          100: '#F5EFE3',
+          200: '#ede4d2',
+          300: '#cfc7b6',
+          400: '#a49c8b',
         },
-        // Brass — the editorial "Verdict" accent.
         brass: {
-          50: '#fbf3df',
-          100: '#f6e6ba',
-          300: '#e6c877',
-          400: '#d8b154',
-          500: '#c6963a',
-          600: '#a2792c',
-          700: '#7c5d23',
+          50: '#f7ead9',
+          100: '#eed4b8',
+          300: '#d59a6a',
+          400: '#c07a44',
+          500: '#B56F3B',
+          600: '#97592d',
+          700: '#734425',
         },
-        // Restrained signal blue for interactive/link states.
         signal: {
-          300: '#8fb8ff',
-          400: '#5f93f5',
-          500: '#3d73e0',
-          600: '#2c58b8',
+          300: '#b3c4b0',
+          400: '#9CAF9B',
+          500: '#7e947d',
+          600: '#63795f',
         },
-        // Verdict tiers (working terminology).
+        // Verdict tiers, re-hued for the literary identity.
         verdict: {
-          must: '#3fb27f', // Must Read
-          strong: '#79c06a', // Strong Yes
-          worth: '#c6b24a', // Worth a Look
-          maybe: '#d59440', // Maybe
-          pass: '#c96f63', // Probably Pass
+          must: '#3f9e6f', // READ IT / Must Read — library green
+          strong: '#6a9e52', // Strong Yes — sage-green
+          worth: '#C69A45', // Worth a Look — evidence gold
+          maybe: '#c07a44', // Maybe — copper
+          pass: '#9a3a49', // Skip / Probably Pass — oxblood
         },
       },
       fontFamily: {
@@ -82,13 +141,19 @@ const config: Config = {
         '2xl': '1.25rem',
       },
       boxShadow: {
-        card: '0 12px 40px -16px rgba(0,0,0,0.7)',
-        ring: '0 0 0 1px rgba(255,255,255,0.05)',
-        brass: '0 8px 30px -10px rgba(198,150,58,0.45)',
+        card: '0 12px 40px -16px rgba(0,0,0,0.6)',
+        ring: '0 0 0 1px rgba(245,239,227,0.06)',
+        brass: '0 8px 30px -10px rgba(181,111,59,0.45)',
+        copper: '0 8px 30px -10px rgba(181,111,59,0.45)',
+        seal: '0 0 0 1px rgba(198,154,69,0.35), 0 6px 20px -8px rgba(0,0,0,0.5)',
       },
       backgroundImage: {
+        // Library-green + copper chamber glow (dark).
         'verdict-radial':
-          'radial-gradient(1200px 600px at 85% -10%, rgba(198,150,58,0.12), transparent), radial-gradient(900px 520px at 0% 0%, rgba(61,115,224,0.08), transparent)',
+          'radial-gradient(1200px 600px at 85% -12%, rgba(181,111,59,0.12), transparent), radial-gradient(1000px 560px at 0% 0%, rgba(18,60,50,0.35), transparent)',
+        // Warm parchment glow (light).
+        'verdict-radial-light':
+          'radial-gradient(1200px 600px at 85% -12%, rgba(181,111,59,0.10), transparent), radial-gradient(1000px 560px at 0% 0%, rgba(156,175,155,0.18), transparent)',
       },
       maxWidth: {
         content: '72rem',

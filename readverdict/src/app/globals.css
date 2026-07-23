@@ -95,6 +95,42 @@ p {
   .prose-read p + p {
     @apply mt-4;
   }
+
+  /* ---- Courtroom / editorial motifs ---- */
+
+  /* A fine hairline rule, as on a legal document. */
+  .rule-fine {
+    @apply h-px w-full border-0 bg-gradient-to-r from-transparent via-copper-500/40 to-transparent;
+  }
+
+  /* Exhibit label — a small tab used to mark evidence sections. */
+  .exhibit-label {
+    @apply inline-flex items-center gap-1.5 rounded-sm border border-copper-500/40 bg-copper-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-copper-300;
+  }
+
+  /* Docket number / file stamp. */
+  .docket {
+    @apply font-mono text-[11px] uppercase tracking-[0.22em] text-ivory-400;
+  }
+
+  /* Embossed seal ring for verdict moments. */
+  .seal {
+    @apply grid place-items-center rounded-full border border-gold-400/50 bg-gold-400/5 shadow-seal;
+  }
+
+  /* File-stamp motif — angled, weathered evidence stamp. */
+  .file-stamp {
+    @apply inline-flex -rotate-3 items-center rounded border-2 border-oxblood-500/70 px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.15em] text-oxblood-400;
+  }
+
+  /* Subtle paper grain for parchment surfaces (courtroom cards). */
+  .paper-grain {
+    background-image:
+      radial-gradient(rgba(124, 41, 56, 0.015) 1px, transparent 1px),
+      radial-gradient(rgba(18, 60, 50, 0.02) 1px, transparent 1px);
+    background-size: 3px 3px, 4px 4px;
+    background-position: 0 0, 1px 1px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
