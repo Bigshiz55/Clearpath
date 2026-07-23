@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PosterCard } from './PosterCard';
 import { SaveButton } from './SaveButton';
+import { useT } from '@/i18n/I18nProvider';
 
 interface Rec {
   id: number;
@@ -20,6 +21,7 @@ interface Rec {
 }
 
 export function RecommendedForYou({ label }: { label?: string | null }) {
+  const t = useT();
   const [recs, setRecs] = useState<Rec[] | null>(null);
   const [cold, setCold] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -47,9 +49,9 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
     return (
       <section className="rounded-2xl border border-brand-400/30 bg-brand-500/10 p-5 text-center">
         <div className="text-2xl">🧬</div>
-        <h2 className="mt-1 text-lg font-bold text-white">Your recommendations unlock fast</h2>
-        <p className="mx-auto mt-1 max-w-sm text-sm text-slate-300">Rate a handful of titles and we’ll read your taste — then this fills with picks scored just for you, each with the reason it’s here.</p>
-        <Link href="/app/quiz" className="btn-primary mt-4 inline-flex">Build my VERD1CT DNA →</Link>
+        <h2 className="mt-1 text-lg font-bold text-white">{t('discover.recForYou.unlockFast')}</h2>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-slate-300">{t('discover.recForYou.unlockBody')}</p>
+        <Link href="/app/quiz" className="btn-primary mt-4 inline-flex">{t('discover.recForYou.buildDna')}</Link>
       </section>
     );
   }
@@ -57,15 +59,15 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
   return (
     <section>
       <div className="mb-3">
-        <h2 className="text-lg font-semibold text-white">{cold ? 'Popular picks to start you off' : 'Recommended for you'}</h2>
+        <h2 className="text-lg font-semibold text-white">{cold ? t('discover.recForYou.popularStart') : t('discover.recForYou.recommended')}</h2>
         {cold ? (
           <p className="text-xs text-amber-200/90">
-            We’re still getting to know you — these are well-loved, not yet personalized.{' '}
-            <Link href="/app/quiz" className="font-semibold underline">Rate a few</Link> and this becomes truly yours.
+            {t('discover.recForYou.coldA')}
+            <Link href="/app/quiz" className="font-semibold underline">{t('discover.recForYou.rateAFew')}</Link>{t('discover.recForYou.coldB')}
           </p>
         ) : (
           <p className="text-xs text-slate-400">
-            Because of what you&apos;ve watched and rated · scored for {label ?? 'your match'}
+            {t('discover.recForYou.because', { label: label ?? t('discover.common.yourMatch') })}
           </p>
         )}
       </div>

@@ -4,11 +4,13 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateAvatar } from '@/lib/actions/profile';
 import { Avatar } from '@/components/Avatar';
+import { useT } from '@/i18n/I18nProvider';
 
 const EMOJI = ['🍿', '🎬', '🎭', '🕶️', '👑', '🐉', '🦊', '🧠', '🔥', '🌙', '⚡', '🎯', '🦉', '🌵', '🎸', '👽', '🐺', '🍕', '🧛', '🤠'];
 
 export function AvatarPicker({ current, initial, pro = false }: { current: string | null; initial: string; pro?: boolean }) {
   const router = useRouter();
+  const t = useT();
   const [sel, setSel] = useState<string | null>(current);
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -19,7 +21,7 @@ export function AvatarPicker({ current, initial, pro = false }: { current: strin
     start(async () => {
       const r = await updateAvatar({ avatar: value });
       if (!r.ok) {
-        setErr(r.error ?? 'Could not save.');
+        setErr(r.error ?? t('account.avatar.couldNotSave'));
         setSel(current);
         return;
       }
@@ -32,8 +34,8 @@ export function AvatarPicker({ current, initial, pro = false }: { current: strin
       <div className="flex items-center gap-4">
         <Avatar label={sel || initial} px={56} pro={pro} />
         <div>
-          <h2 className="text-lg font-bold text-white">Your avatar</h2>
-          <p className="text-sm text-slate-400">Pick an emoji, or use your initial ({initial}).</p>
+          <h2 className="text-lg font-bold text-white">{t('account.avatar.heading')}</h2>
+          <p className="text-sm text-slate-400">{t('account.avatar.pickEmoji', { initial })}</p>
         </div>
       </div>
 
@@ -45,7 +47,7 @@ export function AvatarPicker({ current, initial, pro = false }: { current: strin
           className={`grid h-10 w-10 place-items-center rounded-full border text-sm font-black transition disabled:opacity-60 ${
             sel === null ? 'border-brand-400 bg-brand-500/20 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:border-white/30'
           }`}
-          title="Use your initial"
+          title={t('account.avatar.useInitial')}
         >
           {initial}
         </button>
