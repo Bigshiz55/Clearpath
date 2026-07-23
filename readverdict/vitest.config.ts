@@ -1,0 +1,17 @@
+import { defineConfig } from 'vitest/config';
+import { fileURLToPath } from 'node:url';
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // The unit tests only touch pure modules; the shim keeps any future
+      // server-only import loadable under the test runner.
+      'server-only': fileURLToPath(new URL('./test/shims/server-only.ts', import.meta.url)),
+    },
+  },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
+  },
+});
