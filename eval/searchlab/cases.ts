@@ -17,6 +17,7 @@ export interface GoldCase {
   lens?: string;
   requestedCount: number;
   allowFranchise: boolean;
+  excludeFranchise?: boolean;
   allowSeed: boolean;
   expect: {
     /** Canonical ids that MUST be excluded (seed + canonical duplicates). */
@@ -76,6 +77,7 @@ export const GOLD_CASES: GoldCase[] = [
       { lang: 'zh', text: '像《洛奇》，但不要续集' },
     ],
     allowFranchise: false,
+    excludeFranchise: true,
     expect: {
       excludedCanonical: ['rocky-1976', 'rocky-ii', 'rocky-iv'],
       mustFail: ['edward-scissorhands-1990'],

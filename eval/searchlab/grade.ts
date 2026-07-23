@@ -94,9 +94,9 @@ export function summarize(label: string, grades: CaseGrade[]): SuiteSummary {
     s.criticalCounts.hallucination += g.critical.hallucination.length;
     if (g.franchiseCapViolated) s.franchiseViolations++;
     s.recallMisses += g.recall.mustQualifyMissing.length;
-    s.bySplit[g.split] ??= { total: 0, passed: 0 };
-    s.bySplit[g.split].total++;
-    if (g.pass) s.bySplit[g.split].passed++;
+    const split = (s.bySplit[g.split] ??= { total: 0, passed: 0 });
+    split.total++;
+    if (g.pass) split.passed++;
   }
   return s;
 }

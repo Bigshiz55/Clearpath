@@ -34,5 +34,5 @@ export interface RankedResult {
 export type Ranker = (
   seed: SeedTitle,
   candidates: (SeedTitle & { personalScore: number })[],
-  opts: { requestedCount: number; lens?: string; allowFranchise?: boolean; allowSeed?: boolean },
+  opts: { requestedCount: number; lens?: string; allowFranchise?: boolean; excludeFranchise?: boolean; allowSeed?: boolean },
 ) => RankedResult;

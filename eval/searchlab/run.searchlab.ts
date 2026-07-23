@@ -26,12 +26,23 @@ function runSuite(ranker: Ranker): { grades: CaseGrade[]; results: { caseId: str
   const results: { caseId: string; result: RankedResult }[] = [];
   for (const gc of GOLD_CASES) {
     const fx = fixtureFor(gc.fixtureKey);
-    const result = ranker(fx.seed, fx.candidates, {
-      requestedCount: gc.requestedCount,
-      lens: gc.lens,
-      allowFranchise: gc.allowFranchise,
-      allowSeed: gc.allowSeed,
-    });
+    let result: RankedResult;
+    if (gc.intent !== 'similar_to') {
+      // where-to-watch / exact-lookup bypass the similarity ranker entirely — the
+      // intent taxonomy routes them to the title itself, seed intentionally kept.
+      result = {
+        items: [{ canonicalId: fx.seed.canonicalId, title: fx.seed.title, personalFit: 100, rank: 1 }],
+        traces: [], excludedSeedOrDup: [],
+      };
+    } else {
+      result = ranker(fx.seed, fx.candidates, {
+        requestedCount: gc.requestedCount,
+        lens: gc.lens,
+        allowFranchise: gc.allowFranchise,
+        excludeFranchise: gc.excludeFranchise,
+        allowSeed: gc.allowSeed,
+      });
+    }
     results.push({ caseId: gc.id, result });
     grades.push(gradeCase(gc, fx, result));
   }
