@@ -45,6 +45,13 @@ const CARDS: CardSpec[] = [
   { title: 'A Show', year: 2024, mediaType: 'tv', score: 63, call: 'MAYBE', ratings: R({ tomatometer: 60, imdb: 6.8 }) },
   { title: '엘리트들 / La Casa de Papel — Parte 5, Volumen 2', year: 2021, mediaType: 'tv', score: 80, call: 'STREAM IT', ratings: R({ rtAudience: 84, imdb: 8.2, metacritic: 74 }) },
   { title: 'Interstellar', year: 2014, mediaType: 'movie', score: 88, call: 'STREAM IT', ratings: R({ tomatometer: 73, rtAudience: 86, imdb: 8.7, metacritic: 74 }) },
+  // Audience-only: shows just "Audience 86%" — no critics, no IMDb placeholder.
+  { title: 'Audience Only Pick', year: 2023, mediaType: 'movie', score: 74, call: 'WORTH A LOOK', ratings: R({ rtAudience: 86 }) },
+  // Invalid IMDb (0) alongside a real audience: the IMDb element must be HIDDEN
+  // (never "IMDb —" / "IMDb 0.0"), audience still shows and reflows to fill.
+  { title: 'Zero-Rating Guard', year: 2022, mediaType: 'tv', score: 68, call: 'MAYBE', ratings: R({ rtAudience: 72, imdb: 0 }) },
+  // NaN rating from a broken feed: also hidden, critics still shown.
+  { title: 'Broken-Feed Guard', year: 2020, mediaType: 'movie', score: 70, call: 'WORTH A LOOK', ratings: R({ tomatometer: 81, imdb: Number.NaN }) },
 ];
 
 function HarnessCard({ c }: { c: CardSpec }) {

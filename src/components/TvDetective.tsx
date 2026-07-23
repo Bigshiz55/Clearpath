@@ -7,6 +7,7 @@ import { CardDna } from '@/components/CardDna';
 import { SaveButton } from '@/components/SaveButton';
 import { TasteFeedback } from '@/components/TasteFeedback';
 import type { MediaType } from '@/lib/types';
+import { imdbScore } from '@/lib/ratings';
 
 const VISIBLE = 12; // show a window of the pool; hiding one slides the next in
 
@@ -46,7 +47,7 @@ function Ratings({ p }: { p: Pick }) {
       {p.rottenTomatoes != null && (
         <span className={p.rottenTomatoes >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {p.rottenTomatoes}%</span>
       )}
-      {p.imdb != null && <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {p.imdb.toFixed(1)}</span>}
+      {imdbScore(p.imdb) != null && <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {imdbScore(p.imdb)!.toFixed(1)}</span>}
       {p.tvmaze != null && <span className="text-gold-300" title="TVmaze community score">★ {p.tvmaze.toFixed(1)}</span>}
     </div>
   );

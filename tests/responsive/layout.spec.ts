@@ -108,7 +108,12 @@ for (const width of WIDTHS) {
       expect(distinctLefts.length, `multi-column at ${width}px`).toBeGreaterThan(1);
     }
 
-    // 5) IMDb: visible, full "IMDb 8.x" text, never clipped (item 3).
+    // 5) IMDb: visible, full "IMDb 8.x" text, never clipped (item 3). And no
+    //    broken IMDb presentation anywhere ("IMDb —", "IMDb 0.0", empty badge).
+    const bodyText = await page.locator('body').innerText();
+    expect(bodyText, 'never "IMDb —"').not.toMatch(/IMDb\s*[—–-]/);
+    expect(bodyText, 'never "IMDb 0.0"').not.toMatch(/IMDb\s*0\.0\b/);
+    expect(bodyText, 'never "IMDb NaN"').not.toMatch(/IMDb\s*NaN/i);
     const imdb = page.locator('[data-rating="imdb"]');
     const imdbCount = await imdb.count();
     expect(imdbCount, 'IMDb chips present').toBeGreaterThan(0);
@@ -116,7 +121,10 @@ for (const width of WIDTHS) {
       const chip = imdb.nth(i);
       await expect(chip).toBeVisible();
       await expect(chip).toContainText('IMDb');
-      await expect(chip).toContainText(/\d\.\d/);
+      // Every rendered badge carries a valid 1.0–10.0 number (never empty/0/dash).
+      const t = (await chip.innerText()).replace(/[^\d.]/g, '');
+      const val = Number.parseFloat(t);
+      expect(Number.isFinite(val) && val > 0 && val <= 10, `IMDb badge #${i} valid number "${t}"`).toBe(true);
       await notClipped(chip, `IMDb chip #${i} @ ${width}px`);
     }
 
@@ -158,6 +166,50 @@ for (const width of WIDTHS) {
       if (la) expect(la.y, `last action clears bottom nav at ${width}px`).toBeLessThanOrEqual(navTop + 1);
       await page.evaluate(() => window.scrollTo(0, 0));
     }
+  });
+}
+
+// IMDb missing-value handling, at every mobile width the user called out.
+for (const width of [320, 375, 390, 430]) {
+  test(`IMDb missing-value handling @ ${width}px — hide cleanly, reflow, never a dash`, async ({ page }) => {
+    await page.setViewportSize({ width, height: HEIGHT });
+    await page.goto('/dev/responsive', { waitUntil: 'networkidle' });
+
+    const cardByTitle = (t: string) => page.locator('[data-testid="card"]', { hasText: t });
+
+    // Audience-only card: shows "Audience", and has NO IMDb and NO critics element.
+    const audienceOnly = cardByTitle('Audience Only Pick');
+    await expect(audienceOnly.locator('[data-rating="audience"]')).toHaveCount(1);
+    await expect(audienceOnly.locator('[data-rating="imdb"]'), 'audience-only: no IMDb badge').toHaveCount(0);
+    await expect(audienceOnly.locator('[data-rating="critics"]'), 'audience-only: no critics').toHaveCount(0);
+    await expect(audienceOnly).not.toContainText('IMDb');
+
+    // Invalid IMDb (0) → hidden; audience still present and starts at the row's left
+    // edge (reflowed, no blank leading slot).
+    const zero = cardByTitle('Zero-Rating Guard');
+    await expect(zero.locator('[data-rating="imdb"]'), 'imdb=0: no badge').toHaveCount(0);
+    await expect(zero.locator('[data-rating="audience"]')).toHaveCount(1);
+    await expect(zero).not.toContainText('IMDb');
+
+    // NaN IMDb → hidden; critics still present.
+    const nan = cardByTitle('Broken-Feed Guard');
+    await expect(nan.locator('[data-rating="imdb"]'), 'imdb=NaN: no badge').toHaveCount(0);
+    await expect(nan.locator('[data-rating="critics"]')).toHaveCount(1);
+    await expect(nan).not.toContainText('IMDb');
+
+    // A valid IMDb card renders the real number.
+    const valid = cardByTitle('Breaking Bad');
+    await expect(valid.locator('[data-rating="imdb"]')).toContainText('9.5');
+
+    // No empty/dash IMDb anywhere on the page.
+    const body = await page.locator('body').innerText();
+    expect(body).not.toMatch(/IMDb\s*[—–\-]/);
+    expect(body).not.toMatch(/IMDb\s*(0\.0|NaN)/i);
+
+    // Redundant evidence chips are gone: metadata like a bare year/"Your NN"/"NN%
+    // audience" is not echoed as a chip. (Harness has no receipts, so assert the
+    // metric labels read as the clean "Critics/Audience/IMDb" set.)
+    await expect(page.locator('[data-rating="audience"]').first()).toContainText('Audience');
   });
 }
 

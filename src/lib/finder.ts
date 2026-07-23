@@ -289,20 +289,21 @@ export async function runFinder(
         // Era window.
         if (q.maxYear != null && meta.year != null && meta.year > q.maxYear) return null;
         if (q.minYear != null && meta.year != null && meta.year < q.minYear) return null;
-        if (meta.year != null) receipts.push(String(meta.year));
+        // Note: the year is shown in the card's metadata line already, so we do NOT
+        // add it as an evidence chip — chips explain WHY it matched, they don't
+        // repeat metadata that's already visible.
         // Upcoming: hasn't been released yet. Skip the rating gates below since
         // unreleased titles have no crowd/critic scores to judge on.
         if (q.upcoming) receipts.push('upcoming');
-        // Audience (TMDB crowd score).
+        // Audience (TMDB crowd score). The % itself is shown in the ratings row, so
+        // we filter on it but don't repeat it as a chip.
         if (q.minAudience != null && !q.upcoming) {
           const aud = meta.voteAverage != null ? Math.round(meta.voteAverage * 10) : null;
           if (aud == null || aud < q.minAudience) return null;
-          receipts.push(`${aud}% audience`);
         }
-        // IMDb rating (from OMDb, when we have it).
+        // IMDb rating (from OMDb, when we have it). Shown in the ratings row — no chip.
         if (q.minImdb != null && !q.upcoming) {
           if (meta.imdbRating == null || meta.imdbRating < q.minImdb) return null;
-          receipts.push(`IMDb ${meta.imdbRating.toFixed(1)}`);
         }
         // On my services.
         const included = providers ? includedServiceNames(providers.options, services) : [];
@@ -336,9 +337,9 @@ export async function runFinder(
           if (Math.abs(p - q.pace) > 35) return null;
           receipts.push(p >= 66 ? 'fast-paced' : p <= 33 ? 'slow burn' : 'balanced pace');
         }
-        // Match threshold.
+        // Match threshold. The match score is the dominant number in the verdict
+        // panel already, so we do NOT prepend a redundant "Your NN" chip.
         if (q.minMatch != null && report.personal.score < q.minMatch) return null;
-        receipts.unshift(`${scoredFor.split(' ')[0]} ${report.personal.score}`);
 
         const where = recProvider;
 
