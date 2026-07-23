@@ -5,11 +5,13 @@ export function RobedPortrait({
   emoji,
   size,
   accent = '#f5c65a',
+  alt = 'The presiding judge',
 }: {
   src?: string;
   emoji?: string | null;
   size: number;
   accent?: string;
+  alt?: string;
 }) {
   const robeW = Math.round(size * 1.75);
   return (
@@ -42,7 +44,7 @@ export function RobedPortrait({
           </div>
         ) : src ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt="The presiding judge" className="h-full w-full object-cover" />
+          <img src={src} alt={alt} className="h-full w-full object-cover" />
         ) : null}
       </div>
     </div>

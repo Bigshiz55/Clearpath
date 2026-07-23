@@ -3,29 +3,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { houseByKey, readHousePick } from '@/lib/houseJudges';
+import { useT } from '@/i18n/I18nProvider';
 
 // The judge's personality — rotating openers, greeting you like a regular.
-const OPENERS = [
-  'the court’s in session. What are we watching tonight?',
-  'tell me the vibe — genre, length, mood — and I’ll hand down a verdict.',
-  'give me a case and I’ll rule. What are you in the mood for?',
-  'no more endless scrolling. Tell me what you want and I’ll find it.',
-  'what’s the assignment tonight — something funny, tense, easy?',
+const OPENER_COUNT = 5;
+
+// Quick prompts: a translated label plus the query it files (empty = surprise).
+const CHIP_KEYS: { label: string; q: string }[] = [
+  { label: 'ask.chipFunnyLabel', q: 'ask.chipFunnyQ' },
+  { label: 'ask.chipCrimeLabel', q: 'ask.chipCrimeQ' },
+  { label: 'ask.chipBingeLabel', q: 'ask.chipBingeQ' },
+  { label: 'ask.chipSurpriseLabel', q: '' },
 ];
 
-const CHIPS = [
-  { label: '😂 Funny & short', q: 'something funny and short for tonight' },
-  { label: '🔪 Crime thriller', q: 'a crime thriller from the last few years' },
-  { label: '🍿 Bingeable series', q: 'a bingeable show with all episodes out, 80%+ audience' },
-  { label: '🎲 Surprise me', q: '' },
-];
-
-function timeGreeting(hour: number): string {
-  if (hour < 5) return 'Burning the midnight oil';
-  if (hour < 12) return 'Morning';
-  if (hour < 17) return 'Afternoon';
-  if (hour < 22) return 'Evening';
-  return 'Late night';
+function timeGreetingKey(hour: number): string {
+  if (hour < 5) return 'ask.greet.midnight';
+  if (hour < 12) return 'ask.greet.morning';
+  if (hour < 17) return 'ask.greet.afternoon';
+  if (hour < 22) return 'ask.greet.evening';
+  return 'ask.greet.lateNight';
 }
 
 export function HomeGreeter({
@@ -39,6 +35,7 @@ export function HomeGreeter({
 }) {
   const lg = size === 'lg';
   const router = useRouter();
+  const t = useT();
   const [q, setQ] = useState('');
   const [judge, setJudge] = useState({ name: 'Judge Annie', src: '/judge-annie.png' });
   const [greeting, setGreeting] = useState<string | null>(null);
@@ -53,9 +50,10 @@ export function HomeGreeter({
     const dog = houseByKey(readHousePick() === 'waffles' ? 'waffles' : 'annie');
     setJudge({ name: dog.name, src: dog.src });
     const hour = new Date().getHours();
-    const who = name ? `, ${name}` : '';
-    const opener = OPENERS[Math.floor(Math.random() * OPENERS.length)]!;
-    setGreeting(`${timeGreeting(hour)}${who} — ${opener}`);
+    const who = name ? t('ask.greetingWho', { name }) : '';
+    const opener = t(`ask.opener.${Math.floor(Math.random() * OPENER_COUNT)}`);
+    setGreeting(t('ask.greetingTemplate', { time: t(timeGreetingKey(hour)), who, opener }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
 
   function ask(text: string) {
@@ -109,7 +107,7 @@ export function HomeGreeter({
         <div className="relative mb-1 max-w-lg rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.06] px-4 py-2.5 backdrop-blur">
           <div className="eyebrow">⚖️ {judge.name}</div>
           <p className={`mt-1 text-slate-50 ${lg ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'}`}>
-            {greeting ?? 'The court is in session. What are we watching tonight?'}
+            {greeting ?? t('ask.greetingFallback')}
           </p>
         </div>
       </div>
@@ -126,17 +124,17 @@ export function HomeGreeter({
               ask(q);
             }
           }}
-          placeholder="Tell the judge what you feel like watching…"
+          placeholder={t('ask.greeterPlaceholder')}
           className={`min-w-0 flex-1 bg-transparent px-1 text-white outline-none placeholder:text-slate-500 ${lg ? 'py-3.5 text-lg sm:text-xl' : 'py-2 text-sm sm:text-base'}`}
-          aria-label="Tell the judge what you want to watch"
+          aria-label={t('ask.greeterAria')}
         />
         {voiceSupported && (
           <button
             type="button"
             onClick={listening ? stopVoice : startVoice}
             className={`grid flex-none place-items-center rounded-xl transition ${lg ? 'h-12 w-12' : 'h-10 w-10'} ${listening ? 'bg-red-500/20 text-red-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-            aria-label={listening ? 'Stop listening' : 'Speak to the judge'}
-            title={listening ? 'Listening… tap to stop' : 'Speak to the judge'}
+            aria-label={listening ? t('ask.stopListening') : t('ask.speakToJudge')}
+            title={listening ? t('ask.listeningTapStop') : t('ask.speakToJudge')}
           >
             <svg viewBox="0 0 24 24" className={lg ? 'h-6 w-6' : 'h-5 w-5'} fill="none" aria-hidden>
               <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="1.6" />
@@ -149,19 +147,19 @@ export function HomeGreeter({
           onClick={() => ask(q)}
           className={`btn-primary flex-none rounded-xl font-bold ${lg ? 'px-6 py-3.5 text-lg' : 'px-4 py-2 text-sm'}`}
         >
-          Ask ⚖️
+          {t('ask.askButton')}
         </button>
       </div>
 
       {/* Quick prompts */}
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {CHIPS.map((c) => (
+        {CHIP_KEYS.map((c) => (
           <button
             key={c.label}
-            onClick={() => ask(c.q)}
+            onClick={() => ask(c.q ? t(c.q) : '')}
             className={`rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:border-white/20 hover:bg-white/10 hover:text-white ${lg ? 'px-3.5 py-1.5 text-sm' : 'px-3 py-1 text-xs'}`}
           >
-            {c.label}
+            {t(c.label)}
           </button>
         ))}
       </div>

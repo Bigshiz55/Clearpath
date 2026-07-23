@@ -5,6 +5,7 @@ import { getProfile, personalLabelFor } from '@/lib/profile';
 import { humanTrait } from '@/lib/scoring/traits';
 import type { PreferenceTrait } from '@/lib/types';
 import { ShareCard, TasteCardArt, WrappedCardArt } from '@/components/ShareCards';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Share cards · WatchVerdict' };
@@ -18,8 +19,9 @@ export default async function CardsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const uid = user?.id ?? '';
+  const { t } = getServerI18n();
   const profile = await getProfile(supabase, uid);
-  const label = profile ? personalLabelFor(profile) : 'My Match';
+  const label = profile ? personalLabelFor(profile) : t('account.cards.myMatch');
 
   const { data: rules } = await supabase
     .from('preference_rules')
@@ -47,25 +49,25 @@ export default async function CardsPage() {
 
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="text-2xl font-bold text-white sm:text-3xl">✨ Share cards</h1>
+      <h1 className="text-2xl font-bold text-white sm:text-3xl">✨ {t('account.cards.heading')}</h1>
       <p className="mt-2 text-sm text-slate-400">
-        Clean, brandable cards built from your real data — save them or share straight to Stories.
+        {t('account.cards.subtitle')}
       </p>
 
       <div className="mt-6 space-y-8">
         <section>
-          <div className="mb-2 text-sm font-semibold text-white">Your Taste Card</div>
+          <div className="mb-2 text-sm font-semibold text-white">{t('account.cards.tasteCard')}</div>
           <ShareCard filename="watchverdict-taste">
             <TasteCardArt label={label} loves={loves} avoids={avoids} />
           </ShareCard>
         </section>
 
         <section>
-          <div className="mb-2 text-sm font-semibold text-white">Your {monthLabel} Wrapped</div>
+          <div className="mb-2 text-sm font-semibold text-white">{t('account.cards.wrapped', { month: monthLabel })}</div>
           {w.length === 0 ? (
             <p className="text-sm text-slate-400">
-              Watch and rate a few titles this month and your Wrapped fills in here. (Take the{' '}
-              <Link href="/app/quiz" className="text-brand-300 underline">Taste Quiz</Link> to kick it off.)
+              {t('account.cards.wrappedEmptyPre')}{' '}
+              <Link href="/app/quiz" className="text-brand-300 underline">{t('account.cards.tasteQuiz')}</Link>{t('account.cards.wrappedEmptyPost')}
             </p>
           ) : (
             <ShareCard filename="watchverdict-wrapped">
@@ -75,8 +77,7 @@ export default async function CardsPage() {
         </section>
 
         <p className="text-xs text-slate-500">
-          Want to share a group decision? Run a <Link href="/app/together" className="text-brand-300 underline">Taste Court</Link> —
-          the verdict screen has its own “Share this verdict” card.
+          {t('account.cards.groupPre')} <Link href="/app/together" className="text-brand-300 underline">{t('account.cards.tasteCourt')}</Link> {t('account.cards.groupPost')}
         </p>
       </div>
     </div>

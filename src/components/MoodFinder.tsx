@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { MOODS } from '@/lib/moods';
 import { PosterCard } from '@/components/PosterCard';
+import { useT } from '@/i18n/I18nProvider';
 
 interface Pick {
   id: number;
@@ -15,6 +16,7 @@ interface Pick {
 }
 
 export function MoodFinder({ hasServices }: { hasServices: boolean }) {
+  const t = useT();
   const [active, setActive] = useState<string | null>(null);
   const [mine, setMine] = useState(false);
   const [picks, setPicks] = useState<Pick[]>([]);
@@ -33,10 +35,10 @@ export function MoodFinder({ hasServices }: { hasServices: boolean }) {
       if (!res.ok) throw new Error(data.error ?? 'Failed');
       setPicks(data.picks ?? []);
       if ((data.picks ?? []).length === 0) {
-        setError(mineFlag ? 'Nothing in this mood on your services right now — try turning that filter off.' : 'No picks found for this mood right now.');
+        setError(mineFlag ? t('ask.moodNoneOnServices') : t('ask.moodNoPicks'));
       }
     } catch {
-      setError('Couldn’t load picks. Try again.');
+      setError(t('ask.moodLoadError'));
       setPicks([]);
     } finally {
       setLoading(false);
@@ -80,7 +82,7 @@ export function MoodFinder({ hasServices }: { hasServices: boolean }) {
             }}
             className="h-4 w-4 accent-brand-500"
           />
-          Only what’s on my streaming services
+          {t('ask.onlyMyServices')}
         </label>
       )}
 
@@ -97,8 +99,8 @@ export function MoodFinder({ hasServices }: { hasServices: boolean }) {
           ) : (
             <>
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm text-slate-400">{picks.length} picks for your mood — tap any for its verdict.</p>
-                <button onClick={pickSurprise} className="btn-secondary text-sm">🎲 Surprise me</button>
+                <p className="text-sm text-slate-400">{t('ask.moodPicks', { count: picks.length })}</p>
+                <button onClick={pickSurprise} className="btn-secondary text-sm">{t('ask.surpriseMe')}</button>
               </div>
 
               {surprise && (
@@ -108,12 +110,12 @@ export function MoodFinder({ hasServices }: { hasServices: boolean }) {
                     <img src={surprise.posterUrl} alt="" className="h-28 w-20 flex-none rounded-lg object-cover" />
                   )}
                   <div>
-                    <div className="text-xs uppercase tracking-wide text-brand-200">Tonight’s wildcard</div>
+                    <div className="text-xs uppercase tracking-wide text-brand-200">{t('ask.tonightsWildcard')}</div>
                     <div className="mt-1 text-lg font-bold text-white">
                       {surprise.title} {surprise.year ? <span className="font-normal text-slate-400">({surprise.year})</span> : null}
                     </div>
                     <Link href={`/app/title/${surprise.mediaType}/${surprise.id}`} className="btn-primary mt-2 inline-flex text-sm">
-                      Get the verdict →
+                      {t('ask.getVerdict')}
                     </Link>
                   </div>
                 </div>

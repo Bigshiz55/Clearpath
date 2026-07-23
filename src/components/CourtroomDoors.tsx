@@ -7,6 +7,7 @@ import { claimSettlement } from '@/lib/actions/sponsors';
 import { RobedPortrait } from '@/components/RobedPortrait';
 import { HOUSE_JUDGES, HOUSE_KEY, houseByKey, readHousePick, type HousePick } from '@/lib/houseJudges';
 import type { Judge } from '@/lib/sponsors';
+import { useT } from '@/i18n/I18nProvider';
 
 // A classical, engraved-inscription face — reads "courtroom / monument".
 const cinzel = Cinzel({ subsets: ['latin'], weight: ['700', '900'] });
@@ -16,6 +17,7 @@ function safeAccent(hex: string | null | undefined): string {
 }
 
 export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [judge, setJudge] = useState<Judge | null>(initialJudge);
   const [pick, setPick] = useState<HousePick>('annie');
@@ -121,7 +123,7 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
             className={`absolute left-1/2 top-[26%] -translate-x-1/2 ${open ? 'animate-reveal-in' : ''}`}
             style={{ filter: `drop-shadow(0 10px 26px ${accent}44)` }}
           >
-            <RobedPortrait src={showVendor ? undefined : dog.src} emoji={showVendor ? judge!.emoji ?? '⚖️' : undefined} size={140} accent={accent} />
+            <RobedPortrait src={showVendor ? undefined : dog.src} emoji={showVendor ? judge!.emoji ?? '⚖️' : undefined} size={140} accent={accent} alt={t('together.presidingJudgeAlt')} />
           </div>
 
           {/* The bench — a wide desk the judge presides behind: nameplate on top,
@@ -136,7 +138,7 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
               }}
             >
               <div className="text-center leading-tight">
-                <div className="text-[9px] uppercase tracking-[0.18em] text-slate-400">{showVendor ? 'Presiding · Sponsored' : 'Now presiding'}</div>
+                <div className="text-[9px] uppercase tracking-[0.18em] text-slate-400">{showVendor ? t('together.presidingSponsored') : t('together.nowPresiding')}</div>
                 <div className="text-sm font-bold text-white" style={{ fontFamily: 'Georgia, serif' }}>{name}</div>
               </div>
               {showVendor && judge!.discountLabel ? (
@@ -144,13 +146,13 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
                   {claim ? (
                     <>
                       {claim.code && <span className="rounded border border-white/15 bg-white/10 px-2 py-0.5 font-mono font-bold text-white">{claim.code}</span>}
-                      {claim.url && <a href={claim.url} onClick={(e) => e.stopPropagation()} target="_blank" rel="noopener noreferrer" style={{ color: accent }} className="font-semibold">{judge!.ctaLabel ?? 'Redeem'} →</a>}
+                      {claim.url && <a href={claim.url} onClick={(e) => e.stopPropagation()} target="_blank" rel="noopener noreferrer" style={{ color: accent }} className="font-semibold">{judge!.ctaLabel ?? t('together.redeem')} →</a>}
                     </>
                   ) : (
                     <>
                       <span style={{ color: accent }}>⚖️ {judge!.discountLabel}</span>
                       <button onClick={(e) => { e.stopPropagation(); doClaim(); }} disabled={claiming} className="rounded px-2 py-0.5 font-semibold text-white" style={{ background: accent }}>
-                        {claiming ? '…' : 'Claim'}
+                        {claiming ? '…' : t('together.claim')}
                       </button>
                     </>
                   )}
@@ -161,7 +163,7 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
                   onClick={(e) => e.stopPropagation()}
                   className={`btn-primary px-4 py-1.5 text-sm shadow-lg transition-opacity duration-500 ${open ? 'opacity-100 delay-300' : 'opacity-0'}`}
                 >
-                  Present your case →
+                  {t('together.presentCase')} →
                 </Link>
               )}
             </div>
@@ -226,17 +228,17 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
               <span className="text-2xl" aria-hidden>{judge!.emoji ?? '⚖️'}</span>
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={dog.src} alt={`${name}, presiding`} className="h-full w-full object-cover" />
+              <img src={dog.src} alt={t('together.namePresiding', { name })} className="h-full w-full object-cover" />
             )}
           </div>
 
           <h2 className={`${cinzel.className} text-4xl font-black uppercase leading-[0.95] tracking-wide sm:text-5xl`} style={{ color: accent, textShadow: `0 2px 18px ${accent}55, 0 1px 0 rgba(0,0,0,.6)` }}>
-            Can’t<br />decide?
+            {t('together.cantDecide1')}<br />{t('together.cantDecide2')}
           </h2>
           <div className={`${cinzel.className} text-2xl font-bold leading-tight text-white sm:text-3xl`} style={{ textShadow: '0 2px 12px rgba(0,0,0,.8)' }}>
-            Take them to court
+            {t('together.takeThemToCourt')}
           </div>
-          <span className="mt-1 rounded-full bg-black/55 px-4 py-1.5 text-sm font-bold text-amber-100 backdrop-blur">⚖️ Tap the doors to enter</span>
+          <span className="mt-1 rounded-full bg-black/55 px-4 py-1.5 text-sm font-bold text-amber-100 backdrop-blur">⚖️ {t('together.tapDoors')}</span>
         </div>
       </div>
 
@@ -256,16 +258,16 @@ export function CourtroomDoors({ initialJudge }: { initialJudge: Judge | null })
           disabled={locating}
           className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${pick === 'vendor' ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
         >
-          {locating ? '…' : '💵 Local vendor'}
+          {locating ? '…' : `💵 ${t('together.localVendor')}`}
         </button>
       </div>
 
       <div className="mt-2 flex items-center justify-center px-1">
         <button onClick={() => setOpen((v) => !v)} className={`${cinzel.className} text-lg font-bold uppercase tracking-wide text-gold-300`}>
-          {open ? '‹ Close the doors' : 'Take them to court ›'}
+          {open ? `‹ ${t('together.closeDoors')}` : `${t('together.takeThemToCourt')} ›`}
         </button>
       </div>
-      {showVendor && <p className="mt-1 text-center text-[10px] text-slate-500">Sponsored — presence and an offer only; never changes your verdict.</p>}
+      {showVendor && <p className="mt-1 text-center text-[10px] text-slate-500">{t('together.sponsoredNote')}</p>}
     </div>
   );
 }

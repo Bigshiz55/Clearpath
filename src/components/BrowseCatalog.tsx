@@ -5,6 +5,7 @@ import { PosterCard } from './PosterCard';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { TMDB_IMAGE_BASE } from '@/lib/tmdb/image';
+import { useT } from '@/i18n/I18nProvider';
 import type { MediaType } from '@/lib/types';
 import type { BrowseMonetization, BrowseSort } from '@/lib/browse';
 
@@ -23,12 +24,12 @@ interface Item {
   posterUrl: string | null;
 }
 
-const MONETIZATION: { v: BrowseMonetization; label: string }[] = [
-  { v: 'all', label: 'Any' },
-  { v: 'flatrate', label: 'Subscription' },
-  { v: 'free', label: 'Free' },
-  { v: 'rent', label: 'Rent' },
-  { v: 'buy', label: 'Buy' },
+const MONETIZATION: { v: BrowseMonetization; key: string }[] = [
+  { v: 'all', key: 'discover.common.any' },
+  { v: 'flatrate', key: 'discover.browse.subscription' },
+  { v: 'free', key: 'discover.browse.free' },
+  { v: 'rent', key: 'discover.browse.rent' },
+  { v: 'buy', key: 'discover.browse.buy' },
 ];
 
 function Seg<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { v: T; label: string }[] }) {
@@ -66,6 +67,7 @@ export function BrowseCatalog({
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [open, setOpen] = useState<QuickLookTarget | null>(null);
+  const tr = useT();
 
   const filterKey = `${mediaType}|${[...providerIds].sort().join(',')}|${[...genreIds].sort().join(',')}|${monetization}|${minRating}|${sort}`;
 
@@ -130,13 +132,13 @@ export function BrowseCatalog({
       {/* Filters */}
       <div className="card space-y-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Seg value={mediaType} onChange={setMediaType} options={[{ v: 'movie', label: 'Movies' }, { v: 'tv', label: 'Shows' }]} />
-          <Seg value={monetization} onChange={setMonetization} options={MONETIZATION} />
-          <Seg value={sort} onChange={setSort} options={[{ v: 'foryou', label: '🧬 For me' }, { v: 'popularity', label: 'Popular' }, { v: 'rating', label: 'Top rated' }, { v: 'new', label: 'Newest' }]} />
+          <Seg value={mediaType} onChange={setMediaType} options={[{ v: 'movie', label: tr('discover.filter.movies') }, { v: 'tv', label: tr('discover.filter.shows') }]} />
+          <Seg value={monetization} onChange={setMonetization} options={MONETIZATION.map((m) => ({ v: m.v, label: tr(m.key) }))} />
+          <Seg value={sort} onChange={setSort} options={[{ v: 'foryou', label: tr('discover.browse.forMe') }, { v: 'popularity', label: tr('discover.filter.popular') }, { v: 'rating', label: tr('discover.filter.topRated') }, { v: 'new', label: tr('discover.filter.newest') }]} />
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-400">Rating ≥</span>
+            <span className="text-xs font-semibold text-slate-400">{tr('discover.browse.ratingGte')}</span>
             <input type="range" min={0} max={9} step={0.5} value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className="w-28 accent-gold-400" />
-            <span className="w-8 text-xs font-bold tabular-nums text-gold-300">{minRating ? minRating.toFixed(1) : 'Any'}</span>
+            <span className="w-8 text-xs font-bold tabular-nums text-gold-300">{minRating ? minRating.toFixed(1) : tr('discover.common.any')}</span>
           </div>
         </div>
 
@@ -144,7 +146,7 @@ export function BrowseCatalog({
         <div className="flex flex-wrap gap-1.5">
           {GENRE_CHIPS.map((g) => (
             <button key={g.id} onClick={() => setGenreIds((prev) => toggle(prev, g.id))} className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${genreIds.includes(g.id) ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-              {g.label}
+              {tr(`discover.genre.${g.key}`)}
             </button>
           ))}
         </div>
@@ -152,15 +154,15 @@ export function BrowseCatalog({
         {/* Providers — the breadth: every service TMDB tracks for the region */}
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Service</span>
-            <button onClick={() => setProviderIds([])} className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${providerIds.length === 0 ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>Any service</button>
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{tr('discover.browse.service')}</span>
+            <button onClick={() => setProviderIds([])} className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${providerIds.length === 0 ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>{tr('discover.browse.anyService')}</button>
             {myInCatalog.length > 0 && (
-              <button onClick={() => setProviderIds(onMine ? [] : myInCatalog)} className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${onMine ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>✅ My services</button>
+              <button onClick={() => setProviderIds(onMine ? [] : myInCatalog)} className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${onMine ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>{tr('discover.common.myServices')}</button>
             )}
             <input
               value={providerQuery}
               onChange={(e) => setProviderQuery(e.target.value)}
-              placeholder="Find a service…"
+              placeholder={tr('discover.browse.findService')}
               className="ml-auto w-40 rounded-lg border border-white/12 bg-ink-900/70 px-2.5 py-1 text-xs text-slate-100 placeholder:text-slate-500 outline-none focus:border-brand-400/60"
             />
           </div>

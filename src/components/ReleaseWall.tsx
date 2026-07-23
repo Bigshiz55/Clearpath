@@ -5,6 +5,7 @@ import { SaveButton } from './SaveButton';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { AlgorithmScore } from './AlgorithmScore';
 import { TasteFeedback } from './TasteFeedback';
+import { useT } from '@/i18n/I18nProvider';
 import type { MediaType } from '@/lib/types';
 
 export interface WallService {
@@ -84,6 +85,7 @@ export function ReleaseWall({
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<QuickLookTarget | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const tr = useT();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,26 +121,26 @@ export function ReleaseWall({
       {/* ---- Controls ---- */}
       <div className="card space-y-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Seg value={mediaType} onChange={setMediaType} options={[{ v: 'all', label: 'All' }, { v: 'movie', label: 'Movies' }, { v: 'tv', label: 'Shows' }]} />
-          <Seg value={win} onChange={setWin} options={[{ v: 'recent', label: 'Out now' }, { v: 'upcoming', label: 'Upcoming' }]} />
-          <Seg value={sort} onChange={setSort} options={[{ v: 'popular', label: 'Popular' }, { v: 'new', label: win === 'upcoming' ? 'Soonest' : 'Newest' }, { v: 'top', label: 'Top rated' }]} />
+          <Seg value={mediaType} onChange={setMediaType} options={[{ v: 'all', label: tr('discover.filter.all') }, { v: 'movie', label: tr('discover.filter.movies') }, { v: 'tv', label: tr('discover.filter.shows') }]} />
+          <Seg value={win} onChange={setWin} options={[{ v: 'recent', label: tr('discover.releaseWall.outNow') }, { v: 'upcoming', label: tr('discover.releaseWall.upcoming') }]} />
+          <Seg value={sort} onChange={setSort} options={[{ v: 'popular', label: tr('discover.filter.popular') }, { v: 'new', label: win === 'upcoming' ? tr('discover.releaseWall.soonest') : tr('discover.filter.newest') }, { v: 'top', label: tr('discover.filter.topRated') }]} />
         </div>
 
         {/* Platform filter — cover every service, plus a one-tap "my services". */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Platform</span>
+          <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{tr('discover.releaseWall.platform')}</span>
           <button
             onClick={() => setProviderIds([])}
             className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${providerIds.length === 0 ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
           >
-            All platforms
+            {tr('discover.releaseWall.allPlatforms')}
           </button>
           {hasMine && (
             <button
               onClick={() => setProviderIds(onMine ? [] : myServiceIds)}
               className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${onMine ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
             >
-              ✅ My services
+              {tr('discover.common.myServices')}
             </button>
           )}
           {shownServices.map((s) => (
@@ -152,7 +154,7 @@ export function ReleaseWall({
           ))}
           {services.length > 6 && (
             <button onClick={() => setShowAllPlatforms((v) => !v)} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-300 hover:text-brand-200">
-              {showAllPlatforms ? 'Fewer' : `+${services.length - 6} more`}
+              {showAllPlatforms ? tr('discover.common.fewer') : tr('discover.releaseWall.morePlatforms', { count: services.length - 6 })}
             </button>
           )}
         </div>
@@ -176,7 +178,7 @@ export function ReleaseWall({
                 {/* Top bar — Movie/TV · ＋ · O. Score lives in the pink box below. */}
                 <div className="flex items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
                   <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
-                    {t.mediaType === 'movie' ? 'Movie' : 'TV'}
+                    {t.mediaType === 'movie' ? tr('discover.common.movieBadge') : tr('discover.common.tvBadge')}
                   </span>
                   <div className="flex flex-1 items-center gap-1.5">
                     <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
@@ -195,7 +197,7 @@ export function ReleaseWall({
                 <button
                   onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
                   className="relative block aspect-[2/3] w-full overflow-hidden"
-                  aria-label={`Quick look at ${t.title}`}
+                  aria-label={tr('discover.releaseWall.quickLook', { title: t.title })}
                 >
                   {t.posterUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -232,8 +234,8 @@ export function ReleaseWall({
       ) : (
         <p className="text-sm text-slate-400">
           {win === 'upcoming'
-            ? 'No upcoming titles match these filters yet. Try “All platforms”, or switch back to Out now.'
-            : 'Nothing matched these filters. Try “All platforms” or a different sort.'}
+            ? tr('discover.releaseWall.emptyUpcoming')
+            : tr('discover.releaseWall.emptyDefault')}
         </p>
       )}
 

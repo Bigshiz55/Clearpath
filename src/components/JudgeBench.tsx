@@ -8,7 +8,19 @@ import { RobedPortrait } from '@/components/RobedPortrait';
  */
 const ACCENT = '#ff2e9a'; // brand pink — matches the app theme, no more gold
 
-export function JudgeBench({ big = false }: { big?: boolean }) {
+export function JudgeBench({
+  big = false,
+  nowPresiding = 'Now presiding',
+  judgeName = 'Judge Verity',
+  blurb = 'Impartial and on your side — bring the room and I’ll settle it. ',
+  blurbEm = 'One verdict, no tricks.',
+}: {
+  big?: boolean;
+  nowPresiding?: string;
+  judgeName?: string;
+  blurb?: string;
+  blurbEm?: string;
+}) {
   const size = big ? 128 : 76;
   return (
     <section
@@ -24,11 +36,11 @@ export function JudgeBench({ big = false }: { big?: boolean }) {
       </div>
       <div className="relative min-w-0">
         <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: ACCENT }}>
-          ⚖️ Now presiding
+          ⚖️ {nowPresiding}
         </div>
-        <div className={`font-black tracking-tight text-white ${big ? 'text-2xl sm:text-3xl' : 'text-lg'}`}>Judge Verity</div>
+        <div className={`font-black tracking-tight text-white ${big ? 'text-2xl sm:text-3xl' : 'text-lg'}`}>{judgeName}</div>
         <div className={`text-slate-200 ${big ? 'mt-0.5 text-sm sm:text-base' : 'text-xs'}`}>
-          Impartial and on your side — bring the room and I’ll settle it. <span className="font-semibold text-white">One verdict, no tricks.</span>
+          {blurb}<span className="font-semibold text-white">{blurbEm}</span>
         </div>
       </div>
     </section>

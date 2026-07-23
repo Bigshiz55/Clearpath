@@ -2,6 +2,35 @@ import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier, WatchProvid
 import { episodeSummary } from '@/lib/tmdb/meta-helpers';
 import { originSummary } from '@/lib/origin';
 import { DnaScore } from '@/components/DnaScore';
+import { getServerI18n } from '@/i18n/server';
+
+// Reuse the already-localized `verdict` namespace for call/tier labels (defined
+// in VerdictBadge) rather than re-translating them here.
+const PRIMARY_CALL_KEY: Record<string, string> = {
+  'WATCH IT': 'watchIt',
+  MAYBE: 'maybe',
+  'SKIP IT': 'skipIt',
+};
+const TIER_KEY: Record<string, string> = {
+  'Must Watch': 'mustWatch',
+  'Strong Watch': 'strongWatch',
+  'Worth Watching': 'worthWatching',
+  'Possible Watch': 'possibleWatch',
+  'Low Priority': 'lowPriority',
+  Skip: 'skip',
+};
+// Localized "kind" line per rating source; brand names stay literal.
+const SOURCE_KIND_KEY: Record<string, string> = {
+  IMDb: 'imdb',
+  'Rotten Tomatoes': 'rtCritics',
+  'RT Audience': 'rtAudience',
+  Metacritic: 'mcCritics',
+  'Metacritic Users': 'mcAudience',
+  'TMDB Audience': 'tmdbAudience',
+  Trakt: 'traktCommunity',
+  Letterboxd: 'letterboxdCommunity',
+  'Roger Ebert': 'ebertCritic',
+};
 
 // Niche community aggregators we don't surface — they read as "random stars".
 // Metacritic is dropped too: it's usually sparse and adds a fourth number that
@@ -39,6 +68,7 @@ export function AtAGlance({
   sources: RatingSource[];
   providers: WatchProviders | null;
 }) {
+  const { t } = getServerI18n();
   const available = sources.filter((s) => s.available && !HIDDEN_SOURCES.has(s.name));
   const streamNames = Array.from(
     new Set(
@@ -52,10 +82,10 @@ export function AtAGlance({
     <section className="card p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-3">
         <span className={`rounded-xl border px-4 py-2 text-lg font-black tracking-tight ${callStyleFor(primaryCall)}`}>
-          {primaryCall}
+          {t(`verdict.primaryCall.${PRIMARY_CALL_KEY[primaryCall] ?? ''}`)}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-bold text-white">{tier}</div>
+          <div className="text-sm font-bold text-white">{t(`verdict.tier.${TIER_KEY[tier] ?? ''}`)}</div>
           <p className="line-clamp-2 text-xs text-slate-300 sm:text-sm">{oneLiner}</p>
         </div>
       </div>
@@ -66,7 +96,7 @@ export function AtAGlance({
             duplicate Stream/Skip box here — it only collided with the DNA call. */}
         <DnaScore mediaType={mediaType} tmdbId={tmdbId} />
         {available.map((s) => {
-          const { node, label } = iconFor(s.name);
+          const { node, label } = iconFor(s.name, t);
           return (
             <div key={s.name} className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               {node}
@@ -83,11 +113,11 @@ export function AtAGlance({
         <span aria-hidden>📺</span>
         {streamNames.length > 0 ? (
           <span className="text-slate-200">
-            <span className="font-semibold text-white">Streaming:</span> {streamNames.join(', ')}
+            <span className="font-semibold text-white">{t('title.streamingLabel')}</span> {streamNames.join(', ')}
           </span>
         ) : (
           <span className="text-slate-400">
-            No subscription stream found in your region{rentBuy ? ' — rent or buy available below' : ' yet'}.
+            {rentBuy ? t('title.noStreamRentBuy') : t('title.noStreamYet')}
           </span>
         )}
       </div>
@@ -96,7 +126,7 @@ export function AtAGlance({
 }
 
 /** Icon + style per known rating source. */
-function iconFor(name: string): { node: React.ReactNode; label: string } {
+function iconFor(name: string, t: (key: string) => string): { node: React.ReactNode; label: string } {
   switch (name) {
     case 'IMDb':
       return {
@@ -110,7 +140,7 @@ function iconFor(name: string): { node: React.ReactNode; label: string } {
     case 'Metacritic':
       return { label: 'Metacritic', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#00ce7a] text-[11px] font-black text-emerald-950">M</span> };
     case 'TMDB Audience':
-      return { label: 'audience', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#faa71a] text-base">🍿</span> };
+      return { label: t('title.audienceLabel'), node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#faa71a] text-base">🍿</span> };
     case 'Metacritic Users':
       return { label: 'MC users', node: <span className="grid h-7 w-7 place-items-center rounded-md border border-[#00ce7a]/60 text-[11px] font-black text-[#00ce7a]">M</span> };
     default:
@@ -119,14 +149,15 @@ function iconFor(name: string): { node: React.ReactNode; label: string } {
 }
 
 export function RatingIcons({ sources }: { sources: RatingSource[] }) {
+  const { t } = getServerI18n();
   const available = sources.filter((s) => s.available && !HIDDEN_SOURCES.has(s.name));
   if (available.length === 0) {
-    return <p className="text-sm text-slate-400">No external ratings available yet for this title.</p>;
+    return <p className="text-sm text-slate-400">{t('title.noExternalRatings')}</p>;
   }
   return (
     <div className="flex flex-wrap gap-2">
       {available.map((s) => {
-        const { node, label } = iconFor(s.name);
+        const { node, label } = iconFor(s.name, t);
         return (
           <div key={s.name} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
             {node}
@@ -142,6 +173,7 @@ export function RatingIcons({ sources }: { sources: RatingSource[] }) {
 }
 
 export function LanguageEpisodes({ meta }: { meta: TitleMetadata }) {
+  const { t } = getServerI18n();
   const origin = originSummary(meta);
   const eps = episodeSummary(meta.mediaType, meta.episodesAired, meta.episodesTotal, meta.nextEpisodeDate);
 
@@ -159,20 +191,20 @@ export function LanguageEpisodes({ meta }: { meta: TitleMetadata }) {
                 <span className={origin.good ? 'text-emerald-300' : 'text-amber-300'}>
                   {' · '}
                   {origin.english === 'native'
-                    ? 'in English'
+                    ? t('title.inEnglish')
                     : origin.english === 'available'
-                      ? 'English dub available'
+                      ? t('title.englishDub')
                       : origin.english === 'subtitles'
-                        ? 'subtitled'
-                        : 'language unconfirmed'}
+                        ? t('title.subtitled')
+                        : t('title.languageUnconfirmed')}
                 </span>
               </>
             ) : (
-              <span className="text-slate-300">Origin &amp; language not available</span>
+              <span className="text-slate-300">{t('title.originUnavailable')}</span>
             )}
           </div>
           <div className="mt-0.5 text-xs text-slate-400">
-            {origin?.note ?? 'We couldn’t confirm where this title is from or its original language.'}
+            {origin?.note ?? t('title.originNoteFallback')}
           </div>
         </div>
       </div>
@@ -218,6 +250,7 @@ export function RecommendationConsensus({
   primaryCall: PrimaryCall;
   sources: RatingSource[];
 }) {
+  const { t } = getServerI18n();
   const available = sources.filter((s) => s.available && !HIDDEN_SOURCES.has(s.name));
   const callStyle = callStyleFor(primaryCall);
 
@@ -237,22 +270,24 @@ export function RecommendationConsensus({
       <Row
         icon="🎬"
         name="WatchVerdict"
-        value="Our personalized call"
-        right={<span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${callStyle}`}>{primaryCall}</span>}
+        value={t('title.ourPersonalizedCall')}
+        right={<span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${callStyle}`}>{t(`verdict.primaryCall.${PRIMARY_CALL_KEY[primaryCall] ?? ''}`)}</span>}
       />
       {available.map((s) => {
         const m = SOURCE_META[s.name] ?? { icon: '★', kind: s.name };
+        const kindKey = SOURCE_KIND_KEY[s.name];
+        const kind = kindKey ? t(`title.sourceKind.${kindKey}`) : m.kind;
         return (
           <Row
             key={s.name}
             icon={m.icon}
             name={s.name}
-            value={m.kind}
+            value={kind}
             right={<span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-sm font-bold tabular-nums text-white">{s.raw}</span>}
           />
         );
       })}
-      <p className="text-[11px] text-slate-500">Every row shows only real, available data — nothing is guessed.</p>
+      <p className="text-[11px] text-slate-500">{t('title.consensusNote')}</p>
     </div>
   );
 }

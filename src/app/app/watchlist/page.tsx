@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { WatchlistManager, type WatchlistItem } from '@/components/watchlist/WatchlistManager';
 import { EmptyState } from '@/components/EmptyState';
+import { getServerI18n } from '@/i18n/server';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -19,22 +20,23 @@ export default async function WatchlistPage() {
     .order('added_at', { ascending: false });
 
   const items = (data as WatchlistItem[] | null) ?? [];
+  const { t } = getServerI18n();
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white sm:text-3xl">Your watchlist</h1>
-        <p className="mt-1 text-sm text-slate-400">Everything you’ve saved — search it, sort it, and ⭐ star your Favorites.</p>
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">{t('account.watchlist.heading')}</h1>
+        <p className="mt-1 text-sm text-slate-400">{t('account.watchlist.subtitle')}</p>
       </div>
 
       {items.length === 0 ? (
         <EmptyState
-          title="Your watchlist is empty"
-          description="Find something worth watching and add it here."
+          title={t('account.watchlist.emptyTitle')}
+          description={t('account.watchlist.emptyDesc')}
           icon={<span className="text-2xl">📺</span>}
           action={
             <Link href="/app" className="btn-primary">
-              Discover titles
+              {t('account.watchlist.discover')}
             </Link>
           }
         />

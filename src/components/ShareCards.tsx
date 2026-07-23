@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
+import { useT } from '@/i18n/I18nProvider';
 
 const MARK = (
   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -14,6 +15,7 @@ const MARK = (
 
 /** Wraps a card node and adds Save / Share (Web Share with the PNG, or download). */
 export function ShareCard({ filename, children }: { filename: string; children: React.ReactNode }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -58,8 +60,8 @@ export function ShareCard({ filename, children }: { filename: string; children: 
     <div>
       <div ref={ref} style={{ display: 'inline-block' }}>{children}</div>
       <div className="mt-3 flex gap-2">
-        <button onClick={share} disabled={busy} className="btn-primary">Share</button>
-        <button onClick={save} disabled={busy} className="btn-secondary">Save image</button>
+        <button onClick={share} disabled={busy} className="btn-primary">{t('misc.share.shareBtn')}</button>
+        <button onClick={save} disabled={busy} className="btn-secondary">{t('misc.share.saveImage')}</button>
       </div>
     </div>
   );

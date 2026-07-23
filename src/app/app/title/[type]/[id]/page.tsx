@@ -15,6 +15,7 @@ import { getTitleDimensions, getUserDimensionProfile } from '@/lib/titleDimensio
 import { dimensionMatch, matchHighlights, topDials } from '@/lib/scoring/dimensions';
 import { TasteMatchView, type TasteMatch } from '@/components/verdict/TasteMatchView';
 import type { TitleMetadata } from '@/lib/types';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -152,6 +153,7 @@ async function getFeedbackDone(tmdbId: number, mediaType: MediaType): Promise<bo
 }
 
 function ErrorCard({ title, message, retryHref }: { title: string; message: string; retryHref?: string }) {
+  const { t } = getServerI18n();
   return (
     <div className="card mx-auto max-w-lg p-8 text-center">
       <h1 className="text-xl font-semibold text-white">{title}</h1>
@@ -159,11 +161,11 @@ function ErrorCard({ title, message, retryHref }: { title: string; message: stri
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         {retryHref && (
           <Link href={retryHref} prefetch={false} className="btn-primary inline-flex">
-            ↻ Try again
+            {t('title.tryAgain')}
           </Link>
         )}
         <Link href="/app" className="btn-secondary inline-flex">
-          ← Back to search
+          {t('title.backToSearch')}
         </Link>
       </div>
     </div>
@@ -232,18 +234,19 @@ export default async function TitlePage({ params }: { params: { type: string; id
       />
     );
   } catch (e) {
+    const { t } = getServerI18n();
     if (e instanceof ConfigError) {
-      return <ErrorCard title="Not configured yet" message={e.userMessage} />;
+      return <ErrorCard title={t('title.errNotConfigured')} message={e.userMessage} />;
     }
     const retryHref = `/app/title/${parsed.mediaType}/${parsed.id}`;
     if (e instanceof TmdbError) {
       if (e.status === 404) notFound();
-      return <ErrorCard title="Couldn’t load this title" message={e.userMessage} retryHref={retryHref} />;
+      return <ErrorCard title={t('title.errLoadTitle')} message={e.userMessage} retryHref={retryHref} />;
     }
     return (
       <ErrorCard
-        title="Something went wrong"
-        message="We couldn’t generate this verdict right now. Please try again in a moment."
+        title={t('title.errGeneric')}
+        message={t('title.errGenericMsg')}
         retryHref={retryHref}
       />
     );

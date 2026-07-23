@@ -9,6 +9,7 @@ import type { TitleVerdict } from '@/lib/askTypes';
 import { type TileRatings } from '@/lib/ratings';
 import { naiveParseQuery, describeQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import type { FinderQuery } from '@/lib/finder';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface ResultItem {
   id: number;
@@ -33,19 +34,15 @@ interface Msg {
   verdict?: TitleVerdict; // a named title put on trial
 }
 
-const EXAMPLES = [
-  'A crime thriller under 2 hours, out in the last couple years',
-  'Something funny and short I can watch tonight on my services',
-  'A bingeable show, all episodes out, 80%+ audience',
-];
-
 export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null }) {
+  const { t, plural } = useI18n();
+  const EXAMPLES = [t('ask.example1'), t('ask.example2'), t('ask.example3')];
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
-  const [judgeName] = useState('Judge Verity');
+  const judgeName = t('ask.judgeName');
   const nextId = useRef(1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
@@ -63,9 +60,10 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
       {
         id: nextId.current++,
         role: 'judge',
-        text: `Judge Verity presiding. Tell me what you’re in the mood for — a vibe, a genre, a “like Mindhunter,” however you’d say it — and I’ll pull real titles, each scored for you. Need exact filters? That’s Forensic Search.`,
+        text: t('ask.judgeIntro'),
       },
     ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -82,7 +80,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
     const query = queryOverride ?? q;
     const text = (rawText ?? input).trim();
     setInput('');
-    say(text || `Filed my case — ${describeQuery(query)}.`, undefined, 'you');
+    say(text || t('ask.filedCase', { desc: describeQuery(query) }), undefined, 'you');
     setLoading(true);
     try {
       const res = await fetch('/api/ask', {
@@ -98,9 +96,9 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
         const v = data.verdict as TitleVerdict;
         const alts = (data.alternatives ?? []) as ResultItem[];
         const skip = v.primaryCall === 'SKIP IT';
-        const ruling =
-          `${v.title}${v.year ? ` (${v.year})` : ''} — my ruling: ${v.primaryCall} at ${v.matchScore} for you. ${v.oneLiner}` +
-          (alts.length > 0 ? (skip ? ' Here’s why, and better picks below.' : ' Here’s the case — and a few more in the same lane.') : '');
+        const titleLabel = v.year ? `${v.title} (${v.year})` : v.title;
+        let ruling = t('ask.titleRuling', { title: titleLabel, call: v.primaryCall, score: v.matchScore, oneLiner: v.oneLiner });
+        if (alts.length > 0) ruling += skip ? t('ask.titleRulingSkip') : t('ask.titleRulingMore');
         say(ruling, alts, 'judge', v);
         return;
       }
@@ -110,14 +108,18 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
       let ruling: string;
       if (items.length > 0) {
         const top = items[0]!;
-        ruling = `I read your case: ${read}. Ruling — ${items.length} title${items.length === 1 ? '' : 's'} worth your night. Top of the docket: ${top.title}${top.year ? ` (${top.year})` : ''} — ${top.primaryCall} at ${top.matchScore} match.`;
+        const topLabel = top.year ? `${top.title} (${top.year})` : top.title;
+        ruling =
+          t('ask.readCase', { read }) +
+          plural('ask.rulingWorth', items.length, { count: items.length }) +
+          t('ask.topDocket', { title: topLabel, call: top.primaryCall, score: top.matchScore });
       } else {
-        ruling = `I read your case: ${read}. No title clears all of that. Try rephrasing — broaden the genre or drop a requirement — and re-file. For exact filters, use Forensic Search.`;
+        ruling = t('ask.readCase', { read }) + t('ask.noClear');
       }
       if (data.relaxed) ruling += ` ${data.relaxed}`;
       say(ruling, items);
     } catch {
-      say('The court hit a snag pulling candidates. Try re-filing that in a moment.');
+      say(t('ask.snag'));
     } finally {
       setLoading(false);
     }
@@ -183,7 +185,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
           <RobedPortrait emoji="🦉" size={44} accent="#f5c65a" />
           <div className="min-w-0 flex-1">
-            <div className="eyebrow">⚖️ The bench</div>
+            <div className="eyebrow">{t('ask.bench')}</div>
             <div className="truncate text-base font-bold text-white">{judgeName}</div>
           </div>
         </div>
@@ -203,7 +205,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
                     {m.items && m.items.length > 0 && (
                       <div className="mt-3">
                         {m.verdict && (
-                          <div className="eyebrow mb-2 text-[11px]">Better for you</div>
+                          <div className="eyebrow mb-2 text-[11px]">{t('ask.betterForYou')}</div>
                         )}
                         <div className="poster-grid">
                           {m.items.map((it) => (
@@ -239,7 +241,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
           {loading && (
             <div className="flex justify-start">
               <div className="rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-slate-400">
-                ⚖️ The court is deliberating<span className="animate-pulse">…</span>
+                {t('ask.deliberating')}<span className="animate-pulse">…</span>
               </div>
             </div>
           )}
@@ -262,7 +264,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
               onChange={(e) => onText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit(); } }}
               rows={1}
-              placeholder={listening ? 'Listening…' : 'Tell the judge what you want — or just hit File it'}
+              placeholder={listening ? t('ask.listeningEllipsis') : t('ask.tellJudgePlaceholder')}
               className="input max-h-28 min-h-[44px] flex-1 resize-none"
             />
             {voiceSupported && (
@@ -270,8 +272,8 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
                 type="button"
                 onClick={listening ? stopVoice : startVoice}
                 className={`grid h-11 w-11 flex-none place-items-center rounded-xl border transition ${listening ? 'border-red-400/50 bg-red-500/20 text-red-200' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
-                aria-label={listening ? 'Stop listening' : 'Speak to the judge'}
-                title={listening ? 'Listening… tap to stop' : 'Speak to the judge'}
+                aria-label={listening ? t('ask.stopListening') : t('ask.speakToJudge')}
+                title={listening ? t('ask.listeningTapStop') : t('ask.speakToJudge')}
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
                   <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="1.6" />
@@ -280,7 +282,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
               </button>
             )}
             <button type="button" onClick={() => submit()} disabled={loading} className="btn-primary h-11 flex-none px-4 disabled:opacity-40">
-              File it
+              {t('ask.fileIt')}
             </button>
           </div>
         </div>

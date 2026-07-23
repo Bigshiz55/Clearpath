@@ -6,16 +6,17 @@ import { getFollowingFeed } from '@/lib/social';
 import { FindPeople } from '@/components/social/FindPeople';
 import { VerdictBadge } from '@/components/VerdictBadge';
 import { tmdbImage } from '@/lib/tmdb/image';
+import { getServerI18n } from '@/i18n/server';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Friends · WatchVerdict' };
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: (key: string, params?: Record<string, string | number>) => string): string {
   const s = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 1000));
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+  if (s < 3600) return t('account.friends.minAgo', { n: Math.floor(s / 60) });
+  if (s < 86400) return t('account.friends.hrAgo', { n: Math.floor(s / 3600) });
+  return t('account.friends.dayAgo', { n: Math.floor(s / 86400) });
 }
 
 export default async function FriendsPage() {
@@ -26,43 +27,41 @@ export default async function FriendsPage() {
   const uid = user?.id ?? '';
   const profile = uid ? await getProfile(supabase, uid) : null;
   const feed = await getFollowingFeed(supabase);
+  const { t } = getServerI18n();
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <section>
-        <h1 className="text-2xl font-bold text-white sm:text-3xl">👥 Friends</h1>
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">👥 {t('account.friends.heading')}</h1>
         <p className="mt-2 text-sm text-slate-400">
-          Follow people and see what they’ve been getting verdicts on. Look someone up by their username.
+          {t('account.friends.subtitle')}
         </p>
         <div className="mt-4">
           <FindPeople />
         </div>
         {profile?.username ? (
           <p className="mt-2 text-xs text-slate-500">
-            Your handle is <span className="font-semibold text-slate-300">@{profile.username}</span> — share it so
-            friends can follow you. Turn on “public activity” in{' '}
-            <Link href="/app/settings" className="text-brand-300 underline">Settings</Link> to let them see your verdicts.
+            {t('account.friends.handleIntro')} <span className="font-semibold text-slate-300">@{profile.username}</span> {t('account.friends.handleShareCta')}{' '}
+            <Link href="/app/settings" className="text-brand-300 underline">{t('account.friends.settings')}</Link> {t('account.friends.handleShareTail')}
           </p>
         ) : (
           <p className="mt-2 text-xs text-slate-500">
-            Set a username in <Link href="/app/settings" className="text-brand-300 underline">Settings</Link> so friends can find you.
+            {t('account.friends.setUsernamePre')} <Link href="/app/settings" className="text-brand-300 underline">{t('account.friends.settings')}</Link> {t('account.friends.setUsernamePost')}
           </p>
         )}
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-white">Latest from people you follow</h2>
+        <h2 className="mb-3 text-lg font-semibold text-white">{t('account.friends.latestHeading')}</h2>
         {feed.kind === 'needs_migration' ? (
           <p className="text-sm text-amber-300">
-            The friends feed needs migration 0007 applied to the database. Once it’s in, verdicts from people you
-            follow show up here.
+            {t('account.friends.needsMigration')}
           </p>
         ) : feed.items.length === 0 ? (
           <div className="card p-6 text-center">
             <div className="text-3xl">🫥</div>
             <p className="mx-auto mt-2 max-w-sm text-sm text-slate-400">
-              Nothing here yet. Follow a few people (search above) who’ve turned on public activity, and their
-              latest verdicts will land here.
+              {t('account.friends.empty')}
             </p>
           </div>
         ) : (
@@ -86,9 +85,9 @@ export default async function FriendsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="text-xs text-slate-400">
                       <Link href={`/app/u/${v.username}`} className="font-semibold text-brand-300 hover:underline">
-                        @{v.username ?? 'someone'}
+                        @{v.username ?? t('account.friends.someone')}
                       </Link>{' '}
-                      · {timeAgo(v.createdAt)}
+                      · {timeAgo(v.createdAt, t)}
                     </div>
                     <div className="line-clamp-1 text-sm font-semibold text-white">
                       {v.title} {v.year ? <span className="font-normal text-slate-400">({v.year})</span> : null}

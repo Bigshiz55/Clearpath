@@ -7,12 +7,15 @@
  * Alignment/size come from `className` (logo lockup on the left, or a centered
  * eyebrow).
  */
+import { getServerI18n } from '@/i18n/server';
+
 export function Tagline({ className = '' }: { className?: string }) {
+  const { t } = getServerI18n();
   return (
-    <p className={`font-bold tracking-tight ${className}`} aria-label="Thousands of choices, one verdict">
+    <p className={`font-bold tracking-tight ${className}`} aria-label={t('misc.tagline.aria')}>
       <span aria-hidden>
-        <span className="text-slate-400">Thousands of choices, </span>
-        <span className="whitespace-nowrap text-white">one </span>
+        <span className="text-slate-400">{t('misc.tagline.prefix')}</span>
+        <span className="whitespace-nowrap text-white">{t('misc.tagline.one')}</span>
         <span className="inline-block whitespace-nowrap font-black text-[#ff1493]">
           VERD
           <span className="wv-iflip">

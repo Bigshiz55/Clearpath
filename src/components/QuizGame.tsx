@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Poster } from './PosterCard';
 import { DnaMirror } from './DnaMirror';
 import { rateQuizTitle } from '@/lib/actions/quiz';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface Item {
   id: number;
@@ -25,6 +26,7 @@ function ratingColor(n: number): string {
 }
 
 export function QuizGame() {
+  const { t, plural } = useI18n();
   const [items, setItems] = useState<Item[] | null>(null);
   const [idx, setIdx] = useState(0);
   const [rated, setRated] = useState(0);
@@ -99,7 +101,7 @@ export function QuizGame() {
   if (failed) {
     return (
       <p className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-        Couldn’t load the quiz. Make sure movie data is connected, then try again.
+        {t('ask.quizLoadError')}
       </p>
     );
   }
@@ -108,7 +110,7 @@ export function QuizGame() {
     return (
       <div className="mt-8 flex flex-col items-center gap-3 text-slate-400">
         <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
-        <span className="text-sm">Loading titles…</span>
+        <span className="text-sm">{t('ask.loadingTitles')}</span>
       </div>
     );
   }
@@ -117,14 +119,13 @@ export function QuizGame() {
     return (
       <div className="mt-8 card p-8 text-center">
         <div className="text-4xl">🎉</div>
-        <h2 className="mt-3 text-xl font-bold text-white">You’ve rated everything we had!</h2>
+        <h2 className="mt-3 text-xl font-bold text-white">{t('ask.ratedEverything')}</h2>
         <p className="mx-auto mt-2 max-w-sm text-sm text-slate-400">
-          Your VERD1CT DNA is well-fed. Fresh popular titles rotate in over time — check back soon, or
-          keep rating from search and the release wall.
+          {t('ask.wellFed')}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button onClick={() => load()} className="btn-secondary">Try again</button>
-          <Link href="/app" className="btn-primary">See my recommendations →</Link>
+          <button onClick={() => load()} className="btn-secondary">{t('ask.tryAgain')}</button>
+          <Link href="/app" className="btn-primary">{t('ask.seeMyRecs')}</Link>
         </div>
       </div>
     );
@@ -138,7 +139,7 @@ export function QuizGame() {
       <div className="mt-6">
         <div className="text-center">
           <div className="text-4xl">🧬</div>
-          <h2 className="mt-2 text-xl font-bold text-white">You rated {rated} titles — here’s your read.</h2>
+          <h2 className="mt-2 text-xl font-bold text-white">{plural('ask.youRatedRead', rated, { count: rated })}</h2>
         </div>
         <DnaMirror onReplay={() => { window.scrollTo({ top: 0 }); load(); }} />
       </div>
@@ -154,7 +155,7 @@ export function QuizGame() {
         <span>
           {idx + 1} / {items.length}
         </span>
-        <span>{rated} rated</span>
+        <span>{t('ask.ratedCount', { count: rated })}</span>
       </div>
       {/* Countdown bar */}
       <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
@@ -171,7 +172,7 @@ export function QuizGame() {
         </div>
         <div className="mt-2 flex items-center gap-2">
           <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase text-slate-300">
-            {current.mediaType === 'movie' ? 'Movie' : 'TV'}
+            {current.mediaType === 'movie' ? t('ask.movie') : t('ask.tv')}
           </span>
           <h2 className="text-base font-bold text-white sm:text-lg">
             {current.title}
@@ -183,8 +184,8 @@ export function QuizGame() {
       {/* Rating buttons */}
       <div className="mt-4">
         <div className="mb-1 flex justify-between px-1 text-[11px] text-slate-500">
-          <span>Not for me</span>
-          <span>Love it</span>
+          <span>{t('ask.notForMe')}</span>
+          <span>{t('ask.loveIt')}</span>
         </div>
         <div className="grid grid-cols-10 gap-1.5 sm:gap-2">
           {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
@@ -192,7 +193,7 @@ export function QuizGame() {
               key={n}
               onClick={() => rate(n)}
               className={`h-11 rounded-xl border text-base font-bold tabular-nums transition ${ratingColor(n)}`}
-              aria-label={`Rate ${n} out of 10`}
+              aria-label={t('ask.rateNof10', { n })}
             >
               {n}
             </button>
@@ -202,7 +203,7 @@ export function QuizGame() {
           onClick={skip}
           className="mt-3 w-full rounded-xl border border-gold-400/40 bg-gold-500/10 py-3 text-sm font-semibold text-amber-100 hover:bg-gold-500/20"
         >
-          🤷 Haven’t seen it — skip →
+          {t('ask.haventSeenSkip')}
         </button>
       </div>
     </div>

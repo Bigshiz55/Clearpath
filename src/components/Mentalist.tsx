@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Poster, PosterCard } from './PosterCard';
 import { SaveButton } from './SaveButton';
 import { addToWatchlist } from '@/lib/actions/watchlist';
+import { useT } from '@/i18n/I18nProvider';
 
 interface SearchHit {
   id: number;
@@ -43,6 +44,7 @@ const MIN = 3;
 type Verdict = 'hit' | 'meh' | 'miss';
 
 export function Mentalist() {
+  const t = useT();
   const [seeds, setSeeds] = useState<SearchHit[]>([]);
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
@@ -105,11 +107,11 @@ export function Mentalist() {
       setDna(d.dna ?? null);
       setPicks((d.picks ?? []) as Pick[]);
     } catch {
-      setError('Something went wrong reading your taste. Try again.');
+      setError(t('ask.mentalistError'));
     } finally {
       setReading(false);
     }
-  }, [seeds, reading]);
+  }, [seeds, reading, t]);
 
   async function saveAll() {
     if (!picks || savingAll) return;
@@ -132,8 +134,8 @@ export function Mentalist() {
     <div className="space-y-6">
       {/* Seed picker */}
       <div className="card p-5">
-        <h2 className="text-lg font-bold text-white">1 · Name {MIN}–{MAX} you genuinely loved</h2>
-        <p className="mt-1 text-sm text-slate-400">Shows or movies — the ones that are so you. We read the hidden threads between them.</p>
+        <h2 className="text-lg font-bold text-white">{t('ask.step1', { min: MIN, max: MAX })}</h2>
+        <p className="mt-1 text-sm text-slate-400">{t('ask.step1Sub')}</p>
 
         {seeds.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -141,7 +143,7 @@ export function Mentalist() {
               <span key={`${s.mediaType}-${s.id}`} className="flex items-center gap-2 rounded-full border border-brand-400/40 bg-brand-500/15 py-1 pl-1 pr-2 text-sm text-white">
                 <span className="h-8 w-6 overflow-hidden rounded"><Poster posterUrl={s.posterUrl} title={s.title} /></span>
                 <span className="max-w-[9rem] truncate font-semibold">{s.title}</span>
-                <button onClick={() => removeSeed(s)} className="text-slate-300 hover:text-white" aria-label={`Remove ${s.title}`}>✕</button>
+                <button onClick={() => removeSeed(s)} className="text-slate-300 hover:text-white" aria-label={t('ask.remove', { title: s.title })}>✕</button>
               </span>
             ))}
           </div>
@@ -152,18 +154,18 @@ export function Mentalist() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search a title you love…"
+              placeholder={t('ask.searchLovePlaceholder')}
               className="w-full rounded-xl border border-white/15 bg-ink-950/70 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none"
             />
             {(hits.length > 0 || searching) && q.trim().length >= 2 && (
               <div className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-xl border border-white/15 bg-ink-900/98 p-1 shadow-2xl backdrop-blur">
-                {searching && hits.length === 0 && <div className="px-3 py-2 text-sm text-slate-400">Searching…</div>}
+                {searching && hits.length === 0 && <div className="px-3 py-2 text-sm text-slate-400">{t('ask.searching')}</div>}
                 {hits.filter((h) => !seedKeys.has(`${h.mediaType}-${h.id}`)).map((h) => (
                   <button key={`${h.mediaType}-${h.id}`} onClick={() => addSeed(h)} className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-white/10">
                     <span className="h-12 w-8 flex-none overflow-hidden rounded"><Poster posterUrl={h.posterUrl} title={h.title} /></span>
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-white">{h.title}</span>
-                      <span className="text-xs text-slate-400">{h.mediaType === 'tv' ? 'TV' : 'Movie'}{h.year ? ` · ${h.year}` : ''}</span>
+                      <span className="text-xs text-slate-400">{h.mediaType === 'tv' ? t('ask.tv') : t('ask.movie')}{h.year ? ` · ${h.year}` : ''}</span>
                     </span>
                   </button>
                 ))}
@@ -174,9 +176,9 @@ export function Mentalist() {
 
         <div className="mt-4 flex items-center gap-3">
           <button onClick={() => void readMind()} disabled={seeds.length < MIN || reading} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">
-            {reading ? '🧬 Building your case…' : '🧬 Start my VERD1CT DNA'}
+            {reading ? t('ask.buildingCase') : t('ask.startDna')}
           </button>
-          <span className="text-xs text-slate-500">{seeds.length}/{MAX} added{seeds.length < MIN ? ` · ${MIN - seeds.length} more to go` : ''}</span>
+          <span className="text-xs text-slate-500">{t('ask.added', { count: seeds.length, max: MAX })}{seeds.length < MIN ? t('ask.moreToGo', { n: MIN - seeds.length }) : ''}</span>
         </div>
         {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
       </div>
@@ -184,15 +186,15 @@ export function Mentalist() {
       {reading && (
         <div className="card flex flex-col items-center gap-3 p-10 text-center">
           <span className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
-          <div className="text-lg font-bold text-white">Reading the threads between your picks…</div>
-          <p className="text-sm text-slate-400">Fingerprinting tone, pace, motifs and lead characters.</p>
+          <div className="text-lg font-bold text-white">{t('ask.readingThreads')}</div>
+          <p className="text-sm text-slate-400">{t('ask.fingerprinting')}</p>
         </div>
       )}
 
       {/* Viewing DNA read-back */}
       {dna && !reading && (
         <div className="card border-brand-400/30 bg-gradient-to-br from-brand-500/10 to-transparent p-5">
-          <h2 className="text-lg font-bold text-white">🧬 Your Viewing DNA</h2>
+          <h2 className="text-lg font-bold text-white">{t('ask.yourViewingDna')}</h2>
           <p className="mt-2 text-sm text-slate-200">{dna.summary}</p>
           {dna.dials.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -205,13 +207,13 @@ export function Mentalist() {
           )}
           {dna.predictions.length > 0 && (
             <div className="mt-5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-brand-200">Did we read you right?</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-brand-200">{t('ask.didWeReadRight')}</div>
               <ul className="mt-2 space-y-2">
                 {dna.predictions.map((p, i) => (
                   <li key={i} className="flex flex-col gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-2.5 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-sm text-slate-100">{p}</span>
                     <span className="flex flex-none gap-1">
-                      {([['hit', '🎯 Nailed it'], ['meh', '≈ Sorta'], ['miss', '✕ Nope']] as const).map(([v, label]) => (
+                      {([['hit', t('ask.predHit')], ['meh', t('ask.predMeh')], ['miss', t('ask.predMiss')]] as const).map(([v, label]) => (
                         <button
                           key={v}
                           onClick={() => setConfirmed((c) => ({ ...c, [i]: v }))}
@@ -233,17 +235,17 @@ export function Mentalist() {
       {picks && !reading && (
         picks.length === 0 ? (
           <div className="card p-6 text-center text-sm text-slate-400">
-            We couldn’t find enough strong matches for that mix — try swapping in a couple of more mainstream favorites.
+            {t('ask.notEnoughMatches')}
           </div>
         ) : (
           <div>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-white">🎯 We predict you’ll pick these</h2>
-                <p className="text-xs text-slate-400">Ranked by how strongly your fingerprint points to each. Tap any for its VERD1CT + where to watch.</p>
+                <h2 className="text-lg font-bold text-white">{t('ask.predictPick')}</h2>
+                <p className="text-xs text-slate-400">{t('ask.rankedBy')}</p>
               </div>
               <button onClick={() => void saveAll()} disabled={savingAll || saved} className="btn-secondary disabled:opacity-50">
-                {saved ? '✓ Saved to watchlist' : savingAll ? 'Saving…' : '+ Save all to watchlist'}
+                {saved ? t('ask.savedToWatchlist') : savingAll ? t('ask.savingEllipsis') : t('ask.saveAllToWatchlist')}
               </button>
             </div>
             <div className="poster-grid">
@@ -258,8 +260,8 @@ export function Mentalist() {
                   overlay={<SaveButton wide removeOnSave tmdbId={p.id} mediaType={p.mediaType} title={p.title} year={p.year} posterPath={p.posterPath} />}
                 >
                   <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="rounded-md bg-brand-500/20 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-brand-100">{p.match}% match</span>
-                    {p.stretch && <span className="rounded-md bg-gold-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-200">STRETCH</span>}
+                    <span className="rounded-md bg-brand-500/20 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-brand-100">{t('ask.pctMatch', { pct: p.match })}</span>
+                    {p.stretch && <span className="rounded-md bg-gold-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-200">{t('ask.stretch')}</span>}
                   </div>
                   <p className="mt-1 line-clamp-3 text-[11px] text-slate-400">{p.reason}</p>
                   <div className="mt-1 text-[10px] text-slate-500">{p.commitment}{p.where ? ` · ${p.where}` : ''}</div>

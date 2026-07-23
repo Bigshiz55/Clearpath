@@ -6,6 +6,7 @@ import { getMyServices } from '@/lib/profile';
 import { STREAMING_SERVICES } from '@/lib/services';
 import { ReleaseWall, type WallService } from '@/components/ReleaseWall';
 import { tmdbImage } from '@/lib/tmdb/image';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'New releases · WatchVerdict' };
@@ -19,6 +20,7 @@ export default async function NewPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const uid = user?.id ?? '';
+  const { t } = getServerI18n();
 
   const [services, waiting] = await Promise.all([
     getMyServices(supabase, uid),
@@ -28,17 +30,14 @@ export default async function NewPage() {
   return (
     <div className="space-y-8">
       <section>
-        <h1 className="text-2xl font-bold text-white sm:text-3xl">🆕 New releases</h1>
-        <p className="mt-2 text-sm text-slate-300">
-          The freshest movies and shows — fine-tune by type, timing, platform, and rating, then tap any
-          poster for a quick look with the trailer. Every title is one tap from its full verdict.
-        </p>
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">{t('discover.new.heading')}</h1>
+        <p className="mt-2 text-sm text-slate-300">{t('discover.new.intro')}</p>
       </section>
 
       {/* Upcoming/just-dropped episodes for shows the user already follows. */}
       {waiting.length > 0 && (
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-white">📺 Waiting for you</h2>
+          <h2 className="mb-3 text-lg font-semibold text-white">{t('discover.new.waitingHeading')}</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {waiting.map((w) => (
               <Link
@@ -51,7 +50,7 @@ export default async function NewPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={tmdbImage(w.posterPath, 'w185')!} alt="" className="h-full w-full object-cover" loading="lazy" />
                   ) : (
-                    <div className="grid h-full w-full place-items-center bg-white/5 text-[10px] text-slate-400">TV</div>
+                    <div className="grid h-full w-full place-items-center bg-white/5 text-[10px] text-slate-400">{t('discover.common.tvBadge')}</div>
                   )}
                 </div>
                 <div className="min-w-0 self-center">
@@ -61,9 +60,7 @@ export default async function NewPage() {
               </Link>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-slate-400">
-            Based on real TMDB air dates for shows on your watchlist — we never invent an episode count.
-          </p>
+          <p className="mt-2 text-[11px] text-slate-400">{t('discover.new.waitingNote')}</p>
         </section>
       )}
 
@@ -74,12 +71,10 @@ export default async function NewPage() {
       {services.length === 0 && (
         <section className="card flex flex-col items-start gap-2 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-white">Make this yours</h2>
-            <p className="mt-0.5 text-sm text-slate-300">
-              Tell us your streaming services and the “My services” filter will spotlight new titles you can start tonight.
-            </p>
+            <h2 className="text-base font-semibold text-white">{t('discover.new.makeYours')}</h2>
+            <p className="mt-0.5 text-sm text-slate-300">{t('discover.new.makeYoursBody')}</p>
           </div>
-          <Link href="/app/settings" className="btn-primary flex-none">Pick my services</Link>
+          <Link href="/app/settings" className="btn-primary flex-none">{t('discover.new.pickServices')}</Link>
         </section>
       )}
     </div>

@@ -24,6 +24,7 @@ import type { RiskAssessment } from '@/lib/finish';
 import type { ContentDna } from '@/lib/contentDna';
 import type { Briefing } from '@/lib/briefing';
 import { originSummary } from '@/lib/origin';
+import { getServerI18n } from '@/i18n/server';
 
 const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   none: 'bg-white/10 text-slate-400',
@@ -74,6 +75,7 @@ export function VerdictReportView({
   tasteMatch?: TasteMatch | null;
 }) {
   const t = report.title;
+  const { t: tr, plural } = getServerI18n();
   const origin = originSummary(t);
   const panel = buildPanel(report);
   const backdrop = tmdbImage(t.backdropPath, 'w780');
@@ -81,12 +83,12 @@ export function VerdictReportView({
   const runtime =
     t.mediaType === 'movie'
       ? t.runtimeMinutes
-        ? `${t.runtimeMinutes} min`
+        ? tr('title.runtimeMin', { n: t.runtimeMinutes })
         : null
       : t.numberOfSeasons
-        ? `${t.numberOfSeasons} season${t.numberOfSeasons === 1 ? '' : 's'}`
+        ? plural('title.seasons', t.numberOfSeasons, { n: t.numberOfSeasons })
         : t.episodeRuntimeMinutes
-          ? `~${t.episodeRuntimeMinutes} min/ep`
+          ? tr('title.minPerEp', { n: t.episodeRuntimeMinutes })
           : null;
 
   return (
@@ -106,7 +108,7 @@ export function VerdictReportView({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="chip">{t.mediaType === 'movie' ? 'Movie' : 'TV Series'}</span>
+              <span className="chip">{t.mediaType === 'movie' ? tr('title.chipMovie') : tr('title.chipTvSeries')}</span>
               {t.contentRating && <span className="chip">{t.contentRating}</span>}
               {runtime && <span className="chip">{runtime}</span>}
               {t.status && t.mediaType === 'tv' && <span className="chip">{t.status}</span>}
@@ -138,7 +140,7 @@ export function VerdictReportView({
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {t.trailerUrl && (
                 <a href={t.trailerUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex">
-                  ▶ Watch trailer
+                  {tr('title.watchTrailer')}
                 </a>
               )}
               {/* Save it right from the placard — same list as everywhere else. */}
@@ -225,9 +227,9 @@ export function VerdictReportView({
 
       {/* Ratings (icons) + language & episodes */}
       <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">Ratings</h2>
+        <h2 className="text-lg font-semibold text-white">{tr('title.ratingsHeading')}</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Critic scores from IMDb / Rotten Tomatoes (when available); audience from TMDB.
+          {tr('title.ratingsSourceNote')}
         </p>
         <div className="mt-4">
           <RatingIcons sources={report.general.sources} />
@@ -239,7 +241,7 @@ export function VerdictReportView({
 
       {/* Recommendation consensus */}
       <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">Recommendation consensus</h2>
+        <h2 className="text-lg font-semibold text-white">{tr('title.consensusHeading')}</h2>
         <div className="mt-4">
           <RecommendationConsensus primaryCall={report.primaryCall} sources={report.general.sources} />
         </div>
@@ -247,31 +249,29 @@ export function VerdictReportView({
 
       {/* Score explanation */}
       <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">How this score was built</h2>
+        <h2 className="text-lg font-semibold text-white">{tr('title.scoreBuiltHeading')}</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="space-y-3">
-            <Bar label="General quality" value={report.general.breakdown.quality} />
-            <Bar label="Audience reception" value={report.general.breakdown.audience} />
-            <Bar label="Watchability" value={report.general.breakdown.watchability} />
-            <Bar label="Engagement" value={report.general.breakdown.engagement} />
+            <Bar label={tr('title.barQuality')} value={report.general.breakdown.quality} />
+            <Bar label={tr('title.barAudience')} value={report.general.breakdown.audience} />
+            <Bar label={tr('title.barWatchability')} value={report.general.breakdown.watchability} />
+            <Bar label={tr('title.barEngagement')} value={report.general.breakdown.engagement} />
           </div>
           <div className="space-y-3">
             <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="text-sm font-semibold text-white">Ratings used</div>
+              <div className="text-sm font-semibold text-white">{tr('title.ratingsUsed')}</div>
               <div className="mt-2 space-y-1 text-sm">
                 {report.general.sources.map((s) => (
                   <div key={s.name} className="flex items-center justify-between">
                     <span className="text-slate-400">{s.name}</span>
                     <span className={s.available ? 'text-slate-200' : 'text-slate-500'}>
-                      {s.available ? s.raw : 'Not available'}
+                      {s.available ? s.raw : tr('title.notAvailable')}
                     </span>
                   </div>
                 ))}
               </div>
               <p className="mt-2 text-xs text-slate-500">
-                Audience & critic scores shown as reported. When critic aggregators are
-                unavailable, quality is estimated from audience data (shrunk toward neutral when
-                few votes exist) and labeled as such — never presented as an official critic score.
+                {tr('title.ratingsUsedNote')}
               </p>
             </div>
           </div>
@@ -280,7 +280,7 @@ export function VerdictReportView({
         {report.personal.adjustments.length > 0 && (
           <div className="mt-5">
             <div className="text-sm font-semibold text-white">
-              {report.personal.label} adjustments
+              {tr('title.adjustmentsHeading', { label: report.personal.label })}
             </div>
             <ul className="mt-2 space-y-2">
               {report.personal.adjustments.map((a, i) => (
@@ -295,7 +295,7 @@ export function VerdictReportView({
                   <div>
                     <div className="flex items-center gap-2 text-sm font-medium text-white">
                       {a.label}
-                      {a.defining && <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">hard rule</span>}
+                      {a.defining && <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">{tr('title.hardRule')}</span>}
                     </div>
                     <div className="text-xs text-slate-400">{a.reason}</div>
                   </div>
@@ -309,7 +309,7 @@ export function VerdictReportView({
       {/* Why it may / may not work */}
       <section className="grid gap-4 sm:grid-cols-2">
         <div className="card p-5">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-emerald-200">Why it may work</h3>
+          <h3 className="flex items-center gap-2 text-base font-semibold text-emerald-200">{tr('title.whyMayWork')}</h3>
           <ul className="mt-3 space-y-2 text-sm text-slate-300">
             {report.reasonsFor.map((r, i) => (
               <li key={i} className="flex gap-2">
@@ -320,7 +320,7 @@ export function VerdictReportView({
           </ul>
         </div>
         <div className="card p-5">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-red-200">Why it may not</h3>
+          <h3 className="flex items-center gap-2 text-base font-semibold text-red-200">{tr('title.whyMayNot')}</h3>
           <ul className="mt-3 space-y-2 text-sm text-slate-300">
             {report.reasonsAgainst.map((r, i) => (
               <li key={i} className="flex gap-2">
@@ -340,10 +340,10 @@ export function VerdictReportView({
             className="card flex items-center justify-between gap-3 p-4 transition hover:border-white/25 hover:bg-white/[0.05]"
           >
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-white">Not feeling this one?</div>
-              <div className="text-xs text-slate-400">Let the Judge put it on trial and show better-for-you picks in the same lane.</div>
+              <div className="text-sm font-semibold text-white">{tr('title.notFeeling')}</div>
+              <div className="text-xs text-slate-400">{tr('title.judgePitch')}</div>
             </div>
-            <span className="btn-primary flex-none">Ask the Judge →</span>
+            <span className="btn-primary flex-none">{tr('title.askJudge')}</span>
           </Link>
         </section>
       )}
@@ -354,10 +354,9 @@ export function VerdictReportView({
 
       {/* Content & tone */}
       <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">Content &amp; tone</h2>
+        <h2 className="text-lg font-semibold text-white">{tr('title.contentTone')}</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Signals inferred from genre, keywords, and rating. Where we can’t responsibly determine a
-          level, it’s marked unknown rather than guessed.
+          {tr('title.contentToneNote')}
         </p>
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {report.contentSignals.map((s) => (
@@ -373,8 +372,8 @@ export function VerdictReportView({
 
       {/* Where to watch */}
       <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">Where to watch</h2>
-        <p className="mt-1 text-xs text-slate-500">Legal options for your region. We link out — we never host or stream content.</p>
+        <h2 className="text-lg font-semibold text-white">{tr('title.whereToWatch')}</h2>
+        <p className="mt-1 text-xs text-slate-500">{tr('title.whereToWatchNote')}</p>
         <div className="mt-4">
           <ProviderRow providers={report.providers} myServices={myServices} />
         </div>
@@ -389,7 +388,7 @@ export function VerdictReportView({
       {/* More like this */}
       {report.similar.length > 0 && (
         <section className="card p-5 sm:p-6">
-          <h2 className="text-lg font-semibold text-white">More like this</h2>
+          <h2 className="text-lg font-semibold text-white">{tr('title.moreLikeThis')}</h2>
           <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
             {report.similar.map((s) => (
               <Link key={`${s.mediaType}-${s.id}`} href={`/app/title/${s.mediaType}/${s.id}`} className="group block">
@@ -415,11 +414,11 @@ export function VerdictReportView({
 
       {/* Final verdict */}
       <section className="card bg-cinema-radial p-6 text-center">
-        <div className="text-xs uppercase tracking-wider text-slate-400">Final verdict</div>
+        <div className="text-xs uppercase tracking-wider text-slate-400">{tr('title.finalVerdict')}</div>
         <div className="mt-2 flex flex-col items-center gap-2">
           <VerdictBadge tier={report.tier} size="lg" />
           <div className="text-sm text-slate-300">
-            Watchlist call: <DispositionChip disposition={report.watchlistDisposition} />
+            {tr('title.watchlistCall')} <DispositionChip disposition={report.watchlistDisposition} />
           </div>
         </div>
       </section>

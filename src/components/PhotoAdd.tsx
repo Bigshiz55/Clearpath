@@ -4,10 +4,12 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { photoMatches, addToWatchlist, type PhotoMatch } from '@/lib/actions/watchlist';
 import { tmdbImage } from '@/lib/tmdb/image';
+import { useI18n } from '@/i18n/I18nProvider';
 
 type State = 'idle' | 'reading' | 'matching' | 'pick' | 'done' | 'error';
 
 export function PhotoAdd() {
+  const { t, plural } = useI18n();
   const [state, setState] = useState<State>('idle');
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState('');
@@ -38,7 +40,7 @@ export function PhotoAdd() {
       setOcrText(text);
       if (!text) {
         setState('error');
-        setMessage('Couldn’t read any text. Try a shot where the title is clearly visible (a pause or info screen works great).');
+        setMessage(t('misc.photo.noText'));
         return;
       }
       setState('matching');
@@ -48,11 +50,11 @@ export function PhotoAdd() {
         setState('pick');
       } else {
         setState('error');
-        setMessage(res.error ?? 'Couldn’t find a matching title in that photo.');
+        setMessage(res.error ?? t('misc.photo.noMatch'));
       }
     } catch {
       setState('error');
-      setMessage('Something went wrong reading the image.');
+      setMessage(t('misc.photo.readError'));
     } finally {
       if (inputRef.current) inputRef.current.value = '';
     }
@@ -72,7 +74,7 @@ export function PhotoAdd() {
     if (res.ok) {
       setAdded((a) => [...a, label]);
     } else {
-      setMessage(res.error ?? 'Couldn’t add that one.');
+      setMessage(res.error ?? t('misc.photo.addError'));
     }
   }
 
@@ -88,23 +90,23 @@ export function PhotoAdd() {
 
   return (
     <div className="card p-5">
-      <div className="text-sm font-semibold text-white">📸 Add from a photo</div>
+      <div className="text-sm font-semibold text-white">{t('misc.photo.title')}</div>
       <p className="mt-1 text-xs text-slate-400">
-        Snap or screenshot what’s on the TV — I’ll read the titles and let you tap the ones to save. No setup.
+        {t('misc.photo.subtitle')}
       </p>
 
       <input ref={inputRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
 
       {(state === 'idle' || state === 'error') && (
         <button onClick={() => inputRef.current?.click()} className="btn-primary mt-4 w-full py-3">
-          Choose or take a photo
+          {t('misc.photo.choosePhoto')}
         </button>
       )}
 
       {(state === 'reading' || state === 'matching') && (
         <div className="mt-4">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>{state === 'reading' ? 'Reading the titles…' : 'Finding matches…'}</span>
+            <span>{state === 'reading' ? t('misc.photo.readingTitles') : t('misc.photo.findingMatches')}</span>
             {state === 'reading' && <span>{progress}%</span>}
           </div>
           <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10">
@@ -124,7 +126,7 @@ export function PhotoAdd() {
       {state === 'pick' && (
         <div className="mt-4">
           <div className="text-xs font-semibold text-slate-300">
-            Found {matches.length} possible {matches.length === 1 ? 'title' : 'titles'} — tap to add:
+            {plural('misc.photo.found', matches.length)}
           </div>
           <div className="mt-2 space-y-2">
             {matches.map((m) => {
@@ -153,12 +155,12 @@ export function PhotoAdd() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-white">{m.title}</div>
                     <div className="text-xs text-slate-400">
-                      {m.mediaType === 'tv' ? 'TV series' : 'Movie'}
+                      {m.mediaType === 'tv' ? t('misc.photo.tvSeries') : t('misc.photo.movie')}
                       {m.year ? ` · ${m.year}` : ''}
                     </div>
                   </div>
                   <span className={`flex-none text-sm font-semibold ${isAdded ? 'text-emerald-300' : 'text-brand-300'}`}>
-                    {isAdded ? '✓ Added' : '+ Add'}
+                    {isAdded ? t('misc.photo.added') : t('misc.photo.add')}
                   </span>
                 </button>
               );
@@ -166,18 +168,18 @@ export function PhotoAdd() {
           </div>
           {message && <p className="mt-2 text-sm text-amber-300">{message}</p>}
           <div className="mt-3 flex gap-2">
-            <Link href="/app/watchlist" className="btn-secondary text-sm">View watchlist</Link>
-            <button onClick={reset} className="btn-ghost text-sm">Add another photo</button>
+            <Link href="/app/watchlist" className="btn-secondary text-sm">{t('misc.photo.viewWatchlist')}</Link>
+            <button onClick={reset} className="btn-ghost text-sm">{t('misc.photo.addAnotherPhoto')}</button>
           </div>
         </div>
       )}
 
       {state === 'done' && (
         <div className="mt-3">
-          <p className="text-sm font-semibold text-emerald-200">✅ Added: {message}</p>
+          <p className="text-sm font-semibold text-emerald-200">✅ {t('misc.photo.addedColon')} {message}</p>
           <div className="mt-2 flex gap-2">
-            <Link href="/app/watchlist" className="btn-secondary text-sm">View watchlist</Link>
-            <button onClick={reset} className="btn-ghost text-sm">Add another</button>
+            <Link href="/app/watchlist" className="btn-secondary text-sm">{t('misc.photo.viewWatchlist')}</Link>
+            <button onClick={reset} className="btn-ghost text-sm">{t('misc.photo.addAnother')}</button>
           </div>
         </div>
       )}
@@ -187,7 +189,7 @@ export function PhotoAdd() {
           <p className="text-sm text-amber-300">{message}</p>
           {ocrText && (
             <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-slate-500">What I read from the photo</summary>
+              <summary className="cursor-pointer text-xs text-slate-500">{t('misc.photo.whatIRead')}</summary>
               <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-2 text-xs text-slate-400">
                 {ocrText}
               </pre>
