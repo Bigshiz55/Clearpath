@@ -98,9 +98,15 @@ export function naiveParseQuery(input: string): FinderQuery {
   const aud = t.match(/(?:audience|score|rating)\D{0,14}(\d{2,3})/) || t.match(/(\d{2,3})\s*%/);
   if (aud) q.minAudience = Math.min(100, Number(aud[1]));
 
-  // English audio.
+  // English audio. A strict phrase ("with english audio", "english dub(bed)",
+  // "no subtitles", "dub required", "listen in english") requires VERIFIED audio in
+  // the primary results (likely/unknown split into possibleMatches downstream).
   if (/\benglish (?:audio|dub|dubbed|language)\b|not subtitl|no subtitl|dubbed in english/.test(t)) {
     q.englishAudioOnly = true;
+  }
+  if (/\bwith english audio\b|\benglish dub(bed)?\b|\bdub required\b|\bno subtitles\b|\blisten in english\b|\benglish spoken\b/.test(t)) {
+    q.englishAudioOnly = true;
+    q.strictEnglishAudio = true;
   }
 
   // On my services.
