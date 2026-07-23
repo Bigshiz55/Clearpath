@@ -90,11 +90,11 @@ export function SaveButton({
   }
 
   const icon = saved ? (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 flex-none" fill="currentColor" aria-hidden>
       <path d="M6.5 3h11A1.5 1.5 0 0 1 19 4.5V21l-7-4-7 4V4.5A1.5 1.5 0 0 1 6.5 3Z" />
     </svg>
   ) : (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <path d="M12 5v14M5 12h14" strokeLinecap="round" />
     </svg>
   );
@@ -129,7 +129,7 @@ export function SaveButton({
       disabled={busy}
       aria-label={saved ? 'Saved — remove from your list' : 'Save'}
       title={saved ? 'Saved — tap to remove' : 'Save'}
-      className={`flex h-9 items-center justify-center gap-1 rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-9'} ${
+      className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-9'} ${
         saved
           ? 'border-brand-300 bg-brand-500'
           : 'border-brand-400/60 bg-brand-500/35 hover:bg-brand-500/60'

@@ -16,11 +16,12 @@ import { useToast } from '@/components/Toast';
 // drops the example into the box so it's obvious what VERD1CT can do. The live-TV
 // listing asks are first so it's clear we know what's actually on right now.
 const EXAMPLES: { hint: string; text: string }[] = [
-  { hint: '📺 On live TV', text: "What's on Lifetime tonight" },
-  { hint: '⏱️ Coming up', text: 'Comedies coming on in the next 4 hours' },
-  { hint: '🎯 Your taste', text: 'I love smart crime mysteries, but I avoid supernatural stories and anything too slow.' },
-  { hint: '🔎 Where to stream', text: 'Where can I watch Jaws?' },
-  { hint: '▶️ On a service', text: "Something great on Netflix I haven't seen" },
+  { hint: '📺 Lifetime movies tonight', text: 'What Lifetime movies are on tonight?' },
+  { hint: '⏱️ Comedies on in the next 2 hours', text: 'Comedies coming on in the next 2 hours' },
+  { hint: '🎬 What’s on right now', text: 'What’s on TV right now that I’d like?' },
+  { hint: '🎯 Crime dramas, nothing slow', text: 'I love crime dramas, but nothing too slow or supernatural.' },
+  { hint: '🔎 Where can I stream Jaws?', text: 'Where can I stream Jaws?' },
+  { hint: '▶️ Good stuff on Netflix', text: 'Something good on Netflix I haven’t seen' },
 ];
 
 export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
@@ -70,13 +71,16 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
           : 'mx-auto max-w-2xl rounded-2xl border border-brand-400/40 bg-gradient-to-r from-brand-500/15 via-fuchsia-500/10 to-transparent p-4'
       }
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <span className={hero ? 'text-3xl' : 'text-2xl'} aria-hidden>⚖️</span>
         <div className="min-w-0">
           <div className={hero ? 'text-xl font-black text-white sm:text-2xl' : 'text-base font-extrabold text-white sm:text-lg'}>State Your Case</div>
           <div className={hero ? 'text-sm font-medium text-slate-100 sm:text-base' : 'text-sm text-slate-300'}>
             Describe your taste — or ask for something specific: what’s on <span className="font-semibold text-white">live TV</span>, <span className="font-semibold text-white">where to stream</span> a title, or what’s good <span className="font-semibold text-white">on a service</span>.
           </div>
+          <Link href="/app/mentalist" className={`mt-1.5 inline-block font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline ${hero ? 'text-sm' : 'text-xs'}`}>
+            Or just name a few shows you love — we’ll figure out your taste →
+          </Link>
         </div>
       </div>
 
@@ -112,14 +116,11 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
             : 'mt-3 w-full resize-none rounded-xl border border-white/15 bg-ink-950/70 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none'
         }
       />
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <Link href="/app/mentalist" className={hero ? 'text-sm font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline' : 'text-xs font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline'}>
-          Or just name a few shows you love — we’ll figure out your taste →
-        </Link>
+      <div className="mt-3 flex justify-end">
         <button
           onClick={() => void submit()}
           disabled={busy || text.trim().length < 4}
-          className={`wv-cta-3d shrink-0 disabled:cursor-not-allowed ${hero ? 'px-7 py-3.5 text-lg' : 'px-5 py-2.5 text-sm'}`}
+          className={`wv-cta-3d disabled:cursor-not-allowed ${hero ? 'px-8 py-3.5 text-lg' : 'px-5 py-2.5 text-sm'}`}
         >
           {busy ? 'Ruling…' : 'Hit the gavel →'}
         </button>
