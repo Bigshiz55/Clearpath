@@ -247,6 +247,19 @@ export const GOLD_CASES: EvalCase[] = [
   gold('Find me a good podcast about true crime.', 'scott', 'unsupported', (q) => {
     q.contentTypes = ['podcast'];
   }, { hardConstraints: [], maxResults: null, expectsRejection: true }, ['unsupported', 'podcast']),
+
+  // Guard: a pure preference STATEMENT (no request verb) must build taste, not
+  // trigger a search. Protects the broadened find-intent from hijacking DNA.
+  gold('I love grounded crime dramas and I hate anything supernatural.', 'scott', 'taste_building', (q) => {
+    q.excludedAttributes = [];
+  }, { hardConstraints: [], maxResults: null }, ['taste_building', 'guard']),
+
+  // "Give me" is a real request verb.
+  gold('Give me a detective show, nothing supernatural.', 'scott', 'personalized_content_discovery', (q) => {
+    q.contentTypes = ['tv'];
+    q.excludedAttributes = ['supernatural'];
+    q.personalizationRequested = true;
+  }, { hardConstraints: [C.excl('supernatural'), C.dedup(), C.real()], maxResults: null }, ['discovery', 'give-me']),
 ];
 
 /** The 15-axis-independent scenario matrix required by Phase 14 as data-tied

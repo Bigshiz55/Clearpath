@@ -49,7 +49,15 @@ function norm(s: string | null): string {
   return (s ?? '').toLowerCase().trim();
 }
 function isVague(raw: string): boolean {
-  return /^\s*(find|show me|give me)?\s*something good\.?\s*$/i.test(raw);
+  // Strip filler words first so "you know, find something good" still reads as
+  // the maximally-vague request that warrants a clarification.
+  const t = raw
+    .toLowerCase()
+    .replace(/\b(um|uh|like|you know|i mean|so|well)\b/g, '')
+    .replace(/[.,!?]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return /^(find|show me|give me|get me)?\s*(something|anything) (good|to watch)$/.test(t) || /^(find|show me|give me)?\s*(anything|whatever)$/.test(t);
 }
 
 // ── Layer B: hard-constraint validity (independent) ──────────────────────────

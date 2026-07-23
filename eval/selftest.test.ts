@@ -60,6 +60,19 @@ describe('normalizer', () => {
   it('rejects unsupported categories', () => {
     expect(normalize('Find me a good podcast.').normalizedIntent).toBe('unsupported');
   });
+  it('treats "give me / pull up / something …" as discovery requests', () => {
+    expect(normalize('Give me a detective show, nothing supernatural.').normalizedIntent).toBe('personalized_content_discovery');
+    expect(normalize('Pull up a comedy.').normalizedIntent).toBe('personalized_content_discovery');
+    expect(normalize('Something light and funny.').normalizedIntent).toBe('personalized_content_discovery');
+  });
+  it('does NOT hijack a taste STATEMENT into a search', () => {
+    // A pure preference (love/hate, no request verb) must stay taste-building.
+    expect(normalize('I love grounded crime dramas and I hate anything supernatural.').normalizedIntent).toBe('taste_building');
+  });
+  it('routes "network + tonight" to broadcast but leaves bare "tonight" as taste', () => {
+    expect(normalize('Pull up a couple of AMC movies later tonight.').normalizedIntent).toBe('scheduled_broadcast_discovery');
+    expect(normalize('a good movie tonight').normalizedIntent).not.toBe('scheduled_broadcast_discovery');
+  });
 });
 
 describe('Layer B is independent and catches planted violations', () => {

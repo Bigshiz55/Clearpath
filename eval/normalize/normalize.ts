@@ -212,11 +212,12 @@ function pickIntent(
   if (s.platform && wantsFind) return 'platform_browse';
   // 3. airing horizon
   if (s.horizon != null) return 'scheduled_broadcast_discovery';
-  // 4. find words + verb (genre/mood discovery)
-  const findWords = /\b(movies?|films?|shows?|series|documentar(y|ies)|comed(y|ies)|funny|scary|horror|thrillers?|family|kids?|action|adventure|dramas?|romance|romantic|rom-?com|sci-?fi|fantasy|animated|anime|western|musical|feel-?good|myster(y|ies)|crime|suspense|tearjerker|date night)\b/i;
-  const findVerb = /\b(find|show me|recommend|suggest|to watch|good|great|best|binge|worth watching)\b/i;
-  if (findWords.test(raw) && findVerb.test(raw)) return 'personalized_content_discovery';
-  // 5. taste-building fallback
+  // 4. find words + verb (genre/mood discovery) — mirrors the build-case route.
+  const findWords = /\b(movies?|films?|shows?|series|documentar(y|ies)|comed(y|ies)|funny|scary|horror|thrillers?|family|kids?|action|adventure|dramas?|romance|romantic|rom-?com|sci-?fi|fantasy|animated|anime|western|musical|feel-?good|myster(y|ies)|crime|suspense|tearjerker|date night|something|anything)\b/i;
+  const findVerb = /\b(find|show me|recommend|suggest|give me|gimme|pull up|put on|i want|i wanna|i'?d like|in the mood for|looking for|feel like|to watch|can watch|could watch|movie night|good|great|best|binge|worth watching)\b/i;
+  const startsWithSomething = /^\s*(something|anything)\b/i.test(raw);
+  if ((findWords.test(raw) && findVerb.test(raw)) || startsWithSomething) return 'personalized_content_discovery';
+  // 5. taste-building fallback (a pure preference statement, no request verb)
   if (/\b(i (love|like|enjoy|hate|avoid)|i'?m into)\b/.test(t)) return 'taste_building';
   return 'unknown';
 }

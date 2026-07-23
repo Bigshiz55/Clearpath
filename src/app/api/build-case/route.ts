@@ -298,9 +298,14 @@ export async function POST(request: Request) {
     // Watch Now grid. Airing/platform/where-to-watch asks were handled above; a
     // pure "I love X, avoid Y" (no find verb) still just builds the DNA. Requires
     // BOTH a genre/media word and a find intent so we don't hijack taste-building.
-    const findWords = /\b(movies?|films?|shows?|series|documentar(y|ies)|comed(y|ies)|funny|scary|horror|thrillers?|family|kids?|action|adventure|dramas?|romance|romantic|rom-?com|sci-?fi|fantasy|animated|anime|western|musical|feel-?good|myster(y|ies)|crime|suspense|tearjerker|date night)\b/i;
-    const findVerb = /\b(find|show me|recommend|suggest|to watch|good|great|best|binge|worth watching)\b/i;
-    if (findWords.test(text) && findVerb.test(text)) {
+    const findWords = /\b(movies?|films?|shows?|series|documentar(y|ies)|comed(y|ies)|funny|scary|horror|thrillers?|family|kids?|action|adventure|dramas?|romance|romantic|rom-?com|sci-?fi|fantasy|animated|anime|western|musical|feel-?good|myster(y|ies)|crime|suspense|tearjerker|date night|something|anything)\b/i;
+    // Request verbs (imperatives + "I want/feel like"). Deliberately excludes
+    // preference verbs (love/like/enjoy/hate/avoid) so a pure taste statement
+    // still builds DNA instead of being hijacked into a search.
+    const findVerb = /\b(find|show me|recommend|suggest|give me|gimme|pull up|put on|i want|i wanna|i'?d like|in the mood for|looking for|feel like|to watch|can watch|could watch|movie night|good|great|best|binge|worth watching)\b/i;
+    // A request phrased as a bare description ("Something light and funny…").
+    const startsWithSomething = /^\s*(something|anything)\b/i.test(text);
+    if ((findWords.test(text) && findVerb.test(text)) || startsWithSomething) {
       const redirect = `/app/finder?q=${encodeURIComponent(text.slice(0, 200))}&run=1`;
       await logCase('find', redirect, { axes: parsed.axes.length });
       return NextResponse.json({
