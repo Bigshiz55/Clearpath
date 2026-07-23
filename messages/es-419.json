@@ -23,5 +23,24 @@
     "region": "Región",
     "save": "Guardar",
     "cancel": "Cancelar"
+  },
+  "card": {
+    "for": "A favor",
+    "forHint": "A favor — más como esto",
+    "pass": "Paso",
+    "passHint": "No es para mí",
+    "save": "Guardar",
+    "saved": "Guardado",
+    "saveHint": "Guardar",
+    "savedHint": "Guardado — quitar de tu lista",
+    "movie": "Película",
+    "tv": "Serie"
+  },
+  "toasts": {
+    "savedToList": "Añadido a tu lista.",
+    "removedFromList": "Quitado de tu lista.",
+    "couldNotRemove": "No se pudo quitar.",
+    "signInToSave": "Inicia sesión para guardar en tu lista.",
+    "somethingWrong": "Algo salió mal."
   }
 }

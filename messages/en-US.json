@@ -23,5 +23,24 @@
     "region": "Region",
     "save": "Save",
     "cancel": "Cancel"
+  },
+  "card": {
+    "for": "For",
+    "forHint": "For it — more like this",
+    "pass": "Pass",
+    "passHint": "Not for me",
+    "save": "Save",
+    "saved": "Saved",
+    "saveHint": "Save",
+    "savedHint": "Saved — remove from your list",
+    "movie": "Movie",
+    "tv": "TV"
+  },
+  "toasts": {
+    "savedToList": "Added to your list.",
+    "removedFromList": "Removed from your list.",
+    "couldNotRemove": "Could not remove.",
+    "signInToSave": "Sign in to save to your list.",
+    "somethingWrong": "Something went wrong."
   }
 }

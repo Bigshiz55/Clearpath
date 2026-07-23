@@ -23,5 +23,24 @@
     "region": "地区",
     "save": "保存",
     "cancel": "取消"
+  },
+  "card": {
+    "for": "喜欢",
+    "forHint": "喜欢 — 多来点这样的",
+    "pass": "跳过",
+    "passHint": "不适合我",
+    "save": "保存",
+    "saved": "已保存",
+    "saveHint": "保存",
+    "savedHint": "已保存 — 从列表中移除",
+    "movie": "电影",
+    "tv": "剧集"
+  },
+  "toasts": {
+    "savedToList": "已加入你的列表。",
+    "removedFromList": "已从你的列表移除。",
+    "couldNotRemove": "无法移除。",
+    "signInToSave": "登录后即可保存到你的列表。",
+    "somethingWrong": "出错了。"
   }
 }

@@ -4,6 +4,7 @@ import { AlgorithmScore } from './AlgorithmScore';
 import { SaveButton } from './SaveButton';
 import { TasteFeedback } from './TasteFeedback';
 import { LikeButton } from './LikeButton';
+import { MediaTag } from './MediaTag';
 
 interface PosterCardProps {
   href?: string;
@@ -73,9 +74,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
     <>
       <div className="line-clamp-2 text-sm font-semibold text-white">{title}</div>
       <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
-        <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
-          {mediaType === 'movie' ? 'Movie' : 'TV'}
-        </span>
+        <MediaTag mediaType={mediaType} />
         <span>
           {year ?? '—'}
           {meta ? ` · ${meta}` : ''}
