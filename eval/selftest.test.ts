@@ -73,6 +73,15 @@ describe('normalizer', () => {
     expect(normalize('Pull up a couple of AMC movies later tonight.').normalizedIntent).toBe('scheduled_broadcast_discovery');
     expect(normalize('a good movie tonight').normalizedIntent).not.toBe('scheduled_broadcast_discovery');
   });
+  it('resolves airing BEFORE platform for a linear channel (F3), but keeps pure platform browses', () => {
+    // A linear channel + a time reaches the guide even though HBO also matches
+    // the Max provider.
+    expect(normalize('Pull up one HBO movie on tonight.').normalizedIntent).toBe('scheduled_broadcast_discovery');
+    expect(normalize('ten HBO movies in the next 3 hours').normalizedIntent).toBe('scheduled_broadcast_discovery');
+    // A named streaming service with only an airing *phrase* stays a browse.
+    expect(normalize('best movies on Netflix').normalizedIntent).toBe('platform_browse');
+    expect(normalize("what's on Netflix").normalizedIntent).toBe('platform_browse');
+  });
 });
 
 describe('Layer B is independent and catches planted violations', () => {

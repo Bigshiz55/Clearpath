@@ -164,7 +164,7 @@ export function normalize(rawQuery: string, opts: NormalizeOptions = {}): Normal
     conf.intent = 0.8;
   } else {
     // ── Intent (mirrors the build-case cascade order) ──────────────────────
-    q.normalizedIntent = pickIntent(rawQuery, t, { platform: Boolean(platform), horizon, watchTitle });
+    q.normalizedIntent = pickIntent(rawQuery, t, { platform: Boolean(platform), network: Boolean(network), horizon, watchTitle });
     conf.intent = 0.7;
   }
 
@@ -196,7 +196,7 @@ export function normalize(rawQuery: string, opts: NormalizeOptions = {}): Normal
 function pickIntent(
   raw: string,
   t: string,
-  s: { platform: boolean; horizon: number | null; watchTitle: string | null },
+  s: { platform: boolean; network: boolean; horizon: number | null; watchTitle: string | null },
 ): NormalizedIntent {
   // 1. where-to-watch
   if (s.watchTitle) return 'where_to_watch';
@@ -208,9 +208,12 @@ function pickIntent(
   const wantsFind =
     /\b(find|show me|recommend|suggest|something|anything|browse|watch|good|what should i watch|what can i watch)\b/.test(t) ||
     /\bon\s+/.test(t);
-  // 2. platform + find
+  // 2. airing wins over platform when a linear network is named (or no platform),
+  //    so "HBO movie on tonight" reaches the guide, not the streaming router.
+  if (s.horizon != null && (s.network || !s.platform)) return 'scheduled_broadcast_discovery';
+  // 3. platform + find
   if (s.platform && wantsFind) return 'platform_browse';
-  // 3. airing horizon
+  // 4. airing cue with a platform but no network / no find intent
   if (s.horizon != null) return 'scheduled_broadcast_discovery';
   // 4. find words + verb (genre/mood discovery) — mirrors the build-case route.
   const findWords = /\b(movies?|films?|shows?|series|documentar(y|ies)|comed(y|ies)|funny|scary|horror|thrillers?|family|kids?|action|adventure|dramas?|romance|romantic|rom-?com|sci-?fi|fantasy|animated|anime|western|musical|feel-?good|myster(y|ies)|crime|suspense|tearjerker|date night|something|anything)\b/i;

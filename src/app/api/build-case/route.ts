@@ -250,27 +250,19 @@ export async function POST(request: Request) {
     const engPlatform = detectPlatform(text);
     const wantsFind = /\b(find|show me|recommend|suggest|something|anything|browse|watch|good|what should i watch|what can i watch)\b/.test(` ${text.toLowerCase()} `) || /\bon\s+/.test(` ${text.toLowerCase()} `);
     const platform = engPlatform && wantsFind ? engPlatform : null;
-    if (platform) {
-      await logCase('platform_find', `/app/finder?providers=${platform.id}`, { platform: platform.name });
-      return NextResponse.json({
-        ok: true,
-        learned,
-        caseId,
-        redirect: `/app/finder?providers=${platform.id}&q=${encodeURIComponent(text.slice(0, 200))}&run=1`,
-        summary: `${tasteLead}Finding something on ${platform.name}, scored for you.`,
-      });
-    }
 
-    // If they asked for something *coming on* soon, honour that constraint: send
-    // them to the live TV guide windowed to the horizon they named, rather than
-    // the generic Watch Now grid. Their stated taste is still folded in above.
-    // A named linear network + a temporal cue ("AMC movies later tonight") is a
-    // broadcast ask even without an explicit airing phrase; fall back to the
-    // liberal temporal reader in that case only, so bare "tonight" alone still
-    // means taste.
+    // Airing intent is resolved BEFORE the streaming platform, so a named linear
+    // channel with a time ("HBO movie on tonight", "Lifetime right now") reaches
+    // the live guide instead of being captured by the streaming router — HBO in
+    // particular also matches the Max provider. A named LINEAR NETWORK (or no
+    // platform at all) tips the tie toward broadcast; a bare platform with only
+    // an airing *phrase* ("what's on Netflix") stays a streaming browse.
+    // A named network + a temporal cue ("AMC movies later tonight") is a
+    // broadcast ask even without an explicit airing phrase (the liberal temporal
+    // reader is used only then, so bare "tonight" alone still means taste).
     const network = detectNetwork(text);
     const horizon = detectAiringHorizon(text) ?? (network ? detectTemporalHorizon(text) : null);
-    if (horizon != null) {
+    if (horizon != null && (network != null || !platform)) {
       const genre = detectGenre(text);
       const movieOnly = /\b(movies?|films?)\b/.test(` ${text.toLowerCase()} `);
       const params = new URLSearchParams({ within: String(horizon) });
@@ -289,6 +281,17 @@ export async function POST(request: Request) {
         summary: what
           ? `${tasteLead}Here’s ${what} coming on in the next ${horizon} hours.`
           : `${tasteLead}Here’s what’s coming on in the next ${horizon} hours.`,
+      });
+    }
+
+    if (platform) {
+      await logCase('platform_find', `/app/finder?providers=${platform.id}`, { platform: platform.name });
+      return NextResponse.json({
+        ok: true,
+        learned,
+        caseId,
+        redirect: `/app/finder?providers=${platform.id}&q=${encodeURIComponent(text.slice(0, 200))}&run=1`,
+        summary: `${tasteLead}Finding something on ${platform.name}, scored for you.`,
       });
     }
 

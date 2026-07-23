@@ -9,7 +9,7 @@
 import { makeRng, type Rng } from './rng';
 import { applyNoise, NOISE_KINDS, type NoiseKind } from './noise';
 import { NETWORKS, PLATFORMS, TIMES, COUNTS, POSITIVE_PREFS, EXCLUSIONS, PERSONALIZATION, UNSUPPORTED } from './matrix';
-import { emptyNormalized, type NormalizedQuery, type ExpectedBehavior, type HardConstraint } from '../contract';
+import { emptyNormalized, type NormalizedQuery, type NormalizedIntent, type ExpectedBehavior, type HardConstraint } from '../contract';
 import type { EvalCase, GenMode, CaseSource } from '../types';
 
 interface Built {
@@ -199,25 +199,33 @@ function unsupported(rng: Rng): Built {
 }
 
 function ambiguous(rng: Rng): Built {
-  const templates: { text: string; ambiguities: string[]; clarify?: boolean }[] = [
+  const D: NormalizedIntent = 'personalized_content_discovery';
+  const templates: { text: string; ambiguities: string[]; clarify?: boolean; intent?: NormalizedIntent }[] = [
     { text: 'Find something new that I have already seen.', ambiguities: ['novelty: new AND already seen'] },
     { text: 'Give me five movies, but only show me one.', ambiguities: ['count: two different counts stated'] },
     { text: 'Something light and funny but also extremely dark.', ambiguities: ['tone: asked for light AND dark'] },
-    { text: 'Put on a Lifetime movie on Netflix right now.', ambiguities: ['source: a linear network AND a streaming service'] },
+    // A named linear network + streaming service: honour the linear channel (→
+    // broadcast) while still flagging the contradiction.
+    { text: 'Put on a Lifetime movie on Netflix right now.', ambiguities: ['source: a linear network AND a streaming service'], intent: 'scheduled_broadcast_discovery' },
     { text: 'Give me a slow-burn mystery, but I do not want anything slow.', ambiguities: ['pace: asked for slow-burn AND not slow'] },
     { text: 'Find something good.', ambiguities: [], clarify: true },
   ];
   const tmpl = rng.pick(templates);
+  const intent = tmpl.intent ?? D;
   const intended = emptyNormalized();
-  intended.normalizedIntent = 'personalized_content_discovery';
+  intended.normalizedIntent = intent;
   intended.ambiguities = tmpl.ambiguities;
+  if (intent === 'scheduled_broadcast_discovery') {
+    intended.networks = ['lifetime'];
+    intended.availability = { type: 'scheduled_broadcast', startOffsetHours: 0, endOffsetHours: 3, timezone: 'USER_TIMEZONE' };
+  }
   return {
     archetype: 'ambiguous',
     profileKey: 'scott',
     text: tmpl.text,
     intended,
     expected: {
-      intent: 'personalized_content_discovery',
+      intent,
       hardConstraints: [hc('no_hallucination', 'must exist')],
       maxResults: null,
       expectedAmbiguities: tmpl.ambiguities,
