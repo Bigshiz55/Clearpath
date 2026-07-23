@@ -6,6 +6,7 @@ import { RatingsStrip } from './RatingsStrip';
 import { SaveButton } from './SaveButton';
 import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 import type { MediaType } from '@/lib/types';
+import { useT } from '@/i18n/I18nProvider';
 
 export interface QuickLookTarget {
   id: number;
@@ -42,6 +43,7 @@ function youTubeId(url: string | null): string | null {
 }
 
 export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClose: () => void }) {
+  const t = useT();
   const [data, setData] = useState<QuickLookData | null>(null);
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -82,7 +84,7 @@ export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClos
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={`${target.title} quick look`}
+      aria-label={t('title.quickLookAria', { title: target.title })}
     >
       <div
         className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-ink-900 shadow-card sm:rounded-2xl"
@@ -92,7 +94,7 @@ export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClos
         <button
           onClick={onClose}
           className="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-full bg-black/60 text-lg text-white backdrop-blur transition hover:bg-black/80"
-          aria-label="Close"
+          aria-label={t('title.close')}
         >
           ✕
         </button>
@@ -103,7 +105,7 @@ export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClos
             <iframe
               className="h-full w-full"
               src={`https://www.youtube.com/embed/${vid}?autoplay=1&rel=0`}
-              title={`${target.title} trailer`}
+              title={t('title.trailerTitle', { title: target.title })}
               allow="autoplay; encrypted-media; picture-in-picture"
               allowFullScreen
             />
@@ -113,14 +115,14 @@ export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClos
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={heroUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                <div className="grid h-full w-full place-items-center text-slate-600">No image</div>
+                <div className="grid h-full w-full place-items-center text-slate-600">{t('title.noImage')}</div>
               )}
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink-900 via-ink-900/20 to-transparent" />
               {vid && (
                 <button
                   onClick={() => setPlaying(true)}
                   className="absolute inset-0 grid place-items-center"
-                  aria-label="Play trailer"
+                  aria-label={t('title.playTrailer')}
                 >
                   <span className="grid h-16 w-16 place-items-center rounded-full bg-white/90 text-2xl text-ink-950 shadow-glow transition hover:scale-105">
                     ▶
@@ -137,7 +139,7 @@ export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClos
             <div className="min-w-0">
               <h2 className="text-xl font-bold text-white">{target.title}</h2>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-300">
-                <span className="uppercase tracking-wide">{target.mediaType === 'movie' ? 'Movie' : 'TV'}</span>
+                <span className="uppercase tracking-wide">{target.mediaType === 'movie' ? t('card.movie') : t('card.tv')}</span>
                 {data?.year && <span>· {data.year}</span>}
                 {data?.runtime && <span>· {data.runtime}</span>}
                 {data?.contentRating && (
@@ -165,20 +167,20 @@ export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClos
 
           {/* Synopsis */}
           {data?.overview && <p className="text-sm leading-relaxed text-slate-200">{data.overview}</p>}
-          {failed && <p className="text-sm text-slate-400">Couldn’t load the full details — open the title for everything.</p>}
+          {failed && <p className="text-sm text-slate-400">{t('title.quickLoadFailed')}</p>}
 
           {/* Where to watch */}
           {data && data.where.length > 0 && (
             <div className="text-xs text-slate-300">
-              <span className="text-slate-400">Streaming on:</span> {data.where.join(' · ')}
+              <span className="text-slate-400">{t('title.streamingOn')}</span> {data.where.join(' · ')}
             </div>
           )}
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2 pt-1">
-            <Link href={titleHref} className="btn-primary flex-1 sm:flex-none">⚖️ See full verdict</Link>
+            <Link href={titleHref} className="btn-primary flex-1 sm:flex-none">{t('title.seeFullVerdict')}</Link>
             {vid && !playing && (
-              <button onClick={() => setPlaying(true)} className="btn-secondary flex-1 sm:flex-none">▶ Play trailer</button>
+              <button onClick={() => setPlaying(true)} className="btn-secondary flex-1 sm:flex-none">{t('title.playTrailerBtn')}</button>
             )}
           </div>
         </div>

@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { importParsedTitles, type ImportRowResult } from '@/lib/actions/import';
 import { parseImportText, type ParsedTitle } from '@/lib/importParse';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const BATCH = 20;
 const MAX_TITLES = 800;
@@ -22,6 +23,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function ImportForm() {
+  const { t, plural } = useI18n();
   const [text, setText] = useState('');
   const [fileName, setFileName] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -51,7 +53,7 @@ export function ImportForm() {
 
     let titles: ParsedTitle[] = parseImportText(text);
     if (titles.length === 0) {
-      setError('No titles found. Paste a list, or choose a CSV export (Letterboxd, Trakt, Simkl, TV Time, Netflix…).');
+      setError(t('misc.import.noTitles'));
       return;
     }
     if (titles.length > MAX_TITLES) titles = titles.slice(0, MAX_TITLES);
@@ -94,7 +96,7 @@ export function ImportForm() {
           className="btn-secondary"
           disabled={running}
         >
-          Choose a CSV file…
+          {t('misc.import.chooseCsv')}
         </button>
         <input
           ref={fileRef}
@@ -107,7 +109,7 @@ export function ImportForm() {
       </div>
 
       <div className="mt-3">
-        <p className="mb-1 text-xs text-slate-500">…or paste titles below:</p>
+        <p className="mb-1 text-xs text-slate-500">{t('misc.import.orPaste')}</p>
         <textarea
           value={text}
           onChange={(e) => {
@@ -117,15 +119,15 @@ export function ImportForm() {
           rows={8}
           placeholder={'Prisoners (2013) - 9\nMare of Easttown 9\nZodiac 8'}
           className="input min-h-[160px] w-full resize-y font-mono text-sm leading-relaxed"
-          aria-label="Paste your watched titles"
+          aria-label={t('misc.import.pasteAria')}
         />
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <span className="text-xs text-slate-500">
           {previewCount > 0
-            ? `${previewCount} unique ${previewCount === 1 ? 'title' : 'titles'} ready`
-            : 'Any CSV export, or one title per line'}
+            ? plural('misc.import.ready', previewCount)
+            : t('misc.import.anyCsv')}
         </span>
         <button
           type="button"
@@ -133,7 +135,7 @@ export function ImportForm() {
           disabled={running || previewCount === 0}
           className="btn-primary"
         >
-          {running ? 'Importing…' : 'Import history'}
+          {running ? t('misc.import.importing') : t('misc.import.importHistory')}
         </button>
       </div>
 
@@ -141,7 +143,7 @@ export function ImportForm() {
         <div className="mt-4">
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>
-              {done} / {total} processed · {imported} added
+              {t('misc.import.progress', { done, total, imported })}
             </span>
             <span>{pct}%</span>
           </div>
@@ -163,21 +165,22 @@ export function ImportForm() {
       {finished && !error && (
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <p className="text-sm font-semibold text-white">
-            Done — added {imported} to your watched list
-            {unmatchedRows.length > 0 ? ` · ${unmatchedRows.length} couldn’t be matched` : ''}.
+            {unmatchedRows.length > 0
+              ? t('misc.import.doneBoth', { added: imported, unmatched: unmatchedRows.length })
+              : t('misc.import.doneSimple', { added: imported })}
           </p>
           <Link href="/app/watchlist" className="btn-secondary text-sm">
-            View watchlist →
+            {t('misc.import.viewWatchlist')}
           </Link>
           <Link href="/app" className="btn-secondary text-sm">
-            See recommendations →
+            {t('misc.import.seeRecs')}
           </Link>
         </div>
       )}
 
       {finished && unmatchedRows.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-xs text-slate-500">Couldn’t match these (title may differ on TMDB):</p>
+          <p className="mb-2 text-xs text-slate-500">{t('misc.import.couldntMatch')}</p>
           <ul className="flex flex-wrap gap-2">
             {unmatchedRows.slice(0, 40).map((r, i) => (
               <li key={i} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300">

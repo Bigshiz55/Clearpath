@@ -1,4 +1,7 @@
+'use client';
+
 import { RobedPortrait } from '@/components/RobedPortrait';
+import { useT } from '@/i18n/I18nProvider';
 
 /**
  * The presiding judge — one fixed, brand-coloured house judge (the gold sponsor
@@ -8,7 +11,27 @@ import { RobedPortrait } from '@/components/RobedPortrait';
  */
 const ACCENT = '#ff2e9a'; // brand pink — matches the app theme, no more gold
 
-export function JudgeBench({ big = false }: { big?: boolean }) {
+export function JudgeBench({
+  big = false,
+  nowPresiding,
+  judgeName,
+  blurb,
+  blurbEm,
+}: {
+  big?: boolean;
+  nowPresiding?: string;
+  judgeName?: string;
+  blurb?: string;
+  blurbEm?: string;
+}) {
+  // Defaults are i18n-aware so a propless `<JudgeBench big />` (e.g. in FinderUI)
+  // still localizes. Callers that pass explicit props (e.g. the Together page)
+  // override these. Keys live in the shared `together.bench.*` namespace.
+  const t = useT();
+  const nowPresidingText = nowPresiding ?? t('together.bench.nowPresiding');
+  const judgeNameText = judgeName ?? t('together.bench.judgeName');
+  const blurbText = blurb ?? t('together.bench.blurb');
+  const blurbEmText = blurbEm ?? t('together.bench.blurbEm');
   const size = big ? 128 : 76;
   return (
     <section
@@ -24,11 +47,11 @@ export function JudgeBench({ big = false }: { big?: boolean }) {
       </div>
       <div className="relative min-w-0">
         <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: ACCENT }}>
-          ⚖️ Now presiding
+          ⚖️ {nowPresidingText}
         </div>
-        <div className={`font-black tracking-tight text-white ${big ? 'text-2xl sm:text-3xl' : 'text-lg'}`}>Judge Verity</div>
+        <div className={`font-black tracking-tight text-white ${big ? 'text-2xl sm:text-3xl' : 'text-lg'}`}>{judgeNameText}</div>
         <div className={`text-slate-200 ${big ? 'mt-0.5 text-sm sm:text-base' : 'text-xs'}`}>
-          Impartial and on your side — bring the room and I’ll settle it. <span className="font-semibold text-white">One verdict, no tricks.</span>
+          {blurbText}<span className="font-semibold text-white">{blurbEmText}</span>
         </div>
       </div>
     </section>

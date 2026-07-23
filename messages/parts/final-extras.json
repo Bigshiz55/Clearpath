@@ -1,0 +1,59 @@
+{
+  "en-US": {
+    "title": {
+      "extras": {
+        "contentDnaHeading": "Content DNA",
+        "contentDnaFrom": {
+          "one": "from {count} viewer check-in",
+          "other": "from {count} viewer check-ins"
+        },
+        "contentDnaNote": "Aggregated from real post-watch answers — not genre tags, not a guess. Each line shows its own sample size.",
+        "finishCheckNote": "Straight from your own watch history — a measured fact about you, not a prediction we invented.",
+        "tonightTellA": "Tell us your streaming services in ",
+        "tonightSettings": "Settings",
+        "tonightTellB": " and every verdict will flag what’s free on a plan you already have.",
+        "tonightIncluded": "You can watch this tonight — included with your {services}.",
+        "tonightElsewhere": "Streaming on {services} — not on a plan you told us you have.",
+        "tonightRentBuy": "Not on your services — rent or buy only right now."
+      }
+    }
+  },
+  "es-419": {
+    "title": {
+      "extras": {
+        "contentDnaHeading": "ADN del contenido",
+        "contentDnaFrom": {
+          "one": "de {count} registro de espectador",
+          "other": "de {count} registros de espectadores"
+        },
+        "contentDnaNote": "Agregado a partir de respuestas reales posteriores al visionado, no de etiquetas de género ni de una suposición. Cada línea muestra su propio tamaño de muestra.",
+        "finishCheckNote": "Directo de tu propio historial de lo que ves: un dato medido sobre ti, no una predicción que inventamos.",
+        "tonightTellA": "Cuéntanos tus servicios de streaming en ",
+        "tonightSettings": "Ajustes",
+        "tonightTellB": " y cada veredicto marcará lo que es gratis en un plan que ya tienes.",
+        "tonightIncluded": "Puedes verlo esta noche: incluido con tu {services}.",
+        "tonightElsewhere": "En streaming en {services}: no está en un plan que nos dijiste que tienes.",
+        "tonightRentBuy": "No está en tus servicios: solo alquiler o compra por ahora."
+      }
+    }
+  },
+  "zh-Hans": {
+    "title": {
+      "extras": {
+        "contentDnaHeading": "内容 DNA",
+        "contentDnaFrom": {
+          "one": "来自 {count} 位观众的观后反馈",
+          "other": "来自 {count} 位观众的观后反馈"
+        },
+        "contentDnaNote": "汇总自真实的观后回答——不是类型标签，也不是猜测。每一行都显示它自己的样本量。",
+        "finishCheckNote": "直接来自你自己的观看记录——关于你的一个可量化事实，而不是我们臆造的预测。",
+        "tonightTellA": "在",
+        "tonightSettings": "设置",
+        "tonightTellB": "中告诉我们你的流媒体服务，每条裁决都会标出你已订阅的套餐里免费的内容。",
+        "tonightIncluded": "今晚就能看——已包含在你的 {services} 中。",
+        "tonightElsewhere": "正在 {services} 上播放——不在你告诉我们的套餐里。",
+        "tonightRentBuy": "不在你的服务范围内——目前只能租或买。"
+      }
+    }
+  }
+}

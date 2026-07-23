@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { QuizModes } from '@/components/QuizModes';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -20,14 +21,14 @@ export default async function QuizPage() {
     totalRated = count ?? 0;
   }
 
+  const { t } = getServerI18n();
+
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="text-2xl font-bold text-white sm:text-3xl">🗂️ Complete My Case File</h1>
+      <h1 className="text-2xl font-bold text-white sm:text-3xl">{t('ask.qp.heading')}</h1>
       <p className="mt-2 text-sm text-slate-400">
-        A guided assessment for more accurate recommendations — about 5 minutes, and you can update it anytime.
-        A poster pops up: call it <span className="font-semibold text-emerald-200">Yes</span>,{' '}
-        <span className="font-semibold text-red-200">No</span>, <span className="font-semibold text-amber-200">Maybe</span>, or
-        Haven’t seen. Every 30 recalculates your algorithm.
+        {t('ask.qp.introBefore')}<span className="font-semibold text-emerald-200">{t('ask.yes')}</span>{t('ask.qp.listSep')}
+        <span className="font-semibold text-red-200">{t('ask.no')}</span>{t('ask.qp.listSep')}<span className="font-semibold text-amber-200">{t('ask.maybe')}</span>{t('ask.qp.introEnd')}
       </p>
       <QuizModes totalRated={totalRated} />
     </div>

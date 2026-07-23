@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useT } from '@/i18n/I18nProvider';
 
 /**
  * The headline group-decision entry: "Can't decide? Take it to court." Starts a
@@ -12,6 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 export function TakeToCourtCard({ className = '' }: { className?: string }) {
   const router = useRouter();
   const supabase = createClient();
+  const t = useT();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +23,7 @@ export function TakeToCourtCard({ className = '' }: { className?: string }) {
     const { data, error } = await supabase.rpc('court_create', { p_media_type: 'any' });
     if (error) {
       setLoading(false);
-      setError(error.code === '42P01' ? 'Live Court needs a one-time setup (run migration 0004).' : error.message);
+      setError(error.code === '42P01' ? t('together.liveCourtSetupNeeded') : error.message);
       return;
     }
     const row = Array.isArray(data) ? data[0] : data;
@@ -29,7 +31,7 @@ export function TakeToCourtCard({ className = '' }: { className?: string }) {
     const token = row?.host_token as string;
     if (!code) {
       setLoading(false);
-      setError('Could not create the courtroom. Try again.');
+      setError(t('together.couldNotCreateCourtroom'));
       return;
     }
     try {
@@ -46,24 +48,23 @@ export function TakeToCourtCard({ className = '' }: { className?: string }) {
         <span className="text-5xl" aria-hidden>⚖️</span>
         <div className="min-w-0 flex-1">
           <h2 className="text-2xl font-black leading-tight text-white sm:text-3xl">
-            Can’t decide with your partner, family, or friends?{' '}
-            <span className="bg-gradient-to-r from-gold-300 to-brand-300 bg-clip-text text-transparent">Take them to court.</span>
+            {t('together.takeCardHeadline')}{' '}
+            <span className="bg-gradient-to-r from-gold-300 to-brand-300 bg-clip-text text-transparent">{t('together.takeCardHeadlineEm')}</span>
           </h2>
           <p className="mt-3 text-base leading-relaxed text-slate-200">
-            Start a courtroom and share the <span className="font-semibold text-white">QR code</span>. Everyone scans it and
-            joins from their own phone, makes their own picks and vetoes, and the judge{' '}
-            <span className="font-semibold text-white">adds up everyone’s taste and hands down one verdict the whole room is happy with.</span>
+            {t('together.takeCardP1')}<span className="font-semibold text-white">{t('together.takeCardQr')}</span>{t('together.takeCardP2')}{' '}
+            <span className="font-semibold text-white">{t('together.takeCardP3')}</span>
           </p>
 
           <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-300">
-            <span className="rounded-full border border-white/12 bg-white/5 px-3 py-1">📱 Scan the QR</span>
-            <span className="rounded-full border border-white/12 bg-white/5 px-3 py-1">🙋 Everyone votes</span>
-            <span className="rounded-full border border-white/12 bg-white/5 px-3 py-1">⚖️ One verdict wins</span>
+            <span className="rounded-full border border-white/12 bg-white/5 px-3 py-1">📱 {t('together.chipScanQr')}</span>
+            <span className="rounded-full border border-white/12 bg-white/5 px-3 py-1">🙋 {t('together.chipEveryoneVotes')}</span>
+            <span className="rounded-full border border-white/12 bg-white/5 px-3 py-1">⚖️ {t('together.chipOneVerdict')}</span>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <button onClick={start} disabled={loading} className="btn-primary px-6 py-3 text-lg disabled:opacity-60">
-              {loading ? 'Opening the courtroom…' : '⚖️ Take them to court'}
+              {loading ? t('together.openingCourtroom') : `⚖️ ${t('together.takeThemToCourtBtn')}`}
             </button>
           </div>
           {error && <p className="mt-2 text-sm text-red-300">{error}</p>}

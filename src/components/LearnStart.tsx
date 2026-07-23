@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useT } from '@/i18n/I18nProvider';
 
 const FLAG = 'wv_learn_session';
 
@@ -17,6 +18,7 @@ const FLAG = 'wv_learn_session';
  */
 export function LearnStart() {
   const router = useRouter();
+  const t = useT();
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,21 +45,21 @@ export function LearnStart() {
 
         if (active) router.replace('/app');
       } catch (e) {
-        if (active) setErr(e instanceof Error ? e.message : 'Could not start your learning session.');
+        if (active) setErr(e instanceof Error ? e.message : t('misc.learn.couldNotStart'));
       }
     })();
     return () => { active = false; };
-  }, [router]);
+  }, [router, t]);
 
   return (
     <div className="grid min-h-dvh place-items-center p-6 text-center">
       <div>
         <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
-        <p className="mt-4 text-sm text-slate-300">Setting up your learning session — this one remembers.</p>
-        <p className="mt-1 text-xs text-slate-500">Keep making picks and your VERD1CT DNA sharpens over time.</p>
+        <p className="mt-4 text-sm text-slate-300">{t('misc.learn.settingUp')}</p>
+        <p className="mt-1 text-xs text-slate-500">{t('misc.learn.keepPicking')}</p>
         {err && (
           <p className="mt-2 text-xs text-rose-300">
-            {err} — <a href="/app" className="underline">continue anyway</a>
+            {err} — <a href="/app" className="underline">{t('misc.learn.continueAnyway')}</a>
           </p>
         )}
       </div>

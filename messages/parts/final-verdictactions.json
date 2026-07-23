@@ -1,0 +1,185 @@
+{
+  "en-US": {
+    "title": {
+      "actions": {
+        "status": {
+          "strict": "Strict Watchlist",
+          "possible": "Possible Watchlist",
+          "watching": "Watching",
+          "watched": "Watched",
+          "paused": "Paused",
+          "dropped": "Dropped"
+        },
+        "toastSomethingWrong": "Something went wrong.",
+        "toastCouldNotSave": "Could not save.",
+        "toastSavedTo": "Saved to {label}.",
+        "toastCouldNotSaveRating": "Could not save rating.",
+        "toastRated": "Rated {n}/10.",
+        "toastCouldNotSaveNotes": "Could not save notes.",
+        "toastNotesSaved": "Notes saved.",
+        "toastCouldNotRemove": "Could not remove.",
+        "toastRemoved": "Removed from your watchlist.",
+        "toastFinalLogged": "Final verdict logged: {label}. It’s in your watchlist.",
+        "finalVerdict": {
+          "guilty": "Guilty — amazing",
+          "acquitted": "Acquitted — it was fine",
+          "archive": "Sentenced to the archive"
+        },
+        "finalHeading": "Finished it? Hand down your Final Verdict",
+        "finalHint": "Logs a dated entry to your watchlist, marked watched.",
+        "openWatchlist": "Open my watchlist",
+        "btnPossible": "Possible",
+        "btnNotes": "Notes",
+        "btnShare": "Share",
+        "btnRecalculate": "Recalculate",
+        "btnRemove": "Remove",
+        "ratingHeading": "Your rating",
+        "rateAria": "Rate {n} out of 10",
+        "notesLabel": "Personal notes",
+        "notesPlaceholder": "Why you want to watch it, who recommended it, where you left off…",
+        "saveNotes": "Save notes",
+        "cancel": "Cancel"
+      },
+      "share": {
+        "heading": "Share this verdict",
+        "subtitle": "Anyone with the link can view it — no account needed.",
+        "toastCouldNotCreate": "Could not create share link.",
+        "toastCopied": "Link copied to clipboard.",
+        "toastCopyFailed": "Copy failed — select and copy manually.",
+        "includePersonal": "Include my {label}",
+        "includePersonalHint": "Off by default — keeps your personal score private.",
+        "expiryLabel": "Link expiry",
+        "expiryNever": "Never",
+        "expiryDays": "{n} days",
+        "creating": "Creating…",
+        "createLink": "Create share link",
+        "copyLink": "Copy link",
+        "shareBtn": "Share",
+        "deactivateNote": "You can deactivate this link anytime from Settings.",
+        "close": "Close"
+      }
+    }
+  },
+  "es-419": {
+    "title": {
+      "actions": {
+        "status": {
+          "strict": "Lista estricta",
+          "possible": "Lista posible",
+          "watching": "Viendo",
+          "watched": "Vista",
+          "paused": "En pausa",
+          "dropped": "Abandonada"
+        },
+        "toastSomethingWrong": "Algo salió mal.",
+        "toastCouldNotSave": "No se pudo guardar.",
+        "toastSavedTo": "Guardada en {label}.",
+        "toastCouldNotSaveRating": "No se pudo guardar la calificación.",
+        "toastRated": "Calificada {n}/10.",
+        "toastCouldNotSaveNotes": "No se pudieron guardar las notas.",
+        "toastNotesSaved": "Notas guardadas.",
+        "toastCouldNotRemove": "No se pudo quitar.",
+        "toastRemoved": "Quitada de tu lista.",
+        "toastFinalLogged": "Veredicto final registrado: {label}. Está en tu lista.",
+        "finalVerdict": {
+          "guilty": "Culpable — increíble",
+          "acquitted": "Absuelta — estuvo bien",
+          "archive": "Condenada al archivo"
+        },
+        "finalHeading": "¿La terminaste? Dicta tu Veredicto final",
+        "finalHint": "Registra una entrada con fecha en tu lista, marcada como vista.",
+        "openWatchlist": "Abrir mi lista",
+        "btnPossible": "Posible",
+        "btnNotes": "Notas",
+        "btnShare": "Compartir",
+        "btnRecalculate": "Recalcular",
+        "btnRemove": "Quitar",
+        "ratingHeading": "Tu calificación",
+        "rateAria": "Calificar {n} de 10",
+        "notesLabel": "Notas personales",
+        "notesPlaceholder": "Por qué quieres verla, quién la recomendó, dónde te quedaste…",
+        "saveNotes": "Guardar notas",
+        "cancel": "Cancelar"
+      },
+      "share": {
+        "heading": "Comparte este veredicto",
+        "subtitle": "Cualquiera con el enlace puede verlo, sin necesidad de cuenta.",
+        "toastCouldNotCreate": "No se pudo crear el enlace para compartir.",
+        "toastCopied": "Enlace copiado al portapapeles.",
+        "toastCopyFailed": "No se pudo copiar: selecciónalo y cópialo manualmente.",
+        "includePersonal": "Incluir mi {label}",
+        "includePersonalHint": "Desactivado por defecto: mantiene privada tu puntuación personal.",
+        "expiryLabel": "Vencimiento del enlace",
+        "expiryNever": "Nunca",
+        "expiryDays": "{n} días",
+        "creating": "Creando…",
+        "createLink": "Crear enlace para compartir",
+        "copyLink": "Copiar enlace",
+        "shareBtn": "Compartir",
+        "deactivateNote": "Puedes desactivar este enlace en cualquier momento desde Configuración.",
+        "close": "Cerrar"
+      }
+    }
+  },
+  "zh-Hans": {
+    "title": {
+      "actions": {
+        "status": {
+          "strict": "必看清单",
+          "possible": "备选清单",
+          "watching": "在看",
+          "watched": "已看",
+          "paused": "已暂停",
+          "dropped": "已弃剧"
+        },
+        "toastSomethingWrong": "出了点问题。",
+        "toastCouldNotSave": "无法保存。",
+        "toastSavedTo": "已保存到{label}。",
+        "toastCouldNotSaveRating": "无法保存评分。",
+        "toastRated": "已评 {n}/10。",
+        "toastCouldNotSaveNotes": "无法保存备注。",
+        "toastNotesSaved": "备注已保存。",
+        "toastCouldNotRemove": "无法移除。",
+        "toastRemoved": "已从你的待看清单中移除。",
+        "toastFinalLogged": "最终评判已记录：{label}。已加入你的待看清单。",
+        "finalVerdict": {
+          "guilty": "有罪 — 精彩绝伦",
+          "acquitted": "无罪 — 还算不错",
+          "archive": "打入冷宫"
+        },
+        "finalHeading": "看完了？宣布你的最终评判",
+        "finalHint": "在你的待看清单中记录一条带日期的条目，标记为已看。",
+        "openWatchlist": "打开我的待看清单",
+        "btnPossible": "备选",
+        "btnNotes": "备注",
+        "btnShare": "分享",
+        "btnRecalculate": "重新计算",
+        "btnRemove": "移除",
+        "ratingHeading": "你的评分",
+        "rateAria": "评 {n} 分（满分 10 分）",
+        "notesLabel": "个人备注",
+        "notesPlaceholder": "为什么想看、谁推荐的、看到哪里了……",
+        "saveNotes": "保存备注",
+        "cancel": "取消"
+      },
+      "share": {
+        "heading": "分享此评判",
+        "subtitle": "任何人只要有链接即可查看，无需账户。",
+        "toastCouldNotCreate": "无法创建分享链接。",
+        "toastCopied": "链接已复制到剪贴板。",
+        "toastCopyFailed": "复制失败：请手动选择并复制。",
+        "includePersonal": "包含我的{label}",
+        "includePersonalHint": "默认关闭，让你的个人评分保持私密。",
+        "expiryLabel": "链接有效期",
+        "expiryNever": "永不过期",
+        "expiryDays": "{n} 天",
+        "creating": "正在创建…",
+        "createLink": "创建分享链接",
+        "copyLink": "复制链接",
+        "shareBtn": "分享",
+        "deactivateNote": "你随时可以在设置中停用此链接。",
+        "close": "关闭"
+      }
+    }
+  }
+}

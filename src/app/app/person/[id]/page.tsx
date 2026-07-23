@@ -5,6 +5,7 @@ import { getPersonForUser } from '@/lib/person';
 import { getPerson } from '@/lib/tmdb/client';
 import { Poster, PosterCard } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,10 +25,11 @@ export default async function PersonPage({ params }: { params: { id: string } })
   const view = await getPersonForUser(supabase, user?.id ?? '', id);
   if (!view) notFound();
 
+  const { t, plural } = getServerI18n();
   const roleLine = [
     view.department,
-    view.directedCount > 0 ? `${view.directedCount} directing credit${view.directedCount === 1 ? '' : 's'}` : null,
-    view.actedCount > 0 ? `${view.actedCount} on-screen role${view.actedCount === 1 ? '' : 's'}` : null,
+    view.directedCount > 0 ? plural('account.person.directingCredits', view.directedCount, { count: view.directedCount }) : null,
+    view.actedCount > 0 ? plural('account.person.onScreenRoles', view.actedCount, { count: view.actedCount }) : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -48,10 +50,10 @@ export default async function PersonPage({ params }: { params: { id: string } })
 
       {/* Filmography, scored for you */}
       <section>
-        <h2 className="mb-1 text-lg font-semibold text-white">🎬 Their work — ranked for your taste</h2>
-        <p className="mb-3 text-xs text-slate-400">Best fit for you first, each with your VERD1CT score. Tap any for where to watch.</p>
+        <h2 className="mb-1 text-lg font-semibold text-white">🎬 {t('account.person.worksHeading')}</h2>
+        <p className="mb-3 text-xs text-slate-400">{t('account.person.worksSubtitle')}</p>
         {view.works.length === 0 ? (
-          <p className="text-sm text-slate-400">No scorable titles found for this person right now.</p>
+          <p className="text-sm text-slate-400">{t('account.person.noTitles')}</p>
         ) : (
           <div className="poster-grid">
             {view.works.map((w) => (

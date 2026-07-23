@@ -31,6 +31,15 @@ body {
     @apply grid gap-4;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  /* On ultra-narrow phones (iPhone-5 / older SE class, ≤359px) two columns get
+     too tight for the longest localized labels; drop to one full-width column so
+     the verdict call, ratings, and action labels stay whole. Modern phones
+     (375px+) keep the two-up grid. */
+  @media (max-width: 359px) {
+    .poster-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
   @media (min-width: 640px) {
     .poster-grid {
       grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

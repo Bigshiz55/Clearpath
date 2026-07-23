@@ -8,6 +8,7 @@ import { VerdictBadge } from '@/components/VerdictBadge';
 import { PosterCard } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
 import { tmdbImage } from '@/lib/tmdb/image';
+import { getServerI18n } from '@/i18n/server';
 import type { PreferenceTrait, VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -16,28 +17,29 @@ export const metadata: Metadata = { title: 'Profile · WatchVerdict' };
 export default async function PublicProfilePage({ params }: { params: { username: string } }) {
   const supabase = createClient();
   const res = await getPublicProfile(supabase, params.username);
+  const { t } = getServerI18n();
 
   if (res.kind === 'needs_migration') {
     return (
       <div className="card mx-auto max-w-lg p-8 text-center">
-        <h1 className="text-xl font-semibold text-white">Profiles aren’t enabled yet</h1>
-        <p className="mt-2 text-sm text-slate-400">This needs migration 0007 applied to the database.</p>
-        <Link href="/app" className="btn-secondary mt-6 inline-flex">← Back</Link>
+        <h1 className="text-xl font-semibold text-white">{t('account.profile.notEnabledTitle')}</h1>
+        <p className="mt-2 text-sm text-slate-400">{t('account.profile.notEnabledBody')}</p>
+        <Link href="/app" className="btn-secondary mt-6 inline-flex">{t('account.profile.back')}</Link>
       </div>
     );
   }
   if (res.kind === 'not_found') {
     return (
       <div className="card mx-auto max-w-lg p-8 text-center">
-        <h1 className="text-xl font-semibold text-white">No one here</h1>
-        <p className="mt-2 text-sm text-slate-400">There’s no WatchVerdict user with that username.</p>
-        <Link href="/app/friends" className="btn-secondary mt-6 inline-flex">← Find people</Link>
+        <h1 className="text-xl font-semibold text-white">{t('account.profile.notFoundTitle')}</h1>
+        <p className="mt-2 text-sm text-slate-400">{t('account.profile.notFoundBody')}</p>
+        <Link href="/app/friends" className="btn-secondary mt-6 inline-flex">{t('account.profile.findPeople')}</Link>
       </div>
     );
   }
 
   const p = res.profile;
-  const name = p.displayName?.trim() || (p.username ? `@${p.username}` : 'WatchVerdict user');
+  const name = p.displayName?.trim() || (p.username ? `@${p.username}` : t('account.profile.wvUser'));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -53,7 +55,7 @@ export default async function PublicProfilePage({ params }: { params: { username
           </div>
         </div>
         {p.isSelf ? (
-          <Link href="/app/settings" className="btn-secondary">Edit profile</Link>
+          <Link href="/app/settings" className="btn-secondary">{t('account.profile.editProfile')}</Link>
         ) : (
           <FollowButton targetId={p.userId} initialFollowing={p.isFollowing} />
         )}
@@ -61,7 +63,7 @@ export default async function PublicProfilePage({ params }: { params: { username
 
       {p.loves.length > 0 && (
         <section className="card p-5">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Loves</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t('account.profile.loves')}</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {p.loves.map((t) => (
               <span key={t} className="chip border-emerald-400/40 text-emerald-100">
@@ -73,17 +75,17 @@ export default async function PublicProfilePage({ params }: { params: { username
       )}
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-white">Recent verdicts</h2>
+        <h2 className="mb-3 text-lg font-semibold text-white">{t('account.profile.recentVerdicts')}</h2>
         {!p.publicActivity ? (
           <p className="text-sm text-slate-400">
-            {name} keeps their activity private. {p.isSelf ? (
-              <>Turn on “public activity” in <Link href="/app/settings" className="text-brand-300 underline">Settings</Link> to share your verdicts.</>
+            {t('account.profile.keepsPrivate', { name })} {p.isSelf ? (
+              <>{t('account.profile.turnOnPre')} <Link href="/app/settings" className="text-brand-300 underline">{t('account.profile.settings')}</Link> {t('account.profile.turnOnPost')}</>
             ) : (
-              'You can still follow them.'
+              t('account.profile.canFollow')
             )}
           </p>
         ) : p.verdicts.length === 0 ? (
-          <p className="text-sm text-slate-400">No verdicts yet.</p>
+          <p className="text-sm text-slate-400">{t('account.profile.noVerdicts')}</p>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {p.verdicts.map((v) => (

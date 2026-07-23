@@ -1,0 +1,197 @@
+{
+  "en-US": {
+    "discover": {
+      "watchTabs": {
+        "readyTab": "▶ Ready to watch",
+        "browseTab": "🔎 Browse everything"
+      }
+    },
+    "ask": {
+      "buildCase": {
+        "exTvTonightHint": "📺 What’s on TV tonight",
+        "exTvTonightText": "What’s on TV tonight?",
+        "exNetflixHint": "▶️ Best movies on Netflix",
+        "exNetflixText": "The best movies on Netflix right now",
+        "exBarbieHint": "🔎 Where can I stream Barbie?",
+        "exBarbieText": "Where can I stream Barbie?",
+        "exNext2hHint": "⏱️ Movies on in the next 2 hours",
+        "exNext2hText": "Movies coming on in the next 2 hours",
+        "exScaryHint": "👻 A really good scary movie",
+        "exScaryText": "A really good scary movie",
+        "exFamilyHint": "👨‍👩‍👧 Family movie night",
+        "exFamilyText": "A great family movie for tonight",
+        "pullingRuling": "Pulling your ruling…",
+        "gotItBuilding": "Got it — building your VERD1CT DNA. 🧬",
+        "couldNotRead": "Could not read that — try again.",
+        "title": "State Your Case",
+        "descA": "Describe your taste — or ask for something specific: what’s on ",
+        "descLiveTv": "live TV",
+        "descB": ", ",
+        "descWhereStream": "where to stream",
+        "descC": " a title, or what’s good ",
+        "descOnService": "on a service",
+        "descD": ".",
+        "orNameShows": "Or just name a few shows you love — we’ll figure out your taste →",
+        "tryOne": "Try one — tap to fill",
+        "textareaAria": "Describe what you like to watch",
+        "placeholder": "e.g. I love clever comedies and thrillers with a twist — but nothing too slow or gory.",
+        "ruling": "Ruling…",
+        "hitGavel": "Hit the gavel →"
+      }
+    },
+    "account": {
+      "notifications": {
+        "notConfigured": "Push isn’t configured on the server yet (VAPID keys).",
+        "blocked": "Notifications were blocked. Enable them in your browser settings to turn this on.",
+        "failedSave": "Failed to save.",
+        "enabledOn": "Notifications on. We’ll only ping you about things worth opening the app for.",
+        "enableFailed": "Couldn’t enable notifications on this device.",
+        "turnedOff": "Notifications off.",
+        "testSent": "Sent — check your notifications.",
+        "testFailed": "Failed.",
+        "unsupported": "This browser doesn’t support push notifications. On iPhone, add WatchVerdict to your Home Screen first (Share → Add to Home Screen), then open it from there and this will appear.",
+        "onThisDevice": "✓ On for this device",
+        "sendTest": "Send test",
+        "turnOff": "Turn off",
+        "enabling": "Enabling…",
+        "turnOn": "🔔 Turn on notifications"
+      },
+      "avatar": {
+        "couldNotSave": "Could not save.",
+        "heading": "Your avatar",
+        "pickEmoji": "Pick an emoji, or use your initial ({initial}).",
+        "useInitial": "Use your initial"
+      }
+    }
+  },
+  "es-419": {
+    "discover": {
+      "watchTabs": {
+        "readyTab": "▶ Listo para ver",
+        "browseTab": "🔎 Explorar todo"
+      }
+    },
+    "ask": {
+      "buildCase": {
+        "exTvTonightHint": "📺 Qué hay en TV esta noche",
+        "exTvTonightText": "¿Qué hay en TV esta noche?",
+        "exNetflixHint": "▶️ Mejores películas en Netflix",
+        "exNetflixText": "Las mejores películas en Netflix ahora mismo",
+        "exBarbieHint": "🔎 ¿Dónde puedo ver Barbie?",
+        "exBarbieText": "¿Dónde puedo ver Barbie en streaming?",
+        "exNext2hHint": "⏱️ Películas en las próximas 2 horas",
+        "exNext2hText": "Películas que empiezan en las próximas 2 horas",
+        "exScaryHint": "👻 Una película de terror muy buena",
+        "exScaryText": "Una película de terror muy buena",
+        "exFamilyHint": "👨‍👩‍👧 Noche de peli en familia",
+        "exFamilyText": "Una gran película familiar para esta noche",
+        "pullingRuling": "Preparando tu veredicto…",
+        "gotItBuilding": "Listo — construyendo tu ADN VERD1CT. 🧬",
+        "couldNotRead": "No pudimos entender eso — inténtalo de nuevo.",
+        "title": "Presenta tu caso",
+        "descA": "Describe tu gusto — o pide algo específico: qué hay en ",
+        "descLiveTv": "TV en vivo",
+        "descB": ", ",
+        "descWhereStream": "dónde ver en streaming",
+        "descC": " un título, o qué hay bueno ",
+        "descOnService": "en un servicio",
+        "descD": ".",
+        "orNameShows": "O simplemente nombra unas series que ames — descubriremos tu gusto →",
+        "tryOne": "Prueba uno — toca para rellenar",
+        "textareaAria": "Describe lo que te gusta ver",
+        "placeholder": "p. ej. Me encantan las comedias ingeniosas y los thrillers con giro — pero nada muy lento ni sangriento.",
+        "ruling": "Deliberando…",
+        "hitGavel": "Baja el mazo →"
+      }
+    },
+    "account": {
+      "notifications": {
+        "notConfigured": "Las notificaciones aún no están configuradas en el servidor (claves VAPID).",
+        "blocked": "Las notificaciones están bloqueadas. Actívalas en los ajustes de tu navegador para habilitar esto.",
+        "failedSave": "No se pudo guardar.",
+        "enabledOn": "Notificaciones activadas. Solo te avisaremos de cosas que valga la pena abrir la app.",
+        "enableFailed": "No se pudieron activar las notificaciones en este dispositivo.",
+        "turnedOff": "Notificaciones desactivadas.",
+        "testSent": "Enviado — revisa tus notificaciones.",
+        "testFailed": "Falló.",
+        "unsupported": "Este navegador no admite notificaciones push. En iPhone, primero agrega WatchVerdict a tu pantalla de inicio (Compartir → Agregar a inicio), luego ábrelo desde ahí y esto aparecerá.",
+        "onThisDevice": "✓ Activado en este dispositivo",
+        "sendTest": "Enviar prueba",
+        "turnOff": "Desactivar",
+        "enabling": "Activando…",
+        "turnOn": "🔔 Activar notificaciones"
+      },
+      "avatar": {
+        "couldNotSave": "No se pudo guardar.",
+        "heading": "Tu avatar",
+        "pickEmoji": "Elige un emoji, o usa tu inicial ({initial}).",
+        "useInitial": "Usar tu inicial"
+      }
+    }
+  },
+  "zh-Hans": {
+    "discover": {
+      "watchTabs": {
+        "readyTab": "▶ 可看了",
+        "browseTab": "🔎 浏览全部"
+      }
+    },
+    "ask": {
+      "buildCase": {
+        "exTvTonightHint": "📺 今晚电视上有什么",
+        "exTvTonightText": "今晚电视上有什么？",
+        "exNetflixHint": "▶️ Netflix 上最好的电影",
+        "exNetflixText": "Netflix 上现在最好的电影",
+        "exBarbieHint": "🔎 哪里能看《Barbie》？",
+        "exBarbieText": "哪里能在线看《Barbie》？",
+        "exNext2hHint": "⏱️ 接下来 2 小时内的电影",
+        "exNext2hText": "接下来 2 小时内开始的电影",
+        "exScaryHint": "👻 一部真正好看的恐怖片",
+        "exScaryText": "一部真正好看的恐怖片",
+        "exFamilyHint": "👨‍👩‍👧 家庭电影之夜",
+        "exFamilyText": "适合今晚全家看的好电影",
+        "pullingRuling": "正在为你准备判决…",
+        "gotItBuilding": "收到 — 正在构建你的 VERD1CT DNA。🧬",
+        "couldNotRead": "无法理解那段内容 — 请重试。",
+        "title": "陈述你的案件",
+        "descA": "描述你的口味 — 或问些具体的：",
+        "descLiveTv": "电视直播",
+        "descB": "上有什么、",
+        "descWhereStream": "在哪里观看",
+        "descC": "某部作品，或者",
+        "descOnService": "某个服务",
+        "descD": "上有什么好片。",
+        "orNameShows": "或者只需说出几部你喜欢的剧 — 我们来读懂你的口味 →",
+        "tryOne": "试一个 — 点击填入",
+        "textareaAria": "描述你喜欢看的内容",
+        "placeholder": "例如：我喜欢机智的喜剧和有反转的惊悚片 — 但别太慢也别太血腥。",
+        "ruling": "判决中…",
+        "hitGavel": "落下法槌 →"
+      }
+    },
+    "account": {
+      "notifications": {
+        "notConfigured": "服务器尚未配置推送（VAPID 密钥）。",
+        "blocked": "通知已被屏蔽。请在浏览器设置中开启，以启用此功能。",
+        "failedSave": "保存失败。",
+        "enabledOn": "通知已开启。我们只会在值得打开应用时才提醒你。",
+        "enableFailed": "无法在此设备上开启通知。",
+        "turnedOff": "通知已关闭。",
+        "testSent": "已发送 — 请查看你的通知。",
+        "testFailed": "失败。",
+        "unsupported": "此浏览器不支持推送通知。在 iPhone 上，请先将 WatchVerdict 添加到主屏幕（分享 → 添加到主屏幕），然后从那里打开，此选项就会出现。",
+        "onThisDevice": "✓ 已在此设备开启",
+        "sendTest": "发送测试",
+        "turnOff": "关闭",
+        "enabling": "开启中…",
+        "turnOn": "🔔 开启通知"
+      },
+      "avatar": {
+        "couldNotSave": "无法保存。",
+        "heading": "你的头像",
+        "pickEmoji": "选一个 emoji，或使用你的首字母（{initial}）。",
+        "useInitial": "使用你的首字母"
+      }
+    }
+  }
+}

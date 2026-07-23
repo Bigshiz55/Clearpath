@@ -1,0 +1,196 @@
+{
+  "nav": {
+    "ask": "Preguntar",
+    "discover": "Descubrir",
+    "onTv": "En TV",
+    "saved": "Guardados",
+    "together": "En grupo",
+    "home": "Inicio",
+    "profile": "Perfil",
+    "more": "Más",
+    "newReleases": "Novedades",
+    "watchDna": "Tu ADN de cine",
+    "chambers": "Tu despacho",
+    "subscriptionCheck": "Revisar suscripciones",
+    "friends": "Amigos",
+    "reminders": "Mis recordatorios",
+    "back": "Atrás",
+    "pro": "Pro"
+  },
+  "common": {
+    "languageRegion": "Idioma y región",
+    "language": "Idioma",
+    "region": "Región",
+    "save": "Guardar",
+    "cancel": "Cancelar"
+  },
+  "card": {
+    "for": "A favor",
+    "forHint": "A favor — más como esto",
+    "pass": "Paso",
+    "passHint": "No es para mí",
+    "save": "Guardar",
+    "saved": "Guardado",
+    "saveHint": "Guardar",
+    "savedHint": "Guardado — quitar de tu lista",
+    "movie": "Película",
+    "tv": "Serie"
+  },
+  "toasts": {
+    "savedToList": "Añadido a tu lista.",
+    "removedFromList": "Quitado de tu lista.",
+    "couldNotRemove": "No se pudo quitar.",
+    "signInToSave": "Inicia sesión para guardar en tu lista.",
+    "somethingWrong": "Algo salió mal."
+  },
+  "verdict": {
+    "header": "El veredicto",
+    "yourVerdict": "Tu VERD1CT",
+    "tier": {
+      "mustWatch": "Imprescindible",
+      "strongWatch": "Muy recomendable",
+      "worthWatching": "Vale la pena",
+      "possibleWatch": "Quizás",
+      "lowPriority": "Baja prioridad",
+      "skip": "Sáltala"
+    },
+    "call": {
+      "watch": "VÉLA",
+      "worth": "QUIZÁS",
+      "uncertain": "INDECISO",
+      "skip": "SÁLTALA",
+      "wildcard": "COMODÍN"
+    },
+    "primaryCall": {
+      "watchIt": "VÉLA",
+      "maybe": "QUIZÁS",
+      "skipIt": "SÁLTALA"
+    },
+    "disposition": {
+      "strict": "Lista fija",
+      "possible": "Lista posible",
+      "skip": "Sáltala"
+    }
+  },
+  "dims": {
+    "pacing": {
+      "label": "Ritmo",
+      "low": "Lento",
+      "high": "Rápido"
+    },
+    "darkness": {
+      "label": "Tono",
+      "low": "Optimista",
+      "high": "Oscuro e intenso"
+    },
+    "warmth": {
+      "label": "Calidez",
+      "low": "Cínico",
+      "high": "Esperanzador"
+    },
+    "humor": {
+      "label": "Humor",
+      "low": "Serio",
+      "high": "Muy cómico"
+    },
+    "suspense": {
+      "label": "Tensión",
+      "low": "Poca tensión",
+      "high": "Al borde del asiento"
+    },
+    "emotion": {
+      "label": "Intensidad emocional",
+      "low": "Ligero",
+      "high": "Desgarrador"
+    },
+    "complexity": {
+      "label": "Complejidad",
+      "low": "Fácil de ver",
+      "high": "Cerebral"
+    },
+    "realism": {
+      "label": "Realismo",
+      "low": "Fantástico",
+      "high": "Realista"
+    },
+    "character": {
+      "label": "Enfoque",
+      "low": "Guiado por la trama",
+      "high": "Guiado por personajes"
+    },
+    "stakes": {
+      "label": "En juego",
+      "low": "Íntimo",
+      "high": "Épico"
+    },
+    "morality": {
+      "label": "Claridad moral",
+      "low": "Definido",
+      "high": "Moralmente gris"
+    },
+    "violence": {
+      "label": "Contenido fuerte",
+      "low": "Suave",
+      "high": "Brutal"
+    },
+    "attention": {
+      "label": "Atención",
+      "low": "De fondo",
+      "high": "Exige concentración"
+    },
+    "serialized": {
+      "label": "Estructura",
+      "low": "Episódico",
+      "high": "Serializado"
+    },
+    "romance": {
+      "label": "Romance",
+      "low": "Nada",
+      "high": "Central"
+    }
+  },
+  "dna": {
+    "tierLearning": "Aún aprendiendo",
+    "tierWeak": "Ligera tendencia",
+    "tierModerate": "Moderada",
+    "tierStrong": "Fuerte",
+    "yours": "Tuyo",
+    "youSetThis": "Lo definiste tú",
+    "avoid": "Evitar",
+    "samples": {
+      "one": "{count} título · {pct}% de certeza",
+      "other": "{count} títulos · {pct}% de certeza"
+    },
+    "close": "Cerrar",
+    "edit": "Editar",
+    "adjust": "Ajustar",
+    "setYour": "Ajusta tu {label}",
+    "dealbreaker": "Hazlo un factor decisivo — aléjame por completo del otro extremo",
+    "saving": "Guardando…",
+    "save": "Guardar",
+    "resetLearned": "Volver a lo aprendido",
+    "couldNotSave": "No se pudo guardar.",
+    "couldNotClear": "No se pudo borrar."
+  },
+  "personality": {
+    "header": "Tu personalidad de cine",
+    "title": {
+      "slowBurnNoir": "El Noir Pausado",
+      "moralGrayZone": "La Zona Gris Moral",
+      "prestigePurist": "El Purista del Prestigio",
+      "thrillSeeker": "El Buscador de Emociones",
+      "epicEscapist": "El Escapista Épico",
+      "feelsChaser": "El Cazador de Sentimientos",
+      "genreExplorer": "El Explorador de Géneros",
+      "groundedRealist": "El Realista",
+      "comfortWatcher": "El Espectador de Confort",
+      "easyStreamer": "El Espectador Relajado",
+      "romantic": "El Romántico",
+      "stillCalibrating": "Calibrando aún"
+    }
+  },
+  "dnaPage": {
+    "heading": "Tu ADN de cine",
+    "subtitle": "Tu gusto, aprendido de lo que calificas: los ejes en los que te apoyas y cómo ves."
+  }
+}

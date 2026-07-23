@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createVerdictShare } from '@/lib/actions/share';
 import { useToast } from '@/components/Toast';
+import { useT } from '@/i18n/I18nProvider';
 import type { MediaType } from '@/lib/types';
 
 export function ShareDialog({
@@ -17,6 +18,7 @@ export function ShareDialog({
   onClose: () => void;
 }) {
   const toast = useToast();
+  const t = useT();
   const [includePersonal, setIncludePersonal] = useState(false);
   const [expires, setExpires] = useState<'never' | '7' | '30'>('never');
   const [loading, setLoading] = useState(false);
@@ -32,7 +34,7 @@ export function ShareDialog({
     });
     setLoading(false);
     if (!res.ok || !res.url) {
-      toast.show(res.error ?? 'Could not create share link.', 'error');
+      toast.show(res.error ?? t('title.share.toastCouldNotCreate'), 'error');
       return;
     }
     setUrl(res.url);
@@ -42,9 +44,9 @@ export function ShareDialog({
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
-      toast.show('Link copied to clipboard.', 'success');
+      toast.show(t('title.share.toastCopied'), 'success');
     } catch {
-      toast.show('Copy failed — select and copy manually.', 'error');
+      toast.show(t('title.share.toastCopyFailed'), 'error');
     }
   }
 
@@ -64,15 +66,15 @@ export function ShareDialog({
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold text-white">Share this verdict</h3>
-        <p className="mt-1 text-sm text-slate-400">Anyone with the link can view it — no account needed.</p>
+        <h3 className="text-lg font-semibold text-white">{t('title.share.heading')}</h3>
+        <p className="mt-1 text-sm text-slate-400">{t('title.share.subtitle')}</p>
 
         {!url ? (
           <div className="mt-4 space-y-4">
             <label className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
               <span className="text-sm text-slate-200">
-                Include my {personalLabel}
-                <span className="block text-xs text-slate-500">Off by default — keeps your personal score private.</span>
+                {t('title.share.includePersonal', { label: personalLabel })}
+                <span className="block text-xs text-slate-500">{t('title.share.includePersonalHint')}</span>
               </span>
               <input
                 type="checkbox"
@@ -83,7 +85,7 @@ export function ShareDialog({
             </label>
 
             <div>
-              <div className="label">Link expiry</div>
+              <div className="label">{t('title.share.expiryLabel')}</div>
               <div className="flex gap-2">
                 {(['never', '7', '30'] as const).map((v) => (
                   <button
@@ -91,14 +93,14 @@ export function ShareDialog({
                     onClick={() => setExpires(v)}
                     className={`chip border ${expires === v ? 'chip-active' : ''}`}
                   >
-                    {v === 'never' ? 'Never' : `${v} days`}
+                    {v === 'never' ? t('title.share.expiryNever') : t('title.share.expiryDays', { n: v })}
                   </button>
                 ))}
               </div>
             </div>
 
             <button onClick={create} disabled={loading} className="btn-primary w-full">
-              {loading ? 'Creating…' : 'Create share link'}
+              {loading ? t('title.share.creating') : t('title.share.createLink')}
             </button>
           </div>
         ) : (
@@ -108,20 +110,20 @@ export function ShareDialog({
             </div>
             <div className="flex gap-2">
               <button onClick={copy} className="btn-secondary flex-1">
-                Copy link
+                {t('title.share.copyLink')}
               </button>
               <button onClick={nativeShare} className="btn-primary flex-1">
-                Share
+                {t('title.share.shareBtn')}
               </button>
             </div>
             <p className="text-center text-xs text-slate-500">
-              You can deactivate this link anytime from Settings.
+              {t('title.share.deactivateNote')}
             </p>
           </div>
         )}
 
         <button onClick={onClose} className="btn-ghost mt-3 w-full">
-          Close
+          {t('title.share.close')}
         </button>
       </div>
     </div>

@@ -1,56 +1,43 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useT } from '@/i18n/I18nProvider';
 
 /**
- * On-screen Back / Home / Forward controls, shown on every /app screen so people
- * (especially seniors) can move between pages without hunting for the browser's
- * buttons or opening the menu. Back/Forward drive the real browser history; the
- * buttons scale up automatically in Vintage / big-text mode via `btn-secondary`.
+ * A single contextual "Back" affordance for /app screens.
+ *
+ * Previously this rendered Back / Home / Forward on every page, which duplicated
+ * the browser controls, the nav-bar logo/Home link, and the mobile Home tab
+ * (Home was reachable four ways on a phone). Per the navigation principles we keep
+ * only a contextual Back — useful for seniors and big-text mode — and drop the
+ * redundant Home button and the unjustified Forward button (no guided workflow
+ * needs a forward control). Nothing renders on the home page itself. Back drives
+ * real browser history; the button scales up in Simple/Vintage mode via
+ * `btn-secondary`.
  */
 export function NavArrows() {
   const router = useRouter();
   const pathname = usePathname();
+  const t = useT();
   const [canBack, setCanBack] = useState(false);
   const onHome = pathname === '/app';
 
   useEffect(() => {
-    // There's a previous screen to return to whenever this tab has history.
     setCanBack(typeof window !== 'undefined' && window.history.length > 1);
   }, [pathname]);
 
+  if (onHome || !canBack) return null;
+
   return (
-    <div className="mb-4 flex items-center justify-between gap-2">
+    <div className="mb-4">
       <button
         type="button"
         onClick={() => router.back()}
-        disabled={!canBack}
-        className="btn-secondary inline-flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-40"
-        aria-label="Go back to the previous page"
+        className="btn-ghost inline-flex items-center gap-1.5 text-slate-300"
+        aria-label={t('nav.back')}
       >
-        <span aria-hidden className="text-lg leading-none">←</span> Back
-      </button>
-
-      {!onHome && (
-        <Link
-          href="/app"
-          className="btn-secondary inline-flex items-center gap-1.5"
-          aria-label="Go to the home page"
-        >
-          <span aria-hidden className="text-lg leading-none">🏠</span>
-          <span className="hidden sm:inline">Home</span>
-        </Link>
-      )}
-
-      <button
-        type="button"
-        onClick={() => router.forward()}
-        className="btn-secondary inline-flex items-center gap-1.5"
-        aria-label="Go forward to the next page"
-      >
-        Forward <span aria-hidden className="text-lg leading-none">→</span>
+        <span aria-hidden className="text-lg leading-none">←</span> {t('nav.back')}
       </button>
     </div>
   );

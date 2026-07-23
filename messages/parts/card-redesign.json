@@ -1,0 +1,59 @@
+{
+  "en-US": {
+    "card": {
+      "why": {
+        "strongTaste": "Strong fit for you",
+        "yourTaste": "Based on your taste",
+        "learning": "Learning your taste",
+        "blend": "Critics + audience"
+      },
+      "rate": {
+        "criticAria": "Rotten Tomatoes critics: {score}%",
+        "criticNaAria": "Rotten Tomatoes critics: not rated",
+        "audienceAria": "Audience score: {score}%",
+        "audienceNaAria": "Audience score: not rated",
+        "imdbAria": "IMDb rating: {score} out of 10",
+        "imdbNaAria": "IMDb rating: not rated",
+        "groupAria": "External ratings"
+      }
+    }
+  },
+  "es-419": {
+    "card": {
+      "why": {
+        "strongTaste": "Muy de tu estilo",
+        "yourTaste": "Según tu gusto",
+        "learning": "Aprendiendo tu gusto",
+        "blend": "Crítica + público"
+      },
+      "rate": {
+        "criticAria": "Crítica de Rotten Tomatoes: {score} %",
+        "criticNaAria": "Crítica de Rotten Tomatoes: sin calificación",
+        "audienceAria": "Puntuación del público: {score} %",
+        "audienceNaAria": "Puntuación del público: sin calificación",
+        "imdbAria": "Puntuación de IMDb: {score} de 10",
+        "imdbNaAria": "Puntuación de IMDb: sin calificación",
+        "groupAria": "Calificaciones externas"
+      }
+    }
+  },
+  "zh-Hans": {
+    "card": {
+      "why": {
+        "strongTaste": "很合你的口味",
+        "yourTaste": "根据你的口味",
+        "learning": "正在学习你的口味",
+        "blend": "影评人 + 观众"
+      },
+      "rate": {
+        "criticAria": "烂番茄专业影评：{score}%",
+        "criticNaAria": "烂番茄专业影评：暂无评分",
+        "audienceAria": "观众评分：{score}%",
+        "audienceNaAria": "观众评分：暂无评分",
+        "imdbAria": "IMDb 评分：{score}（满分 10）",
+        "imdbNaAria": "IMDb 评分：暂无评分",
+        "groupAria": "外部评分"
+      }
+    }
+  }
+}

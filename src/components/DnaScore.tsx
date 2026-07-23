@@ -5,6 +5,7 @@ import type { MediaType } from '@/lib/types';
 import { isPersonalized, type DnaClientResult as Dna } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
 import { Verd1ctBadge } from './Verd1ctBadge';
+import { useT } from '@/i18n/I18nProvider';
 
 /**
  * The WatchVerdict DNA Score — a per-user "odds you'll love it" (0..100). On the
@@ -13,6 +14,7 @@ import { Verd1ctBadge } from './Verd1ctBadge';
  * When the model has little of your data yet, it leans on the objective score.
  */
 export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: number }) {
+  const t = useT();
   const [dna, setDna] = useState<Dna | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -41,12 +43,12 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
   const personal = isPersonalized(dna);
   const learning = dna.confidence < 0.5;
   const sub = !dna.available
-    ? 'Odds you’ll love it'
+    ? t('title.oddsYoullLove')
     : dna.sampleSize === 0
-      ? 'Rate titles to personalize'
+      ? t('title.rateToPersonalize')
       : learning
-        ? `Learning · ${dna.sampleSize} rated`
-        : 'Odds you’ll love it';
+        ? t('title.learningRated', { n: dna.sampleSize })
+        : t('title.oddsYoullLove');
 
   const v = scoreVerdict(dna.score);
   const adj = dna.adjustment ?? 0;
@@ -56,14 +58,14 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
     <div className="flex flex-col gap-1">
       <div
         className="flex items-center gap-3 rounded-xl border-2 border-pink-400/80 bg-gradient-to-r from-pink-500/40 to-rose-500/25 px-3 py-2 shadow-[0_0_18px_rgba(244,63,94,0.35)]"
-        title="Your VERD1CT — a 0–100 estimate of how much YOU will love this, learned from what you’ve rated. It drives your Stream It / Skip It call and sharpens the more you use the app."
+        title={t('title.dnaScoreTip')}
       >
         <Verd1ctBadge score={dna.score} px={52} />
         <div className="min-w-0">
-          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white">Your VERD1CT</div>
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white">{t('verdict.yourVerdict')}</div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-black tracking-wide ${v.visual.badge}`}>
-              {personal ? '🧬' : v.emoji} {v.call}
+              {personal ? '🧬' : v.emoji} {t(`verdict.call.${v.visual.key}`)}
             </span>
             <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/90">{sub}</span>
           </div>

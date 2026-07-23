@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useT } from '@/i18n/I18nProvider';
 
 const KEY = 'wv_install_hint_dismissed';
 
@@ -18,6 +19,7 @@ interface InstallPromptEvent extends Event {
  * (standalone) or dismissed.
  */
 export function InstallHint() {
+  const t = useT();
   const [show, setShow] = useState(false);
   const [ios, setIos] = useState(false);
   const [deferred, setDeferred] = useState<InstallPromptEvent | null>(null);
@@ -81,25 +83,25 @@ export function InstallHint() {
         📱
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-bold text-white">Keep WatchVerdict one tap away</div>
+        <div className="text-sm font-bold text-white">{t('misc.install.headline')}</div>
         {ios ? (
           <div className="mt-0.5 text-xs text-slate-300">
-            Tap the <span className="font-semibold text-white">Share</span> button
+            {t('misc.install.iosTap')} <span className="font-semibold text-white">{t('misc.install.share')}</span> {t('misc.install.iosButton')}
             <span aria-hidden> ⬆️ </span>
-            at the bottom, then <span className="font-semibold text-white">“Add to Home Screen.”</span>
+            {t('misc.install.iosBottom')} <span className="font-semibold text-white">{t('misc.install.addToHome')}</span>
           </div>
         ) : (
-          <div className="mt-0.5 text-xs text-slate-300">Add it to your home screen — it opens full-screen, like an app.</div>
+          <div className="mt-0.5 text-xs text-slate-300">{t('misc.install.generic')}</div>
         )}
       </div>
       {!ios && deferred && (
         <button onClick={install} className="btn-primary flex-none px-4 py-2 text-sm">
-          Install
+          {t('misc.install.install')}
         </button>
       )}
       <button
         onClick={dismiss}
-        aria-label="Dismiss"
+        aria-label={t('misc.install.dismiss')}
         className="flex-none rounded-lg px-2 py-1 text-lg leading-none text-slate-400 hover:text-white"
       >
         ×

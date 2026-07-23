@@ -7,9 +7,26 @@ import { tasteDials, dnaStrength } from '@/lib/scoring/dimensions';
 import { describePersonality } from '@/lib/scoring/personality';
 import { ShareCard, WatchDnaCardArt } from '@/components/ShareCards';
 import { TasteDials } from '@/components/TasteDials';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Your Watch DNA' };
+
+/** English archetype title → stable catalog key (the pure engine stays English). */
+const PERSONALITY_KEY: Record<string, string> = {
+  'The Slow-Burn Noir': 'slowBurnNoir',
+  'The Moral Gray-Zone': 'moralGrayZone',
+  'The Prestige Purist': 'prestigePurist',
+  'The Thrill Seeker': 'thrillSeeker',
+  'The Epic Escapist': 'epicEscapist',
+  'The Feels Chaser': 'feelsChaser',
+  'The Genre Explorer': 'genreExplorer',
+  'The Grounded Realist': 'groundedRealist',
+  'The Comfort Watcher': 'comfortWatcher',
+  'The Easy Streamer': 'easyStreamer',
+  'The Romantic': 'romantic',
+  'Still Calibrating': 'stillCalibrating',
+};
 
 function pct(n: number | null): string {
   return n == null ? '—' : `${Math.round(n * 100)}%`;
@@ -26,13 +43,17 @@ export default async function WatchDnaPage() {
   const persona = describePersonality(profile);
   const dnaScore = dnaStrength(profile);
 
+  const { t } = getServerI18n();
+  const personaTitleKey = PERSONALITY_KEY[persona.title];
+  const personaTitle = personaTitleKey ? t(`personality.title.${personaTitleKey}`) : persona.title;
+
   const ready = profile.samples >= 3;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-white sm:text-3xl">🧬 Your Watch DNA</h1>
-        <p className="mt-1 text-sm text-slate-400">Your taste, learned from what you rate — the axes you lean on and how you watch.</p>
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-white sm:text-3xl">🧬 {t('dnaPage.heading')}</h1>
+        <p className="mt-1 text-sm text-slate-400">{t('dnaPage.subtitle')}</p>
       </div>
 
       {/* Personality */}
@@ -40,8 +61,8 @@ export default async function WatchDnaPage() {
         <div className="bg-gradient-to-br from-brand-500/20 via-fuchsia-500/10 to-transparent p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="text-xs font-bold uppercase tracking-[0.15em] text-brand-300">Your watch personality</div>
-              <h2 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">{persona.title}</h2>
+              <div className="text-xs font-bold uppercase tracking-[0.15em] text-brand-300">{t('personality.header')}</div>
+              <h2 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">{personaTitle}</h2>
             </div>
             <DnaScoreBadge score={dnaScore} />
           </div>
@@ -58,17 +79,17 @@ export default async function WatchDnaPage() {
 
       {/* Behavioral stats */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Rated" value={String(stats.rated)} />
-        <Stat label="Finish rate" value={pct(stats.finishRate)} hint={stats.finishRate != null ? `${stats.finished} of ${stats.finished + stats.abandoned}` : 'watch a few'} />
-        <Stat label="⭐ Favorites" value={String(stats.favorites)} />
-        <Stat label="Avg. days to watch" value={stats.avgDaysToWatch == null ? '—' : stats.avgDaysToWatch < 1 ? 'same day' : String(Math.round(stats.avgDaysToWatch))} />
+        <Stat label={t('dnaPage.statRated')} value={String(stats.rated)} />
+        <Stat label={t('dnaPage.statFinishRate')} value={pct(stats.finishRate)} hint={stats.finishRate != null ? t('dnaPage.statFinishHint', { finished: stats.finished, total: stats.finished + stats.abandoned }) : t('dnaPage.statWatchAFew')} />
+        <Stat label={`⭐ ${t('dnaPage.statFavorites')}`} value={String(stats.favorites)} />
+        <Stat label={t('dnaPage.statAvgDays')} value={stats.avgDaysToWatch == null ? '—' : stats.avgDaysToWatch < 1 ? t('dnaPage.statSameDay') : String(Math.round(stats.avgDaysToWatch))} />
       </section>
 
       {/* Taste dials */}
       <section className="card p-5 sm:p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">Your taste dials</h2>
-          <Link href="/app/quiz" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
+          <h2 className="text-lg font-bold text-white">{t('dnaPage.tasteDialsHeading')}</h2>
+          <Link href="/app/quiz" className="text-sm font-semibold text-brand-300 hover:text-brand-200">{t('dnaPage.rateMore')} →</Link>
         </div>
         {ready && dials.length > 0 ? (
           <TasteDials
@@ -89,15 +110,14 @@ export default async function WatchDnaPage() {
         ) : (
           <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-5 text-center">
             <div className="text-3xl">🍿</div>
-            <p className="mt-2 text-sm text-slate-300">Rate a few titles and your dials will appear here.</p>
-            <Link href="/app/quiz" className="btn-primary mt-3 inline-flex">Play the Taste Quiz →</Link>
+            <p className="mt-2 text-sm text-slate-300">{t('dnaPage.dialsEmpty')}</p>
+            <Link href="/app/quiz" className="btn-primary mt-3 inline-flex">{t('dnaPage.playQuiz')} →</Link>
           </div>
         )}
         {ready && (
           <p className="mt-4 text-[11px] text-slate-500">
-            Learned from {profile.samples} rated titles — the more you rate, the sharper it gets. Tap{' '}
-            <span className="font-semibold text-slate-400">Adjust</span> on any dial to correct it yourself; a dealbreaker
-            steers your recommendations hard away (and becomes a hard filter as content-advisory data lands).
+            {t('dnaPage.learnedFromA', { count: profile.samples })}
+            <span className="font-semibold text-slate-400">{t('dnaPage.adjustWord')}</span>{t('dnaPage.learnedFromB')}
           </p>
         )}
       </section>
@@ -105,8 +125,8 @@ export default async function WatchDnaPage() {
       {/* Shareable card */}
       {ready && (
         <section className="card p-5 sm:p-6">
-          <h2 className="text-lg font-bold text-white">Share your Watch DNA</h2>
-          <p className="mt-0.5 text-sm text-slate-400">Save the card or share it — see who matches your taste.</p>
+          <h2 className="text-lg font-bold text-white">{t('dnaPage.shareHeading')}</h2>
+          <p className="mt-0.5 text-sm text-slate-400">{t('dnaPage.shareSub')}</p>
           <div className="mt-4">
             <ShareCard filename="my-watch-dna">
               <WatchDnaCardArt
@@ -128,10 +148,11 @@ export default async function WatchDnaPage() {
 
 /** A cool circular "Watch DNA score" gauge — how developed the taste profile is. */
 function DnaScoreBadge({ score }: { score: number }) {
+  const { t } = getServerI18n();
   const r = 26;
   const c = 2 * Math.PI * r;
   const dash = (Math.max(0, Math.min(100, score)) / 100) * c;
-  const tier = score >= 75 ? 'Elite' : score >= 50 ? 'Sharp' : score >= 25 ? 'Forming' : 'New';
+  const tier = score >= 75 ? t('dnaPage.tierElite') : score >= 50 ? t('dnaPage.tierSharp') : score >= 25 ? t('dnaPage.tierForming') : t('dnaPage.tierNew');
   return (
     <div className="flex flex-none flex-col items-center">
       <div className="relative h-[68px] w-[68px]">

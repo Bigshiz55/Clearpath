@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useT } from '@/i18n/I18nProvider';
 
 const KEY = 'wv_simple';
 
 /** One-tap Simple (Senior) view: bigger text, bigger buttons, higher contrast. */
 export function SimpleModeToggle({ variant = 'header' }: { variant?: 'header' | 'full' }) {
+  const t = useT();
   const [on, setOn] = useState(false);
 
   useEffect(() => {
@@ -33,9 +35,9 @@ export function SimpleModeToggle({ variant = 'header' }: { variant?: 'header' | 
         }`}
       >
         <span>
-          <span className="block font-semibold text-white">Simple view {on ? '· On' : '· Off'}</span>
+          <span className="block font-semibold text-white">{t('misc.simpleMode.simpleView')} {on ? t('misc.simpleMode.onSuffix') : t('misc.simpleMode.offSuffix')}</span>
           <span className="block text-sm text-slate-400">
-            Bigger text and buttons, higher contrast — easier to read and tap. Tap again to turn off.
+            {t('misc.simpleMode.description')}
           </span>
         </span>
         <span className={`text-2xl ${on ? 'text-brand-300' : 'text-slate-500'}`}>{on ? '🅰️' : 'Aa'}</span>
@@ -47,13 +49,13 @@ export function SimpleModeToggle({ variant = 'header' }: { variant?: 'header' | 
     <button
       onClick={toggle}
       aria-pressed={on}
-      title="Simple view: bigger text and buttons"
+      title={t('misc.simpleMode.title')}
       className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-semibold transition ${
         on ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'
       }`}
     >
       <span aria-hidden className="text-base font-bold leading-none">A</span>
-      <span className="hidden sm:inline">{on ? 'Simple view on' : 'Simple view'}</span>
+      <span className="hidden sm:inline">{on ? t('misc.simpleMode.simpleViewOn') : t('misc.simpleMode.simpleView')}</span>
     </button>
   );
 }

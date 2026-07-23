@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useT } from '@/i18n/I18nProvider';
 
 /**
  * A "start fresh" flow — signs out of any current session and mints a brand-new
@@ -13,6 +14,7 @@ import { createClient } from '@/lib/supabase/client';
  */
 export function FreshStart({ to = '/app/quiz' }: { to?: string }) {
   const router = useRouter();
+  const t = useT();
   const [err, setErr] = useState<string | null>(null);
   // Only ever redirect to an internal path (never an attacker-supplied URL).
   const dest = to.startsWith('/') && !to.startsWith('//') ? to : '/app/quiz';
@@ -31,24 +33,24 @@ export function FreshStart({ to = '/app/quiz' }: { to?: string }) {
         }
         router.replace(dest);
       } catch (e) {
-        if (active) setErr(e instanceof Error ? e.message : 'Could not start a fresh session.');
+        if (active) setErr(e instanceof Error ? e.message : t('misc.fresh.couldNotStart'));
       }
     })();
     return () => {
       active = false;
     };
-  }, [router, dest]);
+  }, [router, dest, t]);
 
   return (
     <div className="grid min-h-dvh place-items-center p-6 text-center">
       <div>
         <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
-        <p className="mt-4 text-sm text-slate-300">Starting a fresh session…</p>
+        <p className="mt-4 text-sm text-slate-300">{t('misc.fresh.starting')}</p>
         {err && (
           <p className="mt-2 text-xs text-rose-300">
             {err} —{' '}
             <a href={dest} className="underline">
-              continue anyway
+              {t('misc.fresh.continueAnyway')}
             </a>
           </p>
         )}

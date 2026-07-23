@@ -1,0 +1,74 @@
+{
+  "en-US": {
+    "dnaPage": {
+      "statRated": "Rated",
+      "statFinishRate": "Finish rate",
+      "statFinishHint": "{finished} of {total}",
+      "statWatchAFew": "watch a few",
+      "statFavorites": "Favorites",
+      "statAvgDays": "Avg. days to watch",
+      "statSameDay": "same day",
+      "tasteDialsHeading": "Your taste dials",
+      "rateMore": "Rate more",
+      "dialsEmpty": "Rate a few titles and your dials will appear here.",
+      "playQuiz": "Play the Taste Quiz",
+      "learnedFromA": "Learned from {count} rated titles — the more you rate, the sharper it gets. Tap ",
+      "adjustWord": "Adjust",
+      "learnedFromB": " on any dial to correct it yourself; a dealbreaker steers your recommendations hard away (and becomes a hard filter as content-advisory data lands).",
+      "shareHeading": "Share your Watch DNA",
+      "shareSub": "Save the card or share it — see who matches your taste.",
+      "tierElite": "Elite",
+      "tierSharp": "Sharp",
+      "tierForming": "Forming",
+      "tierNew": "New"
+    }
+  },
+  "es-419": {
+    "dnaPage": {
+      "statRated": "Calificadas",
+      "statFinishRate": "Tasa de finalización",
+      "statFinishHint": "{finished} de {total}",
+      "statWatchAFew": "mira algunas",
+      "statFavorites": "Favoritas",
+      "statAvgDays": "Días promedio para verla",
+      "statSameDay": "el mismo día",
+      "tasteDialsHeading": "Tus controles de gusto",
+      "rateMore": "Calificar más",
+      "dialsEmpty": "Califica algunos títulos y tus controles aparecerán aquí.",
+      "playQuiz": "Jugar el Test de Gustos",
+      "learnedFromA": "Aprendido de {count} títulos calificados: cuanto más califiques, más preciso se vuelve. Toca ",
+      "adjustWord": "Ajustar",
+      "learnedFromB": " en cualquier control para corregirlo tú mismo; un factor decisivo aleja con fuerza tus recomendaciones (y se vuelve un filtro estricto a medida que llegan datos de guía de contenido).",
+      "shareHeading": "Comparte tu ADN de Visionado",
+      "shareSub": "Guarda la tarjeta o compártela: mira quién comparte tu gusto.",
+      "tierElite": "Élite",
+      "tierSharp": "Afinado",
+      "tierForming": "En formación",
+      "tierNew": "Nuevo"
+    }
+  },
+  "zh-Hans": {
+    "dnaPage": {
+      "statRated": "已评分",
+      "statFinishRate": "看完率",
+      "statFinishHint": "{total} 部中的 {finished} 部",
+      "statWatchAFew": "先看几部",
+      "statFavorites": "收藏",
+      "statAvgDays": "平均观看天数",
+      "statSameDay": "当天",
+      "tasteDialsHeading": "你的口味刻度",
+      "rateMore": "评分更多",
+      "dialsEmpty": "评分几部片子，你的刻度就会出现在这里。",
+      "playQuiz": "玩口味测验",
+      "learnedFromA": "学习自 {count} 部已评分的片子——你评得越多，它就越精准。点击任意刻度上的",
+      "adjustWord": "调整",
+      "learnedFromB": "来自行纠正；一个绝对不要项会强力地把推荐引开（并会随着内容分级数据的到位成为一个硬性过滤条件）。",
+      "shareHeading": "分享你的观影 DNA",
+      "shareSub": "保存或分享这张卡片——看看谁和你口味相合。",
+      "tierElite": "顶级",
+      "tierSharp": "敏锐",
+      "tierForming": "形成中",
+      "tierNew": "新手"
+    }
+  }
+}

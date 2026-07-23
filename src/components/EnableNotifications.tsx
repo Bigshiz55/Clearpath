@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { publicEnv } from '@/lib/env';
 import { savePushSubscription, removePushSubscription, sendTestPush } from '@/lib/actions/push';
 import { useToast } from '@/components/Toast';
+import { useT } from '@/i18n/I18nProvider';
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
@@ -19,6 +20,7 @@ type State = 'checking' | 'unsupported' | 'off' | 'on' | 'busy';
 export function EnableNotifications() {
   const [state, setState] = useState<State>('checking');
   const toast = useToast();
+  const t = useT();
   const vapid = publicEnv.vapidPublicKey();
 
   useEffect(() => {
@@ -39,14 +41,14 @@ export function EnableNotifications() {
 
   async function enable() {
     if (!vapid) {
-      toast.show('Push isn’t configured on the server yet (VAPID keys).', 'error');
+      toast.show(t('account.notifications.notConfigured'), 'error');
       return;
     }
     setState('busy');
     try {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        toast.show('Notifications were blocked. Enable them in your browser settings to turn this on.', 'error');
+        toast.show(t('account.notifications.blocked'), 'error');
         setState('off');
         return;
       }
@@ -62,14 +64,14 @@ export function EnableNotifications() {
         keys: { p256dh: json.keys?.p256dh ?? '', auth: json.keys?.auth ?? '' },
       });
       if (!res.ok) {
-        toast.show(res.error ?? 'Failed to save.', 'error');
+        toast.show(res.error ?? t('account.notifications.failedSave'), 'error');
         setState('off');
         return;
       }
       setState('on');
-      toast.show('Notifications on. We’ll only ping you about things worth opening the app for.', 'success');
+      toast.show(t('account.notifications.enabledOn'), 'success');
     } catch {
-      toast.show('Couldn’t enable notifications on this device.', 'error');
+      toast.show(t('account.notifications.enableFailed'), 'error');
       setState('off');
     }
   }
@@ -84,7 +86,7 @@ export function EnableNotifications() {
         await sub.unsubscribe().catch(() => {});
       }
       setState('off');
-      toast.show('Notifications off.', 'info');
+      toast.show(t('account.notifications.turnedOff'), 'info');
     } catch {
       setState('off');
     }
@@ -92,14 +94,13 @@ export function EnableNotifications() {
 
   async function test() {
     const res = await sendTestPush();
-    toast.show(res.ok ? 'Sent — check your notifications.' : res.error ?? 'Failed.', res.ok ? 'success' : 'error');
+    toast.show(res.ok ? t('account.notifications.testSent') : res.error ?? t('account.notifications.testFailed'), res.ok ? 'success' : 'error');
   }
 
   if (state === 'unsupported') {
     return (
       <p className="text-sm text-slate-400">
-        This browser doesn’t support push notifications. On iPhone, add WatchVerdict to your Home Screen first
-        (Share → Add to Home Screen), then open it from there and this will appear.
+        {t('account.notifications.unsupported')}
       </p>
     );
   }
@@ -109,14 +110,14 @@ export function EnableNotifications() {
       {state === 'on' ? (
         <>
           <span className="rounded-full border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-100">
-            ✓ On for this device
+            {t('account.notifications.onThisDevice')}
           </span>
-          <button onClick={test} className="btn-secondary text-sm">Send test</button>
-          <button onClick={disable} className="btn-ghost text-sm">Turn off</button>
+          <button onClick={test} className="btn-secondary text-sm">{t('account.notifications.sendTest')}</button>
+          <button onClick={disable} className="btn-ghost text-sm">{t('account.notifications.turnOff')}</button>
         </>
       ) : (
         <button onClick={enable} disabled={state === 'busy' || state === 'checking'} className="btn-primary">
-          {state === 'busy' ? 'Enabling…' : '🔔 Turn on notifications'}
+          {state === 'busy' ? t('account.notifications.enabling') : t('account.notifications.turnOn')}
         </button>
       )}
     </div>

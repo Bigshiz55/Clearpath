@@ -6,6 +6,7 @@ import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWit
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
 import { TvDetective } from '@/components/TvDetective';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'On TV today · WatchVerdict' };
@@ -53,6 +54,7 @@ export default async function OnTvPage({
     data: { user },
   } = await supabase.auth.getUser();
   const region = regionFor(user ? await getProfile(supabase, user.id) : null);
+  const { t } = getServerI18n();
 
   const now = new Date();
   const date = isoDate(now);
@@ -113,22 +115,30 @@ export default async function OnTvPage({
         <h1 className="text-2xl font-bold text-white sm:text-3xl">
           {withinHours != null
             ? genreEmpty
-              ? `📺 ${filterLabel ? `${titleCase(filterLabel)} ` : ''}on live TV`
-              : `📺 ${filterLabel ? `${filterLabel} ` : ''}coming on in the next ${withinHours} hours`
-            : '📺 On TV today'}
+              ? filterLabel
+                ? t('discover.onTv.headingLiveLabeled', { label: titleCase(filterLabel) })
+                : t('discover.onTv.headingLive')
+              : filterLabel
+                ? t('discover.onTv.headingWindowLabeled', { label: filterLabel, hours: withinHours })
+                : t('discover.onTv.headingWindow', { hours: withinHours })
+            : t('discover.onTv.headingToday')}
         </h1>
         <p className="mt-2 text-sm text-slate-300">
           {withinHours != null ? (
             <>
-              Real listings for {region} between now and {withinHours} hours from now — channel, time, and rating.
-              Hit <span className="font-semibold text-white">Remind me</span> to get pinged{' '}
-              <span className="font-semibold text-white">1 hour and 5 minutes before</span> a show starts.
+              {t('discover.onTv.subWindowA', { region, hours: withinHours })}
+              <span className="font-semibold text-white">{t('discover.onTv.remindMe')}</span>
+              {t('discover.onTv.subWindowB')}
+              <span className="font-semibold text-white">{t('discover.onTv.beforeStarts')}</span>
+              {t('discover.onTv.subWindowC')}
             </>
           ) : (
             <>
-              What’s on live in {region} — channel, time, and rating. Filter to prime time, sort by rating, and hit{' '}
-              <span className="font-semibold text-white">Remind me</span> to get a phone/PC notification{' '}
-              <span className="font-semibold text-white">1 hour and 5 minutes before</span> it airs.
+              {t('discover.onTv.subTodayA', { region })}
+              <span className="font-semibold text-white">{t('discover.onTv.remindMe')}</span>
+              {t('discover.onTv.subTodayB')}
+              <span className="font-semibold text-white">{t('discover.onTv.beforeStarts')}</span>
+              {t('discover.onTv.subTodayC')}
             </>
           )}
         </p>
@@ -149,13 +159,16 @@ export default async function OnTvPage({
               <div className="rounded-2xl border border-amber-400/30 bg-amber-500/[0.07] p-4 text-center sm:p-5">
                 <div className="text-2xl" aria-hidden>📭</div>
                 <h2 className="mt-1 text-lg font-bold text-white">
-                  No {filterLabel || 'matches'} on live TV in the next {withinHours}h
+                  {t('discover.onTv.noneHeading', { label: filterLabel || t('discover.onTv.matchesWord'), hours: withinHours })}
                 </h2>
                 <p className="mx-auto mt-1.5 max-w-md text-sm text-slate-300">
-                  Our live guide reads real broadcast listings — strongest for major {region} networks
-                  (ABC, CBS, NBC, FOX, CW). It doesn’t reliably carry{' '}
-                  {network ? titleCase(network) : 'cable'}{movieOnly ? ' movies' : ''}, so rather than
-                  guess, we only show what we can actually confirm.
+                  {t('discover.onTv.noneBody', {
+                    region,
+                    what: (() => {
+                      const base = network ? titleCase(network) : t('discover.onTv.cable');
+                      return movieOnly ? t('discover.onTv.whatMovies', { base }) : base;
+                    })(),
+                  })}
                 </p>
                 <div className="mt-3 flex flex-wrap justify-center gap-2">
                   {official && (
@@ -165,24 +178,24 @@ export default async function OnTvPage({
                       rel="noopener noreferrer"
                       className="rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-400"
                     >
-                      📺 See {official.name}’s live schedule →
+                      {t('discover.onTv.seeSchedule', { name: official.name })}
                     </a>
                   )}
                   <Link href="/app/finder" className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition ${official ? 'border border-white/15 text-slate-200 hover:bg-white/10' : 'bg-brand-500 text-white hover:bg-brand-400'}`}>
-                    🔎 Find {movieOnly ? 'movies' : 'titles'} by streaming service
+                    {t('discover.onTv.findByService', { what: movieOnly ? t('discover.onTv.moviesWord') : t('discover.onTv.titlesWord') })}
                   </Link>
                   <Link href="/app/watch" className="rounded-lg border border-white/15 px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
-                    State a new case
+                    {t('discover.onTv.stateNewCase')}
                   </Link>
                 </div>
               </div>
               <h2 className="pt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Meanwhile — actually coming on live TV
+                {t('discover.onTv.meanwhile')}
               </h2>
-              <OnTvGuide airings={windowed} dateLabel={`Next ${withinHours} hours`} country={region} mode="broadcast" remindedIds={remindedIds} windowHours={withinHours} />
+              <OnTvGuide airings={windowed} dateLabel={t('discover.onTv.nextHours', { hours: withinHours })} country={region} mode="broadcast" remindedIds={remindedIds} windowHours={withinHours} />
             </>
           ) : (
-            <OnTvGuide airings={windowed} dateLabel={`Next ${withinHours} hours`} country={region} mode="broadcast" remindedIds={remindedIds} windowHours={withinHours} />
+            <OnTvGuide airings={windowed} dateLabel={t('discover.onTv.nextHours', { hours: withinHours })} country={region} mode="broadcast" remindedIds={remindedIds} windowHours={withinHours} />
           )}
           <p className="text-sm">
             <Link href="/app/tv" className="font-semibold text-brand-300 hover:underline">See the full day’s guide →</Link>

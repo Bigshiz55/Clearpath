@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useT } from '@/i18n/I18nProvider';
 import { SaveButton } from './SaveButton';
 import { EasyQuiz, type QuizResult } from './EasyQuiz';
 import { TasteGame } from './TasteGame';
@@ -26,13 +27,6 @@ interface StoredPrefs {
 const PREFS_KEY = 'wv_easy_prefs';
 const DEFAULTS: StoredPrefs = { mediaType: 'any', maxRuntime: null, content: 'any', era: 'any', favorites: [], dismissed: [], quizTaken: false };
 
-const ERA_LABELS: Record<EasyEra, string> = {
-  any: 'Any era', y2020s: '2020s', y2000s: '2000s–10s', y80s90s: '80s & 90s', y60s70s: '60s & 70s', ypre60: 'Pre-1960',
-};
-const CONTENT_LABELS: Record<EasyContent, string> = {
-  any: 'Anything', mild: 'Nothing scary', clean: 'Keep it clean', family: 'Family only',
-};
-
 /** Old saved prefs used era:'recent'|'classic' and familySafe; migrate them. */
 function normalizePrefs(raw: Record<string, unknown>): StoredPrefs {
   const era = EASY_ERAS.includes(raw.era as EasyEra) ? (raw.era as EasyEra) : 'any';
@@ -44,20 +38,22 @@ function normalizePrefs(raw: Record<string, unknown>): StoredPrefs {
   return { ...DEFAULTS, ...raw, era, content } as StoredPrefs;
 }
 
-const AUDIENCES: { v: EasyAudience; label: string; emoji: string }[] = [
-  { v: 'me', label: 'Just me', emoji: '🙂' },
-  { v: 'partner', label: 'My partner & me', emoji: '💞' },
-  { v: 'family', label: 'The whole family', emoji: '👨‍👩‍👧' },
+const AUDIENCES: { v: EasyAudience; emoji: string }[] = [
+  { v: 'me', emoji: '🙂' },
+  { v: 'partner', emoji: '💞' },
+  { v: 'family', emoji: '👨‍👩‍👧' },
 ];
 
-function callWords(call: string): string {
+/** Map a verdict call to a stable translation key suffix. */
+function callWordsKey(call: string): string {
   const c = call.toUpperCase();
-  if (c.includes('WATCH') || c.includes('MUST')) return 'Watch it';
-  if (c.includes('SKIP')) return 'Skip it';
-  return 'Maybe';
+  if (c.includes('WATCH') || c.includes('MUST')) return 'watch';
+  if (c.includes('SKIP')) return 'skip';
+  return 'maybe';
 }
 
 function BigChoice<T extends string | number | null>({ value, onChange, options, disabledValues }: { value: T; onChange: (v: T) => void; options: { v: T; label: string }[]; disabledValues?: T[] }) {
+  const t = useT();
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((o) => {
@@ -67,7 +63,7 @@ function BigChoice<T extends string | number | null>({ value, onChange, options,
             key={String(o.v)}
             onClick={() => !disabled && onChange(o.v)}
             disabled={disabled}
-            title={disabled ? 'Movies are almost never this short' : undefined}
+            title={disabled ? t('misc.easy.tooShort') : undefined}
             className={`rounded-xl border-2 px-4 py-2.5 text-base font-bold transition ${disabled ? 'cursor-not-allowed border-white/10 bg-white/[0.02] text-slate-600' : value === o.v ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}
           >
             {o.label}
@@ -80,6 +76,7 @@ function BigChoice<T extends string | number | null>({ value, onChange, options,
 
 export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: EasyPick[]; name: string | null; build?: string }) {
   const router = useRouter();
+  const t = useT();
   const [audience, setAudience] = useState<EasyAudience>('me');
   const [prefs, setPrefs] = useState<StoredPrefs>(DEFAULTS);
   const [picks, setPicks] = useState<EasyPick[]>(initialPicks);
@@ -235,14 +232,14 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
   return (
     <div className="mx-auto max-w-3xl space-y-8 px-1 pb-16">
       <div className="pt-2 text-center">
-        <h1 className="text-3xl font-black text-white sm:text-4xl">{name ? `Hello, ${name}.` : 'Hello.'}</h1>
-        <p className="mt-2 text-xl text-slate-200">Let’s find something good to watch tonight.</p>
+        <h1 className="text-3xl font-black text-white sm:text-4xl">{name ? t('misc.easy.helloName', { name }) : t('misc.easy.hello')}</h1>
+        <p className="mt-2 text-xl text-slate-200">{t('misc.easy.subtitle')}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-3">
           <button onClick={() => setQuizOpen(true)} className="inline-flex rounded-xl border-2 border-brand-400/50 bg-brand-500/15 px-5 py-3 text-lg font-bold text-brand-100 transition hover:bg-brand-500/25">
-            📝 Take the 1-minute quiz
+            {t('misc.easy.takeQuiz')}
           </button>
           <button onClick={() => setGameOpen(true)} className="inline-flex rounded-xl border-2 border-gold-400/50 bg-gold-500/10 px-5 py-3 text-lg font-bold text-amber-100 transition hover:bg-gold-500/20">
-            ⚖️ Rate titles in The Docket
+            {t('misc.easy.rateDocket')}
           </button>
         </div>
       </div>
@@ -250,10 +247,10 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
       {/* Pick a source: personalized picks, or what's coming up on live TV */}
       <div className="grid grid-cols-2 gap-3">
         <button onClick={() => setView('picks')} className={`rounded-2xl border-2 px-4 py-4 text-lg font-bold transition ${view === 'picks' ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}>
-          🍿 What to watch
+          {t('misc.easy.whatToWatch')}
         </button>
         <button onClick={() => setView('tv')} className={`rounded-2xl border-2 px-4 py-4 text-lg font-bold transition ${view === 'tv' ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}>
-          📡 On TV soon
+          {t('misc.easy.onTvSoon')}
         </button>
       </div>
 
@@ -263,12 +260,12 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
       <>
       {/* Who's watching */}
       <div>
-        <div className="mb-3 text-center text-lg font-semibold text-slate-200">Who’s watching?</div>
+        <div className="mb-3 text-center text-lg font-semibold text-slate-200">{t('misc.easy.whosWatching')}</div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {AUDIENCES.map((a) => (
             <button key={a.v} onClick={() => setAudience(a.v)} className={`rounded-2xl border-2 px-4 py-5 text-center text-xl font-bold transition ${audience === a.v ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}>
               <span className="mb-1 block text-3xl" aria-hidden>{a.emoji}</span>
-              {a.label}
+              {t(`misc.easy.audience.${a.v}`)}
             </button>
           ))}
         </div>
@@ -277,50 +274,50 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
       {/* Customize — big and simple, learns your taste */}
       <div className="rounded-2xl border-2 border-white/15 bg-white/[0.04]">
         <button onClick={() => setCustomize((v) => !v)} className="flex w-full items-center justify-between px-5 py-4 text-left">
-          <span className="text-xl font-bold text-white">⚙️ Tell us what you like</span>
-          <span className="text-lg font-semibold text-brand-200">{customize ? 'Hide' : 'Set it up'}</span>
+          <span className="text-xl font-bold text-white">{t('misc.easy.tellUs')}</span>
+          <span className="text-lg font-semibold text-brand-200">{customize ? t('misc.easy.hide') : t('misc.easy.setItUp')}</span>
         </button>
         {customize && (
           <div className="space-y-6 border-t-2 border-white/10 p-5">
             <div>
-              <div className="mb-2 text-lg font-semibold text-slate-100">A movie or a show?</div>
-              <BigChoice value={prefs.mediaType} onChange={(v) => savePrefs({ ...prefs, mediaType: v })} options={[{ v: 'any', label: 'Either' }, { v: 'movie', label: '🎬 Movies' }, { v: 'tv', label: '📺 TV shows' }]} />
+              <div className="mb-2 text-lg font-semibold text-slate-100">{t('misc.easy.movieOrShow')}</div>
+              <BigChoice value={prefs.mediaType} onChange={(v) => savePrefs({ ...prefs, mediaType: v })} options={[{ v: 'any', label: t('misc.easy.mt.any') }, { v: 'movie', label: t('misc.easy.mt.movie') }, { v: 'tv', label: t('misc.easy.mt.tv') }]} />
             </div>
             <div>
-              <div className="mb-2 text-lg font-semibold text-slate-100">How long?</div>
+              <div className="mb-2 text-lg font-semibold text-slate-100">{t('misc.easy.howLong')}</div>
               <BigChoice
                 value={prefs.maxRuntime}
                 onChange={(v) => savePrefs({ ...prefs, maxRuntime: v })}
                 options={[
-                  { v: null, label: 'Any length' },
-                  { v: 30, label: '30 min or less' },
-                  { v: 60, label: 'An hour or less' },
-                  { v: 90, label: 'About 1½ hours' },
-                  { v: 120, label: 'About 2 hours' },
+                  { v: null, label: t('misc.easy.rt.any') },
+                  { v: 30, label: t('misc.easy.rt.30') },
+                  { v: 60, label: t('misc.easy.rt.60') },
+                  { v: 90, label: t('misc.easy.rt.90') },
+                  { v: 120, label: t('misc.easy.rt.120') },
                 ]}
               />
             </div>
             <div>
-              <div className="mb-2 text-lg font-semibold text-slate-100">From which era?</div>
-              <BigChoice value={prefs.era} onChange={(v) => savePrefs({ ...prefs, era: v })} options={EASY_ERAS.map((e) => ({ v: e, label: ERA_LABELS[e] }))} />
+              <div className="mb-2 text-lg font-semibold text-slate-100">{t('misc.easy.whichEra')}</div>
+              <BigChoice value={prefs.era} onChange={(v) => savePrefs({ ...prefs, era: v })} options={EASY_ERAS.map((e) => ({ v: e, label: t(`misc.easy.era.${e}`) }))} />
             </div>
             <div>
-              <div className="mb-2 text-lg font-semibold text-slate-100">How clean?</div>
-              <BigChoice value={prefs.content} onChange={(v) => savePrefs({ ...prefs, content: v })} options={EASY_CONTENT.map((c) => ({ v: c, label: CONTENT_LABELS[c] }))} />
+              <div className="mb-2 text-lg font-semibold text-slate-100">{t('misc.easy.howClean')}</div>
+              <BigChoice value={prefs.content} onChange={(v) => savePrefs({ ...prefs, content: v })} options={EASY_CONTENT.map((c) => ({ v: c, label: t(`misc.easy.content.${c}`) }))} />
             </div>
             <div>
-              <div className="mb-2 text-lg font-semibold text-slate-100">Actors you love</div>
+              <div className="mb-2 text-lg font-semibold text-slate-100">{t('misc.easy.actorsYouLove')}</div>
               {prefs.favorites.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-2">
                   {prefs.favorites.map((f) => (
                     <span key={f.id} className="inline-flex items-center gap-2 rounded-full border-2 border-brand-400/60 bg-brand-500/20 px-3 py-1.5 text-base font-semibold text-brand-100">
                       {f.name}
-                      <button onClick={() => removeFavorite(f.id)} aria-label={`Remove ${f.name}`} className="text-lg leading-none text-slate-300 hover:text-white">×</button>
+                      <button onClick={() => removeFavorite(f.id)} aria-label={t('misc.easy.removeActor', { name: f.name })} className="text-lg leading-none text-slate-300 hover:text-white">×</button>
                     </span>
                   ))}
                 </div>
               )}
-              <input value={actorQuery} onChange={(e) => setActorQuery(e.target.value)} placeholder="Type an actor’s name…" className="w-full rounded-xl border-2 border-white/15 bg-ink-900/70 px-4 py-3 text-lg text-white placeholder:text-slate-500 outline-none focus:border-brand-400/70" />
+              <input value={actorQuery} onChange={(e) => setActorQuery(e.target.value)} placeholder={t('misc.easy.actorPlaceholder')} className="w-full rounded-xl border-2 border-white/15 bg-ink-900/70 px-4 py-3 text-lg text-white placeholder:text-slate-500 outline-none focus:border-brand-400/70" />
               {actorHits.length > 0 && (
                 <div className="mt-2 overflow-hidden rounded-xl border-2 border-white/10 bg-ink-850">
                   {actorHits.map((h) => (
@@ -331,7 +328,7 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
                   ))}
                 </div>
               )}
-              <p className="mt-1.5 text-sm text-slate-400">We’ll favor movies starring the actors you add — and remember them next time.</p>
+              <p className="mt-1.5 text-sm text-slate-400">{t('misc.easy.actorsHint')}</p>
             </div>
           </div>
         )}
@@ -340,18 +337,18 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
       {/* Three picks */}
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-2xl font-black text-white">Tonight’s 3 picks for you</div>
+          <div className="text-2xl font-black text-white">{t('misc.easy.picksHeading')}</div>
           {picks.length > 0 && (
-            <button onClick={showDifferent} className="rounded-xl border-2 border-white/20 bg-white/5 px-4 py-2 text-base font-bold text-slate-100 hover:bg-white/10">🔄 Show me different ones</button>
+            <button onClick={showDifferent} className="rounded-xl border-2 border-white/20 bg-white/5 px-4 py-2 text-base font-bold text-slate-100 hover:bg-white/10">{t('misc.easy.showDifferent')}</button>
           )}
         </div>
         {loading ? (
           <div className="space-y-4">{[0, 1, 2].map((i) => <div key={i} className="h-40 animate-pulse rounded-2xl bg-white/5" />)}</div>
         ) : picks.length === 0 ? (
           <div className="rounded-2xl border-2 border-white/15 bg-white/5 p-6 text-center">
-            <p className="text-xl text-slate-200">We couldn’t find three with those settings.</p>
-            <p className="mt-1 text-lg text-slate-400">Try loosening a setting above, or tell us a few movies you love.</p>
-            <Link href="/app/onboarding" className="btn-primary mt-4 inline-flex px-6 py-3 text-lg">Tell us your taste</Link>
+            <p className="text-xl text-slate-200">{t('misc.easy.noneFound')}</p>
+            <p className="mt-1 text-lg text-slate-400">{t('misc.easy.noneFoundHint')}</p>
+            <Link href="/app/onboarding" className="btn-primary mt-4 inline-flex px-6 py-3 text-lg">{t('misc.easy.tellTaste')}</Link>
           </div>
         ) : (
           <div className="space-y-4">
@@ -375,18 +372,18 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
                         {p.title} {p.year ? <span className="font-semibold text-slate-400">({p.year})</span> : null}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full border-2 px-4 py-1 text-xl font-black ${v.solid}`}>{callWords(p.primaryCall)}</span>
-                        {p.featuresFavorite && <span className="rounded-full border-2 border-gold-400/60 bg-gold-500/15 px-3 py-1 text-base font-bold text-amber-100">⭐ An actor you love</span>}
+                        <span className={`rounded-full border-2 px-4 py-1 text-xl font-black ${v.solid}`}>{t(`misc.easy.call.${callWordsKey(p.primaryCall)}`)}</span>
+                        {p.featuresFavorite && <span className="rounded-full border-2 border-gold-400/60 bg-gold-500/15 px-3 py-1 text-base font-bold text-amber-100">{t('misc.easy.actorYouLove')}</span>}
                       </div>
                       <p className="mt-3 text-lg leading-relaxed text-slate-100">{p.reason}</p>
                       {/* Every rating we have, right on the placard. */}
                       <CardRatings mediaType={p.mediaType} tmdbId={p.id} title={p.title} year={p.year} className="mt-2 text-sm" />
-                      {p.where && <p className="mt-2 text-lg font-semibold text-emerald-300">▶ On {p.where}</p>}
+                      {p.where && <p className="mt-2 text-lg font-semibold text-emerald-300">{t('misc.easy.onProvider', { where: p.where })}</p>}
 
                       <div className="mt-4 flex flex-wrap items-center gap-3">
                         <a href={watch.url} target="_blank" rel="noopener noreferrer" className="btn-primary px-6 py-3 text-lg">{watch.label} →</a>
-                        <Link href={`/app/title/${p.mediaType}/${p.id}`} className="rounded-xl border-2 border-white/20 bg-white/5 px-5 py-3 text-lg font-semibold text-slate-100 hover:bg-white/10">More about it</Link>
-                        <button onClick={() => dismiss(key)} className="rounded-xl border-2 border-white/20 bg-white/5 px-5 py-3 text-lg font-semibold text-slate-300 hover:bg-white/10" title="We won’t show this again">👎 Not for me</button>
+                        <Link href={`/app/title/${p.mediaType}/${p.id}`} className="rounded-xl border-2 border-white/20 bg-white/5 px-5 py-3 text-lg font-semibold text-slate-100 hover:bg-white/10">{t('misc.easy.moreAbout')}</Link>
+                        <button onClick={() => dismiss(key)} className="rounded-xl border-2 border-white/20 bg-white/5 px-5 py-3 text-lg font-semibold text-slate-300 hover:bg-white/10" title={t('misc.easy.wontShowAgain')}>{t('misc.easy.notForMe')}</button>
                         <SaveButton tmdbId={p.id} mediaType={p.mediaType} title={p.title} year={p.year} posterPath={null} variant="inline" />
                       </div>
                     </div>
@@ -399,15 +396,15 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
       </div>
 
       <div className="rounded-2xl border-2 border-white/15 bg-white/5 p-5 text-center">
-        <div className="text-xl font-semibold text-white">Want something different?</div>
-        <p className="mt-1 text-lg text-slate-300">Tell us in your own words — type or talk.</p>
-        <Link href="/app/ask" className="btn-secondary mt-3 inline-flex px-6 py-3 text-lg">🎙️ Ask for a movie</Link>
+        <div className="text-xl font-semibold text-white">{t('misc.easy.wantDifferent')}</div>
+        <p className="mt-1 text-lg text-slate-300">{t('misc.easy.ownWords')}</p>
+        <Link href="/app/ask" className="btn-secondary mt-3 inline-flex px-6 py-3 text-lg">{t('misc.easy.askForMovie')}</Link>
       </div>
       </>
       )}
 
       <div className="text-center">
-        <button onClick={useFullApp} className="text-lg font-semibold text-slate-400 underline hover:text-white">Switch to the full app</button>
+        <button onClick={useFullApp} className="text-lg font-semibold text-slate-400 underline hover:text-white">{t('misc.easy.switchFull')}</button>
       </div>
     </div>
   );

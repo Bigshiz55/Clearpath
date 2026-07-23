@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '@/i18n/I18nProvider';
 
 const MOBILE = 'width=device-width, initial-scale=1, viewport-fit=cover';
 
@@ -15,6 +16,7 @@ const MOBILE = 'width=device-width, initial-scale=1, viewport-fit=cover';
  * on scroll/zoom so it's always reachable.
  */
 export function DesktopViewExit() {
+  const t = useT();
   const [desktop, setDesktop] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
 
@@ -76,13 +78,13 @@ export function DesktopViewExit() {
       type="button"
       onClick={backToPhone}
       className="fixed left-1/2 top-0 z-[300] flex items-center gap-2 whitespace-nowrap rounded-full border-2 border-white/30 bg-brand-500 px-6 py-3.5 text-lg font-bold text-white shadow-[0_10px_30px_-6px_rgba(0,0,0,0.8)]"
-      title="Switch back to the phone-friendly layout"
+      title={t('misc.desktopExit.title')}
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
         <rect x="7" y="3" width="10" height="18" rx="2.5" />
         <line x1="11" y1="18" x2="13" y2="18" />
       </svg>
-      Back to phone view
+      {t('misc.desktopExit.label')}
     </button>
   );
 }

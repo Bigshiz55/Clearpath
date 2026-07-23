@@ -1,0 +1,68 @@
+{
+  "en-US": {
+    "discover": {
+      "finder": {
+        "example1": "A crime thriller movie under 140 minutes, out in the last 24 months, match 80+",
+        "example2": "A bingeable show, all episodes out, audience 80%+, English audio, on my services",
+        "example3": "Something funny and short I can watch tonight on my services",
+        "defaultScoredFor": "Your match",
+        "any": "Any",
+        "orDivider": "OR",
+        "movies": "Movies",
+        "shows": "Shows",
+        "releasedRange": "{from} → now",
+        "runtimeHM": "≤ {h}h {m}m",
+        "runtimeH": "≤ {h}h",
+        "runtimeM": "≤ {m}m",
+        "airTonight": "Tonight",
+        "airTomorrow": "Tomorrow",
+        "am": "AM",
+        "pm": "PM"
+      }
+    }
+  },
+  "es-419": {
+    "discover": {
+      "finder": {
+        "example1": "Una película de suspenso criminal de menos de 140 minutos, de los últimos 24 meses, match 80+",
+        "example2": "Una serie para maratonear, con todos los episodios, audiencia 80%+, audio en inglés, en mis servicios",
+        "example3": "Algo divertido y corto que pueda ver esta noche en mis servicios",
+        "defaultScoredFor": "Tu match",
+        "any": "Cualquiera",
+        "orDivider": "O",
+        "movies": "Películas",
+        "shows": "Series",
+        "releasedRange": "{from} → ahora",
+        "runtimeHM": "≤ {h} h {m} min",
+        "runtimeH": "≤ {h} h",
+        "runtimeM": "≤ {m} min",
+        "airTonight": "Esta noche",
+        "airTomorrow": "Mañana",
+        "am": "a. m.",
+        "pm": "p. m."
+      }
+    }
+  },
+  "zh-Hans": {
+    "discover": {
+      "finder": {
+        "example1": "一部 140 分钟以内、近 24 个月内、匹配 80+ 的犯罪惊悚电影",
+        "example2": "一部适合刷剧的剧集，全集已出，观众 80%+，英语音轨，在我的服务上",
+        "example3": "今晚能看的、又搞笑又简短的内容，在我的服务上",
+        "defaultScoredFor": "你的匹配",
+        "any": "不限",
+        "orDivider": "或",
+        "movies": "电影",
+        "shows": "剧集",
+        "releasedRange": "{from} → 至今",
+        "runtimeHM": "≤ {h} 小时 {m} 分",
+        "runtimeH": "≤ {h} 小时",
+        "runtimeM": "≤ {m} 分",
+        "airTonight": "今晚",
+        "airTomorrow": "明天",
+        "am": "上午",
+        "pm": "下午"
+      }
+    }
+  }
+}

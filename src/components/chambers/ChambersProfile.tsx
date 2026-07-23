@@ -11,6 +11,7 @@ import {
   type DecorStyle,
 } from '@/lib/chambers';
 import type { ChambersDnaDim } from '@/lib/chambersData';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const STYLE_KEY = 'wv_chambers_style';
 
@@ -58,6 +59,7 @@ function Stat({ value, label, accent = false }: { value: string | number; label:
 
 export function ChambersProfile(props: ChambersProfileProps) {
   const { name, username, counts, mix, topLove, loves, avoids, dna } = props;
+  const { t, plural } = useI18n();
   const [style, setStyle] = useState<DecorStyle>('moderate');
   useEffect(() => setStyle(readStyle()), []);
 
@@ -111,17 +113,17 @@ export function ChambersProfile(props: ChambersProfileProps) {
           <h1 className="mt-2 text-2xl font-black text-white">{name}</h1>
           {username && <div className="text-sm text-slate-400">@{username}</div>}
           <div className="mt-1 text-base font-semibold text-gold-400">
-            {title ? `“${title}”` : 'Rate a few titles to earn your courtroom title'}
+            {title ? `“${title}”` : t('account.chambers.earnTitle')}
           </div>
         </div>
 
         {/* Docket stats — entertainment activity first, social demoted. */}
         <div className="relative mt-5 grid grid-cols-5 gap-2 rounded-2xl border border-white/10 bg-black/20 p-3">
-          <Stat value={counts.rated} label="Ruled on" />
-          <Stat value={counts.onDocket} label="On docket" />
-          <Stat value={counts.verdicts} label="Verdicts" />
-          <Stat value={`${counts.streakWeeks}🔥`} label={counts.streakWeeks === 1 ? 'Week' : 'Weeks'} />
-          <Stat value={earned.length} label="Badges" accent />
+          <Stat value={counts.rated} label={t('account.chambers.ruledOn')} />
+          <Stat value={counts.onDocket} label={t('account.chambers.onDocket')} />
+          <Stat value={counts.verdicts} label={t('account.chambers.verdicts')} />
+          <Stat value={`${counts.streakWeeks}🔥`} label={plural('account.chambers.weeks', counts.streakWeeks)} />
+          <Stat value={earned.length} label={t('account.chambers.badges')} accent />
         </div>
       </header>
 
@@ -129,28 +131,28 @@ export function ChambersProfile(props: ChambersProfileProps) {
       <section className="card p-4">
         <div className="flex items-center justify-between">
           <div className="eyebrow-lg">
-            ⚖️ Court Standing
+            ⚖️ {t('account.chambers.courtStanding')}
           </div>
-          <div className="text-xs text-slate-400">{standing.points} pts</div>
+          <div className="text-xs text-slate-400">{t('account.chambers.pts', { count: standing.points })}</div>
         </div>
         <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
           <div className="h-full rounded-full bg-gold-400" style={{ width: `${Math.round(standing.progress * 100)}%` }} />
         </div>
         <div className="mt-1.5 text-xs text-slate-400">
           {standing.next
-            ? <><span className="font-semibold text-white">{standing.toNext} pts</span> to <span className="font-semibold text-white">{standing.next.name}</span> — earned by rating titles, getting verdicts, and leaving reviews.</>
-            : 'You’ve reached the top of the bench. Judge.'}
+            ? <><span className="font-semibold text-white">{t('account.chambers.pts', { count: standing.toNext })}</span> {t('account.chambers.to')} <span className="font-semibold text-white">{standing.next.name}</span> {t('account.chambers.earnedBy')}</>
+            : t('account.chambers.topOfBench')}
         </div>
       </section>
 
       {/* ---------------- Watch DNA ---------------- */}
       <section className="card p-4">
         <div className="eyebrow-lg">
-          🧬 Watch DNA
+          🧬 {t('account.chambers.watchDna')}
         </div>
-        <p className="mt-1 text-xs text-slate-400">Computed only from your own ratings, verdicts and reviews — never guessed.</p>
+        <p className="mt-1 text-xs text-slate-400">{t('account.chambers.dnaComputed')}</p>
         {dna.length === 0 && loves.length === 0 && avoids.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-400">Rate titles and answer a few post-watch questions and your DNA fills in here.</p>
+          <p className="mt-3 text-sm text-slate-400">{t('account.chambers.dnaEmpty')}</p>
         ) : (
           <div className="mt-3 space-y-3">
             {dna.map((d) => (
@@ -183,9 +185,9 @@ export function ChambersProfile(props: ChambersProfileProps) {
       <section className="card p-4">
         <div className="flex items-center justify-between">
           <div className="eyebrow-lg">
-            🏅 The Badge Shelf
+            🏅 {t('account.chambers.badgeShelf')}
           </div>
-          <div className="text-xs text-slate-400">{earned.length}/{badges.length} earned</div>
+          <div className="text-xs text-slate-400">{earned.length}/{badges.length} {t('account.chambers.earned')}</div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {earned.map((b) => (
@@ -212,7 +214,7 @@ export function ChambersProfile(props: ChambersProfileProps) {
       {/* ---------------- Customize + share ---------------- */}
       <section className="card flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
-          <div className="label mb-1">Chambers wall</div>
+          <div className="label mb-1">{t('account.chambers.chambersWall')}</div>
           <div className="flex gap-1.5">
             {(['clean', 'moderate', 'full'] as const).map((s) => (
               <button
@@ -220,15 +222,15 @@ export function ChambersProfile(props: ChambersProfileProps) {
                 onClick={() => chooseStyle(s)}
                 className={`rounded-lg border px-3 py-1.5 text-sm capitalize transition ${style === s ? 'border-gold-400/60 bg-gold-500/15 text-amber-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
               >
-                {s}
+                {t(`account.chambers.style.${s}`)}
               </button>
             ))}
           </div>
         </div>
         {username ? (
-          <Link href={`/app/u/${username}`} className="btn-secondary">👁️ View public profile</Link>
+          <Link href={`/app/u/${username}`} className="btn-secondary">👁️ {t('account.chambers.viewPublic')}</Link>
         ) : (
-          <Link href="/app/settings" className="btn-secondary">Set a username to share →</Link>
+          <Link href="/app/settings" className="btn-secondary">{t('account.chambers.setUsername')}</Link>
         )}
       </section>
     </div>

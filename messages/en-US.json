@@ -1,0 +1,196 @@
+{
+  "nav": {
+    "ask": "Ask",
+    "discover": "Discover",
+    "onTv": "On TV",
+    "saved": "Saved",
+    "together": "Together",
+    "home": "Home",
+    "profile": "Profile",
+    "more": "More",
+    "newReleases": "New Releases",
+    "watchDna": "Your Watch DNA",
+    "chambers": "Chambers",
+    "subscriptionCheck": "Subscription check",
+    "friends": "Friends",
+    "reminders": "My reminders",
+    "back": "Back",
+    "pro": "Pro"
+  },
+  "common": {
+    "languageRegion": "Language & Region",
+    "language": "Language",
+    "region": "Region",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "card": {
+    "for": "For",
+    "forHint": "For it — more like this",
+    "pass": "Pass",
+    "passHint": "Not for me",
+    "save": "Save",
+    "saved": "Saved",
+    "saveHint": "Save",
+    "savedHint": "Saved — remove from your list",
+    "movie": "Movie",
+    "tv": "TV"
+  },
+  "toasts": {
+    "savedToList": "Added to your list.",
+    "removedFromList": "Removed from your list.",
+    "couldNotRemove": "Could not remove.",
+    "signInToSave": "Sign in to save to your list.",
+    "somethingWrong": "Something went wrong."
+  },
+  "verdict": {
+    "header": "The verdict",
+    "yourVerdict": "Your VERD1CT",
+    "tier": {
+      "mustWatch": "Must Watch",
+      "strongWatch": "Strong Watch",
+      "worthWatching": "Worth Watching",
+      "possibleWatch": "Possible Watch",
+      "lowPriority": "Low Priority",
+      "skip": "Skip"
+    },
+    "call": {
+      "watch": "STREAM IT",
+      "worth": "MAYBE",
+      "uncertain": "TOSS-UP",
+      "skip": "SKIP IT",
+      "wildcard": "WILDCARD"
+    },
+    "primaryCall": {
+      "watchIt": "WATCH IT",
+      "maybe": "MAYBE",
+      "skipIt": "SKIP IT"
+    },
+    "disposition": {
+      "strict": "Strict Watchlist",
+      "possible": "Possible Watchlist",
+      "skip": "Skip"
+    }
+  },
+  "dims": {
+    "pacing": {
+      "label": "Pace",
+      "low": "Slow burn",
+      "high": "Fast-paced"
+    },
+    "darkness": {
+      "label": "Tone",
+      "low": "Feel-good",
+      "high": "Dark & heavy"
+    },
+    "warmth": {
+      "label": "Warmth",
+      "low": "Cynical",
+      "high": "Hopeful"
+    },
+    "humor": {
+      "label": "Humor",
+      "low": "Serious",
+      "high": "Comedy-heavy"
+    },
+    "suspense": {
+      "label": "Tension",
+      "low": "Low tension",
+      "high": "Edge-of-seat"
+    },
+    "emotion": {
+      "label": "Emotional intensity",
+      "low": "Breezy",
+      "high": "Gut-punch"
+    },
+    "complexity": {
+      "label": "Complexity",
+      "low": "Easy watch",
+      "high": "Cerebral"
+    },
+    "realism": {
+      "label": "Realism",
+      "low": "Fantastical",
+      "high": "Grounded"
+    },
+    "character": {
+      "label": "Focus",
+      "low": "Plot-driven",
+      "high": "Character-driven"
+    },
+    "stakes": {
+      "label": "Stakes",
+      "low": "Intimate",
+      "high": "Epic"
+    },
+    "morality": {
+      "label": "Moral clarity",
+      "low": "Clear-cut",
+      "high": "Morally grey"
+    },
+    "violence": {
+      "label": "Content edge",
+      "low": "Tame",
+      "high": "Brutal"
+    },
+    "attention": {
+      "label": "Attention",
+      "low": "Background-friendly",
+      "high": "Demands focus"
+    },
+    "serialized": {
+      "label": "Structure",
+      "low": "Episodic",
+      "high": "Serialized"
+    },
+    "romance": {
+      "label": "Romance",
+      "low": "None",
+      "high": "Central"
+    }
+  },
+  "dna": {
+    "tierLearning": "Still learning",
+    "tierWeak": "Slight lean",
+    "tierModerate": "Moderate",
+    "tierStrong": "Strong",
+    "yours": "Yours",
+    "youSetThis": "You set this",
+    "avoid": "Avoid",
+    "samples": {
+      "one": "{count} title · {pct}% sure",
+      "other": "{count} titles · {pct}% sure"
+    },
+    "close": "Close",
+    "edit": "Edit",
+    "adjust": "Adjust",
+    "setYour": "Set your {label}",
+    "dealbreaker": "Make this a dealbreaker — steer me hard away from the other end",
+    "saving": "Saving…",
+    "save": "Save",
+    "resetLearned": "Reset to learned",
+    "couldNotSave": "Could not save.",
+    "couldNotClear": "Could not clear."
+  },
+  "personality": {
+    "header": "Your watch personality",
+    "title": {
+      "slowBurnNoir": "The Slow-Burn Noir",
+      "moralGrayZone": "The Moral Gray-Zone",
+      "prestigePurist": "The Prestige Purist",
+      "thrillSeeker": "The Thrill Seeker",
+      "epicEscapist": "The Epic Escapist",
+      "feelsChaser": "The Feels Chaser",
+      "genreExplorer": "The Genre Explorer",
+      "groundedRealist": "The Grounded Realist",
+      "comfortWatcher": "The Comfort Watcher",
+      "easyStreamer": "The Easy Streamer",
+      "romantic": "The Romantic",
+      "stillCalibrating": "Still Calibrating"
+    }
+  },
+  "dnaPage": {
+    "heading": "Your Watch DNA",
+    "subtitle": "Your taste, learned from what you rate — the axes you lean on and how you watch."
+  }
+}

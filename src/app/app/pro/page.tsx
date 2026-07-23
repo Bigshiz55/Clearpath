@@ -4,6 +4,7 @@ import { getEntitlement } from '@/lib/pro';
 import { serverEnv } from '@/lib/env';
 import { PRO_FEATURES, PRO_PRICE_LABEL } from '@/lib/proPlan';
 import { ProUpgradeButton } from '@/components/ProUpgrade';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'WatchVerdict Pro' };
@@ -13,6 +14,7 @@ export default async function ProPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const ent = user ? await getEntitlement(supabase, user.id) : { pro: false, source: null, currentPeriodEnd: null };
   const isAdmin = !!user?.email && serverEnv.adminEmails().includes(user.email.toLowerCase());
+  const { t } = getServerI18n();
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -20,23 +22,23 @@ export default async function ProPage() {
         <div className="inline-flex items-center gap-1.5 rounded-full border border-gold-400/40 bg-gold-500/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.15em] text-gold-200">
           <span aria-hidden>⭐</span> WatchVerdict Pro
         </div>
-        <h1 className="mt-3 text-3xl font-extrabold text-white sm:text-4xl">Your taste, turned up.</h1>
+        <h1 className="mt-3 text-3xl font-extrabold text-white sm:text-4xl">{t('account.pro.headline')}</h1>
         <p className="mt-2 text-sm text-slate-300">
-          Everything free stays free. Pro adds the smart, personal touches — {PRO_PRICE_LABEL}, cancel anytime.
+          {t('account.pro.subtitle', { price: PRO_PRICE_LABEL })}
         </p>
       </div>
 
       {ent.pro ? (
         <div className="card border-gold-400/40 bg-gold-500/[0.06] p-6 text-center">
           <div className="text-3xl" aria-hidden>🎉</div>
-          <div className="mt-2 text-lg font-bold text-white">You’re on Pro</div>
+          <div className="mt-2 text-lg font-bold text-white">{t('account.pro.onProTitle')}</div>
           <p className="mt-1 text-sm text-slate-300">
-            AI-tuned verdicts and household profiles are unlocked. Thanks for supporting WatchVerdict.
+            {t('account.pro.onProBody')}
           </p>
           {ent.currentPeriodEnd && (
-            <p className="mt-2 text-xs text-slate-500">Renews {new Date(ent.currentPeriodEnd).toLocaleDateString()}</p>
+            <p className="mt-2 text-xs text-slate-500">{t('account.pro.renews', { date: new Date(ent.currentPeriodEnd).toLocaleDateString() })}</p>
           )}
-          <Link href="/app" className="btn-secondary mt-4 inline-flex">Back to WatchVerdict →</Link>
+          <Link href="/app" className="btn-secondary mt-4 inline-flex">{t('account.pro.backToWv')}</Link>
         </div>
       ) : (
         <>
@@ -58,7 +60,7 @@ export default async function ProPage() {
               <span className="text-2xl font-black text-white">{PRO_PRICE_LABEL}</span>
             </div>
             <div className="mt-4"><ProUpgradeButton isAdmin={isAdmin} /></div>
-            <p className="mt-3 text-center text-[11px] text-slate-500">The deterministic engine — ranking, scores, the 7 scenarios — is free forever. Pro only refines what’s on top.</p>
+            <p className="mt-3 text-center text-[11px] text-slate-500">{t('account.pro.engineNote')}</p>
           </div>
         </>
       )}

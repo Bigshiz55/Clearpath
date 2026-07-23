@@ -1,4 +1,5 @@
 import type { ContentDna } from '@/lib/contentDna';
+import { getServerI18n } from '@/i18n/server';
 
 /** Bar color leans by what the dimension means (higher isn't always "good"). */
 function tone(key: string, value: number): string {
@@ -10,14 +11,15 @@ function tone(key: string, value: number): string {
 }
 
 export function ContentDnaView({ dna }: { dna: ContentDna }) {
+  const { t, plural } = getServerI18n();
   return (
     <section className="card p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold text-white">🧬 Content DNA</h2>
-        <span className="text-xs text-slate-500">from {dna.responses} viewer {dna.responses === 1 ? 'check-in' : 'check-ins'}</span>
+        <h2 className="text-lg font-semibold text-white">🧬 {t('title.extras.contentDnaHeading')}</h2>
+        <span className="text-xs text-slate-500">{plural('title.extras.contentDnaFrom', dna.responses, {})}</span>
       </div>
       <p className="mt-1 text-xs text-slate-500">
-        Aggregated from real post-watch answers — not genre tags, not a guess. Each line shows its own sample size.
+        {t('title.extras.contentDnaNote')}
       </p>
 
       <div className="mt-4 space-y-3">

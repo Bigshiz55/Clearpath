@@ -1,0 +1,794 @@
+{
+  "en-US": {
+    "misc": {
+      "easy": {
+        "tooShort": "Movies are almost never this short",
+        "hello": "Hello.",
+        "helloName": "Hello, {name}.",
+        "subtitle": "Let’s find something good to watch tonight.",
+        "takeQuiz": "📝 Take the 1-minute quiz",
+        "rateDocket": "⚖️ Rate titles in The Docket",
+        "whatToWatch": "🍿 What to watch",
+        "onTvSoon": "📡 On TV soon",
+        "whosWatching": "Who’s watching?",
+        "audience": {
+          "me": "Just me",
+          "partner": "My partner & me",
+          "family": "The whole family"
+        },
+        "tellUs": "⚙️ Tell us what you like",
+        "hide": "Hide",
+        "setItUp": "Set it up",
+        "movieOrShow": "A movie or a show?",
+        "mt": {
+          "any": "Either",
+          "movie": "🎬 Movies",
+          "tv": "📺 TV shows"
+        },
+        "howLong": "How long?",
+        "rt": {
+          "any": "Any length",
+          "30": "30 min or less",
+          "60": "An hour or less",
+          "90": "About 1½ hours",
+          "120": "About 2 hours"
+        },
+        "whichEra": "From which era?",
+        "era": {
+          "any": "Any era",
+          "y2020s": "2020s",
+          "y2000s": "2000s–10s",
+          "y80s90s": "80s & 90s",
+          "y60s70s": "60s & 70s",
+          "ypre60": "Pre-1960"
+        },
+        "howClean": "How clean?",
+        "content": {
+          "any": "Anything",
+          "mild": "Nothing scary",
+          "clean": "Keep it clean",
+          "family": "Family only"
+        },
+        "actorsYouLove": "Actors you love",
+        "removeActor": "Remove {name}",
+        "actorPlaceholder": "Type an actor’s name…",
+        "actorsHint": "We’ll favor movies starring the actors you add — and remember them next time.",
+        "picksHeading": "Tonight’s 3 picks for you",
+        "showDifferent": "🔄 Show me different ones",
+        "noneFound": "We couldn’t find three with those settings.",
+        "noneFoundHint": "Try loosening a setting above, or tell us a few movies you love.",
+        "tellTaste": "Tell us your taste",
+        "call": {
+          "watch": "Watch it",
+          "skip": "Skip it",
+          "maybe": "Maybe"
+        },
+        "actorYouLove": "⭐ An actor you love",
+        "onProvider": "▶ On {where}",
+        "moreAbout": "More about it",
+        "wontShowAgain": "We won’t show this again",
+        "notForMe": "👎 Not for me",
+        "wantDifferent": "Want something different?",
+        "ownWords": "Tell us in your own words — type or talk.",
+        "askForMovie": "🎙️ Ask for a movie",
+        "switchFull": "Switch to the full app"
+      },
+      "import": {
+        "noTitles": "No titles found. Paste a list, or choose a CSV export (Letterboxd, Trakt, Simkl, TV Time, Netflix…).",
+        "chooseCsv": "Choose a CSV file…",
+        "orPaste": "…or paste titles below:",
+        "pasteAria": "Paste your watched titles",
+        "ready": {
+          "one": "{count} unique title ready",
+          "other": "{count} unique titles ready"
+        },
+        "anyCsv": "Any CSV export, or one title per line",
+        "importing": "Importing…",
+        "importHistory": "Import history",
+        "progress": "{done} / {total} processed · {imported} added",
+        "doneSimple": "Done — added {added} to your watched list.",
+        "doneBoth": "Done — added {added} to your watched list · {unmatched} couldn’t be matched.",
+        "viewWatchlist": "View watchlist →",
+        "seeRecs": "See recommendations →",
+        "couldntMatch": "Couldn’t match these (title may differ on TMDB):"
+      },
+      "importPage": {
+        "heading": "Import your history",
+        "intro1": "Coming from another app? Drop in a",
+        "csvExport": "CSV export",
+        "intro2": "— or paste a list. We’ll match each title, carry over your ratings, and mark it watched, so your history and DNA show up right away.",
+        "worksWith": "Works with CSV exports from",
+        "worksWithRest": "— anything with a title (and optional rating) column. Ratings on a 5-star scale (Letterboxd) are converted to /10 automatically; TV episodes collapse to one entry per show.",
+        "orJustPaste": "Or just paste a list:",
+        "tvTimeRefugee": "TV Time refugee?",
+        "zipHint1": "If your export is a",
+        "zipHint2": ", unzip it first and pick the",
+        "zipHint3": "inside. If your file only has IDs and no titles, export to Letterboxd or Trakt first, then bring that CSV here."
+      },
+      "photo": {
+        "noText": "Couldn’t read any text. Try a shot where the title is clearly visible (a pause or info screen works great).",
+        "noMatch": "Couldn’t find a matching title in that photo.",
+        "readError": "Something went wrong reading the image.",
+        "addError": "Couldn’t add that one.",
+        "title": "📸 Add from a photo",
+        "subtitle": "Snap or screenshot what’s on the TV — I’ll read the titles and let you tap the ones to save. No setup.",
+        "choosePhoto": "Choose or take a photo",
+        "readingTitles": "Reading the titles…",
+        "findingMatches": "Finding matches…",
+        "found": {
+          "one": "Found {count} possible title — tap to add:",
+          "other": "Found {count} possible titles — tap to add:"
+        },
+        "tvSeries": "TV series",
+        "movie": "Movie",
+        "added": "✓ Added",
+        "add": "+ Add",
+        "viewWatchlist": "View watchlist",
+        "addAnotherPhoto": "Add another photo",
+        "addedColon": "Added:",
+        "addAnother": "Add another",
+        "whatIRead": "What I read from the photo"
+      },
+      "fresh": {
+        "couldNotStart": "Could not start a fresh session.",
+        "starting": "Starting a fresh session…",
+        "continueAnyway": "continue anyway"
+      },
+      "learn": {
+        "couldNotStart": "Could not start your learning session.",
+        "settingUp": "Setting up your learning session — this one remembers.",
+        "keepPicking": "Keep making picks and your VERD1CT DNA sharpens over time.",
+        "continueAnyway": "continue anyway"
+      },
+      "install": {
+        "headline": "Keep WatchVerdict one tap away",
+        "iosTap": "Tap the",
+        "share": "Share",
+        "iosButton": "button",
+        "iosBottom": "at the bottom, then",
+        "addToHome": "“Add to Home Screen.”",
+        "generic": "Add it to your home screen — it opens full-screen, like an app.",
+        "install": "Install",
+        "dismiss": "Dismiss"
+      },
+      "guestSave": {
+        "validation": "Enter an email and a password of 6+ characters.",
+        "cta": "Save your account",
+        "savedTitle": "Account saved",
+        "savedBody1": "Everything you’ve saved is now tied to",
+        "savedBody2": ". Sign in with it on any device and your list and taste come with you.",
+        "done": "Done",
+        "formBody": "Keep your watchlist, ratings, and taste — and use them on any device. No re-doing anything.",
+        "emailPlaceholder": "Email",
+        "passwordPlaceholder": "Password (6+ characters)",
+        "saving": "Saving…",
+        "saveAccount": "Save account",
+        "later": "Later"
+      },
+      "signOut": {
+        "signingOut": "Signing out…",
+        "signOut": "Sign out"
+      },
+      "simpleMode": {
+        "simpleView": "Simple view",
+        "onSuffix": "· On",
+        "offSuffix": "· Off",
+        "description": "Bigger text and buttons, higher contrast — easier to read and tap. Tap again to turn off.",
+        "title": "Simple view: bigger text and buttons",
+        "simpleViewOn": "Simple view on"
+      },
+      "viewMode": {
+        "toPhoneTitle": "Back to the phone-friendly layout",
+        "toDesktopTitle": "See the full desktop layout on your phone",
+        "phoneView": "Phone view",
+        "desktopView": "Desktop view"
+      },
+      "desktopExit": {
+        "title": "Switch back to the phone-friendly layout",
+        "label": "Back to phone view"
+      },
+      "share": {
+        "shareBtn": "Share",
+        "saveImage": "Save image",
+        "myTaste": "My taste",
+        "loves": "Loves",
+        "stillFiguring": "Still figuring it out",
+        "hardNo": "Hard no",
+        "tasteFooter": "Stop scrolling. Get rolling.",
+        "wrapped": "Wrapped",
+        "watched": "watched",
+        "avgRating": "avg rating",
+        "topPicks": "Your top picks",
+        "myMonth": "My month on WatchVerdict",
+        "theVerdict": "⚖️ The Verdict",
+        "settledBy": "Settled by WatchVerdict",
+        "myDna": "My Watch DNA 🧬",
+        "tierElite": "Elite",
+        "tierSharp": "Sharp",
+        "tierForming": "Forming",
+        "tierNew": "New",
+        "rated": "{count} rated",
+        "finishRate": " · {pct}% finish rate",
+        "whatsYours": "What’s yours?"
+      },
+      "shareTarget": {
+        "nothingShared": "Nothing was shared to add.",
+        "addedToList": "Added to your list.",
+        "couldNotAdd": "Could not add.",
+        "wentWrong": "Something went wrong.",
+        "adding": "Adding to your watchlist…",
+        "added": "Added",
+        "viewWatchlist": "View watchlist",
+        "done": "Done",
+        "back": "Back"
+      },
+      "tagline": {
+        "aria": "Thousands of choices, one verdict",
+        "prefix": "Thousands of choices, ",
+        "one": "one "
+      },
+      "onTv": {
+        "today": "Today {time}",
+        "tomorrow": "Tomorrow {time}",
+        "dayTime": "{day} {time}",
+        "couldNotSet": "Could not set the reminder.",
+        "reminderSetNotif": "Reminder set! Turn on notifications in Settings so we can ping you before it starts.",
+        "reminderSet": "Reminder set — we’ll ping you 1 hour and 5 minutes before. ⏰",
+        "wentWrong": "Something went wrong. Please try again.",
+        "checking": "Checking what’s on…",
+        "nothingUp": "Nothing notable coming up right now.",
+        "fullGuide": "See the full TV guide",
+        "heading": "📡 Good things coming up on TV",
+        "subheading": "The next few days — tap 🔔 to be reminded before it starts.",
+        "turnOn": "Turn on",
+        "dismiss": "Dismiss",
+        "remindOn": "🔔 On",
+        "remind": "🔔 Remind"
+      },
+      "vintage": {
+        "title": "Vintage Mode",
+        "subtitle": "Big and simple. Just tap a button.",
+        "backFull": "Back to the full app",
+        "findHeading": "🔎 Find a movie or show",
+        "pickHeading": "🎬 Pick something for me",
+        "tvHeading": "🕵️ What’s worth watching on TV",
+        "tvNow": "What’s on TV now",
+        "tvNowSub": "Live channels and times, big and clear",
+        "tasteGame": "Play the Taste Game",
+        "tasteGameSub": "A few taps teaches us what you like",
+        "reminders": "My reminders",
+        "remindersSub": "Shows you asked to be reminded about",
+        "myList": "My list",
+        "myListSub": "Everything you’ve saved to watch"
+      }
+    }
+  },
+  "es-419": {
+    "misc": {
+      "easy": {
+        "tooShort": "Las películas casi nunca son tan cortas",
+        "hello": "Hola.",
+        "helloName": "Hola, {name}.",
+        "subtitle": "Busquemos algo bueno para ver esta noche.",
+        "takeQuiz": "📝 Haz el test de 1 minuto",
+        "rateDocket": "⚖️ Califica títulos en El Expediente",
+        "whatToWatch": "🍿 Qué ver",
+        "onTvSoon": "📡 Pronto en la tele",
+        "whosWatching": "¿Quién va a ver?",
+        "audience": {
+          "me": "Solo yo",
+          "partner": "Mi pareja y yo",
+          "family": "Toda la familia"
+        },
+        "tellUs": "⚙️ Cuéntanos qué te gusta",
+        "hide": "Ocultar",
+        "setItUp": "Configurar",
+        "movieOrShow": "¿Una película o una serie?",
+        "mt": {
+          "any": "Cualquiera",
+          "movie": "🎬 Películas",
+          "tv": "📺 Series"
+        },
+        "howLong": "¿Qué tan larga?",
+        "rt": {
+          "any": "Cualquier duración",
+          "30": "30 min o menos",
+          "60": "Una hora o menos",
+          "90": "Cerca de 1½ horas",
+          "120": "Cerca de 2 horas"
+        },
+        "whichEra": "¿De qué época?",
+        "era": {
+          "any": "Cualquier época",
+          "y2020s": "Años 2020",
+          "y2000s": "2000–2010",
+          "y80s90s": "80 y 90",
+          "y60s70s": "60 y 70",
+          "ypre60": "Antes de 1960"
+        },
+        "howClean": "¿Qué tan apto?",
+        "content": {
+          "any": "Cualquier cosa",
+          "mild": "Nada de miedo",
+          "clean": "Sin contenido fuerte",
+          "family": "Solo familiar"
+        },
+        "actorsYouLove": "Actores que te encantan",
+        "removeActor": "Quitar a {name}",
+        "actorPlaceholder": "Escribe el nombre de un actor…",
+        "actorsHint": "Daremos prioridad a las películas con los actores que agregues, y los recordaremos la próxima vez.",
+        "picksHeading": "Tus 3 sugerencias para esta noche",
+        "showDifferent": "🔄 Muéstrame otras",
+        "noneFound": "No encontramos tres con esos ajustes.",
+        "noneFoundHint": "Prueba aflojar un ajuste de arriba, o dinos algunas películas que te encanten.",
+        "tellTaste": "Cuéntanos tus gustos",
+        "call": {
+          "watch": "Míralo",
+          "skip": "Sáltalo",
+          "maybe": "Quizás"
+        },
+        "actorYouLove": "⭐ Un actor que te encanta",
+        "onProvider": "▶ En {where}",
+        "moreAbout": "Más información",
+        "wontShowAgain": "No volveremos a mostrar esto",
+        "notForMe": "👎 No es para mí",
+        "wantDifferent": "¿Quieres algo distinto?",
+        "ownWords": "Dínoslo con tus palabras: escribe o habla.",
+        "askForMovie": "🎙️ Pide una película",
+        "switchFull": "Cambiar a la app completa"
+      },
+      "import": {
+        "noTitles": "No se encontraron títulos. Pega una lista o elige una exportación CSV (Letterboxd, Trakt, Simkl, TV Time, Netflix…).",
+        "chooseCsv": "Elige un archivo CSV…",
+        "orPaste": "…o pega los títulos abajo:",
+        "pasteAria": "Pega tus títulos vistos",
+        "ready": {
+          "one": "{count} título único listo",
+          "other": "{count} títulos únicos listos"
+        },
+        "anyCsv": "Cualquier exportación CSV, o un título por línea",
+        "importing": "Importando…",
+        "importHistory": "Importar historial",
+        "progress": "{done} / {total} procesados · {imported} añadidos",
+        "doneSimple": "Listo: se añadieron {added} a tu lista de vistos.",
+        "doneBoth": "Listo: se añadieron {added} a tu lista de vistos · no se pudieron emparejar {unmatched}.",
+        "viewWatchlist": "Ver mi lista →",
+        "seeRecs": "Ver recomendaciones →",
+        "couldntMatch": "No se pudieron emparejar estos (el título puede diferir en TMDB):"
+      },
+      "importPage": {
+        "heading": "Importa tu historial",
+        "intro1": "¿Vienes de otra app? Suelta una",
+        "csvExport": "exportación CSV",
+        "intro2": "— o pega una lista. Emparejaremos cada título, traeremos tus calificaciones y lo marcaremos como visto, para que tu historial y tu ADN aparezcan enseguida.",
+        "worksWith": "Funciona con exportaciones CSV de",
+        "worksWithRest": "— cualquiera con una columna de título (y calificación opcional). Las calificaciones en escala de 5 estrellas (Letterboxd) se convierten a /10 automáticamente; los episodios de TV se agrupan en una entrada por serie.",
+        "orJustPaste": "O simplemente pega una lista:",
+        "tvTimeRefugee": "¿Vienes de TV Time?",
+        "zipHint1": "Si tu exportación es un",
+        "zipHint2": ", descomprímelo primero y elige el",
+        "zipHint3": "que está dentro. Si tu archivo solo tiene IDs y no títulos, exporta primero a Letterboxd o Trakt y luego trae ese CSV aquí."
+      },
+      "photo": {
+        "noText": "No se pudo leer ningún texto. Prueba con una toma donde el título se vea claramente (una pausa o una pantalla de información funcionan muy bien).",
+        "noMatch": "No se encontró un título que coincida en esa foto.",
+        "readError": "Algo salió mal al leer la imagen.",
+        "addError": "No se pudo añadir ese.",
+        "title": "📸 Añadir desde una foto",
+        "subtitle": "Toma o captura lo que está en la tele: leeré los títulos y podrás tocar los que quieras guardar. Sin configurar nada.",
+        "choosePhoto": "Elige o toma una foto",
+        "readingTitles": "Leyendo los títulos…",
+        "findingMatches": "Buscando coincidencias…",
+        "found": {
+          "one": "Se encontró {count} título posible — toca para añadir:",
+          "other": "Se encontraron {count} títulos posibles — toca para añadir:"
+        },
+        "tvSeries": "Serie de TV",
+        "movie": "Película",
+        "added": "✓ Añadido",
+        "add": "+ Añadir",
+        "viewWatchlist": "Ver mi lista",
+        "addAnotherPhoto": "Añadir otra foto",
+        "addedColon": "Añadido:",
+        "addAnother": "Añadir otra",
+        "whatIRead": "Lo que leí de la foto"
+      },
+      "fresh": {
+        "couldNotStart": "No se pudo iniciar una sesión nueva.",
+        "starting": "Iniciando una sesión nueva…",
+        "continueAnyway": "continuar de todos modos"
+      },
+      "learn": {
+        "couldNotStart": "No se pudo iniciar tu sesión de aprendizaje.",
+        "settingUp": "Preparando tu sesión de aprendizaje: esta sí recuerda.",
+        "keepPicking": "Sigue eligiendo y tu ADN VERD1CT se afina con el tiempo.",
+        "continueAnyway": "continuar de todos modos"
+      },
+      "install": {
+        "headline": "Ten WatchVerdict a un toque de distancia",
+        "iosTap": "Toca el botón",
+        "share": "Compartir",
+        "iosButton": "",
+        "iosBottom": "abajo, y luego",
+        "addToHome": "“Agregar a inicio”.",
+        "generic": "Agrégalo a tu pantalla de inicio: se abre a pantalla completa, como una app.",
+        "install": "Instalar",
+        "dismiss": "Descartar"
+      },
+      "guestSave": {
+        "validation": "Ingresa un correo y una contraseña de 6+ caracteres.",
+        "cta": "Guardar tu cuenta",
+        "savedTitle": "Cuenta guardada",
+        "savedBody1": "Todo lo que guardaste ahora está vinculado a",
+        "savedBody2": ". Inicia sesión con él en cualquier dispositivo y tu lista y tus gustos te acompañan.",
+        "done": "Listo",
+        "formBody": "Conserva tu lista, tus calificaciones y tus gustos, y úsalos en cualquier dispositivo. Sin rehacer nada.",
+        "emailPlaceholder": "Correo",
+        "passwordPlaceholder": "Contraseña (6+ caracteres)",
+        "saving": "Guardando…",
+        "saveAccount": "Guardar cuenta",
+        "later": "Después"
+      },
+      "signOut": {
+        "signingOut": "Cerrando sesión…",
+        "signOut": "Cerrar sesión"
+      },
+      "simpleMode": {
+        "simpleView": "Vista simple",
+        "onSuffix": "· Activada",
+        "offSuffix": "· Desactivada",
+        "description": "Texto y botones más grandes, mayor contraste: más fácil de leer y tocar. Toca de nuevo para desactivar.",
+        "title": "Vista simple: texto y botones más grandes",
+        "simpleViewOn": "Vista simple activada"
+      },
+      "viewMode": {
+        "toPhoneTitle": "Volver al diseño para teléfono",
+        "toDesktopTitle": "Ver el diseño de escritorio completo en tu teléfono",
+        "phoneView": "Vista de teléfono",
+        "desktopView": "Vista de escritorio"
+      },
+      "desktopExit": {
+        "title": "Volver al diseño para teléfono",
+        "label": "Volver a la vista de teléfono"
+      },
+      "share": {
+        "shareBtn": "Compartir",
+        "saveImage": "Guardar imagen",
+        "myTaste": "Mi gusto",
+        "loves": "Le encanta",
+        "stillFiguring": "Aún lo estoy descubriendo",
+        "hardNo": "Ni hablar",
+        "tasteFooter": "Deja de deslizar. Empieza a ver.",
+        "wrapped": "Resumen",
+        "watched": "vistos",
+        "avgRating": "calificación media",
+        "topPicks": "Tus favoritos",
+        "myMonth": "Mi mes en WatchVerdict",
+        "theVerdict": "⚖️ El Veredicto",
+        "settledBy": "Resuelto por WatchVerdict",
+        "myDna": "Mi ADN de cine 🧬",
+        "tierElite": "Élite",
+        "tierSharp": "Afinado",
+        "tierForming": "En formación",
+        "tierNew": "Nuevo",
+        "rated": "{count} calificados",
+        "finishRate": " · {pct}% de finalización",
+        "whatsYours": "¿Y el tuyo?"
+      },
+      "shareTarget": {
+        "nothingShared": "No se compartió nada para añadir.",
+        "addedToList": "Añadido a tu lista.",
+        "couldNotAdd": "No se pudo añadir.",
+        "wentWrong": "Algo salió mal.",
+        "adding": "Añadiendo a tu lista…",
+        "added": "Añadido",
+        "viewWatchlist": "Ver mi lista",
+        "done": "Listo",
+        "back": "Volver"
+      },
+      "tagline": {
+        "aria": "Miles de opciones, un veredicto",
+        "prefix": "Miles de opciones, ",
+        "one": "un "
+      },
+      "onTv": {
+        "today": "Hoy {time}",
+        "tomorrow": "Mañana {time}",
+        "dayTime": "{day} {time}",
+        "couldNotSet": "No se pudo crear el recordatorio.",
+        "reminderSetNotif": "¡Recordatorio creado! Activa las notificaciones en Ajustes para avisarte antes de que empiece.",
+        "reminderSet": "Recordatorio creado: te avisaremos 1 hora y 5 minutos antes. ⏰",
+        "wentWrong": "Algo salió mal. Inténtalo de nuevo.",
+        "checking": "Viendo qué hay…",
+        "nothingUp": "Nada destacado por ahora.",
+        "fullGuide": "Ver la guía de TV completa",
+        "heading": "📡 Cosas buenas que vienen en la tele",
+        "subheading": "Los próximos días: toca 🔔 para que te avisemos antes de que empiece.",
+        "turnOn": "Activar",
+        "dismiss": "Descartar",
+        "remindOn": "🔔 Activado",
+        "remind": "🔔 Recuérdame"
+      },
+      "vintage": {
+        "title": "Modo Clásico",
+        "subtitle": "Grande y sencillo. Solo toca un botón.",
+        "backFull": "Volver a la app completa",
+        "findHeading": "🔎 Busca una película o serie",
+        "pickHeading": "🎬 Elige algo por mí",
+        "tvHeading": "🕵️ Qué vale la pena ver en la tele",
+        "tvNow": "Qué hay en la tele ahora",
+        "tvNowSub": "Canales y horarios en vivo, grandes y claros",
+        "tasteGame": "Juega al Juego de Gustos",
+        "tasteGameSub": "Unos toques nos enseñan lo que te gusta",
+        "reminders": "Mis recordatorios",
+        "remindersSub": "Programas que pediste que te recordáramos",
+        "myList": "Mi lista",
+        "myListSub": "Todo lo que guardaste para ver"
+      }
+    }
+  },
+  "zh-Hans": {
+    "misc": {
+      "easy": {
+        "tooShort": "电影几乎不会这么短",
+        "hello": "你好。",
+        "helloName": "你好，{name}。",
+        "subtitle": "今晚一起找点好看的吧。",
+        "takeQuiz": "📝 做 1 分钟小测验",
+        "rateDocket": "⚖️ 在案卷里给影视打分",
+        "whatToWatch": "🍿 看什么",
+        "onTvSoon": "📡 即将在电视上播出",
+        "whosWatching": "谁要看？",
+        "audience": {
+          "me": "只有我",
+          "partner": "我和另一半",
+          "family": "全家一起"
+        },
+        "tellUs": "⚙️ 告诉我们你喜欢什么",
+        "hide": "隐藏",
+        "setItUp": "去设置",
+        "movieOrShow": "电影还是剧集？",
+        "mt": {
+          "any": "都行",
+          "movie": "🎬 电影",
+          "tv": "📺 剧集"
+        },
+        "howLong": "要多长？",
+        "rt": {
+          "any": "任意时长",
+          "30": "30 分钟以内",
+          "60": "1 小时以内",
+          "90": "约 1 个半小时",
+          "120": "约 2 小时"
+        },
+        "whichEra": "哪个年代？",
+        "era": {
+          "any": "任意年代",
+          "y2020s": "2020 年代",
+          "y2000s": "2000—2010 年代",
+          "y80s90s": "80 与 90 年代",
+          "y60s70s": "60 与 70 年代",
+          "ypre60": "1960 年以前"
+        },
+        "howClean": "内容要多干净？",
+        "content": {
+          "any": "什么都行",
+          "mild": "别太吓人",
+          "clean": "保持干净",
+          "family": "仅限家庭观看"
+        },
+        "actorsYouLove": "你喜欢的演员",
+        "removeActor": "移除 {name}",
+        "actorPlaceholder": "输入演员的名字…",
+        "actorsHint": "我们会优先推荐你添加的演员出演的电影，下次也会记住他们。",
+        "picksHeading": "为你精选的今晚 3 部",
+        "showDifferent": "🔄 换一批给我看",
+        "noneFound": "用这些设置找不到三部。",
+        "noneFoundHint": "试着放宽上面的某个设置，或告诉我们几部你喜欢的电影。",
+        "tellTaste": "告诉我们你的口味",
+        "call": {
+          "watch": "值得看",
+          "skip": "跳过",
+          "maybe": "也许吧"
+        },
+        "actorYouLove": "⭐ 你喜欢的演员",
+        "onProvider": "▶ 在 {where}",
+        "moreAbout": "了解更多",
+        "wontShowAgain": "我们不会再显示这个",
+        "notForMe": "👎 不适合我",
+        "wantDifferent": "想看点别的？",
+        "ownWords": "用你自己的话告诉我们——打字或说话都行。",
+        "askForMovie": "🎙️ 求推荐一部电影",
+        "switchFull": "切换到完整版应用"
+      },
+      "import": {
+        "noTitles": "未找到任何标题。粘贴一个列表，或选择 CSV 导出文件（Letterboxd、Trakt、Simkl、TV Time、Netflix…）。",
+        "chooseCsv": "选择一个 CSV 文件…",
+        "orPaste": "…或在下面粘贴标题：",
+        "pasteAria": "粘贴你看过的标题",
+        "ready": {
+          "one": "{count} 个唯一标题已就绪",
+          "other": "{count} 个唯一标题已就绪"
+        },
+        "anyCsv": "任意 CSV 导出文件，或每行一个标题",
+        "importing": "正在导入…",
+        "importHistory": "导入历史记录",
+        "progress": "{done} / {total} 已处理 · 已添加 {imported}",
+        "doneSimple": "完成——已将 {added} 个添加到你的已看列表。",
+        "doneBoth": "完成——已将 {added} 个添加到你的已看列表 · {unmatched} 个无法匹配。",
+        "viewWatchlist": "查看片单 →",
+        "seeRecs": "查看推荐 →",
+        "couldntMatch": "无法匹配这些（标题在 TMDB 上可能不同）："
+      },
+      "importPage": {
+        "heading": "导入你的历史记录",
+        "intro1": "从别的应用来？放入一个",
+        "csvExport": "CSV 导出文件",
+        "intro2": "——或粘贴一个列表。我们会匹配每个标题、带过你的评分并标记为已看，让你的历史记录和 DNA 立刻显示出来。",
+        "worksWith": "适用于这些平台的 CSV 导出：",
+        "worksWithRest": "——只要有标题列（评分列可选）即可。5 星制评分（Letterboxd）会自动换算为 /10；电视剧集会合并为每部剧一条记录。",
+        "orJustPaste": "或者直接粘贴一个列表：",
+        "tvTimeRefugee": "从 TV Time 迁移过来？",
+        "zipHint1": "如果你的导出是",
+        "zipHint2": "，先解压再选择里面的",
+        "zipHint3": "文件。如果你的文件只有 ID 没有标题，请先导出到 Letterboxd 或 Trakt，再把那个 CSV 拿到这里。"
+      },
+      "photo": {
+        "noText": "没读到任何文字。试试标题清晰可见的截图（暂停画面或信息页效果很好）。",
+        "noMatch": "在那张照片里没找到匹配的标题。",
+        "readError": "读取图片时出错了。",
+        "addError": "无法添加这一个。",
+        "title": "📸 从照片添加",
+        "subtitle": "拍下或截图电视上的画面——我会读出标题，你只需点选想保存的。无需设置。",
+        "choosePhoto": "选择或拍一张照片",
+        "readingTitles": "正在读取标题…",
+        "findingMatches": "正在查找匹配…",
+        "found": {
+          "one": "找到 {count} 个可能的标题——点击添加：",
+          "other": "找到 {count} 个可能的标题——点击添加："
+        },
+        "tvSeries": "电视剧",
+        "movie": "电影",
+        "added": "✓ 已添加",
+        "add": "+ 添加",
+        "viewWatchlist": "查看片单",
+        "addAnotherPhoto": "再添加一张照片",
+        "addedColon": "已添加：",
+        "addAnother": "再添加一个",
+        "whatIRead": "我从照片里读到的内容"
+      },
+      "fresh": {
+        "couldNotStart": "无法开始一个全新会话。",
+        "starting": "正在开始一个全新会话…",
+        "continueAnyway": "仍然继续"
+      },
+      "learn": {
+        "couldNotStart": "无法开始你的学习会话。",
+        "settingUp": "正在准备你的学习会话——这个会记住。",
+        "keepPicking": "继续选择，你的 VERD1CT DNA 会随着时间越来越精准。",
+        "continueAnyway": "仍然继续"
+      },
+      "install": {
+        "headline": "让 WatchVerdict 触手可及",
+        "iosTap": "点按底部的",
+        "share": "分享",
+        "iosButton": "按钮",
+        "iosBottom": "，然后选择",
+        "addToHome": "“添加到主屏幕”。",
+        "generic": "把它添加到主屏幕——像应用一样全屏打开。",
+        "install": "安装",
+        "dismiss": "关闭"
+      },
+      "guestSave": {
+        "validation": "请输入邮箱和至少 6 位的密码。",
+        "cta": "保存你的账户",
+        "savedTitle": "账户已保存",
+        "savedBody1": "你保存的一切现已绑定到",
+        "savedBody2": "。在任意设备上用它登录，你的片单和口味都会跟着走。",
+        "done": "完成",
+        "formBody": "保留你的片单、评分和口味——在任意设备上使用。无需重做任何事。",
+        "emailPlaceholder": "邮箱",
+        "passwordPlaceholder": "密码（6 位以上）",
+        "saving": "正在保存…",
+        "saveAccount": "保存账户",
+        "later": "以后再说"
+      },
+      "signOut": {
+        "signingOut": "正在退出…",
+        "signOut": "退出登录"
+      },
+      "simpleMode": {
+        "simpleView": "简洁视图",
+        "onSuffix": "· 已开启",
+        "offSuffix": "· 已关闭",
+        "description": "更大的文字和按钮、更高的对比度——更易阅读和点按。再次点按即可关闭。",
+        "title": "简洁视图：更大的文字和按钮",
+        "simpleViewOn": "简洁视图已开启"
+      },
+      "viewMode": {
+        "toPhoneTitle": "回到适合手机的版式",
+        "toDesktopTitle": "在手机上查看完整的桌面版式",
+        "phoneView": "手机视图",
+        "desktopView": "桌面视图"
+      },
+      "desktopExit": {
+        "title": "切换回适合手机的版式",
+        "label": "回到手机视图"
+      },
+      "share": {
+        "shareBtn": "分享",
+        "saveImage": "保存图片",
+        "myTaste": "我的口味",
+        "loves": "喜欢",
+        "stillFiguring": "还在摸索中",
+        "hardNo": "坚决不要",
+        "tasteFooter": "别再刷了，开看吧。",
+        "wrapped": "年度回顾",
+        "watched": "已看",
+        "avgRating": "平均评分",
+        "topPicks": "你的最爱",
+        "myMonth": "我在 WatchVerdict 的这个月",
+        "theVerdict": "⚖️ 判决",
+        "settledBy": "由 WatchVerdict 裁定",
+        "myDna": "我的观影 DNA 🧬",
+        "tierElite": "顶尖",
+        "tierSharp": "敏锐",
+        "tierForming": "成型中",
+        "tierNew": "新手",
+        "rated": "已评 {count}",
+        "finishRate": " · {pct}% 看完率",
+        "whatsYours": "你的呢？"
+      },
+      "shareTarget": {
+        "nothingShared": "没有分享任何可添加的内容。",
+        "addedToList": "已添加到你的列表。",
+        "couldNotAdd": "无法添加。",
+        "wentWrong": "出了点问题。",
+        "adding": "正在添加到你的片单…",
+        "added": "已添加",
+        "viewWatchlist": "查看片单",
+        "done": "完成",
+        "back": "返回"
+      },
+      "tagline": {
+        "aria": "千万种选择，一个裁决",
+        "prefix": "千万种选择，",
+        "one": "一个 "
+      },
+      "onTv": {
+        "today": "今天 {time}",
+        "tomorrow": "明天 {time}",
+        "dayTime": "{day} {time}",
+        "couldNotSet": "无法设置提醒。",
+        "reminderSetNotif": "提醒已设置！请在设置中打开通知，我们才能在开播前提醒你。",
+        "reminderSet": "提醒已设置——我们会在开播前 1 小时零 5 分钟提醒你。⏰",
+        "wentWrong": "出了点问题。请重试。",
+        "checking": "正在看有什么…",
+        "nothingUp": "目前没有什么值得关注的。",
+        "fullGuide": "查看完整电视指南",
+        "heading": "📡 电视上即将播出的好节目",
+        "subheading": "未来几天——点击 🔔 在开播前收到提醒。",
+        "turnOn": "去打开",
+        "dismiss": "关闭",
+        "remindOn": "🔔 已开",
+        "remind": "🔔 提醒我"
+      },
+      "vintage": {
+        "title": "怀旧模式",
+        "subtitle": "又大又简单。只需点一个按钮。",
+        "backFull": "返回完整版应用",
+        "findHeading": "🔎 查找电影或剧集",
+        "pickHeading": "🎬 帮我挑一部",
+        "tvHeading": "🕵️ 电视上有什么值得看",
+        "tvNow": "现在电视上播什么",
+        "tvNowSub": "实时频道和时间，又大又清楚",
+        "tasteGame": "玩口味游戏",
+        "tasteGameSub": "点几下就能让我们了解你的喜好",
+        "reminders": "我的提醒",
+        "remindersSub": "你要求提醒的节目",
+        "myList": "我的列表",
+        "myListSub": "你保存要看的一切"
+      }
+    }
+  }
+}

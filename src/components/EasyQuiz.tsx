@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { EasyAudience, EasyEra, EasyContent } from '@/lib/easyTypes';
+import { useT } from '@/i18n/I18nProvider';
 
 export interface QuizResult {
   audience: EasyAudience;
@@ -13,84 +14,86 @@ export interface QuizResult {
 }
 
 interface Option<T> {
-  label: string;
+  labelKey: string;
   emoji: string;
   value: T;
 }
 interface Question<T> {
   key: keyof QuizResult;
-  prompt: string;
+  promptKey: string;
   options: Option<T>[];
 }
 
 // Five plain questions, each a big tap. Answers map straight onto real levers.
+// Prompts/labels are translated at render; keys + values stay stable (logic).
 const QUESTIONS: Question<string | boolean | number | null | number[]>[] = [
   {
     key: 'audience',
-    prompt: 'Who’s watching tonight?',
+    promptKey: 'ask.easy.q1prompt',
     options: [
-      { label: 'Just me', emoji: '🙂', value: 'me' },
-      { label: 'My partner & me', emoji: '💞', value: 'partner' },
-      { label: 'The whole family', emoji: '👨‍👩‍👧', value: 'family' },
+      { labelKey: 'ask.easy.q1o1', emoji: '🙂', value: 'me' },
+      { labelKey: 'ask.easy.q1o2', emoji: '💞', value: 'partner' },
+      { labelKey: 'ask.easy.q1o3', emoji: '👨‍👩‍👧', value: 'family' },
     ],
   },
   {
     key: 'mediaType',
-    prompt: 'A movie or a TV show?',
+    promptKey: 'ask.easy.q2prompt',
     options: [
-      { label: 'A movie', emoji: '🎬', value: 'movie' },
-      { label: 'A TV show', emoji: '📺', value: 'tv' },
-      { label: 'Either is fine', emoji: '🍿', value: 'any' },
+      { labelKey: 'ask.easy.q2o1', emoji: '🎬', value: 'movie' },
+      { labelKey: 'ask.easy.q2o2', emoji: '📺', value: 'tv' },
+      { labelKey: 'ask.easy.q2o3', emoji: '🍿', value: 'any' },
     ],
   },
   {
     key: 'maxRuntime',
-    prompt: 'How much time do you have?',
+    promptKey: 'ask.easy.q3prompt',
     options: [
-      { label: '30 minutes or less', emoji: '⏱️', value: 30 },
-      { label: 'An hour or less', emoji: '🕐', value: 60 },
-      { label: 'About 1½ hours', emoji: '🕑', value: 90 },
-      { label: 'About 2 hours', emoji: '🕒', value: 120 },
-      { label: 'However long', emoji: '♾️', value: null },
+      { labelKey: 'ask.easy.q3o1', emoji: '⏱️', value: 30 },
+      { labelKey: 'ask.easy.q3o2', emoji: '🕐', value: 60 },
+      { labelKey: 'ask.easy.q3o3', emoji: '🕑', value: 90 },
+      { labelKey: 'ask.easy.q3o4', emoji: '🕒', value: 120 },
+      { labelKey: 'ask.easy.q3o5', emoji: '♾️', value: null },
     ],
   },
   {
     key: 'era',
-    prompt: 'From which era?',
+    promptKey: 'ask.easy.q4prompt',
     options: [
-      { label: 'Any era', emoji: '🎞️', value: 'any' },
-      { label: 'Brand new (2020s)', emoji: '✨', value: 'y2020s' },
-      { label: '2000s & 2010s', emoji: '📀', value: 'y2000s' },
-      { label: 'The 80s & 90s', emoji: '📼', value: 'y80s90s' },
-      { label: 'The 60s & 70s', emoji: '📺', value: 'y60s70s' },
-      { label: 'Golden oldies (pre-1960)', emoji: '🎩', value: 'ypre60' },
+      { labelKey: 'ask.easy.q4o1', emoji: '🎞️', value: 'any' },
+      { labelKey: 'ask.easy.q4o2', emoji: '✨', value: 'y2020s' },
+      { labelKey: 'ask.easy.q4o3', emoji: '📀', value: 'y2000s' },
+      { labelKey: 'ask.easy.q4o4', emoji: '📼', value: 'y80s90s' },
+      { labelKey: 'ask.easy.q4o5', emoji: '📺', value: 'y60s70s' },
+      { labelKey: 'ask.easy.q4o6', emoji: '🎩', value: 'ypre60' },
     ],
   },
   {
     key: 'content',
-    prompt: 'How clean should we keep it?',
+    promptKey: 'ask.easy.q5prompt',
     options: [
-      { label: 'Anything goes', emoji: '😌', value: 'any' },
-      { label: 'Nothing too scary', emoji: '🙂', value: 'mild' },
-      { label: 'Keep it clean', emoji: '👍', value: 'clean' },
-      { label: 'Family-friendly only', emoji: '👨‍👩‍👧', value: 'family' },
+      { labelKey: 'ask.easy.q5o1', emoji: '😌', value: 'any' },
+      { labelKey: 'ask.easy.q5o2', emoji: '🙂', value: 'mild' },
+      { labelKey: 'ask.easy.q5o3', emoji: '👍', value: 'clean' },
+      { labelKey: 'ask.easy.q5o4', emoji: '👨‍👩‍👧', value: 'family' },
     ],
   },
   {
     key: 'moodGenres',
-    prompt: 'What sounds good tonight?',
+    promptKey: 'ask.easy.q6prompt',
     options: [
-      { label: 'Something funny', emoji: '😂', value: [35] },
-      { label: 'A gripping drama', emoji: '🎭', value: [18] },
-      { label: 'Action & adventure', emoji: '💥', value: [28, 12] },
-      { label: 'A true story', emoji: '📖', value: [36, 99] },
-      { label: 'Romance', emoji: '❤️', value: [10749] },
-      { label: 'Mystery & crime', emoji: '🕵️', value: [9648, 80] },
+      { labelKey: 'ask.easy.q6o1', emoji: '😂', value: [35] },
+      { labelKey: 'ask.easy.q6o2', emoji: '🎭', value: [18] },
+      { labelKey: 'ask.easy.q6o3', emoji: '💥', value: [28, 12] },
+      { labelKey: 'ask.easy.q6o4', emoji: '📖', value: [36, 99] },
+      { labelKey: 'ask.easy.q6o5', emoji: '❤️', value: [10749] },
+      { labelKey: 'ask.easy.q6o6', emoji: '🕵️', value: [9648, 80] },
     ],
   },
 ];
 
 export function EasyQuiz({ onDone, onCancel }: { onDone: (r: QuizResult) => void; onCancel: () => void }) {
+  const t = useT();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Partial<QuizResult>>({});
 
@@ -129,8 +132,8 @@ export function EasyQuiz({ onDone, onCancel }: { onDone: (r: QuizResult) => void
       </div>
 
       <div className="mt-2.5 flex-none text-center">
-        <div className="text-xs font-semibold text-slate-400">Question {step + 1} of {QUESTIONS.length}</div>
-        <h1 className="mx-auto mt-0.5 max-w-xl text-xl font-black leading-tight text-white sm:text-2xl">{q.prompt}</h1>
+        <div className="text-xs font-semibold text-slate-400">{t('ask.easy.questionOf', { n: step + 1, total: QUESTIONS.length })}</div>
+        <h1 className="mx-auto mt-0.5 max-w-xl text-xl font-black leading-tight text-white sm:text-2xl">{t(q.promptKey)}</h1>
       </div>
 
       {/* Answers flex to fill; only this area scrolls if a phone is extremely short */}
@@ -142,14 +145,14 @@ export function EasyQuiz({ onDone, onCancel }: { onDone: (r: QuizResult) => void
             const disabled = q.key === 'maxRuntime' && isMovie && (o.value === 30 || o.value === 60);
             return (
               <button
-                key={o.label}
+                key={o.labelKey}
                 onClick={() => !disabled && choose(o.value)}
                 disabled={disabled}
-                title={disabled ? 'Movies are almost never under an hour' : undefined}
+                title={disabled ? t('ask.easy.moviesUnderHour') : undefined}
                 className={`flex min-h-[62px] flex-col items-center justify-center gap-0.5 rounded-xl border-2 px-2 py-2 text-center text-sm font-bold leading-tight transition ${disabled ? 'cursor-not-allowed border-white/10 bg-white/[0.02] text-slate-600' : 'border-white/15 bg-white/[0.04] text-white hover:border-brand-400 hover:bg-brand-500/15 active:scale-[0.98]'}`}
               >
                 <span className="text-2xl" aria-hidden>{o.emoji}</span>
-                <span>{o.label}{disabled ? ' (TV)' : ''}</span>
+                <span>{t(o.labelKey)}{disabled ? t('ask.easy.tvSuffix') : ''}</span>
               </button>
             );
           })}
@@ -161,9 +164,9 @@ export function EasyQuiz({ onDone, onCancel }: { onDone: (r: QuizResult) => void
           onClick={() => (step === 0 ? onCancel() : setStep(step - 1))}
           className="text-sm font-semibold text-slate-400 underline hover:text-white"
         >
-          {step === 0 ? 'Skip the quiz' : '← Back'}
+          {step === 0 ? t('ask.easy.skipQuiz') : t('ask.easy.back')}
         </button>
-        <span className="text-xs text-slate-500">Tap to continue</span>
+        <span className="text-xs text-slate-500">{t('ask.easy.tapToContinue')}</span>
       </div>
     </div>
   );

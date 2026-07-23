@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { EMPTY_QUERY } from '@/lib/finderParse';
+import { useT } from '@/i18n/I18nProvider';
 
 interface Item {
   id: number;
@@ -26,6 +27,7 @@ const CALL_STYLE: Record<string, string> = {
  * no navigating away.
  */
 export function QuickRuling() {
+  const t = useT();
   const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle');
   const [items, setItems] = useState<Item[]>([]);
   const [error, setError] = useState(false);
@@ -54,29 +56,29 @@ export function QuickRuling() {
       <button onClick={rule} disabled={state === 'loading'} className="flex w-full items-center gap-3 text-left disabled:opacity-70">
         <span className="text-3xl" aria-hidden>🎲</span>
         <div className="min-w-0 flex-1">
-          <div className="text-lg font-black text-white">Quick ruling</div>
+          <div className="text-lg font-black text-white">{t('together.quickRuling')}</div>
           <div className="text-sm leading-snug text-slate-300">
             {state === 'loading'
-              ? 'The judge is ruling…'
+              ? t('together.judgeRuling')
               : state === 'done'
-                ? 'Tap for a fresh set.'
-                : 'Don’t feel like deciding? One tap for instant recommendations.'}
+                ? t('together.tapFresh')
+                : t('together.dontDecide')}
           </div>
         </div>
         <span className="flex-none rounded-lg bg-brand-500 px-3 py-2 text-sm font-bold text-white shadow-glow">
-          {state === 'idle' ? 'Rule ⚖️' : state === 'loading' ? '…' : 'Again ↻'}
+          {state === 'idle' ? t('together.ruleBtn') : state === 'loading' ? '…' : t('together.againBtn')}
         </span>
       </button>
 
       {state === 'loading' && (
         <div className="mt-4 flex items-center gap-2 text-sm text-slate-300">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
-          Combing the catalog for you…
+          {t('together.combingCatalog')}
         </div>
       )}
 
       {state === 'done' && error && (
-        <p className="mt-4 text-sm text-red-300">Couldn’t reach the court. Tap “Again” to retry.</p>
+        <p className="mt-4 text-sm text-red-300">{t('together.couldNotReachCourt')}</p>
       )}
 
       {state === 'done' && !error && items.length > 0 && (
@@ -101,7 +103,7 @@ export function QuickRuling() {
                   <span className="mt-0.5 flex items-center gap-2">
                     <span className={`rounded border px-1.5 py-0.5 text-[10px] font-black ${CALL_STYLE[it.primaryCall] ?? 'border-white/15 text-slate-200'}`}>{it.primaryCall}</span>
                     <span className="text-sm font-bold tabular-nums text-gold-400">{it.matchScore}</span>
-                    <span className="text-xs text-slate-400">match</span>
+                    <span className="text-xs text-slate-400">{t('together.matchLabel')}</span>
                   </span>
                 </span>
               </Link>
@@ -111,7 +113,7 @@ export function QuickRuling() {
       )}
 
       {state === 'done' && !error && items.length === 0 && (
-        <p className="mt-4 text-sm text-slate-300">No picks came back — tap “Again”.</p>
+        <p className="mt-4 text-sm text-slate-300">{t('together.noPicksBack')}</p>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
 import { TasteCourt } from './TasteCourt';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const AVOIDABLE: PreferenceTrait[] = ['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn'];
 const LOVABLE: PreferenceTrait[] = ['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer'];
@@ -81,6 +82,7 @@ function Chip({ label, active, tone, onClick }: { label: string; active: boolean
 }
 
 export function TogetherPlanner() {
+  const { t, plural } = useI18n();
   const [store, setStore] = useState<Store>({ members: [], groups: [] });
   const [loaded, setLoaded] = useState(false);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -167,7 +169,7 @@ export function TogetherPlanner() {
     if (ids.length < 2) return;
     const names = store.members.filter((m) => ids.includes(m.id)).map((m) => m.name);
     const suggested = names.length <= 2 ? names.join(' & ') : `${names[0]} + ${names.length - 1} others`;
-    const name = (typeof window !== 'undefined' ? window.prompt('Name this jury', suggested) : suggested) || suggested;
+    const name = (typeof window !== 'undefined' ? window.prompt(t('together.namePrompt'), suggested) : suggested) || suggested;
     const group: Group = { id: newId(), name, memberIds: ids, dna: emptyDNA() };
     persist({ ...store, groups: [...store.groups, group] });
     setActiveGroupId(group.id);
@@ -212,10 +214,10 @@ export function TogetherPlanner() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) setError(data.error ?? 'Could not find a pick.');
+      if (!res.ok) setError(data.error ?? t('together.couldNotFindPick'));
       else setPicks(data.picks ?? []);
     } catch {
-      setError('Network error. Please try again.');
+      setError(t('together.networkError'));
     } finally {
       setLoading(false);
     }
@@ -258,17 +260,17 @@ export function TogetherPlanner() {
     return (
       <div className="mt-5 card p-5">
         <div className="mb-2 text-sm font-semibold text-white">
-          {isGuest ? 'Guest — 30-second taste calibration' : e.name ? 'Edit person' : 'Add a person'}
+          {isGuest ? t('together.guestCalibration') : e.name ? t('together.editPerson') : t('together.addPerson')}
         </div>
         <input
           value={e.name}
           onChange={(ev) => setEditing({ isGuest, member: { ...e, name: ev.target.value } })}
-          placeholder={isGuest ? 'Guest name' : 'Name'}
+          placeholder={isGuest ? t('together.guestName') : t('together.name')}
           className="input"
           maxLength={40}
         />
         <div className="mt-4">
-          <div className="mb-1.5 text-sm font-semibold text-emerald-200">Loves</div>
+          <div className="mb-1.5 text-sm font-semibold text-emerald-200">{t('together.loves')}</div>
           <div className="flex flex-wrap gap-2">
             {LOVABLE.map((t) => (
               <Chip key={t} label={humanTrait(t)} tone="love" active={e.love.includes(t)} onClick={() => toggleTrait('love', t)} />
@@ -276,7 +278,7 @@ export function TogetherPlanner() {
           </div>
         </div>
         <div className="mt-4">
-          <div className="mb-1.5 text-sm font-semibold text-red-200">Hard no’s (never recommend)</div>
+          <div className="mb-1.5 text-sm font-semibold text-red-200">{t('together.hardNosNeverRecommend')}</div>
           <div className="flex flex-wrap gap-2">
             {AVOIDABLE.map((t) => (
               <Chip key={t} label={humanTrait(t)} tone="avoid" active={e.avoid.includes(t)} onClick={() => toggleTrait('avoid', t)} />
@@ -285,15 +287,15 @@ export function TogetherPlanner() {
         </div>
         <div className="mt-5 flex gap-2">
           <button onClick={() => saveMember(e, isGuest)} disabled={!e.name.trim()} className="btn-primary">
-            {isGuest ? 'Add for tonight' : 'Save person'}
+            {isGuest ? t('together.addForTonight') : t('together.savePerson')}
           </button>
           {isGuest && (
             <button onClick={() => saveMember(e, false)} disabled={!e.name.trim()} className="btn-secondary">
-              Save permanently
+              {t('together.savePermanently')}
             </button>
           )}
           <button onClick={() => setEditing(null)} className="btn-ghost">
-            Cancel
+            {t('together.cancel')}
           </button>
         </div>
       </div>
@@ -305,11 +307,10 @@ export function TogetherPlanner() {
       <div className="mt-5 card p-6 text-center">
         <div className="text-3xl">👪</div>
         <p className="mx-auto mt-2 max-w-sm text-sm text-slate-400">
-          Add the people who watch together. Set what each loves and their hard no’s — then get one
-          pick that works for everyone.
+          {t('together.emptyIntro')}
         </p>
         <button onClick={() => setEditing({ isGuest: false, member: { id: newId(), name: '', avoid: [], love: [] } })} className="btn-primary mt-4">
-          + Add a person
+          {t('together.addPersonBtn')}
         </button>
       </div>
     );
@@ -320,14 +321,14 @@ export function TogetherPlanner() {
       {/* Saved groups */}
       {store.groups.length > 0 && (
         <div>
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Your juries</div>
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{t('together.yourJuries')}</div>
           <div className="flex flex-wrap gap-2">
             {store.groups.map((g) => (
               <button
                 key={g.id}
                 onClick={() => (activeGroupId === g.id ? clearGroup() : selectGroup(g))}
                 className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${activeGroupId === g.id ? 'border-brand-400/50 bg-brand-500/20 text-brand-100' : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'}`}
-                title={`${g.dna.nights} nights logged`}
+                title={plural('together.nightsLogged', g.dna.nights, {})}
               >
                 {g.name}
                 {g.dna.nights > 0 ? <span className="ml-1 text-[10px] text-slate-400">· {g.dna.nights}</span> : null}
@@ -346,36 +347,36 @@ export function TogetherPlanner() {
               <div className="min-w-0">
                 <div className="font-semibold text-white">{m.name}</div>
                 <div className="truncate text-xs text-slate-400">
-                  {m.love.length ? `♥ ${m.love.map(humanTrait).join(', ')}` : 'No loves set'}
+                  {m.love.length ? `♥ ${m.love.map(humanTrait).join(', ')}` : t('together.noLovesSet')}
                   {m.avoid.length ? ` · ✗ ${m.avoid.map(humanTrait).join(', ')}` : ''}
                 </div>
               </div>
             </label>
-            <button onClick={() => setEditing({ isGuest: false, member: m })} className="btn-ghost text-xs">Edit</button>
-            <button onClick={() => removeMember(m.id)} className="btn-ghost text-xs text-red-300 hover:bg-red-500/10">Remove</button>
+            <button onClick={() => setEditing({ isGuest: false, member: m })} className="btn-ghost text-xs">{t('together.edit')}</button>
+            <button onClick={() => removeMember(m.id)} className="btn-ghost text-xs text-red-300 hover:bg-red-500/10">{t('together.remove')}</button>
           </div>
         ))}
         {guests.map((g) => (
           <div key={g.id} className="flex items-center gap-3 rounded-xl border border-brand-400/30 bg-brand-500/10 p-3">
             <div className="flex-1">
-              <div className="font-semibold text-white">{g.name} <span className="text-[10px] uppercase text-brand-300">guest</span></div>
-              <div className="truncate text-xs text-slate-400">{g.love.length ? `♥ ${g.love.map(humanTrait).join(', ')}` : 'Guest'}</div>
+              <div className="font-semibold text-white">{g.name} <span className="text-[10px] uppercase text-brand-300">{t('together.guestTag')}</span></div>
+              <div className="truncate text-xs text-slate-400">{g.love.length ? `♥ ${g.love.map(humanTrait).join(', ')}` : t('together.guestFallback')}</div>
             </div>
-            <button onClick={() => setGuests((gs) => gs.filter((x) => x.id !== g.id))} className="btn-ghost text-xs text-red-300">Remove</button>
+            <button onClick={() => setGuests((gs) => gs.filter((x) => x.id !== g.id))} className="btn-ghost text-xs text-red-300">{t('together.remove')}</button>
           </div>
         ))}
       </div>
 
       <div className="flex flex-wrap gap-2">
         <button onClick={() => setEditing({ isGuest: false, member: { id: newId(), name: '', avoid: [], love: [] } })} className="btn-secondary text-sm">
-          + Add a person
+          {t('together.addPersonBtn')}
         </button>
         <button onClick={() => setEditing({ isGuest: true, member: { id: newId(), name: '', avoid: [], love: [] } })} className="btn-ghost text-sm">
-          + Add a guest (30-sec)
+          {t('together.addGuest')}
         </button>
         {selected.size >= 2 && !activeGroup && (
           <button onClick={saveGroup} className="btn-ghost text-sm text-brand-200">
-            ★ Save this jury as a group
+            {t('together.saveJuryGroup')}
           </button>
         )}
       </div>
@@ -386,18 +387,18 @@ export function TogetherPlanner() {
       {/* Controls + go */}
       <div>
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-400">Tonight:</span>
-          {(['any', 'movie', 'tv'] as const).map((t) => (
-            <button key={t} onClick={() => setMediaType(t)} className={`rounded-full border px-3 py-1 text-xs font-medium ${mediaType === t ? 'border-brand-400/50 bg-brand-500/20 text-brand-100' : 'border-white/15 bg-white/5 text-slate-300'}`}>
-              {t === 'any' ? 'Anything' : t === 'movie' ? 'Movies' : 'TV'}
+          <span className="text-xs text-slate-400">{t('together.tonightLabel')}</span>
+          {(['any', 'movie', 'tv'] as const).map((mt) => (
+            <button key={mt} onClick={() => setMediaType(mt)} className={`rounded-full border px-3 py-1 text-xs font-medium ${mediaType === mt ? 'border-brand-400/50 bg-brand-500/20 text-brand-100' : 'border-white/15 bg-white/5 text-slate-300'}`}>
+              {mt === 'any' ? t('together.anything') : mt === 'movie' ? t('together.movies') : t('together.tv')}
             </button>
           ))}
         </div>
         <button onClick={findPick} disabled={loading || tonight.length === 0} className="btn-primary w-full py-3 text-base">
-          {loading ? 'Finding your pick…' : `🍿 Find our pick (${tonight.length} watching)`}
+          {loading ? t('together.findingPick') : plural('together.findOurPick', tonight.length, {})}
         </button>
         <button onClick={() => setCourtOpen(true)} disabled={tonight.length < 2} className="btn-secondary mt-2 w-full">
-          ⚖️ Hold a 90-Second Taste Court
+          ⚖️ {t('together.hold90Court')}
         </button>
       </div>
 
@@ -436,13 +437,13 @@ export function TogetherPlanner() {
                     {p.posterUrl ? <img src={p.posterUrl} alt="" className="h-full w-full object-cover" /> : null}
                   </Link>
                   <div className="min-w-0 flex-1">
-                    {i === 0 && <div className="text-[11px] font-bold uppercase tracking-wide text-brand-300">Tonight’s pick</div>}
+                    {i === 0 && <div className="text-[11px] font-bold uppercase tracking-wide text-brand-300">{t('together.tonightsPick')}</div>}
                     <Link href={`/app/title/${p.mediaType}/${p.id}`} className="block">
                       <h3 className="text-lg font-bold text-white">{p.title} {p.year ? <span className="font-normal text-slate-400">({p.year})</span> : null}</h3>
                     </Link>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${p.anyVeto ? 'border-red-400/40 bg-red-500/15 text-red-100' : p.minScore >= 75 ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100' : 'border-yellow-400/40 bg-yellow-500/15 text-yellow-100'}`}>{p.verdict}</span>
-                      {p.dnaMatch && <span className="rounded-full border border-brand-400/40 bg-brand-500/15 px-2 py-0.5 text-[10px] font-bold text-brand-100">🧬 Your kind of thing</span>}
+                      {p.dnaMatch && <span className="rounded-full border border-brand-400/40 bg-brand-500/15 px-2 py-0.5 text-[10px] font-bold text-brand-100">🧬 {t('together.yourKindOfThing')}</span>}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {p.perMember.map((pm) => (
@@ -457,13 +458,13 @@ export function TogetherPlanner() {
                 {i === 0 && (
                   <div className="border-t border-white/10 px-4 py-3">
                     {isLogged ? (
-                      <div className="text-xs text-slate-400">Logged{activeGroup ? ` to ${activeGroup.name}’s DNA` : ' — pick a saved jury to remember it'} ✓</div>
+                      <div className="text-xs text-slate-400">{activeGroup ? t('together.loggedToGroup', { name: activeGroup.name }) : t('together.loggedNoJury')}</div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400">Watched it? How’d it go:</span>
-                        <button onClick={() => logOutcome(p, 'loved')} className="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-100">👍 Loved</button>
-                        <button onClick={() => logOutcome(p, 'fine')} className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-200">😐 Fine</button>
-                        <button onClick={() => logOutcome(p, 'nope')} className="rounded-lg border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-xs font-semibold text-red-100">👎 Nope</button>
+                        <span className="text-xs text-slate-400">{t('together.watchedHowdItGo')}</span>
+                        <button onClick={() => logOutcome(p, 'loved')} className="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-100">👍 {t('together.loved')}</button>
+                        <button onClick={() => logOutcome(p, 'fine')} className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-200">😐 {t('together.fine')}</button>
+                        <button onClick={() => logOutcome(p, 'nope')} className="rounded-lg border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-xs font-semibold text-red-100">👎 {t('together.nope')}</button>
                       </div>
                     )}
                   </div>
@@ -471,7 +472,7 @@ export function TogetherPlanner() {
               </div>
             );
           })}
-          <button onClick={findPick} className="btn-secondary w-full">🔁 Show me another set</button>
+          <button onClick={findPick} className="btn-secondary w-full">🔁 {t('together.showAnotherSet')}</button>
         </div>
       )}
     </div>
@@ -479,6 +480,7 @@ export function TogetherPlanner() {
 }
 
 function GroupDNAPanel({ group, onDelete }: { group: Group; onDelete: () => void }) {
+  const { t, plural } = useI18n();
   const { dna } = group;
   const topGenres = Object.entries(dna.lovedGenres).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const compromiser =
@@ -489,17 +491,17 @@ function GroupDNAPanel({ group, onDelete }: { group: Group; onDelete: () => void
   return (
     <div className="card p-4">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-bold text-white">🧬 {group.name} — Group DNA</div>
-        <button onClick={onDelete} className="text-[11px] text-slate-500 hover:text-red-300">Delete jury</button>
+        <div className="text-sm font-bold text-white">🧬 {t('together.groupDna', { name: group.name })}</div>
+        <button onClick={onDelete} className="text-[11px] text-slate-500 hover:text-red-300">{t('together.deleteJury')}</button>
       </div>
       {dna.nights === 0 ? (
-        <p className="mt-2 text-xs text-slate-400">Watch something together and tap how it went — this jury’s taste builds here, separate from each person’s.</p>
+        <p className="mt-2 text-xs text-slate-400">{t('together.groupDnaEmpty')}</p>
       ) : (
         <div className="mt-3 space-y-3 text-sm">
-          <div className="text-xs text-slate-400">{dna.nights} {dna.nights === 1 ? 'night' : 'nights'} logged together</div>
+          <div className="text-xs text-slate-400">{plural('together.nightsLoggedTogether', dna.nights, {})}</div>
           {topGenres.length > 0 && (
             <div>
-              <div className="mb-1 text-xs font-semibold text-slate-300">Genres that click when you’re together</div>
+              <div className="mb-1 text-xs font-semibold text-slate-300">{t('together.genresClick')}</div>
               <div className="flex flex-wrap gap-1.5">
                 {topGenres.map(([g, n]) => (
                   <span key={g} className="rounded-full bg-brand-500/15 px-2.5 py-0.5 text-xs text-brand-100">{g}{n > 1 ? ` ×${n}` : ''}</span>
@@ -509,14 +511,14 @@ function GroupDNAPanel({ group, onDelete }: { group: Group; onDelete: () => void
           )}
           {dna.lovedTitles.length > 0 && (
             <div>
-              <div className="mb-1 text-xs font-semibold text-slate-300">Loved together</div>
-              <div className="text-xs text-slate-300">{dna.lovedTitles.slice(0, 8).map((t) => t.title).join(' · ')}</div>
+              <div className="mb-1 text-xs font-semibold text-slate-300">{t('together.lovedTogether')}</div>
+              <div className="text-xs text-slate-300">{dna.lovedTitles.slice(0, 8).map((lt) => lt.title).join(' · ')}</div>
             </div>
           )}
-          {compromiser && <div className="text-xs text-slate-400">Usual compromiser: <span className="text-slate-200">{compromiser}</span></div>}
+          {compromiser && <div className="text-xs text-slate-400">{t('together.usualCompromiser')} <span className="text-slate-200">{compromiser}</span></div>}
           {dna.surprises.length > 0 && (
             <div className="text-xs text-slate-400">
-              Surprise hits (loved despite the odds): <span className="text-slate-200">{Array.from(new Set(dna.surprises.map((s) => s.title))).slice(0, 4).join(', ')}</span>
+              {t('together.surpriseHits')} <span className="text-slate-200">{Array.from(new Set(dna.surprises.map((s) => s.title))).slice(0, 4).join(', ')}</span>
             </div>
           )}
         </div>

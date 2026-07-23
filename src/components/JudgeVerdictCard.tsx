@@ -1,19 +1,23 @@
+'use client';
+
 import Link from 'next/link';
 import { RatingsStrip } from '@/components/RatingsStrip';
 import { SaveButton } from '@/components/SaveButton';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import { EMPTY_TILE_RATINGS } from '@/lib/ratings';
 import type { TitleVerdict } from '@/lib/askTypes';
+import { useT } from '@/i18n/I18nProvider';
 
-const ENGLISH: Record<TitleVerdict['english'], { icon: string; text: string; warn: boolean }> = {
-  native: { icon: '🔊', text: 'English (original language)', warn: false },
-  available: { icon: '🔊', text: 'English audio available', warn: false },
-  subtitles: { icon: '💬', text: 'Subtitles only — no English audio', warn: true },
-  unknown: { icon: '❔', text: 'Language availability unknown', warn: false },
+const ENGLISH: Record<TitleVerdict['english'], { icon: string; key: string; warn: boolean }> = {
+  native: { icon: '🔊', key: 'together.engNative', warn: false },
+  available: { icon: '🔊', key: 'together.engAvailable', warn: false },
+  subtitles: { icon: '💬', key: 'together.engSubtitles', warn: true },
+  unknown: { icon: '❔', key: 'together.engUnknown', warn: false },
 };
 
 /** A named title "on trial" — the full ruling with every parameter that fired. */
 export function JudgeVerdictCard({ v }: { v: TitleVerdict }) {
+  const t = useT();
   const vis = verdictVisualForCall(v.primaryCall);
   const eng = ENGLISH[v.english];
 
@@ -38,11 +42,11 @@ export function JudgeVerdictCard({ v }: { v: TitleVerdict }) {
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <span className={`rounded-md border px-2 py-0.5 text-xs font-black ${vis.badge}`}>{v.primaryCall}</span>
             <span className="text-lg font-black tabular-nums text-gold-400">{v.matchScore}</span>
-            <span className="text-[11px] text-slate-500">{v.scoredFor.split(' ')[0]} match · {v.generalScore} Standard</span>
+            <span className="text-[11px] text-slate-500">{v.scoredFor.split(' ')[0]} {t('together.matchLabel')} · {v.generalScore} {t('together.standardLabel')}</span>
           </div>
           <p className="mt-1.5 text-sm text-slate-200">{v.oneLiner}</p>
           <div className={`mt-1.5 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] ${eng.warn ? 'bg-red-500/15 text-red-200' : 'bg-white/5 text-slate-300'}`}>
-            {eng.icon} {eng.text}
+            {eng.icon} {t(eng.key)}
           </div>
         </div>
       </div>
@@ -50,7 +54,7 @@ export function JudgeVerdictCard({ v }: { v: TitleVerdict }) {
       {/* Why — every parameter that moved your score */}
       {v.keyFactors.length > 0 && (
         <div className="mt-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Why, for you</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{t('together.whyForYou')}</div>
           <div className="mt-1.5 space-y-1">
             {v.keyFactors.map((f, i) => (
               <div key={i} className="flex items-start gap-2 text-xs">
@@ -59,7 +63,7 @@ export function JudgeVerdictCard({ v }: { v: TitleVerdict }) {
                 </span>
                 <span className="text-slate-300">
                   <span className="font-semibold text-white">{f.label}</span>
-                  {f.defining ? <span className="ml-1 rounded bg-red-500/15 px-1 text-[10px] text-red-200">hard rule</span> : null}
+                  {f.defining ? <span className="ml-1 rounded bg-red-500/15 px-1 text-[10px] text-red-200">{t('together.hardRule')}</span> : null}
                   {f.reason ? ` — ${f.reason}` : ''}
                 </span>
               </div>
@@ -72,7 +76,7 @@ export function JudgeVerdictCard({ v }: { v: TitleVerdict }) {
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {v.reasonsFor.length > 0 && (
             <div>
-              <div className="text-[11px] font-semibold text-emerald-300">In its favor</div>
+              <div className="text-[11px] font-semibold text-emerald-300">{t('together.inItsFavor')}</div>
               <ul className="mt-1 space-y-0.5 text-xs text-slate-300">
                 {v.reasonsFor.slice(0, 4).map((r, i) => <li key={i}>✓ {r}</li>)}
               </ul>
@@ -80,7 +84,7 @@ export function JudgeVerdictCard({ v }: { v: TitleVerdict }) {
           )}
           {v.reasonsAgainst.length > 0 && (
             <div>
-              <div className="text-[11px] font-semibold text-red-300">Against it</div>
+              <div className="text-[11px] font-semibold text-red-300">{t('together.againstIt')}</div>
               <ul className="mt-1 space-y-0.5 text-xs text-slate-300">
                 {v.reasonsAgainst.slice(0, 4).map((r, i) => <li key={i}>✕ {r}</li>)}
               </ul>

@@ -5,6 +5,8 @@ import { getBrowseProviders } from '@/lib/browse';
 import { isAdminEmail } from '@/lib/admin';
 import { SettingsView, type ShareRow } from '@/components/settings/SettingsView';
 import { AvatarPicker } from '@/components/AvatarPicker';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { getServerI18n } from '@/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Settings' };
@@ -47,9 +49,18 @@ export default async function SettingsPage() {
     title: ((s.snapshot as { title?: string } | null)?.title) ?? 'Shared verdict',
   }));
 
+  const { t } = getServerI18n();
+
   return (
     <div className="space-y-6">
       <AvatarPicker current={avatar} initial={avatarInitial} pro={pro} />
+
+      <section className="card p-4 sm:p-5">
+        <div className="eyebrow mb-3">🌐 {t('common.languageRegion')}</div>
+        <div className="max-w-sm">
+          <LanguageSwitcher />
+        </div>
+      </section>
 
       <SettingsView
         email={user?.email ?? ''}

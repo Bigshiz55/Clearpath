@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { submitInterview } from '@/lib/actions/interview';
 import { useToast } from '@/components/Toast';
+import { useT } from '@/i18n/I18nProvider';
 import type { InterviewQuestion, Disposition } from '@/lib/interview';
 
 export function PostWatchInterview({
@@ -20,6 +21,7 @@ export function PostWatchInterview({
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
+  const t = useT();
 
   if (questions.length === 0 || done) return null;
 
@@ -32,12 +34,12 @@ export function PostWatchInterview({
     if (res.ok) {
       setDone(true);
       if (res.nudged && res.nudged.length > 0) {
-        toast.show(`Noted — I’ll ease off ${res.nudged.join(' & ')} for you. Edit anytime in Settings.`, 'success');
+        toast.show(t('title.interview.nudged', { traits: res.nudged.join(' & ') }), 'success');
       } else {
-        toast.show('Thanks — that sharpens your taste profile.', 'success');
+        toast.show(t('title.interview.thanks'), 'success');
       }
     } else {
-      toast.show(res.error ?? 'Couldn’t save.', 'error');
+      toast.show(res.error ?? t('title.interview.couldNotSave'), 'error');
     }
   }
 
@@ -51,11 +53,11 @@ export function PostWatchInterview({
   return (
     <section className="card border-brand-400/30 bg-brand-500/[0.06] p-5 sm:p-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">🎬 10-second check-in</h2>
+        <h2 className="text-lg font-semibold text-white">🎬 {t('title.interview.heading')}</h2>
         <span className="text-xs text-slate-500">{answered}/{questions.length}</span>
       </div>
       <p className="mt-1 text-sm text-slate-400">
-        A couple of quick taps and your taste profile gets sharper — this is the stuff no ratings site knows about you.
+        {t('title.interview.blurb')}
       </p>
 
       <div className="mt-4 space-y-4">
@@ -85,7 +87,7 @@ export function PostWatchInterview({
         ))}
       </div>
 
-      <button onClick={() => setDone(true)} className="btn-ghost mt-4 text-sm">Skip</button>
+      <button onClick={() => setDone(true)} className="btn-ghost mt-4 text-sm">{t('title.interview.skip')}</button>
     </section>
   );
 }

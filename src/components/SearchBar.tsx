@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Poster, PosterCard } from './PosterCard';
+import { useT } from '@/i18n/I18nProvider';
 
 interface Result {
   id: number;
@@ -25,6 +26,7 @@ interface Person {
 
 export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
   const router = useRouter();
+  const t = useT();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Result[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -119,7 +121,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         if (!res.ok) {
-          setError(data.error ?? 'Search failed.');
+          setError(data.error ?? t('ask.searchFailed'));
           setResults([]);
           setPeople([]);
         } else {
@@ -129,7 +131,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
           setOpen(true);
         }
       } catch {
-        setError('Network error. Please try again.');
+        setError(t('ask.networkError'));
       } finally {
         setLoading(false);
       }
@@ -137,7 +139,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
     return () => {
       if (debounce.current) clearTimeout(debounce.current);
     };
-  }, [q]);
+  }, [q, t]);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -172,9 +174,9 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
             else fileWithJudge(query);
             clearAll(); // don't leave the query sitting in the box
           }}
-          placeholder="Search by title, actor, genre, or platform…"
+          placeholder={t('ask.searchPlaceholder')}
           className="w-full rounded-2xl border-2 border-white/25 bg-white/[0.07] py-4 pl-12 pr-11 text-base text-white outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:bg-white/[0.1] focus:ring-4 focus:ring-brand-500/25 shadow-[0_12px_40px_-14px_rgba(0,0,0,0.75)] min-h-[56px]"
-          aria-label="Search for a movie, show, actor, or director"
+          aria-label={t('ask.searchAria')}
         />
         {loading && (
           <span className="absolute right-12 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
@@ -186,8 +188,8 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
             type="button"
             onClick={clearAll}
             className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-slate-300 transition hover:bg-white/5 hover:text-white"
-            aria-label="Clear search"
-            title="Clear"
+            aria-label={t('ask.clearSearch')}
+            title={t('ask.clear')}
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
               <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
@@ -200,8 +202,8 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
             className={`absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg transition ${
               listening ? 'bg-red-500/20 text-red-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
-            aria-label={listening ? 'Stop voice search' : 'Search by voice'}
-            title={listening ? 'Listening… tap to stop' : 'Search by voice'}
+            aria-label={listening ? t('ask.stopVoiceSearch') : t('ask.searchByVoice')}
+            title={listening ? t('ask.listeningTapStop') : t('ask.searchByVoice')}
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
               <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="1.6" />
@@ -217,7 +219,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
         <div className="absolute z-30 mt-2 max-h-[75vh] w-full overflow-auto rounded-2xl border border-white/10 bg-ink-850/95 p-3 shadow-card backdrop-blur">
           {people.length > 0 && (
             <div className="mb-3" onClick={() => setOpen(false)}>
-              <div className="eyebrow mb-1.5 text-[11px]">People</div>
+              <div className="eyebrow mb-1.5 text-[11px]">{t('ask.people')}</div>
               <div className="flex flex-col gap-1">
                 {people.map((p) => (
                   <Link
@@ -258,7 +260,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
 
       {open && !loading && q.trim().length >= 2 && results.length === 0 && people.length === 0 && !error && (
         <div className="absolute z-30 mt-2 w-full rounded-2xl border border-white/10 bg-ink-850/95 p-4 text-sm text-slate-400 shadow-card">
-          No matches for “{q}”. Try a different spelling or the original title.
+          {t('ask.noMatches', { q })}
         </div>
       )}
     </div>

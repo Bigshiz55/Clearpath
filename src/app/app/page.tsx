@@ -15,6 +15,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { InstallHint } from '@/components/InstallHint';
 import { getTonight } from '@/lib/tonight';
+import { getServerI18n } from '@/i18n/server';
 import type { VerdictTier } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -48,12 +49,14 @@ export default async function DiscoverPage() {
 
   // A quick 48-hour scan of what's coming on TV, folded into recommendations.
   const upcomingTv = (await getUpcomingTv(regionFor(profile), Date.now()).catch(() => [])).slice(0, 12);
+  const { t } = getServerI18n();
 
   return (
     <div className="space-y-8">
-      {/* The promise, front and center. */}
-      <div className="rounded-2xl border border-sky-400/40 bg-gradient-to-r from-sky-600 to-blue-700 px-5 py-5 text-center shadow-[0_10px_40px_-12px_rgba(37,99,235,0.6)]">
-        <p className="text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">
+      {/* The promise — a calm supporting strip so it frames the hero ask below
+          rather than competing with it for attention. */}
+      <div className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-2.5 text-center">
+        <p className="text-sm font-semibold tracking-tight text-sky-100 sm:text-base">
           We earn your subscription. We don’t trick you into one.
         </p>
       </div>
@@ -69,8 +72,8 @@ export default async function DiscoverPage() {
       <section className="animate-fade-up space-y-6">
         <div className="text-center">
           <h1 className="text-4xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl">
-            Stop scrolling.{' '}
-            <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">Get rolling.</span>
+            {t('home.heroLine1')}{' '}
+            <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">{t('home.heroLine2')}</span>
           </h1>
           <Tagline className="mt-4 text-2xl sm:text-4xl" />
         </div>
@@ -81,32 +84,30 @@ export default async function DiscoverPage() {
         {/* SECONDARY — already know the title? A quiet, smaller search. */}
         <div className="mx-auto max-w-xl">
           <label className="mb-1.5 block text-center text-sm font-semibold text-slate-400">
-            Already know what you want? Search a title, actor, or platform
+            {t('home.alreadyKnow')}
           </label>
           <SearchBar />
         </div>
 
-        {/* Featured — Decide Together (Live Court): the group "wow", given top
-            billing as a wide, prominent card above the rest of the tiles. */}
+        {/* Decide Together (Live Court) — a supporting strip. It also lives in
+            the primary nav now, so it no longer needs hero-scale billing here;
+            kept as a compact, on-brand entry so the ask box stays dominant. */}
         <Link
           href="/app/together"
           style={{
             '--accent': '244,63,94',
-            background: 'linear-gradient(120deg, rgba(255,46,154,0.22), rgba(168,85,247,0.16) 55%, rgba(9,11,18,0.6))',
-            borderColor: 'rgba(255,46,154,0.4)',
+            background: 'linear-gradient(120deg, rgba(255,46,154,0.16), rgba(168,85,247,0.12) 55%, rgba(9,11,18,0.5))',
+            borderColor: 'rgba(255,46,154,0.32)',
           } as React.CSSProperties}
-          className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/30 active:scale-[0.99] sm:gap-6 sm:p-6"
+          className="group relative flex items-center gap-3 overflow-hidden rounded-xl border p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/25 active:scale-[0.99] sm:gap-4"
         >
-          <span className="relative flex-none">
-            <span aria-hidden className="pointer-events-none absolute -inset-3 rounded-full opacity-60 blur-2xl" style={{ background: 'radial-gradient(circle, rgba(255,46,154,0.7), transparent 70%)' }} />
-            <TileIcon name="together" className="relative h-20 w-20 drop-shadow-[0_12px_26px_rgba(0,0,0,0.55)] transition-transform duration-300 group-hover:scale-[1.06] sm:h-24 sm:w-24" />
-          </span>
+          <TileIcon name="together" className="h-11 w-11 flex-none drop-shadow-[0_8px_18px_rgba(0,0,0,0.5)] transition-transform duration-300 group-hover:scale-[1.06] sm:h-12 sm:w-12" />
           <span className="min-w-0 flex-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-100">⚖️ Live Court</span>
-            <span className="mt-1.5 block text-2xl font-black tracking-tight text-white sm:text-3xl">Decide Together</span>
-            <span className="mt-0.5 block text-sm text-slate-200 sm:text-base">One verdict for the whole room — everyone votes from their own phone, the judge settles it.</span>
+            <span className="text-[11px] font-bold uppercase tracking-wide text-brand-100">⚖️ Live Court</span>
+            <span className="block text-base font-black tracking-tight text-white sm:text-lg">Decide Together</span>
+            <span className="line-clamp-1 block text-xs text-slate-300 sm:text-sm">One verdict for the whole room — everyone votes from their own phone.</span>
           </span>
-          <span aria-hidden className="pointer-events-none flex-none text-2xl font-black text-brand-300 transition-transform duration-300 group-hover:translate-x-0.5 sm:text-3xl">→</span>
+          <span aria-hidden className="pointer-events-none flex-none text-xl font-black text-brand-300 transition-transform duration-300 group-hover:translate-x-0.5">→</span>
         </Link>
 
         {/* Big, clear tiles — every area of the app, tap to go deeper. Cleaned to
@@ -114,21 +115,21 @@ export default async function DiscoverPage() {
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {([
             // Core loop
-            { href: '/app/watch', icon: 'watch', title: 'Watch Now', sub: 'Your VERD1CT DNA picks', rgb: '244,63,94' },
-            { href: '/app/quiz', icon: 'quiz', title: 'Take the Taste Quiz', sub: 'Rate a few · about 5 min', rgb: '168,85,247' },
-            { href: '/app/finder', icon: 'search', title: 'Forensic Search', sub: 'Filter by genre, rating, length…', rgb: '99,102,241' },
+            { href: '/app/watch', icon: 'watch', titleKey: 'home.tileWatchTitle', subKey: 'home.tileWatchSub', rgb: '244,63,94' },
+            { href: '/app/quiz', icon: 'quiz', titleKey: 'home.tileQuizTitle', subKey: 'home.tileQuizSub', rgb: '168,85,247' },
+            { href: '/app/finder', icon: 'search', titleKey: 'home.tileFinderTitle', subKey: 'home.tileFinderSub', rgb: '99,102,241' },
             // Discovery
-            { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', rgb: '59,130,246' },
-            { href: '/app/tv', icon: 'tv', title: 'On TV Now', sub: 'What’s live — next 12/24/48h', rgb: '16,185,129' },
+            { href: '/app/new', icon: 'new', titleKey: 'home.tileNewTitle', subKey: 'home.tileNewSub', rgb: '59,130,246' },
+            { href: '/app/tv', icon: 'tv', titleKey: 'home.tileTvTitle', subKey: 'home.tileTvSub', rgb: '16,185,129' },
             // Your stuff
-            { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', rgb: '14,165,233' },
-            { href: '/app/subscriptions', icon: 'money', title: 'Subscription Check', sub: 'Where you overpay for streaming', rgb: '16,185,129' },
-          ] as const).map((t) => (
+            { href: '/app/watchlist', icon: 'watchlist', titleKey: 'home.tileWatchlistTitle', subKey: 'home.tileWatchlistSub', rgb: '14,165,233' },
+            { href: '/app/subscriptions', icon: 'money', titleKey: 'home.tileSubsTitle', subKey: 'home.tileSubsSub', rgb: '16,185,129' },
+          ] as const).map((tile) => (
             <Link
-              key={t.href}
-              href={t.href}
+              key={tile.href}
+              href={tile.href}
               style={{
-                '--accent': t.rgb,
+                '--accent': tile.rgb,
                 background: 'linear-gradient(150deg, rgba(var(--accent),0.18), rgba(9,11,18,0.55))',
                 borderColor: 'rgba(var(--accent),0.32)',
               } as React.CSSProperties}
@@ -142,13 +143,13 @@ export default async function DiscoverPage() {
                   style={{ background: 'radial-gradient(circle, rgba(var(--accent),0.65), transparent 70%)' }}
                 />
                 <TileIcon
-                  name={t.icon}
+                  name={tile.icon}
                   className="relative h-[72px] w-[72px] drop-shadow-[0_10px_22px_rgba(0,0,0,0.55)] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-[1.08] sm:h-24 sm:w-24"
                 />
               </span>
               <span className="mt-3">
-                <span className="block text-xl font-black leading-tight tracking-tight text-white sm:text-2xl">{t.title}</span>
-                <span className="mt-0.5 block text-sm font-semibold text-slate-300">{t.sub}</span>
+                <span className="block text-xl font-black leading-tight tracking-tight text-white sm:text-2xl">{t(tile.titleKey)}</span>
+                <span className="mt-0.5 block text-sm font-semibold text-slate-300">{t(tile.subKey)}</span>
               </span>
             </Link>
           ))}
@@ -160,9 +161,9 @@ export default async function DiscoverPage() {
       {upcomingTv.length > 0 && (
         <section>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">📺 Coming up on TV — next 48 hours</h2>
+            <h2 className="text-lg font-semibold text-white">📺 {t('home.comingUpTv')}</h2>
             <Link href="/app/tv" className="text-sm text-brand-300 hover:underline">
-              Full guide →
+              {t('home.fullGuide')}
             </Link>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2">
@@ -194,20 +195,20 @@ export default async function DiscoverPage() {
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Your recent verdicts</h2>
+          <h2 className="text-lg font-semibold text-white">{t('home.recentVerdicts')}</h2>
           <Link href="/app/watchlist" className="text-sm text-brand-300 hover:underline">
-            View watchlist →
+            {t('home.viewWatchlist')}
           </Link>
         </div>
 
         {verdicts.length === 0 ? (
           <EmptyState
-            title="No verdicts yet"
+            title={t('home.noVerdicts')}
             description="Search above to generate your first verdict — or import everything you’ve already watched and rated in one go."
             icon={<span className="text-2xl">🍿</span>}
             action={
               <Link href="/app/import" className="btn-primary">
-                Import your history
+                {t('home.importHistory')}
               </Link>
             }
           />

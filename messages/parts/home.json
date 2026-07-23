@@ -1,0 +1,53 @@
+{
+  "en-US": { "home": {
+    "promise": "We earn your subscription. We don’t trick you into one.",
+    "heroLine1": "Stop scrolling.", "heroLine2": "Get rolling.",
+    "alreadyKnow": "Already know what you want? Search a title, actor, or platform",
+    "comingUpTv": "Coming up on TV — next 48 hours", "fullGuide": "Full guide →",
+    "recentVerdicts": "Your recent verdicts", "viewWatchlist": "View watchlist →",
+    "noVerdicts": "No verdicts yet",
+    "noVerdictsDesc": "Search above to generate your first verdict — or import everything you’ve already watched and rated in one go.",
+    "importHistory": "Import your history",
+    "tileWatchTitle": "Watch Now", "tileWatchSub": "Your VERD1CT DNA picks",
+    "tileQuizTitle": "Take the Taste Quiz", "tileQuizSub": "Rate a few · about 5 min",
+    "tileFinderTitle": "Forensic Search", "tileFinderSub": "Filter by genre, rating, length…",
+    "tileNewTitle": "New Releases", "tileNewSub": "Fresh, matched to you",
+    "tileTvTitle": "On TV Now", "tileTvSub": "What’s live — next 12/24/48h",
+    "tileWatchlistTitle": "Watchlist", "tileWatchlistSub": "Everything you saved",
+    "tileSubsTitle": "Subscription Check", "tileSubsSub": "Where you overpay for streaming"
+  }},
+  "es-419": { "home": {
+    "promise": "Nos ganamos tu suscripción. No te engañamos para que pagues una.",
+    "heroLine1": "Deja de scrollear.", "heroLine2": "Empieza a ver.",
+    "alreadyKnow": "¿Ya sabes qué quieres? Busca un título, actor o plataforma",
+    "comingUpTv": "Próximamente en TV — próximas 48 horas", "fullGuide": "Guía completa →",
+    "recentVerdicts": "Tus veredictos recientes", "viewWatchlist": "Ver mi lista →",
+    "noVerdicts": "Aún no hay veredictos",
+    "noVerdictsDesc": "Busca arriba para generar tu primer veredicto, o importa de una vez todo lo que ya viste y calificaste.",
+    "importHistory": "Importar tu historial",
+    "tileWatchTitle": "Ver ahora", "tileWatchSub": "Elegidas por tu ADN VERD1CT",
+    "tileQuizTitle": "Haz el test de gustos", "tileQuizSub": "Califica algunas · unos 5 min",
+    "tileFinderTitle": "Búsqueda forense", "tileFinderSub": "Filtra por género, calificación, duración…",
+    "tileNewTitle": "Novedades", "tileNewSub": "Recién salidas, según tu gusto",
+    "tileTvTitle": "En TV ahora", "tileTvSub": "En vivo — próximas 12/24/48 h",
+    "tileWatchlistTitle": "Mi lista", "tileWatchlistSub": "Todo lo que guardaste",
+    "tileSubsTitle": "Revisar suscripciones", "tileSubsSub": "Dónde pagas de más por streaming"
+  }},
+  "zh-Hans": { "home": {
+    "promise": "我们靠实力赢得你的订阅，绝不诱导你付费。",
+    "heroLine1": "别再刷了。", "heroLine2": "开始看吧。",
+    "alreadyKnow": "已经知道想看什么？搜索片名、演员或平台",
+    "comingUpTv": "电视预告 — 未来 48 小时", "fullGuide": "完整节目单 →",
+    "recentVerdicts": "你最近的裁决", "viewWatchlist": "查看清单 →",
+    "noVerdicts": "还没有裁决",
+    "noVerdictsDesc": "在上方搜索以生成你的第一个裁决，或一次性导入你已看过并评分的全部内容。",
+    "importHistory": "导入你的历史记录",
+    "tileWatchTitle": "立即观看", "tileWatchSub": "由你的 VERD1CT DNA 精选",
+    "tileQuizTitle": "做口味测试", "tileQuizSub": "评几部 · 约 5 分钟",
+    "tileFinderTitle": "精细搜索", "tileFinderSub": "按类型、评分、时长筛选…",
+    "tileNewTitle": "新片上架", "tileNewSub": "为你匹配的新作",
+    "tileTvTitle": "正在播出", "tileTvSub": "电视直播 — 未来 12/24/48 小时",
+    "tileWatchlistTitle": "我的清单", "tileWatchlistSub": "你保存的全部内容",
+    "tileSubsTitle": "订阅检查", "tileSubsSub": "看看哪些流媒体在多花钱"
+  }}
+}

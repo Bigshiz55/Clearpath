@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { addToWatchlist, removeWatchlistItem } from '@/lib/actions/watchlist';
 import { useToast } from '@/components/Toast';
+import { useT } from '@/i18n/I18nProvider';
 
 interface Props {
   tmdbId: number;
@@ -37,6 +38,7 @@ export function SaveButton({
   removeOnSave = false,
 }: Props) {
   const toast = useToast();
+  const t = useT();
   const [saved, setSaved] = useState(initialSaved);
   const [itemId, setItemId] = useState<string | null>(initialItemId);
   const [busy, setBusy] = useState(false);
@@ -67,9 +69,9 @@ export function SaveButton({
         if (res.ok) {
           setSaved(false);
           setItemId(null);
-          toast.show('Removed from your list.', 'info');
+          toast.show(t('toasts.removedFromList'), 'info');
         } else {
-          toast.show(res.error ?? 'Could not remove.', 'error');
+          toast.show(res.error ?? t('toasts.couldNotRemove'), 'error');
         }
       } else {
         const res = await addToWatchlist({ tmdbId, mediaType, title, year, posterPath, status: 'strict' });
@@ -77,11 +79,11 @@ export function SaveButton({
           const data = res.data as { itemId: string } | undefined;
           setItemId(data?.itemId ?? null);
           setSaved(true);
-          toast.show('Added to your list.', 'success');
+          toast.show(t('toasts.savedToList'), 'success');
           onSaved?.();
           if (removeOnSave) hideCard();
         } else {
-          toast.show(res.error ?? 'Sign in to save to your list.', 'error');
+          toast.show(res.error ?? t('toasts.signInToSave'), 'error');
         }
       }
     } finally {
@@ -106,7 +108,7 @@ export function SaveButton({
         type="button"
         onClick={toggle}
         disabled={busy}
-        aria-label={saved ? 'Saved — remove from your list' : 'Save'}
+        aria-label={saved ? t('card.savedHint') : t('card.saveHint')}
         className={`items-center gap-1.5 rounded-lg border font-semibold transition ${
           wide ? 'flex w-full justify-center px-3 py-3 text-sm' : 'inline-flex px-2.5 py-1.5 text-xs'
         } ${
@@ -116,7 +118,7 @@ export function SaveButton({
         }`}
       >
         {icon}
-        {saved ? 'Saved' : 'Save'}
+        {saved ? t('card.saved') : t('card.save')}
       </button>
     );
   }
@@ -127,16 +129,16 @@ export function SaveButton({
       type="button"
       onClick={toggle}
       disabled={busy}
-      aria-label={saved ? 'Saved — remove from your list' : 'Save'}
-      title={saved ? 'Saved — tap to remove' : 'Save'}
-      className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-9'} ${
+      aria-label={saved ? t('card.savedHint') : t('card.saveHint')}
+      title={saved ? t('card.savedHint') : t('card.saveHint')}
+      className={`flex min-w-0 items-center justify-center gap-0.5 rounded-md border text-white transition ${wide ? 'h-11 min-h-[44px] w-full flex-1 flex-col' : 'h-9 w-9'} ${
         saved
           ? 'border-brand-300 bg-brand-500'
           : 'border-brand-400/60 bg-brand-500/35 hover:bg-brand-500/60'
       }`}
     >
       {icon}
-      {wide && <span className="text-[10px] font-black uppercase tracking-wide">{saved ? 'Saved' : 'Save'}</span>}
+      {wide && <span className="text-[9px] font-black uppercase tracking-wide">{saved ? t('card.saved') : t('card.save')}</span>}
     </button>
   );
 }

@@ -2,18 +2,22 @@ import type { WatchProviders, WatchProvider } from '@/lib/types';
 import { TMDB_IMAGE_BASE } from '@/lib/tmdb/client';
 import { isProviderMine } from '@/lib/services';
 import { outHref, providerPayout } from '@/lib/affiliate';
+import { getServerI18n } from '@/i18n/server';
 
-const TYPE_LABELS: Record<WatchProvider['type'], string> = {
-  flatrate: 'Stream',
-  free: 'Free',
-  ads: 'Free with ads',
-  rent: 'Rent',
-  buy: 'Buy',
+/** WatchProvider type → catalog key under discover.provider.*. */
+const TYPE_KEY: Record<WatchProvider['type'], string> = {
+  flatrate: 'stream',
+  free: 'free',
+  ads: 'freeAds',
+  rent: 'rent',
+  buy: 'buy',
 };
 
 const TYPE_ORDER: WatchProvider['type'][] = ['flatrate', 'free', 'ads', 'rent', 'buy'];
 
-function ProviderLogo({ p, mine }: { p: WatchProvider; mine: boolean }) {
+type Translate = (key: string, params?: Record<string, string | number>) => string;
+
+function ProviderLogo({ p, mine, t }: { p: WatchProvider; mine: boolean; t: Translate }) {
   const src = p.logoPath ? `${TMDB_IMAGE_BASE}/w92${p.logoPath}` : null;
   const inner = (
     <>
@@ -26,7 +30,7 @@ function ProviderLogo({ p, mine }: { p: WatchProvider; mine: boolean }) {
         </div>
       )}
       <span className={`text-xs font-medium ${mine ? 'text-emerald-100' : 'text-slate-200'}`}>{p.providerName}</span>
-      {mine && <span className="text-[10px] font-bold text-emerald-300">✓ yours</span>}
+      {mine && <span className="text-[10px] font-bold text-emerald-300">{t('discover.provider.yours')}</span>}
       {p.link && <span aria-hidden className="text-[11px] text-brand-300">↗</span>}
     </>
   );
@@ -44,7 +48,7 @@ function ProviderLogo({ p, mine }: { p: WatchProvider; mine: boolean }) {
         target="_blank"
         rel="noopener noreferrer sponsored"
         className={`${cls} hover:border-brand-400/60 hover:bg-brand-500/15`}
-        title={`Open ${p.providerName} →`}
+        title={t('discover.provider.openProvider', { name: p.providerName })}
       >
         {inner}
       </a>
@@ -60,19 +64,19 @@ export function ProviderRow({
   providers: WatchProviders | null;
   myServices?: number[];
 }) {
+  const { t } = getServerI18n();
   if (!providers) {
     return (
       <p className="text-sm text-slate-400">
-        Streaming availability was not requested for this region.
+        {t('discover.provider.notRequested')}
       </p>
     );
   }
   if (!providers.available || providers.options.length === 0) {
     return (
       <p className="text-sm text-slate-400">
-        No legal streaming, rental, or purchase options were found for{' '}
-        <span className="font-medium text-slate-200">{providers.region}</span> right now. Availability
-        changes often — check again later.
+        {t('discover.provider.noneFoundA')}
+        <span className="font-medium text-slate-200">{providers.region}</span>{t('discover.provider.noneFoundB')}
       </p>
     );
   }
@@ -103,7 +107,7 @@ export function ProviderRow({
       {grouped.map((g) => (
         <div key={g.type}>
           <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            {TYPE_LABELS[g.type]}
+            {t(`discover.provider.${TYPE_KEY[g.type]}`)}
           </div>
           <div className="flex flex-wrap gap-2">
             {g.items.map((p) => (
@@ -111,19 +115,19 @@ export function ProviderRow({
                 key={`${g.type}-${p.providerId}`}
                 p={p}
                 mine={(g.type === 'flatrate' || g.type === 'free' || g.type === 'ads') && isProviderMine(p.providerId, myServices)}
+                t={t}
               />
             ))}
           </div>
         </div>
       ))}
       <p className="pt-1 text-[11px] text-slate-500">
-        Availability for {providers.region} provided by TMDB / JustWatch. Data may change and is not
-        guaranteed to be current.
+        {t('discover.provider.footer', { region: providers.region })}
         {providers.link ? (
           <>
             {' '}
             <a href={providers.link} target="_blank" rel="noopener noreferrer" className="text-brand-300 underline">
-              View on JustWatch
+              {t('discover.provider.viewJustWatch')}
             </a>
           </>
         ) : null}

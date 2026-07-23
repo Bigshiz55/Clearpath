@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { setDimensionOverride, clearDimensionOverride } from '@/lib/actions/dimensionOverrides';
+import { useI18n } from '@/i18n/I18nProvider';
 
 export interface DialView {
   key: string;
@@ -18,11 +19,17 @@ export interface DialView {
   isLimit: boolean;
 }
 
-const TIER: Record<DialView['tier'], { text: string; cls: string }> = {
-  learning: { text: 'Still learning', cls: 'text-slate-400 border-slate-500/40 bg-slate-500/10' },
-  weak: { text: 'Slight lean', cls: 'text-slate-300 border-slate-400/40 bg-slate-400/10' },
-  moderate: { text: 'Moderate', cls: 'text-brand-200 border-brand-400/40 bg-brand-500/10' },
-  strong: { text: 'Strong', cls: 'text-emerald-200 border-emerald-400/40 bg-emerald-500/10' },
+const TIER_CLS: Record<DialView['tier'], string> = {
+  learning: 'text-slate-400 border-slate-500/40 bg-slate-500/10',
+  weak: 'text-slate-300 border-slate-400/40 bg-slate-400/10',
+  moderate: 'text-brand-200 border-brand-400/40 bg-brand-500/10',
+  strong: 'text-emerald-200 border-emerald-400/40 bg-emerald-500/10',
+};
+const TIER_KEY: Record<DialView['tier'], string> = {
+  learning: 'dna.tierLearning',
+  weak: 'dna.tierWeak',
+  moderate: 'dna.tierModerate',
+  strong: 'dna.tierStrong',
 };
 
 export function TasteDials({ dials }: { dials: DialView[] }) {
@@ -37,22 +44,35 @@ export function TasteDials({ dials }: { dials: DialView[] }) {
 
 function Dial({ dial }: { dial: DialView }) {
   const router = useRouter();
+  const { t, plural } = useI18n();
   const [open, setOpen] = useState(false);
   const [pref, setPref] = useState(dial.pref);
   const [limit, setLimit] = useState(dial.isLimit);
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
+  // Translate the axis label/endpoints by the stable dimension key, falling back
+  // to the English text the pure engine supplied if a translation is missing.
+  const L = (suffix: 'label' | 'low' | 'high', fb: string) => {
+    const k = `dims.${dial.key}.${suffix}`;
+    const r = t(k);
+    return r === k ? fb : r;
+  };
+  const label = L('label', dial.label);
+  const low = L('low', dial.low);
+  const high = L('high', dial.high);
+
   const strong = Math.abs(dial.pref - 50) >= 25;
-  const tier = TIER[dial.tier];
-  const leanFor = (p: number) => (p >= 50 ? dial.high : dial.low);
+  const tierCls = TIER_CLS[dial.tier];
+  const tierText = t(TIER_KEY[dial.tier]);
+  const leanFor = (p: number) => (p >= 50 ? high : low);
 
   function save() {
     setErr(null);
     start(async () => {
       const r = await setDimensionOverride({ key: dial.key, pref: Math.round(pref), isLimit: limit });
       if (!r.ok) {
-        setErr(r.error ?? 'Could not save.');
+        setErr(r.error ?? t('dna.couldNotSave'));
         return;
       }
       setOpen(false);
@@ -64,7 +84,7 @@ function Dial({ dial }: { dial: DialView }) {
     start(async () => {
       const r = await clearDimensionOverride(dial.key);
       if (!r.ok) {
-        setErr(r.error ?? 'Could not clear.');
+        setErr(r.error ?? t('dna.couldNotClear'));
         return;
       }
       setOpen(false);
@@ -77,11 +97,11 @@ function Dial({ dial }: { dial: DialView }) {
       {/* Axis name + lean + strength */}
       <div className="flex items-baseline justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="text-sm font-bold text-white">{dial.label}</span>
-          {dial.pinned && <span className="text-[10px] font-bold uppercase tracking-wide text-brand-300" title="You set this">📌 Yours</span>}
-          {dial.isLimit && <span className="text-[10px] font-bold uppercase tracking-wide text-rose-300" title="Marked a dealbreaker">⛔ Avoid</span>}
+          <span className="text-sm font-bold text-white">{label}</span>
+          {dial.pinned && <span className="text-[10px] font-bold uppercase tracking-wide text-brand-300" title={t('dna.youSetThis')}>📌 {t('dna.yours')}</span>}
+          {dial.isLimit && <span className="text-[10px] font-bold uppercase tracking-wide text-rose-300" title={t('dna.avoid')}>⛔ {t('dna.avoid')}</span>}
         </div>
-        <span className={`text-xs font-bold ${strong ? 'text-brand-200' : 'text-slate-300'}`}>{dial.lean}</span>
+        <span className={`text-xs font-bold ${strong ? 'text-brand-200' : 'text-slate-300'}`}>{leanFor(dial.pref)}</span>
       </div>
 
       {/* Track */}
@@ -93,24 +113,24 @@ function Dial({ dial }: { dial: DialView }) {
         />
       </div>
       <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-        <span>{dial.low}</span>
-        <span>{dial.high}</span>
+        <span>{low}</span>
+        <span>{high}</span>
       </div>
 
       {/* Confidence + sample count + adjust */}
       <div className="mt-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${dial.pinned ? 'border-brand-400/40 bg-brand-500/10 text-brand-200' : tier.cls}`}>
-            {dial.pinned ? 'You set this' : tier.text}
+          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${dial.pinned ? 'border-brand-400/40 bg-brand-500/10 text-brand-200' : tierCls}`}>
+            {dial.pinned ? t('dna.youSetThis') : tierText}
           </span>
           {!dial.pinned && (
             <span className="text-[11px] text-slate-500">
-              {dial.samples} title{dial.samples === 1 ? '' : 's'} · {Math.round(dial.confidence * 100)}% sure
+              {plural('dna.samples', dial.samples, { pct: Math.round(dial.confidence * 100) })}
             </span>
           )}
         </div>
         <button onClick={() => setOpen((o) => !o)} className="text-[11px] font-bold text-brand-300 hover:text-brand-200">
-          {open ? 'Close' : dial.pinned ? 'Edit' : 'Adjust'}
+          {open ? t('dna.close') : dial.pinned ? t('dna.edit') : t('dna.adjust')}
         </button>
       </div>
 
@@ -118,9 +138,9 @@ function Dial({ dial }: { dial: DialView }) {
       {open && (
         <div className="mt-3 rounded-lg border border-white/10 bg-ink-900/50 p-3">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-400">{dial.low}</span>
+            <span className="text-slate-400">{low}</span>
             <span className="font-bold text-brand-200">{leanFor(pref)}</span>
-            <span className="text-slate-400">{dial.high}</span>
+            <span className="text-slate-400">{high}</span>
           </div>
           <input
             type="range"
@@ -129,20 +149,20 @@ function Dial({ dial }: { dial: DialView }) {
             value={pref}
             onChange={(e) => setPref(Number(e.target.value))}
             className="mt-2 w-full accent-brand-500"
-            aria-label={`Set your ${dial.label}`}
+            aria-label={t('dna.setYour', { label })}
           />
           <label className="mt-2 flex items-center gap-2 text-xs text-slate-300">
             <input type="checkbox" checked={limit} onChange={(e) => setLimit(e.target.checked)} className="accent-rose-500" />
-            Make this a dealbreaker — steer me hard away from the other end
+            {t('dna.dealbreaker')}
           </label>
           {err && <div className="mt-2 text-xs text-rose-300">{err}</div>}
           <div className="mt-3 flex items-center gap-2">
             <button onClick={save} disabled={pending} className="btn-primary px-3 py-1.5 text-xs disabled:opacity-60">
-              {pending ? 'Saving…' : 'Save'}
+              {pending ? t('dna.saving') : t('dna.save')}
             </button>
             {dial.pinned && (
               <button onClick={reset} disabled={pending} className="text-xs font-semibold text-slate-400 hover:text-white">
-                Reset to learned
+                {t('dna.resetLearned')}
               </button>
             )}
           </div>

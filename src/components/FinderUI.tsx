@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useI18n } from '@/i18n/I18nProvider';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { STREAMING_SERVICES } from '@/lib/services';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
@@ -40,13 +41,20 @@ interface ResultItem {
  *  something you can watch now, so we simply don't show an airtime for it. */
 const AIRING_WINDOW_MS = 48 * 60 * 60 * 1000;
 
+/** Translate function signature shared by the module-level readout helpers. */
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
+
 /**
  * A show's next airing, but only when it's within the next 48 hours of the
  * search — the window you can actually act on. Returns null otherwise (e.g. a
  * premiere months away), so no months-out date ever shows up as an airtime.
  * "8:00 PM · CBS · Tonight" / "… · Tomorrow" / "… · Wed Jul 23".
  */
-function airingInfo(a: { network: string; time: string; airstamp: string }): { text: string } | null {
+function airingInfo(
+  a: { network: string; time: string; airstamp: string },
+  t: TFunc,
+  locale: string,
+): { text: string } | null {
   const airMs = Date.parse(a.airstamp);
   if (!Number.isFinite(airMs)) return null;
   const now = Date.now();
@@ -58,28 +66,21 @@ function airingInfo(a: { network: string; time: string; airstamp: string }): { t
   const isToday = d.toDateString() === new Date(now).toDateString();
   const isTomorrow = new Date(now + dayMs).toDateString() === d.toDateString();
   const day = isToday
-    ? 'Tonight'
+    ? t('discover.finder.airTonight')
     : isTomorrow
-      ? 'Tomorrow'
-      : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      ? t('discover.finder.airTomorrow')
+      : d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
 
   let clock = '';
   const m = a.time.match(/^(\d{1,2}):(\d{2})/);
   if (m) {
     let h = Number(m[1]);
-    const ampm = h >= 12 ? 'PM' : 'AM';
+    const ampm = h >= 12 ? t('discover.finder.pm') : t('discover.finder.am');
     h = h % 12 || 12;
     clock = `${h}:${m[2]} ${ampm}`;
   }
   return { text: [clock, a.network, day].filter(Boolean).join(' · ') };
 }
-
-
-const EXAMPLES = [
-  'A crime thriller movie under 140 minutes, out in the last 24 months, match 80+',
-  'A bingeable show, all episodes out, audience 80%+, English audio, on my services',
-  'Something funny and short I can watch tonight on my services',
-];
 
 function Seg<T extends string | number>({
   value, options, onChange,
@@ -140,16 +141,17 @@ function Slider({
   );
 }
 
-function runtimeReadout(v: number): string {
-  if (v >= 240) return 'Any length';
+function runtimeReadout(v: number, t: TFunc): string {
+  if (v >= 240) return t('discover.finder.anyLength');
   const h = Math.floor(v / 60);
   const m = v % 60;
-  return h > 0 ? `≤ ${h}h ${m ? `${m}m` : ''}`.trim() : `≤ ${m}m`;
+  if (h > 0) return m ? t('discover.finder.runtimeHM', { h, m }) : t('discover.finder.runtimeH', { h });
+  return t('discover.finder.runtimeM', { m });
 }
-function releasedReadout(years: number): string {
-  if (years <= 0) return 'Any year';
+function releasedReadout(years: number, t: TFunc): string {
+  if (years <= 0) return t('discover.finder.anyYear');
   const from = new Date().getFullYear() - years;
-  return `${from} → now`;
+  return t('discover.finder.releasedRange', { from });
 }
 
 export function FinderUI({
@@ -162,11 +164,17 @@ export function FinderUI({
   /** On the home screen the judge already lives elsewhere, so hide the bench. */
   embedded?: boolean;
 }) {
+  const { t, plural, locale } = useI18n();
+  const EXAMPLES = [
+    t('discover.finder.example1'),
+    t('discover.finder.example2'),
+    t('discover.finder.example3'),
+  ];
   const [text, setText] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
   const [watcherIdx, setWatcherIdx] = useState(-1); // -1 = You
   const [items, setItems] = useState<ResultItem[] | null>(null);
-  const [scoredFor, setScoredFor] = useState('Your match');
+  const [scoredFor, setScoredFor] = useState(t('discover.finder.defaultScoredFor'));
   const [relaxed, setRelaxed] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -237,10 +245,10 @@ export function FinderUI({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed');
       setItems(data.items ?? []);
-      setScoredFor(data.scoredFor ?? 'Your match');
+      setScoredFor(data.scoredFor ?? t('discover.finder.defaultScoredFor'));
       setRelaxed(data.relaxed ?? null);
     } catch {
-      setError('Couldn’t run that search. Try again.');
+      setError(t('discover.finder.searchError'));
       setItems([]);
     } finally {
       setLoading(false);
@@ -255,8 +263,8 @@ export function FinderUI({
     <div className="space-y-5">
       {(q.providerIds?.length ?? 0) > 0 && (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-brand-400/40 bg-brand-500/10 px-3.5 py-2.5 text-sm text-brand-100">
-          <span>📺 Filtered to <b className="text-white">{providerFilterNames.join(', ') || 'your pick'}</b> — real availability from TMDB.</span>
-          <button onClick={() => set('providerIds', [])} className="flex-none text-xs font-semibold text-brand-200 underline underline-offset-2 hover:text-white">Clear</button>
+          <span>{t('discover.finder.filteredPre')}<b className="text-white">{providerFilterNames.join(', ') || t('discover.finder.yourPick')}</b>{t('discover.finder.filteredPost')}</span>
+          <button onClick={() => set('providerIds', [])} className="flex-none text-xs font-semibold text-brand-200 underline underline-offset-2 hover:text-white">{t('discover.finder.clear')}</button>
         </div>
       )}
       {/* On the home screen, both ways to search live inside ONE outlined box —
@@ -265,7 +273,7 @@ export function FinderUI({
       <div className={embedded ? 'space-y-5 rounded-3xl border-2 border-brand-400/40 bg-brand-500/[0.05] p-4 sm:p-6' : 'contents'}>
         {embedded && (
           <div className="flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
-            <span aria-hidden>⚖️</span> Your opening statement
+            <span aria-hidden>⚖️</span> {t('discover.finder.openingStatement')}
           </div>
         )}
 
@@ -274,7 +282,7 @@ export function FinderUI({
         {!embedded && <JudgeBench big />}
 
         <div className={embedded ? 'flex flex-col gap-3' : 'card flex flex-col gap-3 p-4'}>
-          {!embedded && <div className="eyebrow-lg">⚖️ Try your case</div>}
+          {!embedded && <div className="eyebrow-lg">{t('discover.finder.tryCase')}</div>}
           <textarea
             value={text}
             onChange={(e) => onText(e.target.value)}
@@ -285,7 +293,7 @@ export function FinderUI({
               }
             }}
             rows={3}
-            placeholder="Tell me exactly what you want, then hit Enter… “a crime thriller under 140 min, out in the last 2 years, 80+ match”"
+            placeholder={t('discover.finder.placeholder')}
             className="input min-h-[110px] w-full flex-1 resize-none text-base sm:text-lg"
           />
           <div className="flex flex-wrap gap-1.5">
@@ -296,15 +304,15 @@ export function FinderUI({
             ))}
           </div>
           <button onClick={() => void find()} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
-            {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
+            {loading ? t('discover.finder.deliberating') : t('discover.finder.submitEvidence')}
           </button>
         </div>
       </div>
 
       {loading && (
         <div className="card p-6 text-center">
-          <div className="text-sm font-semibold text-white">⚖️ The court is deliberating…</div>
-          <div className="mt-1 text-xs text-slate-400">Weighing your evidence against every candidate.</div>
+          <div className="text-sm font-semibold text-white">{t('discover.finder.deliberatingCard')}</div>
+          <div className="mt-1 text-xs text-slate-400">{t('discover.finder.weighing')}</div>
         </div>
       )}
       {error && <p className="text-sm text-amber-300">{error}</p>}
@@ -313,19 +321,19 @@ export function FinderUI({
         <div id="finder-results" className="scroll-mt-4">
           {relaxed && <p className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{relaxed}</p>}
           {items.length === 0 ? (
-            <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and submit again.</p>
+            <p className="text-sm text-slate-400">{t('discover.finder.emptyResults')}</p>
           ) : (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="inline-flex flex-wrap items-center gap-1 text-base font-bold text-white sm:text-lg">
-                  ⚖️ The verdict — {items.length} match{items.length === 1 ? '' : 'es'}, ranked by
+                  {plural('discover.finder.verdictLead', items.length, {})}
                   <MatchMark size="text-sm" /> {scoredFor}:
                 </div>
                 <button
                   onClick={() => document.getElementById('evidence')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                   className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
                 >
-                  ⚖️ Present new evidence ↓
+                  {t('discover.finder.presentNew')}
                 </button>
               </div>
               <div className="poster-grid">
@@ -342,7 +350,7 @@ export function FinderUI({
                   >
                     {it.reason && <p className="mt-1.5 line-clamp-3 text-xs text-slate-400">{it.reason}</p>}
                     {(() => {
-                      const info = it.mediaType === 'tv' && it.airing ? airingInfo(it.airing) : null;
+                      const info = it.mediaType === 'tv' && it.airing ? airingInfo(it.airing, t, locale) : null;
                       if (!info) return null;
                       return (
                         <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-2 py-1 text-xs font-bold text-white">
@@ -370,25 +378,25 @@ export function FinderUI({
       {/* OR — type an opening statement above, or build the case with the controls. */}
       <div className="flex items-center gap-4" aria-hidden>
         <span className="h-0.5 flex-1 rounded-full bg-white/15" />
-        <span className="text-3xl font-black uppercase tracking-[0.15em] text-slate-300 sm:text-4xl">OR</span>
+        <span className="text-3xl font-black uppercase tracking-[0.15em] text-slate-300 sm:text-4xl">{t('discover.finder.orDivider')}</span>
         <span className="h-0.5 flex-1 rounded-full bg-white/15" />
       </div>
 
       {/* Submit your evidence — transparent, editable, no black box. */}
       <div id="evidence" className={embedded ? 'space-y-4 scroll-mt-20' : 'card space-y-4 p-4 scroll-mt-20'}>
         <div className="flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
-          <span aria-hidden>🎛️</span> Submit your evidence
+          <span aria-hidden>🎛️</span> {t('discover.finder.submitYourEvidence')}
         </div>
 
         {watchers.length > 0 && (
           <div>
-            <div className="label">Who’s watching</div>
+            <div className="label">{t('discover.finder.whosWatching')}</div>
             <div className="flex flex-wrap gap-1.5">
               <button
                 onClick={() => setWatcherIdx(-1)}
                 className={`rounded-lg border px-3 py-1.5 text-sm transition ${watcherIdx === -1 ? 'border-gold-400/60 bg-gold-500/15 text-gold-400' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
               >
-                You
+                {t('discover.finder.you')}
               </button>
               {watchers.map((w, i) => (
                 <button
@@ -400,13 +408,13 @@ export function FinderUI({
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-slate-400">Scores every result against their taste — “{(watcherIdx >= 0 ? watchers[watcherIdx]!.name : 'You')} match”.</p>
+            <p className="mt-1 text-xs text-slate-400">{t('discover.finder.scoresAgainst', { name: watcherIdx >= 0 ? watchers[watcherIdx]!.name : t('discover.finder.you') })}</p>
           </div>
         )}
 
         <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-start">
           <div>
-            <div className="label">Type</div>
+            <div className="label">{t('discover.finder.typeLabel')}</div>
             <Seg
               value={q.liveOnly ? 'live' : q.mediaType === 'movie' ? 'movie' : 'tv'}
               onChange={(v) =>
@@ -417,32 +425,32 @@ export function FinderUI({
                 }))
               }
               options={[
-                { v: 'movie', label: 'Movies' },
-                { v: 'tv', label: 'Shows' },
-                { v: 'live', label: 'Live TV' },
+                { v: 'movie', label: t('discover.finder.movies') },
+                { v: 'tv', label: t('discover.finder.shows') },
+                { v: 'live', label: t('discover.finder.liveTv') },
               ]}
             />
             {q.liveOnly && (
-              <p className="mt-1 text-[11px] text-slate-400">Shows with a real upcoming airing — channel & time on each result.</p>
+              <p className="mt-1 text-[11px] text-slate-400">{t('discover.finder.liveHint')}</p>
             )}
           </div>
 
           <div>
-            <div className="label">Your services</div>
+            <div className="label">{t('discover.finder.yourServices')}</div>
             <a
               href="/app/settings"
               className="inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 py-2 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/25"
             >
-              <span aria-hidden>⚙️</span> Adjust your services
+              {t('discover.finder.adjustServices')}
             </a>
             <p className="mt-1 text-[11px] text-slate-400">
-              Results prefer the streaming services &amp; channels you have — set those up in Settings.
+              {t('discover.finder.servicesHint')}
             </p>
           </div>
         </div>
 
         <div>
-          <div className="label">Genres</div>
+          <div className="label">{t('discover.finder.genresLabel')}</div>
           <div className="flex flex-wrap gap-1.5">
             {GENRE_CHIPS.map((g) => (
               <button key={g.id} onClick={() => toggleGenre(g.id)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.genreIds.includes(g.id) ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
@@ -453,66 +461,65 @@ export function FinderUI({
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Slider label="Max length" hint="The longest a movie can run" readout={runtimeReadout(q.maxRuntime ?? 240)} min={60} max={240} step={10}
-            minLabel="1 hr" maxLabel="Any length"
+          <Slider label={t('discover.finder.maxLength')} hint={t('discover.finder.maxLengthHint')} readout={runtimeReadout(q.maxRuntime ?? 240, t)} min={60} max={240} step={10}
+            minLabel={t('discover.finder.oneHr')} maxLabel={t('discover.finder.anyLength')}
             value={q.maxRuntime ?? 240} onChange={(v) => set('maxRuntime', v >= 240 ? null : v)} />
-          <Slider label="How far back" hint="How old a title can be" readout={releasedReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0)} min={0} max={75} step={1}
-            minLabel="Any year" maxLabel="Classics"
+          <Slider label={t('discover.finder.howFarBack')} hint={t('discover.finder.howFarBackHint')} readout={releasedReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0, t)} min={0} max={75} step={1}
+            minLabel={t('discover.finder.anyYear')} maxLabel={t('discover.finder.classics')}
             value={q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0} onChange={(years) => set('sinceMonths', years === 0 ? null : years * 12)} />
-          <Slider label="🍿 Popcorn meter (audience)" hint="Minimum crowd score" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
-            minLabel="Any" maxLabel="Crowd-loved"
+          <Slider label={t('discover.finder.popcorn')} hint={t('discover.finder.popcornHint')} readout={q.minAudience ? `${q.minAudience}%+` : t('discover.finder.any')} min={0} max={95} step={5}
+            minLabel={t('discover.finder.any')} maxLabel={t('discover.finder.crowdLoved')}
             value={q.minAudience ?? 0} onChange={(v) => set('minAudience', v === 0 ? null : v)} />
-          <Slider label="IMDb rating" hint="Minimum IMDb score" readout={q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'} min={0} max={9} step={0.5}
-            minLabel="Any" maxLabel="9.0 +"
+          <Slider label={t('discover.finder.imdbRating')} hint={t('discover.finder.imdbHint')} readout={q.minImdb ? `${q.minImdb.toFixed(1)}+` : t('discover.finder.any')} min={0} max={9} step={0.5}
+            minLabel={t('discover.finder.any')} maxLabel={t('discover.finder.imdbMax')}
             value={q.minImdb ?? 0} onChange={(v) => set('minImdb', v === 0 ? null : v)} accent />
-          <Slider label={`${scoredFor} at least`} icon={<MatchMark size="text-sm" />} hint="How well it must fit your taste" readout={q.minMatch ? `${q.minMatch}+` : 'Any'} min={0} max={95} step={5}
-            minLabel="Any" maxLabel="Best fit for you"
+          <Slider label={t('discover.finder.matchAtLeast', { scoredFor })} icon={<MatchMark size="text-sm" />} hint={t('discover.finder.matchHint')} readout={q.minMatch ? `${q.minMatch}+` : t('discover.finder.any')} min={0} max={95} step={5}
+            minLabel={t('discover.finder.any')} maxLabel={t('discover.finder.bestFit')}
             value={q.minMatch ?? 0} onChange={(v) => set('minMatch', v === 0 ? null : v)} accent />
         </div>
         <p className="-mt-1 text-[11px] leading-relaxed text-slate-400">
-          Each slider stays at “Any” until you drag it right. “Audience score” is the crowd rating from TMDB — the open
-          stand-in for Rotten Tomatoes’ audience/Popcorn score.
+          {t('discover.finder.slidersNote')}
         </p>
 
         <div className="flex flex-wrap gap-2">
           <button onClick={() => set('englishAudioOnly', !q.englishAudioOnly)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.englishAudioOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-            {q.englishAudioOnly ? '✓ ' : ''}English audio only
+            {q.englishAudioOnly ? '✓ ' : ''}{t('discover.finder.englishAudio')}
           </button>
           <button
             onClick={() => set('streamItOnly', !q.streamItOnly)}
-            title="Only titles the judge rules Stream It — our “Watch It” verdict."
+            title={t('discover.finder.streamItTitle')}
             className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
           >
-            {q.streamItOnly ? '✓ ' : ''}⚖️ “Stream It” verdicts only
+            {q.streamItOnly ? '✓ ' : ''}{t('discover.finder.streamItOnly')}
           </button>
           {q.mediaType !== 'movie' && (
             <button
               onClick={() => set('bingeableOnly', !q.bingeableOnly)}
-              title="TV only: every episode of the latest season is already out — nothing left to wait on (vs. an ongoing, week-to-week release)."
+              title={t('discover.finder.allEpisodesTitle')}
               className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.bingeableOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
             >
-              {q.bingeableOnly ? '✓ ' : ''}📺 All episodes out
+              {q.bingeableOnly ? '✓ ' : ''}{t('discover.finder.allEpisodes')}
             </button>
           )}
           <button
             onClick={() => set('upcoming', !q.upcoming)}
-            title="Only titles that haven't come out yet — upcoming movies and brand-new shows. Something else nobody else lets you search."
+            title={t('discover.finder.upcomingTitle')}
             className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.upcoming ? 'border-amber-400/50 bg-amber-500/15 text-amber-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
           >
-            {q.upcoming ? '✓ ' : ''}🔮 Upcoming only
+            {q.upcoming ? '✓ ' : ''}{t('discover.finder.upcomingOnly')}
           </button>
           <button
             onClick={() => set('onMyServices', !q.onMyServices)}
             disabled={!hasServices}
-            title={hasServices ? '' : 'Add your services in Settings first'}
+            title={hasServices ? '' : t('discover.finder.onMyServicesTitle')}
             className={`rounded-lg border px-3 py-1.5 text-sm transition disabled:opacity-40 ${q.onMyServices ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
           >
-            {q.onMyServices ? '✓ ' : ''}Only on my services
+            {q.onMyServices ? '✓ ' : ''}{t('discover.finder.onMyServices')}
           </button>
         </div>
 
         <button onClick={() => void find()} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
-          {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
+          {loading ? t('discover.finder.deliberating') : t('discover.finder.submitEvidence')}
         </button>
       </div>
       </div>

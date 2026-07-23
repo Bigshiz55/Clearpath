@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { PreferenceTrait } from '@/lib/types';
 import { ShareCard, CourtCardArt } from './ShareCards';
+import { useI18n } from '@/i18n/I18nProvider';
 
 export interface CourtMember {
   name: string;
@@ -19,14 +20,14 @@ interface Finalist {
 interface Veto { idx: number; by: string; reason: string }
 
 const MOODS = [
-  { key: 'any', label: 'Anything', emoji: '🎬' },
-  { key: 'light', label: 'Light', emoji: '🌤️' },
-  { key: 'intense', label: 'Intense', emoji: '🔥' },
-  { key: 'funny', label: 'Funny', emoji: '😂' },
-  { key: 'cinematic', label: 'Cinematic', emoji: '🎥' },
-  { key: 'short', label: 'Short', emoji: '⏱️' },
+  { key: 'any', emoji: '🎬' },
+  { key: 'light', emoji: '🌤️' },
+  { key: 'intense', emoji: '🔥' },
+  { key: 'funny', emoji: '😂' },
+  { key: 'cinematic', emoji: '🎥' },
+  { key: 'short', emoji: '⏱️' },
 ];
-const REASONS = ['Too intense', 'Too long', 'Not in the mood', 'Seen it', 'Just no'];
+const REASON_KEYS = ['tooIntense', 'tooLong', 'notInMood', 'seenIt', 'justNo'];
 const CLOCK = 90;
 
 export function TasteCourt({
@@ -39,6 +40,7 @@ export function TasteCourt({
   onClose: () => void;
   onWinnerLogged?: (f: Finalist, outcome: 'loved' | 'fine' | 'nope') => void;
 }) {
+  const { t, plural } = useI18n();
   const [phase, setPhase] = useState<'mood' | 'loading' | 'veto' | 'verdict'>('mood');
   const [moodIdx, setMoodIdx] = useState(0);
   const [moods, setMoods] = useState<string[]>(() => members.map(() => 'any'));
@@ -63,14 +65,14 @@ export function TasteCourt({
         }),
       });
       const data = await res.json();
-      if (!res.ok || data.error) { setError(data.error ?? 'The court could not convene.'); return; }
+      if (!res.ok || data.error) { setError(data.error ?? t('together.courtCouldNotConvene')); return; }
       const f = (data.finalists ?? []) as Finalist[];
-      if (f.length === 0) { setError('No finalists survived the exclusions.'); return; }
+      if (f.length === 0) { setError(t('together.noFinalists')); return; }
       setFinalists(f);
       setVetoIdx(0);
       setPhase('veto');
     } catch {
-      setError('Network error. Try again.');
+      setError(t('together.networkErrorShort'));
     }
   }
 
@@ -130,17 +132,19 @@ export function TasteCourt({
     const w = finalists[winnerIdx];
     if (!w) return lines;
     const above85 = finalists.filter((f) => f.minScore >= 85);
-    if (w.minScore >= 85 && above85.length === 1) lines.push(`It’s the only finalist above 85 for all ${w.perMember.length}.`);
-    else lines.push(`Highest floor of the three — nobody scored it below ${w.minScore}.`);
+    if (w.minScore >= 85 && above85.length === 1) lines.push(t('together.judgeOnlyAbove85', { count: w.perMember.length }));
+    else lines.push(t('together.judgeHighestFloor', { score: w.minScore }));
     finalists.forEach((f, i) => {
       if (i === winnerIdx) return;
       const vs = vetoes.filter((v) => v.idx === i);
       const bestAvg = f.avgScore >= Math.max(...finalists.map((x) => x.avgScore));
       if (vs.length) {
-        lines.push(`${f.title}${bestAvg ? ` had the highest average (${f.avgScore}) but` : ' —'} took a “${vs[0]!.reason}” veto${vs.length > 1 ? ` from ${vs.length} people` : ` from ${vs[0]!.by}`}.`);
+        const avgClause = bestAvg ? t('together.judgeAvgClause', { avg: f.avgScore }) : t('together.judgeDash');
+        const fromClause = vs.length > 1 ? t('together.judgeFromPeople', { count: vs.length }) : t('together.judgeFromPerson', { name: vs[0]!.by });
+        lines.push(t('together.judgeVetoLine', { title: f.title, avgClause, reason: vs[0]!.reason, fromClause }));
       } else {
         const low = f.perMember.reduce((a, b) => (b.score < a.score ? b : a));
-        lines.push(`${f.title} fell short — ${low.name} only gave it ${low.score}.`);
+        lines.push(t('together.judgeFellShort', { title: f.title, name: low.name, score: low.score }));
       }
     });
     return lines;
@@ -152,27 +156,27 @@ export function TasteCourt({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-ink-950/95 backdrop-blur">
       <div className="mx-auto max-w-lg px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
-          <div className="text-sm font-bold text-white">⚖️ The 90-Second Taste Court</div>
-          <button onClick={onClose} className="btn-ghost text-xs">Close</button>
+          <div className="text-sm font-bold text-white">⚖️ {t('together.court90Title')}</div>
+          <button onClick={onClose} className="btn-ghost text-xs">{t('together.close')}</button>
         </div>
 
         {error && (
           <div className="card p-6 text-center">
             <p className="text-sm text-red-200">{error}</p>
-            <button onClick={onClose} className="btn-secondary mt-4">Back</button>
+            <button onClick={onClose} className="btn-secondary mt-4">{t('together.back')}</button>
           </div>
         )}
 
         {/* Phase: mood (pass the phone) */}
         {!error && phase === 'mood' && (
           <div className="card p-6 text-center">
-            <div className="text-xs uppercase tracking-wide text-slate-400">Pass the phone to</div>
+            <div className="text-xs uppercase tracking-wide text-slate-400">{t('together.passPhoneTo')}</div>
             <div className="mt-1 text-2xl font-extrabold text-white">{members[moodIdx]?.name}</div>
-            <p className="mt-1 text-sm text-slate-400">What’s your mood tonight? (private)</p>
+            <p className="mt-1 text-sm text-slate-400">{t('together.moodQuestion')}</p>
             <div className="mt-4 grid grid-cols-3 gap-2">
               {MOODS.map((m) => (
                 <button key={m.key} onClick={() => pickMood(m.key)} className="rounded-xl border border-white/15 bg-white/5 py-3 text-sm font-semibold text-slate-200 hover:bg-white/10">
-                  <div className="text-xl">{m.emoji}</div>{m.label}
+                  <div className="text-xl">{m.emoji}</div>{t(`together.mood.${m.key}`)}
                 </button>
               ))}
             </div>
@@ -183,8 +187,8 @@ export function TasteCourt({
         {!error && phase === 'loading' && (
           <div className="card flex flex-col items-center gap-3 p-10 text-center">
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
-            <div className="text-sm text-slate-300">The court is deliberating…</div>
-            <div className="text-xs text-slate-500">Weighing {members.length} tastes against the field</div>
+            <div className="text-sm text-slate-300">{t('together.courtDeliberating')}</div>
+            <div className="text-xs text-slate-500">{plural('together.weighingTastes', members.length, {})}</div>
           </div>
         )}
 
@@ -192,10 +196,10 @@ export function TasteCourt({
         {!error && phase === 'veto' && (
           <div>
             <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm text-slate-300">Pass to <span className="font-bold text-white">{members[vetoIdx]?.name}</span> — one veto</div>
+              <div className="text-sm text-slate-300">{t('together.passTo')}<span className="font-bold text-white">{members[vetoIdx]?.name}</span>{t('together.oneVetoSuffix')}</div>
               <div className={`rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${clock <= 15 ? 'bg-red-500/20 text-red-200' : 'bg-white/10 text-slate-200'}`}>⏱ {clock}s</div>
             </div>
-            <p className="mb-3 text-xs text-slate-500">Titles are hidden on purpose — judge them on the vibe, not the poster.</p>
+            <p className="mb-3 text-xs text-slate-500">{t('together.titlesHidden')}</p>
             {pendingVeto === null ? (
               <>
                 <div className="space-y-2">
@@ -210,20 +214,23 @@ export function TasteCourt({
                     </button>
                   ))}
                 </div>
-                <button onClick={passVeto} className="btn-secondary mt-3 w-full">I’m good with all three — no veto</button>
+                <button onClick={passVeto} className="btn-secondary mt-3 w-full">{t('together.noVeto')}</button>
               </>
             ) : (
               <div className="card p-4">
-                <div className="text-sm text-white">Veto <span className="font-bold">Option {label(pendingVeto)}</span> — why?</div>
+                <div className="text-sm text-white">{t('together.vetoPrefix')}<span className="font-bold">{t('together.optionLabel', { label: label(pendingVeto) })}</span>{t('together.vetoWhy')}</div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {REASONS.map((r) => (
-                    <button key={r} onClick={() => castVeto(r)} className="rounded-full border border-red-400/40 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-100">{r}</button>
-                  ))}
+                  {REASON_KEYS.map((rk) => {
+                    const rl = t(`together.reason.${rk}`);
+                    return (
+                      <button key={rk} onClick={() => castVeto(rl)} className="rounded-full border border-red-400/40 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-100">{rl}</button>
+                    );
+                  })}
                 </div>
-                <button onClick={() => setPendingVeto(null)} className="btn-ghost mt-3 text-xs">Back</button>
+                <button onClick={() => setPendingVeto(null)} className="btn-ghost mt-3 text-xs">{t('together.back')}</button>
               </div>
             )}
-            <div className="mt-3 text-center text-xs text-slate-500">{vetoIdx + 1} / {members.length} voting</div>
+            <div className="mt-3 text-center text-xs text-slate-500">{vetoIdx + 1} / {members.length} {t('together.voting')}</div>
           </div>
         )}
 
@@ -231,7 +238,7 @@ export function TasteCourt({
         {!error && phase === 'verdict' && finalists[winnerIdx] && (
           <div>
             <div className="text-center">
-              <div className="text-xs uppercase tracking-widest text-brand-300">The Verdict</div>
+              <div className="text-xs uppercase tracking-widest text-brand-300">{t('together.theVerdict')}</div>
               <h2 className="mt-1 text-3xl font-extrabold text-white">{finalists[winnerIdx]!.title}</h2>
               {finalists[winnerIdx]!.year && <div className="text-slate-400">({finalists[winnerIdx]!.year})</div>}
             </div>
@@ -251,28 +258,28 @@ export function TasteCourt({
             )}
 
             <div className="mt-5 card p-4">
-              <div className="text-xs font-bold uppercase tracking-wide text-slate-400">The Judge’s reasoning</div>
+              <div className="text-xs font-bold uppercase tracking-wide text-slate-400">{t('together.judgesReasoning')}</div>
               <ul className="mt-2 space-y-1.5 text-sm text-slate-200">
                 {judgeLines().map((l, i) => (
                   <li key={i} className="flex gap-2"><span className="text-brand-300">•</span>{l}</li>
                 ))}
               </ul>
-              <p className="mt-2 text-[11px] text-slate-500">Every line is from the real per-person scores and vetoes — no guessing.</p>
+              <p className="mt-2 text-[11px] text-slate-500">{t('together.everyLineReal')}</p>
             </div>
 
             <div className="mt-5">
               {onWinnerLogged && !logged ? (
                 <div className="flex items-center justify-center gap-2">
-                  <span className="text-xs text-slate-400">How’d it go:</span>
-                  <button onClick={() => { onWinnerLogged(finalists[winnerIdx]!, 'loved'); setLogged(true); }} className="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-100">👍 Loved</button>
-                  <button onClick={() => { onWinnerLogged(finalists[winnerIdx]!, 'fine'); setLogged(true); }} className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-200">😐 Fine</button>
-                  <button onClick={() => { onWinnerLogged(finalists[winnerIdx]!, 'nope'); setLogged(true); }} className="rounded-lg border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-xs text-red-100">👎 Nope</button>
+                  <span className="text-xs text-slate-400">{t('together.howdItGo')}</span>
+                  <button onClick={() => { onWinnerLogged(finalists[winnerIdx]!, 'loved'); setLogged(true); }} className="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-100">👍 {t('together.loved')}</button>
+                  <button onClick={() => { onWinnerLogged(finalists[winnerIdx]!, 'fine'); setLogged(true); }} className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-200">😐 {t('together.fine')}</button>
+                  <button onClick={() => { onWinnerLogged(finalists[winnerIdx]!, 'nope'); setLogged(true); }} className="rounded-lg border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-xs text-red-100">👎 {t('together.nope')}</button>
                 </div>
               ) : logged ? (
-                <div className="text-center text-xs text-slate-400">Logged to your jury’s DNA ✓</div>
+                <div className="text-center text-xs text-slate-400">{t('together.loggedJuryDna')}</div>
               ) : null}
-              <button onClick={() => setShowShare(true)} className="btn-secondary mt-3 w-full">📸 Share this verdict</button>
-              <button onClick={onClose} className="btn-primary mt-2 w-full">Done — let’s watch</button>
+              <button onClick={() => setShowShare(true)} className="btn-secondary mt-3 w-full">📸 {t('together.shareVerdict')}</button>
+              <button onClick={onClose} className="btn-primary mt-2 w-full">{t('together.doneWatch')}</button>
             </div>
 
             {showShare && (
@@ -285,7 +292,7 @@ export function TasteCourt({
                       members={finalists[winnerIdx]!.perMember.map((pm) => ({ name: pm.name, score: pm.score }))}
                     />
                   </ShareCard>
-                  <button onClick={() => setShowShare(false)} className="btn-ghost mt-2 w-full text-sm">Close</button>
+                  <button onClick={() => setShowShare(false)} className="btn-ghost mt-2 w-full text-sm">{t('together.close')}</button>
                 </div>
               </div>
             )}
