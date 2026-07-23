@@ -15,13 +15,16 @@ import { useToast } from '@/components/Toast';
 // The kinds of things you can ask — one per router capability. Tapping a chip
 // drops the example into the box so it's obvious what VERD1CT can do. The live-TV
 // listing asks are first so it's clear we know what's actually on right now.
+// The most common things people ask — broad, mainstream, and each one shows off
+// a different engine trick (live listings, time window, where-to-watch, a
+// service, a genre, an occasion). Not tuned to any one person's taste.
 const EXAMPLES: { hint: string; text: string }[] = [
-  { hint: '📺 Lifetime movies tonight', text: 'What Lifetime movies are on tonight?' },
-  { hint: '⏱️ Comedies on in the next 2 hours', text: 'Comedies coming on in the next 2 hours' },
-  { hint: '🎬 What’s on right now', text: 'What’s on TV right now that I’d like?' },
-  { hint: '🎯 Crime dramas, nothing slow', text: 'I love crime dramas, but nothing too slow or supernatural.' },
-  { hint: '🔎 Where can I stream Jaws?', text: 'Where can I stream Jaws?' },
-  { hint: '▶️ Good stuff on Netflix', text: 'Something good on Netflix I haven’t seen' },
+  { hint: '📺 What’s on TV tonight', text: 'What’s on TV tonight?' },
+  { hint: '▶️ Best movies on Netflix', text: 'The best movies on Netflix right now' },
+  { hint: '🔎 Where can I stream Barbie?', text: 'Where can I stream Barbie?' },
+  { hint: '⏱️ Movies on in the next 2 hours', text: 'Movies coming on in the next 2 hours' },
+  { hint: '👻 A really good scary movie', text: 'A really good scary movie' },
+  { hint: '👨‍👩‍👧 Family movie night', text: 'A great family movie for tonight' },
 ];
 
 export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
@@ -109,7 +112,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}
         rows={3}
         aria-label="Describe what you like to watch"
-        placeholder="e.g. I love intelligent crime mysteries, but I avoid supernatural stories and anything too slow."
+        placeholder="e.g. I love clever comedies and thrillers with a twist — but nothing too slow or gory."
         className={
           hero
             ? 'mt-3 w-full resize-none rounded-xl border border-white/20 bg-ink-950/70 px-4 py-3.5 text-base font-medium text-white placeholder:text-slate-400 focus:border-brand-400 focus:outline-none'
