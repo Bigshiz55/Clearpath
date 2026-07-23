@@ -1,0 +1,153 @@
+{
+  "seed": 1234,
+  "n": 2000,
+  "metrics": {
+    "n": 2000,
+    "neverDeadEndRate": 1,
+    "recoveryCompleteness": 1,
+    "intentAccuracy": 0.904,
+    "resolutionRecall": 0.994,
+    "resolutionOrLeadRecall": 1,
+    "meanExpansions": 19.872,
+    "medianExpansions": 20,
+    "confidentRate": 0.673,
+    "byIntent": {
+      "genre": {
+        "total": 120,
+        "intentCorrect": 92,
+        "resolved": 0,
+        "titleAnchored": 0
+      },
+      "similar_to": {
+        "total": 406,
+        "intentCorrect": 406,
+        "resolved": 406,
+        "titleAnchored": 406
+      },
+      "conversational": {
+        "total": 104,
+        "intentCorrect": 20,
+        "resolved": 0,
+        "titleAnchored": 0
+      },
+      "schedule": {
+        "total": 107,
+        "intentCorrect": 107,
+        "resolved": 0,
+        "titleAnchored": 0
+      },
+      "availability": {
+        "total": 411,
+        "intentCorrect": 411,
+        "resolved": 411,
+        "titleAnchored": 411
+      },
+      "upcoming": {
+        "total": 117,
+        "intentCorrect": 117,
+        "resolved": 0,
+        "titleAnchored": 0
+      },
+      "franchise": {
+        "total": 163,
+        "intentCorrect": 110,
+        "resolved": 0,
+        "titleAnchored": 0
+      },
+      "recommendation": {
+        "total": 100,
+        "intentCorrect": 100,
+        "resolved": 0,
+        "titleAnchored": 0
+      },
+      "incomplete": {
+        "total": 98,
+        "intentCorrect": 71,
+        "resolved": 0,
+        "titleAnchored": 0
+      },
+      "title_lookup": {
+        "total": 374,
+        "intentCorrect": 374,
+        "resolved": 367,
+        "titleAnchored": 374
+      }
+    },
+    "failures": [
+      {
+        "text": "hey brooklyn 99",
+        "reason": "unresolved_title"
+      },
+      {
+        "text": "brooklyn 99",
+        "reason": "unresolved_title"
+      },
+      {
+        "text": "hey doone",
+        "reason": "unresolved_title"
+      },
+      {
+        "text": "doone",
+        "reason": "unresolved_title"
+      },
+      {
+        "text": "ok so brooklyn 99",
+        "reason": "unresolved_title"
+      },
+      {
+        "text": "doone",
+        "reason": "unresolved_title"
+      },
+      {
+        "text": "brooklyn 99 tonight",
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  "targets": {
+    "neverDeadEndRate": 1,
+    "recoveryCompleteness": 1,
+    "intentAccuracy": 0.85,
+    "resolutionRecall": 0.85,
+    "resolutionOrLeadRecall": 0.9,
+    "meanExpansions": 8
+  },
+  "checks": [
+    {
+      "key": "neverDeadEndRate",
+      "target": 1,
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "key": "recoveryCompleteness",
+      "target": 1,
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "key": "intentAccuracy",
+      "target": 0.85,
+      "actual": 0.904,
+      "pass": true
+    },
+    {
+      "key": "resolutionRecall",
+      "target": 0.85,
+      "actual": 0.994,
+      "pass": true
+    },
+    {
+      "key": "resolutionOrLeadRecall",
+      "target": 0.9,
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "key": "meanExpansions",
+      "target": 8,
+      "actual": 19.872,
+      "pass": true
+    }
+  ]
+}

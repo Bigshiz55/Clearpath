@@ -5,6 +5,9 @@ import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
+import { understandIntent } from '@/lib/search/retrieval/intent';
+import { expandQueries } from '@/lib/search/retrieval/expand';
+import { recover } from '@/lib/search/retrieval/recovery';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -124,6 +127,28 @@ export async function POST(req: Request) {
     }
 
     const result = await runFinder(supabase, user.id, query, watcher, limit);
+
+    // The never-dead-end guarantee: a literal search must NEVER terminate on a bare
+    // "No results". When discovery finds nothing, return an honest RECOVERY state —
+    // likely interpretations + useful suggestions (navigation/refinements), and a
+    // single clarifying question only when necessary. No titles are fabricated.
+    if (result.items.length === 0 && text.trim()) {
+      const intent = understandIntent(text);
+      const expansions = expandQueries(text, intent);
+      const recovery = recover(text, intent, expansions, []);
+      return NextResponse.json({
+        kind: 'recovery',
+        scoredFor: result.scoredFor,
+        query,
+        intent: intent.kind,
+        interpretations: recovery.interpretations,
+        suggestions: recovery.suggestions,
+        clarifyingQuestion: recovery.clarifyingQuestion,
+        message: recovery.message,
+        relaxed: result.relaxed,
+      });
+    }
+
     return NextResponse.json({
       kind: 'search',
       query,
