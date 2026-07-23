@@ -12,11 +12,22 @@ import { useToast } from '@/components/Toast';
  * watch a title, something on a service, what's coming on) to the right screen.
  * (The title-by-title Mentalist is still one tap away.)
  */
+// The kinds of things you can ask — one per router capability. Tapping a chip
+// drops the example into the box so it's obvious what VERD1CT can do.
+const EXAMPLES: { hint: string; text: string }[] = [
+  { hint: '🎯 Your taste', text: 'I love smart crime mysteries, but I avoid supernatural stories and anything too slow.' },
+  { hint: '📺 On live TV', text: 'Lifetime movies coming on tonight' },
+  { hint: '⏱️ Coming up', text: 'Comedies coming on in the next 4 hours' },
+  { hint: '🔎 Where to stream', text: 'Where can I watch Jaws?' },
+  { hint: '▶️ On a service', text: "Something great on Netflix I haven't seen" },
+];
+
 export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const boxRef = useRef<HTMLTextAreaElement>(null);
   const lastCase = useRef<{ id: string | null; at: number }>({ id: null, at: 0 });
 
   async function submit() {
@@ -62,10 +73,28 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         <span className={hero ? 'text-3xl' : 'text-2xl'} aria-hidden>⚖️</span>
         <div className="min-w-0">
           <div className={hero ? 'text-xl font-black text-white sm:text-2xl' : 'text-base font-extrabold text-white sm:text-lg'}>State Your Case</div>
-          <div className={hero ? 'text-sm font-medium text-slate-100 sm:text-base' : 'text-sm text-slate-300'}>Tell us what you like — or ask for something specific, like “crime shows coming on in the next few hours.”</div>
+          <div className={hero ? 'text-sm font-medium text-slate-100 sm:text-base' : 'text-sm text-slate-300'}>
+            Describe your taste — or ask for something specific: what’s on <span className="font-semibold text-white">live TV</span>, <span className="font-semibold text-white">where to stream</span> a title, or what’s good <span className="font-semibold text-white">on a service</span>.
+          </div>
         </div>
       </div>
+
+      {/* Tappable examples — one per kind of question, so the range is obvious. */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {EXAMPLES.map((ex) => (
+          <button
+            key={ex.hint}
+            type="button"
+            onClick={() => { setText(ex.text); boxRef.current?.focus(); }}
+            className="rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white"
+          >
+            {ex.hint}
+          </button>
+        ))}
+      </div>
+
       <textarea
+        ref={boxRef}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}
@@ -74,7 +103,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         placeholder="e.g. I love intelligent crime mysteries, but I avoid supernatural stories and anything too slow."
         className={
           hero
-            ? 'mt-4 w-full resize-none rounded-xl border border-white/20 bg-ink-950/70 px-4 py-3.5 text-base font-medium text-white placeholder:text-slate-400 focus:border-brand-400 focus:outline-none'
+            ? 'mt-3 w-full resize-none rounded-xl border border-white/20 bg-ink-950/70 px-4 py-3.5 text-base font-medium text-white placeholder:text-slate-400 focus:border-brand-400 focus:outline-none'
             : 'mt-3 w-full resize-none rounded-xl border border-white/15 bg-ink-950/70 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none'
         }
       />
@@ -87,7 +116,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
           disabled={busy || text.trim().length < 4}
           className={`btn-primary shrink-0 text-white disabled:cursor-not-allowed ${hero ? 'px-6 py-3 text-base font-black disabled:opacity-70' : 'disabled:opacity-50'}`}
         >
-          {busy ? 'Building…' : 'Build my Taste DNA →'}
+          {busy ? 'Deliberating…' : 'Hit the gavel →'}
         </button>
       </div>
     </div>
