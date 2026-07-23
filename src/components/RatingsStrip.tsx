@@ -80,42 +80,45 @@ export function RatingsStrip({
         </div>
       )}
 
-      {/* Line 2 — all three source ratings on one line, sized up for legibility:
-          no pills on 🍅/🍿 (just icon + value) so tomato, popcorn and IMDb fit. */}
-      <div className="flex items-center gap-2.5 text-sm font-black tabular-nums">
-        <RatingChip
-          label="🍅"
-          value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
-          tone={ratings.tomatometer != null ? tomatoColor(ratings.tomatometer) : ''}
-          title="Rotten Tomatoes — Tomatometer (critics)"
-        />
-        <RatingChip
-          label="🍿"
-          value={popcorn != null ? `${popcorn}%` : null}
-          tone={popcorn != null ? 'text-amber-200' : ''}
-          title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
-        />
-        <span
-          className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
-          title="IMDb rating"
-        >
-          <span className="text-[10px] font-black opacity-80">IMDb</span> {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
-        </span>
+      {/* Line 2 — source ratings in an equal-width, auto-fitting grid (`.ratings-grid`).
+          Available sources lay across the card and WRAP to a second row on a very
+          narrow card rather than clipping — IMDb is never pushed off the edge.
+          A source with no score is omitted cleanly (no awkward dash). */}
+      <div className="ratings-grid text-sm font-black tabular-nums">
+        {ratings.tomatometer != null && (
+          <RatingChip label="🍅" value={`${ratings.tomatometer}%`} tone={tomatoColor(ratings.tomatometer)} title="Rotten Tomatoes — Tomatometer (critics)" />
+        )}
+        {popcorn != null && (
+          <RatingChip
+            label="🍿"
+            value={`${popcorn}%`}
+            tone="text-amber-200"
+            title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
+          />
+        )}
+        {ratings.imdb != null && (
+          <span
+            data-rating="imdb"
+            className="inline-flex min-w-0 items-center justify-center gap-1 rounded bg-[#f5c518] px-1.5 py-0.5 text-black"
+            title="IMDb rating"
+          >
+            <span className="text-[10px] font-black opacity-80">IMDb</span> {ratings.imdb.toFixed(1)}
+          </span>
+        )}
+        {ratings.metacritic != null && (
+          <RatingChip label="Ⓜ" value={`${ratings.metacritic}`} tone="text-teal-200" title="Metacritic Metascore" />
+        )}
       </div>
     </div>
   );
 }
 
-/** One source rating — icon + value, dimmed to "–" when unavailable. No pill, so
- *  all three ratings fit one line in a narrow card. */
-function RatingChip({ label, value, tone, title }: { label: string; value: string | null; tone: string; title: string }) {
+/** One source rating — icon + full value, content-sized so it never truncates. */
+function RatingChip({ label, value, tone, title }: { label: string; value: string; tone: string; title: string }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap ${value != null ? tone : 'text-slate-500'}`}
-      title={title}
-    >
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap ${tone}`} title={title}>
       <span aria-hidden className="text-base leading-none">{label}</span>
-      {value ?? '–'}
+      {value}
     </span>
   );
 }

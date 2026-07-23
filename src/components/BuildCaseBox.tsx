@@ -125,11 +125,13 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
             : 'mt-3 w-full resize-none rounded-xl border border-white/15 bg-ink-950/70 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none'
         }
       />
-      <div className="mt-3 flex justify-end">
+      {/* Full-width on narrow phones (never lopsided / floating to one side);
+          intrinsic-width and right-aligned from `sm` up. */}
+      <div className="mt-3 flex flex-col sm:flex-row sm:justify-end">
         <button
           onClick={() => void submit()}
           disabled={busy || text.trim().length < 4}
-          className={`wv-cta-3d disabled:cursor-not-allowed ${hero ? 'px-8 py-3.5 text-lg' : 'px-5 py-2.5 text-sm'}`}
+          className={`wv-cta-3d w-full disabled:cursor-not-allowed sm:w-auto ${hero ? 'px-8 py-3.5 text-lg' : 'px-5 py-2.5 text-sm'}`}
         >
           {busy ? 'Ruling…' : 'Hit the gavel →'}
         </button>
