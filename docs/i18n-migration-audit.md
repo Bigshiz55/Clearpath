@@ -147,17 +147,23 @@ containers.
 - **Catalog payload**: `/app/layout` passes the active-locale catalog **plus the
   English fallback** into the client provider on every `/app` page. Serialized
   sizes: en-US 66.5 kB, es-419 72.4 kB, zh-Hans 42.3 kB (uncompressed JSON;
-  gzips to roughly a third). For **en-US the active catalog and the fallback are
-  identical**, so English users currently ship ~133 kB of duplicated JSON in the
-  RSC stream.
+  gzips to roughly a third). **Correction to an earlier draft:** for en-US the
+  active catalog and the fallback are the *same object reference*
+  (`getMessages('en-US')` returns `CATALOGS['en-US']`, which *is*
+  `ENGLISH_MESSAGES`), so React Flight serializes it **once** — en-US is **not**
+  double-shipped. es/zh users do ship the English fallback (~66 kB) alongside
+  their locale catalog; since completeness is test-enforced the fallback is
+  effectively defense-in-depth, so it's kept deliberately.
 - Together route first-load is the heaviest at ~180 kB (its many client
   components), unchanged in character by i18n.
 
 ## 10. Recommendations (not done; for follow-up approval)
 
-1. **Skip the fallback prop when `locale === 'en-US'`** (or when active ===
-   fallback). Removes ~66 kB of duplicated JSON for the default-locale majority.
-   One-line change in `app/app/layout.tsx`.
+1. **Drop the English fallback prop for complete non-English catalogs.** en-US is
+   already deduped by Flight; es/zh ship a redundant ~66 kB fallback that
+   test-enforced completeness makes unnecessary. Removing it (or gating it to dev)
+   is a one-line change in `app/app/layout.tsx`, traded against losing the
+   raw-key-vs-English safety net if a key ever slips through.
 2. **Scope catalogs per route** once catalogs grow further — ship only the
    namespaces a route uses rather than the full 1,558-key merged object. The
    `messages/parts/*` split already maps cleanly to screen groups.
@@ -184,3 +190,75 @@ containers.
   completeness / interpolation / leakage suite.
 - `npm run build` — compiles; 45/45 static pages preserved.
 - Full-tree key scan — 0 catalog keys referenced in code but missing.
+
+---
+
+## 12. Forensic review (adversarial second pass)
+
+A second pass was run as "the engineer who did NOT write this," assuming bugs.
+It found that the first pass's own verification had a **glob defect**:
+`git ls-files 'src/components/**/*.tsx'` matches only *subdirectories* of
+`components/`, silently skipping every top-level `src/components/*.tsx` — which is
+most components. So a class of components for which the parallel extraction pass
+had drafted catalogs but never wired the component slipped through as "done,"
+still rendering English. Re-running every scan with `src/**/*.tsx` surfaced them.
+
+**Real bugs found and fixed (translation intended, component never wired):**
+
+- `ProviderRow` (rendered on **every** title page — Stream/Free/Rent/Buy,
+  "yours", availability notes, JustWatch footer) → `discover.provider.*`.
+- `OnTvGuide` (full TV-guide screen) → `discover.onTvGuide.*`.
+- `TvDetective` (crime scan) → `discover.detective.*`.
+- `FinderUI` (Forensic Search, ~50 strings) → `discover.finder.*`, with
+  locale-aware runtime/air-time/weekday formatting.
+- `PostWatchInterview`, `CloudCrews`, `MyReminders`, `RecommendedForYou`,
+  `WatchTabs`, `BuildCaseBox`, `EnableNotifications`, `AvatarPicker`, the
+  `Nav` Pro upsell, `LiveCourt` "No art", `BrowseCatalog` leftovers,
+  `RobedPortrait` default alt, and the share-card / poster a11y family
+  (`Verd1ctBadge`, `WatchCall`, `WatchNowGrid`, `PosterCard`, `ShareCards`).
+- `JudgeBench` leaked English default props when rendered propless (as in
+  FinderUI); its defaults now fall back to the existing `together.bench.*` keys.
+
+**Latent locale bugs fixed while wiring (would have broken es/zh even after
+translation):**
+
+- `OnTvGuide` and `TvDetective` each branched on `notice.includes('Settings')`
+  — an English-string match that fails in every other locale. Replaced with
+  boolean state.
+- `OnTvGuide` had `const t = fmtTime(...)` shadowing the translator.
+- `MatchMark` exported a dead raw-English `MATCH_TOOLTIP` constant (no consumers)
+  — replaced with a translated `useMatchTooltip()` hook.
+
+**Bugs the remediation itself introduced, then caught and fixed:**
+
+- `discover.browse.fewer` was referenced by `BrowseCatalog` but never added to a
+  catalog (would render the raw key). Added.
+- `account.reminders.heading` collided: the MyReminders component reused the
+  reminders **page's** namespace, and because its part file loads last it
+  overrode the page H1 ("My reminders" → "🔔 Your reminders"), producing a
+  double-bell heading. Component strings moved to `account.remindersList.*`.
+
+**Verified clean (not bugs):** English→key lookup maps
+(`VerdictBadge`/`CriticsTable`/`ReportExtras`), brand `sr-only`/names
+(`Logo` "Verdict", judge names), the `OnTvGuide` "Talk Show" show-type enum,
+`LoginForm` (pre-auth `/login` shell, outside the provider), and the 26 page
+`metadata` titles (`/app` is `disallow`ed in `robots.txt`, so English titles are
+a tab-title UX gap, **not** an SEO regression; converting them to
+`generateMetadata` is a documented follow-up).
+
+**Automated invariants now enforced/checked at the end of the pass:**
+
+- 0 catalog keys referenced in code but missing (full-tree scan, corrected glob).
+- 0 interpolation param mismatches at call sites (the one flagged key,
+  `together.defaultMsg`, intentionally passes its `{title}`/`{mins}` through for
+  later `.replace()` at share time).
+- 0 keys defined in multiple part files with conflicting values.
+- 3 fully-orphaned namespaces pruned (`discover.easyOnTv`, `discover.newForYou`,
+  `discover.toast`); remaining dead keys are partial subsets of live namespaces,
+  left in place (harmless, and pruning individual keys risks dynamic lookups).
+
+**Final gates:** typecheck clean · lint clean · 226/226 unit tests · `next build`
+45/45 static pages · corrected-glob coverage 116/137 app-surface files wired or
+text-free (85%); the 21 remainder are admin tools, thin server wrappers,
+lookup-map/brand components, the auth shell, and metadata titles — all accounted
+for above.
