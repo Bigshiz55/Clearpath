@@ -1,147 +1,76 @@
 # ReadVerdict — Migration Report
 
-Migration of the ReadVerdict project out of the shared `Bigshiz55/Clearpath`
-repository into its own **private** repository.
+Non-destructive migration of the completed ReadVerdict project into its own
+**private** repository, on a dedicated branch that leaves the existing default
+branch and history untouched.
 
 ## New repository location
 
-- **Target:** `Bigshiz55/readverdict` (private). GitHub repo names are
-  case-insensitive; a private `Bigshiz55/ReadVerdict` already exists and is the
-  intended destination.
-- **Automated push could not be completed from this environment.** Two blockers,
-  both hard:
-  1. The GitHub App **cannot create repositories**
-     (`POST /user/repos` → `403 Resource not accessible by integration`).
-  2. The `add_repo` connection to the existing private repo was **not granted at
-     the tool-approval layer**, and the GitHub MCP is otherwise hard-scoped to
-     `bigshiz55/clearpath` (writes to `readverdict` are denied).
-- **Resolution — history-preserving hand-off:** the migration is delivered as a
-  **git bundle** (`readverdict.bundle`) carrying the full migration branch and
-  its complete history, plus a source ZIP. You complete the one-line push from a
-  machine that holds your GitHub credentials (see “Hand-off” below). Nothing in
-  the existing repositories is modified.
+- **Repository:** `Bigshiz55/ReadVerdict` (private).
+- **Migration branch:** `migration/readverdict-complete` (new; branched from the
+  existing `main`).
+- **Default branch `main`:** left **exactly as-is** — not modified, not
+  force-pushed, not merged into. No pull request opened.
 
-## Branch migrated
+## Existing repository — inspection (read-only, before any change)
 
-- **Source:** `claude/readverdict-j5ze9b` in `Bigshiz55/Clearpath`, subdirectory
-  `readverdict/`.
-- **Migration branch:** `rv-migrate`, produced by
-  `git subtree split --prefix=readverdict`, which rewrites history so the project
-  sits at the repository root.
-- **To be pushed to the private repo as:** `main` (by you, via the bundle).
+- **Branches:** `main` only.
+- **Commits (3):**
+  - `340d1e1` Add files via upload
+  - `6b0c4a6` Add ReadVerdict app source (src/ — pages, Google Books, scoring, components)
+  - `0505461` Book pages: "on trial" depth — the case breakdown + better-rated alternatives
+- **Contents:** an **earlier ReadVerdict prototype** — a Next.js app built on the
+  **Google Books** API with a simpler feature set:
+  `src/lib/googleBooks.ts`, `src/lib/bookScore.ts` (+ test), `src/lib/types.ts`,
+  `src/app/api/search/route.ts`, `src/app/book/[id]/page.tsx`, `src/app/page.tsx`,
+  `src/app/layout.tsx`, `src/app/globals.css`, components (`BookSearch`,
+  `ReadGreeter`, `VerdictBadge`), plus configs. (It also commits build artifacts
+  `next-env.d.ts` and `tsconfig.tsbuildinfo`.)
+- **Related?** Yes — same product concept (ReadVerdict, "on trial", verdict
+  badge, book scoring), but a **distinct, earlier implementation**, not the
+  completed Phases 1–16 codebase.
 
-## Hand-off — how to complete the push (one time, from your machine)
+### What would be lost or conflicted
 
-```bash
-# 1. Clone the delivered bundle (full history, project at root):
-git clone -b rv-migrate readverdict.bundle readverdict
-cd readverdict
-git branch -m rv-migrate main          # name it main
+- **On `main`: nothing.** `main` is untouched; every existing file and commit
+  stays exactly where it is.
+- **On the migration branch:** the completed app **supersedes** the earlier
+  prototype, so the prototype files above are not present at the migration
+  branch tip. They are **not discarded** — they remain intact on `main` and in
+  history, and in this branch's own ancestry (it is branched from `main`). The
+  migration commit's diff shows precisely what changed.
 
-# 2. Point it at your private repo and push:
-git remote set-url origin https://github.com/Bigshiz55/readverdict.git
-git push -u origin main
+## Source migrated
 
-# 3. Verify it builds independently:
-npm ci && npm run typecheck && npm run lint && npm test && npm run build
-npm run dev            # http://localhost:3000
-```
-
-If `Bigshiz55/readverdict` does not resolve, create an empty private repo of that
-name first (GitHub → New repository → Private → no README), then run step 2.
-
-## Commit history — PRESERVED
-
-`git subtree split` preserved the full relevant history (10 commits), rebased to
-the project root:
-
-```
-Migration prep: replace last stale route references
-Phases 15-16: integration tests + full documentation + completion report
-Phases 13-14: engineering hardening + evaluation harness
-Phases 7-12: trial-centric product UI + local flow
-Phase 5+6: Book Trial engine + DNF/finish prediction
-Phase 4: provider adapters + reading-history imports
-Phase 3 + visual identity: literary palette & canonical data model
-ReadVerdict Phase 2: brand & application shell
-ReadVerdict Phase 1: durable foundation baseline
-Add ReadVerdict: initial books app
-```
-
-## Files copied
-
-The complete project root: `src/` (111 TS/TSX files incl. 11 test files),
-`supabase/migrations/`, `docs/`, all configs (`package.json`, `tsconfig.json`,
-`next.config.mjs`, `tailwind.config.ts`, `postcss.config.mjs`, `vitest.config.ts`,
-`.eslintrc.json`, `.prettierrc.json`, `.gitignore`), `.env.example`, and all
-documentation (`README.md`, `ARCHITECTURE.md`, `PHASE_REPORT.md`, `docs/*`). No
-`node_modules` or `.next` (git-ignored build artifacts).
+- **From:** `Bigshiz55/Clearpath` @ `claude/readverdict-j5ze9b`, commit
+  `f8ff754`, subdirectory `readverdict/` (the completed Phases 1–16 project).
+- **How:** branched `migration/readverdict-complete` from `main`, then replaced
+  the working tree with the completed project (project at repo root) in a single,
+  reviewable migration commit. `main`'s full history is preserved as the branch's
+  ancestry.
 
 ## Secrets audit — CLEAN
 
-- No `.env` / `.env.local` tracked (git-ignored). Only `.env.example` with **empty
-  placeholders** is included.
-- Grep for secret patterns (`sk-…`, service-role keys, inline api keys) across all
-  tracked source: **no matches**.
-- Server-only secrets (`SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`,
-  `GOOGLE_BOOKS_API_KEY`) are never `NEXT_PUBLIC_` and never imported into client
-  code. `.gitignore` excludes `.env`, `.env.local`, `.env*.local`.
+Only `.env.example` (empty placeholders) is included; `.gitignore` excludes
+`.env`, `.env.local`, `.env*.local`. No secret patterns in tracked source. Server
+-only keys (`SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `GOOGLE_BOOKS_API_KEY`)
+are never `NEXT_PUBLIC_` and never imported client-side.
 
 ## Shared dependencies — NONE
 
-- Grep for `clearpath` / `watchverdict` in migrated source: **no matches**.
-- Grep for imports reaching outside the project (`../../..`, absolute `/home`):
-  **none**. All internal imports use the self-contained `@/` → `src/` alias.
-- `.eslintrc.json` sets `root: true` (no config cascade from any parent).
-- Verdict: ReadVerdict has **no runtime or build dependency on Clearpath**. No
-  shared engine code needs to be carried; the project is fully standalone.
+No `clearpath`/`watchverdict` references, no imports outside the project, and
+`.eslintrc.json` sets `root: true`. ReadVerdict is fully standalone.
 
-## WatchVerdict-specific cleanup performed
+## Verification
 
-- `next.config.mjs`: cache-control route matcher updated to current ReadVerdict
-  routes; stale `ask/together` references removed.
-- `not-found.tsx`: dead `/ask` link → `/search`.
-- `package.json` name is already `readverdict`; metadata, routes, and env var
-  names are ReadVerdict-specific.
+`npm ci`, `npm test`, and `npm run build` are run on the migration branch, plus a
+fresh-clone build check. Results are reported to the owner before any merge.
 
-## Independence verification — PASSED
+## Rollback
 
-The migration branch was extracted to a clean directory with no shared parent
-(`/home/user/rv-independent`) and verified end-to-end:
-
-- `npm ci` ✅
-- `npm run typecheck` ✅
-- `npm run lint` ✅ (no warnings)
-- `npm test` ✅ **88 tests / 11 files**
-- `npm run search-lab:smoke` ✅ (0 constraint violations)
-- `npm run build` ✅ (11 routes)
-- Smoke test: all routes 200, including a live Open Library trial page
-  (`/trial/openlibrary:OL66554W`)
-
-## Clearpath / WatchVerdict integrity — INTACT
-
-- Working tree clean; no non-`readverdict` files modified.
-- `watchverdict` package and `src/lib/scoring/` engine present and untouched.
-- All ReadVerdict work isolated under `readverdict/` and the migration branch;
-  the original `claude/readverdict-j5ze9b` branch and source are **retained**.
-
-## Remaining risks
-
-- **The final push is performed by you**, from the delivered bundle — this
-  environment could not push to the private repo (create = 403; add_repo not
-  granted; MCP scoped to `clearpath`).
-- The destination is the **pre-existing** `Bigshiz55/ReadVerdict`. If it already
-  contains unrelated content, `git push -u origin main` will be rejected as a
-  non-fast-forward — **inspect it first**; only force-push (`--force-with-lease`)
-  if you intend to replace it. Nothing is overwritten without your explicit
-  action.
-
-## Rollback instructions
-
-- The source of truth remains `Bigshiz55/Clearpath` @ `claude/readverdict-j5ze9b`
-  → `readverdict/`, plus delivered ZIP checkpoints. Nothing there is deleted by
-  this migration.
-- To undo the private-repo push: in `Bigshiz55/readverdict`, reset `main` to its
-  prior commit (or delete the branch); the Clearpath copy is unaffected.
-- To rebuild the migration branch locally:
-  `git -C Clearpath subtree split --prefix=readverdict -b rv-migrate`.
+- The migration adds **only** the `migration/readverdict-complete` branch;
+  deleting that branch fully reverts the repository to its prior state. `main` is
+  never touched.
+- The source of truth also remains at `Bigshiz55/Clearpath` @
+  `claude/readverdict-j5ze9b` (`readverdict/`), plus delivered ZIP/bundle
+  checkpoints.
