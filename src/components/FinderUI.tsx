@@ -181,6 +181,7 @@ export function FinderUI({
   // e.g. /app/finder?providers=9&q=…&run=1 for "something on Prime Video".
   const searchParams = useSearchParams();
   const seeded = useRef(false);
+  const seededRun = useRef(false);
   useEffect(() => {
     if (seeded.current) return;
     seeded.current = true;
@@ -194,9 +195,24 @@ export function FinderUI({
     const seededQuery: FinderQuery = { ...naiveParseQuery(qText ?? ''), ...(ids.length ? { providerIds: ids } : {}) };
     if (qText) setText(qText);
     setQ(seededQuery);
-    if (searchParams.get('run') === '1') void find(seededQuery, qText ?? '');
+    if (searchParams.get('run') === '1') {
+      seededRun.current = true;
+      void find(seededQuery, qText ?? '');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // A seeded run (e.g. tapping "Best movies on Netflix") lands the user at the
+  // top of the bench, but the results render below the intro — so once the
+  // auto-search finishes, glide straight to them instead of leaving the user
+  // staring at an empty-looking input screen.
+  useEffect(() => {
+    if (!seededRun.current || loading || !items) return;
+    seededRun.current = false;
+    requestAnimationFrame(() => {
+      document.getElementById('finder-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [loading, items]);
   function set<K extends keyof FinderQuery>(key: K, val: FinderQuery[K]) {
     setQ((prev) => ({ ...prev, [key]: val }));
   }
@@ -294,7 +310,7 @@ export function FinderUI({
       {error && <p className="text-sm text-amber-300">{error}</p>}
 
       {items && !loading && (
-        <div>
+        <div id="finder-results" className="scroll-mt-4">
           {relaxed && <p className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{relaxed}</p>}
           {items.length === 0 ? (
             <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and submit again.</p>
