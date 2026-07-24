@@ -9,6 +9,12 @@ import {
   type AccessConfig,
   type AccessResult,
 } from '@/lib/founder/access';
+import { listSessions, sessionsAvailable } from '@/lib/founder/sessions';
+import { FounderSessions, toView } from '@/components/founder/FounderSessions';
+import { getWatchStats } from '@/lib/watchStats';
+import { getUserDimensionProfile } from '@/lib/titleDimensions';
+import { describePersonality } from '@/lib/scoring/personality';
+import { dnaStrength, tasteDials } from '@/lib/scoring/dimensions';
 import { WatchVerdictWordmark } from '@/components/WatchVerdictWordmark';
 
 /**
@@ -19,8 +25,8 @@ import { WatchVerdictWordmark } from '@/components/WatchVerdictWordmark';
  *
  * A founder may enter ONLY their own route; an admin/owner may enter any (for
  * support); everyone else sees an access-denied screen and is NEVER shown
- * another founder's environment or data. Data isolation underneath is enforced
- * by RLS (every row keyed to the founder's own user_id); this is the route gate.
+ * another founder's environment. Data isolation underneath is enforced by RLS
+ * (every row keyed to the founder's own user_id); this is the route gate.
  */
 export async function FounderTestEnv({ founder }: { founder: FounderKey }) {
   const meta = founderByKey(founder);
@@ -28,14 +34,18 @@ export async function FounderTestEnv({ founder }: { founder: FounderKey }) {
   // Verify identity from the request cookies. Any config/auth failure is treated
   // as "not signed in" — a founder route must fail closed, never 500 open.
   let email: string | null = null;
+  let userId = '';
+  let supabase: ReturnType<typeof createClient> | null = null;
   try {
-    const supabase = createClient();
+    supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
     email = user?.email ?? null;
+    userId = user?.id ?? '';
   } catch {
     email = null;
+    supabase = null;
   }
 
   const cfg: AccessConfig = {
@@ -44,9 +54,24 @@ export async function FounderTestEnv({ founder }: { founder: FounderKey }) {
   };
   const access = resolveFounderAccess(email, founder, cfg);
 
-  if (!access.allowed) {
+  if (!access.allowed || !supabase) {
     return <AccessDenied founderName={meta.name} access={access} />;
   }
+
+  // Load this founder's sessions + a snapshot of what their DNA has learned so
+  // far. Everything here is fail-open: a missing migration or read error still
+  // renders the environment (the founder's ratings work regardless).
+  const [migrationReady, sessions, stats] = await Promise.all([
+    sessionsAvailable(supabase).catch(() => false),
+    listSessions(supabase, userId, founder).catch(() => []),
+    getWatchStats(supabase, userId).catch(() => null),
+  ]);
+  const rated = stats?.rated ?? 0;
+  const profile = await getUserDimensionProfile(supabase, userId, rated).catch(() => null);
+  const persona = profile ? describePersonality(profile) : null;
+  const strength = profile ? dnaStrength(profile) : 0;
+  const dials = profile ? tasteDials(profile, 5) : [];
+  const dnaReady = (profile?.samples ?? 0) >= 3;
 
   return (
     <div className="min-h-dvh bg-slate-950 text-white">
@@ -85,6 +110,52 @@ export async function FounderTestEnv({ founder }: { founder: FounderKey }) {
             </p>
           )}
         </section>
+
+        {/* What this founder's DNA has learned so far — the before/after signal. */}
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-white">Learned Watch DNA</h2>
+            <Link href="/app/dna" className="text-sm font-semibold text-brand-300 hover:text-brand-200">
+              Full DNA →
+            </Link>
+          </div>
+          {dnaReady && persona ? (
+            <div className="mt-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-brand-400/40 bg-brand-500/15 px-3 py-1 text-sm font-bold text-brand-100">
+                  {persona.title}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {rated} rated · DNA strength {strength}
+                </span>
+              </div>
+              {dials.length > 0 && (
+                <ul className="mt-3 flex flex-wrap gap-1.5">
+                  {dials.map((d) => (
+                    <li
+                      key={d.dim.key}
+                      className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200"
+                    >
+                      {d.lean}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-slate-300">
+              No DNA yet for {meta.name}. Rate a few titles below and a learned profile appears here — the &ldquo;before&rdquo;
+              you can compare future sessions against.
+            </p>
+          )}
+        </section>
+
+        <FounderSessions
+          founder={founder}
+          founderName={meta.name}
+          sessions={sessions.map(toView)}
+          migrationReady={migrationReady}
+        />
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6">
           <h2 className="text-lg font-bold">Enter the product as {meta.name}</h2>
@@ -144,7 +215,10 @@ function AccessDenied({ founderName, access }: { founderName: string; access: Ac
         <p className="mt-2 text-sm text-slate-300">{denyMessage(access)}</p>
 
         {access.reason === 'not_signed_in' && (
-          <Link href={`/login?next=${encodeURIComponent(founderByKey(access.founder).route)}`} className="btn-primary mt-4 inline-flex">
+          <Link
+            href={`/login?next=${encodeURIComponent(founderByKey(access.founder).route)}`}
+            className="btn-primary mt-4 inline-flex"
+          >
             Sign in
           </Link>
         )}
