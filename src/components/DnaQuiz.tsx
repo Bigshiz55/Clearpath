@@ -67,8 +67,8 @@ type PrimaryPayload = Pick<SubmitPayload, 'recognition' | 'attraction' | 'rating
  */
 const PRIMARY = {
   looksGood: { key: 'looks-good', label: 'Looks Good', emoji: '✨', cls: 'wv-quiz-btn--liked', testid: 'act-looks-good' },
-  watchlist: { key: 'watchlist', label: 'Add to Watchlist', emoji: '➕', cls: 'wv-quiz-btn--loved', testid: 'act-watchlist' },
-  notInterested: { key: 'not-interested', label: 'Not Interested', emoji: '👎', cls: 'wv-quiz-btn--disliked', testid: 'act-not-interested' },
+  watchlist: { key: 'watchlist', label: 'Add to Watchlist', emoji: '🔖', cls: 'wv-quiz-btn--gold', testid: 'act-watchlist' },
+  notInterested: { key: 'not-interested', label: 'Not Interested', emoji: '👎', cls: 'wv-quiz-btn--nope', testid: 'act-not-interested' },
   seen: { key: 'seen', label: 'Seen It', emoji: '👁️', cls: 'wv-quiz-btn--unseen', testid: 'act-seen' },
 } as const;
 
@@ -400,21 +400,34 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
         </div>
       )}
 
-      {/* One-time "how it works" sheet */}
+      {/* One-time "how it works" sheet — large, legible, colour-matched to the
+          real buttons so the mapping is obvious at a glance. */}
       {showIntro && (
-        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 p-4 sm:items-center" data-testid="quiz-intro">
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-ink-900 p-5 text-center shadow-card">
-            <h2 className="text-lg font-black text-white">🧬 Build your Watch DNA</h2>
-            <p className="mt-2 text-left text-sm text-slate-300">
-              For each title, tap one:
+        <div className="fixed inset-0 z-[120] flex items-end justify-center overflow-y-auto bg-black/70 p-4 sm:items-center" data-testid="quiz-intro">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-ink-900 p-6 shadow-card">
+            <h2 className="text-center text-2xl font-black text-white">🧬 Build your Watch DNA</h2>
+            <p className="mt-2 text-center text-base text-slate-300">
+              We’ll show you titles one at a time. For each, tap one button — that’s it.
             </p>
-            <ul className="mt-1 space-y-1 text-left text-sm text-slate-300">
-              <li>✨ <b>Looks Good</b> — mild interest (won’t save it)</li>
-              <li>➕ <b>Add to Watchlist</b> — you want to watch it</li>
-              <li>👎 <b>Not Interested</b> — not for you</li>
-              <li>👁️ <b>Seen It</b> — rate how it was</li>
+            <ul className="mt-5 space-y-3">
+              <li className="flex items-center gap-3">
+                <span className="wv-quiz-legend wv-quiz-btn--liked">✨ Looks Good</span>
+                <span className="text-base text-slate-200">Caught your eye <span className="text-slate-400">(won’t save it)</span></span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="wv-quiz-legend wv-quiz-btn--gold">🔖 Watchlist</span>
+                <span className="text-base text-slate-200">You want to watch it</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="wv-quiz-legend wv-quiz-btn--nope">👎 Not Interested</span>
+                <span className="text-base text-slate-200">Not for you</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="wv-quiz-legend wv-quiz-btn--unseen">👁️ Seen It</span>
+                <span className="text-base text-slate-200">Already watched — rate it</span>
+              </li>
             </ul>
-            <button onClick={dismissIntro} className="btn-primary mt-4 w-full" data-testid="quiz-intro-dismiss">Got it</button>
+            <button onClick={dismissIntro} className="btn-primary mt-6 w-full py-3.5 text-lg" data-testid="quiz-intro-dismiss">Got it — let’s go</button>
           </div>
         </div>
       )}

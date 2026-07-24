@@ -315,6 +315,27 @@ body {
 .wv-quiz-btn--liked    { border-color: rgba(16, 185, 129, 0.55); background: rgba(16, 185, 129, 0.12); }
 .wv-quiz-btn--disliked { border-color: rgba(245, 158, 11, 0.55); background: rgba(245, 158, 11, 0.12); }
 .wv-quiz-btn--unseen   { border-color: rgba(148, 163, 184, 0.5); background: rgba(148, 163, 184, 0.12); }
+/* Intent-valence accents for the primary actions: gold = save it, red = no. */
+.wv-quiz-btn--gold     { border-color: rgba(234, 179, 8, 0.65);  background: rgba(234, 179, 8, 0.15); }
+.wv-quiz-btn--nope     { border-color: rgba(239, 68, 68, 0.6);   background: rgba(239, 68, 68, 0.14); }
+
+/* Colored legend pill used in the intro sheet — mirrors the real button accents
+   so the explanation visually matches the buttons the user will tap. */
+.wv-quiz-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  min-width: 8.5rem;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.5rem 0.6rem;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff;
+}
 
 /* Home-tile ambient sheen — a slow light band that drifts across each tile so
    the hub feels alive on touch devices (where hover never fires). */
