@@ -135,15 +135,20 @@ export async function loadDnaConfidence(
   return { tally, confidence: computeDnaConfidence(tally) };
 }
 
-/** Count of onboarding calibration answers (drives Quiz Progress), 0..∞ (UI caps at 20). */
-export async function countCalibrationAnswers(supabase: SupabaseClient, userId: string, sessionId?: string): Promise<number> {
+/** Count answered events with a given source tag. Fail-open → 0. */
+export async function countAnswersBySource(
+  supabase: SupabaseClient,
+  userId: string,
+  source: string,
+  sessionId?: string,
+): Promise<number> {
   if (!userId) return 0;
   try {
     let q = supabase
       .from('preference_events')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('source', 'calibration')
+      .eq('source', source)
       .is('undone_at', null);
     if (sessionId) q = q.eq('session_id', sessionId);
     const { count } = await q;
@@ -151,4 +156,9 @@ export async function countCalibrationAnswers(supabase: SupabaseClient, userId: 
   } catch {
     return 0;
   }
+}
+
+/** Count of onboarding calibration answers (drives Quiz Progress), 0..∞ (UI caps at 20). */
+export function countCalibrationAnswers(supabase: SupabaseClient, userId: string, sessionId?: string): Promise<number> {
+  return countAnswersBySource(supabase, userId, 'calibration', sessionId);
 }
