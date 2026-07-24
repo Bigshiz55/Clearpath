@@ -229,6 +229,60 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 7px 0 #b30d6b;
 }
 
+/* ── DNA quiz: ONE-TILE mobile layout ──────────────────────────────────────
+   The active rating card fills exactly the space left after the app header,
+   the compact utility row, and the fixed bottom nav (plus iOS safe areas),
+   using the *dynamic* viewport unit so Safari's collapsing chrome can never
+   push the answer buttons under the fold. Inside the tile it's a flex column
+   where ONLY the poster may shrink — the title and the four buttons are never
+   pushed off screen. On very short viewports the poster shrinks first (and can
+   scroll internally as a last resort); the buttons always stay put.
+   `--wv-quiz-reserve` is the total chrome above+below the tile; tune it there. */
+:root {
+  --wv-quiz-reserve: 15.5rem;
+}
+.wv-quiz-fit {
+  height: calc(100dvh - var(--wv-quiz-reserve) - env(safe-area-inset-top));
+  min-height: 20rem;
+}
+@media (min-width: 640px) {
+  /* On desktop the bottom nav is hidden and there's plenty of height — let the
+     tile size to its content instead of the mobile viewport calc. */
+  .wv-quiz-fit { height: auto; min-height: 0; }
+}
+
+/* Four equal answer buttons. Every modifier below changes ONLY colour accents —
+   never geometry — so all four render at identical width, height, weight, font,
+   padding and radius. */
+.wv-quiz-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: clamp(48px, 7.4dvh, 60px);
+  padding: 0.25rem 0.5rem;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(0.8rem, 3.3vw, 1rem);
+  line-height: 1.05;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.wv-quiz-btn:active:not(:disabled) { transform: scale(0.97); }
+.wv-quiz-btn:disabled { opacity: 0.55; }
+.wv-quiz-btn .wv-quiz-emoji { font-size: 1.1rem; line-height: 1; }
+.wv-quiz-btn--loved    { border-color: rgba(244, 63, 94, 0.55);  background: rgba(244, 63, 94, 0.12); }
+.wv-quiz-btn--liked    { border-color: rgba(16, 185, 129, 0.55); background: rgba(16, 185, 129, 0.12); }
+.wv-quiz-btn--disliked { border-color: rgba(245, 158, 11, 0.55); background: rgba(245, 158, 11, 0.12); }
+.wv-quiz-btn--unseen   { border-color: rgba(148, 163, 184, 0.5); background: rgba(148, 163, 184, 0.12); }
+
 /* Home-tile ambient sheen — a slow light band that drifts across each tile so
    the hub feels alive on touch devices (where hover never fires). */
 @keyframes wv-tile-sheen {

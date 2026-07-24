@@ -20,16 +20,7 @@ export default async function QuizPage() {
     totalRated = count ?? 0;
   }
 
-  return (
-    <div className="mx-auto max-w-xl">
-      <h1 className="text-2xl font-bold text-white sm:text-3xl">🧬 Build your Watch DNA</h1>
-      <p className="mt-2 text-sm text-slate-400">
-        Have you seen it? If so, how was it? Every answer sharpens your recommendations — and
-        “haven’t seen it” never counts against you. Stop anytime; update it whenever.
-      </p>
-      <div className="mt-5">
-        <DnaQuiz totalRated={totalRated} />
-      </div>
-    </div>
-  );
+  // No repeated heading/paragraph here — the rating tile owns the viewport and
+  // the one-time explanation lives inside DnaQuiz's intro sheet.
+  return <DnaQuiz totalRated={totalRated} />;
 }

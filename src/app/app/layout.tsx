@@ -4,6 +4,7 @@ import { getProfile, ensureGuestProfile, personalLabelFor, getAvatar } from '@/l
 import { isPro } from '@/lib/pro';
 import { Nav } from '@/components/Nav';
 import { NavArrows } from '@/components/NavArrows';
+import { BuildBadge } from '@/components/BuildBadge';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,9 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main className="container-page py-6">
         <NavArrows />
         {children}
-        <div className="mt-10 text-center text-[10px] tracking-wide text-slate-600">
-          build {sha}{ref ? ` · ${ref.replace(/^.*\//, '')}` : ''}
-        </div>
+        <BuildBadge sha={sha} branch={ref} />
       </main>
     </div>
   );

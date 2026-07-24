@@ -17,6 +17,13 @@ declare global {
   }
 }
 
+/**
+ * Renders the REAL DnaQuiz inside a faithful copy of the /app shell — the same
+ * sticky header height, the same compact utility row, and the same fixed bottom
+ * nav (with the pb-20 safe reserve) as `src/app/app/layout.tsx`. This is what
+ * lets Playwright prove the one-tile requirement: artwork + title + four equal
+ * buttons all visible, nothing hidden behind the bottom nav, no page scroll.
+ */
 export function DnaQuizHarness() {
   const onSubmit = async (p: SubmitPayload) => {
     if (typeof window !== 'undefined') (window.__quizSubmits ??= []).push(p);
@@ -27,9 +34,34 @@ export function DnaQuizHarness() {
     if (typeof window !== 'undefined') (window.__quizUndos ??= []).push(eventId);
     return { ok: true as const };
   };
+
   return (
-    <div className="container-page">
-      <DnaQuiz items={MOCK} onSubmit={onSubmit} onUndo={onUndo} />
+    <div className="min-h-dvh pb-20 sm:pb-0">
+      {/* Mock global header — same height/treatment as the real <Nav> */}
+      <header className="sticky top-0 z-40 flex h-16 items-center border-b border-white/10 bg-ink-950/80 backdrop-blur">
+        <div className="container-page font-bold tracking-tight text-white">WatchVerdict</div>
+      </header>
+
+      <main className="container-page py-6">
+        {/* Mock compact utility row — same shape/height as NavArrows on the quiz route */}
+        <div className="mb-2 flex items-center justify-between gap-2" data-testid="mock-navrow">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-sm font-semibold text-slate-100">←</span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-sm font-semibold text-slate-100">🏠</span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-sm font-semibold text-slate-100">→</span>
+        </div>
+
+        <DnaQuiz items={MOCK} onSubmit={onSubmit} onUndo={onUndo} />
+      </main>
+
+      {/* Mock fixed bottom nav — same height/position/reserve as the real one */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-ink-950/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden"
+        data-testid="mock-bottomnav"
+      >
+        {['Home', 'Watch Now', 'New', 'On TV', 'Watchlist'].map((l) => (
+          <span key={l} className="flex flex-1 flex-col items-center gap-0.5 px-1 py-1 text-[11px] text-slate-300">{l}</span>
+        ))}
+      </nav>
     </div>
   );
 }

@@ -11,9 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export default function DnaQuizHarnessPage() {
   if (process.env.MOBILE_HARNESS !== '1') notFound();
-  return (
-    <div className="min-h-dvh py-6">
-      <DnaQuizHarness />
-    </div>
-  );
+  // The harness renders its own full app-shell facsimile (header + nav row +
+  // fixed bottom nav), so no extra wrapper here.
+  return <DnaQuizHarness />;
 }
