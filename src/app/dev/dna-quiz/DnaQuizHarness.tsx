@@ -28,7 +28,7 @@ export function DnaQuizHarness() {
     return { ok: true as const };
   };
   return (
-    <div className="container-page">
+    <div className="h-full">
       <DnaQuiz items={MOCK} onSubmit={onSubmit} onUndo={onUndo} />
     </div>
   );
