@@ -9,6 +9,7 @@ import { CourtInviteBox } from '@/components/court/CourtInviteBox';
 import { courtInviteUrlFromEnv } from '@/lib/court/inviteUrl';
 import { getGuestId } from '@/lib/court/guestId';
 import { classifyRpcError, classifyRoomStatus, stateInfo, type ClassifiedError } from '@/lib/court/joinState';
+import { CourtErrorCard } from '@/components/court/CourtErrorCard';
 
 const MOODS = [
   { key: 'any', label: 'Anything', emoji: '🎬' }, { key: 'light', label: 'Light', emoji: '🌤️' },
@@ -254,7 +255,7 @@ export function LiveCourt({ code }: { code: string }) {
 
   // Terminal, classified error → a clear recovery screen (never an endless spinner).
   if (fatal) {
-    return <Shell><FatalCard err={fatal} onRetry={retryConnection} /></Shell>;
+    return <Shell><CourtErrorCard err={fatal} onRetry={retryConnection} /></Shell>;
   }
   if (notFound) {
     return <Shell><div className="card p-8 text-center"><div className="text-3xl">🔗</div><p className="mt-3 text-sm text-slate-400">This Court room doesn’t exist or has ended.</p><Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVerdict →</Link></div></Shell>;
@@ -456,28 +457,6 @@ function FinalistCard({ f, onVeto, busy }: { f: Finalist; onVeto: () => void; bu
       <button onClick={onVeto} disabled={busy} className="mt-2 w-full rounded-xl border border-red-400/40 bg-red-500/10 py-2 text-xs font-bold text-red-100 transition hover:bg-red-500/20 disabled:opacity-40">
         🚫 Veto — swap this one out
       </button>
-    </div>
-  );
-}
-
-/** A precise, recoverable error screen — one per classified Court state. */
-function FatalCard({ err, onRetry }: { err: ClassifiedError; onRetry: () => void }) {
-  return (
-    <div className="card p-6 text-center">
-      <div className="text-3xl">{err.state === 'room-full' ? '🚪' : err.state === 'connection-failed' ? '🔌' : err.transient ? '⏳' : '⚖️'}</div>
-      <p className="mt-3 text-sm text-slate-200">{err.message}</p>
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-        {(err.recovery === 'try-again' || err.recovery === 'reconnect' || err.transient) && (
-          <button onClick={onRetry} className="btn-primary text-sm">{err.recovery === 'reconnect' ? 'Reconnect' : 'Try again'}</button>
-        )}
-        {err.recovery === 'open-correct-site' && (
-          <p className="text-xs text-slate-500">Open the invite link the host sent — make sure it’s the same site.</p>
-        )}
-        <Link href="/app" className="btn-secondary text-sm">Return home</Link>
-      </div>
-      {err.state === 'migration-missing' && (
-        <p className="mt-3 text-[11px] text-slate-500">Site owner: apply the Court database update (migrations 0004 + 0014 + 0023).</p>
-      )}
     </div>
   );
 }
