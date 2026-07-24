@@ -31,6 +31,11 @@ const schema = z.object({
   dnf: z.boolean().optional(),
   reasons: z.array(z.string().max(40)).max(6).optional(),
   dwellMs: z.number().int().min(0).max(600000).optional(),
+  /** Which surface produced this answer: 'calibration' (onboarding, counts toward
+   *  Quiz Progress), 'pack:<key>' (optional booster), or 'quiz' (default). */
+  source: z.string().max(40).optional(),
+  /** Founder test session id (isolates the event to a named session). */
+  sessionId: z.string().max(80).optional(),
 });
 
 export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{ ok: boolean; error?: string }> {
@@ -67,11 +72,11 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
     reasons: a.reasons as QuizAnswer['reasons'],
     dims,
     dwellMs: a.dwellMs,
-    source: 'quiz',
+    source: a.source ?? 'quiz',
   };
 
   // 1) The real engine (idempotent on eventId → duplicate taps write once).
-  await recordEvents(supabase, user.id, [quizAnswerToEvent(answer)]);
+  await recordEvents(supabase, user.id, [quizAnswerToEvent(answer)], a.sessionId ? { sessionId: a.sessionId } : {});
 
   // 2) Legacy watchlist mirror for SEEN ratings (keeps existing recs seeded).
   const legacy = legacyRatingFor(answer);

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { recordQuizAnswer, undoQuizAnswer } from '@/lib/actions/dnaQuiz';
 import type { QuizRating, Recognition } from '@/lib/preference/quizMap';
 import type { AttractionGrade } from '@/lib/preference/types';
+import { computeDnaConfidence, emptyTally, type DnaSignalTally } from '@/lib/preference/dnaConfidence';
+import { calibrationProgress, CALIBRATION_SIZE, EARLY_COMPLETE } from '@/lib/preference/calibration';
 
 export interface QuizItem {
   id: number;
@@ -30,10 +32,38 @@ export interface SubmitPayload {
   dnf?: boolean;
   reasons?: string[];
   dwellMs?: number;
+  source?: string;
+  sessionId?: string;
+}
+
+/** How the finite flow is configured — onboarding calibration vs an optional pack. */
+export interface CalibrationConfig {
+  /** Total titles in this finite flow (20 onboarding · pack size for packs). */
+  total: number;
+  /** Answers already recorded for this flow (resume). */
+  answered: number;
+  /** Show the onboarding "Quiz Progress" metric (false for packs). */
+  showQuizProgress: boolean;
+  /** Show a "starter DNA ready" checkpoint after this many (onboarding = 10). */
+  checkpointAt?: number;
+  /** Event source tag: 'calibration' | 'pack:<key>'. */
+  source: string;
+  /** API endpoint returning { items, answered, size, complete }. */
+  endpoint: string;
+  /** Founder test session id (isolates events), if any. */
+  sessionId?: string;
+  /** Where "See Recommendations" / done goes. */
+  doneHref?: string;
+  /** Human label for the flow (e.g. "Comedy pack"). */
+  label?: string;
 }
 
 interface Props {
-  totalRated?: number;
+  /** Server-computed signal snapshot so DNA Confidence starts at the real value. */
+  initialTally?: DnaSignalTally;
+  /** Finite-flow config. When omitted, defaults to onboarding calibration. */
+  calibration?: CalibrationConfig;
+  /** Test harness: preloaded items + injected handlers. */
   items?: QuizItem[];
   onSubmit?: (p: SubmitPayload) => Promise<{ ok: boolean; error?: string }>;
   onUndo?: (eventId: string) => Promise<{ ok: boolean }>;
@@ -41,15 +71,6 @@ interface Props {
 
 type PrimaryPayload = Pick<SubmitPayload, 'recognition' | 'attraction' | 'rating' | 'watchlist'>;
 
-/**
- * Four primary actions — one tap, then the next title. Intent stays distinct:
- *   ⭐ Looks Good → attraction 'interested'   (mild interest, NOT saved)
- *   📌 Save       → attraction 'must_watch' + saved to the high-intent watchlist
- *   ⏭ Skip       → attraction 'not_interested' (a real "not for me" signal)
- *   👁 Seen It    → opens the 4-way rating step → Experience DNA
- */
-/** Crisp line/solid icons — premium and consistent (emoji rendered inconsistently
- *  across devices). Sized 1.15rem, currentColor. */
 const ICONS = {
   star: (
     <svg viewBox="0 0 24 24" fill="currentColor" className="h-[1.15rem] w-[1.15rem]" aria-hidden>
@@ -88,40 +109,41 @@ const RATINGS: { key: QuizRating; label: string; emoji: string; cls: string; tes
   { key: 'disliked', label: 'Didn’t Like It', emoji: '👎', cls: 'wv-quiz-btn--disliked', testid: 'rate-disliked' },
 ];
 
-/** Common genres so "Still learning" always has something honest to show. */
-const COMMON_GENRES = ['Action', 'Comedy', 'Crime', 'Drama', 'Sci-Fi', 'Thriller', 'Romance', 'Horror', 'Mystery', 'Animation', 'Documentary', 'Fantasy'];
-
-type GenreStat = Record<string, { pos: number; neg: number }>;
-
-/** Session-local learning view — an honest progress meter, not a fabricated rating. */
-function dnaView(genres: GenreStat, answered: number) {
-  const confidence = Math.min(96, Math.round(100 * (1 - Math.exp(-answered / 22))));
-  const net = (g: string) => (genres[g]?.pos ?? 0) - (genres[g]?.neg ?? 0);
-  const encountered = Object.keys(genres);
-  const expert = encountered.filter((g) => net(g) >= 2).sort((a, b) => net(b) - net(a)).slice(0, 3);
-  const learnFrom = [
-    ...encountered.filter((g) => !expert.includes(g)),
-    ...COMMON_GENRES.filter((g) => !(g in genres)),
-  ];
-  const learning = Array.from(new Set(learnFrom)).filter((g) => !expert.includes(g)).slice(0, 3);
-  return { confidence, expert, learning };
-}
-
-function titleCase(g: string) { return g.replace(/\b\w/g, (c) => c.toUpperCase()); }
-
 const uid = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `q_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e9).toString(36)}`;
 
+const DEFAULT_CAL: CalibrationConfig = {
+  total: CALIBRATION_SIZE,
+  answered: 0,
+  showQuizProgress: true,
+  checkpointAt: EARLY_COMPLETE,
+  source: 'calibration',
+  endpoint: '/api/calibration',
+  doneHref: '/app/watch',
+  label: 'Watch DNA calibration',
+};
+
+function fmtEta(seconds: number): string {
+  if (seconds <= 0) return 'done';
+  if (seconds < 60) return `~${seconds}s left`;
+  const m = Math.round(seconds / 60);
+  return `~${m} min left`;
+}
+
 /**
- * Cinematic ONE-TILE discovery quiz. A blurred backdrop from the current poster
- * fills any aspect ratio (no black bars, phone → ultrawide); the crisp poster is
- * the hero. A live Watch-DNA meter animates as you rate. Every action is one tap
- * → the next title slides in — no popups, no lingering overlays, nothing between
- * cards. Fits the usable viewport with no scrolling at every size.
+ * FINITE cinematic Watch-DNA calibration. Two SEPARATE metrics are always
+ * distinct:
+ *   • Quiz Progress   — how far through the finite N-title onboarding (X of 20).
+ *   • Watch DNA Confidence — how well we understand you, from diverse real
+ *     signals; it never mirrors Quiz Progress and never hits 100 from answers
+ *     alone.
+ * After the checkpoint (10) we offer to stop with a starter DNA; at the total
+ * (20) onboarding ends — we never present an endless feed.
  */
-export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
+export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: Props) {
+  const cal = calibration ?? DEFAULT_CAL;
   const submit = onSubmit ?? recordQuizAnswer;
   const undo = onUndo ?? undoQuizAnswer;
   const isHarness = !!items;
@@ -129,35 +151,36 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
   const [queue, setQueue] = useState<QuizItem[]>(items ?? []);
   const [idx, setIdx] = useState(0);
   const [mode, setMode] = useState<'primary' | 'rating'>('primary');
-  const [answered, setAnswered] = useState(totalRated);
-  const [genres, setGenres] = useState<GenreStat>({});
+  const [answered, setAnswered] = useState(cal.answered);
+  const [tally, setTally] = useState<DnaSignalTally>(initialTally ?? emptyTally());
   const [errored, setErrored] = useState(false);
   const [loading, setLoading] = useState(!items);
   const [failed, setFailed] = useState(false);
-  const [dry, setDry] = useState(false);
+  const [serverComplete, setServerComplete] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
+  const [checkpointDismissed, setCheckpointDismissed] = useState(false);
+  const [finishedLater, setFinishedLater] = useState(false);
 
   const shownAt = useRef<number>(Date.now());
   const busy = useRef(false);
-  const history = useRef<{ eventId: string; idx: number; genre?: string; pos: boolean; neg: boolean }[]>([]);
+  const history = useRef<{ eventId: string; idx: number }[]>([]);
   const seen = useRef<Set<string>>(new Set((items ?? []).map((i) => `${i.mediaType}-${i.id}`)));
   const fetching = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const view = useMemo(() => dnaView(genres, answered), [genres, answered]);
+  // The two metrics — computed independently.
+  const progress = useMemo(() => calibrationProgress(answered, cal.total), [answered, cal.total]);
+  const confidence = useMemo(() => computeDnaConfidence(tally).percent, [tally]);
+  const complete = serverComplete || answered >= cal.total;
+  const atCheckpoint =
+    !isHarness && cal.checkpointAt != null && answered >= cal.checkpointAt && answered < cal.total && !checkpointDismissed;
 
-  // Measured, device-agnostic fit — correct the tile height by exactly the
-  // document overflow/slack via visualViewport. Only the poster shrinks.
+  // Measured, device-agnostic fit — only the poster shrinks (unchanged logic).
   useEffect(() => {
     const el = rootRef.current;
     if (!el || typeof window === 'undefined') return;
     const fit = () => {
-      // True desktop (wide AND tall) sizes via CSS; no bottom nav to clear.
       if (window.innerWidth >= 640 && window.innerHeight >= 640) { el.style.height = ''; el.style.minHeight = ''; return; }
-      // Deterministic fill: from the tile's top down to the reserved bottom
-      // (the real page paddings that sit below it), measured live so iOS Safari
-      // chrome + safe areas are always accounted for. No dvh/scrollHeight math
-      // (that mis-fires on iOS and shrank the poster to a thumbnail).
       el.style.minHeight = '0';
       el.style.height = '';
       const vpH = window.visualViewport?.height ?? window.innerHeight;
@@ -165,7 +188,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
       const main = el.closest('main');
       const outer = main?.parentElement ?? null;
       const pb = (n: Element | null) => (n ? parseFloat(getComputedStyle(n).paddingBottom) || 0 : 0);
-      const reserveBelow = pb(main) + pb(outer); // main py-6 bottom + outer nav reserve
+      const reserveBelow = pb(main) + pb(outer);
       el.style.height = `${Math.max(180, Math.round(vpH - top - reserveBelow))}px`;
     };
     fit();
@@ -180,29 +203,31 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
       window.removeEventListener('resize', fit);
       window.removeEventListener('orientationchange', fit);
     };
-  }, [idx, mode, loading, failed, dry]);
+  }, [idx, mode, loading, failed, complete, atCheckpoint]);
 
   const fetchBatch = useCallback(async () => {
-    if (items || fetching.current || dry) return;
+    if (items || fetching.current) return;
     fetching.current = true;
     try {
-      const r = await fetch('/api/quiz', { cache: 'no-store' });
+      const sep = cal.endpoint.includes('?') ? '&' : '?';
+      const url = cal.sessionId ? `${cal.endpoint}${sep}session=${encodeURIComponent(cal.sessionId)}` : cal.endpoint;
+      const r = await fetch(url, { cache: 'no-store' });
       const d = await r.json();
       if (d.error) { setFailed(true); return; }
+      if (typeof d.answered === 'number') setAnswered(d.answered);
+      if (d.complete) setServerComplete(true);
       const fresh: QuizItem[] = (d.items ?? []).filter((it: QuizItem) => !seen.current.has(`${it.mediaType}-${it.id}`));
       fresh.forEach((it) => seen.current.add(`${it.mediaType}-${it.id}`));
-      if (fresh.length === 0) setDry(true);
-      else setQueue((q) => [...q, ...fresh]);
+      if (fresh.length > 0) setQueue((q) => [...q, ...fresh]);
     } catch {
       setFailed(true);
     } finally {
       fetching.current = false;
       setLoading(false);
     }
-  }, [items, dry]);
+  }, [items, cal.endpoint, cal.sessionId]);
 
   useEffect(() => { void fetchBatch(); }, [fetchBatch]);
-  useEffect(() => { if (!items && queue.length - idx <= 5 && !failed) void fetchBatch(); }, [items, idx, queue.length, failed, fetchBatch]);
   useEffect(() => { shownAt.current = Date.now(); setMode('primary'); }, [idx]);
   useEffect(() => {
     if (isHarness) return;
@@ -212,20 +237,10 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
   const current = queue[idx] ?? null;
   const advance = useCallback(() => setIdx((i) => i + 1), []);
 
-  const bumpGenre = (genre: string | undefined, pos: boolean, neg: boolean) => {
-    if (!genre) return;
-    const g = titleCase(genre);
-    setGenres((prev) => {
-      const cur = prev[g] ?? { pos: 0, neg: 0 };
-      return { ...prev, [g]: { pos: cur.pos + (pos ? 1 : 0), neg: cur.neg + (neg ? 1 : 0) } };
-    });
-  };
-
-  // ONE write, then advance. No popups, no pause.
   const send = useCallback(
     async (payload: PrimaryPayload) => {
       const c = queue[idx];
-      if (!c || busy.current) return;
+      if (!c || busy.current || complete) return;
       busy.current = true;
       setErrored(false);
       const eventId = uid();
@@ -237,16 +252,23 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
         year: c.year,
         posterPath: c.posterPath,
         dwellMs: Date.now() - shownAt.current,
+        source: cal.source,
+        sessionId: cal.sessionId,
         ...payload,
       };
-      const pos = payload.recognition === 'seen' ? payload.rating === 'loved' || payload.rating === 'liked' : payload.attraction === 'interested' || payload.attraction === 'must_watch';
-      const neg = payload.recognition === 'seen' ? payload.rating === 'disliked' || payload.rating === 'hated' : payload.attraction === 'not_interested' || payload.attraction === 'absolutely_not';
       try {
         const res = await submit(full);
         if (!res.ok) { setErrored(true); busy.current = false; return; }
-        history.current.push({ eventId, idx, genre: c.genre ?? undefined, pos, neg });
+        history.current.push({ eventId, idx });
         setAnswered((n) => n + 1);
-        bumpGenre(c.genre ?? undefined, pos, neg);
+        // DNA Confidence grows from this REAL calibration/pack answer — not from a
+        // question merely appearing. Onboarding answers add calibration signal;
+        // pack answers add pack signal.
+        setTally((t) => ({
+          ...t,
+          calibrationAnswers: cal.source === 'calibration' ? t.calibrationAnswers + 1 : t.calibrationAnswers,
+          packAnswers: cal.source.startsWith('pack:') ? t.packAnswers + 1 : t.packAnswers,
+        }));
         advance();
       } catch {
         setErrored(true);
@@ -254,7 +276,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
         busy.current = false;
       }
     },
-    [queue, idx, submit, advance],
+    [queue, idx, submit, advance, cal.source, cal.sessionId, complete],
   );
 
   const onLooksGood = useCallback(() => void send({ recognition: 'unseen', attraction: 'interested' }), [send]);
@@ -266,17 +288,16 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
     const last = history.current.pop();
     if (!last) return;
     setAnswered((n) => Math.max(0, n - 1));
-    if (last.genre) {
-      const g = titleCase(last.genre);
-      setGenres((prev) => {
-        const cur = prev[g]; if (!cur) return prev;
-        return { ...prev, [g]: { pos: Math.max(0, cur.pos - (last.pos ? 1 : 0)), neg: Math.max(0, cur.neg - (last.neg ? 1 : 0)) } };
-      });
-    }
+    setTally((t) => ({
+      ...t,
+      calibrationAnswers: cal.source === 'calibration' ? Math.max(0, t.calibrationAnswers - 1) : t.calibrationAnswers,
+      packAnswers: cal.source.startsWith('pack:') ? Math.max(0, t.packAnswers - 1) : t.packAnswers,
+    }));
+    setServerComplete(false);
     setErrored(false);
     setIdx(last.idx);
     await undo(last.eventId).catch(() => {});
-  }, [undo]);
+  }, [undo, cal.source]);
 
   const dismissIntro = () => {
     setShowIntro(false);
@@ -299,52 +320,86 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
       </div>
     );
   }
-  if (!current) {
+
+  // Finished onboarding (or ran the pool dry / chose "Finish Later").
+  if (complete || finishedLater || !current) {
+    const done = complete;
     return (
       <div className="wv-quiz-fit mx-auto flex max-w-md flex-col items-center justify-center text-center" data-testid="quiz-done">
-        <p className="text-2xl font-black text-white">That’s a wrap for now 🎬</p>
-        <p className="mt-2 text-sm text-slate-300">Watch DNA · {view.confidence}% prediction confidence</p>
-        <Link href="/app/watch" className="btn-primary mt-5 inline-flex">See my picks</Link>
+        <div className="text-3xl" aria-hidden>🎬</div>
+        {done ? (
+          <>
+            <p className="mt-2 text-2xl font-black text-white">
+              {cal.showQuizProgress ? 'Calibration complete' : 'Pack complete'}
+            </p>
+            {cal.showQuizProgress && (
+              <div className="mt-3 flex items-center gap-6" data-testid="done-metrics">
+                <Metric label="Quiz Progress" value="100%" tone="brand" testid="done-quiz-progress" />
+                <Metric label="Watch DNA Confidence" value={`${confidence}%`} tone="emerald" testid="done-dna-confidence" />
+              </div>
+            )}
+            {!cal.showQuizProgress && (
+              <p className="mt-2 text-sm text-slate-300">Watch DNA Confidence · <span className="font-bold text-emerald-300">{confidence}%</span></p>
+            )}
+          </>
+        ) : (
+          <p className="mt-2 text-2xl font-black text-white">That’s a wrap for now</p>
+        )}
+        <Link href={cal.doneHref ?? '/app/watch'} className="btn-primary mt-5 inline-flex" data-testid="quiz-done-cta">
+          See my recommendations
+        </Link>
       </div>
     );
   }
 
   return (
     <>
-      {/* Cinematic backdrop generated from the current poster */}
       {current.posterUrl && <div className="wv-cine-bg" style={{ backgroundImage: `url(${current.posterUrl})` }} aria-hidden />}
       <div className="wv-cine-scrim" aria-hidden />
       <div className="wv-cine-grain" aria-hidden />
 
       <div ref={rootRef} className="wv-quiz-fit relative z-10 mx-auto flex w-full max-w-md flex-col gap-2.5" data-testid="dna-quiz">
-        {/* 1 · Watch-DNA progress */}
+        {/* 1 · TWO metrics — Quiz Progress (onboarding) + Watch DNA Confidence */}
         <div className="shrink-0" data-testid="quiz-stage">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-200">🧬 Watch DNA</span>
+            <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-200">🧬 {cal.label ?? 'Watch DNA'}</span>
             <div className="flex items-center gap-1">
               <button onClick={() => setShowIntro(true)} className="rounded-md px-1.5 py-1 text-slate-400 hover:text-slate-200" aria-label="How this works">ⓘ</button>
               <button onClick={() => void undoLast()} disabled={history.current.length === 0} className="rounded-md px-2 py-1 text-xs font-bold text-brand-200 disabled:opacity-30" aria-label="Undo last answer">↶ Undo</button>
             </div>
           </div>
-          <div className="mt-0.5 flex items-end gap-2">
-            <span key={answered} className="wv-dna-pct wv-pop" data-testid="dna-confidence">{view.confidence}%</span>
-            <span className="pb-1 text-[10px] font-bold uppercase leading-tight tracking-wide text-slate-400">Prediction<br />confidence</span>
-          </div>
-          <div className="wv-dna-bar mt-1.5"><span style={{ width: `${view.confidence}%` }} /></div>
-          <div className="wv-dna-detail mt-2 gap-1.5">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold text-emerald-300">Expert in</span>
-              {view.expert.length ? view.expert.map((g) => <span key={g} className="wv-dna-chip wv-dna-chip--expert">{g}</span>)
-                : <span className="text-[11px] text-slate-400">building your profile…</span>}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-300">Still learning</span>
-              {view.learning.map((g) => <span key={g} className="wv-dna-chip wv-dna-chip--learning">{g}</span>)}
+
+          <div className="mt-1 grid grid-cols-2 gap-2">
+            {cal.showQuizProgress ? (
+              <div className="rounded-lg border border-white/10 bg-black/25 px-2.5 py-1.5" data-testid="quiz-progress">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Quiz Progress</span>
+                  <span className="text-[10px] font-semibold text-slate-300" data-testid="quiz-title-index">{progress.index} of {cal.total}</span>
+                </div>
+                <div className="mt-0.5 flex items-end gap-1.5">
+                  <span key={`p${answered}`} className="wv-dna-pct wv-pop text-brand-200" data-testid="quiz-progress-pct">{progress.percent}%</span>
+                </div>
+                <div className="wv-dna-bar wv-dna-bar--brand mt-1"><span style={{ width: `${progress.percent}%` }} /></div>
+                <div className="mt-0.5 text-[10px] text-slate-400" data-testid="quiz-eta">{fmtEta(progress.secondsRemaining)}</div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-white/10 bg-black/25 px-2.5 py-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Pack</span>
+                <div className="mt-0.5 text-sm font-bold text-white" data-testid="pack-index">{progress.index} of {cal.total}</div>
+              </div>
+            )}
+
+            <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/5 px-2.5 py-1.5" data-testid="dna-confidence-card">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-300/90">Watch DNA Confidence</span>
+              <div className="mt-0.5 flex items-end gap-1.5">
+                <span key={`c${confidence}`} className="wv-dna-pct wv-pop text-emerald-300" data-testid="dna-confidence">{confidence}%</span>
+              </div>
+              <div className="wv-dna-bar mt-1"><span style={{ width: `${confidence}%` }} /></div>
             </div>
           </div>
         </div>
 
-        {/* 2 + 3 · Hero poster + title (slides in on every new title) */}
+        {/* 2 + 3 · Hero poster + title */}
         <div key={idx} className="wv-title-in flex min-h-0 flex-1 flex-col gap-2">
           <div className="relative min-h-0 flex-1" data-testid="quiz-poster">
             {current.posterUrl ? (
@@ -397,12 +452,33 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
         )}
         {errored && <p className="shrink-0 text-center text-xs text-red-300" data-testid="quiz-error">Couldn’t save — tap again.</p>}
 
+        {/* Checkpoint at 10 — starter DNA ready */}
+        {atCheckpoint && (
+          <div className="fixed inset-0 z-[120] flex items-end justify-center overflow-y-auto bg-black/70 p-4 sm:items-center" data-testid="quiz-checkpoint">
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-ink-900 p-6 shadow-card text-center">
+              <div className="text-3xl" aria-hidden>✨</div>
+              <h2 className="mt-1 text-2xl font-black text-white">Your starter Watch DNA is ready.</h2>
+              <p className="mt-2 text-sm text-slate-300">
+                {answered} of {cal.total} rated · Watch DNA Confidence{' '}
+                <span className="font-bold text-emerald-300" data-testid="checkpoint-confidence">{confidence}%</span>. Keep going to sharpen it, or stop here.
+              </p>
+              <div className="mt-5 grid gap-2">
+                <button onClick={() => setCheckpointDismissed(true)} className="btn-primary w-full py-3" data-testid="checkpoint-continue">Continue</button>
+                <Link href={cal.doneHref ?? '/app/watch'} className="btn-secondary w-full py-3" data-testid="checkpoint-early-recs">See Early Recommendations</Link>
+                <button onClick={() => setFinishedLater(true)} className="w-full py-2 text-sm font-semibold text-slate-300" data-testid="checkpoint-finish-later">Finish Later</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* One-time "how it works" sheet */}
-        {showIntro && (
+        {showIntro && !atCheckpoint && (
           <div className="fixed inset-0 z-[120] flex items-end justify-center overflow-y-auto bg-black/70 p-4 sm:items-center" data-testid="quiz-intro">
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-ink-900 p-6 shadow-card">
               <h2 className="text-center text-2xl font-black text-white">🧬 Build your Watch DNA</h2>
-              <p className="mt-2 text-center text-base text-slate-300">We’ll show you titles one at a time. For each, tap one — that’s it.</p>
+              <p className="mt-2 text-center text-base text-slate-300">
+                {cal.showQuizProgress ? `${cal.total} quick titles — one tap each. ` : ''}Two things move: <span className="font-semibold text-brand-200">Quiz Progress</span> (how far along) and <span className="font-semibold text-emerald-300">DNA Confidence</span> (how well we know you).
+              </p>
               <ul className="mt-5 space-y-3">
                 <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--liked"><span className="wv-quiz-ico">{ICONS.star}</span> Looks Good</span><span className="text-base text-slate-200">Caught your eye <span className="text-slate-400">(won’t save it)</span></span></li>
                 <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--gold"><span className="wv-quiz-ico">{ICONS.bookmark}</span> Save</span><span className="text-base text-slate-200">You want to watch it</span></li>
@@ -415,5 +491,15 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
         )}
       </div>
     </>
+  );
+}
+
+function Metric({ label, value, tone, testid }: { label: string; value: string; tone: 'brand' | 'emerald'; testid?: string }) {
+  const color = tone === 'brand' ? 'text-brand-200' : 'text-emerald-300';
+  return (
+    <div className="text-center" data-testid={testid}>
+      <div className={`text-3xl font-black tabular-nums ${color}`}>{value}</div>
+      <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</div>
+    </div>
   );
 }
