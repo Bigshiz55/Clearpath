@@ -83,6 +83,30 @@ describe('quiz answer → Watch DNA evidence', () => {
     expect(after.map((c) => c.id)).toEqual(['fast', 'slow']); // flipped by real evidence
   });
 
+  it('(A1) "Looks Good" (unseen + interested) feeds ATTRACTION, never Experience', () => {
+    const state = deriveDna([quizAnswerToEvent(answer({ recognition: 'unseen', attraction: 'interested', dims: fast }))], 0);
+    expect(state.experience.samples).toBe(0);
+    expect(state.experience.dims.pacing!.evidence).toBe(0);
+    expect(state.attraction.samples).toBe(1);
+    expect(state.attraction.dims.pacing!.evidence).toBeGreaterThan(0);
+    expect(legacyRatingFor(answer({ recognition: 'unseen', attraction: 'interested' }))).toBeNull();
+  });
+
+  it('(A2) "Add to Watchlist" (must_watch) is stronger positive intent than "Looks Good" (interested)', () => {
+    const watchlist = pacingEvidence({ recognition: 'unseen', attraction: 'must_watch', rating: undefined });
+    const looksGood = pacingEvidence({ recognition: 'unseen', attraction: 'interested', rating: undefined });
+    expect(watchlist).toBeGreaterThan(looksGood);
+  });
+
+  it('(A3) "Not Interested" pushes ATTRACTION toward the opposite pole', () => {
+    const state = deriveDna(
+      Array.from({ length: 5 }, (_, i) => quizAnswerToEvent(answer({ eventId: `n${i}`, titleId: `n${i}`, recognition: 'unseen', attraction: 'not_interested', dims: fast }))),
+      0,
+    );
+    expect(state.attraction.dims.pacing!.pref).toBeLessThan(50); // disliked a fast title ⇒ leans slow
+    expect(state.experience.samples).toBe(0); // never touches Experience
+  });
+
   it('legacy 1–10 mirror preserves Loved>Liked>Okay>Disliked>Hated ordering', () => {
     const r = (rt: QuizAnswer['rating']) => legacyRatingFor(answer({ rating: rt }))!;
     expect(r('loved')).toBeGreaterThan(r('liked'));

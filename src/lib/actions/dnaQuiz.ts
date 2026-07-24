@@ -6,6 +6,7 @@ import { recordEvents, undoEvent } from '@/lib/preference/store';
 import { getCachedDimensions } from '@/lib/titleDimensions';
 import { quizAnswerToEvent, legacyRatingFor, type QuizAnswer } from '@/lib/preference/quizMap';
 import { rateQuizTitle } from '@/lib/actions/quiz';
+import { addToWatchlist } from '@/lib/actions/watchlist';
 
 /**
  * The ONE write path from the redesigned two-step quiz into the real Watch DNA
@@ -23,6 +24,10 @@ const schema = z.object({
   posterPath: z.string().max(300).nullable().optional(),
   recognition: z.enum(['seen', 'unseen', 'unsure']),
   rating: z.enum(['loved', 'liked', 'okay', 'disliked', 'hated']).optional(),
+  /** Pre-watch intent for unseen titles (Looks Good / Add to Watchlist / Not Interested). */
+  attraction: z.enum(['must_watch', 'interested', 'maybe_interested', 'not_interested', 'absolutely_not']).optional(),
+  /** Strong intent: also save the title to the high-intent watchlist. */
+  watchlist: z.boolean().optional(),
   dnf: z.boolean().optional(),
   reasons: z.array(z.string().max(40)).max(6).optional(),
   dwellMs: z.number().int().min(0).max(600000).optional(),
@@ -57,6 +62,7 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
     at: Date.now(),
     recognition: a.recognition,
     rating: a.rating,
+    attraction: a.attraction,
     dnf: a.dnf,
     reasons: a.reasons as QuizAnswer['reasons'],
     dims,
@@ -80,7 +86,48 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
     }).catch(() => {});
   }
 
+  // 3) Strong intent ("Add to Watchlist") ALSO saves to the high-intent list.
+  //    "Looks Good" never does — the watchlist stays a deliberate list.
+  if (a.watchlist) {
+    await addToWatchlist({
+      tmdbId: a.tmdbId,
+      mediaType: a.mediaType,
+      title: a.title,
+      year: a.year ?? null,
+      posterPath: a.posterPath ?? null,
+      status: 'strict',
+    }).catch(() => {});
+  }
+
   return { ok: true };
+}
+
+/**
+ * Watchlist-only save for the non-blocking "Looks good → Add to Watchlist" chip.
+ * It upgrades intent to a real save WITHOUT recording a second DNA event (the
+ * "Looks Good" attraction signal was already logged), so we never double-count.
+ */
+const watchlistSchema = z.object({
+  tmdbId: z.number().int().positive(),
+  mediaType: z.enum(['movie', 'tv']),
+  title: z.string().min(1).max(300),
+  year: z.number().int().nullable().optional(),
+  posterPath: z.string().max(300).nullable().optional(),
+});
+
+export async function addQuizToWatchlist(input: z.infer<typeof watchlistSchema>): Promise<{ ok: boolean }> {
+  const parsed = watchlistSchema.safeParse(input);
+  if (!parsed.success) return { ok: false };
+  const v = parsed.data;
+  const res = await addToWatchlist({
+    tmdbId: v.tmdbId,
+    mediaType: v.mediaType,
+    title: v.title,
+    year: v.year ?? null,
+    posterPath: v.posterPath ?? null,
+    status: 'strict',
+  }).catch(() => ({ ok: false as const }));
+  return { ok: res.ok };
 }
 
 /** Undo the most recent quiz answer (soft-delete, audit trail preserved). */

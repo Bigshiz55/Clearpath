@@ -280,7 +280,9 @@ body {
   font-size: clamp(0.8rem, 3.3vw, 1rem);
   line-height: 1.05;
   text-align: center;
-  white-space: nowrap;
+  /* Wrap long labels ("Add to Watchlist") instead of clipping — button size is
+     held equal by the grid + min-height, so wrapping never breaks the layout. */
+  white-space: normal;
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;

@@ -6,7 +6,7 @@
  * that `deriveDna` consumes.
  */
 import type { TitleDimensions } from '@/lib/scoring/dimensions';
-import type { ExperienceGrade, PreferenceEvent, PrimaryAction, ReasonCode } from './types';
+import type { AttractionGrade, ExperienceGrade, PreferenceEvent, PrimaryAction, ReasonCode } from './types';
 
 /** Recognition step outcome. */
 export type Recognition = 'seen' | 'unseen' | 'unsure';
@@ -24,6 +24,13 @@ export interface QuizAnswer {
   recognition: Recognition;
   /** Present only when recognition === 'seen'. */
   rating?: QuizRating;
+  /**
+   * Pre-watch intent (recognition !== 'seen'). "Looks Good" = interested,
+   * "Add to Watchlist" = must_watch (stronger), "Not Interested" = not_interested.
+   * Feeds the ATTRACTION channel, never Experience — an unseen title can never
+   * be taste evidence. Absent → exposure-only (zero DNA), unchanged behaviour.
+   */
+  attraction?: AttractionGrade;
   /** Seen but stopped before the end → overrides the grade with DNF. */
   dnf?: boolean;
   /** Optional high-value follow-up reasons. */
@@ -36,6 +43,11 @@ export interface QuizAnswer {
   source?: string;
 }
 
+/** Is this attraction grade a positive (interested) lean? */
+function attractionPositive(g: AttractionGrade): boolean {
+  return g === 'must_watch' || g === 'interested' || g === 'maybe_interested';
+}
+
 /** Map a rating choice to an Experience grade (DNF wins when the user bailed). */
 export function gradeFor(answer: QuizAnswer): ExperienceGrade | null {
   if (answer.recognition !== 'seen') return null;
@@ -45,10 +57,16 @@ export function gradeFor(answer: QuizAnswer): ExperienceGrade | null {
 
 /** Coarse action tag (stats/analytics); the fine grade drives the actual signal. */
 function actionFor(answer: QuizAnswer): PrimaryAction {
-  if (answer.recognition !== 'seen') return 'skip'; // haven't-seen / unsure = zero DNA
-  const g = gradeFor(answer);
-  if (!g) return 'skip';
-  return g === 'disliked' || g === 'hated' || g === 'dnf' ? 'seen_disliked' : 'seen_liked';
+  if (answer.recognition === 'seen') {
+    const g = gradeFor(answer);
+    if (!g) return 'skip';
+    return g === 'disliked' || g === 'hated' || g === 'dnf' ? 'seen_disliked' : 'seen_liked';
+  }
+  // Unseen with an explicit intent → Attraction; otherwise exposure-only (skip).
+  if (answer.attraction) {
+    return attractionPositive(answer.attraction) ? 'unseen_interested' : 'unseen_not_interested';
+  }
+  return 'skip';
 }
 
 /**
@@ -81,6 +99,7 @@ export function legacyRatingFor(answer: QuizAnswer): number | null {
  */
 export function quizAnswerToEvent(answer: QuizAnswer): PreferenceEvent {
   const grade = gradeFor(answer);
+  const attractionGrade = answer.recognition !== 'seen' ? answer.attraction : undefined;
   return {
     id: answer.eventId,
     at: answer.at,
@@ -89,6 +108,7 @@ export function quizAnswerToEvent(answer: QuizAnswer): PreferenceEvent {
     genres: answer.genres,
     action: actionFor(answer),
     experienceGrade: grade ?? undefined,
+    attractionGrade,
     reasons: answer.reasons,
     dwellMs: answer.dwellMs,
     source: answer.source ?? 'quiz',

@@ -1,6 +1,6 @@
 'use client';
 
-import { DnaQuiz, type QuizItem, type SubmitPayload } from '@/components/DnaQuiz';
+import { DnaQuiz, type QuizItem, type SubmitPayload, type WatchlistRef } from '@/components/DnaQuiz';
 
 /** A fixed, deterministic pool — including a long title and a missing poster. */
 const MOCK: QuizItem[] = [
@@ -14,6 +14,7 @@ declare global {
   interface Window {
     __quizSubmits?: SubmitPayload[];
     __quizUndos?: string[];
+    __quizWatchlist?: WatchlistRef[];
   }
 }
 
@@ -34,6 +35,10 @@ export function DnaQuizHarness() {
     if (typeof window !== 'undefined') (window.__quizUndos ??= []).push(eventId);
     return { ok: true as const };
   };
+  const onWatchlist = async (w: WatchlistRef) => {
+    if (typeof window !== 'undefined') (window.__quizWatchlist ??= []).push(w);
+    return { ok: true as const };
+  };
 
   return (
     <div className="min-h-dvh pb-20 sm:pb-0">
@@ -50,7 +55,7 @@ export function DnaQuizHarness() {
           <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-sm font-semibold text-slate-100">→</span>
         </div>
 
-        <DnaQuiz items={MOCK} onSubmit={onSubmit} onUndo={onUndo} />
+        <DnaQuiz items={MOCK} onSubmit={onSubmit} onUndo={onUndo} onWatchlist={onWatchlist} />
       </main>
 
       {/* Mock fixed bottom nav — same height/position/reserve as the real one */}
