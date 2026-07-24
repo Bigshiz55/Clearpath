@@ -138,7 +138,13 @@ export function deriveDna(events: PreferenceEvent[], now: number): DnaState {
     }
     const broadDampen = hasExplanatoryReason ? BROAD_DAMPEN_WITH_REASON : 1;
 
-    applySignal(channelOf(state, primary.channel), primary, event, ageMs, true, broadDampen);
+    // "Just not in the mood" makes the WHOLE reaction temporary — it must not
+    // become a permanent taste penalty. Reclassify the primary signal to decay,
+    // unless a real explanatory reason was also given.
+    const moodOnly = (event.reasons ?? []).includes('not_in_the_mood') && !hasExplanatoryReason;
+    const primaryToApply = moodOnly ? { ...primary, decay: 'mood' as const } : primary;
+
+    applySignal(channelOf(state, primaryToApply.channel), primaryToApply, event, ageMs, true, broadDampen);
     for (const s of reasonSignals) applySignal(channelOf(state, s.channel), s, event, ageMs, false, 1);
   }
   return state;
@@ -146,6 +152,23 @@ export function deriveDna(events: PreferenceEvent[], now: number): DnaState {
 
 function channelOf(state: DnaState, channel: DnaChannel): ChannelProfile {
   return state[channel];
+}
+
+/**
+ * Fold explicit corrections into an override map (dim key → target 0..100),
+ * last write wins. Corrections are deliberate user statements that OVERRIDE
+ * inferred taste for their axes.
+ */
+export function deriveCorrections(events: PreferenceEvent[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const e of events) {
+    for (const c of e.corrections ?? []) {
+      if (typeof c.target === 'number' && Number.isFinite(c.target)) {
+        out[c.key] = Math.min(100, Math.max(0, c.target));
+      }
+    }
+  }
+  return out;
 }
 
 /** Undo: re-derive without the most recent event. */

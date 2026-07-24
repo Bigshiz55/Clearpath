@@ -162,4 +162,10 @@ export interface PreferenceEvent {
   roundId?: string;
   /** Title familiarity 0..1 (recognizable titles are safer to judge). */
   familiarity?: number;
+  /**
+   * Explicit user CORRECTIONS of specific axes (e.g. "actually, I do like
+   * animation"). These OVERRIDE inferred signals for those axes at full
+   * confidence — a deliberate statement beats a pile of guesses. Last write wins.
+   */
+  corrections?: Array<{ key: string; target: number }>;
 }

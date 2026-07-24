@@ -103,6 +103,76 @@ I am not claiming THE DNA CASE is complete. What IS true: every decision the gam
 make is now implemented as pure, verifiable logic with 64 passing tests, so the UI and
 migration increments are wiring, not invention.
 
+---
+
+# Increment 3 — Migration + ranking wiring (load-bearing)
+
+The three DNA channels now persist and **measurably rerank the production ranking
+path** (`rankByDna`). No parallel engine, no test-only path.
+
+## Files changed / added
+- `supabase/migrations/0023_preference_dna.sql` (new) — persistent data model.
+- `src/lib/pendingMigrations.ts` — registered `0023_preference_dna` (base64, idempotent) for `/api/admin/migrate`.
+- `src/lib/preference/rank.ts` (new) — `preferenceNudge` (bounded ±10), `rankWithPreference`, `preferenceConfidence`, `hasPreferenceSignal`.
+- `src/lib/preference/store.ts` (new, server-only) — `loadPreference` (1 indexed query), `recordEvents` (batched, dedup), `undoEvent` (soft-delete), `recordOutcome`.
+- `src/lib/preference/engine.ts` — `deriveCorrections`; "just not in the mood" now decays the whole reaction.
+- `src/lib/dna.ts` — **wired the preference nudge into `rankByDna`** (no-op without evidence; zero AI when there's no embedding Taste-DNA).
+- Tests: `rank.test.ts` (8 property tests), `store.int.test.ts` (gated live), `rankReport.test.ts` (before/after report generator).
+- `docs/dna-rank-report.md` (generated) — before/after ranking with per-title movement.
+
+## Ranking formula (production)
+`dnaFit = clamp( base + dimN + rerankN + prefN , 0..100 )`, where `base` = objective
+Watchability (or the embedding Taste-DNA blend when available), `dimN`/`rerankN` are the
+existing bounded content-fingerprint nudges, and **`prefN` = the new preference nudge**:
+
+`prefN = clamp( agreement × 10 , −10..10 )`, `agreement = 0.7·dimSigned + 0.3·genreSigned`,
+each `signed = direction × avgConfidence` (so higher-confidence beliefs move ranking more).
+
+## Evidence weights (per observation, before info/decay scaling)
+Experience: loved 1.6 · liked 1.1 · okay 0.35 · disliked 1.1 · hated 1.6 · DNF 1.3.
+Attraction: must-watch 1.1 · interested 0.8 · maybe 0.3 · not-interested 0.8 · absolutely-not 1.2.
+Discovery: 0.4–0.9. Experience merged at 1.0 vs Attraction 0.7. **Corrections override** inferred at confidence 1.0.
+
+## Cost & scale (per `rankByDna` call, added by this wiring)
+- **+1 DB query** (one indexed SELECT on `preference_events`, capped at 1000 rows, `undone_at is null`).
+- **0 new external API calls** (uses already-fetched cached dims + metadata).
+- **0 AI calls** — and *fewer* than before for preference-only users (the embedding is now skipped when there's no Taste-DNA).
+- Pure ranking latency: **0.059 ms per 24-title shelf** (measured, 5000 iters). Bounded candidate set (`cap`), batched writes, request dedup via client id + `unstable_cache`, graceful empty fallback when the provider/table is unavailable.
+
+## Strict status table (this increment)
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Migrations + data model for all evidence types, provenance, corrections/undo, outcomes, calibration | **PASS (written)** / **NOT TESTED (applied live)** | `0023_preference_dna.sql`, idempotent, RLS; base64 round-trips exactly. Applying to clean/existing DB needs a live project. |
+| Wire all three channels into the real `rankByDna` | **PASS** | `src/lib/dna.ts` diff; build + tsc green |
+| Experience outweighs Attraction | **PASS** | `rank.test.ts (a)` |
+| Corrections outweigh inferred | **PASS** | `rank.test.ts (b)` |
+| Rejection / DNF lowers appropriate titles | **PASS** | `rank.test.ts (c)` |
+| Temporary mood decays, core DNA unchanged | **PASS** | `rank.test.ts (d)` + engine |
+| Low-confidence users → lower-confidence output | **PASS** | `rank.test.ts (e)` |
+| Completing a round materially reranks | **PASS** | `rank.test.ts (f)`, `rankReport.test.ts`, `dna-rank-report.md` |
+| Uses the real production path, no parallel engine | **PASS** | nudge lives inside `rankByDna`; report uses the same `preferenceNudge` |
+| Core path works with zero AI calls | **PASS (by construction)** | embedding skipped when no Taste-DNA; nudge is pure |
+| Before/after ranking report | **PASS** | `docs/dna-rank-report.md` (generated) |
+| Cost/scale safeguards (1 query, no per-title AI/API, bounded, batched, indexed, dedup, fallback) | **PASS** | `store.ts`, indexes in `0023`, measured latency |
+| A completed round persists / trait confidence changes / RLS isolation, live | **NOT TESTED** | `store.int.test.ts` written, gated; needs Supabase env + 0023 applied |
+| Two users opposite DNA → different rankings | **PASS (pure)** / **NOT TESTED (live)** | `rank.test.ts` shows opposite DNA → opposite nudge; live variant in `store.int.test.ts` |
+| Migration verified vs clean / existing schema / existing user | **NOT TESTED / BLOCKED** | no live Postgres in this environment |
+| User sees what was learned; fast on a phone (acceptance) | **NOT MET** | needs the UI increment (not built, by your instruction) |
+
+## Acceptance standard — honest verdict
+**Not fully met yet, by design:** you asked me to stop after migration + ranking wiring and
+NOT build the UI. So "a real user completes a round and *sees* it" awaits the UI increment,
+and "evidence persists / shelves rerank live" awaits applying `0023` to a real project and
+running `store.int.test.ts`. Everything that can be proven without a live DB/UI **is** proven:
+the wiring is in the real path, the six ranking properties hold, the round reranks materially,
+and the cost profile is one indexed query with zero added AI.
+
+## Remaining blockers
+1. Apply `0023` to the live project (`/api/admin/migrate` or `supabase db push`) and run `store.int.test.ts` against it (persistence + RLS + live rerank).
+2. Wire `recordEvents`/`loadPreference` into an API route the client calls (trivial; deferred with the UI).
+3. Backfill: existing `watchlist_items` ratings are not yet mirrored into `preference_events` (new signal starts fresh; the old dimension nudge still covers them).
+
 ## Recommended next increment
 
 1. **Migration** — persist the event log + per-trait confidence (`preference_events`,

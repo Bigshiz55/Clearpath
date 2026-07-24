@@ -12,6 +12,13 @@ import { getUserDimensionProfile, getCachedDimensions, getTitleDimensions } from
 import { dimensionMatch, matchHighlights } from '@/lib/scoring/dimensions';
 import { rerankNudge } from '@/lib/scoring/reranker';
 import { RERANK_MODEL } from '@/lib/scoring/rerankerWeights';
+import { loadPreference } from '@/lib/preference/store';
+import { preferenceNudge, hasPreferenceSignal } from '@/lib/preference/rank';
+
+/** TMDB genre names → the slug vocabulary the preference model stores. */
+function genreSlug(name: string): string {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
 
 const clampScore = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
@@ -150,8 +157,19 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
   cap = 24,
 ): Promise<{ items: Array<T & { dnaFit: number | null }>; personalized: boolean }> {
   const pool = items.slice(0, cap);
-  const dna = userId ? await getUserTasteDna(supabase, userId) : EMPTY_DNA;
-  if (!dna.liked) return { items: pool.map((i) => ({ ...i, dnaFit: null })), personalized: false };
+  const now = Date.now();
+  // Load the embedding Taste-DNA AND the three-channel preference DNA (THE DNA
+  // CASE) in parallel. The preference read is one indexed query, cost-safe, and
+  // degrades to empty when the table/keys are absent.
+  const [dna, pref] = await Promise.all([
+    userId ? getUserTasteDna(supabase, userId) : Promise.resolve(EMPTY_DNA),
+    userId ? loadPreference(supabase, userId, now) : Promise.resolve(null),
+  ]);
+  const hasPref = pref != null && hasPreferenceSignal(pref.dna);
+  // Nothing to personalize with → preserve the incoming order (unchanged behavior).
+  if (!dna.liked && !hasPref) {
+    return { items: pool.map((i) => ({ ...i, dnaFit: null })), personalized: false };
+  }
 
   // Content-fingerprint personalization (bounded, deterministic, cache-only):
   // nudge the ranking toward titles whose AI content DNA matches the axes this
@@ -166,24 +184,32 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
 
   // Rank by the full Watchability score — the user's DNA blended with the
   // objective ratings (the same 0–100 shown at the top of every card), so the
-  // order on screen matches the number the user sees.
+  // order on screen matches the number the user sees. The preference nudge (THE
+  // DNA CASE) is a further bounded ±PREF_NUDGE_MAX term on top.
   const scored = await Promise.all(
     pool.map(async (i) => {
-      const [vector, data] = await Promise.all([
-        getTitleVector(i.mediaType, i.id),
+      // ZERO AI when there's no embedding Taste-DNA: the preference path needs
+      // only cached dims + metadata, never an embedding.
+      const [data, vector] = await Promise.all([
         getScoringData(i.mediaType, i.id, 'US').catch(() => null),
+        dna.liked ? getTitleVector(i.mediaType, i.id) : Promise.resolve(null),
       ]);
-      if (!vector || !data) return { ...i, dnaFit: null };
+      if (!data) return { ...i, dnaFit: null };
       const general = computeGeneralScore(data.meta, data.providers);
       const objective = general.standardScore ?? general.score;
-      const { score } = dnaScore(vector, dna, objective);
-      const dims = useDims ? dimsMap.get(`${i.mediaType}-${i.id}`) : undefined;
-      const match = dims ? dimensionMatch(dims, dimProfile) : null;
+      const base = dna.liked && vector ? dnaScore(vector, dna, objective).score : objective;
+
+      const dims = dimsMap.get(`${i.mediaType}-${i.id}`);
+      const match = useDims && dims ? dimensionMatch(dims, dimProfile) : null;
       // Heuristic dimension nudge + the learned re-ranker nudge (a no-op until a
       // model is promoted into rerankerWeights.ts). Both bounded.
       const dimN = match != null ? Math.max(-DIM_NUDGE_MAX, Math.min(DIM_NUDGE_MAX, (match - 50) * DIM_NUDGE_SLOPE)) : 0;
       const rerankN = match != null ? rerankNudge(objective, match, RERANK_MODEL) : 0;
-      return { ...i, dnaFit: clampScore(score + dimN + rerankN) };
+      // The three-channel preference nudge (bounded, no-op without evidence).
+      const prefN = hasPref && dims
+        ? preferenceNudge({ dims, genres: (data.meta.genres ?? []).map(genreSlug) }, pref!.dna, { corrections: pref!.corrections }).nudge
+        : 0;
+      return { ...i, dnaFit: clampScore(base + dimN + rerankN + prefN) };
     }),
   );
   const personalized = scored.some((s) => s.dnaFit != null);
