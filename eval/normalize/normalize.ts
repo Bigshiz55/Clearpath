@@ -28,6 +28,7 @@ import {
   detectOrigin,
   detectAudio,
   detectRuntimeMaxMinutes,
+  detectExcludedMediaType,
 } from '@/lib/nlu/detectors';
 import {
   emptyNormalized,
@@ -57,6 +58,10 @@ function detectContentTypes(t: string, mediaType: string): ContentType[] {
   // "show" only as a noun (mirrors naiveParseQuery) — strip the verb "show me/us".
   const noVerbShow = t.replace(/\bshows?\s+(me|us|them)\b/g, ' ');
   if (mediaType === 'tv' || /\b(show|shows|series|sitcoms?)\b/.test(noVerbShow)) out.add('tv');
+  // "the movie, not the series" — drop the type the user explicitly ruled out.
+  // Mirrors augmentInternational's media-type narrowing in the live pipeline.
+  const excluded = detectExcludedMediaType(t);
+  if (excluded && out.size > 1) out.delete(excluded);
   return [...out];
 }
 

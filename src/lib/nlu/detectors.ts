@@ -301,7 +301,11 @@ export function detectNetwork(text: string): { key: string; name: string } | nul
 export function detectPlatform(text: string): { id: number; name: string } | null {
   const t = ` ${text.toLowerCase()} `;
   const table: { id: number; name: string; strong: RegExp; bare?: RegExp }[] = [
-    { id: 8, name: 'Netflix', strong: /\bnetflix\b/ },
+    // Netflix carries a curated set of high-frequency misspellings so the
+    // offline detector (the fallback when the LLM parser has no key) still
+    // resolves the platform a typo would otherwise silently drop. Each variant
+    // is unambiguous — none collides with an ordinary English word.
+    { id: 8, name: 'Netflix', strong: /\b(netflix|netflx|netlix|netfix|netflex|netfllix|neflix)\b/ },
     { id: 9, name: 'Prime Video', strong: /\b(amazon prime|prime video|amazon video)\b/, bare: /\b(amazon|prime)\b/ },
     { id: 337, name: 'Disney+', strong: /\b(disney\s*\+|disney plus)\b/, bare: /\bdisney\b/ },
     { id: 1899, name: 'Max', strong: /\b(hbo max|hbo)\b/, bare: /\bmax\b/ },
@@ -312,6 +316,7 @@ export function detectPlatform(text: string): { id: number; name: string } | nul
     { id: 43, name: 'Starz', strong: /\bstarz\b/ },
     { id: 37, name: 'Showtime', strong: /\bshowtime\b/ },
     { id: 526, name: 'AMC+', strong: /\bamc\s*\+/ },
+    { id: 151, name: 'BritBox', strong: /\bbritbox\b/ },
     { id: 73, name: 'Tubi', strong: /\btubi\b/ },
     { id: 300, name: 'Pluto TV', strong: /\bpluto\b/ },
     { id: 207, name: 'The Roku Channel', strong: /\broku\b/ },
@@ -429,5 +434,18 @@ export function detectRuntimeMaxMinutes(text: string): number | null {
     const n = WORD_NUM[hr2[1]] ?? Number(hr2[1]);
     if (Number.isFinite(n) && n > 0) return Math.round(n * 60);
   }
+  return null;
+}
+
+/**
+ * The media type the user explicitly RULED OUT — "the movie, not the series",
+ * "not a TV show", "not a film". Returns the excluded type so a caller can
+ * narrow an otherwise-uncommitted ('any') query to the other type. Conservative:
+ * only a clear negation cue fires it, so "not that one" or a bare title never do.
+ */
+export function detectExcludedMediaType(text: string): 'movie' | 'tv' | null {
+  const t = ` ${text.toLowerCase()} `;
+  if (/\bnot\s+(?:a|an|the)?\s*(?:tv\s+)?(?:series|show|sitcom)\b/.test(t)) return 'tv';
+  if (/\bnot\s+(?:a|an|the)?\s*(?:movie|film|flick|feature)\b/.test(t)) return 'movie';
   return null;
 }

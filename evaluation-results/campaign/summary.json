@@ -1,44 +1,44 @@
 {
-  "sha": "f961d0b",
+  "sha": "00b59b8",
   "branch": "prod-fix",
   "seed": 7,
-  "total": 3000,
-  "passed": 3000,
+  "total": 2000,
+  "passed": 2000,
   "categories": {},
   "dims": {
     "origin_country": {
-      "relevant": 1646,
-      "clean": 1646,
+      "relevant": 1109,
+      "clean": 1109,
       "rate": 1
     },
     "english_audio": {
-      "relevant": 1016,
-      "clean": 1016,
+      "relevant": 702,
+      "clean": 702,
       "rate": 1
     },
     "runtime": {
-      "relevant": 920,
-      "clean": 920,
+      "relevant": 617,
+      "clean": 617,
       "rate": 1
     },
     "media_type": {
-      "relevant": 3000,
-      "clean": 3000,
+      "relevant": 2000,
+      "clean": 2000,
       "rate": 1
     },
     "platform": {
-      "relevant": 1473,
-      "clean": 1473,
+      "relevant": 987,
+      "clean": 987,
       "rate": 1
     },
     "exclusion": {
-      "relevant": 920,
-      "clean": 920,
+      "relevant": 623,
+      "clean": 623,
       "rate": 1
     },
     "reference": {
-      "relevant": 1049,
-      "clean": 1049,
+      "relevant": 693,
+      "clean": 693,
       "rate": 1
     }
   }

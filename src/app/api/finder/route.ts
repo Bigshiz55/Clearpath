@@ -4,6 +4,7 @@ import { runFinder, type FinderQuery, type Watcher } from '@/lib/finder';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
+import { augmentInternational } from '@/lib/askInternational';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -28,6 +29,8 @@ function coerceQuery(raw: unknown): FinderQuery {
     upcoming: Boolean(q.upcoming),
     liveOnly: Boolean(q.liveOnly),
     pace: typeof q.pace === 'number' ? Math.max(0, Math.min(100, q.pace)) : null,
+    originCountries: Array.isArray(q.originCountries) ? q.originCountries.map(String).slice(0, 4) : undefined,
+    originalLanguages: Array.isArray(q.originalLanguages) ? q.originalLanguages.map(String).slice(0, 4) : undefined,
   };
 }
 
@@ -61,6 +64,12 @@ export async function POST(req: Request) {
       query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
       if (text) limit = parseRequestedCount(text);
     }
+    // Foreign-origin / English-audio / runtime augmentation — the SAME unified
+    // step the ask route applies. Neither parser extracts these, so without it
+    // "a Spanish film with English audio under two hours" would keep only
+    // "movie" and leak wrong-origin results. Restricts the pool to the real
+    // origin/language + runtime and requires English audio at verification.
+    query = augmentInternational(query, text);
     // An explicit provider from the deep-link — e.g. tapping "Best movies on
     // Netflix" sends ?providers=8 → body.query.providerIds=[8] — must survive AI
     // parsing. The AI fills genre/mood from the free text but doesn't read the

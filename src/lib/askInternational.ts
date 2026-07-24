@@ -1,5 +1,5 @@
 import type { FinderQuery } from '@/lib/finder';
-import { detectOrigin, detectAudio, detectRuntimeMaxMinutes } from '@/lib/nlu/detectors';
+import { detectOrigin, detectAudio, detectRuntimeMaxMinutes, detectExcludedMediaType } from '@/lib/nlu/detectors';
 
 /**
  * Foreign-origin / English-audio / runtime are dimensions neither the LLM filter
@@ -23,5 +23,12 @@ export function augmentInternational(query: FinderQuery, text: string): FinderQu
   }
   if (audio.englishAudioRequired) query.englishAudioOnly = true;
   if (runtimeMax != null && query.maxRuntime == null) query.maxRuntime = runtimeMax;
+  // "the movie, not the series" narrows an uncommitted query to the type the
+  // user DIDN'T rule out. Only fills when the parser stayed on 'any', so an
+  // explicit mediaType from the parser always wins.
+  if (!query.mediaType || query.mediaType === 'any') {
+    const excluded = detectExcludedMediaType(text);
+    if (excluded) query.mediaType = excluded === 'tv' ? 'movie' : 'tv';
+  }
   return query;
 }

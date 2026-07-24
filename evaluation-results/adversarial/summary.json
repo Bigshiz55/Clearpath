@@ -1,0 +1,131 @@
+{
+  "sha": "00b59b8",
+  "total": 17,
+  "passed": 17,
+  "results": [
+    {
+      "id": "adv-contradiction-years",
+      "category": "contradiction",
+      "prompt": "A 2026 movie from 1985.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-contradiction-audio",
+      "category": "contradiction",
+      "prompt": "English audio required, but original-language audio only.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-impossible-hallmark-violence",
+      "category": "impossible",
+      "prompt": "A Hallmark movie exactly as violent as The Silence of the Lambs.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-ambiguous-paramount",
+      "category": "ambiguous_provider",
+      "prompt": "A Paramount movie.",
+      "pass": true,
+      "failures": [],
+      "note": "Bare \"Paramount\" is the studio OR Paramount+. Conservative detector returns no platform rather than a wrong one."
+    },
+    {
+      "id": "adv-ambiguous-apple",
+      "category": "ambiguous_provider",
+      "prompt": "An Apple show.",
+      "pass": true,
+      "failures": [],
+      "note": "Bare \"Apple\" (the company) must not silently become a platform filter without an \"on\"/\"TV+\" cue."
+    },
+    {
+      "id": "adv-ambiguous-apple-explicit",
+      "category": "ambiguous_provider",
+      "prompt": "A sci-fi show on Apple TV+.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-misspell-netflix",
+      "category": "misspelling",
+      "prompt": "A Korean thriler on Netflx under two hours.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-samename-fargo",
+      "category": "same_name_title",
+      "prompt": "Fargo.",
+      "pass": true,
+      "failures": [],
+      "note": "Fargo is a 1996 film AND a TV series. Offline the bare title resolves nothing; live disambiguation + a clarifying prompt are the retrieval layer’s job. Assert only that nothing false is invented."
+    },
+    {
+      "id": "adv-movie-not-series",
+      "category": "movie_tv_ambiguity",
+      "prompt": "Show me Fargo the movie, not the series.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-english-is-language",
+      "category": "country_vs_language",
+      "prompt": "An English movie.",
+      "pass": true,
+      "failures": [],
+      "note": "\"English\" is a LANGUAGE cue, not necessarily British ORIGIN — must not force GB origin."
+    },
+    {
+      "id": "adv-british-is-origin",
+      "category": "country_vs_language",
+      "prompt": "A recent British detective series without supernatural elements.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-origlang-vs-audio",
+      "category": "origlang_vs_audio",
+      "prompt": "A movie in Spanish with English audio.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-network-hbo",
+      "category": "provider_vs_network",
+      "prompt": "An HBO show.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-platform-hulu",
+      "category": "provider_vs_network",
+      "prompt": "A movie on Hulu.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-similar-plus-hard",
+      "category": "similarity_plus_hard",
+      "prompt": "A movie like Rocky on Prime, not animated.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-negatives-stack",
+      "category": "negative_constraints",
+      "prompt": "A recent thriller, no animation, not slow, no supernatural.",
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "adv-zero-match",
+      "category": "zero_match",
+      "prompt": "A live-action documentary about real unicorns filmed on Mars.",
+      "pass": true,
+      "failures": [],
+      "note": "Impossible-to-satisfy at the CATALOG level; an honest no-match must come from the (live) retrieval layer, never a fabricated title. Offline: assert nothing false is minted."
+    }
+  ]
+}

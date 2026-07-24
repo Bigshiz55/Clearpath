@@ -37,4 +37,19 @@ describe('ask route international augmentation (live wiring)', () => {
     augmentInternational(q, 'under two hours');
     expect(q.maxRuntime).toBe(90);
   });
+
+  it('narrows an uncommitted query when a media type is explicitly ruled out', () => {
+    const anyQ: FinderQuery = { ...base(), mediaType: 'any' };
+    augmentInternational(anyQ, 'Fargo the movie, not the series');
+    expect(anyQ.mediaType).toBe('movie');
+    const anyQ2: FinderQuery = { ...base(), mediaType: 'any' };
+    augmentInternational(anyQ2, 'the show, not a movie');
+    expect(anyQ2.mediaType).toBe('tv');
+  });
+
+  it('never overrides a media type the parser already committed to', () => {
+    const q: FinderQuery = { ...base(), mediaType: 'tv' };
+    augmentInternational(q, 'not the series'); // conflicting, but parser wins
+    expect(q.mediaType).toBe('tv');
+  });
 });

@@ -7,6 +7,7 @@ import {
   detectGenre,
   detectNetwork,
   detectPlatform,
+  detectExcludedMediaType,
   extractCount,
   parseRequestedCount,
 } from './detectors';
@@ -151,5 +152,29 @@ describe('detectPlatform', () => {
     expect(detectPlatform('on Netflix, no wait, Hulu')).toEqual({ id: 15, name: 'Hulu' });
     // No correction cue → first platform still wins.
     expect(detectPlatform('best movies on Netflix')).toEqual({ id: 8, name: 'Netflix' });
+  });
+  it('resolves curated Netflix misspellings (offline typo tolerance)', () => {
+    expect(detectPlatform('on Netflx')).toEqual({ id: 8, name: 'Netflix' });
+    expect(detectPlatform('a thriller on netlix')).toEqual({ id: 8, name: 'Netflix' });
+    expect(detectPlatform('netfix crime series')).toEqual({ id: 8, name: 'Netflix' });
+    // A non-misspelling word must NOT false-match Netflix.
+    expect(detectPlatform('a nice film')).toBeNull();
+  });
+  it('recognizes BritBox as a platform (named in the difficult-search set)', () => {
+    expect(detectPlatform('a detective series on BritBox')).toEqual({ id: 151, name: 'BritBox' });
+  });
+});
+
+describe('detectExcludedMediaType', () => {
+  it('detects the media type the user ruled out', () => {
+    expect(detectExcludedMediaType('Fargo the movie, not the series')).toBe('tv');
+    expect(detectExcludedMediaType('the show, not a movie')).toBe('movie');
+    expect(detectExcludedMediaType('not a TV show')).toBe('tv');
+    expect(detectExcludedMediaType('not a film')).toBe('movie');
+  });
+  it('does not fire without a clear media-type negation', () => {
+    expect(detectExcludedMediaType('a good crime movie')).toBeNull();
+    expect(detectExcludedMediaType('not that one, something newer')).toBeNull();
+    expect(detectExcludedMediaType('Fargo')).toBeNull();
   });
 });
