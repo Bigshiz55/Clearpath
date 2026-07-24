@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { recordQuizAnswer, undoQuizAnswer, addQuizToWatchlist } from '@/lib/actions/dnaQuiz';
+import { recordQuizAnswer, undoQuizAnswer } from '@/lib/actions/dnaQuiz';
 import type { QuizRating, Recognition } from '@/lib/preference/quizMap';
 import type { AttractionGrade } from '@/lib/preference/types';
 
@@ -34,15 +34,6 @@ export interface SubmitPayload {
   dwellMs?: number;
 }
 
-/** Minimal shape the watchlist chip needs to save a title. */
-export interface WatchlistRef {
-  tmdbId: number;
-  mediaType: 'movie' | 'tv';
-  title: string;
-  year: number | null;
-  posterPath: string | null;
-}
-
 interface Props {
   totalRated?: number;
   /** Test/harness override — skip the /api/quiz fetch and use these. */
@@ -50,41 +41,39 @@ interface Props {
   /** Override the write path (harness). Defaults to the real server action. */
   onSubmit?: (p: SubmitPayload) => Promise<{ ok: boolean; error?: string }>;
   onUndo?: (eventId: string) => Promise<{ ok: boolean }>;
-  /** Override the watchlist-only save (the "Looks good" chip). */
-  onWatchlist?: (w: WatchlistRef) => Promise<{ ok: boolean }>;
 }
 
-/** Primary decision payload (no rating step, except "Seen it"). */
+/** Primary decision payload (no follow-ups). */
 type PrimaryPayload = Pick<SubmitPayload, 'recognition' | 'attraction' | 'rating' | 'watchlist'>;
 
 /**
- * The four primary actions. Three are one-tap; "Seen it" opens a compact rating
- * sub-state. Intent levels are distinct and never conflated:
+ * Four primary actions — every one is ONE tap, then the next title. No modal, no
+ * chip, no "why?", nothing between cards. Intent levels stay distinct:
  *   Looks Good      → attraction 'interested'   (mild interest, NOT saved)
  *   Add to Watchlist→ attraction 'must_watch' + saved to the high-intent list
  *   Not Interested  → attraction 'not_interested'
- *   Seen It         → opens Loved / Liked / OK / Didn't Like → Experience DNA
+ *   Seen It         → opens the 4-way rating step (still one tap to advance)
  */
 const PRIMARY = {
-  looksGood: { key: 'looks-good', label: 'Looks Good', emoji: '✨', cls: 'wv-quiz-btn--liked', testid: 'act-looks-good' },
-  watchlist: { key: 'watchlist', label: 'Add to Watchlist', emoji: '🔖', cls: 'wv-quiz-btn--gold', testid: 'act-watchlist' },
-  notInterested: { key: 'not-interested', label: 'Not Interested', emoji: '👎', cls: 'wv-quiz-btn--nope', testid: 'act-not-interested' },
-  seen: { key: 'seen', label: 'Seen It', emoji: '👁️', cls: 'wv-quiz-btn--unseen', testid: 'act-seen' },
+  looksGood: { label: 'Looks Good', emoji: '✨', cls: 'wv-quiz-btn--liked', testid: 'act-looks-good' },
+  watchlist: { label: 'Add to Watchlist', emoji: '🔖', cls: 'wv-quiz-btn--gold', testid: 'act-watchlist' },
+  notInterested: { label: 'Not Interested', emoji: '👎', cls: 'wv-quiz-btn--nope', testid: 'act-not-interested' },
+  seen: { label: 'Seen It', emoji: '👁️', cls: 'wv-quiz-btn--unseen', testid: 'act-seen' },
 } as const;
 
 /** "Seen it" quick-rating choices → Experience grades. */
 const RATINGS: { key: QuizRating; label: string; emoji: string; cls: string; testid: string }[] = [
-  { key: 'loved', label: 'Loved', emoji: '❤️', cls: 'wv-quiz-btn--loved', testid: 'rate-loved' },
-  { key: 'liked', label: 'Liked', emoji: '👍', cls: 'wv-quiz-btn--liked', testid: 'rate-liked' },
-  { key: 'okay', label: 'It was OK', emoji: '😐', cls: 'wv-quiz-btn--unseen', testid: 'rate-okay' },
-  { key: 'disliked', label: 'Didn’t Like', emoji: '👎', cls: 'wv-quiz-btn--disliked', testid: 'rate-disliked' },
+  { key: 'loved', label: 'Loved It', emoji: '❤️', cls: 'wv-quiz-btn--loved', testid: 'rate-loved' },
+  { key: 'liked', label: 'Liked It', emoji: '👍', cls: 'wv-quiz-btn--liked', testid: 'rate-liked' },
+  { key: 'okay', label: 'It Was Okay', emoji: '😐', cls: 'wv-quiz-btn--unseen', testid: 'rate-okay' },
+  { key: 'disliked', label: 'Didn’t Like It', emoji: '👎', cls: 'wv-quiz-btn--disliked', testid: 'rate-disliked' },
 ];
 
-function stageLabel(rated: number): string {
-  if (rated < 5) return 'DNA warming up';
-  if (rated < 10) return 'DNA getting sharper';
-  if (rated < 20) return 'DNA taking shape';
-  if (rated < 30) return 'DNA looking strong';
+function stageLabel(n: number): string {
+  if (n < 5) return 'DNA warming up';
+  if (n < 10) return 'DNA getting sharper';
+  if (n < 20) return 'DNA taking shape';
+  if (n < 30) return 'DNA looking strong';
   return 'DNA highly refined';
 }
 
@@ -94,17 +83,16 @@ const uid = () =>
     : `q_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e9).toString(36)}`;
 
 /**
- * ONE-TILE discovery quiz. A single self-contained card — progress, artwork,
- * title, and a 2×2 grid of four EQUAL action buttons — that fits the usable
- * mobile viewport (see `.wv-quiz-fit`) with no scrolling. Distinct intent levels
- * feed the real Watch DNA engine via `recordQuizAnswer`. The watchlist stays a
- * deliberate, high-intent list: "Looks Good" never saves; only "Add to
- * Watchlist" (or the optional follow-up chip) does.
+ * ONE-TILE discovery quiz — a single self-contained card (progress, artwork,
+ * title, four EQUAL buttons) that fits the usable mobile viewport with no
+ * scrolling. The active flow is strictly tap → next title: NO between-card
+ * modals, chips, or reason questions. A brief, passive confirmation is the only
+ * feedback, and the next title is already loaded. Deeper feedback is reserved
+ * for user-initiated paths outside this flow.
  */
-export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }: Props) {
+export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
   const submit = onSubmit ?? recordQuizAnswer;
   const undo = onUndo ?? undoQuizAnswer;
-  const saveWatchlist = onWatchlist ?? addQuizToWatchlist;
   const isHarness = !!items;
 
   const [queue, setQueue] = useState<QuizItem[]>(items ?? []);
@@ -117,19 +105,17 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
   const [failed, setFailed] = useState(false);
   const [dry, setDry] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
-  const [chip, setChip] = useState<{ ref: WatchlistRef; saved: boolean } | null>(null);
 
   const shownAt = useRef<number>(Date.now());
   const busy = useRef(false);
-  const history = useRef<{ eventId: string; idx: number; wasRated: boolean }[]>([]);
+  const history = useRef<{ eventId: string; idx: number }[]>([]);
   const seen = useRef<Set<string>>(new Set((items ?? []).map((i) => `${i.mediaType}-${i.id}`)));
   const fetching = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const chipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Measured, device-agnostic fit (see previous notes): correct the tile height
-  // by exactly the document overflow/slack via visualViewport. Only the poster
-  // shrinks; the four buttons never leave the screen.
+  // Measured, device-agnostic fit: correct the tile height by exactly the
+  // document overflow/slack via visualViewport. Only the poster shrinks; the
+  // four buttons never leave the screen.
   useEffect(() => {
     const el = rootRef.current;
     if (!el || typeof window === 'undefined') return;
@@ -187,17 +173,13 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
   const current = queue[idx] ?? null;
   const advance = useCallback(() => setIdx((i) => i + 1), []);
 
-  const refOf = (it: QuizItem): WatchlistRef => ({
-    tmdbId: it.id, mediaType: it.mediaType, title: it.title, year: it.year, posterPath: it.posterPath,
-  });
-
+  // ONE write, then advance. Never pauses, never opens anything.
   const send = useCallback(
-    async (payload: PrimaryPayload, confirmMsg = 'Saved ✓'): Promise<QuizItem | null> => {
+    async (payload: PrimaryPayload, confirmMsg = 'Saved ✓') => {
       const c = queue[idx];
-      if (!c || busy.current) return null; // no double-submit
+      if (!c || busy.current) return; // no double-submit
       busy.current = true;
       const eventId = uid();
-      const isRated = payload.recognition === 'seen';
       setStatus('saving');
       const full: SubmitPayload = {
         eventId,
@@ -211,16 +193,14 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
       };
       try {
         const res = await submit(full);
-        if (!res.ok) { setStatus('error'); busy.current = false; return null; }
-        history.current.push({ eventId, idx, wasRated: isRated });
+        if (!res.ok) { setStatus('error'); busy.current = false; return; }
+        history.current.push({ eventId, idx });
         setAnswered((n) => n + 1); // every decision advances progress
         setSavedMsg(confirmMsg);
         setStatus('saved');
-        advance();
-        return c;
+        advance(); // next title immediately — no follow-up
       } catch {
         setStatus('error');
-        return null;
       } finally {
         busy.current = false;
       }
@@ -228,48 +208,16 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
     [queue, idx, submit, advance],
   );
 
-  const clearChip = () => { if (chipTimer.current) clearTimeout(chipTimer.current); setChip(null); };
-
-  // Looks Good: mild interest, NOT saved. Offer a brief, non-blocking chip that
-  // lets the user upgrade the JUST-answered title to the watchlist if they want.
-  const onLooksGood = useCallback(async () => {
-    const answered = await send({ recognition: 'unseen', attraction: 'interested' }, 'Looks good ✓');
-    if (!answered) return;
-    if (chipTimer.current) clearTimeout(chipTimer.current);
-    setChip({ ref: refOf(answered), saved: false });
-    chipTimer.current = setTimeout(() => setChip(null), 5000);
-  }, [send]);
-
-  const onAddWatchlist = useCallback(async () => {
-    clearChip();
-    await send({ recognition: 'unseen', attraction: 'must_watch', watchlist: true }, 'Added to watchlist ✓');
-  }, [send]);
-
-  const onNotInterested = useCallback(async () => {
-    clearChip();
-    await send({ recognition: 'unseen', attraction: 'not_interested' }, 'Got it ✓');
-  }, [send]);
-
-  const onRate = useCallback(async (rating: QuizRating) => {
-    clearChip();
-    await send({ recognition: 'seen', rating }, 'Saved ✓');
-  }, [send]);
-
-  // Chip → save the previous "Looks Good" title to the watchlist (no 2nd DNA event).
-  const chipSave = useCallback(async () => {
-    if (!chip) return;
-    setChip({ ...chip, saved: true });
-    await saveWatchlist(chip.ref).catch(() => {});
-    if (chipTimer.current) clearTimeout(chipTimer.current);
-    chipTimer.current = setTimeout(() => setChip(null), 1500);
-  }, [chip, saveWatchlist]);
+  const onLooksGood = useCallback(() => void send({ recognition: 'unseen', attraction: 'interested' }, 'Looks good ✓'), [send]);
+  const onAddWatchlist = useCallback(() => void send({ recognition: 'unseen', attraction: 'must_watch', watchlist: true }, 'On your watchlist ✓'), [send]);
+  const onNotInterested = useCallback(() => void send({ recognition: 'unseen', attraction: 'not_interested' }, 'Not for you ✓'), [send]);
+  const onRate = useCallback((r: { key: QuizRating; label: string }) => void send({ recognition: 'seen', rating: r.key }, `Rated: ${r.label}`), [send]);
 
   const retry = () => setStatus('idle');
 
   const undoLast = useCallback(async () => {
     const last = history.current.pop();
     if (!last) return;
-    clearChip();
     setAnswered((n) => Math.max(0, n - 1));
     setStatus('idle');
     setIdx(last.idx);
@@ -298,6 +246,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
     );
   }
   if (!current) {
+    // Session end — the ONLY place a refinement offer may appear (never mid-flow).
     return (
       <div className="wv-quiz-fit mx-auto flex max-w-md flex-col items-center justify-center text-center" data-testid="quiz-done">
         <p className="text-xl font-black text-white">That’s a wrap for now 🎬</p>
@@ -335,7 +284,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
             <span className="text-lg font-bold text-slate-200">{current.title}</span>
           </div>
         )}
-        {/* Save state overlays the poster → no layout shift */}
+        {/* Passive confirmation only — no buttons, never blocks, next title is already up */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-2" aria-live="polite">
           {status === 'saving' && <span className="rounded-full bg-black/60 px-2.5 py-0.5 text-xs text-slate-200">Saving…</span>}
           {status === 'saved' && <span className="rounded-full bg-emerald-600/85 px-2.5 py-0.5 text-xs font-semibold text-white" data-testid="save-ok">{savedMsg}</span>}
@@ -345,19 +294,6 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
             </span>
           )}
         </div>
-        {/* Non-blocking "Looks good → Add to Watchlist" chip (previous title) */}
-        {chip && (
-          <div className="absolute inset-x-0 top-0 flex justify-center pt-2" data-testid="lg-chip">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/15 bg-ink-950/90 px-3 py-1 text-xs shadow-card backdrop-blur">
-              <span className="text-slate-300">Looks good</span>
-              {chip.saved ? (
-                <span className="font-semibold text-emerald-300">On your list ✓</span>
-              ) : (
-                <button onClick={() => void chipSave()} className="font-bold text-brand-200" data-testid="lg-chip-add">+ Watchlist</button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* 3 · Title + year/type */}
@@ -371,16 +307,16 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
       {/* 4 · Four equal buttons — primary actions, or the "Seen it" rating step */}
       {mode === 'primary' ? (
         <div className="wv-quiz-grid shrink-0" data-testid="quiz-grid" role="group" aria-label="What do you think of this title?">
-          <button onClick={() => void onLooksGood()} className={`wv-quiz-btn ${PRIMARY.looksGood.cls}`} data-testid={PRIMARY.looksGood.testid}>
+          <button onClick={onLooksGood} className={`wv-quiz-btn ${PRIMARY.looksGood.cls}`} data-testid={PRIMARY.looksGood.testid}>
             <span aria-hidden className="wv-quiz-emoji">{PRIMARY.looksGood.emoji}</span>{PRIMARY.looksGood.label}
           </button>
-          <button onClick={() => void onAddWatchlist()} className={`wv-quiz-btn ${PRIMARY.watchlist.cls}`} data-testid={PRIMARY.watchlist.testid}>
+          <button onClick={onAddWatchlist} className={`wv-quiz-btn ${PRIMARY.watchlist.cls}`} data-testid={PRIMARY.watchlist.testid}>
             <span aria-hidden className="wv-quiz-emoji">{PRIMARY.watchlist.emoji}</span>{PRIMARY.watchlist.label}
           </button>
-          <button onClick={() => void onNotInterested()} className={`wv-quiz-btn ${PRIMARY.notInterested.cls}`} data-testid={PRIMARY.notInterested.testid}>
+          <button onClick={onNotInterested} className={`wv-quiz-btn ${PRIMARY.notInterested.cls}`} data-testid={PRIMARY.notInterested.testid}>
             <span aria-hidden className="wv-quiz-emoji">{PRIMARY.notInterested.emoji}</span>{PRIMARY.notInterested.label}
           </button>
-          <button onClick={() => { clearChip(); setMode('rating'); }} className={`wv-quiz-btn ${PRIMARY.seen.cls}`} data-testid={PRIMARY.seen.testid}>
+          <button onClick={() => setMode('rating')} className={`wv-quiz-btn ${PRIMARY.seen.cls}`} data-testid={PRIMARY.seen.testid}>
             <span aria-hidden className="wv-quiz-emoji">{PRIMARY.seen.emoji}</span>{PRIMARY.seen.label}
           </button>
         </div>
@@ -392,7 +328,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
           </div>
           <div className="wv-quiz-grid" role="group" aria-label="Rate this title">
             {RATINGS.map((r) => (
-              <button key={r.key} onClick={() => void onRate(r.key)} className={`wv-quiz-btn ${r.cls}`} data-testid={r.testid}>
+              <button key={r.key} onClick={() => onRate(r)} className={`wv-quiz-btn ${r.cls}`} data-testid={r.testid}>
                 <span aria-hidden className="wv-quiz-emoji">{r.emoji}</span>{r.label}
               </button>
             ))}
@@ -400,8 +336,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo, onWatchlist }
         </div>
       )}
 
-      {/* One-time "how it works" sheet — large, legible, colour-matched to the
-          real buttons so the mapping is obvious at a glance. */}
+      {/* One-time "how it works" sheet — shown once, never between cards */}
       {showIntro && (
         <div className="fixed inset-0 z-[120] flex items-end justify-center overflow-y-auto bg-black/70 p-4 sm:items-center" data-testid="quiz-intro">
           <div className="w-full max-w-md rounded-3xl border border-white/10 bg-ink-900 p-6 shadow-card">

@@ -42,32 +42,19 @@ test.beforeEach(async ({ page }) => {
 
 // ── Intent semantics ────────────────────────────────────────────────────────
 
-test('(intent) Looks Good = interest signal, but does NOT save to the watchlist', async ({ page }) => {
+test('(intent) Looks Good = interest signal, does NOT save, and advances at once', async ({ page }) => {
+  const title0 = await page.getByTestId('quiz-title').innerText();
   await page.getByTestId('act-looks-good').click();
-  await expect(page.getByTestId('save-ok')).toHaveText(/Looks good/);
+  await expect(page.getByTestId('quiz-title')).not.toHaveText(title0); // advanced immediately
   const subs = await page.evaluate(() => window.__quizSubmits ?? []);
-  const wl = await page.evaluate(() => window.__quizWatchlist ?? []);
   expect(subs).toHaveLength(1);
   expect(subs[0]).toMatchObject({ recognition: 'unseen', attraction: 'interested' });
   expect(subs[0]!.watchlist ?? false, 'Looks Good never auto-saves').toBeFalsy();
-  expect(wl, 'nothing added to the watchlist').toHaveLength(0);
 });
 
-test('(intent) the "Looks good" chip lets you save WITHOUT recording a second signal', async ({ page }) => {
-  await page.getByTestId('act-looks-good').click(); // answers The Matrix (id 603), advances
-  await expect(page.getByTestId('lg-chip')).toBeVisible();
-  await page.getByTestId('lg-chip-add').click();
-  await expect(page.getByText('On your list ✓')).toBeVisible(); // save resolved
-  const subs = await page.evaluate(() => window.__quizSubmits ?? []);
-  const wl = await page.evaluate(() => window.__quizWatchlist ?? []);
-  expect(subs.length, 'no extra DNA event from the chip').toBe(1);
-  expect(wl).toHaveLength(1);
-  expect(wl[0]!.tmdbId, 'chip saved the PREVIOUS title').toBe(603);
-});
-
-test('(intent) Add to Watchlist saves AND records a stronger signal + confirmation', async ({ page }) => {
+test('(intent) Add to Watchlist saves AND records a stronger signal', async ({ page }) => {
   await page.getByTestId('act-watchlist').click();
-  await expect(page.getByTestId('save-ok')).toHaveText(/Added to watchlist/);
+  await expect(page.getByTestId('save-ok')).toHaveText(/On your watchlist/);
   const subs = await page.evaluate(() => window.__quizSubmits ?? []);
   expect(subs[0]).toMatchObject({ recognition: 'unseen', attraction: 'must_watch', watchlist: true });
 });
@@ -98,6 +85,30 @@ test('(intent) Seen It → Back returns to the primary actions without recording
   await expect(page.getByTestId('quiz-grid')).toBeVisible();
   const subs = await page.evaluate(() => window.__quizSubmits ?? []);
   expect(subs).toHaveLength(0);
+});
+
+test('(no-interrupt) NO modal/chip/reason question appears between cards', async ({ page }) => {
+  // A mix of decisions across action types (kept within the 4-title mock pool).
+  await page.getByTestId('act-looks-good').click();
+  await page.getByTestId('act-not-interested').click();
+  await page.getByTestId('act-seen').click();
+  await page.getByTestId('rate-loved').click();
+  // After a full mix of decisions: still on a primary card, no overlays.
+  await expect(page.getByTestId('quiz-grid')).toBeVisible();
+  await expect(page.getByTestId('quiz-intro')).toHaveCount(0); // no modal
+  await expect(page.getByTestId('rating-step')).toHaveCount(0); // rating advanced away
+  // No "why / what made it work / held it back" style prompts anywhere.
+  await expect(page.getByText(/why|what made|held it back|what didn.t/i)).toHaveCount(0);
+});
+
+test('(no-interrupt) a Seen It rating saves and advances immediately (no pause)', async ({ page }) => {
+  const title0 = await page.getByTestId('quiz-title').innerText();
+  await page.getByTestId('act-seen').click();
+  await page.getByTestId('rate-loved').click();
+  await expect(page.getByTestId('quiz-grid')).toBeVisible(); // straight back to primary
+  await expect(page.getByTestId('quiz-title')).not.toHaveText(title0); // next title
+  const subs = await page.evaluate(() => window.__quizSubmits ?? []);
+  expect(subs[0]).toMatchObject({ recognition: 'seen', rating: 'loved' });
 });
 
 // ── Flow ────────────────────────────────────────────────────────────────────

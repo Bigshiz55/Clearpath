@@ -102,34 +102,6 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
   return { ok: true };
 }
 
-/**
- * Watchlist-only save for the non-blocking "Looks good → Add to Watchlist" chip.
- * It upgrades intent to a real save WITHOUT recording a second DNA event (the
- * "Looks Good" attraction signal was already logged), so we never double-count.
- */
-const watchlistSchema = z.object({
-  tmdbId: z.number().int().positive(),
-  mediaType: z.enum(['movie', 'tv']),
-  title: z.string().min(1).max(300),
-  year: z.number().int().nullable().optional(),
-  posterPath: z.string().max(300).nullable().optional(),
-});
-
-export async function addQuizToWatchlist(input: z.infer<typeof watchlistSchema>): Promise<{ ok: boolean }> {
-  const parsed = watchlistSchema.safeParse(input);
-  if (!parsed.success) return { ok: false };
-  const v = parsed.data;
-  const res = await addToWatchlist({
-    tmdbId: v.tmdbId,
-    mediaType: v.mediaType,
-    title: v.title,
-    year: v.year ?? null,
-    posterPath: v.posterPath ?? null,
-    status: 'strict',
-  }).catch(() => ({ ok: false as const }));
-  return { ok: res.ok };
-}
-
 /** Undo the most recent quiz answer (soft-delete, audit trail preserved). */
 export async function undoQuizAnswer(eventId: string): Promise<{ ok: boolean }> {
   const supabase = createClient();
