@@ -8,6 +8,8 @@ import {
   refreshFounderSession,
   archiveFounderSession,
   renameFounderSession,
+  reopenFounderSession,
+  switchFounderSession,
 } from '@/lib/actions/founderSessions';
 
 /** Serializable session shape passed from the server shell (epoch ms → display). */
@@ -102,10 +104,11 @@ export function FounderSessions({
         <div className="mt-5">
           <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">Active</div>
           <ul className="mt-2 space-y-2">
-            {active.map((s) => (
+            {active.map((s, i) => (
               <SessionRow
                 key={s.id}
                 s={s}
+                isCurrent={i === 0}
                 founder={founder}
                 pending={pending}
                 renaming={renaming === s.id}
@@ -119,6 +122,7 @@ export function FounderSessions({
                   run(() => renameFounderSession({ founder, id: s.id, name: renameText }), 'Renamed.', () => setRenaming(null))
                 }
                 onCancelRename={() => setRenaming(null)}
+                onSwitch={() => run(() => switchFounderSession({ founder, id: s.id }), `Switched to “${s.name}”.`)}
                 onArchive={() => run(() => archiveFounderSession({ founder, id: s.id }), 'Session archived.')}
               />
             ))}
@@ -133,14 +137,23 @@ export function FounderSessions({
             {archived.map((s) => (
               <li
                 key={s.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 opacity-80"
+                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-white">{s.name}</div>
+                  <div className="truncate text-sm font-medium text-slate-200">{s.name}</div>
                   <div className="text-[11px] text-slate-500">
                     {fmt(s.createdAt)} → {fmt(s.lastActiveAt)} · archived
                   </div>
                 </div>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => run(() => reopenFounderSession({ founder, id: s.id }), `Reopened “${s.name}”.`)}
+                  className="flex-none text-xs font-semibold text-brand-300 hover:text-brand-200 disabled:opacity-50"
+                  data-testid="session-reopen"
+                >
+                  Reopen
+                </button>
               </li>
             ))}
           </ul>
@@ -152,6 +165,7 @@ export function FounderSessions({
 
 function SessionRow({
   s,
+  isCurrent,
   pending,
   renaming,
   renameText,
@@ -159,9 +173,11 @@ function SessionRow({
   onRenameText,
   onSubmitRename,
   onCancelRename,
+  onSwitch,
   onArchive,
 }: {
   s: SessionView;
+  isCurrent: boolean;
   founder: FounderKey;
   pending: boolean;
   renaming: boolean;
@@ -170,10 +186,14 @@ function SessionRow({
   onRenameText: (v: string) => void;
   onSubmitRename: () => void;
   onCancelRename: () => void;
+  onSwitch: () => void;
   onArchive: () => void;
 }) {
   return (
-    <li className="flex items-center justify-between gap-3 rounded-xl border border-emerald-400/20 bg-emerald-500/5 px-3 py-2">
+    <li
+      className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${isCurrent ? 'border-emerald-400/40 bg-emerald-500/10' : 'border-white/10 bg-white/5'}`}
+      data-testid="session-row"
+    >
       <div className="min-w-0 flex-1">
         {renaming ? (
           <div className="flex items-center gap-2">
@@ -193,15 +213,25 @@ function SessionRow({
           </div>
         ) : (
           <>
-            <div className="truncate text-sm font-medium text-white">{s.name}</div>
-            <div className="text-[11px] text-slate-500">
-              started {fmt(s.createdAt)} · active
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-medium text-white">{s.name}</span>
+              {isCurrent && (
+                <span className="flex-none rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-200" data-testid="session-current">
+                  Current
+                </span>
+              )}
             </div>
+            <div className="text-[11px] text-slate-500">started {fmt(s.createdAt)} · active</div>
           </>
         )}
       </div>
       {!renaming && (
         <div className="flex flex-none gap-2">
+          {!isCurrent && (
+            <button type="button" onClick={onSwitch} disabled={pending} className="text-xs font-semibold text-emerald-300 hover:text-emerald-200 disabled:opacity-50" data-testid="session-switch">
+              Switch to
+            </button>
+          )}
           <button type="button" onClick={onStartRename} className="text-xs font-semibold text-slate-300 hover:text-white">
             Rename
           </button>

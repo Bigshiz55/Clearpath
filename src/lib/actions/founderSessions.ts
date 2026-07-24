@@ -5,7 +5,15 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 import { resolveFounderAccess, founderByKey, type FounderKey, type AccessConfig } from '@/lib/founder/access';
-import { createSession, refreshSession, archiveSession, renameSession, listSessions } from '@/lib/founder/sessions';
+import {
+  createSession,
+  refreshSession,
+  archiveSession,
+  renameSession,
+  listSessions,
+  reopenSession,
+  makeCurrentSession,
+} from '@/lib/founder/sessions';
 import { defaultSessionName, sanitizeSessionName } from '@/lib/founder/sessionModel';
 
 /**
@@ -91,6 +99,34 @@ export async function archiveFounderSession(input: z.infer<typeof idSchema>): Pr
 
   const supabase = createClient();
   const ok = await archiveSession(supabase, auth.ctx.userId, id);
+  if (ok) revalidate(founder);
+  return { ok };
+}
+
+export async function reopenFounderSession(input: z.infer<typeof idSchema>): Promise<{ ok: boolean; error?: string }> {
+  const parsed = idSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'Invalid input.' };
+  const { founder, id } = parsed.data;
+
+  const auth = await authorize(founder);
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  const supabase = createClient();
+  const ok = await reopenSession(supabase, auth.ctx.userId, id);
+  if (ok) revalidate(founder);
+  return { ok };
+}
+
+export async function switchFounderSession(input: z.infer<typeof idSchema>): Promise<{ ok: boolean; error?: string }> {
+  const parsed = idSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'Invalid input.' };
+  const { founder, id } = parsed.data;
+
+  const auth = await authorize(founder);
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  const supabase = createClient();
+  const ok = await makeCurrentSession(supabase, auth.ctx.userId, id);
   if (ok) revalidate(founder);
   return { ok };
 }

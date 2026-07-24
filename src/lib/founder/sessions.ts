@@ -151,6 +151,31 @@ export async function touchSession(supabase: SupabaseClient, userId: string, id:
     .eq('id', id);
 }
 
+/** Reopen an archived session (archived → active), bumping it to current. */
+export async function reopenSession(supabase: SupabaseClient, userId: string, id: string): Promise<boolean> {
+  if (!userId || !id) return false;
+  const { error } = await supabase
+    .from('founder_test_sessions')
+    .update({ status: 'active', last_active_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('id', id);
+  return !error;
+}
+
+/**
+ * Make a session the CURRENT one to switch into it — it becomes the most-recently
+ * active (which `activeSession` selects). Reopens it if archived. Own-rows only.
+ */
+export async function makeCurrentSession(supabase: SupabaseClient, userId: string, id: string): Promise<boolean> {
+  if (!userId || !id) return false;
+  const { error } = await supabase
+    .from('founder_test_sessions')
+    .update({ status: 'active', last_active_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('id', id);
+  return !error;
+}
+
 /**
  * Ensure the founder has at least one active session, creating a first one if
  * none exists. Returns {sessions, active}. Fail-open: on any error returns

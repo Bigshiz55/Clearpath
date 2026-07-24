@@ -77,4 +77,19 @@ describe('DNA Confidence (pure)', () => {
   it('raw weight total exceeds 100 so full engagement can reach the cap', () => {
     expect(RAW_WEIGHT_TOTAL).toBeGreaterThan(100);
   });
+
+  it('after a full 20/20 calibration, confidence keeps rising as OTHER signals arrive — with calibration frozen at 20', () => {
+    // Quiz Progress is answered/20; once calibration hits 20 it never grows.
+    const base = tally({ calibrationAnswers: 20 });
+    const cBase = dnaConfidencePercent(base);
+    // More engagement of every OTHER kind — calibrationAnswers stays 20 (Quiz
+    // Progress stays 100%), yet confidence climbs.
+    const later = tally({
+      calibrationAnswers: 20,
+      watched: 6, ratings: 6, saved: 4, completed: 4, corrections: 3,
+      recsAccepted: 5, recsRejected: 3, packAnswers: 6, searches: 4,
+    });
+    expect(later.calibrationAnswers).toBe(20); // never exceeds the finite 20
+    expect(dnaConfidencePercent(later)).toBeGreaterThan(cBase);
+  });
 });
