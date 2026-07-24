@@ -22,7 +22,13 @@ export function augmentInternational(query: FinderQuery, text: string): FinderQu
     query.originalLanguages = origin.languages;
   }
   if (audio.englishAudioRequired) query.englishAudioOnly = true;
-  if (runtimeMax != null && query.maxRuntime == null) query.maxRuntime = runtimeMax;
+  // Runtime is a CEILING, so the tighter value must win. The parser's default
+  // cap (~150) is not a user signal, and a worded "under two hours" (120) the
+  // regex parser misses would otherwise be lost. Taking the min never loosens
+  // an explicit, stricter cap the parser set (e.g. 90 stays 90).
+  if (runtimeMax != null && (query.maxRuntime == null || runtimeMax < query.maxRuntime)) {
+    query.maxRuntime = runtimeMax;
+  }
   // "the movie, not the series" narrows an uncommitted query to the type the
   // user DIDN'T rule out. Only fills when the parser stayed on 'any', so an
   // explicit mediaType from the parser always wins.
