@@ -330,3 +330,104 @@ export function detectPlatform(text: string): { id: number; name: string } | nul
   for (const p of table) if (p.bare && new RegExp(`\\bon\\s+(?:the\\s+)?${p.bare.source}`).test(t)) return { id: p.id, name: p.name };
   return null;
 }
+
+// ── International origin / language / audio / runtime ────────────────────────
+// Pure detectors that give the search pipeline first-class foreign-origin,
+// original-language, English-audio and runtime-cap constraints — the dimensions
+// the ask parser previously dropped (so "a Spanish film with English audio" kept
+// only "movie"). Nationality adjective / country name → ISO-3166 country + the
+// ISO-639-1 original language. Conservative: only fires on an explicit cue.
+
+interface OriginRule { re: RegExp; country: string; lang: string }
+const ORIGIN_RULES: OriginRule[] = [
+  { re: /\b(spanish|spain|castilian|from spain)\b/, country: 'ES', lang: 'es' },
+  { re: /\b(mexican|mexico)\b/, country: 'MX', lang: 'es' },
+  { re: /\b(argentin(e|ian)|argentina)\b/, country: 'AR', lang: 'es' },
+  { re: /\b(french|france)\b/, country: 'FR', lang: 'fr' },
+  { re: /\b(italian|italy)\b/, country: 'IT', lang: 'it' },
+  { re: /\b(german|germany)\b/, country: 'DE', lang: 'de' },
+  { re: /\b(korean|korea|k-?drama)\b/, country: 'KR', lang: 'ko' },
+  { re: /\b(japanese|japan)\b/, country: 'JP', lang: 'ja' },
+  { re: /\b(indian|india|bollywood|hindi)\b/, country: 'IN', lang: 'hi' },
+  { re: /\b(brazil(ian)?|portuguese)\b/, country: 'BR', lang: 'pt' },
+  { re: /\b(british|england|english|uk|u\.k\.)\b/, country: 'GB', lang: 'en' },
+  { re: /\b(irish|ireland)\b/, country: 'IE', lang: 'en' },
+  { re: /\b(australian|australia)\b/, country: 'AU', lang: 'en' },
+  { re: /\b(scandinavian|swedish|sweden|norwegian|norway|danish|denmark|nordic)\b/, country: 'SE', lang: 'sv' },
+];
+
+export interface OriginDetection {
+  countries: string[];
+  languages: string[];
+  /** True when a NON-domestic (non-US) origin was requested, incl. "foreign". */
+  foreign: boolean;
+}
+
+/** Detect requested production origin + original language. Empty when none. */
+export function detectOrigin(text: string): OriginDetection {
+  const t = ` ${text.toLowerCase()} `;
+  const countries = new Set<string>();
+  const languages = new Set<string>();
+  for (const r of ORIGIN_RULES) {
+    if (r.re.test(t)) {
+      // "english" alone (audio) must not be read as British origin — require a
+      // stronger UK cue for GB, but always allow the language signal elsewhere.
+      if (r.country === 'GB' && !/\b(british|england|uk|u\.k\.)\b/.test(t)) continue;
+      countries.add(r.country);
+      if (r.lang !== 'en') languages.add(r.lang);
+    }
+  }
+  // Generic "foreign / international / non-english" without a named country.
+  const genericForeign = /\b(foreign|international|non-?english|world cinema)\b/.test(t);
+  const foreign = genericForeign || [...countries].some((c) => c !== 'US' && c !== 'GB');
+  return { countries: [...countries], languages: [...languages], foreign };
+}
+
+export interface AudioDetection {
+  englishAudioRequired: boolean;
+  englishDubRequired: boolean;
+  dubNotAcceptable: boolean;
+  subtitlesNotAcceptable: boolean;
+  originalAudioPreferred: boolean;
+}
+
+/** Detect English-audio / dub / subtitle preferences. Conservative. */
+export function detectAudio(text: string): AudioDetection {
+  const t = ` ${text.toLowerCase()} `;
+  const englishDubRequired = /\b(english dub|dubbed in english|english dubbed|english-language dub)\b/.test(t);
+  const englishAudioRequired =
+    englishDubRequired ||
+    /\b(english audio|in english|english language|english-language|english spoken|spoken english)\b/.test(t) ||
+    /\bneeds? (?:to be )?(?:in )?english\b/.test(t);
+  const subtitlesNotAcceptable = /\b(no subtitles?|without subtitles?|don'?t want to read|hate subtitles?|not subtitled|no subs)\b/.test(t);
+  const dubNotAcceptable = /\b(no dub|not dubbed|original audio only|subtitles? (?:are )?fine|prefer subtitles?)\b/.test(t);
+  const originalAudioPreferred = /\b(original (?:language|audio)|subtitles? (?:are )?(?:fine|ok|okay|acceptable|preferred))\b/.test(t);
+  return { englishAudioRequired, englishDubRequired, dubNotAcceptable, subtitlesNotAcceptable, originalAudioPreferred };
+}
+
+const WORD_NUM: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+
+/** The runtime CEILING in minutes if the text names one ("under two hours" → 120,
+ *  "under 110 minutes" → 110, "under 90" → 90). Null when unconstrained. */
+export function detectRuntimeMaxMinutes(text: string): number | null {
+  const t = ` ${text.toLowerCase()} `;
+  // "under two hours" / "less than 2 hrs"
+  const hr = t.match(/\b(?:under|less than|below|no more than|at most|within|shorter than)\s+(\d+(?:\.\d+)?|one|two|three)\s*(?:hours?|hrs?)\b/);
+  if (hr && hr[1]) {
+    const n = WORD_NUM[hr[1]] ?? Number(hr[1]);
+    if (Number.isFinite(n) && n > 0) return Math.round(n * 60);
+  }
+  // "under 110 minutes" / "less than 90 min"
+  const mn = t.match(/\b(?:under|less than|below|no more than|at most|within|shorter than)\s+(\d{2,3})\s*(?:minutes?|mins?)\b/);
+  if (mn && mn[1]) {
+    const n = Number(mn[1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  // "two hours or less"
+  const hr2 = t.match(/\b(\d+(?:\.\d+)?|one|two|three)\s*(?:hours?|hrs?)\s+or\s+(?:less|under|shorter)\b/);
+  if (hr2 && hr2[1]) {
+    const n = WORD_NUM[hr2[1]] ?? Number(hr2[1]);
+    if (Number.isFinite(n) && n > 0) return Math.round(n * 60);
+  }
+  return null;
+}

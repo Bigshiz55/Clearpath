@@ -102,6 +102,13 @@ export interface NormalizedQuery {
   sortPriority: string[];
   ambiguities: string[]; // machine-detected contradictions/vagueness
   confidence: Record<string, number>; // per-field 0..1
+  // ── International origin / language / audio / runtime (foreign-film support) ──
+  originCountries: string[]; // ISO-3166, e.g. ['ES'] for a Spanish film
+  originalLanguages: string[]; // ISO-639-1, e.g. ['es']
+  foreignOrigin: boolean; // a non-domestic origin was requested
+  englishAudioRequired: boolean; // English audio (incl. dub) is a hard need
+  englishDubRequired: boolean;
+  runtimeMaxMinutes: number | null; // explicit runtime ceiling
 }
 
 export function emptyNormalized(rawQuery = ''): NormalizedQuery {
@@ -123,6 +130,12 @@ export function emptyNormalized(rawQuery = ''): NormalizedQuery {
     sortPriority: ['constraint_satisfaction', 'personalized_match', 'availability_time'],
     ambiguities: [],
     confidence: {},
+    originCountries: [],
+    originalLanguages: [],
+    foreignOrigin: false,
+    englishAudioRequired: false,
+    englishDubRequired: false,
+    runtimeMaxMinutes: null,
   };
 }
 

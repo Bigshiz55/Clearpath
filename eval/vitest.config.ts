@@ -15,7 +15,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['eval/runner/*.eval.ts'],
+    include: ['eval/runner/*.eval.ts', 'eval/critical/*.test.ts', 'eval/**/*.selftest.test.ts'],
     testTimeout: 600_000,
     hookTimeout: 600_000,
     // The runner logs a summary; keep console output.

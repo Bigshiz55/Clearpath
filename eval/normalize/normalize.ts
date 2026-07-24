@@ -25,6 +25,9 @@ import {
   detectPlatform,
   extractWatchTitle,
   extractCount,
+  detectOrigin,
+  detectAudio,
+  detectRuntimeMaxMinutes,
 } from '@/lib/nlu/detectors';
 import {
   emptyNormalized,
@@ -67,11 +70,24 @@ const EXCLUSION_PATTERNS: [RegExp, string][] = [
   [/\b(no|not|nothing|avoid|without)\b[^.]*\b(graphic )?violence|gore\b/, 'graphic_violence'],
   [/\b(no|not|nothing|avoid|without)\b[^.]*\bsubtitles?|subbed\b/, 'subtitles'],
   [/\b(no|not|nothing|avoid|without)\b[^.]*\bdubbed|dub\b/, 'dubbed'],
+  [/\b(no|not|nothing|avoid|without|isn'?t|aren'?t)\b[^.]*\b(animation|animated|cartoons?|anime)\b/, 'animation'],
+  [/\bnot? animated\b/, 'animation'],
+  [/\bno violence against (children|kids|minors)\b|\b(no|without|avoid)\b[^.]*\bviolence against (children|kids|minors)\b|\b(child|kid) (abuse|endangerment)\b/, 'violence_against_children'],
+];
+
+// "hates / can't stand / dislikes / isn't into X" is also an exclusion cue —
+// e.g. "my wife hates supernatural stuff". Maps the disliked topic to a tag.
+const DISLIKE_PATTERNS: [RegExp, string][] = [
+  [/\b(hates?|can'?t stand|cannot stand|dislikes?|isn'?t into|not into|sick of|tired of|no interest in)\b[^.]*\b(supernatural|ghosts?|paranormal|haunt|witch|vampire|zombie)\b/, 'supernatural'],
+  [/\b(hates?|can'?t stand|cannot stand|dislikes?|isn'?t into|not into)\b[^.]*\b(sci-?fi|science fiction)\b/, 'science_fiction'],
+  [/\b(hates?|can'?t stand|cannot stand|dislikes?|isn'?t into|not into)\b[^.]*\b(horror|gore|scary)\b/, 'horror'],
+  [/\b(hates?|can'?t stand|cannot stand|dislikes?|isn'?t into|not into)\b[^.]*\b(subtitles?|reading)\b/, 'subtitles'],
 ];
 
 function detectExclusions(t: string): string[] {
   const out = new Set<string>();
   for (const [re, tag] of EXCLUSION_PATTERNS) if (re.test(t)) out.add(tag);
+  for (const [re, tag] of DISLIKE_PATTERNS) if (re.test(t)) out.add(tag);
   // history exclusions
   if (/\b(nothing|not|no)\b[^.]*\b(i'?ve |i have )?(already )?(seen|watched)\b/.test(t) || /\bhaven'?t (already )?(seen|watched)\b/.test(t)) {
     out.add('already_watched');
@@ -121,6 +137,14 @@ function detectContradictions(t: string, out: string[]): void {
   if (/\blifetime\b/.test(t) && /\bnetflix\b/.test(t)) out.push('source: a linear network AND a streaming service');
   const counts = t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})\b/g);
   if (counts && new Set(counts).size > 1 && /\b(actually|make it|just|only)\b/.test(t)) out.push('count: two different counts stated');
+  // Impossible/contradictory requests — flag so the engine clarifies, never fabricates.
+  const years = t.match(/\b(19|20)\d\d\b/g);
+  if (years && new Set(years).size > 1 && /\b(from|made in|released in)\b/.test(t)) out.push('date: two different years stated');
+  if (/\benglish audio\b/.test(t) && /\b(original(-| )?language|original) audio only\b/.test(t)) out.push('audio: english audio required AND original-language-only');
+  if (/\bhallmark\b/.test(t) && /\b(as violent as|extremely violent|gory|graphic gore|serial killer)\b/.test(t)) {
+    out.push('catalog: a family network AND extreme-violence reference');
+  }
+  if (/\bno foreign\b/.test(t) && /\b(spanish|korean|french|italian|german|japanese|foreign)\b/.test(t)) out.push('origin: a foreign production AND no foreign films');
 }
 
 export interface NormalizeOptions {
@@ -152,6 +176,19 @@ export function normalize(rawQuery: string, opts: NormalizeOptions = {}): Normal
   q.excludedAttributes = detectExclusions(t);
   q.householdProfile = detectHousehold(t);
   q.personalizationRequested = detectPersonalization(t);
+
+  // ── International origin / language / audio / runtime (real detectors) ─────
+  const origin = detectOrigin(rawQuery);
+  const audio = detectAudio(rawQuery);
+  q.originCountries = origin.countries;
+  q.originalLanguages = origin.languages;
+  q.foreignOrigin = origin.foreign;
+  q.englishAudioRequired = audio.englishAudioRequired;
+  q.englishDubRequired = audio.englishDubRequired;
+  q.runtimeMaxMinutes = detectRuntimeMaxMinutes(rawQuery);
+  if (origin.countries.length) conf.originCountries = 0.85;
+  if (audio.englishAudioRequired) conf.englishAudioRequired = 0.85;
+  if (q.runtimeMaxMinutes != null) conf.runtimeMaxMinutes = 0.9;
 
   if (network) conf.networks = 0.9;
   if (platform) conf.platforms = 0.9;
@@ -205,6 +242,10 @@ function pickIntent(
   if (/\b(something (just )?like|similar to|reminds me of|in the vein of|kind of like|more like|stuff like)\s+[a-z0-9]/i.test(raw)) {
     return 'similar_to';
   }
+  // "a movie/film/show like <Proper Noun>" and "the tension/vibe/feel of <Proper
+  // Noun>" — require a Capitalized reference so this never catches "that I'd like".
+  if (/\b(?:movies?|films?|shows?|series|one)\s+(?:just\s+)?like\s+[A-Z]/.test(raw)) return 'similar_to';
+  if (/\b(?:the\s+)?(?:tension|vibe|feel|energy|tone|style|atmosphere|intensity)\s+of\s+[A-Z]/.test(raw)) return 'similar_to';
   const wantsFind =
     /\b(find|show me|recommend|suggest|something|anything|browse|watch|good|what should i watch|what can i watch)\b/.test(t) ||
     /\bon\s+/.test(t);
