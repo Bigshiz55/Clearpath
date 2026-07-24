@@ -14,14 +14,14 @@ declare -a ROWS=()
 
 cleanup() {
   if [ -n "${SERVER_PID}" ] && kill -0 "${SERVER_PID}" 2>/dev/null; then
-    echo ">> tearing down harness server (pgid ${SERVER_PID})"
+    echo ">> tearing down harness server (process group ${SERVER_PID})"
     kill -TERM -- "-${SERVER_PID}" 2>/dev/null || kill -TERM "${SERVER_PID}" 2>/dev/null || true
     sleep 2
     kill -KILL -- "-${SERVER_PID}" 2>/dev/null || kill -KILL "${SERVER_PID}" 2>/dev/null || true
   fi
-  # Belt-and-suspenders: nothing named next/playwright left behind on our port.
-  pkill -f "PORT=${PORT} npm start" 2>/dev/null || true
-  pkill -f "next-server" 2>/dev/null || true
+  # Belt-and-suspenders: whatever is still bound to our port (next-server can
+  # double-fork out of the killed group) is a stale server — remove it precisely.
+  kill_port_server
 }
 trap cleanup EXIT INT TERM
 
@@ -48,6 +48,23 @@ run_step() {
   return "${code}"
 }
 
+# Self-healing: a prior run that was hard-killed (SIGKILL runs no traps) can leave a
+# server on our port. Sweep it BEFORE we start so we never inherit an orphan.
+# PRECISE: only kill a process actually BOUND to our port whose command is a
+# node/next server — never anything in this script's own toolchain (npm/bash/tsc).
+kill_port_server() {
+  local pids pid cmd
+  pids=$(ss -ltnpH "sport = :${PORT}" 2>/dev/null | grep -oE 'pid=[0-9]+' | grep -oE '[0-9]+' | sort -u)
+  for pid in $pids; do
+    [ "$pid" = "$$" ] && continue
+    cmd=$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)
+    case "$cmd" in
+      *next*|*node*) echo ">> killing server on :${PORT} pid ${pid} (${cmd:0:60})"; kill -9 "$pid" 2>/dev/null || true;;
+    esac
+  done
+}
+presweep() { echo ">> pre-sweep: checking port ${PORT}"; kill_port_server; }
+
 wait_ready() {
   local tries=0 max=40 # 40 x 2s = 80s ceiling
   echo ">> waiting for ${HARNESS_URL} (bounded ${max}x2s)"
@@ -59,6 +76,8 @@ wait_ready() {
   done
   echo "!! harness NOT ready after $((max * 2))s at ${HARNESS_URL}"; return 1
 }
+
+presweep
 
 # ── 1) lint ──────────────────────────────────────────────────────────────────
 run_step "lint" 180 npm run lint
