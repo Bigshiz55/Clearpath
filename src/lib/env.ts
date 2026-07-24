@@ -145,6 +145,20 @@ export const serverEnv = {
       .filter(Boolean);
   },
   /**
+   * Approved founder accounts for the /TestScott · /TestHeather · /TestAmy
+   * environments. Server-only; these are EMAILS of real sign-in accounts, never
+   * credentials. A founder route is accessible only to its mapped email (or an
+   * admin). Set FOUNDER_SCOTT_EMAIL / FOUNDER_HEATHER_EMAIL / FOUNDER_AMY_EMAIL.
+   */
+  founderEmails(): Record<'scott' | 'heather' | 'amy', string | undefined> {
+    const norm = (v?: string) => (v ? v.trim().toLowerCase() || undefined : undefined);
+    return {
+      scott: norm(optional('FOUNDER_SCOTT_EMAIL')),
+      heather: norm(optional('FOUNDER_HEATHER_EMAIL')),
+      amy: norm(optional('FOUNDER_AMY_EMAIL')),
+    };
+  },
+  /**
    * Affiliate program tags — appended to provider deep links at redirect time.
    * These are NOT secrets (they ride in the public outbound URL), but we read
    * them server-side so they never bloat the client bundle. Each is optional;
