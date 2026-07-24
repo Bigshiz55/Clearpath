@@ -291,6 +291,8 @@ body {
 .wv-quiz-btn:active:not(:disabled) { transform: scale(0.97); }
 .wv-quiz-btn:disabled { opacity: 0.55; }
 .wv-quiz-btn .wv-quiz-emoji { font-size: 1.1rem; line-height: 1; }
+.wv-quiz-ico { display: inline-flex; align-items: center; line-height: 0; color: #fff; }
+.wv-quiz-legend .wv-quiz-ico { color: #fff; }
 /* 2×2 on phones. In short landscape the four equal buttons collapse to a single
    equal row so the whole card still fits without scrolling — never uneven. */
 .wv-quiz-grid {
@@ -378,31 +380,31 @@ body {
   background-size: 140px 140px;
 }
 
-/* Hero poster — the crisp artwork, floated over the backdrop with depth. */
+/* Hero poster — the crisp artwork, floated over the backdrop with depth.
+   Absolutely positioned to fill its (flex-sized) parent: `height:100%` on a
+   flex-grow child does NOT resolve in Safari, which collapsed the poster to a
+   thumbnail — `position:absolute; inset:0` sizes reliably everywhere. The
+   drop-shadow hugs the poster's real silhouette (object-contain letterboxes). */
 .wv-poster-hero {
+  position: absolute;
+  inset: 0;
   height: 100%;
-  width: auto;
-  max-width: 100%;
-  margin-inline: auto;
+  width: 100%;
   object-fit: contain;
-  border-radius: 16px;
-  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.8), 0 6px 18px -8px rgba(0, 0, 0, 0.7);
-  outline: 1px solid rgba(255, 255, 255, 0.08);
-  outline-offset: -1px;
+  object-position: center;
+  filter: drop-shadow(0 22px 42px rgba(0, 0, 0, 0.68)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6));
 }
 .wv-poster-fallback {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
-  height: 100%;
-  aspect-ratio: 2 / 3;
-  max-width: 100%;
-  margin-inline: auto;
   padding: 1.25rem;
   text-align: center;
-  border-radius: 16px;
-  background: linear-gradient(160deg, rgba(47, 107, 255, 0.22), rgba(17, 22, 38, 0.6));
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(47, 107, 255, 0.28), rgba(17, 22, 38, 0.7));
   box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.8);
-  outline: 1px solid rgba(255, 255, 255, 0.1);
+  outline: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* Watch-DNA progress panel */
@@ -443,7 +445,9 @@ body {
 /* The Expert/Still-learning detail only appears when there's real vertical room
    (tablet/desktop), so the mobile one-tile never gets crowded. */
 .wv-dna-detail { display: none; }
-@media (min-height: 720px) {
+/* Only show the Expert / Still-learning detail where there's real room — tablet
+   and desktop. On phones we keep the panel compact so the poster stays the hero. */
+@media (min-width: 768px) {
   .wv-dna-detail { display: grid; }
 }
 

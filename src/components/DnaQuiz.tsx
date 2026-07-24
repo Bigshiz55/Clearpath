@@ -48,11 +48,37 @@ type PrimaryPayload = Pick<SubmitPayload, 'recognition' | 'attraction' | 'rating
  *   ⏭ Skip       → attraction 'not_interested' (a real "not for me" signal)
  *   👁 Seen It    → opens the 4-way rating step → Experience DNA
  */
+/** Crisp line/solid icons — premium and consistent (emoji rendered inconsistently
+ *  across devices). Sized 1.15rem, currentColor. */
+const ICONS = {
+  star: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="h-[1.15rem] w-[1.15rem]" aria-hidden>
+      <path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.9l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95L12 2.5z" />
+    </svg>
+  ),
+  bookmark: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" className="h-[1.15rem] w-[1.15rem]" aria-hidden>
+      <path d="M6 3.5h12a1 1 0 011 1V21l-7-4-7 4V4.5a1 1 0 011-1z" fill="currentColor" fillOpacity="0.18" />
+    </svg>
+  ),
+  skip: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="h-[1.15rem] w-[1.15rem]" aria-hidden>
+      <path d="M5 5l8 7-8 7V5zm9 0h2.4v14H14V5z" />
+    </svg>
+  ),
+  eye: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[1.15rem] w-[1.15rem]" aria-hidden>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
+} as const;
+
 const PRIMARY = {
-  looksGood: { label: 'Looks Good', emoji: '⭐', cls: 'wv-quiz-btn--liked', testid: 'act-looks-good' },
-  save: { label: 'Save', emoji: '📌', cls: 'wv-quiz-btn--gold', testid: 'act-save' },
-  skip: { label: 'Skip', emoji: '⏭️', cls: 'wv-quiz-btn--nope', testid: 'act-skip' },
-  seen: { label: 'Seen It', emoji: '👁️', cls: 'wv-quiz-btn--seen', testid: 'act-seen' },
+  looksGood: { label: 'Looks Good', icon: ICONS.star, cls: 'wv-quiz-btn--liked', testid: 'act-looks-good' },
+  save: { label: 'Save', icon: ICONS.bookmark, cls: 'wv-quiz-btn--gold', testid: 'act-save' },
+  skip: { label: 'Skip', icon: ICONS.skip, cls: 'wv-quiz-btn--nope', testid: 'act-skip' },
+  seen: { label: 'Seen It', icon: ICONS.eye, cls: 'wv-quiz-btn--seen', testid: 'act-seen' },
 } as const;
 
 const RATINGS: { key: QuizRating; label: string; emoji: string; cls: string; testid: string }[] = [
@@ -126,13 +152,21 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
     const el = rootRef.current;
     if (!el || typeof window === 'undefined') return;
     const fit = () => {
+      // True desktop (wide AND tall) sizes via CSS; no bottom nav to clear.
       if (window.innerWidth >= 640 && window.innerHeight >= 640) { el.style.height = ''; el.style.minHeight = ''; return; }
+      // Deterministic fill: from the tile's top down to the reserved bottom
+      // (the real page paddings that sit below it), measured live so iOS Safari
+      // chrome + safe areas are always accounted for. No dvh/scrollHeight math
+      // (that mis-fires on iOS and shrank the poster to a thumbnail).
       el.style.minHeight = '0';
       el.style.height = '';
       const vpH = window.visualViewport?.height ?? window.innerHeight;
-      const overflow = document.documentElement.scrollHeight - Math.round(vpH);
-      const base = el.getBoundingClientRect().height;
-      el.style.height = `${Math.max(140, Math.round(base - overflow))}px`;
+      const top = el.getBoundingClientRect().top;
+      const main = el.closest('main');
+      const outer = main?.parentElement ?? null;
+      const pb = (n: Element | null) => (n ? parseFloat(getComputedStyle(n).paddingBottom) || 0 : 0);
+      const reserveBelow = pb(main) + pb(outer); // main py-6 bottom + outer nav reserve
+      el.style.height = `${Math.max(180, Math.round(vpH - top - reserveBelow))}px`;
     };
     fit();
     const vv = window.visualViewport;
@@ -312,7 +346,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
 
         {/* 2 + 3 · Hero poster + title (slides in on every new title) */}
         <div key={idx} className="wv-title-in flex min-h-0 flex-1 flex-col gap-2">
-          <div className="relative flex min-h-0 flex-1 items-center justify-center" data-testid="quiz-poster">
+          <div className="relative min-h-0 flex-1" data-testid="quiz-poster">
             {current.posterUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={current.posterUrl} alt={current.title} className="wv-poster-hero" />
@@ -334,16 +368,16 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
         {mode === 'primary' ? (
           <div className="wv-quiz-grid shrink-0" data-testid="quiz-grid" role="group" aria-label="What do you think of this title?">
             <button onClick={onLooksGood} className={`wv-quiz-btn ${PRIMARY.looksGood.cls}`} data-testid={PRIMARY.looksGood.testid}>
-              <span aria-hidden className="wv-quiz-emoji">{PRIMARY.looksGood.emoji}</span>{PRIMARY.looksGood.label}
+              <span aria-hidden className="wv-quiz-ico">{PRIMARY.looksGood.icon}</span>{PRIMARY.looksGood.label}
             </button>
             <button onClick={onSave} className={`wv-quiz-btn ${PRIMARY.save.cls}`} data-testid={PRIMARY.save.testid}>
-              <span aria-hidden className="wv-quiz-emoji">{PRIMARY.save.emoji}</span>{PRIMARY.save.label}
+              <span aria-hidden className="wv-quiz-ico">{PRIMARY.save.icon}</span>{PRIMARY.save.label}
             </button>
             <button onClick={onSkip} className={`wv-quiz-btn ${PRIMARY.skip.cls}`} data-testid={PRIMARY.skip.testid}>
-              <span aria-hidden className="wv-quiz-emoji">{PRIMARY.skip.emoji}</span>{PRIMARY.skip.label}
+              <span aria-hidden className="wv-quiz-ico">{PRIMARY.skip.icon}</span>{PRIMARY.skip.label}
             </button>
             <button onClick={() => setMode('rating')} className={`wv-quiz-btn ${PRIMARY.seen.cls}`} data-testid={PRIMARY.seen.testid}>
-              <span aria-hidden className="wv-quiz-emoji">{PRIMARY.seen.emoji}</span>{PRIMARY.seen.label}
+              <span aria-hidden className="wv-quiz-ico">{PRIMARY.seen.icon}</span>{PRIMARY.seen.label}
             </button>
           </div>
         ) : (
@@ -370,10 +404,10 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
               <h2 className="text-center text-2xl font-black text-white">🧬 Build your Watch DNA</h2>
               <p className="mt-2 text-center text-base text-slate-300">We’ll show you titles one at a time. For each, tap one — that’s it.</p>
               <ul className="mt-5 space-y-3">
-                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--liked">⭐ Looks Good</span><span className="text-base text-slate-200">Caught your eye <span className="text-slate-400">(won’t save it)</span></span></li>
-                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--gold">📌 Save</span><span className="text-base text-slate-200">You want to watch it</span></li>
-                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--nope">⏭️ Skip</span><span className="text-base text-slate-200">Not for you</span></li>
-                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--seen">👁️ Seen It</span><span className="text-base text-slate-200">Already watched — rate it</span></li>
+                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--liked"><span className="wv-quiz-ico">{ICONS.star}</span> Looks Good</span><span className="text-base text-slate-200">Caught your eye <span className="text-slate-400">(won’t save it)</span></span></li>
+                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--gold"><span className="wv-quiz-ico">{ICONS.bookmark}</span> Save</span><span className="text-base text-slate-200">You want to watch it</span></li>
+                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--nope"><span className="wv-quiz-ico">{ICONS.skip}</span> Skip</span><span className="text-base text-slate-200">Not for you</span></li>
+                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--seen"><span className="wv-quiz-ico">{ICONS.eye}</span> Seen It</span><span className="text-base text-slate-200">Already watched — rate it</span></li>
               </ul>
               <button onClick={dismissIntro} className="btn-primary mt-6 w-full py-3.5 text-lg" data-testid="quiz-intro-dismiss">Got it — let’s go</button>
             </div>
