@@ -21,7 +21,7 @@ import { useToast } from '@/components/Toast';
 const EXAMPLES: { hint: string; text: string }[] = [
   { hint: '📺 What’s on TV tonight', text: 'What’s on TV tonight?' },
   { hint: '▶️ Best movies on Netflix', text: 'The best movies on Netflix right now' },
-  { hint: '🔎 Where can I stream Barbie?', text: 'Where can I stream Barbie?' },
+  { hint: '🔪 3 Prime thrillers I’d actually like', text: 'Recommend 3 thriller movies currently available on Prime Video that match my taste.' },
   { hint: '⏱️ Movies on in the next 2 hours', text: 'Movies coming on in the next 2 hours' },
   { hint: '👻 A really good scary movie', text: 'A really good scary movie' },
   { hint: '👨‍👩‍👧 Family movie night', text: 'A great family movie for tonight' },

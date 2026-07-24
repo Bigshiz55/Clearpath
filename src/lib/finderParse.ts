@@ -19,6 +19,7 @@ export const EMPTY_QUERY: FinderQuery = {
   upcoming: false,
   liveOnly: false,
   pace: null,
+  count: null,
 };
 
 /** Plain-English read-back of the constraints the parser extracted — the judge
@@ -131,6 +132,17 @@ export function naiveParseQuery(input: string): FinderQuery {
   // Upcoming — not out yet (upcoming, coming soon, hasn't been released).
   if (/\bupcoming\b|\bcoming soon\b|\bnot (?:out|released)( yet)?\b|\bhasn'?t (?:come out|been released)\b|\bfuture releases?\b/.test(t)) {
     q.upcoming = true;
+  }
+
+  // Explicit result count — "recommend 3 thrillers", "show me 5 movies", "top 3".
+  // Capped 1–12 so a stray number can't blow out the grid. Only counts when the
+  // number sits right before a media/quantity word or a request verb.
+  const countMatch =
+    t.match(/\b(?:recommend|show me|give me|find|suggest|top|pick|list)\s+(\d{1,2})\b/) ||
+    t.match(/\b(\d{1,2})\s+(?:great |good |best )?(?:thrillers?|movies?|films?|shows?|series|picks?|titles?|comedies|documentaries|options?)\b/);
+  if (countMatch) {
+    const n = Number(countMatch[1]);
+    if (n >= 1 && n <= 12) q.count = n;
   }
 
   // Pace.

@@ -28,6 +28,8 @@ function coerceQuery(raw: unknown): FinderQuery {
     upcoming: Boolean(q.upcoming),
     liveOnly: Boolean(q.liveOnly),
     pace: typeof q.pace === 'number' ? Math.max(0, Math.min(100, q.pace)) : null,
+    count: typeof q.count === 'number' && q.count >= 1 && q.count <= 12 ? Math.round(q.count) : null,
+    strictEnglishAudio: Boolean(q.strictEnglishAudio),
   };
 }
 

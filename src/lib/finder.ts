@@ -63,6 +63,10 @@ export interface FinderQuery {
   onMyServices: boolean;
   /** Explicit streaming provider ids to require (the on-home service checkboxes). */
   providerIds?: number[];
+  /** An explicitly requested number of results ("recommend 3 thrillers"). When set,
+   *  the finder returns at most this many and reports a shortfall rather than
+   *  padding with weak matches. */
+  count?: number | null;
   minMatch: number | null; // 0..100
   /** Only titles our verdict rules WATCH IT ("Stream It"). */
   streamItOnly: boolean;
@@ -127,6 +131,9 @@ export interface FinderResult {
   possibleMatches?: FinderItem[];
   /** Strict English-audio bookkeeping (honest counts; we never pad). */
   verifiedAudio?: { requested: number | null; verifiedCount: number; shortfall: boolean };
+  /** When the query asked for an explicit count ("recommend 3"), how many were
+   *  requested vs returned — so the UI can say "only found N" instead of padding. */
+  requestedCount?: { requested: number; returned: number; shortfall: boolean };
 }
 
 const CANDIDATE_CAP = 16;
@@ -410,7 +417,14 @@ export async function runFinder(
     items = verified; // primary = verified only
   }
 
-  const finalItems = items.slice(0, Math.max(1, Math.min(limit, 20)));
+  // An explicit "recommend N" caps the results at N and reports a shortfall
+  // instead of padding with weak matches.
+  const effLimit = q.count != null ? Math.max(1, Math.min(q.count, 20)) : Math.max(1, Math.min(limit, 20));
+  const requestedCount = q.count != null
+    ? { requested: q.count, returned: Math.min(items.length, effLimit), shortfall: items.length < q.count }
+    : undefined;
+
+  const finalItems = items.slice(0, effLimit);
   // Attach the real next airing (channel + time) to every TV result, so "ask for
   // a show" always shows where and when it's on. Best-effort; null when unknown.
   await Promise.all(
@@ -421,5 +435,5 @@ export async function runFinder(
       }),
   );
 
-  return { items: finalItems, scoredFor, relaxed, total: items.length, possibleMatches, verifiedAudio };
+  return { items: finalItems, scoredFor, relaxed, total: items.length, possibleMatches, verifiedAudio, requestedCount };
 }
