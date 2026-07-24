@@ -196,6 +196,9 @@ export function LiveCourt({ code }: { code: string }) {
           {err && <p className="mt-3 text-xs text-red-300">{err}</p>}
           <button onClick={join} disabled={joining || !name.trim()} className="btn-primary mt-4 w-full py-3">{joining ? 'Joining…' : 'Join the Court →'}</button>
         </div>
+        {/* Host can invite the others straight away — before entering their own name —
+            so the Send invite + QR are on the very first screen. */}
+        {isHost && <CourtInviteBox url={shareUrl} qr={qr} onToggleQr={showQr} />}
       </Shell>
     );
   }
