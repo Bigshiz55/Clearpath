@@ -51,13 +51,12 @@ export function LiveCourt({ code }: { code: string }) {
   const [gaveled, setGaveled] = useState(false);
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Canonical court URL from the active court id. Prefer the configured PRODUCTION
-  // domain (NEXT_PUBLIC_SITE_URL, inlined at build) so an invite always points at
-  // production even from a preview host; fall back to the current origin (which in
-  // production IS the production domain, served over HTTPS).
-  const origin =
-    (process.env.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, '')) ||
-    (typeof window !== 'undefined' ? window.location.origin : '');
+  // The invite link MUST point at the SAME deployment the host is on — the room
+  // lives in that deployment's database, so a friend has to open this exact origin
+  // to find and join it. Using window.location.origin guarantees that; a hardcoded
+  // NEXT_PUBLIC_SITE_URL could send friends to a different host that doesn't have
+  // the room (that was breaking joins).
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const shareUrl = origin ? `${origin}/court/${code}` : '';
   async function showQr() {
     if (!shareUrl) return;
@@ -77,8 +76,17 @@ export function LiveCourt({ code }: { code: string }) {
 
   async function refresh() {
     const { data, error } = await supabase.rpc('court_state', { p_code: code });
-    if (error) { if (error.code === '42P01') setErr('Live Court isn’t set up yet — run the latest Supabase migrations (0004 + 0014).'); return; }
+    if (error) {
+      // Surface WHY instead of leaving a friend stuck on "Connecting…" forever.
+      setErr(
+        error.code === '42P01'
+          ? 'Live Court isn’t set up yet — run the latest Supabase migrations (0004 + 0014).'
+          : `Couldn’t reach the room: ${error.message}. Check your connection and try again.`,
+      );
+      return;
+    }
     if (data == null) { setNotFound(true); return; }
+    setErr(null);
     setState(data as State);
   }
 
@@ -173,7 +181,13 @@ export function LiveCourt({ code }: { code: string }) {
   if (notFound) {
     return <Shell><div className="card p-8 text-center"><div className="text-3xl">🔗</div><p className="mt-3 text-sm text-slate-400">This Court room doesn’t exist or has ended.</p><Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVerdict →</Link></div></Shell>;
   }
-  if (!state) return <Shell><div className="text-sm text-slate-400">Connecting to the room…</div></Shell>;
+  if (!state) return (
+    <Shell>
+      {err
+        ? <div className="card p-5 text-center"><div className="text-3xl">⚠️</div><p className="mt-3 text-sm text-red-300">{err}</p><p className="mt-2 text-xs text-slate-500">Ask the host to resend the invite link, or make sure you opened it on the same site.</p></div>
+        : <div className="text-sm text-slate-400">Connecting to the room…</div>}
+    </Shell>
+  );
 
   const isHost = !!hostToken;
   const anyPicks = (state.participants ?? []).some((p) => (p.pickCount ?? 0) > 0);
