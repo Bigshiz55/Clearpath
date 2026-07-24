@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { qrForUrl } from '@/lib/actions/qr';
 import { getMyTaste, type MyTaste } from '@/lib/actions/profile';
 import { CourtInviteBox } from '@/components/court/CourtInviteBox';
+import { courtInviteUrlFromEnv } from '@/lib/court/inviteUrl';
 
 const MOODS = [
   { key: 'any', label: 'Anything', emoji: '🎬' }, { key: 'light', label: 'Light', emoji: '🌤️' },
@@ -51,13 +52,11 @@ export function LiveCourt({ code }: { code: string }) {
   const [gaveled, setGaveled] = useState(false);
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // The invite link MUST point at the SAME deployment the host is on — the room
-  // lives in that deployment's database, so a friend has to open this exact origin
-  // to find and join it. Using window.location.origin guarantees that; a hardcoded
-  // NEXT_PUBLIC_SITE_URL could send friends to a different host that doesn't have
-  // the room (that was breaking joins).
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const shareUrl = origin ? `${origin}/court/${code}` : '';
+  // The invite link is built by the ONE authoritative URL service. Default base is
+  // the host's own origin (guarantees the recipient hits the same deployment/DB); a
+  // dedicated NEXT_PUBLIC_COURT_ORIGIN can pin a canonical custom domain.
+  const invite = courtInviteUrlFromEnv(code);
+  const shareUrl = invite.url ?? '';
   async function showQr() {
     if (!shareUrl) return;
     if (qr) { setQr(null); return; } // toggle off
