@@ -57,6 +57,7 @@ export function CourtInviteHarness({ url, qr, mode }: { url: string; qr: string 
         <div className="text-xs uppercase tracking-widest text-brand-300">Waiting room · 2 in</div>
         <CourtInviteBox
           url={url}
+          roomName="room ABCD"
           qr={showQr ? qr : null}
           onToggleQr={() => setShowQr((v) => !v)}
           getNavigator={getNavigator}

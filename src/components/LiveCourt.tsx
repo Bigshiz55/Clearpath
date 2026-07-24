@@ -51,9 +51,17 @@ export function LiveCourt({ code }: { code: string }) {
   const [gaveled, setGaveled] = useState(false);
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Canonical court URL generated from the active court id (same-origin, HTTPS in
-  // production) — this is the invite link shared/copied.
-  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/court/${code}` : '';
+  // Canonical court URL from the active court id. Prefer the configured PRODUCTION
+  // domain (NEXT_PUBLIC_SITE_URL, inlined at build) so an invite always points at
+  // production even from a preview host; fall back to the current origin (which in
+  // production IS the production domain, served over HTTPS).
+  const origin =
+    (process.env.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, '')) ||
+    (typeof window !== 'undefined' ? window.location.origin : '');
+  const shareUrl = origin ? `${origin}/court/${code}` : '';
+  // A short room label for the invitation copy ("room ABCD"); the schema has no
+  // human room name, so the code is the room's identity.
+  const roomName = `room ${code}`;
   async function showQr() {
     if (!shareUrl) return;
     if (qr) { setQr(null); return; } // toggle off
@@ -256,7 +264,7 @@ export function LiveCourt({ code }: { code: string }) {
             ))}
           </div>
 
-          <CourtInviteBox url={shareUrl} qr={qr} onToggleQr={showQr} />
+          <CourtInviteBox url={shareUrl} roomName={roomName} qr={qr} onToggleQr={showQr} />
 
           {err && <p className="mt-3 text-xs text-red-300">{err}</p>}
 

@@ -1,54 +1,57 @@
 /**
- * Court "Send invite" behavior — PURE and injectable so it can be unit-tested
- * without a real browser. The component wires real `navigator`/DOM in; tests pass
- * fakes. iOS-safe: `navigator.share` is invoked SYNCHRONOUSLY inside the caller's
- * tap (no awaited network call, no setTimeout before it).
+ * Live Court invite — iMessage-first. PURE + injectable so it's unit-testable
+ * without a real browser. Primary path is the native iOS share sheet
+ * (`navigator.share`), invoked SYNCHRONOUSLY inside the user's tap (no awaited
+ * network call, no setTimeout before it) so iOS Safari accepts the gesture and the
+ * user can pick Messages and send over iMessage. We NEVER try to send an iMessage
+ * silently (browsers can't) and NEVER build an in-app recipient picker.
  *
- * Flow (exactly as specified):
- *   1. If navigator.share exists → call it with the fixed title/text/url and await.
- *      - user cancel (AbortError) → NO error, NO fallback.
- *      - non-cancel throw / unsupported → clipboard.
- *   2. navigator.clipboard.writeText → toast "Invite link copied".
- *   3. clipboard unavailable/fails → execCommand textarea fallback → toast.
- *   4. everything fails → open the manual modal.
- * A duplicate-tap lock prevents concurrent shares.
+ * Flow:
+ *   1. navigator.share({ title, text, url }) with a friendly invitation + the secure
+ *      room URL → user selects Messages in the sheet.
+ *      - user cancel (AbortError) → no error, no fallback.
+ *   2. share unsupported or throws → open the polished fallback modal
+ *      (Copy Invite Link · Open Messages [sms:] · Copy Full Invitation).
+ * The Invite button never silently fails. A duplicate-tap lock prevents double sheets.
  */
 
 export type InviteButtonState = 'idle' | 'sharing' | 'copied';
-export type InviteOutcome =
-  | 'shared'
-  | 'cancelled'
-  | 'copied-clipboard'
-  | 'copied-exec'
-  | 'manual'
-  | 'ignored-duplicate';
+export type InviteOutcome = 'shared' | 'cancelled' | 'fallback-modal' | 'ignored-duplicate';
 
 export interface InviteNavigator {
   share?: (data: ShareData) => Promise<void>;
   clipboard?: { writeText?: (text: string) => Promise<void> };
 }
 
-export interface RunInviteOptions {
-  url: string;
-  navigator: InviteNavigator;
-  /** Synchronous execCommand-based copy fallback; returns true on success. */
-  execCopy: (text: string) => boolean;
-  setButtonState: (s: InviteButtonState) => void;
-  /** Show the "Invite link copied" toast + flash the copied button label. */
-  onCopied: () => void;
-  /** Open the centered manual-copy modal (last resort). */
-  onManual: () => void;
-  /** Dev-only structured logger (event, optional detail). */
-  log?: (event: string, detail?: unknown) => void;
-  /** Duplicate-tap guard shared with the component (a ref). */
-  lock: { get: () => boolean; set: (v: boolean) => void };
+/** The friendly invitation body (room name woven in when available). */
+export const INVITE_TITLE = 'WatchVerdict Live Court';
+const BASE_MESSAGE =
+  'Join me in WatchVerdict Live Court. We’ll each pick our favorites, then WatchVerdict will combine our taste and choose what we should watch tonight.';
+
+export function inviteMessage(roomName?: string | null): string {
+  const name = roomName?.trim();
+  return name
+    ? `Join me in WatchVerdict Live Court (${name}). We’ll each pick our favorites, then WatchVerdict will combine our taste and choose what we should watch tonight.`
+    : BASE_MESSAGE;
 }
 
-export const INVITE_SHARE_TITLE = 'Join my WatchVerdict Court';
-export const INVITE_SHARE_TEXT = 'Join my WatchVerdict Court and help decide what we should watch.';
+/** Share payload for navigator.share — message + secure room URL. */
+export function inviteShareData(url: string, roomName?: string | null): ShareData {
+  return { title: INVITE_TITLE, text: inviteMessage(roomName), url };
+}
 
-export function inviteShareData(url: string): ShareData {
-  return { title: INVITE_SHARE_TITLE, text: INVITE_SHARE_TEXT, url };
+/** The full copy-paste invitation: message + URL on its own line. */
+export function fullInvitation(url: string, roomName?: string | null): string {
+  return `${inviteMessage(roomName)}\n\n${url}`;
+}
+
+/**
+ * An iOS-compatible Messages deep link carrying the invitation body (message + URL),
+ * URL-encoded. `sms:&body=` is the form iOS Safari honors; other platforms accept it
+ * too. Opening it lets the user pick a recipient in Messages themselves.
+ */
+export function smsHref(url: string, roomName?: string | null): string {
+  return `sms:&body=${encodeURIComponent(fullInvitation(url, roomName))}`;
 }
 
 /** A share rejection that means "the user dismissed the sheet" — not a failure. */
@@ -58,19 +61,32 @@ function isCancel(e: unknown): boolean {
   return err.name === 'AbortError' || err.name === 'NotAllowedError' || /abort|cancel|dismiss/i.test(err.message ?? '');
 }
 
+export interface RunInviteOptions {
+  url: string;
+  roomName?: string | null;
+  navigator: InviteNavigator;
+  setButtonState: (s: InviteButtonState) => void;
+  /** Open the polished fallback modal (share unsupported / failed). Never silent. */
+  onFallback: () => void;
+  /** Dev-only structured logger (event, optional detail). */
+  log?: (event: string, detail?: unknown) => void;
+  /** Duplicate-tap guard shared with the component (a ref). */
+  lock: { get: () => boolean; set: (v: boolean) => void };
+}
+
 export async function runInvite(o: RunInviteOptions): Promise<InviteOutcome> {
-  const { url, navigator: nav, log } = o;
+  const { url, roomName, navigator: nav, log } = o;
   if (o.lock.get()) { log?.('duplicate tap ignored'); return 'ignored-duplicate'; }
-  if (!url) { log?.('no invite url'); return 'ignored-duplicate'; }
+  if (!url) { log?.('no invite url — opening fallback'); o.onFallback(); return 'fallback-modal'; }
   o.lock.set(true);
   log?.('invite button clicked');
   log?.('generated invite URL', url);
   try {
     if (typeof nav.share === 'function') {
       log?.('navigator.share supported');
-      // Invoke share() SYNCHRONOUSLY (the promise is created before any await),
-      // so iOS Safari accepts it as part of the user gesture.
-      const shared = nav.share(inviteShareData(url));
+      // Invoke share() SYNCHRONOUSLY (promise created before any await) so iOS
+      // accepts it as part of the user gesture and opens the share sheet.
+      const shared = nav.share(inviteShareData(url, roomName));
       o.setButtonState('sharing');
       try {
         await shared;
@@ -79,42 +95,25 @@ export async function runInvite(o: RunInviteOptions): Promise<InviteOutcome> {
         return 'shared';
       } catch (e) {
         if (isCancel(e)) { log?.('share cancelled'); o.setButtonState('idle'); return 'cancelled'; }
-        log?.('share failed (non-cancel) — falling back to clipboard', e);
-        o.setButtonState('idle');
+        log?.('share failed (non-cancel) — opening fallback modal', e);
       }
     } else {
-      log?.('navigator.share unsupported');
+      log?.('navigator.share unsupported — opening fallback modal');
     }
-
-    // Clipboard fallback.
-    if (typeof nav.clipboard?.writeText === 'function') {
-      try {
-        await nav.clipboard.writeText(url);
-        log?.('clipboard fallback success');
-        o.onCopied();
-        return 'copied-clipboard';
-      } catch (e) {
-        log?.('clipboard writeText failed', e);
-      }
-    } else {
-      log?.('navigator.clipboard unavailable');
-    }
-
-    // execCommand textarea fallback.
-    if (o.execCopy(url)) {
-      log?.('execCommand copy success');
-      o.onCopied();
-      return 'copied-exec';
-    }
-
-    // Everything failed → manual modal.
-    log?.('all invite methods failed — opening manual modal');
-    o.onManual();
+    o.onFallback();
     o.setButtonState('idle');
-    return 'manual';
+    return 'fallback-modal';
   } finally {
     o.lock.set(false);
   }
+}
+
+/** Copy text via the async Clipboard API, falling back to execCommand. */
+export async function copyText(nav: InviteNavigator, text: string, execCopy: (t: string) => boolean): Promise<boolean> {
+  try {
+    if (typeof nav.clipboard?.writeText === 'function') { await nav.clipboard.writeText(text); return true; }
+  } catch { /* fall through */ }
+  return execCopy(text);
 }
 
 /** Safe execCommand('copy') via an off-screen textarea. Returns true on success. */
