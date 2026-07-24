@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `c40b64d` · Branch: `prod-fix`
+- Commit: `1f01245` · Branch: `prod-fix`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 

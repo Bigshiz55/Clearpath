@@ -76,6 +76,11 @@ export interface FinderQuery {
   minYear?: number | null;
   /** Genre ids to exclude (content comfort — e.g. horror). */
   excludeGenreIds?: number[];
+  /** Requested production origin (ISO-3166, e.g. ['ES']) — restricts candidates
+   *  to that origin so "a Spanish film" never returns a US-only blockbuster. */
+  originCountries?: string[];
+  /** Requested original language (ISO-639-1, e.g. ['es']). */
+  originalLanguages?: string[];
   /** TMDB keyword ids for trope/vibe filtering (heist, dystopia, feel-good…). */
   keywordIds?: number[];
   /** A reference title the ask compared to ("shows like Mindhunter") — for the
@@ -194,6 +199,12 @@ export async function runFinder(
           minYear: q.minYear ?? undefined,
           excludeGenreIds: q.excludeGenreIds,
           keywordIds: q.keywordIds,
+          // Foreign-origin: restrict the candidate pool to the requested
+          // production origin / original language so "a Spanish film" never
+          // surfaces a US-only blockbuster (TMDB with_original_language /
+          // with_origin_country). First entry wins when several are named.
+          originalLanguage: q.originalLanguages?.[0],
+          originCountry: q.originCountries?.[0],
           sortBy: 'popularity.desc',
           page,
         }),

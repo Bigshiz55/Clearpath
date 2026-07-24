@@ -5,6 +5,7 @@ import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
+import { augmentInternational } from '@/lib/askInternational';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -29,6 +30,8 @@ function coerceQuery(raw: unknown): FinderQuery {
     upcoming: Boolean(q.upcoming),
     liveOnly: Boolean(q.liveOnly),
     pace: typeof q.pace === 'number' ? Math.max(0, Math.min(100, q.pace)) : null,
+    originCountries: Array.isArray(q.originCountries) ? q.originCountries.map(String).slice(0, 4) : undefined,
+    originalLanguages: Array.isArray(q.originalLanguages) ? q.originalLanguages.map(String).slice(0, 4) : undefined,
   };
 }
 
@@ -86,6 +89,9 @@ export async function POST(req: Request) {
       query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
       if (text) limit = parseRequestedCount(text);
     }
+    // Foreign-origin / English-audio / runtime augmentation (deterministic; the
+    // parser paths don't extract these) — restricts the pool to the real origin.
+    query = augmentInternational(query, text);
     // Guarantee the actor filter regardless of AI: if a person is named and not
     // already resolved, look them up (fuzzy, so misspellings still match).
     if (text && (!query.castIds || query.castIds.length === 0)) {
