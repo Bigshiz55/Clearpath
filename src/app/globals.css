@@ -430,6 +430,12 @@ body {
   box-shadow: 0 0 12px rgba(47, 107, 255, 0.6);
   transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* Quiz Progress uses the brand pink so it reads distinct from the emerald
+   DNA-confidence bar right beside it — the two metrics must never look alike. */
+.wv-dna-bar--brand > span {
+  background: linear-gradient(90deg, #ff1493, #a855f7);
+  box-shadow: 0 0 12px rgba(255, 20, 147, 0.5);
+}
 .wv-dna-chip {
   display: inline-flex;
   align-items: center;
