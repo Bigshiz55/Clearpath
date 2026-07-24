@@ -31,3 +31,6 @@ npm-debug.log*
 /evaluation-results/runs/
 /evaluation-results/latest.json
 /eval/gold/regression.json
+
+# Playwright transient artifacts
+/test-results/

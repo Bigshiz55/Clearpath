@@ -10,7 +10,6 @@ import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictBadge } from '@/components/VerdictBadge';
 import { RecommendedForYou } from '@/components/RecommendedForYou';
 import { BuildCaseBox } from '@/components/BuildCaseBox';
-import { Tagline } from '@/components/Tagline';
 import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { InstallHint } from '@/components/InstallHint';
@@ -51,28 +50,15 @@ export default async function DiscoverPage() {
 
   return (
     <div className="space-y-8">
-      {/* The promise, front and center. */}
-      <div className="rounded-2xl border border-sky-400/40 bg-gradient-to-r from-sky-600 to-blue-700 px-5 py-5 text-center shadow-[0_10px_40px_-12px_rgba(37,99,235,0.6)]">
-        <p className="text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">
-          We earn your subscription. We don’t trick you into one.
-        </p>
-      </div>
-
-      {/* App-install nudge for testers — self-hides once installed/dismissed. */}
-      <InstallHint />
-
-      {/* Welcome + 30-second tour, right at the top. (Vintage Mode now lives in
-          the top nav, where the Simple-view toggle used to be.) */}
-      <TonightHome tonight={tonight} />
-
-      {/* HERO — decide right here: search, ask, and every tool on one screen. */}
-      <section className="animate-fade-up space-y-6">
+      {/* PRIMARY ASK — first thing on the screen so the input is reachable
+          without scrolling on a phone. Compact hero, then the ask, then a quiet
+          secondary search. */}
+      <section className="animate-fade-up space-y-4">
         <div className="text-center">
-          <h1 className="text-4xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl">
-            Stop scrolling.{' '}
-            <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">Get rolling.</span>
+          <h1 className="text-[1.75rem] font-black leading-tight tracking-tight text-white sm:text-5xl">
+            What should we watch?
           </h1>
-          <Tagline className="mt-4 text-2xl sm:text-4xl" />
+          <p className="mt-1 text-base text-slate-300 sm:text-xl">Tell us what you’re in the mood for.</p>
         </div>
 
         {/* PRIMARY move — State Your Case: the plain-English ask is the hero. */}
@@ -81,11 +67,26 @@ export default async function DiscoverPage() {
         {/* SECONDARY — already know the title? A quiet, smaller search. */}
         <div className="mx-auto max-w-xl">
           <label className="mb-1.5 block text-center text-sm font-semibold text-slate-400">
-            Already know what you want? Search a title, actor, or platform
+            Search by title, actor, or service
           </label>
           <SearchBar />
         </div>
+      </section>
 
+      {/* The promise + install nudge + tour, below the primary action. */}
+      <div className="rounded-2xl border border-sky-400/40 bg-gradient-to-r from-sky-600 to-blue-700 px-5 py-4 text-center shadow-[0_10px_40px_-12px_rgba(37,99,235,0.6)]">
+        <p className="text-lg font-black leading-tight tracking-tight text-white sm:text-2xl">
+          We earn your subscription. We don’t trick you into one.
+        </p>
+      </div>
+
+      {/* App-install nudge for testers — self-hides once installed/dismissed. */}
+      <InstallHint />
+
+      {/* Welcome + 30-second tour. */}
+      <TonightHome tonight={tonight} />
+
+      <section className="space-y-6">
         {/* Featured — Decide Together (Live Court): the group "wow", given top
             billing as a wide, prominent card above the rest of the tiles. */}
         <Link
