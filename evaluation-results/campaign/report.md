@@ -1,6 +1,6 @@
 # Search Validation Campaign
 
-- Commit `00b59b8` · Branch `prod-fix` · Seed 7
+- Commit `e85503e` · Branch `prod-fix` · Seed 7
 - **Total searches: 2000 · Passed 2000 (100.0%) · Failed 0 (0.0%)**
 
 ## Per-dimension pass rate (of cases naming that dimension)

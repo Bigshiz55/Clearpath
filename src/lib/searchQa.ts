@@ -16,6 +16,7 @@ import {
   detectNetwork,
   detectPlatform,
   detectOrigin,
+  detectRuntimeMaxMinutes,
 } from '@/lib/nlu/detectors';
 import { searchConfidence, type SearchSignals, type SearchConfidence } from '@/lib/nlu/confidence';
 import type { FinderQuery } from '@/lib/finder';
@@ -83,7 +84,11 @@ export function buildSearchQa(rawQuery: string): SearchQaView {
   if (network) hard.push({ kind: 'network', value: network.key, verifiedBy: 'live_tmdb' });
   if (platform) hard.push({ kind: 'platform', value: platform.name, verifiedBy: 'live_tmdb' });
   for (const id of q.providerIds ?? []) hard.push({ kind: 'provider_id', value: String(id), verifiedBy: 'live_tmdb' });
-  if (q.maxRuntime != null) hard.push({ kind: 'runtime_max', value: `${q.maxRuntime}m`, verifiedBy: 'live_tmdb' });
+  // Only surface runtime as a USER hard constraint when the wording specified one
+  // — the parser's default ~150m cap is a system default, not a stated request,
+  // and must not masquerade as something the user asked for.
+  const userRuntime = detectRuntimeMaxMinutes(text);
+  if (userRuntime != null) hard.push({ kind: 'runtime_max', value: `${userRuntime}m`, verifiedBy: 'live_tmdb' });
 
   // Soft preferences — affect ranking only.
   const soft: { key: string; value: string }[] = [];
