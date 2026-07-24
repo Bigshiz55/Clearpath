@@ -7,6 +7,8 @@ import { qrForUrl } from '@/lib/actions/qr';
 import { getMyTaste, type MyTaste } from '@/lib/actions/profile';
 import { CourtInviteBox } from '@/components/court/CourtInviteBox';
 import { courtInviteUrlFromEnv } from '@/lib/court/inviteUrl';
+import { getGuestId } from '@/lib/court/guestId';
+import { classifyRpcError, classifyRoomStatus, stateInfo, type ClassifiedError } from '@/lib/court/joinState';
 
 const MOODS = [
   { key: 'any', label: 'Anything', emoji: '🎬' }, { key: 'light', label: 'Light', emoji: '🌤️' },
@@ -22,7 +24,7 @@ interface Finalist {
   rank: number; id: number; mediaType: 'movie' | 'tv'; title: string; year: number | null; posterUrl: string | null;
   attributes: string[]; genres: string[]; perMember: PerMember[]; pickedBy: string[]; fit: number; minScore: number; avgScore: number; streaming: string[];
 }
-interface State { status: 'lobby' | 'veto' | 'verdict'; mediaType: string; finalists: Finalist[] | null; participants: Participant[] }
+interface State { status: 'lobby' | 'veto' | 'verdict' | 'closed' | 'expired'; mediaType: string; finalists: Finalist[] | null; participants: Participant[]; expiresAt?: string | null }
 
 const keyOf = (p: { mediaType: string; id: number }) => `${p.mediaType}-${p.id}`;
 
@@ -50,7 +52,15 @@ export function LiveCourt({ code }: { code: string }) {
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
   const [gaveled, setGaveled] = useState(false);
-  const poll = useRef<ReturnType<typeof setInterval> | null>(null);
+  // A terminal error (room gone/closed/expired/full/started/config/migration) that
+  // stops polling and shows a recovery screen — never an infinite spinner.
+  const [fatal, setFatal] = useState<ClassifiedError | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopped = useRef(false);
+  const fails = useRef(0);
+  const firstLoaded = useRef(false);
 
   // The invite link is built by the ONE authoritative URL service. Default base is
   // the host's own origin (guarantees the recipient hits the same deployment/DB); a
@@ -73,27 +83,72 @@ export function LiveCourt({ code }: { code: string }) {
     getMyTaste().then(setMine).catch(() => {});
   }, [code]);
 
-  async function refresh() {
+  // One authoritative fetch of room state. Classifies every failure into a precise
+  // state; terminal states stop the loop, transient ones drive a bounded retry.
+  async function refresh(): Promise<void> {
     const { data, error } = await supabase.rpc('court_state', { p_code: code });
     if (error) {
-      // Surface WHY instead of leaving a friend stuck on "Connecting…" forever.
-      setErr(
-        error.code === '42P01'
-          ? 'Live Court isn’t set up yet — run the latest Supabase migrations (0004 + 0014).'
-          : `Couldn’t reach the room: ${error.message}. Check your connection and try again.`,
-      );
+      const c = classifyRpcError(error);
+      if (!c.transient) { setFatal(c); stopped.current = true; return; }
+      fails.current += 1;
+      if (fails.current >= 2) setReconnecting(true);
       return;
     }
-    if (data == null) { setNotFound(true); return; }
+    if (data == null) { setFatal(stateInfo('room-not-found')); setNotFound(true); stopped.current = true; return; }
+    const st = data as State;
+    const cls = classifyRoomStatus(st.status);
+    if (cls.state !== 'ok') { setState(st); setFatal(cls); stopped.current = true; return; }
+    firstLoaded.current = true;
+    fails.current = 0;
+    setReconnecting(false);
     setErr(null);
-    setState(data as State);
+    setState(st);
   }
 
+  // Bounded, visibility-aware polling loop with exponential backoff (no fixed
+  // high-frequency interval, no infinite retries). Pauses when backgrounded and
+  // resumes on foreground; never spins forever.
   useEffect(() => {
-    void refresh();
-    poll.current = setInterval(refresh, 1500);
-    return () => { if (poll.current) clearInterval(poll.current); };
+    stopped.current = false;
+    fails.current = 0;
+    firstLoaded.current = false;
+    setLoadTimedOut(false);
+
+    async function loop() {
+      if (stopped.current) return;
+      if (typeof document !== 'undefined' && document.hidden) { schedule(2500); return; }
+      await refresh();
+      const delay = fails.current > 0 ? Math.min(8000, 1500 * 2 ** Math.min(fails.current, 3)) : 1500;
+      schedule(delay);
+    }
+    function schedule(ms: number) {
+      if (stopped.current) return;
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+      pollTimer.current = setTimeout(loop, ms);
+    }
+    void loop();
+
+    // No infinite "Connecting…": if the first load hasn't landed in 10s, offer a retry.
+    const loadTimer = setTimeout(() => { if (!firstLoaded.current && !stopped.current) setLoadTimedOut(true); }, 10_000);
+    const onVis = () => { if (typeof document !== 'undefined' && !document.hidden && !stopped.current) { if (pollTimer.current) clearTimeout(pollTimer.current); void loop(); } };
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVis);
+
+    return () => {
+      stopped.current = true;
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+      clearTimeout(loadTimer);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVis);
+    };
   }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function retryConnection() {
+    setFatal(null);
+    setLoadTimedOut(false);
+    setReconnecting(false);
+    fails.current = 0;
+    stopped.current = false;
+    void refresh();
+  }
 
   // Play the gavel-strike once when the ruling first lands.
   useEffect(() => {
@@ -104,11 +159,31 @@ export function LiveCourt({ code }: { code: string }) {
   }, [state?.status, gaveled]);
 
   async function join() {
-    if (!name.trim()) return;
+    const nm = name.trim();
+    if (!nm) { setErr('Enter a display name to join.'); return; }
     setJoining(true);
-    const { data, error } = await supabase.rpc('court_join', { p_code: code, p_name: name.trim(), p_love: [], p_avoid: [], p_mood: mood });
+    setErr(null);
+    // A STABLE device guest id makes the join idempotent server-side: refreshing,
+    // reconnecting, or re-opening the link re-uses the same seat (no ghost rows).
+    const guestId = getGuestId();
+    let { data, error } = await supabase.rpc('court_join', {
+      p_code: code, p_name: nm, p_love: [], p_avoid: [], p_mood: mood, p_guest_id: guestId,
+    });
+    // Backward-compat: a deployment that hasn't applied 0023 only has the legacy
+    // 5-arg court_join. If the 6-arg signature isn't found, retry without guest_id
+    // so joining still works (idempotency arrives once the migration is applied).
+    if (error && (error.code === 'PGRST202' || /could not find the function|function .*court_join.* does not exist/i.test(error.message ?? ''))) {
+      ({ data, error } = await supabase.rpc('court_join', { p_code: code, p_name: nm, p_love: [], p_avoid: [], p_mood: mood }));
+    }
     setJoining(false);
-    if (error) { setErr(error.message); return; }
+    if (error) {
+      const c = classifyRpcError(error);
+      // Recoverable-in-place errors stay inline; terminal room states show the
+      // full recovery screen.
+      if (c.state === 'name-required' || c.state === 'connection-failed' || c.state === 'unexpected') setErr(c.message);
+      else setFatal(c);
+      return;
+    }
     const row = Array.isArray(data) ? data[0] : data;
     const pid = row?.participant_id as string;
     if (pid) {
@@ -177,14 +252,18 @@ export function LiveCourt({ code }: { code: string }) {
     else void refresh();
   }
 
+  // Terminal, classified error → a clear recovery screen (never an endless spinner).
+  if (fatal) {
+    return <Shell><FatalCard err={fatal} onRetry={retryConnection} /></Shell>;
+  }
   if (notFound) {
     return <Shell><div className="card p-8 text-center"><div className="text-3xl">🔗</div><p className="mt-3 text-sm text-slate-400">This Court room doesn’t exist or has ended.</p><Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVerdict →</Link></div></Shell>;
   }
   if (!state) return (
     <Shell>
-      {err
-        ? <div className="card p-5 text-center"><div className="text-3xl">⚠️</div><p className="mt-3 text-sm text-red-300">{err}</p><p className="mt-2 text-xs text-slate-500">Ask the host to resend the invite link, or make sure you opened it on the same site.</p></div>
-        : <div className="text-sm text-slate-400">Connecting to the room…</div>}
+      {loadTimedOut
+        ? <div className="card p-6 text-center"><div className="text-3xl">🔌</div><p className="mt-3 text-sm text-slate-300">This is taking longer than usual to connect.</p><p className="mt-1 text-xs text-slate-500">Check your connection, or make sure you opened the invite on the same site as the host.</p><button onClick={retryConnection} className="btn-primary mt-4">Try again</button></div>
+        : <div className="text-center"><div className="text-sm text-slate-400">Connecting to the room…</div>{reconnecting && <div className="mt-2 text-xs text-amber-300">Reconnecting…</div>}</div>}
     </Shell>
   );
 
@@ -377,6 +456,28 @@ function FinalistCard({ f, onVeto, busy }: { f: Finalist; onVeto: () => void; bu
       <button onClick={onVeto} disabled={busy} className="mt-2 w-full rounded-xl border border-red-400/40 bg-red-500/10 py-2 text-xs font-bold text-red-100 transition hover:bg-red-500/20 disabled:opacity-40">
         🚫 Veto — swap this one out
       </button>
+    </div>
+  );
+}
+
+/** A precise, recoverable error screen — one per classified Court state. */
+function FatalCard({ err, onRetry }: { err: ClassifiedError; onRetry: () => void }) {
+  return (
+    <div className="card p-6 text-center">
+      <div className="text-3xl">{err.state === 'room-full' ? '🚪' : err.state === 'connection-failed' ? '🔌' : err.transient ? '⏳' : '⚖️'}</div>
+      <p className="mt-3 text-sm text-slate-200">{err.message}</p>
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        {(err.recovery === 'try-again' || err.recovery === 'reconnect' || err.transient) && (
+          <button onClick={onRetry} className="btn-primary text-sm">{err.recovery === 'reconnect' ? 'Reconnect' : 'Try again'}</button>
+        )}
+        {err.recovery === 'open-correct-site' && (
+          <p className="text-xs text-slate-500">Open the invite link the host sent — make sure it’s the same site.</p>
+        )}
+        <Link href="/app" className="btn-secondary text-sm">Return home</Link>
+      </div>
+      {err.state === 'migration-missing' && (
+        <p className="mt-3 text-[11px] text-slate-500">Site owner: apply the Court database update (migrations 0004 + 0014 + 0023).</p>
+      )}
     </div>
   );
 }
