@@ -24,7 +24,10 @@ export interface CaseResult {
 }
 
 function check(label: string, ok: boolean, category: FailCategory, detail: string): ConstraintResult {
-  return ok ? { label, ok: true } : { label, ok: false, category, detail };
+  // Always carry the category — even on a pass — so the campaign can count how
+  // many cases actually EXERCISED a dimension (its denominator), not just how
+  // many failed it. Omitting it on pass made per-dimension rates vacuous (0/0).
+  return ok ? { label, ok: true, category } : { label, ok: false, category, detail };
 }
 
 /** Grade one case's expected intent against what the parser produced. */

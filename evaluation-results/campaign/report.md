@@ -1,17 +1,17 @@
 # Search Validation Campaign
 
-- Commit `6bc4797` · Branch `prod-fix` · Seed 7
+- Commit `f961d0b` · Branch `prod-fix` · Seed 7
 - **Total searches: 3000 · Passed 3000 (100.0%) · Failed 0 (0.0%)**
 
 ## Per-dimension pass rate (of cases naming that dimension)
 
-- origin_country: 100.0% (0/0)
-- english_audio: 100.0% (0/0)
-- runtime: 100.0% (0/0)
-- media_type: 100.0% (0/0)
-- platform: 100.0% (0/0)
-- exclusion: 100.0% (0/0)
-- reference: 100.0% (0/0)
+- origin_country: 100.0% (1646/1646)
+- english_audio: 100.0% (1016/1016)
+- runtime: 100.0% (920/920)
+- media_type: 100.0% (3000/3000)
+- platform: 100.0% (1473/1473)
+- exclusion: 100.0% (920/920)
+- reference: 100.0% (1049/1049)
 
 ## Failure categories
 

@@ -1,5 +1,5 @@
 {
-  "sha": "6bc4797",
+  "sha": "f961d0b",
   "branch": "prod-fix",
   "seed": 7,
   "total": 3000,
@@ -7,38 +7,38 @@
   "categories": {},
   "dims": {
     "origin_country": {
-      "relevant": 0,
-      "clean": 0,
+      "relevant": 1646,
+      "clean": 1646,
       "rate": 1
     },
     "english_audio": {
-      "relevant": 0,
-      "clean": 0,
+      "relevant": 1016,
+      "clean": 1016,
       "rate": 1
     },
     "runtime": {
-      "relevant": 0,
-      "clean": 0,
+      "relevant": 920,
+      "clean": 920,
       "rate": 1
     },
     "media_type": {
-      "relevant": 0,
-      "clean": 0,
+      "relevant": 3000,
+      "clean": 3000,
       "rate": 1
     },
     "platform": {
-      "relevant": 0,
-      "clean": 0,
+      "relevant": 1473,
+      "clean": 1473,
       "rate": 1
     },
     "exclusion": {
-      "relevant": 0,
-      "clean": 0,
+      "relevant": 920,
+      "clean": 920,
       "rate": 1
     },
     "reference": {
-      "relevant": 0,
-      "clean": 0,
+      "relevant": 1049,
+      "clean": 1049,
       "rate": 1
     }
   }
