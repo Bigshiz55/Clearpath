@@ -154,4 +154,12 @@ export interface PreferenceEvent {
   discoveryGrade?: DiscoveryGrade;
   /** Optional follow-up reasons attached to a negative action. */
   reasons?: ReasonCode[];
+  /** ms the card was shown before the user acted (quality signal; too-fast = suspect). */
+  dwellMs?: number;
+  /** Which surface produced the event (onboarding, round, home, etc.). */
+  source?: string;
+  /** The Case Round this event belongs to, if any. */
+  roundId?: string;
+  /** Title familiarity 0..1 (recognizable titles are safer to judge). */
+  familiarity?: number;
 }
