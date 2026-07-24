@@ -302,6 +302,10 @@ body {
 }
 @media (max-height: 520px) {
   .wv-quiz-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* Short/landscape viewports: the flex-1 poster must never be squeezed to 0 by
+     the metrics + title + button row. Guarantee it a visible minimum — the
+     measured fit still leaves room, so nothing overflows or scrolls. */
+  .wv-quiz-poster { min-height: 4.5rem; }
   /* Narrow 4-up columns: let labels wrap to two lines and cap the font so no
      text is ever clipped. Buttons stay equal size. */
   .wv-quiz-btn {

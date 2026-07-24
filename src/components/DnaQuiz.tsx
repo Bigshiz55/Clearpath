@@ -401,7 +401,7 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
 
         {/* 2 + 3 · Hero poster + title */}
         <div key={idx} className="wv-title-in flex min-h-0 flex-1 flex-col gap-2">
-          <div className="relative min-h-0 flex-1" data-testid="quiz-poster">
+          <div className="wv-quiz-poster relative min-h-0 flex-1" data-testid="quiz-poster">
             {current.posterUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={current.posterUrl} alt={current.title} className="wv-poster-hero" />
