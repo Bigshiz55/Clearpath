@@ -10,11 +10,16 @@ import {
   type AccessResult,
 } from '@/lib/founder/access';
 import { listSessions, sessionsAvailable } from '@/lib/founder/sessions';
+import { activeSession } from '@/lib/founder/sessionModel';
 import { FounderSessions, toView } from '@/components/founder/FounderSessions';
 import { getWatchStats } from '@/lib/watchStats';
 import { getUserDimensionProfile } from '@/lib/titleDimensions';
 import { describePersonality } from '@/lib/scoring/personality';
 import { dnaStrength, tasteDials } from '@/lib/scoring/dimensions';
+import { loadDnaConfidence, countCalibrationAnswers } from '@/lib/preference/dnaSignals';
+import { calibrationProgress } from '@/lib/preference/calibration';
+import { DnaConfidencePanel } from '@/components/DnaConfidencePanel';
+import { RecommendationSlate } from '@/components/RecommendationSlate';
 import { WatchVerdictWordmark } from '@/components/WatchVerdictWordmark';
 
 /**
@@ -73,6 +78,20 @@ export async function FounderTestEnv({ founder }: { founder: FounderKey }) {
   const dials = profile ? tasteDials(profile, 5) : [];
   const dnaReady = (profile?.samples ?? 0) >= 3;
 
+  // The active named session scopes this founder's calibration + confidence, so
+  // "Scott Main" and "Scott Fresh DNA" learn independently. Session-scoped DNA
+  // Confidence + Quiz Progress are the two separate metrics (never mirror).
+  const active = activeSession(sessions);
+  const sessionId = active?.id;
+  const [confResult, calAnswered] = await Promise.all([
+    loadDnaConfidence(supabase, userId, sessionId ? { sessionId } : {})
+      .then((r) => r.confidence)
+      .catch(() => null),
+    countCalibrationAnswers(supabase, userId, sessionId).catch(() => 0),
+  ]);
+  const quizProgress = calibrationProgress(calAnswered);
+  const quizHref = sessionId ? `/app/quiz?session=${encodeURIComponent(sessionId)}` : '/app/quiz';
+
   return (
     <div className="min-h-dvh bg-slate-950 text-white">
       <header className="border-b border-white/10 bg-black/40 backdrop-blur">
@@ -110,6 +129,22 @@ export async function FounderTestEnv({ founder }: { founder: FounderKey }) {
             </p>
           )}
         </section>
+
+        {/* Two SEPARATE metrics for the active session — never mirror each other. */}
+        <section className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-white/10 bg-black/25 p-4" data-testid="founder-quiz-progress">
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Quiz Progress</div>
+            <div className="mt-1 text-3xl font-black tabular-nums text-brand-200">{quizProgress.percent}%</div>
+            <div className="text-[11px] text-slate-500">{Math.min(calAnswered, quizProgress.size)} of {quizProgress.size} · onboarding</div>
+          </div>
+          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/5 p-4" data-testid="founder-dna-confidence">
+            <div className="text-[10px] font-bold uppercase tracking-wide text-emerald-300/90">Watch DNA Confidence</div>
+            <div className="mt-1 text-3xl font-black tabular-nums text-emerald-300">{confResult?.percent ?? 0}%</div>
+            <div className="text-[11px] text-slate-500">how well we know {active?.name ?? meta.name}</div>
+          </div>
+        </section>
+
+        {confResult && <DnaConfidencePanel result={confResult} />}
 
         {/* What this founder's DNA has learned so far — the before/after signal. */}
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6">
@@ -157,13 +192,19 @@ export async function FounderTestEnv({ founder }: { founder: FounderKey }) {
           migrationReady={migrationReady}
         />
 
+        {/* Refresh Recommendations — preserves DNA, new slate, validated + logged. */}
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6">
+          <RecommendationSlate surface="founder" sessionId={sessionId} />
+        </section>
+
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6">
           <h2 className="text-lg font-bold">Enter the product as {meta.name}</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Use the real WatchVerdict experience — your ratings and recommendations here belong to this founder identity.
+            Use the real WatchVerdict experience — your ratings and recommendations here belong to this founder identity
+            {active ? <> · session <span className="font-semibold text-white">{active.name}</span></> : null}.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/app/quiz" className="btn-primary">
+            <Link href={quizHref} className="btn-primary">
               Build Watch DNA
             </Link>
             <Link href="/app/dna" className="btn-secondary">
