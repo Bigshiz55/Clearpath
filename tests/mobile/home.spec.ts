@@ -33,13 +33,15 @@ for (const width of WIDTHS) {
       await page.screenshot({ path: path.join(SHOTS, `mobile-home-${width}.png`), fullPage: true });
     }
 
-    // 1) Wordmark is the solid "WatchVERDICT" — regression guard for the broken
-    //    "WatchVERD_CT" / "WatchVERD CT" the flip gimmick produced on iOS.
+    // 1) Wordmark is the canonical brand "WatchVERD1CT" — the "I" is an intentional
+    //    white numeral 1 (see WatchVerdictWordmark + logo.spec.ts). Regression guard
+    //    for the broken "WatchVERD_CT" / "WatchVERDCT" / "WatchVERD CT" the old flip
+    //    gimmick produced on iOS (missing glyph or a gap).
     const header = page.locator('[data-testid="site-header"]');
     const brand = header.locator('span.whitespace-nowrap').first();
     const brandText = (await brand.innerText()).replace(/\s+/g, '');
-    expect(brandText, `wordmark solid @ ${width}px (got "${brandText}")`).toBe('WatchVERDICT');
-    expect(brandText, 'never underscores/gaps').not.toMatch(/VERD[^I]?CT|VERD_|VERD\s+CT/);
+    expect(brandText, `wordmark solid @ ${width}px (got "${brandText}")`).toBe('WatchVERD1CT');
+    expect(brandText, 'never clipped/underscored/gapped').not.toMatch(/VERDCT|VERD_CT|VERD\s+CT/);
 
     // 2) Compact hero headline visible, no clipping.
     const headline = page.locator('[data-testid="hero-headline"]');
