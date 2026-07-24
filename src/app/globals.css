@@ -300,11 +300,15 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
 }
+/* The hero poster must always be substantial — never the collapsed thumbnail iOS
+   produced when the measured tile came out short. Give it a guaranteed portrait
+   min-height (the tile grows to fit via min-height, so nothing else is clipped);
+   it still grows past this via flex-1 whenever there's room. */
+.wv-quiz-poster { min-height: clamp(150px, 32dvh, 320px); }
 @media (max-height: 520px) {
   .wv-quiz-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  /* Short/landscape viewports: the flex-1 poster must never be squeezed to 0 by
-     the metrics + title + button row. Guarantee it a visible minimum — the
-     measured fit still leaves room, so nothing overflows or scrolls. */
+  /* Short/landscape viewports: a smaller guaranteed minimum so the whole tile
+     still fits a wide, short screen without needing to scroll. */
   .wv-quiz-poster { min-height: 4.5rem; }
   /* Narrow 4-up columns: let labels wrap to two lines and cap the font so no
      text is ever clipped. Buttons stay equal size. */
@@ -412,6 +416,14 @@ body {
 }
 
 /* Watch-DNA progress panel */
+/* Compact metric number for the two side-by-side quiz cards — smaller than the
+   standalone confidence readout so the pair leaves more room for the poster. */
+.wv-quiz-metric-pct {
+  font-weight: 900;
+  font-size: clamp(1.3rem, 5vw, 1.6rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
 .wv-dna-pct {
   font-weight: 900;
   font-size: clamp(1.6rem, 6vw, 2.1rem);

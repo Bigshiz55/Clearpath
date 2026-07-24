@@ -181,7 +181,11 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
     if (!el || typeof window === 'undefined') return;
     const fit = () => {
       if (window.innerWidth >= 640 && window.innerHeight >= 640) { el.style.height = ''; el.style.minHeight = ''; return; }
-      el.style.minHeight = '0';
+      // Fill the free space as a *minimum*, never a fixed cap: the poster keeps a
+      // guaranteed min-height (CSS), so if a short iOS viewport (Safari chrome
+      // expanded) makes this measurement small, the tile GROWS to fit the poster
+      // instead of squeezing it to a thumbnail. A little scroll on tiny screens
+      // beats a collapsed poster — which was the real on-device bug.
       el.style.height = '';
       const vpH = window.visualViewport?.height ?? window.innerHeight;
       const top = el.getBoundingClientRect().top;
@@ -189,7 +193,7 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
       const outer = main?.parentElement ?? null;
       const pb = (n: Element | null) => (n ? parseFloat(getComputedStyle(n).paddingBottom) || 0 : 0);
       const reserveBelow = pb(main) + pb(outer);
-      el.style.height = `${Math.max(180, Math.round(vpH - top - reserveBelow))}px`;
+      el.style.minHeight = `${Math.max(180, Math.round(vpH - top - reserveBelow))}px`;
     };
     fit();
     const vv = window.visualViewport;
@@ -377,7 +381,7 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
                   <span className="text-[10px] font-semibold text-slate-300" data-testid="quiz-title-index">{progress.index} of {cal.total}</span>
                 </div>
                 <div className="mt-0.5 flex items-end gap-1.5">
-                  <span key={`p${answered}`} className="wv-dna-pct wv-pop text-brand-200" data-testid="quiz-progress-pct">{progress.percent}%</span>
+                  <span key={`p${answered}`} className="wv-quiz-metric-pct wv-pop text-brand-200" data-testid="quiz-progress-pct">{progress.percent}%</span>
                 </div>
                 <div className="wv-dna-bar wv-dna-bar--brand mt-1"><span style={{ width: `${progress.percent}%` }} /></div>
                 <div className="mt-0.5 text-[10px] text-slate-400" data-testid="quiz-eta">{fmtEta(progress.secondsRemaining)}</div>
@@ -392,7 +396,7 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
             <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/5 px-2.5 py-1.5" data-testid="dna-confidence-card">
               <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-300/90">Watch DNA Confidence</span>
               <div className="mt-0.5 flex items-end gap-1.5">
-                <span key={`c${confidence}`} className="wv-dna-pct wv-pop text-emerald-300" data-testid="dna-confidence">{confidence}%</span>
+                <span key={`c${confidence}`} className="wv-quiz-metric-pct wv-pop text-emerald-300" data-testid="dna-confidence">{confidence}%</span>
               </div>
               <div className="wv-dna-bar mt-1"><span style={{ width: `${confidence}%` }} /></div>
             </div>

@@ -80,6 +80,13 @@ test.describe('watch-dna calibration — responsive matrix', () => {
       await expect(page.locator('[data-testid="quiz-poster"]')).toBeVisible();
       await expect(page.locator('[data-testid="quiz-grid"]')).toBeVisible();
 
+      // The poster must be SUBSTANTIAL, never collapsed to a thumbnail (the real
+      // on-device bug). Require a solid minimum on portrait; a smaller floor in
+      // short landscape where vertical room is scarce.
+      const posterH = await page.locator('[data-testid="quiz-poster"]').evaluate((n) => n.getBoundingClientRect().height);
+      const floor = vp.h <= 520 ? 60 : 130;
+      expect(posterH, `${vp.name}: poster not collapsed (h=${Math.round(posterH)} ≥ ${floor})`).toBeGreaterThanOrEqual(floor);
+
       await noHorizontalOverflow(page, `quiz ${vp.name}`);
       await page.screenshot({ path: path.join(SHOTS, `quiz-${vp.name}.png`), fullPage: false });
     });
