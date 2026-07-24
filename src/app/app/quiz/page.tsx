@@ -20,14 +20,15 @@ export default async function QuizPage() {
     totalRated = count ?? 0;
   }
 
+  // Compact, height-bounded shell so the single-screen quiz fits within the app
+  // chrome (top nav + bottom nav) without scrolling; the poster flexes to fill.
   return (
-    <div className="mx-auto max-w-xl">
-      <h1 className="text-2xl font-bold text-white sm:text-3xl">🧬 Build your Watch DNA</h1>
-      <p className="mt-2 text-sm text-slate-400">
-        Have you seen it? If so, how was it? Every answer sharpens your recommendations — and
-        “haven’t seen it” never counts against you. Stop anytime; update it whenever.
-      </p>
-      <div className="mt-5">
+    <div className="mx-auto flex h-[calc(100svh-8.5rem)] max-w-md flex-col">
+      <div className="shrink-0 text-center">
+        <h1 className="text-lg font-bold text-white">🧬 Build your Watch DNA</h1>
+        <p className="mt-0.5 text-xs text-slate-400">Rate what you’ve seen — “haven’t seen it” never counts against you.</p>
+      </div>
+      <div className="mt-2 min-h-0 flex-1">
         <DnaQuiz totalRated={totalRated} />
       </div>
     </div>
