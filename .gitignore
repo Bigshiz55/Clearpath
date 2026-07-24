@@ -31,3 +31,8 @@ npm-debug.log*
 /evaluation-results/runs/
 /evaluation-results/latest.json
 /eval/gold/regression.json
+
+# Playwright transient run artifacts (screenshots are kept under test-results/responsive/)
+test-results/responsive-artifacts/
+playwright-report/
+test-results/e2e-artifacts/

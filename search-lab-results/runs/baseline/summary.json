@@ -1,0 +1,24 @@
+{
+  "label": "baseline",
+  "total": 8,
+  "passed": 1,
+  "failed": 7,
+  "criticalCounts": {
+    "seedLeak": 2,
+    "duplicate": 0,
+    "contradictionLeak": 12,
+    "hallucination": 0
+  },
+  "franchiseViolations": 3,
+  "recallMisses": 8,
+  "bySplit": {
+    "dev": {
+      "total": 6,
+      "passed": 1
+    },
+    "holdout": {
+      "total": 2,
+      "passed": 0
+    }
+  }
+}

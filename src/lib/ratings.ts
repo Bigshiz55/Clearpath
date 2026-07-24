@@ -36,6 +36,36 @@ export function tileRatingsFromScore(general: WatchVerdictScore): TileRatings {
   };
 }
 
+/**
+ * A valid, displayable IMDb rating (1..10) or `null`. Treats null, undefined,
+ * empty string, 0, negatives, NaN/non-finite, "N/A", and dashes as MISSING — so a
+ * card NEVER renders "IMDb —", "IMDb 0.0", an empty badge, or reserved blank space.
+ * We never fabricate a value; missing simply hides the element.
+ */
+export function imdbScore(raw: unknown): number | null {
+  if (raw == null) return null;
+  let n: number;
+  if (typeof raw === 'number') n = raw;
+  else if (typeof raw === 'string') {
+    const t = raw.trim().toLowerCase();
+    if (t === '' || t === '-' || t === '–' || t === '—' || t === 'n/a' || t === 'na' || t === 'null' || t === 'undefined') return null;
+    n = Number.parseFloat(t);
+  } else return null;
+  if (!Number.isFinite(n) || n <= 0 || n > 10) return null;
+  return n;
+}
+
+/**
+ * A valid percentage 0..100 (0 IS meaningful for a critics/audience score) or
+ * `null`. Rejects NaN/non-finite/out-of-range so a broken value never renders.
+ */
+export function pctScore(raw: unknown): number | null {
+  if (raw == null) return null;
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number.parseFloat(raw.trim()) : NaN;
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+  return Math.round(n);
+}
+
 export function hasAnyRating(r: TileRatings): boolean {
   return (
     r.standardScore != null ||

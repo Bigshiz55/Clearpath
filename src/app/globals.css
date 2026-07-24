@@ -10,6 +10,31 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* ---------------------------------------------------------------------------
+   Global overflow / box-model safety net. Tailwind's preflight already sets
+   box-sizing: border-box, but we assert it (belt-and-suspenders) and stop any
+   single stray element from creating a horizontal scrollbar on phones. We do
+   NOT hide overflow on content containers — root causes are fixed at source so
+   the layout tests genuinely pass rather than being masked.
+--------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden; /* guard only; content is sized to fit, not clipped */
+}
+/* Media never forces a container wider than the viewport. */
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
 body {
   @apply bg-ink-950 text-slate-100 antialiased;
   background-image:
@@ -21,24 +46,91 @@ body {
 
 @layer components {
   .container-page {
-    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
-  }
-
-  /* The one poster-grid used across the app. Two-up on phones; from `sm` up it
-     auto-fills columns but never lets a card shrink below a readable width, so
-     cards stay big enough on every screen instead of squeezing to 6-across. */
-  .poster-grid {
-    @apply grid gap-4;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    @apply mx-auto w-full max-w-6xl;
+    /* Horizontal padding respects the notch/curved edges in landscape while
+       never dropping below the base gutter in portrait (safe-area = 0 there). */
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
   }
   @media (min-width: 640px) {
+    .container-page {
+      padding-left: max(1.5rem, env(safe-area-inset-left));
+      padding-right: max(1.5rem, env(safe-area-inset-right));
+    }
+  }
+
+  /* Wide container for data-dense pages (On TV) — uses the available viewport up
+     to ~1600px instead of collapsing into a narrow centered column, with
+     comfortable responsive gutters and safe-area insets. */
+  .container-wide {
+    @apply mx-auto w-full;
+    max-width: 1600px;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+  @media (min-width: 640px) {
+    .container-wide { padding-left: max(1.5rem, env(safe-area-inset-left)); padding-right: max(1.5rem, env(safe-area-inset-right)); }
+  }
+  @media (min-width: 1280px) {
+    .container-wide { padding-left: max(2rem, env(safe-area-inset-left)); padding-right: max(2rem, env(safe-area-inset-right)); }
+  }
+
+  /* On TV card rail: full-width cards on phones, more columns as width allows —
+     driven by actual width so nothing squeezes below readability. */
+  .ontv-rail {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  }
+  /* Horizontally scrollable filter/view bar for mobile; wraps to a row on desktop. */
+  .ontv-viewbar {
+    @apply flex gap-2 overflow-x-auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ontv-viewbar::-webkit-scrollbar { display: none; }
+
+  /* The one poster-grid used across the app.
+     PHONE (<600px): a TRUE single column — one full-width verdict card per row,
+     never two squeezed side by side. Each card gets the full content width so the
+     score, ratings, and actions have real room (no horizontal compression).
+     ≥600px: multi-column density returns, sized by actual track width so nothing
+     squeezes below readability. This 600px cut is the mobile/desktop boundary the
+     whole layout keys off. */
+  .poster-grid {
+    @apply grid gap-4;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 600px) {
     .poster-grid {
       grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     }
   }
 
+  /* Cards are containers, so their internal pieces (verdict panel, ratings) can
+     respond to the CARD's width via @container — not just the viewport. This is
+     what lets the same card work at 150px and at 320px. */
   .card {
     @apply rounded-2xl border border-white/10 bg-ink-850/70 shadow-card backdrop-blur;
+    container-type: inline-size;
+    container-name: card;
+  }
+
+  /* Rating chips: content-sized and WRAPPING. Each source keeps its FULL value
+     (never truncated) and wraps to a new row when the card is too narrow to hold
+     them on one line — so IMDb is never pushed off the edge nor clipped. A wide
+     card keeps all sources on one row; a ~150px card wraps to two rows. No fixed
+     pixel widths cause overflow. (Equal-width grid isn't forced here because on a
+     150px card it would squeeze values; natural wrap keeps every value legible.) */
+  .ratings-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.625rem;
+    min-width: 0;
+  }
+  .ratings-grid > * {
+    flex: 0 0 auto;
+    min-width: 0;
   }
 
   .btn {
@@ -205,7 +297,11 @@ body {
   font-weight: 900;
   letter-spacing: 0.005em;
   border-radius: 18px;
-  white-space: nowrap;
+  /* Wrap (don't overflow) when the label is long — full-width on narrow phones
+     and 30–50% longer translated strings both stay inside the button. */
+  white-space: normal;
+  text-align: center;
+  text-wrap: balance;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   background-image: linear-gradient(180deg, #ff62b6 0%, #ff1493 100%);
   box-shadow:
@@ -255,7 +351,7 @@ body {
    scoreboard / split-flap: front is the "I", back is a white "1". */
 .wv-iflip {
   display: inline-block;
-  width: 0.64em;
+  width: 0.7em;
   text-align: center;
   perspective: 420px;
   color: #ffffff; /* accent stays white on both the I and the 1 */

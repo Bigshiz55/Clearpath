@@ -129,7 +129,7 @@ export function SaveButton({
       disabled={busy}
       aria-label={saved ? 'Saved — remove from your list' : 'Save'}
       title={saved ? 'Saved — tap to remove' : 'Save'}
-      className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-9'} ${
+      className={`flex min-w-0 items-center justify-center gap-0.5 rounded-md border text-white transition ${wide ? 'h-11 w-full flex-1' : 'h-9 w-9'} ${
         saved
           ? 'border-brand-300 bg-brand-500'
           : 'border-brand-400/60 bg-brand-500/35 hover:bg-brand-500/60'

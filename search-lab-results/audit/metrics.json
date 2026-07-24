@@ -1,0 +1,276 @@
+{
+  "legacy": {
+    "n": 52,
+    "tp": 26,
+    "fp": 5,
+    "fn": 3,
+    "tn": 18,
+    "precision": 0.839,
+    "recall": 0.897,
+    "falsePositiveRate": 0.217,
+    "falseNegativeRate": 0.103,
+    "accuracy": 0.846,
+    "dangerousFalsePositives": 5,
+    "noMatchAccuracy": 0.545,
+    "exactTitleAccuracy": 1,
+    "franchiseIdentityAccuracy": 0.867,
+    "byCategory": {
+      "exact_match": {
+        "correct": 5,
+        "total": 5,
+        "fp": 0,
+        "fn": 0
+      },
+      "punctuation": {
+        "correct": 4,
+        "total": 4,
+        "fp": 0,
+        "fn": 0
+      },
+      "subtitle": {
+        "correct": 4,
+        "total": 4,
+        "fp": 0,
+        "fn": 0
+      },
+      "international_title": {
+        "correct": 1,
+        "total": 4,
+        "fp": 0,
+        "fn": 3
+      },
+      "alternate_title": {
+        "correct": 1,
+        "total": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "one_word": {
+        "correct": 5,
+        "total": 5,
+        "fp": 0,
+        "fn": 0
+      },
+      "close_but_wrong": {
+        "correct": 4,
+        "total": 9,
+        "fp": 5,
+        "fn": 0
+      },
+      "title_with_year": {
+        "correct": 3,
+        "total": 3,
+        "fp": 0,
+        "fn": 0
+      },
+      "sequel": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "prequel": {
+        "correct": 1,
+        "total": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "franchise_collection": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "remake": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "reboot": {
+        "correct": 1,
+        "total": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "tv_vs_movie": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "tmdb_conflict": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "obscure": {
+        "correct": 3,
+        "total": 3,
+        "fp": 0,
+        "fn": 0
+      },
+      "no_confident_match": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      }
+    },
+    "confidenceByBand": {
+      "low": {
+        "correct": 14,
+        "total": 17,
+        "accepts": 0
+      },
+      "mid": {
+        "correct": 2,
+        "total": 2,
+        "accepts": 0
+      },
+      "high": {
+        "correct": 28,
+        "total": 33,
+        "accepts": 31
+      }
+    }
+  },
+  "fixed": {
+    "n": 52,
+    "tp": 29,
+    "fp": 0,
+    "fn": 0,
+    "tn": 23,
+    "precision": 1,
+    "recall": 1,
+    "falsePositiveRate": 0,
+    "falseNegativeRate": 0,
+    "accuracy": 1,
+    "dangerousFalsePositives": 0,
+    "noMatchAccuracy": 1,
+    "exactTitleAccuracy": 1,
+    "franchiseIdentityAccuracy": 0.933,
+    "byCategory": {
+      "exact_match": {
+        "correct": 5,
+        "total": 5,
+        "fp": 0,
+        "fn": 0
+      },
+      "punctuation": {
+        "correct": 4,
+        "total": 4,
+        "fp": 0,
+        "fn": 0
+      },
+      "subtitle": {
+        "correct": 4,
+        "total": 4,
+        "fp": 0,
+        "fn": 0
+      },
+      "international_title": {
+        "correct": 4,
+        "total": 4,
+        "fp": 0,
+        "fn": 0
+      },
+      "alternate_title": {
+        "correct": 1,
+        "total": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "one_word": {
+        "correct": 5,
+        "total": 5,
+        "fp": 0,
+        "fn": 0
+      },
+      "close_but_wrong": {
+        "correct": 9,
+        "total": 9,
+        "fp": 0,
+        "fn": 0
+      },
+      "title_with_year": {
+        "correct": 3,
+        "total": 3,
+        "fp": 0,
+        "fn": 0
+      },
+      "sequel": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "prequel": {
+        "correct": 1,
+        "total": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "franchise_collection": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "remake": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "reboot": {
+        "correct": 1,
+        "total": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "tv_vs_movie": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "tmdb_conflict": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "obscure": {
+        "correct": 3,
+        "total": 3,
+        "fp": 0,
+        "fn": 0
+      },
+      "no_confident_match": {
+        "correct": 2,
+        "total": 2,
+        "fp": 0,
+        "fn": 0
+      }
+    },
+    "confidenceByBand": {
+      "low": {
+        "correct": 20,
+        "total": 20,
+        "accepts": 0
+      },
+      "mid": {
+        "correct": 2,
+        "total": 2,
+        "accepts": 0
+      },
+      "high": {
+        "correct": 30,
+        "total": 30,
+        "accepts": 29
+      }
+    }
+  }
+}

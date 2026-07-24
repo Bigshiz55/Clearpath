@@ -1,0 +1,436 @@
+{
+  "selectedThresholds": {
+    "version": "v1-calibrated-candidate",
+    "minAnchor": 0.4,
+    "maxContradiction": 0.42,
+    "hardRealismGap": 40,
+    "minConfidence": 0.4,
+    "defaultFranchiseCap": 1
+  },
+  "rationale": "Chosen among 15 configs with zero critical-contradiction leaks; max F1=0.944, tie-broken by false-qualification, then no-result rate, then closeness to provisional.",
+  "consideredEligible": 15,
+  "calibration": {
+    "provisional": {
+      "n": 35,
+      "tp": 17,
+      "fp": 3,
+      "fn": 2,
+      "tn": 13,
+      "precision": 0.85,
+      "recall": 0.895,
+      "falseQualificationRate": 0.188,
+      "noResultRate": 0.111,
+      "criticalContradictionRate": 0.214,
+      "f1": 0.872,
+      "byCategory": {
+        "positive": {
+          "qualified": 15,
+          "total": 17,
+          "correct": 15
+        },
+        "contradiction": {
+          "qualified": 3,
+          "total": 14,
+          "correct": 11
+        },
+        "borderline": {
+          "qualified": 1,
+          "total": 1,
+          "correct": 1
+        },
+        "franchise": {
+          "qualified": 1,
+          "total": 1,
+          "correct": 1
+        },
+        "broad_similarity": {
+          "qualified": 0,
+          "total": 2,
+          "correct": 2
+        }
+      },
+      "byBucket": {
+        "sports": {
+          "correct": 4,
+          "total": 4
+        },
+        "crime": {
+          "correct": 2,
+          "total": 2
+        },
+        "thriller": {
+          "correct": 2,
+          "total": 2
+        },
+        "scifi_horror": {
+          "correct": 1,
+          "total": 2
+        },
+        "prison_drama": {
+          "correct": 1,
+          "total": 1
+        },
+        "romcom": {
+          "correct": 2,
+          "total": 2
+        },
+        "superhero": {
+          "correct": 2,
+          "total": 2
+        },
+        "heist": {
+          "correct": 2,
+          "total": 2
+        },
+        "timeloop": {
+          "correct": 2,
+          "total": 2
+        },
+        "war": {
+          "correct": 1,
+          "total": 2
+        },
+        "western": {
+          "correct": 1,
+          "total": 1
+        },
+        "coming_of_age": {
+          "correct": 1,
+          "total": 1
+        },
+        "action": {
+          "correct": 1,
+          "total": 1
+        },
+        "music_drama": {
+          "correct": 0,
+          "total": 1
+        },
+        "tv_crime": {
+          "correct": 2,
+          "total": 2
+        },
+        "tv_prestige": {
+          "correct": 1,
+          "total": 1
+        },
+        "spanish": {
+          "correct": 1,
+          "total": 2
+        },
+        "east_asian": {
+          "correct": 1,
+          "total": 2
+        },
+        "french": {
+          "correct": 2,
+          "total": 2
+        },
+        "documentary": {
+          "correct": 1,
+          "total": 1
+        }
+      }
+    },
+    "selected": {
+      "n": 35,
+      "tp": 17,
+      "fp": 0,
+      "fn": 2,
+      "tn": 16,
+      "precision": 1,
+      "recall": 0.895,
+      "falseQualificationRate": 0,
+      "noResultRate": 0.111,
+      "criticalContradictionRate": 0,
+      "f1": 0.944,
+      "byCategory": {
+        "positive": {
+          "qualified": 15,
+          "total": 17,
+          "correct": 15
+        },
+        "contradiction": {
+          "qualified": 0,
+          "total": 14,
+          "correct": 14
+        },
+        "borderline": {
+          "qualified": 1,
+          "total": 1,
+          "correct": 1
+        },
+        "franchise": {
+          "qualified": 1,
+          "total": 1,
+          "correct": 1
+        },
+        "broad_similarity": {
+          "qualified": 0,
+          "total": 2,
+          "correct": 2
+        }
+      },
+      "byBucket": {
+        "sports": {
+          "correct": 4,
+          "total": 4
+        },
+        "crime": {
+          "correct": 2,
+          "total": 2
+        },
+        "thriller": {
+          "correct": 2,
+          "total": 2
+        },
+        "scifi_horror": {
+          "correct": 2,
+          "total": 2
+        },
+        "prison_drama": {
+          "correct": 1,
+          "total": 1
+        },
+        "romcom": {
+          "correct": 2,
+          "total": 2
+        },
+        "superhero": {
+          "correct": 2,
+          "total": 2
+        },
+        "heist": {
+          "correct": 2,
+          "total": 2
+        },
+        "timeloop": {
+          "correct": 2,
+          "total": 2
+        },
+        "war": {
+          "correct": 2,
+          "total": 2
+        },
+        "western": {
+          "correct": 1,
+          "total": 1
+        },
+        "coming_of_age": {
+          "correct": 1,
+          "total": 1
+        },
+        "action": {
+          "correct": 1,
+          "total": 1
+        },
+        "music_drama": {
+          "correct": 1,
+          "total": 1
+        },
+        "tv_crime": {
+          "correct": 2,
+          "total": 2
+        },
+        "tv_prestige": {
+          "correct": 1,
+          "total": 1
+        },
+        "spanish": {
+          "correct": 1,
+          "total": 2
+        },
+        "east_asian": {
+          "correct": 1,
+          "total": 2
+        },
+        "french": {
+          "correct": 2,
+          "total": 2
+        },
+        "documentary": {
+          "correct": 1,
+          "total": 1
+        }
+      }
+    }
+  },
+  "holdout": {
+    "provisional": {
+      "n": 14,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "tn": 9,
+      "precision": 1,
+      "recall": 1,
+      "falseQualificationRate": 0,
+      "noResultRate": 0,
+      "criticalContradictionRate": 0,
+      "f1": 1,
+      "byCategory": {
+        "contradiction": {
+          "qualified": 0,
+          "total": 6,
+          "correct": 6
+        },
+        "positive": {
+          "qualified": 5,
+          "total": 5,
+          "correct": 5
+        },
+        "broad_similarity": {
+          "qualified": 0,
+          "total": 3,
+          "correct": 3
+        }
+      },
+      "byBucket": {
+        "crime": {
+          "correct": 1,
+          "total": 1
+        },
+        "thriller": {
+          "correct": 1,
+          "total": 1
+        },
+        "prison_drama": {
+          "correct": 1,
+          "total": 1
+        },
+        "superhero": {
+          "correct": 1,
+          "total": 1
+        },
+        "timeloop": {
+          "correct": 1,
+          "total": 1
+        },
+        "war": {
+          "correct": 1,
+          "total": 1
+        },
+        "romcom": {
+          "correct": 1,
+          "total": 1
+        },
+        "tv_crime": {
+          "correct": 1,
+          "total": 1
+        },
+        "spanish": {
+          "correct": 1,
+          "total": 1
+        },
+        "east_asian": {
+          "correct": 1,
+          "total": 1
+        },
+        "french": {
+          "correct": 1,
+          "total": 1
+        },
+        "music_drama": {
+          "correct": 1,
+          "total": 1
+        },
+        "action": {
+          "correct": 1,
+          "total": 1
+        },
+        "documentary": {
+          "correct": 1,
+          "total": 1
+        }
+      }
+    },
+    "selected": {
+      "n": 14,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "tn": 9,
+      "precision": 1,
+      "recall": 1,
+      "falseQualificationRate": 0,
+      "noResultRate": 0,
+      "criticalContradictionRate": 0,
+      "f1": 1,
+      "byCategory": {
+        "contradiction": {
+          "qualified": 0,
+          "total": 6,
+          "correct": 6
+        },
+        "positive": {
+          "qualified": 5,
+          "total": 5,
+          "correct": 5
+        },
+        "broad_similarity": {
+          "qualified": 0,
+          "total": 3,
+          "correct": 3
+        }
+      },
+      "byBucket": {
+        "crime": {
+          "correct": 1,
+          "total": 1
+        },
+        "thriller": {
+          "correct": 1,
+          "total": 1
+        },
+        "prison_drama": {
+          "correct": 1,
+          "total": 1
+        },
+        "superhero": {
+          "correct": 1,
+          "total": 1
+        },
+        "timeloop": {
+          "correct": 1,
+          "total": 1
+        },
+        "war": {
+          "correct": 1,
+          "total": 1
+        },
+        "romcom": {
+          "correct": 1,
+          "total": 1
+        },
+        "tv_crime": {
+          "correct": 1,
+          "total": 1
+        },
+        "spanish": {
+          "correct": 1,
+          "total": 1
+        },
+        "east_asian": {
+          "correct": 1,
+          "total": 1
+        },
+        "french": {
+          "correct": 1,
+          "total": 1
+        },
+        "music_drama": {
+          "correct": 1,
+          "total": 1
+        },
+        "action": {
+          "correct": 1,
+          "total": 1
+        },
+        "documentary": {
+          "correct": 1,
+          "total": 1
+        }
+      }
+    }
+  }
+}

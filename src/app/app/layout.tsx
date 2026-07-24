@@ -45,7 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ref = process.env.VERCEL_GIT_COMMIT_REF ?? '';
 
   return (
-    <div className="min-h-dvh pb-20 sm:pb-0">
+    <div className="min-h-dvh pb-[calc(4.75rem+env(safe-area-inset-bottom))] sm:pb-0">
       <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} pro={pro} avatarLabel={avatarLabel} />
       <main className="container-page py-6">
         <NavArrows />

@@ -14,6 +14,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "playwright test",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "playwright test --config playwright.e2e.config.ts",
+    "verify": "bash scripts/verify.sh",
     "eval:selftest": "vitest run eval",
     "eval:watchverdict": "node eval/cli.mjs",
     "eval:watchverdict:smoke": "node eval/cli.mjs smoke",
@@ -25,7 +29,17 @@
     "eval:watchverdict:live": "node eval/cli.mjs live",
     "eval:watchverdict:baseline": "node eval/cli.mjs baseline",
     "eval:watchverdict:compare": "node eval/cli.mjs compare",
-    "eval:watchverdict:optimize": "node eval/cli.mjs optimize"
+    "eval:watchverdict:optimize": "node eval/cli.mjs optimize",
+    "search-lab:baseline": "node eval/searchlab/cli.mjs baseline",
+    "search-lab:gated": "node eval/searchlab/cli.mjs gated",
+    "search-lab:regression": "node eval/searchlab/cli.mjs regression",
+    "search-lab:holdout": "node eval/searchlab/cli.mjs holdout",
+    "search-lab:compare": "node eval/searchlab/cli.mjs compare",
+    "search-lab:calibrate": "vitest run --config eval/searchlab/calibration/vitest.calibration.config.ts",
+    "search-lab:audit": "vitest run --config eval/searchlab/audit/vitest.audit.config.ts",
+    "search-lab:benchmark": "vitest run --config eval/searchlab/benchmark/vitest.benchmark.config.ts",
+    "search-lab:clarify": "vitest run --config eval/searchlab/clarify/vitest.clarify.config.ts",
+    "test:responsive": "playwright test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -42,6 +56,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^20.14.10",
     "@types/pg": "^8.20.0",
     "@types/qrcode": "^1.5.6",

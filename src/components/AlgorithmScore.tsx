@@ -46,16 +46,18 @@ export function AlgorithmScore({
       className={`rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 px-2 py-2 shadow-[0_0_16px_rgba(244,63,94,0.28)] ${className}`}
       title="Your VERD1CT — your taste blended with every rating into one 0–100 estimate of how much YOU will like it. The blue TV means it’s from WatchVerdict."
     >
-      {/* The VERD1CT badge (number + TV) beside the ruling (Stream It / …). */}
+      {/* Row 1 — the VERD1CT badge (number + TV) beside the ruling (Stream It / …).
+          `min-w-0` on the text column lets the label wrap instead of forcing the
+          panel wider than the card; the badge stays a fixed, non-shrinking size. */}
       <div className="flex items-center gap-2.5">
         {score != null ? (
           <Verd1ctBadge score={score} px={44} />
         ) : (
           <span className="grid h-11 w-11 flex-none place-items-center rounded-[24%] bg-white/10 text-xl font-black text-slate-400">—</span>
         )}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {v && (
-            <span className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-sm font-black tracking-tight ${v.visual.badge}`}>
+            <span className={`inline-flex max-w-full items-center rounded-md px-2 py-0.5 text-sm font-black leading-tight tracking-tight ${v.visual.badge}`}>
               {v.call}
             </span>
           )}

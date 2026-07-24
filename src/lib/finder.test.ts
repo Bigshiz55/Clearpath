@@ -1,6 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { naiveParseQuery, describeQuery } from './finderParse';
 
+describe('Finder — explicit result count (the "3 Prime thrillers" quick-start)', () => {
+  it('parses the quick-start prompt into movie + thriller + count 3', () => {
+    const q = naiveParseQuery('Recommend 3 thriller movies currently available on Prime Video that match my taste.');
+    expect(q.count).toBe(3);
+    expect(q.mediaType).toBe('movie');
+    // Thriller genre id is present (finderGenres maps "thriller").
+    expect(q.genreIds.length).toBeGreaterThan(0);
+  });
+  it('reads a count from "top N" and "N movies", capped at 1..12', () => {
+    expect(naiveParseQuery('top 3 comedies').count).toBe(3);
+    expect(naiveParseQuery('show me 5 movies on Netflix').count).toBe(5);
+    expect(naiveParseQuery('give me 50 movies').count).toBeNull(); // out of range → ignored
+    expect(naiveParseQuery('a crime thriller from the last 24 months').count).toBeNull();
+  });
+});
+
 describe('Finder natural-language parsing (no AI needed)', () => {
   // Regression: the request verb "show me/us/them" must not be read as a TV
   // signal (it was flipping "show me movies" to mediaType 'any' and leaking TV

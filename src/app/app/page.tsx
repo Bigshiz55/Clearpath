@@ -50,10 +50,11 @@ export default async function DiscoverPage() {
   const upcomingTv = (await getUpcomingTv(regionFor(profile), Date.now()).catch(() => [])).slice(0, 12);
 
   return (
-    <div className="space-y-8">
-      {/* The promise, front and center. */}
-      <div className="rounded-2xl border border-sky-400/40 bg-gradient-to-r from-sky-600 to-blue-700 px-5 py-5 text-center shadow-[0_10px_40px_-12px_rgba(37,99,235,0.6)]">
-        <p className="text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">
+    <div className="space-y-6 sm:space-y-8">
+      {/* The promise, front and center. Compact on phones so the primary input
+          reaches the first screen without heavy scrolling. */}
+      <div className="rounded-2xl border border-sky-400/40 bg-gradient-to-r from-sky-600 to-blue-700 px-4 py-3.5 text-center shadow-[0_10px_40px_-12px_rgba(37,99,235,0.6)] sm:px-5 sm:py-5">
+        <p className="text-lg font-black leading-tight tracking-tight text-white sm:text-3xl">
           We earn your subscription. We don’t trick you into one.
         </p>
       </div>
@@ -65,14 +66,17 @@ export default async function DiscoverPage() {
           the top nav, where the Simple-view toggle used to be.) */}
       <TonightHome tonight={tonight} />
 
-      {/* HERO — decide right here: search, ask, and every tool on one screen. */}
-      <section className="animate-fade-up space-y-6">
+      {/* HERO — decide right here: search, ask, and every tool on one screen.
+          Headline scales fluidly with clamp() and the mobile stack is tightened so
+          the plain-English input (the primary action) sits within the first
+          screen instead of below a screen-tall banner. */}
+      <section className="animate-fade-up space-y-4 sm:space-y-6">
         <div className="text-center">
-          <h1 className="text-4xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl">
+          <h1 className="font-extrabold leading-[0.98] tracking-tight text-white" style={{ fontSize: 'clamp(1.75rem, 7vw, 3.75rem)' }}>
             Stop scrolling.{' '}
             <span className="bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">Get rolling.</span>
           </h1>
-          <Tagline className="mt-4 text-2xl sm:text-4xl" />
+          <Tagline className="mt-2 text-lg sm:mt-4 sm:text-4xl" />
         </div>
 
         {/* PRIMARY move — State Your Case: the plain-English ask is the hero. */}

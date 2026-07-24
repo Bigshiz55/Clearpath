@@ -1,0 +1,86 @@
+{
+  "calibration": {
+    "pairs": 35,
+    "seeds": 21,
+    "byBucket": {
+      "sports": 4,
+      "crime": 2,
+      "thriller": 2,
+      "scifi_horror": 2,
+      "prison_drama": 1,
+      "romcom": 2,
+      "superhero": 2,
+      "heist": 2,
+      "timeloop": 2,
+      "war": 2,
+      "western": 1,
+      "coming_of_age": 1,
+      "action": 1,
+      "music_drama": 1,
+      "tv_crime": 2,
+      "tv_prestige": 1,
+      "spanish": 2,
+      "east_asian": 2,
+      "french": 2,
+      "documentary": 1
+    },
+    "byKind": {
+      "movie/1970s/en": 10,
+      "movie/1990s/en": 5,
+      "movie/1980s/en": 2,
+      "movie/2000s/en": 5,
+      "movie/2010s/en": 4,
+      "tv/2010s/en": 3,
+      "movie/2010s/es": 1,
+      "tv/2010s/es": 1,
+      "movie/2010s/zh": 1,
+      "movie/2000s/zh": 1,
+      "movie/2000s/fr": 2
+    },
+    "byCategory": {
+      "positive": 17,
+      "contradiction": 14,
+      "borderline": 1,
+      "franchise": 1,
+      "broad_similarity": 2
+    }
+  },
+  "holdout": {
+    "pairs": 14,
+    "seeds": 14,
+    "byBucket": {
+      "crime": 1,
+      "thriller": 1,
+      "prison_drama": 1,
+      "superhero": 1,
+      "timeloop": 1,
+      "war": 1,
+      "romcom": 1,
+      "tv_crime": 1,
+      "spanish": 1,
+      "east_asian": 1,
+      "french": 1,
+      "music_drama": 1,
+      "action": 1,
+      "documentary": 1
+    },
+    "byKind": {
+      "movie/1970s/en": 1,
+      "movie/2010s/en": 4,
+      "movie/1990s/en": 2,
+      "movie/2000s/en": 1,
+      "movie/2020s/en": 1,
+      "tv/2010s/en": 1,
+      "tv/2010s/es": 1,
+      "movie/2010s/zh": 1,
+      "movie/2010s/fr": 1,
+      "movie/1980s/en": 1
+    },
+    "byCategory": {
+      "contradiction": 6,
+      "positive": 5,
+      "broad_similarity": 3
+    }
+  },
+  "note": "Development/calibration set is tuned against; holdout is frozen and scored once. Thresholds stay v1-provisional until a larger fully human-audited set is reviewed."
+}

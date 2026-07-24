@@ -19,6 +19,7 @@ export const EMPTY_QUERY: FinderQuery = {
   upcoming: false,
   liveOnly: false,
   pace: null,
+  count: null,
 };
 
 /** Plain-English read-back of the constraints the parser extracted — the judge
@@ -98,9 +99,15 @@ export function naiveParseQuery(input: string): FinderQuery {
   const aud = t.match(/(?:audience|score|rating)\D{0,14}(\d{2,3})/) || t.match(/(\d{2,3})\s*%/);
   if (aud) q.minAudience = Math.min(100, Number(aud[1]));
 
-  // English audio.
+  // English audio. A strict phrase ("with english audio", "english dub(bed)",
+  // "no subtitles", "dub required", "listen in english") requires VERIFIED audio in
+  // the primary results (likely/unknown split into possibleMatches downstream).
   if (/\benglish (?:audio|dub|dubbed|language)\b|not subtitl|no subtitl|dubbed in english/.test(t)) {
     q.englishAudioOnly = true;
+  }
+  if (/\bwith english audio\b|\benglish dub(bed)?\b|\bdub required\b|\bno subtitles\b|\blisten in english\b|\benglish spoken\b/.test(t)) {
+    q.englishAudioOnly = true;
+    q.strictEnglishAudio = true;
   }
 
   // On my services.
@@ -125,6 +132,17 @@ export function naiveParseQuery(input: string): FinderQuery {
   // Upcoming — not out yet (upcoming, coming soon, hasn't been released).
   if (/\bupcoming\b|\bcoming soon\b|\bnot (?:out|released)( yet)?\b|\bhasn'?t (?:come out|been released)\b|\bfuture releases?\b/.test(t)) {
     q.upcoming = true;
+  }
+
+  // Explicit result count — "recommend 3 thrillers", "show me 5 movies", "top 3".
+  // Capped 1–12 so a stray number can't blow out the grid. Only counts when the
+  // number sits right before a media/quantity word or a request verb.
+  const countMatch =
+    t.match(/\b(?:recommend|show me|give me|find|suggest|top|pick|list)\s+(\d{1,2})\b/) ||
+    t.match(/\b(\d{1,2})\s+(?:great |good |best )?(?:thrillers?|movies?|films?|shows?|series|picks?|titles?|comedies|documentaries|options?)\b/);
+  if (countMatch) {
+    const n = Number(countMatch[1]);
+    if (n >= 1 && n <= 12) q.count = n;
   }
 
   // Pace.

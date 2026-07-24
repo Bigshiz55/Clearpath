@@ -168,6 +168,7 @@ export function FinderUI({
   const [items, setItems] = useState<ResultItem[] | null>(null);
   const [scoredFor, setScoredFor] = useState('Your match');
   const [relaxed, setRelaxed] = useState<string | null>(null);
+  const [shortfall, setShortfall] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -239,6 +240,14 @@ export function FinderUI({
       setItems(data.items ?? []);
       setScoredFor(data.scoredFor ?? 'Your match');
       setRelaxed(data.relaxed ?? null);
+      // Honest count: if they asked for N and we found fewer strong matches, say so
+      // rather than padding the grid with weak recommendations.
+      const rc = data.requestedCount as { requested: number; returned: number; shortfall: boolean } | undefined;
+      setShortfall(
+        rc && rc.shortfall
+          ? `You asked for ${rc.requested}, but only ${rc.returned} strong match${rc.returned === 1 ? '' : 'es'} cleared the bar — shown here without padding the rest.`
+          : null,
+      );
     } catch {
       setError('Couldn’t run that search. Try again.');
       setItems([]);
@@ -312,6 +321,7 @@ export function FinderUI({
       {items && !loading && (
         <div id="finder-results" className="scroll-mt-4">
           {relaxed && <p className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{relaxed}</p>}
+          {shortfall && <p className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{shortfall}</p>}
           {items.length === 0 ? (
             <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and submit again.</p>
           ) : (

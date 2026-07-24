@@ -5,6 +5,10 @@ import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
+import { understandIntent } from '@/lib/search/retrieval/intent';
+import { expandQueries } from '@/lib/search/retrieval/expand';
+import { recover } from '@/lib/search/retrieval/recovery';
+import { clarify } from '@/lib/search/clarify/engine';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -49,6 +53,28 @@ export async function POST(req: Request) {
 
     // 1) If they named a specific title, put THAT on trial (full verdict + reasons).
     const text = typeof body.text === 'string' ? body.text.slice(0, 300) : '';
+
+    // 0) Clarification Engine (feature-flagged; default OFF so production is
+    // unchanged). Runs before search: only a LOW-confidence ambiguous query is
+    // intercepted with a single localized tap-clarification. High/medium proceed
+    // to the normal flow. Localized to the caller's locale (body.locale) or the
+    // detected query language. Pure + non-breaking.
+    if (process.env.CLARIFY_ENGINE === '1' && text.trim()) {
+      const appLocale = typeof (body as { locale?: unknown }).locale === 'string' ? (body as { locale: string }).locale : null;
+      const c = clarify(text, { appLocale });
+      if (c.decision.action === 'clarify') {
+        return NextResponse.json({
+          kind: 'clarification',
+          locale: c.locale,
+          dir: c.dir,
+          heading: c.clarification!.heading,
+          options: c.clarification!.options,           // localized tap targets, canonical meaningKey/intent attached
+          canonicalIntents: c.decision.options.map((o) => ({ intent: o.intent, meaningKey: o.meaningKey, confidence: o.confidence })),
+          topConfidence: c.decision.topConfidence,
+        });
+      }
+    }
+
     if (text.trim()) {
       const titled = await askJudgeTitle(supabase, user.id, text);
       if (titled) return NextResponse.json({ kind: 'title', ...titled });
@@ -68,7 +94,7 @@ export async function POST(req: Request) {
     if (reference) {
       const wantCount = text ? parseRequestedCount(text) : 10;
       const similar = await askSimilarTo(supabase, user.id, reference, wantCount);
-      if (similar) {
+      if (similar && similar.kind === 'similar') {
         return NextResponse.json({
           kind: 'search',
           query: similar.query,
@@ -77,6 +103,27 @@ export async function POST(req: Request) {
           items: similar.items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
         });
       }
+      // A resolved similar request that qualified ZERO candidates returns an
+      // honest no-close-matches state — it is NEVER silently handed to the
+      // ungated Finder. Broader, personally-appealing titles are returned in a
+      // clearly-labelled separate field, never blended with similar results.
+      if (similar && similar.kind === 'no_close_matches') {
+        return NextResponse.json({
+          kind: 'no_close_matches',
+          scoredFor: similar.scoredFor,
+          interpretation: similar.noClose.interpretation,
+          reason: similar.noClose.reason,
+          gateBreakdown: similar.noClose.gateBreakdown,
+          candidatesConsidered: similar.noClose.candidatesConsidered,
+          broadenOptions: similar.noClose.broadenOptions,
+          message: similar.noClose.message,
+          broaderAlternatives: similar.broaderAlternatives.map((i) => ({
+            ...i, posterUrl: tmdbImage(i.posterPath, 'w342'), label: 'broader_alternative',
+          })),
+        });
+      }
+      // similar === null → the reference title couldn't be resolved at all, so
+      // this was not a similar-to request; fall through to plain discovery.
     }
 
     if (ai) {
@@ -103,6 +150,28 @@ export async function POST(req: Request) {
     }
 
     const result = await runFinder(supabase, user.id, query, watcher, limit);
+
+    // The never-dead-end guarantee: a literal search must NEVER terminate on a bare
+    // "No results". When discovery finds nothing, return an honest RECOVERY state —
+    // likely interpretations + useful suggestions (navigation/refinements), and a
+    // single clarifying question only when necessary. No titles are fabricated.
+    if (result.items.length === 0 && text.trim()) {
+      const intent = understandIntent(text);
+      const expansions = expandQueries(text, intent);
+      const recovery = recover(text, intent, expansions, []);
+      return NextResponse.json({
+        kind: 'recovery',
+        scoredFor: result.scoredFor,
+        query,
+        intent: intent.kind,
+        interpretations: recovery.interpretations,
+        suggestions: recovery.suggestions,
+        clarifyingQuestion: recovery.clarifyingQuestion,
+        message: recovery.message,
+        relaxed: result.relaxed,
+      });
+    }
+
     return NextResponse.json({
       kind: 'search',
       query,

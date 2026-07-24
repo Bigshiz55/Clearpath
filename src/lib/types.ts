@@ -36,6 +36,12 @@ export interface TitleMetadata {
   overview: string;
   genres: string[];
   keywords: string[];
+  /** TMDB franchise/collection id (belongs_to_collection). Optional and
+   *  backward-compatible; present only for movies that belong to a collection.
+   *  Used as the reliable franchise identity for seed-similarity franchise
+   *  handling; absence means franchise membership is UNKNOWN (never inferred as
+   *  a filter trigger). */
+  collectionId?: number | null;
   posterPath: string | null;
   backdropPath: string | null;
   runtimeMinutes: number | null;

@@ -12,6 +12,8 @@ import { getNextAiring, type NextAiring } from '@/lib/onTv';
 import { tileRatingsFromScore, type TileRatings } from '@/lib/ratings';
 import type { PersonalContext } from '@/lib/scoring/personal';
 import type { TitleMetadata } from '@/lib/types';
+import { gatherAudioRecords } from '@/lib/lang/audioSources';
+import { resolveEnglishAudio, AUDIO_STATUS_LABEL, type EnglishAudioStatus, type ResolvedAudio } from '@/lib/lang/audioAvailability';
 
 const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
 const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
@@ -54,9 +56,17 @@ export interface FinderQuery {
   minAudience: number | null; // 0..100 — TMDB crowd score
   minImdb: number | null; // 0..10 — minimum IMDb rating
   englishAudioOnly: boolean;
+  /** STRICT English-audio request ("with English audio", "dub required", "no
+   *  subtitles"): the primary results may contain ONLY VERIFIED_ENGLISH_AUDIO;
+   *  likely/unknown are returned separately as possibleMatches, never mixed. */
+  strictEnglishAudio?: boolean;
   onMyServices: boolean;
   /** Explicit streaming provider ids to require (the on-home service checkboxes). */
   providerIds?: number[];
+  /** An explicitly requested number of results ("recommend 3 thrillers"). When set,
+   *  the finder returns at most this many and reports a shortfall rather than
+   *  padding with weak matches. */
+  count?: number | null;
   minMatch: number | null; // 0..100
   /** Only titles our verdict rules WATCH IT ("Stream It"). */
   streamItOnly: boolean;
@@ -100,6 +110,13 @@ export interface FinderItem {
   imdbId?: string | null;
   /** TV only: the next real broadcast/stream airing (channel + time), if any. */
   airing?: NextAiring | null;
+  /** Resolved English-audio status for the recommended provider + region — computed
+   *  through the audio-availability layer, NEVER claimed from the TMDB heuristic. */
+  audioStatus?: EnglishAudioStatus;
+  audioStatusLabel?: string;
+  audioNote?: string;
+  audioVerifiedAt?: string | null;
+  audioProvider?: string | null;
 }
 
 export interface FinderResult {
@@ -108,9 +125,47 @@ export interface FinderResult {
   /** Set when we had to relax a constraint to return anything. */
   relaxed: string | null;
   total: number;
+  /** Strict English-audio requests only: candidates whose English audio is NOT
+   *  verified (likely/unknown), shown in a separate labelled section — never mixed
+   *  into `items`. */
+  possibleMatches?: FinderItem[];
+  /** Strict English-audio bookkeeping (honest counts; we never pad). */
+  verifiedAudio?: { requested: number | null; verifiedCount: number; shortfall: boolean };
+  /** When the query asked for an explicit count ("recommend 3"), how many were
+   *  requested vs returned — so the UI can say "only found N" instead of padding. */
+  requestedCount?: { requested: number; returned: number; shortfall: boolean };
 }
 
 const CANDIDATE_CAP = 16;
+
+function slugProvider(name: string): string {
+  return name.toLowerCase().replace(/\+/g, 'plus').replace(/[^a-z0-9]+/g, '');
+}
+
+/**
+ * Resolve English-audio status for a title on its RECOMMENDED provider + region,
+ * through the audio-availability layer. The TMDB `englishAvailability` signal is
+ * passed only as a LOW-confidence heuristic source — it can never yield VERIFIED.
+ */
+function resolveFinderAudio(
+  id: number,
+  mediaType: MediaType,
+  meta: TitleMetadata,
+  providerName: string | null,
+  region: string,
+): ResolvedAudio {
+  if (!providerName) {
+    return { status: 'UNKNOWN', confidence: 0, providerName: null, region, verifiedAt: null, verifiedSeasons: null, seasonUncertain: false, note: 'No provider identified for this title/region.' };
+  }
+  const providerId = slugProvider(providerName);
+  const titleId = `${mediaType}:${id}`;
+  const records = gatherAudioRecords(titleId, { providerId, providerName, region }, {
+    titleId, mediaType, providerId, providerName, region,
+    originalLanguage: meta.originalLanguage ?? null,
+    englishAvailability: meta.englishAvailability,
+  });
+  return resolveEnglishAudio(records, { providerId, region });
+}
 
 function fmtRuntime(min: number | null): string | null {
   if (!min) return null;
@@ -241,31 +296,39 @@ export async function runFinder(
         // Era window.
         if (q.maxYear != null && meta.year != null && meta.year > q.maxYear) return null;
         if (q.minYear != null && meta.year != null && meta.year < q.minYear) return null;
-        if (meta.year != null) receipts.push(String(meta.year));
+        // Note: the year is shown in the card's metadata line already, so we do NOT
+        // add it as an evidence chip — chips explain WHY it matched, they don't
+        // repeat metadata that's already visible.
         // Upcoming: hasn't been released yet. Skip the rating gates below since
         // unreleased titles have no crowd/critic scores to judge on.
         if (q.upcoming) receipts.push('upcoming');
-        // Audience (TMDB crowd score).
+        // Audience (TMDB crowd score). The % itself is shown in the ratings row, so
+        // we filter on it but don't repeat it as a chip.
         if (q.minAudience != null && !q.upcoming) {
           const aud = meta.voteAverage != null ? Math.round(meta.voteAverage * 10) : null;
           if (aud == null || aud < q.minAudience) return null;
-          receipts.push(`${aud}% audience`);
         }
-        // IMDb rating (from OMDb, when we have it).
+        // IMDb rating (from OMDb, when we have it). Shown in the ratings row — no chip.
         if (q.minImdb != null && !q.upcoming) {
           if (meta.imdbRating == null || meta.imdbRating < q.minImdb) return null;
-          receipts.push(`IMDb ${meta.imdbRating.toFixed(1)}`);
         }
-        // English audio.
-        if (q.englishAudioOnly && !(meta.englishAvailability === 'native' || meta.englishAvailability === 'available')) {
-          return null;
-        }
-        if (q.englishAudioOnly) receipts.push('English audio');
         // On my services.
         const included = providers ? includedServiceNames(providers.options, services) : [];
         if (q.onMyServices) {
           if (included.length === 0) return null;
           receipts.push(`on ${included[0]}`);
+        }
+        // English audio — resolved through the audio-availability layer for the
+        // RECOMMENDED provider + region. VERIFIED comes only from a verified source;
+        // the TMDB heuristic yields at most LIKELY. For an English-audio request we
+        // drop titles that are provably subtitle-only / no-English-audio / conflicting;
+        // likely/unknown are kept and honestly labelled (and, for a STRICT request,
+        // split out of the primary list below — never claimed as verified here).
+        const recProvider = included[0] ?? (providers ? streamingNames(providers.options)[0] ?? null : null);
+        const audio = resolveFinderAudio(id, mediaType, meta, recProvider, region);
+        if (q.englishAudioOnly) {
+          if (audio.status === 'ENGLISH_SUBTITLES_ONLY' || audio.status === 'NO_ENGLISH_AUDIO' || audio.status === 'CONFLICTING_DATA') return null;
+          receipts.push(AUDIO_STATUS_LABEL[audio.status]);
         }
         // Stream It only (our WATCH IT verdict).
         if (q.streamItOnly && report.primaryCall !== 'WATCH IT') return null;
@@ -281,12 +344,11 @@ export async function runFinder(
           if (Math.abs(p - q.pace) > 35) return null;
           receipts.push(p >= 66 ? 'fast-paced' : p <= 33 ? 'slow burn' : 'balanced pace');
         }
-        // Match threshold.
+        // Match threshold. The match score is the dominant number in the verdict
+        // panel already, so we do NOT prepend a redundant "Your NN" chip.
         if (q.minMatch != null && report.personal.score < q.minMatch) return null;
-        receipts.unshift(`${scoredFor.split(' ')[0]} ${report.personal.score}`);
 
-        const where =
-          included[0] ?? (providers ? streamingNames(providers.options)[0] ?? null : null);
+        const where = recProvider;
 
         return {
           id,
@@ -303,6 +365,11 @@ export async function runFinder(
           deciderUrl: deciderSearchUrl(meta.title, meta.year),
           ratings: tileRatingsFromScore(report.general),
           imdbId: meta.imdbId ?? null,
+          audioStatus: audio.status,
+          audioStatusLabel: AUDIO_STATUS_LABEL[audio.status],
+          audioNote: audio.note,
+          audioVerifiedAt: audio.verifiedAt,
+          audioProvider: audio.providerName,
         } as FinderItem;
       } catch {
         return null;
@@ -338,7 +405,26 @@ export async function runFinder(
     }
   }
 
-  const finalItems = items.slice(0, Math.max(1, Math.min(limit, 20)));
+  // STRICT English audio: the primary list contains ONLY verified titles; likely /
+  // unknown go into a separate possibleMatches section (never mixed, never padded).
+  let possibleMatches: FinderItem[] | undefined;
+  let verifiedAudio: FinderResult['verifiedAudio'];
+  if (q.strictEnglishAudio) {
+    const verified = items.filter((i) => i.audioStatus === 'VERIFIED_ENGLISH_AUDIO');
+    const possible = items.filter((i) => i.audioStatus === 'LIKELY_ENGLISH_AUDIO' || i.audioStatus === 'UNKNOWN');
+    verifiedAudio = { requested: limit, verifiedCount: verified.length, shortfall: verified.length < limit };
+    possibleMatches = possible.slice(0, Math.max(1, Math.min(limit, 20)));
+    items = verified; // primary = verified only
+  }
+
+  // An explicit "recommend N" caps the results at N and reports a shortfall
+  // instead of padding with weak matches.
+  const effLimit = q.count != null ? Math.max(1, Math.min(q.count, 20)) : Math.max(1, Math.min(limit, 20));
+  const requestedCount = q.count != null
+    ? { requested: q.count, returned: Math.min(items.length, effLimit), shortfall: items.length < q.count }
+    : undefined;
+
+  const finalItems = items.slice(0, effLimit);
   // Attach the real next airing (channel + time) to every TV result, so "ask for
   // a show" always shows where and when it's on. Best-effort; null when unknown.
   await Promise.all(
@@ -349,5 +435,5 @@ export async function runFinder(
       }),
   );
 
-  return { items: finalItems, scoredFor, relaxed, total: items.length };
+  return { items: finalItems, scoredFor, relaxed, total: items.length, possibleMatches, verifiedAudio, requestedCount };
 }

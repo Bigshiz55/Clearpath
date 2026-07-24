@@ -1,0 +1,62 @@
+{
+  "baseline": {
+    "label": "baseline",
+    "total": 8,
+    "passed": 1,
+    "failed": 7,
+    "criticalCounts": {
+      "seedLeak": 2,
+      "duplicate": 0,
+      "contradictionLeak": 12,
+      "hallucination": 0
+    },
+    "franchiseViolations": 3,
+    "recallMisses": 8,
+    "bySplit": {
+      "dev": {
+        "total": 6,
+        "passed": 1
+      },
+      "holdout": {
+        "total": 2,
+        "passed": 0
+      }
+    }
+  },
+  "gated": {
+    "label": "gated",
+    "total": 8,
+    "passed": 8,
+    "failed": 0,
+    "criticalCounts": {
+      "seedLeak": 0,
+      "duplicate": 0,
+      "contradictionLeak": 0,
+      "hallucination": 0
+    },
+    "franchiseViolations": 0,
+    "recallMisses": 0,
+    "bySplit": {
+      "dev": {
+        "total": 6,
+        "passed": 6
+      },
+      "holdout": {
+        "total": 2,
+        "passed": 2
+      }
+    }
+  },
+  "baselineCritical": {
+    "seedLeak": 2,
+    "duplicate": 0,
+    "contradictionLeak": 12,
+    "hallucination": 0
+  },
+  "gatedCritical": {
+    "seedLeak": 0,
+    "duplicate": 0,
+    "contradictionLeak": 0,
+    "hallucination": 0
+  }
+}

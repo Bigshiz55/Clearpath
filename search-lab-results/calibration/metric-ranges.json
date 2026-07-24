@@ -1,0 +1,26 @@
+{
+  "precision": {
+    "min": 0.792,
+    "max": 1
+  },
+  "recall": {
+    "min": 0.895,
+    "max": 1
+  },
+  "falseQualificationRate": {
+    "min": 0,
+    "max": 0.313
+  },
+  "noResultRate": {
+    "min": 0,
+    "max": 0.111
+  },
+  "criticalContradictionRate": {
+    "min": 0,
+    "max": 0.286
+  },
+  "f1": {
+    "min": 0.872,
+    "max": 0.944
+  }
+}
