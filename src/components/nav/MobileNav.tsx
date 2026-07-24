@@ -46,7 +46,7 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-ink-950/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
+      <nav data-app-bottomnav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-ink-950/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
         {primary.map((l) => (
           <Link
             key={l.href}

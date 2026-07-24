@@ -242,13 +242,23 @@ body {
   --wv-quiz-reserve: 15.5rem;
 }
 .wv-quiz-fit {
+  /* First-paint fallback — dynamic viewport minus the app chrome. JS then
+     measures the exact free space per device (see DnaQuiz useAvailableFit) and
+     overrides this, so the tile is never sized to a single "target" phone. */
   height: calc(100dvh - var(--wv-quiz-reserve) - env(safe-area-inset-top));
-  min-height: 20rem;
+  min-height: 12rem;
 }
-@media (min-width: 640px) {
-  /* On desktop the bottom nav is hidden and there's plenty of height — let the
-     tile size to its content instead of the mobile viewport calc. */
-  .wv-quiz-fit { height: auto; min-height: 0; }
+@media (min-width: 640px) and (min-height: 640px) {
+  /* True desktop (wide AND tall): no bottom nav to clear, so size to the
+     viewport with a sensible cap. A real height (not auto) lets the poster fill
+     via flex-1 instead of collapsing. JS leaves this alone. Short landscape
+     phones (wide but < 640 tall) deliberately fall through to the mobile calc
+     + the measured JS fit below, so their buttons never drop below the fold. */
+  .wv-quiz-fit {
+    height: calc(100dvh - 10rem);
+    max-height: 760px;
+    min-height: 18rem;
+  }
 }
 
 /* Four equal answer buttons. Every modifier below changes ONLY colour accents —
@@ -278,6 +288,27 @@ body {
 .wv-quiz-btn:active:not(:disabled) { transform: scale(0.97); }
 .wv-quiz-btn:disabled { opacity: 0.55; }
 .wv-quiz-btn .wv-quiz-emoji { font-size: 1.1rem; line-height: 1; }
+/* 2×2 on phones. In short landscape the four equal buttons collapse to a single
+   equal row so the whole card still fits without scrolling — never uneven. */
+.wv-quiz-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+@media (max-height: 520px) {
+  .wv-quiz-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* Narrow 4-up columns: let labels wrap to two lines and cap the font so no
+     text is ever clipped. Buttons stay equal size. */
+  .wv-quiz-btn {
+    white-space: normal;
+    overflow: visible;
+    font-size: 0.8rem;
+    gap: 0.3rem;
+    line-height: 1.05;
+    padding: 0.25rem 0.4rem;
+  }
+  .wv-quiz-btn .wv-quiz-emoji { font-size: 1rem; }
+}
 .wv-quiz-btn--loved    { border-color: rgba(244, 63, 94, 0.55);  background: rgba(244, 63, 94, 0.12); }
 .wv-quiz-btn--liked    { border-color: rgba(16, 185, 129, 0.55); background: rgba(16, 185, 129, 0.12); }
 .wv-quiz-btn--disliked { border-color: rgba(245, 158, 11, 0.55); background: rgba(245, 158, 11, 0.12); }

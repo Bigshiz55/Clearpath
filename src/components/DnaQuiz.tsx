@@ -103,6 +103,43 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
   const history = useRef<{ eventId: string; idx: number; wasRated: boolean }[]>([]);
   const seen = useRef<Set<string>>(new Set((items ?? []).map((i) => `${i.mediaType}-${i.id}`)));
   const fetching = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Measured, device-agnostic fit. Rather than sizing the tile to any target
+  // phone, we let the CSS dvh fallback lay it out, then correct the tile height
+  // by exactly the document's overflow (shrink) or slack (grow) so the WHOLE
+  // interaction fits the *actual* viewport — every iPhone, safe areas, and
+  // Safari's collapsing chrome (via visualViewport) all handled the same way.
+  // Only the poster shrinks (min-h-0); the buttons never leave the screen.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof window === 'undefined') return;
+    const fit = () => {
+      // Only true desktop (wide AND tall) uses the CSS height untouched; short
+      // landscape phones still get the measured fit so buttons stay on screen.
+      if (window.innerWidth >= 640 && window.innerHeight >= 640) { el.style.height = ''; el.style.minHeight = ''; return; }
+      el.style.minHeight = '0';
+      el.style.height = ''; // reset to the CSS dvh baseline before measuring
+      const vpH = window.visualViewport?.height ?? window.innerHeight;
+      const overflow = document.documentElement.scrollHeight - Math.round(vpH);
+      const base = el.getBoundingClientRect().height;
+      // 160px keeps the four buttons + title + progress on screen no matter what;
+      // beyond that only the artwork gives way.
+      el.style.height = `${Math.max(140, Math.round(base - overflow))}px`;
+    };
+    fit();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', fit);
+    vv?.addEventListener('scroll', fit);
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', fit);
+    return () => {
+      vv?.removeEventListener('resize', fit);
+      vv?.removeEventListener('scroll', fit);
+      window.removeEventListener('resize', fit);
+      window.removeEventListener('orientationchange', fit);
+    };
+  }, [idx, loading, failed, dry]);
 
   const fetchBatch = useCallback(async () => {
     if (items || fetching.current || dry) return;
@@ -216,7 +253,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
   }
 
   return (
-    <div className="wv-quiz-fit mx-auto flex w-full max-w-md flex-col gap-2" data-testid="dna-quiz">
+    <div ref={rootRef} className="wv-quiz-fit mx-auto flex w-full max-w-md flex-col gap-2" data-testid="dna-quiz">
       {/* 1 · Compact progress + Undo (one line) */}
       <div className="flex items-center justify-between gap-2 text-xs">
         <span className="truncate font-semibold text-slate-300" data-testid="quiz-stage">
@@ -278,7 +315,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
       </div>
 
       {/* 4 · Four equal buttons — 2×2 grid, single-tap records the opinion */}
-      <div className="grid shrink-0 grid-cols-2 gap-2" data-testid="quiz-grid" role="group" aria-label="Rate this title">
+      <div className="wv-quiz-grid shrink-0" data-testid="quiz-grid" role="group" aria-label="Rate this title">
         {CHOICES.map((c) => (
           <button
             key={c.key}

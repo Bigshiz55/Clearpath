@@ -55,6 +55,7 @@ export function DnaQuizHarness() {
 
       {/* Mock fixed bottom nav — same height/position/reserve as the real one */}
       <nav
+        data-app-bottomnav
         className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-ink-950/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden"
         data-testid="mock-bottomnav"
       >

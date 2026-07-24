@@ -161,3 +161,37 @@ for (const { w, h } of TARGETS) {
     await page.screenshot({ path: path.join(SHOTS, `dna-quiz-${w}x${h}.png`), fullPage: false });
   });
 }
+
+// ── Landscape must degrade gracefully: four equal buttons stay on screen ─────
+const LANDSCAPE = [
+  { w: 667, h: 375 },
+  { w: 844, h: 390 },
+  { w: 932, h: 430 },
+];
+for (const { w, h } of LANDSCAPE) {
+  test(`(landscape) ${w}×${h} — four equal buttons on screen, no horizontal overflow`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto('/dev/dna-quiz', { waitUntil: 'networkidle' });
+    await expect(page.getByTestId('dna-quiz')).toBeVisible();
+
+    const doc = await page.evaluate(() => ({
+      sw: document.documentElement.scrollWidth,
+      cw: document.documentElement.clientWidth,
+    }));
+    expect(doc.sw, `no horizontal overflow @ landscape ${w}×${h}`).toBeLessThanOrEqual(doc.cw + 1);
+
+    const boxes = [] as { w: number; h: number }[];
+    for (const id of RATE_IDS) {
+      const b = await box(page, id);
+      boxes.push({ w: Math.round(b.width), h: Math.round(b.height) });
+      expect(b.height, `${id} ≥48px @ landscape ${w}×${h}`).toBeGreaterThanOrEqual(48);
+      expect(b.y + b.height, `${id} visible (not below fold) @ landscape ${w}×${h}`).toBeLessThanOrEqual(h + 1);
+    }
+    const widths = boxes.map((b) => b.w);
+    const heights = boxes.map((b) => b.h);
+    expect(Math.max(...widths) - Math.min(...widths), `equal widths @ landscape ${w}×${h}`).toBeLessThanOrEqual(1);
+    expect(Math.max(...heights) - Math.min(...heights), `equal heights @ landscape ${w}×${h}`).toBeLessThanOrEqual(1);
+
+    await page.screenshot({ path: path.join(SHOTS, `dna-quiz-landscape-${w}x${h}.png`), fullPage: false });
+  });
+}
