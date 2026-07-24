@@ -5,6 +5,9 @@ import { getWatchStats } from '@/lib/watchStats';
 import { getUserDimensionProfile } from '@/lib/titleDimensions';
 import { describePersonality } from '@/lib/scoring/personality';
 import { dnaStrength, tasteDials } from '@/lib/scoring/dimensions';
+import { loadDnaConfidence } from '@/lib/preference/dnaSignals';
+import { loadEvalRows } from '@/lib/reco/store';
+import { accuracyReport } from '@/lib/reco/accuracy';
 import { FOUNDERS, type FounderKey } from './access';
 import { listSessions } from './sessions';
 import { activeSession } from './sessionModel';
@@ -25,11 +28,16 @@ export interface FounderSnapshot {
   provisioned: boolean; // that email maps to a real auth account
   rated: number;
   strength: number;
+  /** Watch DNA Confidence (0..100), account-level. */
+  confidence: number;
   personaTitle: string | null;
   topLeans: string[];
   sessionCount: number;
   activeSessions: number;
   lastActiveAt: number | null;
+  /** Recommendation accuracy over logged outcomes (null until enough data). */
+  recAccuracy: number | null;
+  recSamples: number;
 }
 
 /** email(lowercased) → auth user id, by paging the admin user list. */
@@ -73,21 +81,29 @@ export async function resolveFounderSnapshots(): Promise<FounderSnapshot[]> {
       try {
         const stats = await getWatchStats(admin, userId).catch(() => null);
         const rated = stats?.rated ?? 0;
-        const profile = await getUserDimensionProfile(admin, userId, rated).catch(() => null);
-        const sessions = await listSessions(admin, userId, f.key).catch(() => []);
+        const [profile, sessions, conf, evalRows] = await Promise.all([
+          getUserDimensionProfile(admin, userId, rated).catch(() => null),
+          listSessions(admin, userId, f.key).catch(() => []),
+          loadDnaConfidence(admin, userId).then((r) => r.confidence.percent).catch(() => 0),
+          loadEvalRows(admin, { userId, limit: 2000 }).catch(() => []),
+        ]);
         const persona = profile ? describePersonality(profile) : null;
         const dials = profile ? tasteDials(profile, 4) : [];
         const active = activeSession(sessions);
+        const report = accuracyReport(evalRows, { minSamples: 10 });
         return {
           ...base,
           provisioned: true,
           rated,
           strength: profile ? dnaStrength(profile) : 0,
+          confidence: conf,
           personaTitle: (profile?.samples ?? 0) >= 3 && persona ? persona.title : null,
           topLeans: dials.map((d) => d.lean),
           sessionCount: sessions.length,
           activeSessions: sessions.filter((s) => s.status === 'active').length,
           lastActiveAt: active?.lastActiveAt ?? (sessions[0]?.lastActiveAt ?? null),
+          recAccuracy: report.overall.reliable ? Math.round(report.overall.accuracy * 100) : null,
+          recSamples: report.overall.n,
         };
       } catch {
         return { ...base, provisioned: true };
@@ -105,10 +121,13 @@ function baseSnapshot(key: FounderKey, name: string, email: string | null, provi
     provisioned,
     rated: 0,
     strength: 0,
+    confidence: 0,
     personaTitle: null,
     topLeans: [],
     sessionCount: 0,
     activeSessions: 0,
     lastActiveAt: null,
+    recAccuracy: null,
+    recSamples: 0,
   };
 }

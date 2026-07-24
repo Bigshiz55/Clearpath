@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { isAdminEmail } from '@/lib/admin';
 import { resolveFounderSnapshots, type FounderSnapshot } from '@/lib/founder/directory';
 import { founderByKey } from '@/lib/founder/access';
+import { pairwiseOverlaps } from '@/lib/founder/founderCompare';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -51,6 +52,8 @@ export default async function FounderComparisonPage() {
           ))}
         </div>
 
+        <DnaOverlap snapshots={snapshots} />
+
         <p className="mt-6 text-center text-[11px] text-slate-500">
           Snapshots reflect current stored DNA. &ldquo;Not provisioned&rdquo; means the founder email isn&rsquo;t linked
           to a real sign-in account yet.
@@ -74,9 +77,11 @@ function FounderColumn({ s }: { s: FounderSnapshot }) {
 
       {s.provisioned ? (
         <dl className="mt-4 space-y-3">
+          <Metric label="DNA Confidence" value={`${s.confidence}%`} />
           <Metric label="Persona" value={s.personaTitle ?? 'Forming…'} />
           <Metric label="DNA strength" value={String(s.strength)} />
           <Metric label="Titles rated" value={String(s.rated)} />
+          <Metric label="Rec accuracy" value={s.recAccuracy != null ? `${s.recAccuracy}% (n=${s.recSamples})` : `— (n=${s.recSamples})`} />
           <Metric label="Sessions" value={`${s.activeSessions} active · ${s.sessionCount} total`} />
           {s.topLeans.length > 0 && (
             <div>
@@ -124,5 +129,38 @@ function Metric({ label, value }: { label: string; value: string }) {
         {value}
       </dd>
     </div>
+  );
+}
+
+/** Pairwise DNA overlap + differences across the provisioned founders. */
+function DnaOverlap({ snapshots }: { snapshots: FounderSnapshot[] }) {
+  const provisioned = snapshots.filter((s) => s.provisioned && s.topLeans.length > 0);
+  if (provisioned.length < 2) return null;
+  const nameOf = (key: string) => founderByKey(key as FounderSnapshot['key']).name;
+  const pairs = pairwiseOverlaps(provisioned.map((s) => ({ key: s.key, leans: s.topLeans })));
+
+  return (
+    <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
+      <h2 className="text-lg font-bold">DNA overlap &amp; differences</h2>
+      <p className="mt-1 text-sm text-slate-400">
+        How much each founder&rsquo;s learned taste leans overlap — proving the profiles are genuinely distinct, not
+        shared.
+      </p>
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {pairs.map((p) => (
+          <div key={`${p.aKey}-${p.bKey}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-white">{nameOf(p.aKey)} ↔ {nameOf(p.bKey)}</span>
+              <span className="text-sm font-black tabular-nums text-brand-200">{Math.round(p.overlap.jaccard * 100)}%</span>
+            </div>
+            <div className="mt-2 space-y-1 text-[11px]">
+              <div><span className="text-emerald-300">Shared:</span> <span className="text-slate-300">{p.overlap.shared.join(', ') || 'none'}</span></div>
+              <div><span className="text-slate-400">Only {nameOf(p.aKey)}:</span> <span className="text-slate-300">{p.overlap.onlyA.join(', ') || '—'}</span></div>
+              <div><span className="text-slate-400">Only {nameOf(p.bKey)}:</span> <span className="text-slate-300">{p.overlap.onlyB.join(', ') || '—'}</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
