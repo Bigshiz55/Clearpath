@@ -1,9 +1,11 @@
 # Verdict Growth OS — The Decision Engine
 
-**Status:** agreed architecture, pre-Phase-2. This document is the contract the
-Phase 2 build follows. It supersedes the "nine modules" framing in the original
-`ARCHITECTURE.md`; those modules survive as *views over one ledger*, not as
-independent systems.
+**Status:** **FROZEN operating-model candidate**, pre-Phase-2. This document is the
+contract the Phase 2 build follows. It supersedes the "nine modules" framing in the
+original `ARCHITECTURE.md`; those modules survive as *views over one ledger*, not as
+independent systems. Extended by ADR-004 (reversibility), ADR-005 (decision
+classes), ADR-006 (learning value + multi-constraint portfolio) — see §9–§12. The
+recommendation to freeze is in §13.
 
 ---
 
@@ -132,9 +134,20 @@ Staff four, stub the rest. Capability for 11; headcount for 4.
 
 **Budget competition = a capital market.** Each cycle, a resource pool (cash,
 capacity, founder attention, risk, reputation) is allocated by one constrained
-optimizer maximizing Σ ΔEV. Outcomes update each seat's **credibility weight**
-(calibration-adjusted); chronic over-promisers get their future estimates shrunk
-toward priors. Nobody argues — the track record reprices proposals.
+optimizer maximizing Σ **TotalValue** (§12, not just ΔEV). Outcomes update each
+seat's **credibility weight** (calibration-adjusted); chronic over-promisers get
+their future estimates shrunk toward priors. Nobody argues — the track record
+reprices proposals.
+
+**Responsibility deltas from the value-function additions (§9–§12):**
+- **CDS (Data Science)** owns learning-value/EVOI estimation, belief
+  recalibration, and the calibration curve (are our confidences honest?).
+- **CFO** owns the constraint budgets — including **founder attention** and the
+  **irreversible-risk cap** — and the explore quota's cash line.
+- **CEO** owns the composite-objective weights and risk appetite (set with CDS),
+  and assigns each decision's **class** (ADR-005) and reversibility bar.
+- **Every seat's scorecard** now also grades calibration of its confidence and
+  reversibility estimates, not just realized ΔEV.
 
 ---
 
@@ -201,3 +214,85 @@ no money movement. The moat is the **calibrated value model + the event ledger +
 the belief store** — those are cheap to build now and make agents cheap to add
 later. Everything else is deferred to the roadmap in `docs/ROADMAP.md` and
 sequenced in `docs/PHASE_2_MIGRATION_PLAN.md`.
+
+---
+
+## 9. Decision reversibility (ADR-004)
+
+Every Decision carries a reversibility level — `easy_to_reverse`, `moderate_cost`,
+`difficult`, `nearly_irreversible` — backed by a continuous `cost_to_reverse`.
+Reversibility changes the ranking three ways:
+
+```
+downsideRisk = P(bad_outcome) × cost_to_reverse
+riskAdjEV    = EV_base × confidence − downsideRisk          (irreversible costs more)
+optionValue  = uncertainty × upsideRetained × (1 − reverseFriction)
+               (reversible + uncertain = a cheap call option → positive)
+```
+
+Plus a **portfolio cap on concurrent one-way doors** (risk budget). Net effect:
+between two equal-EV actions, the more reversible one wins; reversible bets clear a
+lower evidence bar, so the company runs more of them and learns faster.
+
+## 10. Decision classes (ADR-005)
+
+Every Decision is tagged **A (strategic) · B (product) · C (growth experiment) ·
+D (learning investment)**. Class is largely implied by reversibility + primary value
+source, and each class has a default governance policy (approval, evidence bar,
+acceptable uncertainty, review cadence, rollback expectation, measurement period)
+stored in `decision_class_policies`. Governance is proportional: founder attention
+goes to A/B; C/D run fast on thin evidence. Default-deny still holds — classes set
+*how much* process, never *whether* an externally-visible action needs approval.
+
+## 11. Learning value (ADR-006)
+
+Learning value is **expected value of information, in dollars**:
+
+```
+LearningValue = Σ_{future decisions f that depend on what this reveals}
+                  P(result flips f) × |ΔEV swing of f| × time_discount
+```
+
+It only counts if it would **change a future decision** — interesting-but-inert
+information scores zero. Class D decisions are ranked primarily on it; a negative
+direct ΔEV is acceptable when learning value clears the cost (the Meta paid test).
+Growth Science recalibrates versioned belief distributions after each experiment
+(prior → measure → Bayesian posterior → re-price ledger → update base-rates, class
+priors, exec credibility, and the calibration curve).
+
+## 12. The CEO portfolio — maximize long-term value, not EV
+
+```
+maximize  Σ TotalValue(d),  TotalValue = riskAdjEV + LearningValue + optionValue + strategicValue
+subject to:  cash ≤ budget · eng_days ≤ capacity · founder_attention ≤ capacity
+             · irreversible_risk ≤ risk budget · dependencies · funnel diversification
+             · RESERVE an explore quota for Class C/D · blend short/long horizon
+```
+
+The explore reserve, the learning-value term, and strategic/durability weighting are
+what turn "maximize EV" into "maximize long-term company value." **Implementation is
+one composite scalar + three hard constraints + one reserve — not a Pareto solver**
+(§13). Weights are Growth-Science-tunable, never frozen constants.
+
+## 13. Freeze recommendation
+
+**Recommendation: FREEZE the operating model now, with two riders.**
+
+Freeze the *structure* — the pipeline, the Decision envelope (EV, confidence, risk,
+reversibility, class, learning value), the four classes, the composite objective and
+its constraint set, the event/belief substrate, and the safety invariants (§7). This
+model has converged: the last three additions are refinements of the *value function*
+and *governance metadata*, not new architecture, and each slots into the existing
+envelope and portfolio selector.
+
+- **Rider 1 — freeze structure, not numbers.** All coefficients (risk penalties,
+  learning-value and strategic weights, class thresholds, reversibility costs) are
+  Growth-Science-tunable parameters in `beliefs`, not frozen constants.
+- **Rider 2 — freeze only what Phase 2 needs.** The multi-product allocator, async
+  execution, and the additional executive seats stay explicitly out of the freeze
+  and deferred to the roadmap.
+
+Further pre-implementation design would now be speculative — itself a form of
+over-engineering. The highest-value next act is to **build Phase 2 steps 1–2**
+(event log + belief store, then calibrate the KPI value graph on WV's real funnel)
+and let measured results, not more design, drive the next changes.

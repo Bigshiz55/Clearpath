@@ -31,22 +31,35 @@ No existing table is dropped in Phase 2; the current tests stay green throughout
 | scheduled_jobs, job_runs | **keep** | Job runner substrate; `job_runs` already has idempotency + cost. |
 | audit_events | **keep → projection** | Becomes a read projection of the new `events` log. |
 
-### Net-new tables required (16)
+### Net-new tables required (17)
 
 Event core: **events**, **outbox**.
 Value model: **kpi_nodes**, **kpi_edges**, **beliefs**.
-Decisioning: **signals**, **plays**, **decisions**, **decision_dependencies**.
+Decisioning: **signals**, **plays**, **decisions**, **decision_dependencies**,
+**decision_class_policies** (ADR-005 governance-as-data).
 Executives/allocation: **executives**, **resource_pools**, **budget_cycles**, **capital_allocations**, **exec_scorecards**, **credibility_weights**.
 Execution/learning: **execution_tasks**, **measurements**, **attributions**, **engine_runs**.
 
 ### Columns added to existing tables
 - `decisions` (new) carries the full envelope: `ev_conservative/ev_base/ev_optimistic`,
-  `confidence`, `effort_eng_days`, `cash_cost_usd`, `risk`, `kpi_node_id`,
-  `time_to_impact_days`, `impact_half_life_days`, `automatable`,
-  `requires_approval`, `reversibility`, `pathway_acquisition/retention/revenue`
-  (check: sum = 1), `option_value_usd`, `strategic_uncertainty_resolved`,
+  `confidence`, `effort_eng_days`, `founder_attention_cost`, `cash_cost_usd`, `risk`,
+  `kpi_node_id`, `time_to_impact_days`, `impact_half_life_days`, `automatable`,
+  `requires_approval`, `pathway_acquisition/retention/revenue` (check: sum = 1),
   `owning_executive_id`, `resource_pool_id`, `evidence jsonb`, `assumptions jsonb`,
-  `provenance jsonb`, `status`, `play_id`, `signal_id`.
+  `uncertainty jsonb`, `provenance jsonb`, `status`, `play_id`, `signal_id`,
+  and the value-function additions (ADR-004/005/006):
+  `decision_class` (A/B/C/D), `reversibility` (4-level),
+  `cost_to_reverse_usd`, `prob_bad_outcome`, `downside_risk_usd` (derived),
+  `option_value_usd`, `learning_value_usd`, `strategic_value_usd`,
+  `total_value_usd` (derived = riskAdjEV + learning + option + strategic).
+- `decision_class_policies` — per-class defaults: approval, evidence bar,
+  acceptable uncertainty, review cadence, rollback expectation, measurement period.
+- `resource_pools` gains a `founder_attention` pool and an `irreversible_risk` cap;
+  `budget_cycles` gains `explore_quota`.
+- `beliefs` also stores the tunable value-function coefficients (risk penalties,
+  learning/strategic weights, class thresholds) — frozen-structure / tunable-numbers.
+- `measurements`/`experiments` add `parameter_targeted`, `prior_belief_id`,
+  `posterior_belief_id`, `predicted_learning_value`, `realized_learning_value`.
 - `approvals.decision_id`, `experiments.decision_id`/`kpi_node_id`/`verdict`,
   `observations.kpi_node_id`, `products.north_star_metric`/`enterprise_value_multiplier`.
 
@@ -67,13 +80,16 @@ a projection.
 base-rates, per-channel CAC). Seed WV nodes from the funnel; port the preview
 value model (`src/lib/decision-preview/kpiGraph.ts`) into the real graph.
 
-**0004_decisions.sql** — `plays` (Playbook), `signals`, `decisions` (full
-envelope), `decision_dependencies`. Backfill `decisions` from `recommendations` +
-`opportunities`. Point the Decision Engine at real signals. `opportunities`
-becomes a source-type; keep as legacy view.
+**0004_decisions.sql** — `plays` (Playbook), `signals`, `decisions` (full envelope
+incl. `decision_class`, `reversibility`, `cost_to_reverse_usd`, `learning_value_usd`,
+`option_value_usd`, `strategic_value_usd`, `total_value_usd`), `decision_dependencies`,
+`decision_class_policies` (seed the A/B/C/D defaults from ADR-005). Backfill
+`decisions` from `recommendations` + `opportunities`. Point the Decision Engine at
+real signals. `opportunities` becomes a source-type; keep as legacy view.
 
 **0005_executives.sql** — `executives` (mandate = KPI-node set, team, scorecard),
-`resource_pools`, `budget_cycles`, `capital_allocations`, `exec_scorecards`,
+`resource_pools` (incl. `founder_attention` + `irreversible_risk` cap),
+`budget_cycles` (incl. `explore_quota`), `capital_allocations`, `exec_scorecards`,
 `credibility_weights`. Add `owning_executive_id`/`resource_pool_id` to `decisions`.
 Seed the four live seats (CPO, CGO, CDS, CFO-as-constraint).
 

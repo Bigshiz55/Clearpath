@@ -2,16 +2,29 @@
 
 v1 delivered the disciplined foundation: pure decision engine, adapters with
 mocks, full schema, seeded command center, approval workflow, and safety
-controls. The following phases turn mocks into reality — each independently
-gated by credentials + explicit approval.
+controls. The operating model is now a **frozen candidate** (`docs/DECISION_ENGINE.md`
+§13; ADR-001→006). The following phases turn mocks into reality — each
+independently gated by credentials + explicit approval.
 
-## Phase 2 — Persistence & auth (no external providers yet)
-- Stand up a **dedicated** Supabase project (separate from WV/RV).
-- Run `0001_init.sql`; swap `src/lib/store.ts` internals for Supabase queries
-  (function signatures already match — UI/engine untouched).
-- Wire authentication (`supabase.auth.getUser()`), RLS policies, and the
-  `roles`/`permissions` model. Writes remain service-role for OS jobs.
-- Seed the DB from `src/lib/seed` with `is_demo = true`.
+## Phase 2 — Decision Engine core + persistence (no external providers yet)
+Sequenced in `docs/PHASE_2_MIGRATION_PLAN.md §4`. In strict order:
+- **Event log + belief store** (`events`, `beliefs`) — the durable substrate.
+- **Calibrate the KPI value graph** on WV's real funnel (free-to-paid + LTV) —
+  the single highest-leverage task; it dominates every ΔEV.
+- **`decisions` ledger** — collapse `recommendations`/`opportunities`; land the
+  full envelope including **reversibility, decision class, and a placeholder
+  learning value** (ADR-004/005/006). Reversibility penalty + class policies ship
+  in this first cut; full EVOI learning value arrives with the calibration loop.
+- **Portfolio selector + CEO morning brief** — the composite objective
+  (riskAdjEV + learning + option + strategic) under the constraint set + explore
+  reserve. One scalar + three constraints + one reserve — no Pareto solver.
+- **Growth Science calibration loop** — `measurements` → `attributions` →
+  Bayesian `beliefs` update → re-price; this activates real learning value.
+- Stand up a **dedicated** Supabase project (separate from WV/RV); run migrations
+  `0001`→`0007`; swap `src/lib/store.ts` internals for Supabase (signatures match);
+  wire auth + RLS + `roles`/`permissions`; writes stay service-role.
+- Promote `src/lib/decision-preview/*` to `src/lib/decision-engine/*`, now reading
+  tunable coefficients from `beliefs` instead of hard-coded seed anchors.
 
 ## Phase 3 — Read-only real signals
 - **Analytics adapter (live)**: real funnel events for both products. Flip mode
