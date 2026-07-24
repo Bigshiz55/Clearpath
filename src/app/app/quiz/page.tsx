@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
-import { QuizModes } from '@/components/QuizModes';
+import { DnaQuiz } from '@/components/DnaQuiz';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'Complete My Case File · WatchVerdict',
+  title: 'Build your Watch DNA · WatchVerdict',
 };
 
 export default async function QuizPage() {
@@ -22,14 +22,14 @@ export default async function QuizPage() {
 
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="text-2xl font-bold text-white sm:text-3xl">🗂️ Complete My Case File</h1>
+      <h1 className="text-2xl font-bold text-white sm:text-3xl">🧬 Build your Watch DNA</h1>
       <p className="mt-2 text-sm text-slate-400">
-        A guided assessment for more accurate recommendations — about 5 minutes, and you can update it anytime.
-        A poster pops up: call it <span className="font-semibold text-emerald-200">Yes</span>,{' '}
-        <span className="font-semibold text-red-200">No</span>, <span className="font-semibold text-amber-200">Maybe</span>, or
-        Haven’t seen. Every 30 recalculates your algorithm.
+        Have you seen it? If so, how was it? Every answer sharpens your recommendations — and
+        “haven’t seen it” never counts against you. Stop anytime; update it whenever.
       </p>
-      <QuizModes totalRated={totalRated} />
+      <div className="mt-5">
+        <DnaQuiz totalRated={totalRated} />
+      </div>
     </div>
   );
 }

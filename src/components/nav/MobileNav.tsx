@@ -16,6 +16,15 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const secondaryActive = secondary.some((l) => isActive(l.href));
 
+  // Short labels so six tabs stay legible and un-wrapped at 320px.
+  const SHORT: Record<string, string> = {
+    '/app': 'Home',
+    '/app/watch': 'Watch',
+    '/app/new': 'New',
+    '/app/tv': 'On TV',
+    '/app/watchlist': 'Saved',
+  };
+
   return (
     <>
       {open && (
@@ -42,18 +51,19 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
           <Link
             key={l.href}
             href={l.href}
-            className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-1 text-[11px] ${isActive(l.href) ? 'font-semibold text-brand-200' : 'text-slate-300'}`}
+            aria-current={isActive(l.href) ? 'page' : undefined}
+            className={`flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1 text-[11px] leading-none ${isActive(l.href) ? 'font-semibold text-brand-200' : 'text-slate-300'}`}
           >
-            {l.label}
+            <span className="whitespace-nowrap">{SHORT[l.href] ?? l.label}</span>
           </Link>
         ))}
         <button
           onClick={() => setOpen((v) => !v)}
-          className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-1 text-[11px] ${open || secondaryActive ? 'font-semibold text-brand-200' : 'text-slate-300'}`}
+          className={`flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1 text-[11px] leading-none ${open || secondaryActive ? 'font-semibold text-brand-200' : 'text-slate-300'}`}
           aria-haspopup="menu"
           aria-expanded={open}
         >
-          More
+          <span className="whitespace-nowrap">More</span>
         </button>
       </nav>
     </>

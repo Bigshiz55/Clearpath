@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:mobile": "playwright test --config playwright.mobile.config.ts",
     "eval:selftest": "vitest run eval",
     "eval:watchverdict": "node eval/cli.mjs",
     "eval:watchverdict:smoke": "node eval/cli.mjs smoke",
@@ -42,6 +43,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^20.14.10",
     "@types/pg": "^8.20.0",
     "@types/qrcode": "^1.5.6",

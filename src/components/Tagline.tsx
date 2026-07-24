@@ -13,16 +13,7 @@ export function Tagline({ className = '' }: { className?: string }) {
       <span aria-hidden>
         <span className="text-slate-400">Thousands of choices, </span>
         <span className="whitespace-nowrap text-white">one </span>
-        <span className="inline-block whitespace-nowrap font-black text-[#ff1493]">
-          VERD
-          <span className="wv-iflip">
-            <span className="wv-iflip-inner">
-              <span className="wv-iflip-face">I</span>
-              <span className="wv-iflip-face wv-iflip-back">1</span>
-            </span>
-          </span>
-          CT
-        </span>
+        <span className="inline-block whitespace-nowrap font-black text-[#ff1493]">VERDICT</span>
       </span>
     </p>
   );

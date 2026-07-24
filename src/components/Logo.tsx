@@ -54,19 +54,11 @@ export function Logo({
     <Link href={href} className="group inline-flex items-center gap-2.5">
       <LogoMark box={box} inner={inner} />
       {!compact && (
+        // Solid, single-run wordmark. No per-letter animation or fixed-width
+        // slot — the previous 3D "I→1" flip collapsed to an empty gap on iOS
+        // Safari and read as "WatchVERD_CT". It must ALWAYS render "WatchVERDICT".
         <span className={`whitespace-nowrap font-bold tracking-tight text-white ${word}`}>
-          Watch
-          <span className="text-[#ff1493]" aria-hidden>
-            VERD
-            <span className="wv-iflip">
-              <span className="wv-iflip-inner">
-                <span className="wv-iflip-face">I</span>
-                <span className="wv-iflip-face wv-iflip-back">1</span>
-              </span>
-            </span>
-            CT
-          </span>
-          <span className="sr-only">Verdict</span>
+          Watch<span className="text-[#ff1493]">VERDICT</span>
         </span>
       )}
     </Link>

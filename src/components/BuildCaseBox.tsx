@@ -12,19 +12,18 @@ import { useToast } from '@/components/Toast';
  * watch a title, something on a service, what's coming on) to the right screen.
  * (The title-by-title Mentalist is still one tap away.)
  */
-// The kinds of things you can ask — one per router capability. Tapping a chip
-// drops the example into the box so it's obvious what VERD1CT can do. The live-TV
-// listing asks are first so it's clear we know what's actually on right now.
-// The most common things people ask — broad, mainstream, and each one shows off
-// a different engine trick (live listings, time window, where-to-watch, a
-// service, a genre, an occasion). Not tuned to any one person's taste.
-const EXAMPLES: { hint: string; text: string }[] = [
-  { hint: '📺 What’s on TV tonight', text: 'What’s on TV tonight?' },
-  { hint: '▶️ Best movies on Netflix', text: 'The best movies on Netflix right now' },
-  { hint: '🔎 Where can I stream Barbie?', text: 'Where can I stream Barbie?' },
-  { hint: '⏱️ Movies on in the next 2 hours', text: 'Movies coming on in the next 2 hours' },
-  { hint: '👻 A really good scary movie', text: 'A really good scary movie' },
-  { hint: '👨‍👩‍👧 Family movie night', text: 'A great family movie for tonight' },
+// Chips: the first three are shown up front (mobile-clean); the rest reveal on
+// "More ideas". Each `text` is the full query dropped into the box; `hint` is the
+// short chip label. Kept broad and mainstream — not tuned to one person's taste.
+const PRIMARY_EXAMPLES: { hint: string; text: string }[] = [
+  { hint: 'What’s on TV tonight?', text: 'What’s on TV tonight?' },
+  { hint: 'Best movies on Netflix', text: 'The best movies on Netflix right now' },
+  { hint: 'Family movie night', text: 'A great family movie for tonight' },
+];
+const MORE_EXAMPLES: { hint: string; text: string }[] = [
+  { hint: 'Where can I stream Barbie?', text: 'Where can I stream Barbie?' },
+  { hint: 'On in the next 2 hours', text: 'Movies coming on in the next 2 hours' },
+  { hint: 'A really good scary movie', text: 'A really good scary movie' },
 ];
 
 export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
@@ -32,12 +31,24 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   const toast = useToast();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const lastCase = useRef<{ id: string | null; at: number }>({ id: null, at: 0 });
 
+  function fill(t: string) {
+    setText(t);
+    boxRef.current?.focus();
+  }
+
   async function submit() {
     const t = text.trim();
-    if (t.length < 4 || busy) return;
+    if (busy) return;
+    // Never a dead-looking button: an empty tap just guides the user to the box.
+    if (t.length < 4) {
+      boxRef.current?.focus();
+      toast.show('Tell us a little more — a few words is enough.', 'info');
+      return;
+    }
     setBusy(true);
     try {
       // A resubmit within 90s is a likely rephrase → a weak "that missed" label
@@ -56,13 +67,11 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
       // If the case included an actionable ask (e.g. "coming on in the next 12
       // hours" or "something on Netflix"), the server routes us to the right
       // screen. `stay` = a lookup that found nothing — keep them here with the note.
-      // On a routing moment, pop the ruling dead-center in pink (the gavel is
-      // baked into that toast); a stay-put build gets the quiet bottom toast.
       if (typeof d.redirect === 'string') {
         toast.show(d.summary || 'Pulling your ruling…', 'verdict');
         router.push(d.redirect);
       } else {
-        toast.show(d.summary ? `⚖️ ${d.summary}` : 'Got it — building your VERD1CT DNA. 🧬', 'success');
+        toast.show(d.summary ? `⚖️ ${d.summary}` : 'Got it — building your VERDICT DNA. 🧬', 'success');
         if (!d.stay) router.push('/app/watch');
       }
     } catch {
@@ -73,67 +82,77 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   }
 
   return (
-    <div
-      className={
-        hero
-          ? 'mx-auto max-w-2xl rounded-3xl border-2 border-brand-400/50 bg-gradient-to-br from-brand-500/20 via-fuchsia-500/10 to-transparent p-5 shadow-[0_16px_50px_-16px_rgba(236,72,153,0.55)] sm:p-6'
-          : 'mx-auto max-w-2xl rounded-2xl border border-brand-400/40 bg-gradient-to-r from-brand-500/15 via-fuchsia-500/10 to-transparent p-4'
-      }
-    >
-      <div className="flex items-start gap-3">
-        <span className={hero ? 'text-3xl' : 'text-2xl'} aria-hidden>⚖️</span>
-        <div className="min-w-0">
-          <div className={hero ? 'text-xl font-black text-white sm:text-2xl' : 'text-base font-extrabold text-white sm:text-lg'}>State Your Case</div>
-          <div className={hero ? 'text-sm font-medium text-slate-100 sm:text-base' : 'text-sm text-slate-300'}>
-            Describe your taste — or ask for something specific: what’s on <span className="font-semibold text-white">live TV</span>, <span className="font-semibold text-white">where to stream</span> a title, or what’s good <span className="font-semibold text-white">on a service</span>.
-          </div>
-          <Link href="/app/mentalist" className={`mt-1.5 inline-block font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline ${hero ? 'text-sm' : 'text-xs'}`}>
-            Or just name a few shows you love — we’ll figure out your taste →
-          </Link>
-        </div>
+    <div data-testid="statecase-card" className="mx-auto max-w-2xl rounded-2xl border border-brand-400/40 bg-gradient-to-br from-brand-500/15 via-fuchsia-500/10 to-transparent p-4 shadow-[0_12px_40px_-16px_rgba(236,72,153,0.45)] sm:p-5">
+      {/* Title + one concise supporting line (max two lines). */}
+      <div className="flex items-center gap-2.5">
+        <span className={hero ? 'text-2xl' : 'text-xl'} aria-hidden>⚖️</span>
+        <h2 className={hero ? 'text-lg font-black text-white sm:text-2xl' : 'text-base font-extrabold text-white sm:text-lg'}>State Your Case</h2>
       </div>
+      <p className="mt-1 text-sm leading-snug text-slate-300">
+        Describe what you want, or name a few shows and movies you love.
+      </p>
 
-      {/* Tappable examples — one per kind of question, so the range is obvious.
-          Live-TV listings lead so it's clear we show what's actually on. */}
-      <div className="mt-3">
-        <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Try one — tap to fill</div>
-        <div className="flex flex-wrap gap-1.5">
-          {EXAMPLES.map((ex) => (
-            <button
-              key={ex.hint}
-              type="button"
-              onClick={() => { setText(ex.text); boxRef.current?.focus(); }}
-              className="rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white"
-            >
-              {ex.hint}
-            </button>
-          ))}
-        </div>
-      </div>
-
+      {/* Textarea — the primary action. ~110px tall, strong border + focus ring. */}
       <textarea
         ref={boxRef}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}
-        rows={3}
         aria-label="Describe what you like to watch"
-        placeholder="e.g. I love clever comedies and thrillers with a twist — but nothing too slow or gory."
-        className={
-          hero
-            ? 'mt-3 w-full resize-none rounded-xl border border-white/20 bg-ink-950/70 px-4 py-3.5 text-base font-medium text-white placeholder:text-slate-400 focus:border-brand-400 focus:outline-none'
-            : 'mt-3 w-full resize-none rounded-xl border border-white/15 bg-ink-950/70 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none'
-        }
+        placeholder="Try: Clever thrillers with a twist, but nothing too slow or gory."
+        className="mt-3 h-[112px] w-full resize-none rounded-xl border border-white/25 bg-ink-950/70 px-3.5 py-3 text-base leading-snug text-white placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/40 focus:outline-none"
       />
-      <div className="mt-3 flex justify-end">
+
+      {/* Three suggestion chips, then "More ideas" reveals the rest. Consistent
+          height/padding, wrap cleanly, readable at 320px. */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {PRIMARY_EXAMPLES.map((ex) => (
+          <button
+            key={ex.hint}
+            type="button"
+            onClick={() => fill(ex.text)}
+            className="min-h-[36px] rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[13px] font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white active:scale-95"
+          >
+            {ex.hint}
+          </button>
+        ))}
+        {showMore &&
+          MORE_EXAMPLES.map((ex) => (
+            <button
+              key={ex.hint}
+              type="button"
+              onClick={() => fill(ex.text)}
+              className="min-h-[36px] rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[13px] font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white active:scale-95"
+            >
+              {ex.hint}
+            </button>
+          ))}
         <button
-          onClick={() => void submit()}
-          disabled={busy || text.trim().length < 4}
-          className={`wv-cta-3d disabled:cursor-not-allowed ${hero ? 'px-8 py-3.5 text-lg' : 'px-5 py-2.5 text-sm'}`}
+          type="button"
+          onClick={() => setShowMore((v) => !v)}
+          aria-expanded={showMore}
+          className="min-h-[36px] rounded-full border border-brand-300/40 bg-transparent px-3 py-1.5 text-[13px] font-semibold text-brand-200 transition hover:bg-brand-500/15 active:scale-95"
         >
-          {busy ? 'Ruling…' : 'Hit the gavel →'}
+          {showMore ? 'Fewer ideas' : 'More ideas'}
         </button>
       </div>
+
+      {/* Primary CTA — full width, ≥48px, always looks pressable (only dims while
+          ruling). An empty tap focuses the box rather than sitting dead-grey. */}
+      <button
+        onClick={() => void submit()}
+        disabled={busy}
+        className="wv-cta-3d mt-4 w-full py-3.5 text-lg"
+      >
+        {busy ? 'Ruling…' : 'Hit the Gavel →'}
+      </button>
+
+      <Link
+        href="/app/mentalist"
+        className="mt-3 block text-center text-xs font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline"
+      >
+        Or name a few titles you love — we’ll figure out your taste →
+      </Link>
     </div>
   );
 }
