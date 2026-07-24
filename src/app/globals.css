@@ -247,6 +247,7 @@ body {
      overrides this, so the tile is never sized to a single "target" phone. */
   height: calc(100dvh - var(--wv-quiz-reserve) - env(safe-area-inset-top));
   min-height: 12rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 @media (min-width: 640px) and (min-height: 640px) {
   /* True desktop (wide AND tall): no bottom nav to clear, so size to the
@@ -335,6 +336,134 @@ body {
   font-weight: 800;
   font-size: 0.95rem;
   color: #fff;
+}
+
+/* ── DNA quiz: CINEMATIC redesign ──────────────────────────────────────────
+   A blurred, dimmed, grainy full-viewport backdrop generated from the current
+   poster so portrait art never sits in black bars — the screen always feels
+   cinematic on any aspect ratio (phone → ultrawide). The real poster stays
+   crisp and centered on top. */
+.wv-cine-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(42px) saturate(1.4) brightness(0.98);
+  transform: scale(1.22);
+  will-change: transform;
+  animation: wv-cine-drift 30s ease-in-out infinite alternate;
+}
+@keyframes wv-cine-drift {
+  from { transform: scale(1.2) translate3d(0, 0, 0); }
+  to   { transform: scale(1.26) translate3d(0, -1.6%, 0); }
+}
+.wv-cine-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(130% 100% at 50% 12%, rgba(6, 9, 17, 0.14), rgba(3, 5, 11, 0.66) 80%),
+    linear-gradient(180deg, rgba(3, 5, 11, 0.46) 0%, rgba(3, 5, 11, 0.58) 55%, rgba(3, 5, 11, 0.74) 100%);
+}
+.wv-cine-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+}
+
+/* Hero poster — the crisp artwork, floated over the backdrop with depth. */
+.wv-poster-hero {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  margin-inline: auto;
+  object-fit: contain;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.8), 0 6px 18px -8px rgba(0, 0, 0, 0.7);
+  outline: 1px solid rgba(255, 255, 255, 0.08);
+  outline-offset: -1px;
+}
+.wv-poster-fallback {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  aspect-ratio: 2 / 3;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 1.25rem;
+  text-align: center;
+  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(47, 107, 255, 0.22), rgba(17, 22, 38, 0.6));
+  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.8);
+  outline: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Watch-DNA progress panel */
+.wv-dna-pct {
+  font-weight: 900;
+  font-size: clamp(1.6rem, 6vw, 2.1rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.wv-dna-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.wv-dna-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #34d399, #2f6bff 70%, #a855f7);
+  box-shadow: 0 0 12px rgba(47, 107, 255, 0.6);
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.wv-dna-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.wv-dna-chip--expert { background: rgba(52, 211, 153, 0.16); color: #a7f3d0; border: 1px solid rgba(52, 211, 153, 0.3); }
+.wv-dna-chip--learning { background: rgba(255, 255, 255, 0.06); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.12); }
+/* The Expert/Still-learning detail only appears when there's real vertical room
+   (tablet/desktop), so the mobile one-tile never gets crowded. */
+.wv-dna-detail { display: none; }
+@media (min-height: 720px) {
+  .wv-dna-detail { display: grid; }
+}
+
+/* Micro-interactions — all well under 350ms, all inline (no popups). */
+@keyframes wv-title-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.wv-title-in { animation: wv-title-in 0.26s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes wv-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+.wv-pop { animation: wv-pop 0.22s ease-out; }
+.wv-quiz-btn--seen { border-color: rgba(129, 140, 248, 0.55); background: rgba(129, 140, 248, 0.14); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wv-cine-bg, .wv-title-in, .wv-pop { animation: none !important; }
+  .wv-dna-bar > span { transition: none; }
 }
 
 /* Home-tile ambient sheen — a slow light band that drifts across each tile so

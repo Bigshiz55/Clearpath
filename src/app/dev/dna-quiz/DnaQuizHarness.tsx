@@ -2,12 +2,19 @@
 
 import { DnaQuiz, type QuizItem, type SubmitPayload } from '@/components/DnaQuiz';
 
+/** Deterministic 2:3 SVG poster so the harness exercises real artwork dimensions
+ *  (and the cinematic backdrop is visible in screenshots). */
+function poster(title: string, a: string, b: string): string {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='600'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='${a}'/><stop offset='1' stop-color='${b}'/></linearGradient></defs><rect width='400' height='600' fill='url(#g)'/><text x='200' y='300' font-family='Arial' font-size='34' font-weight='bold' fill='white' text-anchor='middle'>${title}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 /** A fixed, deterministic pool — including a long title and a missing poster. */
 const MOCK: QuizItem[] = [
-  { id: 603, mediaType: 'movie', title: 'The Matrix', year: 1999, posterPath: '/x.jpg', posterUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', genre: 'Sci-Fi' },
-  { id: 1396, mediaType: 'tv', title: 'Breaking Bad', year: 2008, posterPath: '/y.jpg', posterUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', genre: 'Crime' },
+  { id: 603, mediaType: 'movie', title: 'The Matrix', year: 1999, posterPath: '/x.jpg', posterUrl: poster('MATRIX', '#1e3a8a', '#064e3b'), genre: 'Sci-Fi' },
+  { id: 1396, mediaType: 'tv', title: 'Breaking Bad', year: 2008, posterPath: '/y.jpg', posterUrl: poster('BREAKING BAD', '#7c2d12', '#052e16'), genre: 'Crime' },
   { id: 999, mediaType: 'movie', title: 'A Ridiculously Long Movie Title That Should Wrap Cleanly Without Breaking The Card Layout Or Overflowing', year: 2021, posterPath: null, posterUrl: null, genre: 'Drama' },
-  { id: 550, mediaType: 'movie', title: 'Fight Club', year: 1999, posterPath: '/z.jpg', posterUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', genre: 'Thriller' },
+  { id: 550, mediaType: 'movie', title: 'Fight Club', year: 1999, posterPath: '/z.jpg', posterUrl: poster('FIGHT CLUB', '#881337', '#1e1b4b'), genre: 'Thriller' },
 ];
 
 declare global {
