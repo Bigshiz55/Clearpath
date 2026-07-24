@@ -7,6 +7,9 @@ import { tasteDials, dnaStrength } from '@/lib/scoring/dimensions';
 import { describePersonality } from '@/lib/scoring/personality';
 import { ShareCard, WatchDnaCardArt } from '@/components/ShareCards';
 import { TasteDials } from '@/components/TasteDials';
+import { DnaConfidencePanel } from '@/components/DnaConfidencePanel';
+import { RecommendationSlate } from '@/components/RecommendationSlate';
+import { loadDnaConfidence } from '@/lib/preference/dnaSignals';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Your Watch DNA' };
@@ -21,6 +24,7 @@ export default async function WatchDnaPage() {
   const uid = user?.id ?? '';
 
   const stats = await getWatchStats(supabase, uid);
+  const { confidence: dnaConfidence } = await loadDnaConfidence(supabase, uid);
   const profile = await getUserDimensionProfile(supabase, uid, stats.rated);
   const dials = tasteDials(profile, 8);
   const persona = describePersonality(profile);
@@ -56,6 +60,9 @@ export default async function WatchDnaPage() {
         </div>
       </section>
 
+      {/* DNA Confidence — separate from onboarding progress, with its evidence */}
+      <DnaConfidencePanel result={dnaConfidence} />
+
       {/* Behavioral stats */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Rated" value={String(stats.rated)} />
@@ -68,7 +75,10 @@ export default async function WatchDnaPage() {
       <section className="card p-5 sm:p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Your taste dials</h2>
-          <Link href="/app/quiz" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
+          <div className="flex items-center gap-3">
+            <Link href="/app/dna/packs" className="text-sm font-semibold text-emerald-300 hover:text-emerald-200">🎯 Boosters</Link>
+            <Link href="/app/quiz" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
+          </div>
         </div>
         {ready && dials.length > 0 ? (
           <TasteDials
@@ -101,6 +111,13 @@ export default async function WatchDnaPage() {
           </p>
         )}
       </section>
+
+      {/* Fresh, refreshable, validated recommendations — refresh preserves DNA */}
+      {ready && (
+        <section className="card p-5 sm:p-6">
+          <RecommendationSlate surface="dna" />
+        </section>
+      )}
 
       {/* Shareable card */}
       {ready && (
