@@ -3,6 +3,7 @@ import './globals.css';
 import { publicEnv } from '@/lib/env';
 import { ToastProvider } from '@/components/Toast';
 import { ServiceWorker } from '@/components/ServiceWorker';
+import { BuildVersionBadge } from '@/components/BuildVersionBadge';
 
 const siteUrl = publicEnv.siteUrl();
 
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
+        <BuildVersionBadge />
         <ToastProvider>{children}</ToastProvider>
         <ServiceWorker />
       </body>

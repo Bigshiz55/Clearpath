@@ -53,6 +53,9 @@ test.describe('app home — responsive matrix', () => {
       await page.setViewportSize({ width: vp.w, height: vp.h });
       await page.goto('/dev/mobile-home', { waitUntil: 'networkidle' });
 
+      // The build/version badge is present on every screen.
+      await expect(page.locator('[data-testid="build-badge"]')).toBeVisible();
+
       // Wordmark intact (the intentional numeral 1 as the "I", never clipped).
       const brand = page.locator('[data-testid="site-header"] span.whitespace-nowrap').first();
       const brandText = (await brand.innerText()).replace(/\s+/g, '');

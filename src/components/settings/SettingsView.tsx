@@ -494,6 +494,21 @@ export function SettingsView(props: {
         )}
       </section>
 
+      {/* Developer / QA */}
+      <section className="card p-5">
+        <h2 className="text-lg font-semibold text-white">Developer info</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Build, branch, commit, environment, and database details for debugging &amp; QA.
+        </p>
+        <button
+          type="button"
+          onClick={() => { try { window.dispatchEvent(new Event('wv:open-build-info')); } catch { /* no-op */ } }}
+          className="btn-secondary mt-3 text-sm"
+        >
+          🛠 View build information
+        </button>
+      </section>
+
       {/* Danger zone */}
       <section className="card border-red-500/20 p-5">
         <h2 className="text-lg font-semibold text-red-200">Delete account</h2>
