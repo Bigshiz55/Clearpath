@@ -1,0 +1,45 @@
+{
+  "sha": "6bc4797",
+  "branch": "prod-fix",
+  "seed": 7,
+  "total": 3000,
+  "passed": 3000,
+  "categories": {},
+  "dims": {
+    "origin_country": {
+      "relevant": 0,
+      "clean": 0,
+      "rate": 1
+    },
+    "english_audio": {
+      "relevant": 0,
+      "clean": 0,
+      "rate": 1
+    },
+    "runtime": {
+      "relevant": 0,
+      "clean": 0,
+      "rate": 1
+    },
+    "media_type": {
+      "relevant": 0,
+      "clean": 0,
+      "rate": 1
+    },
+    "platform": {
+      "relevant": 0,
+      "clean": 0,
+      "rate": 1
+    },
+    "exclusion": {
+      "relevant": 0,
+      "clean": 0,
+      "rate": 1
+    },
+    "reference": {
+      "relevant": 0,
+      "clean": 0,
+      "rate": 1
+    }
+  }
+}

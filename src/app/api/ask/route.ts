@@ -6,6 +6,25 @@ import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
+import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
+
+/**
+ * "Something like X" is best served by TMDB-similar ONLY when the reference is
+ * the dominant signal. When the ask ALSO carries hard constraints — a foreign
+ * origin, a platform/network, or English audio — raw similar (which ignores all
+ * of them) would return wrong-origin / wrong-platform titles. In that case we
+ * fall through to the ONE finder pipeline, which enforces those constraints and
+ * still carries the reference for read-back. Unifies the two retrieval paths.
+ */
+function hasCompetingConstraints(text: string): boolean {
+  if (!text) return false;
+  return (
+    detectOrigin(text).countries.length > 0 ||
+    detectAudio(text).englishAudioRequired ||
+    detectNetwork(text) != null ||
+    detectPlatform(text) != null
+  );
+}
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -68,7 +87,7 @@ export async function POST(req: Request) {
     // LLM's reference when present, else a regex on the raw text (so it still
     // works with no OpenAI key). Falls through to plain discovery on a miss.
     const reference = (ai?.similarTo ?? '').trim() || (text ? extractReference(text) : null);
-    if (reference) {
+    if (reference && !hasCompetingConstraints(text)) {
       const wantCount = text ? parseRequestedCount(text) : 10;
       const similar = await askSimilarTo(supabase, user.id, reference, wantCount);
       if (similar) {
