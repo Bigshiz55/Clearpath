@@ -4,15 +4,15 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { recordEvents, undoEvent } from '@/lib/preference/store';
 import { getCachedDimensions } from '@/lib/titleDimensions';
-import { quizAnswerToEvent, legacyRatingFor, type QuizAnswer } from '@/lib/preference/quizMap';
+import { quizAnswerToEvent, legacyRatingFor, savesToWatchlist, type QuizAnswer } from '@/lib/preference/quizMap';
 import { rateQuizTitle } from '@/lib/actions/quiz';
+import { addToWatchlist } from '@/lib/actions/watchlist';
 
 /**
- * The ONE write path from the redesigned two-step quiz into the real Watch DNA
- * engine. A "Seen it" rating persists a rich `preference_events` row (Loved ≠
- * Liked ≠ DNF, etc.) AND mirrors a legacy 1–10 watchlist rating so existing
- * recommendation seeds keep working. "Haven't seen"/"Not sure" persist as
- * zero-DNA exposure so we don't re-ask. No parallel scoring engine.
+ * The ONE write path from the Watch DNA card into the real engine. Each intent
+ * feeds the correct channel (pre-watch ATTRACTION vs post-watch EXPERIENCE), and
+ * "Watchlist" additionally saves the title. Idempotent on eventId (duplicate taps
+ * write once). Fail-soft: the DNA write never throws to the UI.
  */
 const schema = z.object({
   eventId: z.string().min(6).max(64),
@@ -21,10 +21,8 @@ const schema = z.object({
   title: z.string().min(1).max(300),
   year: z.number().int().nullable().optional(),
   posterPath: z.string().max(300).nullable().optional(),
-  recognition: z.enum(['seen', 'unseen', 'unsure']),
-  rating: z.enum(['loved', 'liked', 'okay', 'disliked', 'hated']).optional(),
-  dnf: z.boolean().optional(),
-  reasons: z.array(z.string().max(40)).max(6).optional(),
+  intent: z.enum(['looks_good', 'watchlist', 'not_interested', 'seen']),
+  rating: z.enum(['loved', 'liked', 'okay', 'disliked']).optional(),
   dwellMs: z.number().int().min(0).max(600000).optional(),
 });
 
@@ -55,10 +53,8 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
     eventId: a.eventId,
     titleId,
     at: Date.now(),
-    recognition: a.recognition,
+    intent: a.intent,
     rating: a.rating,
-    dnf: a.dnf,
-    reasons: a.reasons as QuizAnswer['reasons'],
     dims,
     dwellMs: a.dwellMs,
     source: 'quiz',
@@ -67,7 +63,20 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
   // 1) The real engine (idempotent on eventId → duplicate taps write once).
   await recordEvents(supabase, user.id, [quizAnswerToEvent(answer)]);
 
-  // 2) Legacy watchlist mirror for SEEN ratings (keeps existing recs seeded).
+  // 2) "Watchlist" saves the title (status: possible = wants to watch). Only the
+  //    Watchlist intent writes here — "Looks good" is a taste signal only.
+  if (savesToWatchlist(answer)) {
+    await addToWatchlist({
+      tmdbId: a.tmdbId,
+      mediaType: a.mediaType,
+      title: a.title,
+      year: a.year ?? null,
+      posterPath: a.posterPath ?? null,
+      status: 'possible',
+    }).catch(() => {});
+  }
+
+  // 3) Legacy watchlist mirror for SEEN ratings (keeps existing recs seeded).
   const legacy = legacyRatingFor(answer);
   if (legacy != null) {
     await rateQuizTitle({
@@ -83,13 +92,32 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
   return { ok: true };
 }
 
-/** Undo the most recent quiz answer (soft-delete, audit trail preserved). */
-export async function undoQuizAnswer(eventId: string): Promise<{ ok: boolean }> {
+/**
+ * Undo the most recent quiz answer (soft-delete the DNA event, audit trail kept).
+ * If it was a "Watchlist" save, also remove the item so Undo fully reverses the
+ * action.
+ */
+export async function undoQuizAnswer(
+  eventId: string,
+  watchlistItem?: { tmdbId: number; mediaType: 'movie' | 'tv' },
+): Promise<{ ok: boolean }> {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false };
+
   const ok = await undoEvent(supabase, user.id, eventId);
+
+  if (watchlistItem) {
+    await supabase
+      .from('watchlist_items')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('tmdb_id', watchlistItem.tmdbId)
+      .eq('media_type', watchlistItem.mediaType)
+      .then(() => undefined, () => undefined);
+  }
+
   return { ok };
 }
