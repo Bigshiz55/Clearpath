@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { WatchVerdictWordmark } from './WatchVerdictWordmark';
 import { qrForUrl } from '@/lib/actions/qr';
 import { getMyTaste, type MyTaste } from '@/lib/actions/profile';
 
@@ -376,7 +377,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       <header className="container-page flex h-16 items-center">
-        <span className="whitespace-nowrap text-lg font-bold tracking-tight text-white">Watch<span className="text-[#ff1493]">VERDICT</span> · ⚖️ Court</span>
+        <span className="inline-flex items-center gap-1.5 text-lg"><WatchVerdictWordmark /> <span className="whitespace-nowrap font-bold text-white">· ⚖️ Court</span></span>
       </header>
       <main className="container-page mx-auto max-w-md py-4">{children}</main>
     </div>

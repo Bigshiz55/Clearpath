@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { WatchVerdictWordmark } from './WatchVerdictWordmark';
 
 /** The WatchVerdict app mark alone — a retro TV with scales of justice on the
  *  screen. `box`/`inner` size it; `overlay` renders on top (e.g. a score), and
@@ -53,14 +54,11 @@ export function Logo({
   return (
     <Link href={href} className="group inline-flex items-center gap-2.5">
       <LogoMark box={box} inner={inner} />
-      {!compact && (
-        // Solid, single-run wordmark. No per-letter animation or fixed-width
-        // slot — the previous 3D "I→1" flip collapsed to an empty gap on iOS
-        // Safari and read as "WatchVERD_CT". It must ALWAYS render "WatchVERDICT".
-        <span className={`whitespace-nowrap font-bold tracking-tight text-white ${word}`}>
-          Watch<span className="text-[#ff1493]">VERDICT</span>
-        </span>
-      )}
+      {!compact && <WatchVerdictWordmark className={word} />}
     </Link>
   );
 }
+
+/** Canonical shared brand logo (app mark + WatchVERD1CT wordmark). Alias of Logo
+ *  so callers can import a clearly-named component. */
+export const WatchVerdictLogo = Logo;
