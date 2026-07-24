@@ -10,10 +10,13 @@ import { CourtInviteHarness } from './Harness';
  */
 export const dynamic = 'force-dynamic';
 
-const COURT_URL = 'https://watchverdict.app/court/ABCD';
+const COURT_URL = 'https://clearpath-pearl-chi.vercel.app/court/ABCD';
 
 export default async function DevCourtInvite({ searchParams }: { searchParams: { mode?: string } }) {
   if (process.env.RESPONSIVE_HARNESS !== '1') notFound();
-  const qr = await qrForUrl(COURT_URL);
-  return <CourtInviteHarness url={COURT_URL} qr={qr} mode={searchParams.mode ?? 'share'} />;
+  const mode = searchParams.mode ?? 'share';
+  // `missing` mode exercises the invalid-URL error path (URL not ready before tap).
+  const url = mode === 'missing' ? '' : COURT_URL;
+  const qr = url ? await qrForUrl(url) : null;
+  return <CourtInviteHarness url={url} qr={qr} mode={mode} />;
 }

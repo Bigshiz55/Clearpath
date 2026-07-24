@@ -1,60 +1,61 @@
 /**
- * Live Court invite — iMessage-first. PURE + injectable so it's unit-testable
- * without a real browser. Primary path is the native iOS share sheet
- * (`navigator.share`), invoked SYNCHRONOUSLY inside the user's tap (no awaited
- * network call, no setTimeout before it) so iOS Safari accepts the gesture and the
- * user can pick Messages and send over iMessage. We NEVER try to send an iMessage
- * silently (browsers can't) and NEVER build an in-app recipient picker.
+ * Live Court invite — native iOS share sheet first. PURE + injectable so it's
+ * unit-testable without a browser.
  *
- * Flow:
- *   1. navigator.share({ title, text, url }) with a friendly invitation + the secure
- *      room URL → user selects Messages in the sheet.
- *      - user cancel (AbortError) → no error, no fallback.
- *   2. share unsupported or throws → open the polished fallback modal
- *      (Copy Invite Link · Open Messages [sms:] · Copy Full Invitation).
- * The Invite button never silently fails. A duplicate-tap lock prevents double sheets.
+ * The share() call is made SYNCHRONOUSLY inside the caller's tap (no awaited work
+ * before it) so iOS Safari / installed PWA accept the user gesture and open the
+ * native share sheet (Messages, Mail, WhatsApp, Copy, …). We never force Messages,
+ * never window.open first, and never do fetch/auth/room-creation before share — the
+ * invite URL is prepared BEFORE the tap and validated here.
+ *
+ * Fallback (share unsupported or throws a non-cancel error):
+ *   clipboard writeText(message + URL) → toast; if clipboard fails → execCommand;
+ *   if that fails → manual modal. AbortError = the user dismissed the sheet (no-op).
+ * Every non-cancel outcome is visible: share sheet, copied toast, manual modal, or
+ * an error toast — a tap NEVER silently does nothing.
  */
 
-export type InviteButtonState = 'idle' | 'sharing' | 'copied';
-export type InviteOutcome = 'shared' | 'cancelled' | 'fallback-modal' | 'ignored-duplicate';
+export type InviteButtonState = 'idle' | 'sharing';
+export type InviteOutcome =
+  | 'shared'
+  | 'cancelled'
+  | 'copied'
+  | 'manual'
+  | 'invalid-url'
+  | 'ignored-duplicate';
 
 export interface InviteNavigator {
   share?: (data: ShareData) => Promise<void>;
   clipboard?: { writeText?: (text: string) => Promise<void> };
 }
 
-/** The friendly invitation body (room name woven in when available). */
-export const INVITE_TITLE = 'WatchVerdict Live Court';
-const BASE_MESSAGE =
-  'Join me in WatchVerdict Live Court. We’ll each pick our favorites, then WatchVerdict will combine our taste and choose what we should watch tonight.';
+export const INVITE_TITLE = 'Join my WatchVERD1CT Court';
+export const INVITE_TEXT = 'Help us decide what to watch tonight. Join my WatchVERD1CT Court:';
 
-export function inviteMessage(roomName?: string | null): string {
-  const name = roomName?.trim();
-  return name
-    ? `Join me in WatchVerdict Live Court (${name}). We’ll each pick our favorites, then WatchVerdict will combine our taste and choose what we should watch tonight.`
-    : BASE_MESSAGE;
+/** A well-formed, shareable Court room URL: absolute http(s) with a /court/<id> path.
+ *  Rejects undefined / empty / relative / malformed URLs so we never share junk. */
+export function isValidInviteUrl(url: unknown): url is string {
+  if (typeof url !== 'string' || url.trim() === '') return false;
+  let u: URL;
+  try { u = new URL(url); } catch { return false; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  return /^\/court\/[^/]+/.test(u.pathname);
 }
 
-/** Share payload for navigator.share — message + secure room URL. */
-export function inviteShareData(url: string, roomName?: string | null): ShareData {
-  return { title: INVITE_TITLE, text: inviteMessage(roomName), url };
+export function inviteShareData(url: string): ShareData {
+  return { title: INVITE_TITLE, text: INVITE_TEXT, url };
 }
 
-/** The full copy-paste invitation: message + URL on its own line. */
-export function fullInvitation(url: string, roomName?: string | null): string {
-  return `${inviteMessage(roomName)}\n\n${url}`;
+/** The full copy/paste invitation: message + URL (one space, as iMessage renders it). */
+export function inviteClipboardText(url: string): string {
+  return `${INVITE_TEXT} ${url}`;
 }
 
-/**
- * An iOS-compatible Messages deep link carrying the invitation body (message + URL),
- * URL-encoded. `sms:&body=` is the form iOS Safari honors; other platforms accept it
- * too. Opening it lets the user pick a recipient in Messages themselves.
- */
-export function smsHref(url: string, roomName?: string | null): string {
-  return `sms:&body=${encodeURIComponent(fullInvitation(url, roomName))}`;
+/** iOS Messages deep link carrying the invitation, URL-encoded (no raw spaces). */
+export function smsHref(url: string): string {
+  return `sms:&body=${encodeURIComponent(inviteClipboardText(url))}`;
 }
 
-/** A share rejection that means "the user dismissed the sheet" — not a failure. */
 function isCancel(e: unknown): boolean {
   const err = e as { name?: string; message?: string } | null;
   if (!err) return false;
@@ -63,46 +64,73 @@ function isCancel(e: unknown): boolean {
 
 export interface RunInviteOptions {
   url: string;
-  roomName?: string | null;
   navigator: InviteNavigator;
+  /** Synchronous execCommand copy fallback; returns true on success. */
+  execCopy: (text: string) => boolean;
   setButtonState: (s: InviteButtonState) => void;
-  /** Open the polished fallback modal (share unsupported / failed). Never silent. */
-  onFallback: () => void;
-  /** Dev-only structured logger (event, optional detail). */
+  /** Toast: "Invite link copied — paste it into Messages." */
+  onCopied: () => void;
+  /** Open the manual invite modal (clipboard also failed). */
+  onManual: () => void;
+  /** Visible error toast (e.g. URL not ready). */
+  onError: (message: string) => void;
   log?: (event: string, detail?: unknown) => void;
-  /** Duplicate-tap guard shared with the component (a ref). */
+  /** Duplicate-tap guard (a ref shared with the component). */
   lock: { get: () => boolean; set: (v: boolean) => void };
 }
 
 export async function runInvite(o: RunInviteOptions): Promise<InviteOutcome> {
-  const { url, roomName, navigator: nav, log } = o;
+  const { navigator: nav, log } = o;
   if (o.lock.get()) { log?.('duplicate tap ignored'); return 'ignored-duplicate'; }
-  if (!url) { log?.('no invite url — opening fallback'); o.onFallback(); return 'fallback-modal'; }
+  // The URL is prepared before the tap; validate it (never share localhost-junk/undefined).
+  if (!isValidInviteUrl(o.url)) {
+    log?.('invalid invite url', o.url);
+    o.onError('The invitation link is not ready yet. Try again in a moment.');
+    return 'invalid-url';
+  }
+  const url = o.url;
   o.lock.set(true);
-  log?.('invite button clicked');
-  log?.('generated invite URL', url);
+  log?.('invite tapped', url);
   try {
     if (typeof nav.share === 'function') {
-      log?.('navigator.share supported');
-      // Invoke share() SYNCHRONOUSLY (promise created before any await) so iOS
-      // accepts it as part of the user gesture and opens the share sheet.
-      const shared = nav.share(inviteShareData(url, roomName));
+      log?.('navigator.share supported — opening sheet');
+      // SYNCHRONOUS invocation inside the gesture (promise created before any await).
+      const shared = nav.share(inviteShareData(url));
       o.setButtonState('sharing');
       try {
         await shared;
         log?.('share success');
-        o.setButtonState('idle');
         return 'shared';
       } catch (e) {
-        if (isCancel(e)) { log?.('share cancelled'); o.setButtonState('idle'); return 'cancelled'; }
-        log?.('share failed (non-cancel) — opening fallback modal', e);
+        if (isCancel(e)) { log?.('share dismissed (AbortError)'); return 'cancelled'; }
+        log?.('share failed (non-cancel) — falling back to clipboard', e);
+      } finally {
+        o.setButtonState('idle');
       }
     } else {
-      log?.('navigator.share unsupported — opening fallback modal');
+      log?.('navigator.share unsupported — clipboard fallback');
     }
-    o.onFallback();
-    o.setButtonState('idle');
-    return 'fallback-modal';
+
+    const text = inviteClipboardText(url);
+    // Clipboard fallback → visible confirmation.
+    try {
+      if (typeof nav.clipboard?.writeText === 'function') {
+        await nav.clipboard.writeText(text);
+        log?.('clipboard copy success');
+        o.onCopied();
+        return 'copied';
+      }
+    } catch (e) {
+      log?.('clipboard writeText failed', e);
+    }
+    if (o.execCopy(text)) {
+      log?.('execCommand copy success');
+      o.onCopied();
+      return 'copied';
+    }
+    log?.('all copy methods failed — manual modal');
+    o.onManual();
+    return 'manual';
   } finally {
     o.lock.set(false);
   }
@@ -132,5 +160,15 @@ export function copyViaExecCommand(text: string): boolean {
     return ok;
   } catch {
     return false;
+  }
+}
+
+/** Compact one-line display of a Court URL: "host/court/…" (code truncated). */
+export function displayInviteUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.host}/court/…`;
+  } catch {
+    return url;
   }
 }

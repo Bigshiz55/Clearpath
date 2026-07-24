@@ -3,129 +3,130 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * Live Court iMessage-first invite — AUTOMATED BROWSER VERIFICATION (Chromium).
- * Playwright CANNOT drive the real iOS share sheet or Messages app, so this covers
- * only what a browser can: URL generation, that share() is called from the tap with
- * the right payload, cancel handling, the polished fallback modal and its actions
- * (Copy Invite Link · Open Messages [sms:] · Copy Full Invitation), copy
- * confirmations, dedupe, and 390px layout. The share-sheet/Messages hand-off itself
- * is covered by the MANUAL iPhone steps in docs/court-imessage-invite.md.
+ * Live Court "Send invite" — AUTOMATED BROWSER VERIFICATION (Chromium). Playwright
+ * cannot open the real iOS share sheet or Messages app, so this covers only what a
+ * browser can: that tapping calls navigator.share() with the correct room URL
+ * directly from the click, AbortError is a silent no-op, a non-abort error falls
+ * back to clipboard, a failed clipboard opens the manual modal, an invalid URL shows
+ * a visible error, the tap target isn't blocked, and the mobile layout doesn't
+ * overflow at 320/375/390. The share-sheet/Messages hand-off is MANUAL — see
+ * docs/court-imessage-invite.md.
  */
 const SHOTS = path.join(process.cwd(), 'test-results', 'court-invite');
 fs.mkdirSync(SHOTS, { recursive: true });
 
-const URL = 'https://watchverdict.app/court/ABCD';
-const MESSAGE = 'Join me in WatchVerdict Live Court (room ABCD). We’ll each pick our favorites, then WatchVerdict will combine our taste and choose what we should watch tonight.';
-const PHONE = { width: 390, height: 800 };
+const URL = 'https://clearpath-pearl-chi.vercel.app/court/ABCD';
+const CLIP = 'Help us decide what to watch tonight. Join my WatchVERD1CT Court: ' + URL;
+const WIDTHS = [320, 375, 390];
 
-async function go(page: Page, mode: string) {
-  await page.setViewportSize(PHONE);
+async function go(page: Page, mode: string, width = 390) {
+  await page.setViewportSize({ width, height: 820 });
   await page.goto(`/dev/court-invite?mode=${mode}`, { waitUntil: 'networkidle' });
 }
-const inviteBtn = (page: Page) => page.locator('[data-testid="court-send-invite"]');
+const btn = (page: Page) => page.locator('[data-testid="court-send-invite"]');
 
-test('Invite is a real, enabled, unobstructed <button> at 390px', async ({ page }) => {
+test('tap invokes navigator.share with the correct room URL, from the click', async ({ page }) => {
   await go(page, 'share');
-  const btn = inviteBtn(page);
-  await expect(btn).toBeVisible();
-  await expect(btn).toBeEnabled();
-  expect(await btn.evaluate((el) => el.tagName)).toBe('BUTTON');
-  expect(await btn.getAttribute('type')).toBe('button');
-  const covered = await btn.evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-    return !(el === top || el.contains(top));
-  });
-  expect(covered, 'not covered by another element').toBe(false);
-  expect(await btn.evaluate((el) => getComputedStyle(el).pointerEvents)).not.toBe('none');
-  await page.screenshot({ path: path.join(SHOTS, 'court-imessage-390.png'), fullPage: true });
-});
-
-test('tap invokes navigator.share with title + friendly message + secure production URL', async ({ page }) => {
-  await go(page, 'share');
-  await inviteBtn(page).click();
+  await btn(page).click();
   await expect.poll(() => page.evaluate(() => window.__shareCalls)).toBe(1);
-  const shared = await page.evaluate(() => window.__lastShare);
-  expect(shared?.title).toBe('WatchVerdict Live Court');
-  expect(shared?.url).toBe(URL); // production domain, secure room id
-  expect(shared?.text).toBe(MESSAGE);
-  await expect(page.locator('[data-testid="court-invite-modal"]')).toHaveCount(0); // native = no modal
+  expect(await page.evaluate(() => window.__lastShare)).toEqual({
+    title: 'Join my WatchVERD1CT Court',
+    text: 'Help us decide what to watch tonight. Join my WatchVERD1CT Court:',
+    url: URL,
+  });
+  await expect(page.locator('[data-testid="court-invite-modal"]')).toHaveCount(0);
 });
 
-test('user cancels the share sheet → no modal, button restored', async ({ page }) => {
+test('AbortError (dismiss) shows no failure — no error, no modal', async ({ page }) => {
   await go(page, 'cancel');
-  await inviteBtn(page).click();
+  await btn(page).click();
   await expect.poll(() => page.evaluate(() => window.__shareCalls)).toBe(1);
   await page.waitForTimeout(150);
+  await expect(page.locator('[data-testid="court-invite-error"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="court-invite-modal"]')).toHaveCount(0);
-  await expect(inviteBtn(page)).toContainText('Invite');
+  await expect(btn(page)).toContainText('Send invite');
 });
 
-test('share unsupported → polished modal with Open Messages / Copy link / Copy full', async ({ page }) => {
-  await go(page, 'unsupported');
-  await inviteBtn(page).click();
-  const modal = page.locator('[data-testid="court-invite-modal"]');
-  await expect(modal).toBeVisible();
+test('non-AbortError falls back to clipboard with the copied confirmation', async ({ page }) => {
+  await go(page, 'error');
+  await btn(page).click();
+  await expect(page.locator('[data-testid="court-invite-toast"]')).toContainText('paste it into Messages');
+  expect(await page.evaluate(() => window.__lastClip)).toBe(CLIP);
+});
 
-  // Open Messages is a real sms: deep link with the encoded message + URL.
+test('unsupported share → clipboard + copied confirmation', async ({ page }) => {
+  await go(page, 'unsupported');
+  await btn(page).click();
+  await expect(page.locator('[data-testid="court-invite-toast"]')).toContainText('Invite link copied');
+});
+
+test('failed clipboard opens the manual invite modal with Open Messages (sms:)', async ({ page }) => {
+  await go(page, 'clipfail');
+  await btn(page).click();
+  await expect(page.locator('[data-testid="court-invite-modal"]')).toBeVisible();
   const sms = page.locator('[data-testid="court-open-messages"]');
-  await expect(sms).toBeVisible();
   const href = (await sms.getAttribute('href'))!;
   expect(href.startsWith('sms:&body=')).toBe(true);
-  const body = decodeURIComponent(href.replace('sms:&body=', ''));
-  expect(body).toContain(MESSAGE);
-  expect(body).toContain(URL);
-  expect(href).not.toMatch(/\s/); // properly URL-encoded
-
-  await expect(page.locator('[data-testid="court-manual-copy"]')).toBeVisible();
+  expect(decodeURIComponent(href.replace('sms:&body=', ''))).toBe(CLIP);
+  expect(href).not.toMatch(/\s/);
   await expect(page.locator('[data-testid="court-copy-full"]')).toBeVisible();
+  await expect(page.locator('[data-testid="court-manual-close"]')).toBeVisible();
 });
 
-test('share throws → same polished modal fallback', async ({ page }) => {
-  await go(page, 'error');
-  await inviteBtn(page).click();
-  await expect(page.locator('[data-testid="court-invite-modal"]')).toBeVisible();
+test('an invalid/undefined room URL shows a visible error and never shares', async ({ page }) => {
+  await go(page, 'missing');
+  await btn(page).click();
+  await expect(page.locator('[data-testid="court-invite-error"]')).toContainText('not ready');
+  expect(await page.evaluate(() => window.__shareCalls)).toBe(0);
 });
 
-test('Copy invite link and Copy full invitation confirm clearly', async ({ page }) => {
-  await go(page, 'unsupported');
-  await inviteBtn(page).click();
-  await page.locator('[data-testid="court-manual-copy"]').click();
-  await expect(page.locator('[data-testid="court-modal-toast"]')).toContainText('Invite link copied');
-  expect(await page.evaluate(() => window.__lastClip)).toBe(URL);
-
-  await page.locator('[data-testid="court-copy-full"]').click();
-  await expect(page.locator('[data-testid="court-modal-toast"]')).toContainText('Invitation copied');
-  const full = await page.evaluate(() => window.__lastClip);
-  expect(full).toContain(MESSAGE);
-  expect(full).toContain(URL);
-});
-
-test('rapid taps never open two share sheets', async ({ page }) => {
+test('rapid taps never open two share sheets; button never permanently disabled', async ({ page }) => {
   await go(page, 'hang');
-  const btn = inviteBtn(page);
-  await btn.click();
-  await btn.click({ force: true });
-  await btn.click({ force: true });
+  const b = btn(page);
+  await b.click();
+  await b.click({ force: true });
+  await b.click({ force: true });
   await page.waitForTimeout(150);
   expect(await page.evaluate(() => window.__shareCalls)).toBe(1);
-  await expect(btn).toContainText('Opening Messages');
-  await expect(btn).toBeDisabled();
+  await expect(b).not.toBeDisabled(); // never uses the disabled attribute
+  // The time-bounded guard releases the button within ~1.5s even though share hangs.
+  await expect.poll(() => b.innerText(), { timeout: 3000 }).toContain('Send invite');
 });
 
-test('QR stays inside its card with the URL below it (no overlap) @ 390px', async ({ page }) => {
-  await go(page, 'share');
-  const qr = page.locator('[data-testid="court-qr"]');
-  await expect(qr).toBeVisible();
-  const card = page.locator('.card');
-  const qb = (await qr.boundingBox())!;
-  const cb = (await card.boundingBox())!;
-  expect(qb.x).toBeGreaterThanOrEqual(cb.x - 1);
-  expect(qb.x + qb.width).toBeLessThanOrEqual(cb.x + cb.width + 1);
-  expect(qb.width).toBeLessThanOrEqual(280 + 1);
-  const url = page.locator('[data-testid="court-invite-url"]');
-  const ub = (await url.boundingBox())!;
-  expect(ub.y).toBeGreaterThanOrEqual(qb.y + qb.height - 1);
-  const { sw, cw } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
-  expect(sw).toBeLessThanOrEqual(cw + 1);
-});
+for (const width of WIDTHS) {
+  test(`layout + tap target @ ${width}px — no overflow, 52px button, URL row contained`, async ({ page }) => {
+    await go(page, 'share', width);
+    await page.screenshot({ path: path.join(SHOTS, `court-invite-${width}.png`), fullPage: true });
+
+    // No horizontal overflow.
+    const { sw, cw } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+    expect(sw, `no horizontal scroll @ ${width}`).toBeLessThanOrEqual(cw + 1);
+
+    // Button is a real, ≥52px, unobstructed <button type=button>.
+    const b = btn(page);
+    await expect(b).toBeVisible();
+    expect(await b.evaluate((el) => el.tagName)).toBe('BUTTON');
+    expect(await b.getAttribute('type')).toBe('button');
+    const bb = (await b.boundingBox())!;
+    expect(bb.height, 'button ≥52px').toBeGreaterThanOrEqual(52);
+    const blocked = await b.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return !(el === top || el.contains(top));
+    });
+    expect(blocked, 'no invisible element blocks the button').toBe(false);
+    expect(await b.evaluate((el) => getComputedStyle(el).pointerEvents)).not.toBe('none');
+    expect(await b.evaluate((el) => getComputedStyle(el).touchAction)).toBe('manipulation');
+
+    // The URL row is one line, inside the card, and doesn't overlap the button.
+    const card = page.locator('[data-testid="court-invite-url"]').locator('xpath=ancestor::*[contains(@class,"rounded-xl")][1]');
+    const url = page.locator('[data-testid="court-invite-url"]');
+    const ub = (await url.boundingBox())!;
+    const cardBox = (await card.boundingBox())!;
+    expect(ub.x + ub.width, 'URL inside card').toBeLessThanOrEqual(cardBox.x + cardBox.width + 1);
+    expect(ub.y, 'URL row below the button').toBeGreaterThan(bb.y + bb.height - 1);
+    // The Copy control works.
+    await page.locator('[data-testid="court-copy-url"]').click();
+    await expect(page.locator('[data-testid="court-invite-toast"]')).toBeVisible();
+  });
+}

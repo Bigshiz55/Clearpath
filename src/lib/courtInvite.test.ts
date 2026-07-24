@@ -1,90 +1,116 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  runInvite, inviteShareData, inviteMessage, fullInvitation, smsHref, copyText,
-  INVITE_TITLE, type RunInviteOptions,
+  runInvite, isValidInviteUrl, inviteShareData, inviteClipboardText, smsHref, displayInviteUrl, copyText,
+  INVITE_TITLE, INVITE_TEXT, type RunInviteOptions,
 } from './courtInvite';
 
-const URL = 'https://watchverdict.app/court/ABCD';
-const ROOM = 'room ABCD';
+const URL = 'https://clearpath-pearl-chi.vercel.app/court/ABCD';
 
 function harness(over: Partial<RunInviteOptions> = {}) {
   let locked = false;
+  const calls = { copied: 0, manual: 0, errors: [] as string[] };
   const states: string[] = [];
-  let fallbacks = 0;
   const base: RunInviteOptions = {
     url: URL,
-    roomName: ROOM,
     navigator: {},
+    execCopy: () => false,
     setButtonState: (s) => states.push(s),
-    onFallback: () => { fallbacks++; },
+    onCopied: () => { calls.copied++; },
+    onManual: () => { calls.manual++; },
+    onError: (m) => { calls.errors.push(m); },
     lock: { get: () => locked, set: (v) => { locked = v; } },
     ...over,
   };
-  return { opts: base, states, fallbacks: () => fallbacks, isLocked: () => locked };
+  return { opts: base, calls, states, isLocked: () => locked };
 }
 
-describe('invitation content — iMessage-first copy', () => {
-  it('weaves the room name into the friendly message when available', () => {
-    expect(inviteMessage(ROOM)).toContain('WatchVerdict Live Court (room ABCD)');
-    expect(inviteMessage(null)).toContain('Join me in WatchVerdict Live Court.');
-    expect(inviteMessage(ROOM)).toContain('combine our taste and choose what we should watch tonight');
+describe('isValidInviteUrl', () => {
+  it('accepts an absolute http(s) /court/<id> URL', () => {
+    expect(isValidInviteUrl(URL)).toBe(true);
+    expect(isValidInviteUrl('http://localhost:3000/court/XY')).toBe(true);
   });
-  it('inviteShareData carries title + message + secure url', () => {
-    const d = inviteShareData(URL, ROOM);
-    expect(d.title).toBe(INVITE_TITLE);
-    expect(d.url).toBe(URL);
-    expect(d.text).toContain('room ABCD');
-  });
-  it('fullInvitation is the message followed by the URL on its own line', () => {
-    const full = fullInvitation(URL, ROOM);
-    expect(full).toContain(inviteMessage(ROOM));
-    expect(full.endsWith(URL)).toBe(true);
-    expect(full).toContain('\n\n');
-  });
-  it('smsHref is an iOS Messages deep link with the encoded body', () => {
-    const href = smsHref(URL, ROOM);
-    expect(href.startsWith('sms:&body=')).toBe(true);
-    const body = decodeURIComponent(href.replace('sms:&body=', ''));
-    expect(body).toBe(fullInvitation(URL, ROOM));
-    expect(href).toContain(encodeURIComponent(URL));
-    // Properly URL-encoded (no raw spaces or newlines in the href).
-    expect(href).not.toMatch(/\s/);
+  it('rejects undefined, empty, relative, malformed, and non-court URLs', () => {
+    expect(isValidInviteUrl(undefined)).toBe(false);
+    expect(isValidInviteUrl('')).toBe(false);
+    expect(isValidInviteUrl('/court/ABCD')).toBe(false);
+    expect(isValidInviteUrl('not a url')).toBe(false);
+    expect(isValidInviteUrl('https://example.com/')).toBe(false);
+    expect(isValidInviteUrl('javascript:alert(1)')).toBe(false);
   });
 });
 
-describe('runInvite — share sheet first, polished modal fallback', () => {
-  it('opens the native share sheet with the correct payload on success', async () => {
+describe('invite payloads', () => {
+  it('share data uses the exact title/text + the room URL', () => {
+    expect(inviteShareData(URL)).toEqual({ title: INVITE_TITLE, text: INVITE_TEXT, url: URL });
+  });
+  it('clipboard text is "message url"', () => {
+    expect(inviteClipboardText(URL)).toBe(`${INVITE_TEXT} ${URL}`);
+  });
+  it('smsHref is an encoded sms deep link (no raw spaces)', () => {
+    const href = smsHref(URL);
+    expect(href.startsWith('sms:&body=')).toBe(true);
+    expect(decodeURIComponent(href.replace('sms:&body=', ''))).toBe(inviteClipboardText(URL));
+    expect(href).not.toMatch(/\s/);
+  });
+  it('displayInviteUrl is a compact host/court/… string', () => {
+    expect(displayInviteUrl(URL)).toBe('clearpath-pearl-chi.vercel.app/court/…');
+  });
+});
+
+describe('runInvite', () => {
+  it('invokes navigator.share with the correct room URL on tap', async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     const h = harness({ navigator: { share } });
-    const out = await runInvite(h.opts);
-    expect(out).toBe('shared');
-    expect(share).toHaveBeenCalledTimes(1);
-    expect(share).toHaveBeenCalledWith(inviteShareData(URL, ROOM));
-    expect(h.fallbacks()).toBe(0);
-    expect(h.states).toEqual(['sharing', 'idle']);
+    expect(await runInvite(h.opts)).toBe('shared');
+    expect(share).toHaveBeenCalledWith({ title: INVITE_TITLE, text: INVITE_TEXT, url: URL });
+    expect(h.calls.copied).toBe(0);
+    expect(h.calls.errors).toEqual([]);
   });
 
-  it('treats a user cancel as a no-op — no fallback modal', async () => {
-    const share = vi.fn().mockRejectedValue(Object.assign(new Error('aborted'), { name: 'AbortError' }));
-    const h = harness({ navigator: { share } });
+  it('treats AbortError (dismiss) as a no-op — no copy, no error, no modal', async () => {
+    const share = vi.fn().mockRejectedValue(Object.assign(new Error('abort'), { name: 'AbortError' }));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const h = harness({ navigator: { share, clipboard: { writeText } } });
     expect(await runInvite(h.opts)).toBe('cancelled');
-    expect(h.fallbacks()).toBe(0);
+    expect(writeText).not.toHaveBeenCalled();
+    expect(h.calls.copied).toBe(0);
+    expect(h.calls.manual).toBe(0);
   });
 
-  it('opens the fallback modal when share is unsupported', async () => {
-    const h = harness({ navigator: {} });
-    expect(await runInvite(h.opts)).toBe('fallback-modal');
-    expect(h.fallbacks()).toBe(1);
+  it('a non-AbortError falls back to clipboard + copied toast', async () => {
+    const share = vi.fn().mockRejectedValue(new Error('share failed'));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const h = harness({ navigator: { share, clipboard: { writeText } } });
+    expect(await runInvite(h.opts)).toBe('copied');
+    expect(writeText).toHaveBeenCalledWith(inviteClipboardText(URL));
+    expect(h.calls.copied).toBe(1);
   });
 
-  it('opens the fallback modal when share throws a non-cancel error', async () => {
-    const share = vi.fn().mockRejectedValue(new Error('share exploded'));
-    const h = harness({ navigator: { share } });
-    expect(await runInvite(h.opts)).toBe('fallback-modal');
-    expect(h.fallbacks()).toBe(1);
+  it('unsupported share → clipboard + copied toast', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const h = harness({ navigator: { clipboard: { writeText } } });
+    expect(await runInvite(h.opts)).toBe('copied');
+    expect(h.calls.copied).toBe(1);
   });
 
-  it('never opens two share sheets from rapid taps', async () => {
+  it('failed clipboard AND execCommand → manual modal', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+    const execCopy = vi.fn().mockReturnValue(false);
+    const h = harness({ navigator: { clipboard: { writeText } }, execCopy });
+    expect(await runInvite(h.opts)).toBe('manual');
+    expect(h.calls.manual).toBe(1);
+    expect(h.calls.copied).toBe(0);
+  });
+
+  it('an invalid/undefined room URL shows a visible error and never shares', async () => {
+    const share = vi.fn();
+    const h = harness({ url: '', navigator: { share } });
+    expect(await runInvite(h.opts)).toBe('invalid-url');
+    expect(share).not.toHaveBeenCalled();
+    expect(h.calls.errors[0]).toMatch(/not ready/i);
+  });
+
+  it('ignores a duplicate tap while a share is in flight (one share call)', async () => {
     let resolve!: () => void;
     const share = vi.fn().mockReturnValue(new Promise<void>((r) => { resolve = r; }));
     const h = harness({ navigator: { share } });
@@ -97,18 +123,11 @@ describe('runInvite — share sheet first, polished modal fallback', () => {
   });
 });
 
-describe('copyText — clipboard with execCommand fallback', () => {
-  it('uses the async clipboard when available', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    const exec = vi.fn().mockReturnValue(true);
-    expect(await copyText({ clipboard: { writeText } }, 'hello', exec)).toBe(true);
-    expect(writeText).toHaveBeenCalledWith('hello');
-    expect(exec).not.toHaveBeenCalled();
-  });
-  it('falls back to execCommand when clipboard is unavailable/throws', async () => {
-    const writeText = vi.fn().mockRejectedValue(new Error('denied'));
-    const exec = vi.fn().mockReturnValue(true);
-    expect(await copyText({ clipboard: { writeText } }, 'hello', exec)).toBe(true);
-    expect(exec).toHaveBeenCalledWith('hello');
+describe('copyText', () => {
+  it('uses async clipboard, else execCommand', async () => {
+    const ok = await copyText({ clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } }, 't', () => false);
+    expect(ok).toBe(true);
+    const viaExec = await copyText({ clipboard: { writeText: vi.fn().mockRejectedValue(new Error('x')) } }, 't', () => true);
+    expect(viaExec).toBe(true);
   });
 });

@@ -59,9 +59,6 @@ export function LiveCourt({ code }: { code: string }) {
     (process.env.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, '')) ||
     (typeof window !== 'undefined' ? window.location.origin : '');
   const shareUrl = origin ? `${origin}/court/${code}` : '';
-  // A short room label for the invitation copy ("room ABCD"); the schema has no
-  // human room name, so the code is the room's identity.
-  const roomName = `room ${code}`;
   async function showQr() {
     if (!shareUrl) return;
     if (qr) { setQr(null); return; } // toggle off
@@ -264,7 +261,7 @@ export function LiveCourt({ code }: { code: string }) {
             ))}
           </div>
 
-          <CourtInviteBox url={shareUrl} roomName={roomName} qr={qr} onToggleQr={showQr} />
+          <CourtInviteBox url={shareUrl} qr={qr} onToggleQr={showQr} />
 
           {err && <p className="mt-3 text-xs text-red-300">{err}</p>}
 

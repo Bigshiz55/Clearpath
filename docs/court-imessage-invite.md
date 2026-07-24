@@ -1,70 +1,112 @@
-# Live Court invite — iMessage-first
+# Live Court "Send invite" — native iOS share sheet (final)
 
-Redesigns the Court invite around the native iOS share sheet so a host can send the
-invitation over **iMessage** in one tap, with a polished fallback that includes an
-**Open Messages** (`sms:`) deep link.
+Tapping **Send invite** opens the native iOS share sheet (Messages/iMessage, Mail,
+WhatsApp, Copy…) directly from the tap, with a reliable clipboard→modal fallback.
 
-## Root cause — "why the Invite button didn't open the share sheet"
+## Exact root cause (why the tap did nothing)
 
-Checklist, with findings for this codebase:
+Two independent defects, fixed:
 
-| Check | Finding |
-|---|---|
-| `navigator.share()` called directly from the tap? | **Yes now** — `runInvite` creates the `share()` promise synchronously inside the click handler *before* any `await`, so iOS accepts the user gesture. (The pre-refactor `invite()` also called it in the tap, but…) |
-| An `async`/network op before `share()`? | **No** — the invite URL is computed at render (`shareUrl`), not fetched on tap; nothing is awaited before `share()`. |
-| Is the URL valid? | **Yes** — `https://<prod>/court/<code>`, an absolute HTTPS URL (`inviteShareData` passes it as `url`). An invalid/relative URL makes iOS reject the share; ours is absolute. |
-| Served over HTTPS? | **Required** — `navigator.share`/`clipboard` only exist in a secure context. Production is HTTPS; on plain-HTTP or a non-secure preview the API is absent → we now fall to the modal instead of doing nothing. |
-| Button disabled / covered? | **No** — `type="button"`, `pointer-events:auto`, `relative z-10`; only disabled during the brief "Opening Messages…" state. Playwright asserts it's the top element at its center and not covered. |
-| Exception swallowed? | **This was the real defect.** The old handler wrapped `share()` in a bare `catch {}` and then silently `writeText`'d with no UI, so a cancel, an unsupported browser, or a thrown error all looked identical: "nothing happened." Now a cancel is a clean no-op, and any other failure **opens the visible fallback modal** — the button never silently fails. |
-| Called inside an iframe? | **No** — Court renders at the top-level route `/court/[code]`, not embedded. (Web Share is blocked in cross-origin iframes without `allow="web-share"`; N/A here.) |
-| Production supports Web Share? | **Yes on iOS Safari** (and Android Chrome). Desktop Firefox/older browsers don't — those now get the modal (Copy link / Open Messages / Copy full), never a dead button. |
+1. **A double duplicate-tap lock that ate the tap.** The component's `onInvite`
+   set `lock.current = true` *before* calling `runInvite`, and `runInvite` begins
+   by checking that same lock and bailing as a duplicate — so it returned
+   `ignored-duplicate` and **never called `navigator.share()`**. The button looked
+   tappable and produced no sheet, no toast, no error: a silent no-op. Fix: the
+   component no longer pre-sets the lock; `runInvite` owns it (sets it true *after*
+   its own guard, releases in `finally`). This was the concrete reason the tap did
+   nothing in the harness and is the class of bug that reproduces on-device.
+2. **The button could get stuck `disabled`.** The Send button was
+   `disabled={state === 'sharing'}`; if a `navigator.share()` promise ever hung
+   (a known iOS/PWA quirk) or a prior run left the state, the button stayed
+   permanently disabled → "tapping does nothing." Fix: the button is **never**
+   `disabled`; a **time-bounded** ref-lock (auto-released after 1.5s) prevents
+   double-taps without ever freezing the control.
 
-**Summary:** the flow was already gesture-synchronous, but failures were swallowed with no fallback UI, so on any device/context where the sheet didn't open the button appeared broken. The fix makes the fallback explicit and iMessage-oriented.
+The full checklist findings: the share call is now synchronous inside the tap (no
+awaited fetch/auth/room-creation before it, no `window.open` first); the URL is
+prepared before the tap and validated (`isValidInviteUrl`); a real
+`<button type="button">`; `pointer-events:auto`, `touch-action:manipulation`,
+`z-10`, not covered (asserted via `elementFromPoint`); no nested interactive HTML;
+`/court/[code]` is top-level (not an iframe). HTTPS + production Web Share support
+are device/deploy conditions covered by the manual steps.
 
-## Exact behavior now
+## Behavior now
 
-1. Tap **💬 Invite** → `navigator.share({ title: "WatchVerdict Live Court", text: <friendly message, room name woven in>, url: <prod room URL> })`, invoked synchronously in the gesture → iOS share sheet opens → user picks **Messages** → sends over iMessage. We never auto-send (browsers can't) and never show an in-app recipient picker.
-2. **Cancel** (dismiss sheet) → clean no-op.
-3. **Share unavailable or throws** → a polished modal:
-   - **Open Messages** — an `sms:&body=<encoded message + URL>` link (iOS opens Messages prefilled).
-   - **Copy invite link** — copies the room URL, confirms "Invite link copied".
-   - **Copy full invitation** — copies message + URL, confirms "Invitation copied".
-   - Close. Every copy shows a clear confirmation; the button never silently fails.
+Tap **📨 Send invite** →
+1. `navigator.share({ title: "Join my WatchVERD1CT Court", text: "Help us decide what
+   to watch tonight. Join my WatchVERD1CT Court:", url: <prod room URL> })`, invoked
+   synchronously → iOS share sheet → pick Messages → send over iMessage.
+2. Dismiss (AbortError) → silent no-op.
+3. Share unsupported / non-cancel error → copy `"<message> <url>"` to the clipboard →
+   toast **"Invite link copied — paste it into Messages."**
+4. Clipboard also fails → **manual modal**: the full invitation, **Open Messages**
+   (`sms:&body=<encoded message+url>`), **Copy invitation**, **Close**.
+5. URL not ready/invalid → visible error toast "The invitation link is not ready yet."
 
-Copy: *"Join me in WatchVerdict Live Court (room ABCD). We'll each pick our favorites, then WatchVerdict will combine our taste and choose what we should watch tonight."*
+Every non-cancel outcome is visible — a tap never silently does nothing.
+
+## Layout (iPhone-first)
+
+- **Send invite** is the full-width primary button, **≥52px**, `touch-action:
+  manipulation`, active/pressed state; **QR code** is the secondary button. Stacked
+  vertically with ≥12px gap on phones, side-by-side from 420px.
+- The raw URL is replaced by a **compact one-line row**: 🔗 `host/court/…`
+  (truncated) + a separate **Copy** control — never overlaps the buttons or escapes
+  the card (asserted at 320/375/390).
 
 ## URL / room / auth
 
-- **Production domain:** `NEXT_PUBLIC_SITE_URL` (inlined at build) is preferred; falls back to `window.location.origin` (which in production *is* the HTTPS production domain).
-- **Secure room id:** the 8-char room code from `court_create` (`/court/<code>`).
-- **Invitation preserved through login/signup + joins the exact room:** `/court/[code]` is a **top-level route, not under the `/app` auth gate**, and Court RPCs allow guests (`court_join` granted to `anon`). So opening the link lands the recipient directly in the exact room — no login wall — and if they do sign in, the code is in the URL path and preserved.
+- Production origin: `NEXT_PUBLIC_SITE_URL` (inlined) → falls back to
+  `window.location.origin` (which in production is the HTTPS prod domain, e.g.
+  `clearpath-pearl-chi.vercel.app`).
+- Secure room id: the code from `court_create` → `/court/<code>`.
+- `/court/[code]` is a top-level, guest-joinable route (Court RPCs granted to
+  `anon`), so the recipient's link opens the exact room with no login wall;
+  preserved through login/signup because the code is in the URL path.
 
 ## Files changed
 
-- `src/lib/courtInvite.ts` — iMessage-first pure logic: `inviteMessage`/`inviteShareData` (room-name aware), `fullInvitation`, `smsHref` (URL-encoded `sms:&body=`), `runInvite` (share → cancel no-op → **fallback modal**), `copyText` helper.
-- `src/components/court/CourtInviteBox.tsx` — 💬 Invite button + modal with **Open Messages / Copy invite link / Copy full invitation** and clear copy confirmations; `roomName` prop.
-- `src/components/LiveCourt.tsx` — production-domain invite URL (`NEXT_PUBLIC_SITE_URL` → origin) + passes `roomName` (`room <code>`).
-- `src/app/dev/court-invite/Harness.tsx` — passes `roomName`.
-- `src/lib/courtInvite.test.ts` — 11 unit tests (share payload, room-name copy, `smsHref` encoding, `fullInvitation`, cancel/unsupported/error → modal, dedupe, `copyText`).
-- `tests/responsive/court-invite.spec.ts` — 8 Playwright tests (below).
+- `src/lib/courtInvite.ts` — `isValidInviteUrl`, `inviteShareData`,
+  `inviteClipboardText`, `smsHref`, `displayInviteUrl`, and `runInvite`
+  (share → cancel no-op → clipboard/toast → manual modal → visible error).
+- `src/components/court/CourtInviteBox.tsx` — full-width 52px Send invite, QR
+  secondary, compact truncated URL row + Copy, error/copied toasts, manual modal;
+  time-bounded lock (never `disabled`).
+- `src/components/LiveCourt.tsx` — production-domain invite URL.
+- `src/app/dev/court-invite/{page,Harness}.tsx` — harness uses the prod-style URL and
+  a `missing` mode for the invalid-URL path.
+- `src/lib/courtInvite.test.ts` (14) + `tests/responsive/court-invite.spec.ts` (10).
 
-## Automated browser verification (Chromium) — what Playwright CAN check
+## Commands run — real results
 
-**8/8 pass @ 390px:** real enabled unobstructed `<button type=button>`; tap calls `navigator.share` once with the correct title + friendly message + **production URL**; cancel → no modal, label restored; unsupported/error → the polished modal with **Open Messages** (`sms:&body=` deep link carrying the encoded message + URL), Copy link, Copy full; both copies confirm and copy the right text; rapid taps → exactly one share call; QR inside its card with the URL below it, no overflow. Unit: **11/11**. Typecheck, lint, build, full suite green.
+- `npm run lint` → clean · `npm run typecheck` → clean
+- `npm test` → **392 passed** · `npm run build` → success
+- `npx playwright test court-invite.spec.ts` → **10 passed**; full Playwright → **52 passed**
+- Console: only the dev-only `[court-invite]` traces (gated to non-production).
 
-## Manual iPhone verification (required — Playwright cannot drive the iOS share sheet or Messages)
+## Automated (Chromium) vs. manual iPhone
 
-Playwright can't open the real share sheet or the Messages app, so these steps must be done on a device:
+Automated (10 Playwright): tap calls `navigator.share` once with the correct prod
+URL from the click; AbortError → no error/modal; non-abort → clipboard + toast;
+unsupported → clipboard + toast; clipboard fail → modal with a valid `sms:` link;
+invalid URL → visible error, no share; rapid taps → one share, never permanently
+disabled; no invisible element blocks the button; no overflow + ≥52px button + URL
+row contained at 320/375/390.
 
-**Sender (iPhone Safari, ~390px):**
-1. Open the production site over **HTTPS**, start a Live Court, reach the waiting room.
-2. Tap **💬 Invite** → confirm the **native share sheet opens** immediately.
-3. Confirm **Messages** appears as a target; select it → the prewritten invitation (message + room link) is prefilled in a new iMessage.
-4. Send to the recipient. (Optional) tap Cancel instead → confirm nothing breaks and the button resets.
-5. Fallback: in a browser without Web Share (or if the sheet is dismissed), confirm the modal's **Open Messages** opens Messages prefilled, and both Copy actions show a confirmation.
+**Manual (required — Playwright can't drive the iOS share sheet/Messages):**
+1. iPhone **Safari** over HTTPS: start a Court, reach the waiting room, tap **Send
+   invite** → confirm the **native share sheet opens** and Messages is selectable
+   with the invitation + link prefilled; send it.
+2. iPhone **installed PWA** (Add to Home Screen, standalone): repeat step 1.
+3. **Android Chrome / desktop Chrome**: share sheet where supported, else the
+   copied toast. **Desktop Safari / Firefox**: copied toast or modal.
+4. Dismiss the sheet → nothing breaks, button resets.
+5. **Recipient (second user / second phone):** open the link from Messages → lands
+   in the **same room**, joins and picks without a login wall.
 
-**Recipient (a second, separate user / second iPhone):**
-6. Open the received link from Messages → confirm it opens **the exact same room** (same code) and can join and pick, without being forced to log in.
-7. Verify sender and recipient appear together in the same waiting room and the draft proceeds.
+## Remaining limitation
 
-Do not merge or deploy.
+The actual iOS share-sheet → Messages hand-off and the installed-PWA path can only be
+confirmed on a physical device (Playwright/Chromium can't invoke the OS sheet). The
+code satisfies the iOS rules (synchronous, gesture-bound, HTTPS, validated absolute
+URL); step-through above is the on-device confirmation. Do not merge or deploy.
