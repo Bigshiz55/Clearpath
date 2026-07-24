@@ -57,7 +57,20 @@ export function DnaQuizHarness() {
           <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-sm font-semibold text-slate-100">→</span>
         </div>
 
-        <DnaQuiz items={MOCK} onSubmit={onSubmit} onUndo={onUndo} />
+        <DnaQuiz
+          items={MOCK}
+          onSubmit={onSubmit}
+          onUndo={onUndo}
+          calibration={{
+            total: MOCK.length,
+            answered: 0,
+            showQuizProgress: true,
+            source: 'calibration',
+            endpoint: '/api/calibration',
+            doneHref: '/app/watch',
+            label: 'Watch DNA calibration',
+          }}
+        />
       </main>
 
       {/* Mock fixed bottom nav — same height/position/reserve as the real one */}

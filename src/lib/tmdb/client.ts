@@ -296,6 +296,10 @@ export interface DiscoverOptions {
   excludeGenreIds?: number[];
   /** TMDB keyword ids (with_keywords) — trope/subject/vibe filtering (OR). */
   keywordIds?: number[];
+  /** ISO-639-1 original language (with_original_language), e.g. 'ja' for anime. */
+  originalLanguage?: string;
+  /** ISO-3166-1 origin country (with_origin_country), e.g. 'KR' for K-drama. */
+  originCountry?: string;
   page?: number;
 }
 
@@ -319,6 +323,8 @@ export async function discoverTitles(
   if (opts.genreIds && opts.genreIds.length > 0) params.with_genres = opts.genreIds.join('|');
   if (opts.excludeGenreIds && opts.excludeGenreIds.length > 0) params.without_genres = opts.excludeGenreIds.join(',');
   if (opts.keywordIds && opts.keywordIds.length > 0) params.with_keywords = opts.keywordIds.join('|'); // OR — any matching trope
+  if (opts.originalLanguage) params.with_original_language = opts.originalLanguage;
+  if (opts.originCountry) params.with_origin_country = opts.originCountry;
   // Monetization: an explicit filter wins; otherwise, when filtering by provider,
   // default to the "included" tiers so results are things you can actually stream.
   const monetization = opts.monetization ?? (opts.providerIds && opts.providerIds.length > 0 ? 'flatrate|free|ads' : undefined);
