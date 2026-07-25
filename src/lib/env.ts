@@ -137,11 +137,21 @@ export const serverEnv = {
   migrateSecret(): string | undefined {
     return optional('MIGRATE_SECRET');
   },
-  /** Comma/space-separated allowlist of admin emails (ADMIN_EMAILS). */
+  /**
+   * Allowlist of admin emails (ADMIN_EMAILS), separated by commas OR whitespace
+   * — including newlines, because Vercel's env editor is a textarea and people
+   * paste one address per line.
+   *
+   * This deliberately splits the RAW value BEFORE `clean()` touches it.
+   * `clean()` strips non-printable characters by DELETING them, so cleaning
+   * first turns "a@x.com\nb@y.com" into the single fused entry
+   * "a@x.comb@y.com" — the list still looks populated (count 1) while matching
+   * nobody, which is a 404 with no diagnosis attached.
+   */
   adminEmails(): string[] {
-    return (optional('ADMIN_EMAILS') ?? '')
-      .split(/[,\s]+/)
-      .map((s) => s.trim().toLowerCase())
+    return (process.env.ADMIN_EMAILS ?? '')
+      .split(/[,;\s]+/)
+      .map((s) => clean(s).toLowerCase())
       .filter(Boolean);
   },
   /**

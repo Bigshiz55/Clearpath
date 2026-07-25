@@ -205,14 +205,22 @@ export async function GET(request: Request) {
   // enumerating admins.
   if (searchParams.get('probe') === 'founder') {
     const admins = serverEnv.adminEmails();
+    // Shape-only validation. An entry with two "@" is almost always two pasted
+    // addresses that got fused; one with none is not an address at all. Both
+    // leave the list looking populated while matching nobody, so the count
+    // alone is not enough to trust.
+    const malformed = admins.filter((e) => (e.match(/@/g) ?? []).length !== 1).length;
     return NextResponse.json({
       probe: 'founder',
       result: {
         adminEmailsConfigured: admins.length > 0,
         adminEmailCount: admins.length,
-        hint: admins.length > 0
-          ? 'ADMIN_EMAILS is set. /founder/recommendation-lab is reachable by those accounts once signed in.'
-          : 'ADMIN_EMAILS is EMPTY — /founder/recommendation-lab will 404 for everyone, including you. Set it in Vercel and redeploy.',
+        malformedEntries: malformed,
+        hint: admins.length === 0
+          ? 'ADMIN_EMAILS is EMPTY — /founder/recommendation-lab will 404 for everyone, including you. Set it in Vercel and redeploy.'
+          : malformed > 0
+            ? `${malformed} entr${malformed === 1 ? 'y does' : 'ies do'} not look like a single email address — usually two addresses fused together. Re-enter one per line or comma-separated, then redeploy.`
+            : 'ADMIN_EMAILS is set and every entry is well-formed. Sign in, then open /api/founder/self-check to confirm YOUR address is the one on the list.',
       },
     }, { headers: { 'cache-control': 'no-store' } });
   }
