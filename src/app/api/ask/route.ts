@@ -8,6 +8,8 @@ import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askP
 import { augmentInternational } from '@/lib/askInternational';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
 import { classifySearch } from '@/lib/nlu/searchMode';
+import { buildQueryPlan } from '@/lib/nlu/queryPlan';
+import { mediaTypeSatisfies } from '@/lib/nlu/mediaOntology';
 
 /**
  * "Something like X" is best served by TMDB-similar ONLY when the reference is
@@ -138,12 +140,24 @@ export async function POST(req: Request) {
     }
 
     const result = await runFinder(supabase, user.id, query, watcher, limit);
+
+    // FINAL MEDIA-TYPE GUARD (last line of defence): when the request explicitly
+    // asked for movies (or shows), a candidate of the opposite type must never be
+    // shown — regardless of how high it ranks. This is what stops "three movies
+    // on Lifetime" from surfacing TV series. It only REMOVES wrong-type results;
+    // it never substitutes, so an honest shortfall is preferred over a wrong fill.
+    let items = result.items;
+    const plan = text.trim() ? buildQueryPlan(text) : null;
+    if (plan && plan.mediaTypes.length > 0) {
+      items = items.filter((i) => plan.mediaTypes.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
+    }
+
     return NextResponse.json({
       kind: 'search',
       query,
       scoredFor: result.scoredFor,
       relaxed: result.relaxed,
-      items: result.items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+      items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
     });
   } catch {
     return NextResponse.json({ error: 'The court hit a snag.' }, { status: 500 });
