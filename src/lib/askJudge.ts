@@ -39,7 +39,7 @@ function titleMatches(cleaned: string, resultTitle: string): boolean {
  *  phrase ("a crime thriller under 2h") — those belong to the Finder. */
 export function looksLikeTitleAsk(text: string): boolean {
   const q = naiveParseQuery(text);
-  if (q.genreIds.length > 0 || q.minMatch != null || q.minAudience != null || q.maxRuntime !== EMPTY_QUERY.maxRuntime) return false;
+  if (q.genreIds.length > 0 || q.minMatch != null || q.minAudience != null || q.maxRuntime != null) return false;
   if (/\b(something|anything|surprise|recommend|find me|show me|in the mood|funny|scary|short|long|bingeable)\b/i.test(text)) return false;
   return cleanTitleText(text).length >= 3;
 }

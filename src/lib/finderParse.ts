@@ -7,7 +7,7 @@ import { GENRE_IDS, genreLabel } from '@/lib/finderGenres';
 export const EMPTY_QUERY: FinderQuery = {
   mediaType: 'any',
   genreIds: [],
-  maxRuntime: 150, // default cap ~2.5h; drag right to "Any length"
+  maxRuntime: null, // neutral — "Any length" filters nothing until the user (or their ask) sets a cap
   sinceMonths: null,
   minAudience: null,
   minImdb: null,
@@ -29,8 +29,7 @@ export function describeQuery(q: FinderQuery): string {
   if (q.mediaType === 'movie') parts.push('movies');
   else if (q.mediaType === 'tv') parts.push('shows');
   for (const id of q.genreIds) parts.push(genreLabel(id).toLowerCase());
-  // Only announce a length the user actually asked for — not the silent default cap.
-  if (q.maxRuntime != null && q.maxRuntime !== EMPTY_QUERY.maxRuntime) {
+  if (q.maxRuntime != null) {
     const h = Math.floor(q.maxRuntime / 60);
     const m = q.maxRuntime % 60;
     parts.push(h > 0 ? `under ${h}${m ? `h${m}m` : 'h'}` : `under ${m}m`);

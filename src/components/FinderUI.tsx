@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
+import { canonicalQueryKey, activeFilterChips } from '@/lib/refineState';
 import { STREAMING_SERVICES } from '@/lib/services';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { PosterCard } from '@/components/PosterCard';
@@ -170,6 +171,15 @@ export function FinderUI({
   const [relaxed, setRelaxed] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The canonical key of the request the current results came from. Comparing
+  // it to the key of the CURRENT controls is what detects "these results are
+  // stale relative to the filters" — no guessing from individual fields.
+  const [lastRunKey, setLastRunKey] = useState<string | null>(null);
+  const [justUpdated, setJustUpdated] = useState(false);
+  // Latest-request-wins: a monotonic id + AbortController so a slow older
+  // response can never overwrite a newer result set.
+  const seqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   function onText(v: string) {
     setText(v);
@@ -223,33 +233,57 @@ export function FinderUI({
     }));
   }
   async function find(qOverride?: FinderQuery, textOverride?: string) {
+    const mySeq = ++seqRef.current;
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
     setLoading(true);
     setError(null);
+    const watcher = watcherIdx >= 0 ? watchers[watcherIdx] : null;
+    const effQuery = qOverride ?? q;
+    const effText = (textOverride ?? text).trim();
+    const runKey = canonicalQueryKey(effQuery, effText, watcher?.name ?? null);
+    const isRefinement = items != null;
     try {
-      const watcher = watcherIdx >= 0 ? watchers[watcherIdx] : null;
       const res = await fetch('/api/finder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // Send the raw ask too, so the server can parse it smartly (actor names,
         // counts, "over 70%", etc.). Falls back to the tools below when empty.
-        body: JSON.stringify({ query: qOverride ?? q, text: (textOverride ?? text).trim(), watcher }),
+        body: JSON.stringify({ query: effQuery, text: effText, watcher }),
+        signal: ac.signal,
       });
       const data = await res.json();
+      if (mySeq !== seqRef.current) return; // superseded — a newer request owns the screen
       if (!res.ok) throw new Error(data.error ?? 'Failed');
       setItems(data.items ?? []);
       setScoredFor(data.scoredFor ?? 'Your match');
       setRelaxed(data.relaxed ?? null);
-    } catch {
+      setLastRunKey(runKey);
+      if (isRefinement) {
+        setJustUpdated(true);
+        window.setTimeout(() => setJustUpdated(false), 4000);
+      }
+    } catch (e) {
+      if (mySeq !== seqRef.current || (e instanceof DOMException && e.name === 'AbortError')) return;
       setError('Couldn’t run that search. Try again.');
       setItems([]);
+      setLastRunKey(runKey);
     } finally {
-      setLoading(false);
+      if (mySeq === seqRef.current) setLoading(false);
     }
   }
 
   const providerFilterNames = (q.providerIds ?? [])
     .map((id) => STREAMING_SERVICES.find((s) => s.id === id || s.ids.includes(id))?.name)
     .filter((n): n is string => Boolean(n));
+
+  // Staleness: the controls' canonical key vs. the key the results were
+  // fetched with. When they differ, the results no longer reflect the filters.
+  const currentKey = canonicalQueryKey(q, text.trim(), watcherIdx >= 0 ? (watchers[watcherIdx]?.name ?? null) : null);
+  const filtersChanged = items != null && !loading && lastRunKey != null && currentKey !== lastRunKey;
+  const filterChips = activeFilterChips(q);
+  const ctaLabel = loading ? 'The court is deliberating…' : items != null ? '⚖️ Update results' : '⚖️ Submit evidence';
 
   return (
     <div className="space-y-5">
@@ -296,7 +330,7 @@ export function FinderUI({
             ))}
           </div>
           <button onClick={() => void find()} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
-            {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
+            {ctaLabel}
           </button>
         </div>
       </div>
@@ -311,6 +345,22 @@ export function FinderUI({
 
       {items && !loading && (
         <div id="finder-results" className="scroll-mt-4">
+          {filtersChanged && (
+            <div
+              data-testid="filters-changed"
+              className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400/40 bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-100"
+            >
+              <span>Filters changed — these results don’t reflect them yet.</span>
+              <button onClick={() => void find()} className="flex-none rounded-lg border border-amber-300/50 bg-amber-400/20 px-3 py-1.5 text-xs font-bold text-amber-50 transition hover:bg-amber-400/30">
+                Update results
+              </button>
+            </div>
+          )}
+          {justUpdated && !filtersChanged && (
+            <p data-testid="results-updated" role="status" className="mb-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-100">
+              ✓ Results updated — everything below matches your current filters.
+            </p>
+          )}
           {relaxed && <p className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{relaxed}</p>}
           {items.length === 0 ? (
             <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and submit again.</p>
@@ -328,6 +378,14 @@ export function FinderUI({
                   ⚖️ Present new evidence ↓
                 </button>
               </div>
+              {filterChips.length > 0 && (
+                <div data-testid="active-filters" className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span className="uppercase tracking-wide text-slate-500">Filtering by</span>
+                  {filterChips.map((c) => (
+                    <span key={c} className="rounded-md border border-brand-400/30 bg-brand-500/10 px-2 py-0.5 font-semibold text-brand-100">{c}</span>
+                  ))}
+                </div>
+              )}
               <div className="poster-grid">
                 {items.map((it) => (
                   <PosterCard
@@ -512,7 +570,7 @@ export function FinderUI({
         </div>
 
         <button onClick={() => void find()} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
-          {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
+          {ctaLabel}
         </button>
       </div>
       </div>
