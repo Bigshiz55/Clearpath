@@ -35,6 +35,9 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
+  // Monotonic request id: a slower earlier fetch must never overwrite a newer
+  // query's results (prevents stale results appearing behind a new query).
+  const seqRef = useRef(0);
 
   // Resolve voice support AFTER mount only. Computing it from `window` during
   // render makes the server (no window → false) and first client render (true)
@@ -119,10 +122,15 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
       return;
     }
     setLoading(true);
+    // Never let a stale error/result set linger behind a NEW query (the "Sniper
+    // the last hand" case, where an old error message covered fresh content).
+    setError(null);
+    const mySeq = ++seqRef.current;
     debounce.current = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
+        if (mySeq !== seqRef.current) return; // a newer query superseded this one
         if (!res.ok) {
           setError(data.error ?? 'Search failed.');
           setResults([]);
@@ -134,9 +142,9 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
           setOpen(true);
         }
       } catch {
-        setError('Network error. Please try again.');
+        if (mySeq === seqRef.current) setError('Network error. Please try again.');
       } finally {
-        setLoading(false);
+        if (mySeq === seqRef.current) setLoading(false);
       }
     }, 300);
     return () => {
@@ -164,7 +172,13 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
           autoFocus={autoFocus}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          onFocus={() => results.length && setOpen(true)}
+          onFocus={(e) => {
+            if (results.length) setOpen(true);
+            // When the on-screen keyboard opens, keep the field (and its results)
+            // in view instead of hidden behind the keyboard.
+            const el = e.currentTarget;
+            setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 250);
+          }}
           onKeyDown={(e) => {
             if (e.key !== 'Enter') return;
             const query = q.trim();
