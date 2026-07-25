@@ -165,18 +165,18 @@ export function extractWatchTitle(text: string): string | null {
 export function detectGenre(text: string): string | null {
   const t = ` ${text.toLowerCase()} `;
   const table: [RegExp, string][] = [
-    [/\b(comed(y|ies)|sitcoms?|funny)\b/, 'Comedy'],
+    [/\b(comed(y|ies)|sitcoms?|funny|comdey|comdy)\b/, 'Comedy'],
     [/\b(dramas?)\b/, 'Drama'],
     [/\b(crime)\b/, 'Crime'],
-    [/\b(thrillers?)\b/, 'Thriller'],
-    [/\b(horror|scary)\b/, 'Horror'],
+    [/\b(thrillers?|thriler|thrillr)\b/, 'Thriller'],
+    [/\b(horror|scary|horrer|horor|horrror)\b/, 'Horror'],
     [/\b(sci-?fi|science fiction)\b/, 'Science-Fiction'],
-    [/\b(rom-?coms?|romance|romantic)\b/, 'Romance'],
-    [/\b(myster(y|ies))\b/, 'Mystery'],
+    [/\b(rom-?coms?|romance|romantic|romence)\b/, 'Romance'],
+    [/\b(myster(y|ies)|mistery)\b/, 'Mystery'],
     [/\b(action)\b/, 'Action'],
     [/\b(reality)\b/, 'Reality'],
     [/\b(sports?)\b/, 'Sports'],
-    [/\b(documentar(y|ies)|docs?)\b/, 'Documentary'],
+    [/\b(documentar(y|ies)|docs?|documentry|documentery|documantary)\b/, 'Documentary'],
     [/\b(fantasy)\b/, 'Fantasy'],
     [/\b(family|kids?|children'?s?)\b/, 'Family'],
     [/\b(western)\b/, 'Western'],
@@ -317,6 +317,7 @@ export function detectPlatform(text: string): { id: number; name: string } | nul
     { id: 37, name: 'Showtime', strong: /\bshowtime\b/ },
     { id: 526, name: 'AMC+', strong: /\bamc\s*\+/ },
     { id: 151, name: 'BritBox', strong: /\bbritbox\b/ },
+    { id: 87, name: 'Acorn TV', strong: /\b(acorn tv|acorn)\b/ },
     { id: 73, name: 'Tubi', strong: /\btubi\b/ },
     { id: 300, name: 'Pluto TV', strong: /\bpluto\b/ },
     { id: 207, name: 'The Roku Channel', strong: /\broku\b/ },
@@ -345,17 +346,21 @@ export function detectPlatform(text: string): { id: number; name: string } | nul
 
 interface OriginRule { re: RegExp; country: string; lang: string }
 const ORIGIN_RULES: OriginRule[] = [
-  { re: /\b(spanish|spain|castilian|from spain)\b/, country: 'ES', lang: 'es' },
+  // Each rule carries a few curated, unambiguous MISSPELLINGS so the offline
+  // fallback (used when the LLM parser has no key) still resolves origin on a
+  // typo. Exhaustive typo handling is the live LLM's job; these are the common
+  // ones seen in real voice/keyboard input.
+  { re: /\b(spanish|spain|castilian|from spain|spanihs|spansh|spainish|espanol)\b/, country: 'ES', lang: 'es' },
   { re: /\b(mexican|mexico)\b/, country: 'MX', lang: 'es' },
   { re: /\b(argentin(e|ian)|argentina)\b/, country: 'AR', lang: 'es' },
-  { re: /\b(french|france)\b/, country: 'FR', lang: 'fr' },
-  { re: /\b(italian|italy)\b/, country: 'IT', lang: 'it' },
-  { re: /\b(german|germany)\b/, country: 'DE', lang: 'de' },
-  { re: /\b(korean|korea|k-?drama)\b/, country: 'KR', lang: 'ko' },
-  { re: /\b(japanese|japan)\b/, country: 'JP', lang: 'ja' },
+  { re: /\b(french|france|frenchh|frnch)\b/, country: 'FR', lang: 'fr' },
+  { re: /\b(italian|italy|italion|itallian)\b/, country: 'IT', lang: 'it' },
+  { re: /\b(german|germany|germen|jerman)\b/, country: 'DE', lang: 'de' },
+  { re: /\b(korean|korea|k-?drama|koreen|korien|korain)\b/, country: 'KR', lang: 'ko' },
+  { re: /\b(japanese|japan|japanes|japenese|japenes)\b/, country: 'JP', lang: 'ja' },
   { re: /\b(indian|india|bollywood|hindi)\b/, country: 'IN', lang: 'hi' },
   { re: /\b(brazil(ian)?|portuguese)\b/, country: 'BR', lang: 'pt' },
-  { re: /\b(british|england|english|uk|u\.k\.)\b/, country: 'GB', lang: 'en' },
+  { re: /\b(british|england|english|uk|u\.k\.|britsh|brittish|britsish)\b/, country: 'GB', lang: 'en' },
   { re: /\b(irish|ireland)\b/, country: 'IE', lang: 'en' },
   { re: /\b(australian|australia)\b/, country: 'AU', lang: 'en' },
   { re: /\b(scandinavian|swedish|sweden|norwegian|norway|danish|denmark|nordic)\b/, country: 'SE', lang: 'sv' },
@@ -377,7 +382,7 @@ export function detectOrigin(text: string): OriginDetection {
     if (r.re.test(t)) {
       // "english" alone (audio) must not be read as British origin — require a
       // stronger UK cue for GB, but always allow the language signal elsewhere.
-      if (r.country === 'GB' && !/\b(british|england|uk|u\.k\.)\b/.test(t)) continue;
+      if (r.country === 'GB' && !/\b(british|england|uk|u\.k\.|britsh|brittish|britsish)\b/.test(t)) continue;
       countries.add(r.country);
       if (r.lang !== 'en') languages.add(r.lang);
     }

@@ -37,10 +37,25 @@ const PLATFORMS: Platform[] = [
   { phrase: 'on Hulu', kind: 'platform', id: 15 },
   { phrase: 'on Max', kind: 'platform', id: 1899 },
   { phrase: 'on Disney+', kind: 'platform', id: 337 },
+  { phrase: 'on Apple TV+', kind: 'platform', id: 350 },
+  { phrase: 'on Peacock', kind: 'platform', id: 386 },
+  { phrase: 'on Paramount+', kind: 'platform', id: 531 },
+  { phrase: 'on BritBox', kind: 'platform', id: 151 },
+  { phrase: 'on Acorn TV', kind: 'platform', id: 87 },
   { phrase: 'on Hallmark', kind: 'network', key: 'hallmark' },
+  { phrase: 'on Lifetime', kind: 'network', key: 'lifetime' },
 ];
 
-const GENRES = ['crime', 'mystery', 'thriller', 'comedy', 'romance', 'horror', 'documentary', 'detective', 'action'];
+// Curated, unambiguous platform misspellings — each maps back to the same id so
+// the generator can prove the offline typo-tolerance path across the fleet.
+const PLATFORM_TYPOS: Record<number, string[]> = {
+  8: ['on Netflx', 'on netlix', 'on netfix'],
+};
+
+const GENRES = [
+  'crime', 'mystery', 'thriller', 'comedy', 'romance', 'horror', 'documentary', 'detective', 'action',
+  'family', 'psychological thriller', 'sci-fi', 'fantasy', 'western', 'drama', 'kids',
+];
 const REFERENCES = ['Rocky', 'Knives Out', 'The Silence of the Lambs', 'Gone Girl', 'Home Alone', 'Se7en', 'Die Hard'];
 const RUNTIMES = [
   { phrase: 'under 90 minutes', max: 90 },
@@ -82,12 +97,17 @@ export function generateCases(n: number, seed = 1): CriticalCase[] {
     const excl = useExcl ? pick(EXCLUSIONS, r) : null;
     const noun = media === 'movie' ? (chance(0.5, r) ? 'movie' : 'film') : 'series';
 
-    // Assemble a natural prompt.
+    // Assemble a natural prompt. A fraction of platform mentions are swapped for
+    // a curated misspelling to exercise offline typo-tolerance at scale.
     const parts = ['A'];
     if (origin) parts.push(origin.adj);
     parts.push(genre, noun);
     if (ref) parts.push(`like ${ref}`);
-    if (platform) parts.push(platform.phrase);
+    if (platform) {
+      const typos = platform.id != null ? PLATFORM_TYPOS[platform.id] : undefined;
+      const usePhrase = typos && chance(0.3, r) ? pick(typos, r) : platform.phrase;
+      parts.push(usePhrase);
+    }
     if (audio) parts.push(audio.phrase);
     if (runtime) parts.push(runtime.phrase);
     let prompt = parts.join(' ');

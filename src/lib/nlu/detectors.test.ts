@@ -8,6 +8,7 @@ import {
   detectNetwork,
   detectPlatform,
   detectExcludedMediaType,
+  detectOrigin,
   extractCount,
   parseRequestedCount,
 } from './detectors';
@@ -162,6 +163,36 @@ describe('detectPlatform', () => {
   });
   it('recognizes BritBox as a platform (named in the difficult-search set)', () => {
     expect(detectPlatform('a detective series on BritBox')).toEqual({ id: 151, name: 'BritBox' });
+  });
+  it('recognizes the full forensic streaming set', () => {
+    expect(detectPlatform('on Acorn TV')).toEqual({ id: 87, name: 'Acorn TV' });
+    expect(detectPlatform('a mystery on Acorn')).toEqual({ id: 87, name: 'Acorn TV' });
+    expect(detectPlatform('on Apple TV+')).toEqual({ id: 350, name: 'Apple TV+' });
+    expect(detectPlatform('on Peacock')).toEqual({ id: 386, name: 'Peacock' });
+    expect(detectPlatform('on Paramount+')).toEqual({ id: 531, name: 'Paramount+' });
+  });
+});
+
+describe('detectOrigin — curated misspellings (offline fallback)', () => {
+  it('resolves common origin misspellings', () => {
+    expect(detectOrigin('a koreen thriller').countries).toContain('KR');
+    expect(detectOrigin('a spanihs film').countries).toContain('ES');
+    expect(detectOrigin('a japanes movie').countries).toContain('JP');
+    expect(detectOrigin('a britsh detective series').countries).toContain('GB');
+    expect(detectOrigin('an italion drama').countries).toContain('IT');
+  });
+  it('still never reads "english" (audio) as British origin', () => {
+    expect(detectOrigin('an english movie').countries).not.toContain('GB');
+    expect(detectOrigin('a spanish film with english audio').countries).not.toContain('GB');
+  });
+});
+
+describe('detectGenre — curated misspellings', () => {
+  it('resolves common genre misspellings', () => {
+    expect(detectGenre('a horrer movie')).toBe('Horror');
+    expect(detectGenre('a documentry about whales')).toBe('Documentary');
+    expect(detectGenre('a comdey series')).toBe('Comedy');
+    expect(detectGenre('a thriler')).toBe('Thriller');
   });
 });
 
