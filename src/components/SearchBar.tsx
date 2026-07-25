@@ -36,9 +36,14 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
 
-  const voiceSupported =
-    typeof window !== 'undefined' &&
-    ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+  // Resolve voice support AFTER mount only. Computing it from `window` during
+  // render makes the server (no window → false) and first client render (true)
+  // disagree, which is a hydration mismatch (React #418). Start false on both
+  // sides, then reveal the mic once mounted.
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  useEffect(() => {
+    setVoiceSupported('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+  }, []);
 
   // A spoken/typed *request* ("give me a crime thriller under 2 hours") isn't a
   // title lookup — hand it to the judge, who actually runs it. A short phrase is
@@ -185,7 +190,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
           <button
             type="button"
             onClick={clearAll}
-            className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-slate-300 transition hover:bg-white/5 hover:text-white"
+            className="absolute right-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-lg text-slate-300 transition hover:bg-white/5 hover:text-white"
             aria-label="Clear search"
             title="Clear"
           >
@@ -197,7 +202,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
           <button
             type="button"
             onClick={listening ? stopVoice : startVoice}
-            className={`absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg transition ${
+            className={`absolute right-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-lg transition ${
               listening ? 'bg-red-500/20 text-red-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
             aria-label={listening ? 'Stop voice search' : 'Search by voice'}

@@ -111,7 +111,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
             key={ex.hint}
             type="button"
             onClick={() => fill(ex.text)}
-            className="min-h-[36px] rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[13px] font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white active:scale-95"
+            className="min-h-[44px] rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[13px] font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white active:scale-95"
           >
             {ex.hint}
           </button>
@@ -122,7 +122,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
               key={ex.hint}
               type="button"
               onClick={() => fill(ex.text)}
-              className="min-h-[36px] rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[13px] font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white active:scale-95"
+              className="min-h-[44px] rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[13px] font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white active:scale-95"
             >
               {ex.hint}
             </button>
@@ -131,7 +131,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
           type="button"
           onClick={() => setShowMore((v) => !v)}
           aria-expanded={showMore}
-          className="min-h-[36px] rounded-full border border-brand-300/40 bg-transparent px-3 py-1.5 text-[13px] font-semibold text-brand-200 transition hover:bg-brand-500/15 active:scale-95"
+          className="min-h-[44px] rounded-full border border-brand-300/40 bg-transparent px-3 py-1.5 text-[13px] font-semibold text-brand-200 transition hover:bg-brand-500/15 active:scale-95"
         >
           {showMore ? 'Fewer ideas' : 'More ideas'}
         </button>
@@ -149,7 +149,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
 
       <Link
         href="/app/mentalist"
-        className="mt-3 block text-center text-xs font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline"
+        className="mt-2 flex min-h-[44px] items-center justify-center px-2 text-center text-xs font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline"
       >
         Or name a few titles you love — we’ll figure out your taste →
       </Link>

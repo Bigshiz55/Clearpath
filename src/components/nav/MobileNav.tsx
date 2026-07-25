@@ -28,7 +28,7 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
   return (
     <>
       {open && (
-        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm sm:hidden" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)}>
           <div
             className="absolute inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] mx-2 overflow-hidden rounded-2xl border border-white/10 bg-ink-850 p-2 shadow-card"
             onClick={(e) => e.stopPropagation()}
@@ -46,7 +46,7 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
         </div>
       )}
 
-      <nav data-app-bottomnav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-ink-950/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
+      <nav data-app-bottomnav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-ink-950/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
         {primary.map((l) => (
           <Link
             key={l.href}

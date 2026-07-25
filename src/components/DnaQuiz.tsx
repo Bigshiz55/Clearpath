@@ -368,8 +368,8 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-200">🧬 {cal.label ?? 'Watch DNA'}</span>
             <div className="flex items-center gap-1">
-              <button onClick={() => setShowIntro(true)} className="rounded-md px-1.5 py-1 text-slate-400 hover:text-slate-200" aria-label="How this works">ⓘ</button>
-              <button onClick={() => void undoLast()} disabled={history.current.length === 0} className="rounded-md px-2 py-1 text-xs font-bold text-brand-200 disabled:opacity-30" aria-label="Undo last answer">↶ Undo</button>
+              <button onClick={() => setShowIntro(true)} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-slate-400 hover:text-slate-200" aria-label="How this works">ⓘ</button>
+              <button onClick={() => void undoLast()} disabled={history.current.length === 0} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md px-2 text-xs font-bold text-brand-200 disabled:opacity-30" aria-label="Undo last answer">↶ Undo</button>
             </div>
           </div>
 

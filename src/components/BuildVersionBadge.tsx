@@ -49,8 +49,11 @@ export function BuildVersionBadge() {
 
   return (
     <>
-      {/* Fixed, centered, thin — floats above content, never blocks nav (the row
-          is pointer-events-none; only the pill itself is interactive). */}
+      {/* FIXED thin bar in its own top band (height ≈ --wv-badge-h). Fixed, so it
+          adds ZERO layout height — full-height (100dvh / min-h-dvh) screens don't
+          overflow. The app header reserves matching top padding so the badge sits
+          ABOVE the logo/controls and never overlaps them. The row is
+          pointer-events-none; only the pill is interactive. */}
       <div
         className="pointer-events-none fixed inset-x-0 top-0 z-[200] flex justify-center"
         style={{ paddingTop: 'max(env(safe-area-inset-top), 2px)' }}
@@ -62,14 +65,14 @@ export function BuildVersionBadge() {
           onPointerDown={startPress}
           onPointerUp={endPress}
           onPointerLeave={endPress}
-          className={`pointer-events-auto max-w-[92vw] truncate rounded-full border px-2.5 py-[3px] text-[10px] font-semibold leading-none tracking-wide shadow-sm backdrop-blur ${ENV_STYLE[env]}`}
+          className={`pointer-events-auto inline-flex h-5 max-w-[92vw] items-center truncate rounded-full border px-2.5 text-[10px] font-semibold leading-none tracking-wide shadow-sm backdrop-blur ${ENV_STYLE[env]}`}
           aria-label="Build and version information"
           data-testid="build-badge"
         >
           {!isPublicProduction(env) && (
             <span aria-hidden className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-current align-middle opacity-80" />
           )}
-          {badgeText(env, info)}
+          <span className="truncate">{badgeText(env, info)}</span>
         </button>
       </div>
 

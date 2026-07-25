@@ -32,7 +32,7 @@ export default function MobileHomeHarness() {
     <div className="min-h-dvh pb-20">
       <header
         data-testid="site-header"
-        className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[env(safe-area-inset-top)] backdrop-blur"
+        className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[calc(env(safe-area-inset-top)+1.5rem)] backdrop-blur"
       >
         <div className="container-page flex h-16 items-center">
           <Logo href="/app" size="lg" />

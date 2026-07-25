@@ -39,11 +39,13 @@ export function Nav({
 }) {
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[env(safe-area-inset-top)] backdrop-blur">
-        <div className="container-page flex h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-6">
+      {/* Top padding clears the fixed build badge (~1.5rem band) so it never
+          overlaps the logo or the header controls. */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[calc(env(safe-area-inset-top)+1.5rem)] backdrop-blur">
+        <div className="container-page flex h-16 items-center justify-between gap-2 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-6">
             <Logo href="/app" size="lg" />
-            <nav className="hidden items-center gap-1 sm:flex">
+            <nav className="hidden items-center gap-1 lg:flex">
               {PRIMARY.map((l) => (
                 <Link key={l.href} href={l.href} className="btn-ghost px-3 py-2 text-sm">
                   {l.label}
@@ -52,8 +54,10 @@ export function Nav({
               <MoreMenu links={SECONDARY} />
             </nav>
           </div>
-          <div className="flex items-center gap-2">
-            <ViewModeToggle />
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Desktop-preview toggle is meaningless on the phone-native layout
+                and its width overflowed narrow headers — hide it on mobile. */}
+            <ViewModeToggle className="hidden sm:inline-flex" />
             <Link
               href="/app/pro"
               title="WatchVerdict Pro — AI-tuned verdicts, household profiles & more"

@@ -47,9 +47,11 @@ export function Logo({
   compact?: boolean;
   size?: 'md' | 'lg';
 }) {
-  const box = size === 'lg' ? 'h-14 w-14 rounded-2xl' : 'h-9 w-9 rounded-xl';
-  const inner = size === 'lg' ? 'h-11 w-11' : 'h-7 w-7';
-  const word = size === 'lg' ? 'text-2xl sm:text-3xl' : 'text-lg';
+  // `lg` shrinks on small phones so the header (logo + right controls) never
+  // exceeds a narrow viewport, then grows from `sm` up.
+  const box = size === 'lg' ? 'h-11 w-11 rounded-xl sm:h-14 sm:w-14 sm:rounded-2xl' : 'h-9 w-9 rounded-xl';
+  const inner = size === 'lg' ? 'h-9 w-9 sm:h-11 sm:w-11' : 'h-7 w-7';
+  const word = size === 'lg' ? 'text-xl sm:text-3xl' : 'text-lg';
 
   return (
     <Link href={href} className="group inline-flex items-center gap-2.5">
