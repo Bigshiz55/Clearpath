@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { VotingFloor, type FloorCandidate } from '@/components/court/VotingFloor';
-import { buildPool, replaceCandidate, type PoolCandidate, type PoolState } from '@/lib/court/pool';
+import { CourtSizePicker } from '@/components/court/CourtSizePicker';
+import { buildPool, replaceCandidate, COURT_SIZES, DEFAULT_COURT_SIZE, type CourtSize, type PoolCandidate, type PoolState } from '@/lib/court/pool';
 import { canVote, VETO_TOKENS_PER_MEMBER, type Vote, type VoteAction } from '@/lib/court/voting';
 
 /**
@@ -14,7 +15,8 @@ import { canVote, VETO_TOKENS_PER_MEMBER, type Vote, type VoteAction } from '@/l
  */
 
 const GENRES = ['Mystery', 'Comedy', 'Thriller', 'Drama', 'Sci-Fi', 'Documentary', 'Action', 'Romance'];
-const FIXTURES: PoolCandidate[] = Array.from({ length: 12 }, (_, i) => ({
+// 20 fixtures so even a Deep court (16) can be filled from real supply.
+const FIXTURES: PoolCandidate[] = Array.from({ length: 20 }, (_, i) => ({
   key: `movie-${i + 1}`,
   title: i === 0 ? 'A Deliberately Very Long Fixture Title That Must Wrap Cleanly' : `Fixture Title ${i + 1}`,
   genre: GENRES[i % GENRES.length]!,
@@ -29,7 +31,8 @@ const FIXTURES: PoolCandidate[] = Array.from({ length: 12 }, (_, i) => ({
 const MEMBERS = ['you', 'heather', 'amy'];
 
 export default function CourtVoteHarness() {
-  const [pool, setPool] = useState<PoolState>(() => buildPool(FIXTURES));
+  const [size, setSize] = useState<CourtSize>(DEFAULT_COURT_SIZE);
+  const [pool, setPool] = useState<PoolState>(() => buildPool(FIXTURES, DEFAULT_COURT_SIZE));
   const [votes, setVotes] = useState<Vote[]>([
     // Two other members have already voted on the first title, so the
     // hidden-ballot state is visible immediately.
@@ -63,9 +66,26 @@ export default function CourtVoteHarness() {
     return { ok: true };
   }
 
+  // Changing the size rebuilds the court from the same supply. Votes are
+  // cleared because a ballot on a title that is no longer in play is a lie.
+  function changeSize(next: CourtSize) {
+    if (next === size) return;
+    setSize(next);
+    setPool(buildPool(FIXTURES, next));
+    setVotes([]);
+  }
+
+  const started = votes.some((v) => v.memberId === 'you');
+
   return (
     <main className="container-page py-6" data-testid="court-vote-harness">
       <h1 className="mb-4 text-xl font-black text-white">Court — voting floor</h1>
+      <div className="mb-5">
+        <CourtSizePicker value={size} onChange={changeSize} warnOnChange={started} />
+        <p data-testid="court-size-summary" className="mt-2 text-xs text-slate-400">
+          {COURT_SIZES[size].label}: {COURT_SIZES[size].total} titles, {COURT_SIZES[size].active} in play.
+        </p>
+      </div>
       <VotingFloor
         candidates={candidates}
         memberCount={MEMBERS.length}

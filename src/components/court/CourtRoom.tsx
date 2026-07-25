@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { WatchVerdictWordmark } from '@/components/WatchVerdictWordmark';
+import { CourtSizePicker } from '@/components/court/CourtSizePicker';
+import { COURT_SIZES, DEFAULT_COURT_SIZE, type CourtSize } from '@/lib/court/pool';
 import { qrForUrl } from '@/lib/actions/qr';
 import { getMyTaste, type MyTaste } from '@/lib/actions/profile';
 import {
@@ -73,6 +75,9 @@ export function CourtRoom({ code }: { code: string }) {
   // Stage 2 — tonight (TEMPORARY; never written to permanent DNA)
   const [tonight, setTonight] = useState<Tonight>(EMPTY_TONIGHT);
   const [tonightDone, setTonightDone] = useState(false);
+  // Court size is the HOST's setting for the whole room, so it lives beside
+  // tonight's preferences rather than inside them (guests never send it).
+  const [courtSize, setCourtSize] = useState<CourtSize>(DEFAULT_COURT_SIZE);
 
   // Stage 3 — shortlist
   const [picks, setPicks] = useState<Pick[]>([]);
@@ -108,6 +113,8 @@ export function CourtRoom({ code }: { code: string }) {
       if (savedPicks) setPicks(JSON.parse(savedPicks) as Pick[]);
       const savedTonight = localStorage.getItem(`court_tonight_${code}`);
       if (savedTonight) { setTonight(JSON.parse(savedTonight) as Tonight); setTonightDone(true); }
+      const savedSize = localStorage.getItem(`court_size_${code}`);
+      if (savedSize === 'quick' || savedSize === 'standard' || savedSize === 'deep') setCourtSize(savedSize);
       const savedReactions = localStorage.getItem(`court_react_${code}`);
       if (savedReactions) setMyReactions(JSON.parse(savedReactions) as Record<string, Reaction>);
     } catch { /* ignore */ }
@@ -210,7 +217,7 @@ export function CourtRoom({ code }: { code: string }) {
     setBuilding(true); setErr(null);
     const res = await fetch('/api/court/start', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, hostToken }),
+      body: JSON.stringify({ code, hostToken, size: courtSize }),
     });
     const d = await res.json().catch(() => ({}));
     setBuilding(false);
@@ -570,6 +577,7 @@ export function CourtRoom({ code }: { code: string }) {
             {tonight.moods.length > 0 ? ` · ${tonight.moods.join(', ')}` : ''}
             {tonight.avoid.length > 0 ? ` · avoiding ${tonight.avoid.join(', ')}` : ''}
             {tonight.time !== 'any' ? ` · ${TIMES.find((t) => t.k === tonight.time)?.label}` : ''}
+            {isHost ? ` · ${COURT_SIZES[courtSize].label} (${COURT_SIZES[courtSize].total} titles)` : ''}
           </p>
         ) : (
           <div className="mt-3 space-y-3">
@@ -593,6 +601,18 @@ export function CourtRoom({ code }: { code: string }) {
                 <Chip key={t.k} on={tonight.time === t.k} onClick={() => setTonight({ ...tonight, time: t.k })}>{t.label}</Chip>
               ))}
             </Field>
+            {isHost && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                <CourtSizePicker
+                  value={courtSize}
+                  onChange={(next) => {
+                    setCourtSize(next);
+                    try { localStorage.setItem(`court_size_${code}`, next); } catch { /* ignore */ }
+                  }}
+                />
+                <p className="mt-2 text-[11px] text-slate-500">Only you set this — it applies to the whole room.</p>
+              </div>
+            )}
             <p className="text-[11px] text-slate-500">These apply to tonight only — your saved DNA is untouched.</p>
             <div className="flex flex-wrap gap-2">
               <button data-testid="tonight-ready" onClick={() => { setTonightDone(true); void saveTonight(tonight, true); }} className="btn-primary text-sm">I’m ready</button>

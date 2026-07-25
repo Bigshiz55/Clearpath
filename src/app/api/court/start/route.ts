@@ -2,10 +2,17 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { computeFinalistsFromPicks, type CourtPick, type CourtWishMember } from '@/lib/court';
+import { COURT_SIZES, DEFAULT_COURT_SIZE } from '@/lib/court/pool';
 
 export const dynamic = 'force-dynamic';
 
-const schema = z.object({ code: z.string().min(4).max(64), hostToken: z.string().min(8).max(80) });
+const schema = z.object({
+  code: z.string().min(4).max(64),
+  hostToken: z.string().min(8).max(80),
+  // The host's court size. Unknown/absent falls back to Standard rather than
+  // failing the room — an old client must still be able to start a court.
+  size: z.enum(['quick', 'standard', 'deep']).optional(),
+});
 
 /** Coerce a stored `picks` jsonb blob into clean CourtPick[]. */
 function toPicks(raw: unknown): CourtPick[] {
@@ -65,7 +72,8 @@ export async function POST(request: Request) {
     // whole shortlist from the group's DNA + tonight's preferences, so a room
     // can never get stuck because nobody wants to search.
 
-    const result = await computeFinalistsFromPicks(members, (room.media_type as 'any' | 'movie' | 'tv') ?? 'any', [], 'US');
+    const spec = COURT_SIZES[body.size ?? DEFAULT_COURT_SIZE];
+    const result = await computeFinalistsFromPicks(members, (room.media_type as 'any' | 'movie' | 'tv') ?? 'any', [], 'US', spec.total);
     if (result.error || !result.finalists) return NextResponse.json({ error: result.error ?? 'Couldn’t build a shortlist — try broadening tonight’s preferences.' }, { status: 200 });
 
     const seenKeys = result.finalists.map((f) => `${f.mediaType}-${f.id}`);

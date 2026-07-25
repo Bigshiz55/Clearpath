@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildPool, replaceCandidate, selectVaried, totalShown, isWatchable,
-  ACTIVE_SLOTS, MAX_CANDIDATES, type PoolCandidate,
+  ACTIVE_SLOTS, MAX_CANDIDATES, COURT_SIZES, DEFAULT_COURT_SIZE, type PoolCandidate,
 } from './pool';
 import {
   canVote, vetoTokensLeft, ballotView, liveVoteScore, scoreCandidate, guestSentiment,
@@ -283,5 +283,55 @@ describe('tie-breaking never lets guests decide', () => {
     }));
     const r = breakTie(tied, signals, guestHeavy);
     expect(r.winner.key).toBe('a'); // unchanged by the guest jury
+  });
+});
+
+describe('court sizes — Quick 8 / Standard 12 / Deep 16', () => {
+  const many = () =>
+    Array.from({ length: 20 }, (_, i) =>
+      cand({
+        key: `m-${i}`,
+        genre: ['Thriller','Comedy','Drama','Mystery','Sci-Fi','Doc','Action','Romance'][i % 8]!,
+        decade: 1990 + (i % 4) * 10,
+        tone: ['tense','light','sombre'][i % 3]!,
+        fit: 99 - i,
+      }),
+    );
+
+  it('Standard is the default and yields 12 total, 6 active', () => {
+    const p = buildPool(many());
+    expect(p.size).toBe('standard');
+    expect(p.active).toHaveLength(6);
+    expect(totalShown(p)).toBe(12);
+  });
+
+  it('Quick yields 8 total with 4 active', () => {
+    const p = buildPool(many(), 'quick');
+    expect(p.active).toHaveLength(4);
+    expect(totalShown(p)).toBe(8);
+  });
+
+  it('Deep yields 16 total with 8 active', () => {
+    const p = buildPool(many(), 'deep');
+    expect(p.active).toHaveLength(8);
+    expect(totalShown(p)).toBe(16);
+  });
+
+  it('each size caps its own total across the whole session', () => {
+    for (const [size, total] of [['quick', 8], ['standard', 12], ['deep', 16]] as const) {
+      let p = buildPool(many(), size);
+      for (const key of [...p.active.map((c) => c.key)]) {
+        p = replaceCandidate(p, key, 'veto').state;
+      }
+      expect(totalShown(p), size).toBeLessThanOrEqual(total);
+      expect(p.size).toBe(size); // size survives replacement
+    }
+  });
+
+  it('COURT_SIZES matches the documented option set', () => {
+    expect(COURT_SIZES.quick.total).toBe(8);
+    expect(COURT_SIZES.standard.total).toBe(12);
+    expect(COURT_SIZES.deep.total).toBe(16);
+    expect(DEFAULT_COURT_SIZE).toBe('standard');
   });
 });

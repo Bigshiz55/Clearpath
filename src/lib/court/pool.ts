@@ -1,9 +1,10 @@
 /**
  * COURT CANDIDATE POOL (pure, no I/O).
  *
- * Exactly SIX active candidates, with SIX held in reserve — twelve maximum for
- * a standard session. When a title is removed (veto or "seen it") the next best
- * reserve is promoted immediately, so replacement feels instant to the room.
+ * The host chooses the court size: Quick (8), Standard (12, the default) or
+ * Deep (16). Some are active in the tray, the rest held in reserve. When a
+ * title is removed (veto or "seen it") the next best reserve is promoted
+ * immediately, so replacement feels instant to the room.
  *
  * Variety is enforced structurally rather than hoped for: the selector will not
  * take a second candidate that duplicates an already-chosen genre/era/tone
@@ -11,8 +12,34 @@
  * near-identical thrillers from filling the tray.
  */
 
-export const ACTIVE_SLOTS = 6;
-export const MAX_CANDIDATES = 12;
+/**
+ * COURT SIZE — the host picks how many candidates the room considers.
+ * Standard (12) is the default. `active` is how many are in play at once;
+ * the remainder is held in reserve to replace vetoed or already-seen titles.
+ */
+export type CourtSize = 'quick' | 'standard' | 'deep';
+
+export interface CourtSizeSpec {
+  key: CourtSize;
+  label: string;
+  /** Total candidates this court may ever show. */
+  total: number;
+  /** How many are active (visible in the tray) at any moment. */
+  active: number;
+  blurb: string;
+}
+
+export const COURT_SIZES: Record<CourtSize, CourtSizeSpec> = {
+  quick:    { key: 'quick',    label: 'Quick Court',    total: 8,  active: 4, blurb: 'Fewer choices, fastest decision.' },
+  standard: { key: 'standard', label: 'Standard Court', total: 12, active: 6, blurb: 'The default — enough variety to feel chosen.' },
+  deep:     { key: 'deep',     label: 'Deep Court',     total: 16, active: 8, blurb: 'Most variety, for a group that wants to browse.' },
+};
+
+export const DEFAULT_COURT_SIZE: CourtSize = 'standard';
+
+/** Legacy constants — the Standard court, kept so existing callers still work. */
+export const ACTIVE_SLOTS = COURT_SIZES.standard.active;
+export const MAX_CANDIDATES = COURT_SIZES.standard.total;
 
 export interface PoolCandidate {
   key: string; // "movie-123"
@@ -34,6 +61,8 @@ export interface PoolCandidate {
 }
 
 export interface PoolState {
+  /** Which court size this pool was built for. */
+  size: CourtSize;
   active: PoolCandidate[];
   reserve: PoolCandidate[];
   /** Everything removed, with the reason, so nothing is silently re-offered. */
@@ -86,11 +115,13 @@ export function selectVaried(pool: PoolCandidate[], count: number): PoolCandidat
  * here — `eligible` must already be filtered by the caller, because a title
  * that breaks a constraint must never be a candidate at any rank.
  */
-export function buildPool(eligible: PoolCandidate[]): PoolState {
-  const picked = selectVaried(eligible, MAX_CANDIDATES);
+export function buildPool(eligible: PoolCandidate[], size: CourtSize = DEFAULT_COURT_SIZE): PoolState {
+  const spec = COURT_SIZES[size];
+  const picked = selectVaried(eligible, spec.total);
   return {
-    active: picked.slice(0, ACTIVE_SLOTS),
-    reserve: picked.slice(ACTIVE_SLOTS, MAX_CANDIDATES),
+    size,
+    active: picked.slice(0, spec.active),
+    reserve: picked.slice(spec.active, spec.total),
     removed: [],
   };
 }
@@ -120,6 +151,7 @@ export function replaceCandidate(state: PoolState, key: string, reason: RemovalR
 
   return {
     state: {
+      size: state.size,
       active,
       reserve: state.reserve.slice(promoted ? 1 : 0),
       removed: [...state.removed, { key, reason }],
@@ -129,7 +161,7 @@ export function replaceCandidate(state: PoolState, key: string, reason: RemovalR
   };
 }
 
-/** Total candidates this session has ever shown — must never exceed 12. */
+/** Total candidates this session has ever shown — never exceeds the court size. */
 export function totalShown(state: PoolState): number {
   return state.active.length + state.reserve.length + state.removed.length;
 }

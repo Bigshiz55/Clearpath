@@ -7,7 +7,6 @@ import { canonicalQueryKey, activeFilterChips } from '@/lib/refineState';
 import { STREAMING_SERVICES } from '@/lib/services';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { PosterCard } from '@/components/PosterCard';
-import { JudgeBench } from '@/components/JudgeBench';
 import { MatchMark } from '@/components/MatchMark';
 import { type TileRatings } from '@/lib/ratings';
 import type { FinderQuery } from '@/lib/finder';
@@ -314,7 +313,7 @@ export function FinderUI({
   );
   const filtersChanged = items != null && !loading && lastRunKey != null && currentKey !== lastRunKey;
   const filterChips = activeFilterChips(q);
-  const ctaLabel = loading ? 'The court is deliberating…' : items != null ? '⚖️ Update results' : '⚖️ Submit evidence';
+  const ctaLabel = loading ? 'Searching…' : items != null ? 'Update results' : 'Find titles';
 
   return (
     <div className="space-y-5">
@@ -330,16 +329,15 @@ export function FinderUI({
       <div className={embedded ? 'space-y-5 rounded-3xl border-2 border-brand-400/40 bg-brand-500/[0.05] p-4 sm:p-6' : 'contents'}>
         {embedded && (
           <div className="flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
-            <span aria-hidden>⚖️</span> Your opening statement
+            Your search
           </div>
         )}
 
         {/* Hero — the judge & the bench on the left, your plain-English ask on the right */}
         <div className={`grid gap-4 ${embedded ? '' : 'lg:grid-cols-2'}`}>
-        {!embedded && <JudgeBench big />}
 
         <div className={embedded ? 'flex flex-col gap-3' : 'card flex flex-col gap-3 p-4'}>
-          {!embedded && <div className="eyebrow-lg">⚖️ Try your case</div>}
+          {!embedded && <div className="eyebrow-lg">Refine your search</div>}
           <textarea
             value={text}
             onChange={(e) => onText(e.target.value)}
@@ -368,8 +366,8 @@ export function FinderUI({
 
       {loading && (
         <div className="card p-6 text-center">
-          <div className="text-sm font-semibold text-white">⚖️ The court is deliberating…</div>
-          <div className="mt-1 text-xs text-slate-400">Weighing your evidence against every candidate.</div>
+          <div className="text-sm font-semibold text-white">Searching…</div>
+          <div className="mt-1 text-xs text-slate-400">Checking every candidate against your requirements.</div>
         </div>
       )}
       {error && <p className="text-sm text-amber-300">{error}</p>}
@@ -394,19 +392,19 @@ export function FinderUI({
           )}
           {relaxed && <p className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{relaxed}</p>}
           {items.length === 0 ? (
-            <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and submit again.</p>
+            <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and search again.</p>
           ) : (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="inline-flex flex-wrap items-center gap-1 text-base font-bold text-white sm:text-lg">
-                  ⚖️ The verdict — {items.length} match{items.length === 1 ? '' : 'es'}, ranked by
+                  {items.length} match{items.length === 1 ? '' : 'es'} for you, ranked by
                   <MatchMark size="text-sm" /> {scoredFor}:
                 </div>
                 <button
                   onClick={() => document.getElementById('evidence')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                   className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
                 >
-                  ⚖️ Present new evidence ↓
+                  Update search ↓
                 </button>
               </div>
               {filterChips.length > 0 && (
@@ -454,7 +452,7 @@ export function FinderUI({
                     {it.explain && (
                       <details data-testid="why-verdict" className="group mt-2 rounded-lg border border-white/10 bg-white/[0.03] text-xs">
                         <summary className="cursor-pointer select-none px-2 py-1.5 font-bold text-brand-200 transition hover:text-white">
-                          ⚖️ Why this Verd1ct?
+                          Why this Verd1ct?
                         </summary>
                         <div className="space-y-2 px-2 pb-2">
                           {it.explain.rose.length > 0 && (
@@ -526,7 +524,7 @@ export function FinderUI({
       {/* Submit your evidence — transparent, editable, no black box. */}
       <div id="evidence" className={embedded ? 'space-y-4 scroll-mt-20' : 'card space-y-4 p-4 scroll-mt-20'}>
         <div className="flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
-          <span aria-hidden>🎛️</span> Submit your evidence
+          Refine your search
         </div>
 
         {watchers.length > 0 && (
@@ -645,7 +643,7 @@ export function FinderUI({
             title="Only titles the judge rules Stream It — our “Watch It” verdict."
             className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
           >
-            {q.streamItOnly ? '✓ ' : ''}⚖️ “Stream It” verdicts only
+            {q.streamItOnly ? '✓ ' : ''}“Stream It” only
           </button>
           {q.mediaType !== 'movie' && (
             <button

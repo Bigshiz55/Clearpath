@@ -133,3 +133,66 @@ test.describe('responsive', () => {
     });
   }
 });
+
+/**
+ * COURT SIZE — the host chooses how many titles the room considers. The picker
+ * drives the REAL `buildPool`, so these assertions prove the engine and the
+ * interface agree rather than that a label was typed correctly.
+ */
+test.describe('court size', () => {
+  test('defaults to Standard Court: 12 titles, 6 in play', async ({ page }) => {
+    await page.goto(URL);
+    await expect(page.getByTestId('court-size-picker')).toBeVisible();
+    await expect(page.getByTestId('court-size-standard')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('court-size-summary')).toContainText('Standard Court: 12 titles, 6 in play');
+    await expect(page.getByTestId('tray-item')).toHaveCount(6);
+    await expect(page.getByTestId('voting-floor')).toContainText('6 held in reserve');
+    await page.screenshot({ path: path.join(SHOTS, 'size-standard.png'), fullPage: false });
+  });
+
+  test('Quick Court builds 8 titles with 4 in play', async ({ page }) => {
+    await page.goto(URL);
+    await page.getByTestId('court-size-quick').click();
+    await expect(page.getByTestId('court-size-quick')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('tray-item')).toHaveCount(4);
+    await expect(page.getByTestId('voting-floor')).toContainText('4 held in reserve');
+    await page.screenshot({ path: path.join(SHOTS, 'size-quick.png'), fullPage: false });
+  });
+
+  test('Deep Court builds 16 titles with 8 in play', async ({ page }) => {
+    await page.goto(URL);
+    await page.getByTestId('court-size-deep').click();
+    await expect(page.getByTestId('court-size-deep')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('tray-item')).toHaveCount(8);
+    await expect(page.getByTestId('voting-floor')).toContainText('8 held in reserve');
+    await page.screenshot({ path: path.join(SHOTS, 'size-deep.png'), fullPage: false });
+  });
+
+  test('changing size after voting warns the room and resets the ballots', async ({ page }) => {
+    await page.goto(URL);
+    // No warning before anyone has voted — nothing would be lost.
+    await expect(page.getByTestId('court-size-warning')).toHaveCount(0);
+    await page.getByTestId('vote-watch_it').click();
+    await expect(page.getByTestId('ballot-state')).toContainText('Room so far');
+    // Now the host is warned BEFORE changing, while there is still a ballot to lose.
+    await expect(page.getByTestId('court-size-warning')).toBeVisible();
+
+    await page.getByTestId('court-size-deep').click();
+    // Ballots cleared: the floor is hidden again, tokens restored, warning moot.
+    await expect(page.getByTestId('ballot-state')).toContainText('hidden until you cast yours');
+    await expect(page.getByTestId('veto-tokens')).toContainText('2 of 2 vetoes left');
+    await expect(page.getByTestId('court-size-warning')).toHaveCount(0);
+  });
+
+  test('the size picker stays usable at 320px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 860 });
+    await page.goto(URL);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    for (const id of ['court-size-quick', 'court-size-standard', 'court-size-deep']) {
+      const box = await page.getByTestId(id).boundingBox();
+      expect(box!.height, `${id} tap target`).toBeGreaterThanOrEqual(44);
+    }
+    await page.screenshot({ path: path.join(SHOTS, 'size-picker-320.png'), fullPage: false });
+  });
+});

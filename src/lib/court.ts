@@ -2,6 +2,7 @@ import 'server-only';
 import { getPopular, getTitle, getWatchProviders, getSimilar } from '@/lib/tmdb/client';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { buildVerdict, avoidRule, loveRule } from '@/lib/scoring';
+import { selectVaried } from '@/lib/court/pool';
 import type { MediaType, PreferenceTrait, TitleMetadata } from '@/lib/types';
 
 export interface CourtMemberInput {
@@ -197,6 +198,12 @@ export async function computeFinalistsFromPicks(
   mediaType: 'any' | 'movie' | 'tv',
   excludeKeys: string[],
   region: string,
+  /**
+   * How many candidates the court considers. 3 keeps every existing caller
+   * (the classic three-finalist shortlist) working unchanged; the Live Court
+   * passes 8 / 12 / 16 from the host's chosen court size.
+   */
+  count = 3,
 ): Promise<{ finalists?: RankedFinalist[]; error?: string }> {
   const allow = (mt: MediaType) => (mediaType === 'any' ? true : mt === mediaType);
   const exclude = new Set(excludeKeys);
@@ -238,7 +245,10 @@ export async function computeFinalistsFromPicks(
       pool.set(keyOf(s.mediaType, s.id), { id: s.id, mediaType: s.mediaType });
     }
   }
-  const candidates = [...pool.values()].filter((c) => !exclude.has(keyOf(c.mediaType, c.id))).slice(0, 30);
+  // Fetch enough supply that even a Deep court (16) can be filled with variety
+  // after metadata failures and exclusions.
+  const supply = Math.max(30, count * 3);
+  const candidates = [...pool.values()].filter((c) => !exclude.has(keyOf(c.mediaType, c.id))).slice(0, supply);
   if (candidates.length === 0) return { error: 'That’s every option we’ve got — nothing new to show.' };
 
   // Fetch metadata once for every candidate (picks are a subset, so this also
@@ -281,7 +291,29 @@ export async function computeFinalistsFromPicks(
   });
 
   scored.sort((a, b) => b.fit - a.fit || b.avgScore - a.avgScore || b.minScore - a.minScore);
-  const top = scored.slice(0, 3);
+
+  // A three-title shortlist is already the top of the ranking, so it is taken
+  // straight. A larger court runs the same variety selector the voting floor
+  // uses, because twelve near-identical thrillers is not a choice.
+  let top = scored.slice(0, count);
+  if (count > 3) {
+    const varied = selectVaried(
+      scored.map((s) => ({
+        key: s.key,
+        title: s.meta.title,
+        genre: (s.meta.genres[0] ?? 'Unclassified').toLowerCase(),
+        decade: s.meta.year ? Math.floor(s.meta.year / 10) * 10 : 0,
+        tone: (s.meta.genres[1] ?? '—').toLowerCase(),
+        popularity: s.avgScore,
+        fit: s.fit,
+        availableOn: [],
+        reason: '',
+      })),
+      count,
+    );
+    const byKey = new Map(scored.map((s) => [s.key, s]));
+    top = varied.map((v) => byKey.get(v.key)!).filter(Boolean);
+  }
   if (top.length === 0) return { error: 'Couldn’t rank anything. Try again.' };
 
   const finalists = await Promise.all(

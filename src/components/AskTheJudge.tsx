@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { RobedPortrait } from '@/components/RobedPortrait';
 import { ReasonText } from '@/components/ReasonText';
 import { PosterCard } from '@/components/PosterCard';
 import { JudgeVerdictCard } from '@/components/JudgeVerdictCard';
@@ -45,7 +44,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
-  const [judgeName] = useState('Judge Verity');
+  const [assistantName] = useState('WatchVerd1ct');
   const nextId = useRef(1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
@@ -63,7 +62,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
       {
         id: nextId.current++,
         role: 'judge',
-        text: `Judge Verity presiding. Tell me what you’re in the mood for — a vibe, a genre, a “like Mindhunter,” however you’d say it — and I’ll pull real titles, each scored for you. Need exact filters? That’s Forensic Search.`,
+        text: `Tell me what you’re in the mood for — a vibe, a genre, a “like Mindhunter,” however you’d say it — and I’ll pull real titles, each scored for you. Need exact filters? That’s Forensic Search.`,
       },
     ]);
   }, []);
@@ -181,10 +180,10 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
       {/* ============ The conversation ============ */}
       <div className="card flex h-[56vh] max-h-[620px] flex-col overflow-hidden p-0">
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
-          <RobedPortrait emoji="🦉" size={44} accent="#f5c65a" />
+          <span aria-hidden className="grid h-11 w-11 flex-none place-items-center rounded-xl border border-brand-400/40 bg-brand-500/15 text-sm font-black text-brand-100">V1</span>
           <div className="min-w-0 flex-1">
             <div className="eyebrow">⚖️ The bench</div>
-            <div className="truncate text-base font-bold text-white">{judgeName}</div>
+            <div className="truncate text-base font-bold text-white">{assistantName}</div>
           </div>
         </div>
 
