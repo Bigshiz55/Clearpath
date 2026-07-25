@@ -84,10 +84,12 @@ test.describe('watch-dna calibration — responsive matrix', () => {
       await expect(page.locator('[data-testid="quiz-grid"]')).toBeVisible();
 
       // The poster must be SUBSTANTIAL, never collapsed to a thumbnail (the real
-      // on-device bug). Require a solid minimum on portrait; a smaller floor in
-      // short landscape where vertical room is scarce.
+      // on-device bug) — but it is ALSO structurally capped at 18dvh so it can
+      // never overlap the answer buttons (the other real on-device bug, iOS
+      // Safari). So the floor scales with the viewport: 17% of its height
+      // (1% slack under the CSS clamp), bounded to [60, 130].
       const posterH = await page.locator('[data-testid="quiz-poster"]').evaluate((n) => n.getBoundingClientRect().height);
-      const floor = vp.h <= 520 ? 60 : 130;
+      const floor = Math.min(130, Math.max(60, Math.round(vp.h * 0.17)));
       expect(posterH, `${vp.name}: poster not collapsed (h=${Math.round(posterH)} ≥ ${floor})`).toBeGreaterThanOrEqual(floor);
 
       await noHorizontalOverflow(page, `quiz ${vp.name}`);
