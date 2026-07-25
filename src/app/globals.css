@@ -33,8 +33,17 @@ body {
   }
   @media (min-width: 640px) {
     .poster-grid {
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      /* Content-aware minimum: a card must fit FOR/PASS/SAVE + all three rating
+         chips without crowding, so 250px — fewer, wider columns on laptops
+         instead of a cramped 6-across. */
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     }
+  }
+  /* Safari/WebKit min-content guard: a grid child's implicit min-width is
+     auto, which lets long unbreakable content (ratings row, badges) stretch
+     the track and escape the card. Force it to 0 so cards clip/wrap instead. */
+  .poster-grid > * {
+    min-width: 0;
   }
 
   .card {

@@ -82,7 +82,9 @@ export function RatingsStrip({
 
       {/* Line 2 — all three source ratings on one line, sized up for legibility:
           no pills on 🍅/🍿 (just icon + value) so tomato, popcorn and IMDb fit. */}
-      <div className="flex items-center gap-2.5 text-sm font-black tabular-nums">
+      {/* flex-wrap: on a card too narrow for all three chips, the row wraps —
+          IMDb must never escape the panel border (Safari min-content included). */}
+      <div className="flex min-w-0 flex-wrap items-center gap-2.5 text-sm font-black tabular-nums">
         <RatingChip
           label="🍅"
           value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
