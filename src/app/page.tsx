@@ -26,13 +26,15 @@ export default function LandingPage() {
   return (
     <div className="min-h-dvh">
       <PromiseBar />
-      <header className="container-page flex items-start justify-between py-3">
-        <div className="flex flex-col gap-1">
+      {/* flex-wrap so the auth buttons drop below the logo lockup on narrow
+          phones instead of forcing horizontal overflow. */}
+      <header className="container-page flex flex-wrap items-start justify-between gap-y-2 py-3">
+        <div className="flex min-w-0 flex-col gap-1">
           <Logo size="lg" />
           {/* Tagline tucked under the wordmark — a proper logo lockup. */}
           <Tagline className="pl-[3.75rem] text-base sm:text-lg" />
         </div>
-        <div className="flex items-center gap-2 pt-1.5">
+        <div className="flex shrink-0 items-center gap-2 pt-1.5">
           <Link href="/login" className="btn-ghost">
             Sign in
           </Link>
