@@ -45,7 +45,7 @@ test.describe('TEST A — Why this Verd1ct? on real result cards', () => {
     await page.goto(HARNESS);
     const finder = page.getByTestId('harness-finder');
     await finder.getByRole('textbox').first().fill('a fast mystery under 100 minutes');
-    await finder.getByRole('button', { name: /Submit evidence/ }).first().click();
+    await finder.getByRole('button', { name: /Find titles/ }).first().click();
 
     const why = page.getByTestId('why-verdict');
     await expect(why).toBeVisible();
@@ -104,7 +104,7 @@ test.describe('TEST B — household selection changes the request, scoring and d
 
     // 1) Solo search first.
     await finder.getByRole('textbox').first().fill('crime thrillers');
-    await finder.getByRole('button', { name: /Submit evidence/ }).first().click();
+    await finder.getByRole('button', { name: /Find titles/ }).first().click();
     await expect(page.getByText('Solo Pick')).toBeVisible();
     expect(bodies[0]!.watchers).toBeUndefined();
 
@@ -183,7 +183,7 @@ test.describe('TEST F — mobile result card', () => {
     await page.goto(HARNESS);
     const finder = page.getByTestId('harness-finder');
     await finder.getByRole('textbox').first().fill('family movie night');
-    await finder.getByRole('button', { name: /Submit evidence/ }).first().click();
+    await finder.getByRole('button', { name: /Find titles/ }).first().click();
 
     const why = page.getByTestId('why-verdict');
     await expect(why).toBeVisible();

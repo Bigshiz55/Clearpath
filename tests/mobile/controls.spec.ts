@@ -44,7 +44,7 @@ test.describe('FinderUI — refinement pipeline', () => {
 
     // 1) Type the mandated regression ask and submit.
     await finder.getByRole('textbox').first().fill('Family movie night');
-    await finder.getByRole('button', { name: /Submit evidence/ }).first().click();
+    await finder.getByRole('button', { name: /Find titles/ }).first().click();
     await expect(page.locator('#finder-results')).toBeVisible();
     await expect(page.getByText('First Wave')).toBeVisible();
     expect(requests[0]!.text).toBe('Family movie night');
@@ -53,7 +53,7 @@ test.describe('FinderUI — refinement pipeline', () => {
     // No hidden runtime cap rides along with a neutral ask.
     expect((requests[0]!.query as Record<string, unknown>).maxRuntime).toBeNull();
 
-    // 2) With results showing, the CTA reads "Update results", not "Submit evidence".
+    // 2) With results showing, the CTA reads "Update results", not "Find titles".
     await expect(finder.getByRole('button', { name: /Update results/ }).first()).toBeVisible();
 
     // 3) Move the IMDb slider → results are now stale → banner appears.
@@ -111,7 +111,7 @@ test.describe('FinderUI — refinement pipeline', () => {
     await page.goto(HARNESS);
     const finder = page.getByTestId('harness-finder');
     await finder.getByRole('textbox').first().fill('anything');
-    await finder.getByRole('button', { name: /Submit evidence/ }).first().click();
+    await finder.getByRole('button', { name: /Find titles/ }).first().click();
     await expect(page.getByText(/Couldn’t run that search/)).toBeVisible();
   });
 });

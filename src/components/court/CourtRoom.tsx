@@ -6,6 +6,10 @@ import { createClient } from '@/lib/supabase/client';
 import { WatchVerdictWordmark } from '@/components/WatchVerdictWordmark';
 import { CourtSizePicker } from '@/components/court/CourtSizePicker';
 import { COURT_SIZES, DEFAULT_COURT_SIZE, type CourtSize } from '@/lib/court/pool';
+import {
+  channelName, pollIntervalMs, statusFromChannel, syncLabel, REFRESH_COALESCE_MS,
+  type SyncEvent, type SyncStatus,
+} from '@/lib/court/liveSync';
 import { qrForUrl } from '@/lib/actions/qr';
 import { getMyTaste, type MyTaste } from '@/lib/actions/profile';
 import {
@@ -97,10 +101,15 @@ export function CourtRoom({ code }: { code: string }) {
   const [seenCount, setSeenCount] = useState(0);
   const [sendFailed, setSendFailed] = useState<string | null>(null);
 
+  // Live sync — Realtime carries the signal, the RPC still carries the data.
+  const [sync, setSync] = useState<SyncStatus>('connecting');
+
   const [qr, setQr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
+  const coalesce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channel = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/court/${code}` : '';
 
@@ -138,11 +147,44 @@ export function CourtRoom({ code }: { code: string }) {
     setState(data as State);
   }, [code, supabase]);
 
+  /** Coalesce a burst of broadcasts into a single re-read. */
+  const nudge = useCallback(() => {
+    if (coalesce.current) return;
+    coalesce.current = setTimeout(() => {
+      coalesce.current = null;
+      void refresh();
+    }, REFRESH_COALESCE_MS);
+  }, [refresh]);
+
+  // Realtime: subscribe to the room's channel. The payload is never trusted as
+  // data — it only tells us to re-read through the access-checked RPC.
+  useEffect(() => {
+    const ch = supabase
+      .channel(channelName(code), { config: { broadcast: { self: false } } })
+      .on('broadcast', { event: 'chat' }, () => nudge())
+      .on('broadcast', { event: 'state' }, () => nudge())
+      .subscribe((status) => setSync(statusFromChannel(status)));
+    channel.current = ch;
+    return () => {
+      channel.current = null;
+      if (coalesce.current) { clearTimeout(coalesce.current); coalesce.current = null; }
+      void supabase.removeChannel(ch);
+    };
+  }, [code, supabase, nudge]);
+
+  // Polling is the floor, not the mechanism: fast while the socket is down,
+  // a slow heartbeat once it is up so a dropped broadcast can't strand a room.
   useEffect(() => {
     void refresh();
-    poll.current = setInterval(() => void refresh(), 2000);
+    poll.current = setInterval(() => void refresh(), pollIntervalMs(sync));
     return () => { if (poll.current) clearInterval(poll.current); };
-  }, [refresh]);
+  }, [refresh, sync]);
+
+  /** Tell the room something changed. Best effort: a failed broadcast just
+   *  means the others fall back to their poll. */
+  const announce = useCallback((event: SyncEvent) => {
+    void channel.current?.send({ type: 'broadcast', event, payload: {} }).catch(() => {});
+  }, []);
 
   // ---- Stage 1: join ----
   async function join() {
@@ -163,6 +205,7 @@ export function CourtRoom({ code }: { code: string }) {
     setParticipantId(pid);
     setMyName(name.trim());
     if (picks.length) void savePicks(picks, pid);
+    announce('state');
     void refresh();
   }
 
@@ -172,6 +215,7 @@ export function CourtRoom({ code }: { code: string }) {
     try { localStorage.setItem(`court_tonight_${code}`, JSON.stringify(next)); } catch { /* ignore */ }
     if (!participantId) return;
     try { await supabase.rpc('court_set_tonight', { p_code: code, p_participant: participantId, p_tonight: next, p_ready: ready }); } catch { /* best effort */ }
+    announce('state');
     void refresh();
   }
   function toggleIn(list: string[], v: string, max = 99) {
@@ -197,6 +241,7 @@ export function CourtRoom({ code }: { code: string }) {
     try { localStorage.setItem(`court_picks_${code}`, JSON.stringify(next)); } catch { /* ignore */ }
     if (!pid) return;
     try { await supabase.rpc('court_set_picks', { p_code: code, p_participant: pid, p_picks: next }); } catch { /* retry on next change */ }
+    announce('state');
     void refresh();
   }
   function addPick(h: SearchHit) {
@@ -222,7 +267,7 @@ export function CourtRoom({ code }: { code: string }) {
     const d = await res.json().catch(() => ({}));
     setBuilding(false);
     if (!res.ok || d.error) setErr(d.error ?? 'Could not build the shortlist.');
-    else void refresh();
+    else { announce('state'); void refresh(); }
   }
 
   // ---- Stage 4: reactions ----
@@ -234,6 +279,7 @@ export function CourtRoom({ code }: { code: string }) {
     setBusy(true);
     try { await supabase.rpc('court_react', { p_code: code, p_participant: participantId, p_key: k, p_reaction: r, p_reason: reason ?? '' }); } catch { /* ignore */ }
     setBusy(false);
+    announce('state');
     void refresh();
   }
 
@@ -242,6 +288,7 @@ export function CourtRoom({ code }: { code: string }) {
     setBusy(true);
     try { await supabase.rpc('court_reveal', { p_code: code, p_host_token: hostToken }); } catch { /* ignore */ }
     setBusy(false);
+    announce('state');
     void refresh();
   }
 
@@ -256,7 +303,7 @@ export function CourtRoom({ code }: { code: string }) {
     setDraft(''); setSendFailed(null);
     const { error } = await supabase.rpc('court_chat_send', { p_code: code, p_participant: participantId, p_body: text });
     if (error) setSendFailed(text);
-    else void refresh();
+    else { announce('chat'); void refresh(); }
   }
 
   // ---- Derived room model ----
@@ -315,7 +362,7 @@ export function CourtRoom({ code }: { code: string }) {
 
   if (notFound) {
     return (
-      <Shell>
+      <Shell sync={sync}>
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
           <p className="text-sm text-slate-400">This Court has ended or the link is no longer valid.</p>
           <Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVerd1ct</Link>
@@ -324,7 +371,7 @@ export function CourtRoom({ code }: { code: string }) {
     );
   }
   if (!state) {
-    return <Shell><p className="text-sm text-slate-400">Connecting to your group…</p></Shell>;
+    return <Shell sync={sync}><p className="text-sm text-slate-400">Connecting to your group…</p></Shell>;
   }
 
   const isHost = !!hostToken;
@@ -336,7 +383,7 @@ export function CourtRoom({ code }: { code: string }) {
   // silently did nothing.
   if (!participantId && state.status !== 'verdict') {
     return (
-      <Shell>
+      <Shell sync={sync}>
         <section data-testid="court-join" className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           <h1 className="text-lg font-bold text-white">Join the group</h1>
           <p className="mt-1 text-sm text-slate-400">Add your name and you’re in. No account needed.</p>
@@ -365,7 +412,7 @@ export function CourtRoom({ code }: { code: string }) {
     const note = partialNote(snapshot);
     if (!winner) {
       return (
-        <Shell>
+        <Shell sync={sync}>
           <section data-testid="court-verdict-empty" className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5">
             <h1 className="text-lg font-bold text-white">No option survived</h1>
             <p className="mt-1 text-sm text-amber-100">Every title was vetoed or appealed. Remove a veto or add more possibilities to get a Verd1ct.</p>
@@ -376,7 +423,7 @@ export function CourtRoom({ code }: { code: string }) {
     }
     const f = (state.finalists ?? []).find((x) => keyOf(x) === winner.key);
     return (
-      <Shell onChat={() => setChatOpen(true)} unread={unread}>
+      <Shell onChat={() => setChatOpen(true)} unread={unread} sync={sync}>
         <section data-testid="court-verdict">
           <p className="text-xs font-semibold uppercase tracking-widest text-brand-300">Your group’s Verd1ct</p>
           <h1 className="mt-1 text-2xl font-black leading-tight text-white sm:text-3xl">
@@ -447,7 +494,7 @@ export function CourtRoom({ code }: { code: string }) {
   // ==================== STAGE 4 — REACT TOGETHER ============================
   if (state.status === 'veto' && ranked.length > 0) {
     return (
-      <Shell onChat={() => setChatOpen(true)} unread={unread}>
+      <Shell onChat={() => setChatOpen(true)} unread={unread} sync={sync}>
         <section data-testid="court-react">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-lg font-bold text-white">React together</h1>
@@ -527,7 +574,7 @@ export function CourtRoom({ code }: { code: string }) {
 
   // ============ STAGES 2 + 3 — SET TONIGHT · BUILD THE SHORTLIST ============
   return (
-    <Shell onChat={() => setChatOpen(true)} unread={unread}>
+    <Shell onChat={() => setChatOpen(true)} unread={unread} sync={sync}>
       {/* Your group */}
       <section data-testid="court-group" className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -766,7 +813,7 @@ function ChatPanel({
   );
 }
 
-function Shell({ children, onChat, unread = 0 }: { children: React.ReactNode; onChat?: () => void; unread?: number }) {
+function Shell({ children, onChat, unread = 0, sync }: { children: React.ReactNode; onChat?: () => void; unread?: number; sync?: SyncStatus }) {
   return (
     <div className="min-h-dvh pb-24 sm:pb-8">
       {/* The global build badge floats across the top of every screen, so the
@@ -777,6 +824,22 @@ function Shell({ children, onChat, unread = 0 }: { children: React.ReactNode; on
           <WatchVerdictWordmark />
           <span className="whitespace-nowrap font-semibold text-slate-400">Court</span>
         </span>
+        <span className="flex items-center gap-2">
+          {sync && (
+            <span
+              data-testid="sync-status"
+              data-sync={sync}
+              title={syncLabel(sync)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-semibold ${
+                sync === 'live'
+                  ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                  : 'border-amber-400/40 bg-amber-500/10 text-amber-100'
+              }`}
+            >
+              <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${sync === 'live' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              {syncLabel(sync)}
+            </span>
+          )}
         {onChat && (
           <button onClick={onChat} data-testid="open-chat" className="relative min-h-[44px] rounded-xl border border-white/12 px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/5">
             Group chat
@@ -785,6 +848,7 @@ function Shell({ children, onChat, unread = 0 }: { children: React.ReactNode; on
             )}
           </button>
         )}
+        </span>
       </header>
       <main className="container-page mx-auto max-w-2xl py-3">{children}</main>
     </div>

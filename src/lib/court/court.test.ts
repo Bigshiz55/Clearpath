@@ -4,6 +4,9 @@ import {
   ACTIVE_SLOTS, MAX_CANDIDATES, COURT_SIZES, DEFAULT_COURT_SIZE, type PoolCandidate,
 } from './pool';
 import {
+  channelName, pollIntervalMs, statusFromChannel, syncLabel, POLL_LIVE_MS, POLL_FALLBACK_MS,
+} from './liveSync';
+import {
   canVote, vetoTokensLeft, ballotView, liveVoteScore, scoreCandidate, guestSentiment,
   finalThree, breakTie, DEFAULT_WEIGHTS, VETO_TOKENS_PER_MEMBER,
   type Vote, type MemberRef, type CandidateSignals,
@@ -333,5 +336,43 @@ describe('court sizes — Quick 8 / Standard 12 / Deep 16', () => {
     expect(COURT_SIZES.standard.total).toBe(12);
     expect(COURT_SIZES.deep.total).toBe(16);
     expect(DEFAULT_COURT_SIZE).toBe('standard');
+  });
+});
+
+// ------------------------------------------------------------ live sync -----
+
+describe('live sync policy', () => {
+  it('polls slowly when the socket is live, fast when it is not', () => {
+    expect(pollIntervalMs('live')).toBe(POLL_LIVE_MS);
+    expect(pollIntervalMs('polling')).toBe(POLL_FALLBACK_MS);
+    expect(pollIntervalMs('live')).toBeGreaterThan(pollIntervalMs('polling'));
+  });
+
+  it('never stops polling entirely — a dropped broadcast must not strand a room', () => {
+    for (const s of ['live', 'connecting', 'polling'] as const) {
+      expect(pollIntervalMs(s)).toBeGreaterThan(0);
+      expect(Number.isFinite(pollIntervalMs(s))).toBe(true);
+    }
+  });
+
+  it('only treats an explicit SUBSCRIBED as live; anything unknown degrades', () => {
+    expect(statusFromChannel('SUBSCRIBED')).toBe('live');
+    expect(statusFromChannel('JOINING')).toBe('connecting');
+    for (const bad of ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED', '', 'subscribed', 'anything']) {
+      expect(statusFromChannel(bad), bad).toBe('polling');
+    }
+  });
+
+  it('gives every room its own channel, case-insensitively', () => {
+    expect(channelName('abcd')).toBe(channelName('ABCD'));
+    expect(channelName('abcd')).not.toBe(channelName('abce'));
+    expect(channelName('abcd')).toContain('ABCD');
+  });
+
+  it('tells the room the truth when sync is degraded', () => {
+    expect(syncLabel('live')).toBe('Live');
+    expect(syncLabel('polling')).toMatch(/still updating/i);
+    // Degraded must never be silent — the label has to say something.
+    expect(syncLabel('connecting').length).toBeGreaterThan(0);
   });
 });

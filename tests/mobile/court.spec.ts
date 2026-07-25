@@ -387,3 +387,183 @@ test.describe('TEST 10 — mobile Court', () => {
     });
   }
 });
+
+/**
+ * TEST 11 — LIVE SYNC. Drives the REAL Supabase Realtime protocol (phoenix v2
+ * array frames) through a mocked socket, so this proves the client actually
+ * connects, reports its state honestly, and re-reads on a push rather than
+ * waiting for the poll.
+ *
+ * The security property under test is the important one: the socket carries a
+ * SIGNAL, never room data. Chat bodies live behind `court_state_v2`, so a
+ * broadcast payload must stay empty.
+ */
+interface FakeSocket {
+  /** Push a broadcast to the client, as the server would. */
+  broadcast: (event: 'chat' | 'state') => Promise<void>;
+  /** Every frame the client sent us. */
+  sent: string[];
+}
+
+async function mockRealtime(page: Page): Promise<FakeSocket> {
+  const sent: string[] = [];
+  let topic = 'realtime:court:HARNESS1';
+  let push: ((data: string) => void) | null = null;
+
+  await page.routeWebSocket(/realtime/, (ws) => {
+    push = (data: string) => ws.send(data);
+    ws.onMessage((raw) => {
+      const text = String(raw);
+      sent.push(text);
+      let frame: [string | null, string | null, string, string, unknown];
+      try {
+        frame = JSON.parse(text) as [string | null, string | null, string, string, unknown];
+      } catch {
+        return; // non-JSON control frame — nothing for the fake server to answer
+      }
+      if (!Array.isArray(frame)) return;
+      const [joinRef, ref, frameTopic, event] = frame;
+      if (event === 'phx_join') {
+        topic = frameTopic;
+        ws.send(JSON.stringify([joinRef, ref, frameTopic, 'phx_reply', { status: 'ok', response: {} }]));
+      } else if (event === 'heartbeat') {
+        ws.send(JSON.stringify([joinRef, ref, frameTopic, 'phx_reply', { status: 'ok', response: {} }]));
+      }
+    });
+  });
+
+  return {
+    sent,
+    broadcast: async (event) => {
+      const frame = JSON.stringify([null, null, topic, 'broadcast', { type: 'broadcast', event, payload: {} }]);
+      await page.evaluate(() => {}); // flush pending work before pushing
+      push?.(frame);
+    },
+  };
+}
+
+async function joinAs(page: Page, who: string) {
+  await page.goto(HARNESS);
+  await page.getByPlaceholder('Your name').fill(who);
+  await page.getByTestId('join-court').click();
+  await expect(page.getByTestId('court-group')).toBeVisible();
+}
+
+test.describe('TEST 11 — live sync', () => {
+  test('reports Live once the socket subscribes', async ({ page }) => {
+    await mockRealtime(page);
+    await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
+    await joinAs(page, 'Scott');
+    await expect(page.getByTestId('sync-status')).toHaveAttribute('data-sync', 'live');
+    await expect(page.getByTestId('sync-status')).toHaveText('Live');
+    await page.screenshot({ path: path.join(SHOTS, '11-live.png') });
+  });
+
+  test('a broadcast delivers a message far faster than the heartbeat poll', async ({ page }) => {
+    const socket = await mockRealtime(page);
+    const { room } = await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
+    await joinAs(page, 'Scott');
+    await expect(page.getByTestId('sync-status')).toHaveAttribute('data-sync', 'live');
+
+    await page.getByTestId('open-chat').click();
+    await expect(page.getByTestId('group-chat')).toBeVisible();
+
+    // Someone else speaks: the row lands in the database, then the server pushes.
+    room.messages.push({ id: 'm-remote', sender: 'Heather', body: 'I am in for the mystery', at: new Date(0).toISOString() });
+    const started = Date.now();
+    await socket.broadcast('chat');
+    await expect(page.getByText('I am in for the mystery')).toBeVisible({ timeout: 3_000 });
+    // The live poll interval is 15s, so arriving inside 3s can only be the push.
+    expect(Date.now() - started, 'message must arrive by push, not by poll').toBeLessThan(3_000);
+  });
+
+  test('the socket carries no room data — chat bodies only travel through the RPC', async ({ page }) => {
+    const socket = await mockRealtime(page);
+    await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
+    await joinAs(page, 'Scott');
+    await expect(page.getByTestId('sync-status')).toHaveAttribute('data-sync', 'live');
+
+    await page.getByTestId('open-chat').click();
+    await page.getByTestId('chat-input').fill('my private plan for tonight');
+    await page.getByTestId('chat-send').click();
+    await expect(page.getByText('my private plan for tonight')).toBeVisible();
+
+    // An announcement went out...
+    const broadcasts = socket.sent.filter((f) => f.includes('"broadcast"'));
+    expect(broadcasts.length, 'sending a message must announce to the room').toBeGreaterThan(0);
+    // ...carrying nothing. No message body, no sender, no participant id.
+    for (const frame of socket.sent) {
+      expect(frame, 'no chat body may cross the socket').not.toContain('my private plan');
+      expect(frame, 'no participant id may cross the socket').not.toContain('p-1');
+    }
+  });
+
+  test('with the socket down the room says so and keeps working by polling', async ({ page }) => {
+    // No mockRealtime: wss://harness.invalid is unreachable, exactly like a
+    // member on a flaky connection.
+    const { room } = await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
+    await joinAs(page, 'Scott');
+    await expect(page.getByTestId('sync-status')).toHaveAttribute('data-sync', 'polling');
+    await expect(page.getByTestId('sync-status')).toContainText('still updating');
+
+    // Degraded must still mean working: the 2s fallback poll picks this up.
+    room.participants.push({ id: 'p-2', name: 'Heather' });
+    await expect(page.getByText('Heather')).toBeVisible({ timeout: 8_000 });
+    await page.screenshot({ path: path.join(SHOTS, '11-degraded.png') });
+  });
+});
+
+/**
+ * TEST 12 — COURT SIZE in the real room. The size is the HOST's setting for
+ * everyone, so a guest must not be able to change how many titles the room
+ * considers.
+ */
+test.describe('TEST 12 — court size is the host’s call', () => {
+  test('the host picks Quick / Standard / Deep, and Standard is the default', async ({ page }) => {
+    await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
+    await page.addInitScript(() => localStorage.setItem('court_host_HARNESS1', 'host-token-abcdefgh'));
+    await joinAs(page, 'Scott');
+
+    const picker = page.getByTestId('court-size-picker');
+    await expect(picker).toBeVisible();
+    await expect(page.getByTestId('court-size-standard')).toHaveAttribute('aria-checked', 'true');
+    await expect(picker).toContainText('Quick Court');
+    await expect(picker).toContainText('Deep Court');
+    await page.screenshot({ path: path.join(SHOTS, '12-size-host.png'), fullPage: true });
+
+    await page.getByTestId('court-size-deep').click();
+    await expect(page.getByTestId('court-size-deep')).toHaveAttribute('aria-checked', 'true');
+    // The choice survives a reload — a host who drops out does not lose the room's setup.
+    await page.reload();
+    await expect(page.getByTestId('court-size-deep')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  test('the chosen size is what the server is asked to build', async ({ page }) => {
+    await mockRoom(page, {
+      ...EMPTY_LOBBY,
+      participants: [{ id: 'p-1', name: 'Scott', ready: true }, { id: 'p-2', name: 'Heather', ready: true }],
+    });
+    await page.addInitScript(() => localStorage.setItem('court_host_HARNESS1', 'host-token-abcdefgh'));
+
+    let startBody: Record<string, unknown> | null = null;
+    await page.route('**/api/court/start', async (route) => {
+      startBody = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
+      await route.fulfill({ json: { ok: true } });
+    });
+
+    await joinAs(page, 'Scott');
+    await page.getByTestId('court-size-quick').click();
+    await page.getByTestId('tonight-ready').click();
+    await page.getByTestId('build-shortlist').click();
+
+    await expect.poll(() => startBody).not.toBeNull();
+    expect(startBody!.size, 'the host’s court size must reach the server').toBe('quick');
+  });
+
+  test('a guest never sees the size control', async ({ page }) => {
+    await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
+    // No host token: this member joined by invite link.
+    await joinAs(page, 'Heather');
+    await expect(page.getByTestId('court-size-picker')).toHaveCount(0);
+  });
+});
