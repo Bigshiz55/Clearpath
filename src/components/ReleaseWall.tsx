@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { releasesEmptyState } from '@/lib/releasesDiagnostics';
 import { SaveButton } from './SaveButton';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { AlgorithmScore } from './AlgorithmScore';
@@ -84,9 +85,15 @@ export function ReleaseWall({
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<QuickLookTarget | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [errored, setErrored] = useState(false);
+  // Monotonic request id: a slower earlier fetch must never overwrite a newer
+  // filter combination's results (latest state wins).
+  const seqRef = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setErrored(false);
+    const mySeq = ++seqRef.current;
     try {
       const res = await fetch('/api/releases', {
         method: 'POST',
@@ -94,11 +101,13 @@ export function ReleaseWall({
         body: JSON.stringify({ mediaType, window: win, sort, providerIds }),
       });
       const data = await res.json();
-      setItems(data.items ?? []);
+      if (mySeq !== seqRef.current) return; // superseded by a newer request
+      if (!res.ok) { setErrored(true); setItems([]); }
+      else setItems(data.items ?? []);
     } catch {
-      setItems([]);
+      if (mySeq === seqRef.current) { setErrored(true); setItems([]); }
     } finally {
-      setLoading(false);
+      if (mySeq === seqRef.current) setLoading(false);
     }
   }, [mediaType, win, sort, providerIds]);
 
@@ -230,11 +239,34 @@ export function ReleaseWall({
           })}
         </div>
       ) : (
-        <p className="text-sm text-slate-400">
-          {win === 'upcoming'
-            ? 'No upcoming titles match these filters yet. Try “All platforms”, or switch back to Out now.'
-            : 'Nothing matched these filters. Try “All platforms” or a different sort.'}
-        </p>
+        (() => {
+          // Diagnostic empty state: distinguish an UNSUPPORTED combination
+          // (upcoming + a provider filter, which TMDB can't verify) from genuine
+          // no-data and from an API error — each with truthful recovery actions.
+          const es = releasesEmptyState({ window: win, providerIds, itemCount: 0, errored });
+          return (
+            <div className="text-sm text-slate-400" role="status" data-testid="releases-empty" data-reason={es.reason}>
+              <p>{es.message}</p>
+              {es.actions.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {es.actions.map((a) => (
+                    <button
+                      key={a.label}
+                      type="button"
+                      onClick={() => {
+                        if (a.patch.providerIds !== undefined) setProviderIds(a.patch.providerIds);
+                        if (a.patch.window !== undefined) setWin(a.patch.window);
+                      }}
+                      className="rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 py-1.5 text-xs font-semibold text-brand-100 hover:bg-brand-500/25"
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()
       )}
 
       {open && <QuickLook target={open} onClose={() => setOpen(null)} />}
