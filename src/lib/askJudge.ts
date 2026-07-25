@@ -12,6 +12,9 @@ import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { genreIdFromName } from '@/lib/finderGenres';
 import { runFinder, type FinderItem, type FinderQuery } from '@/lib/finder';
 import type { TitleVerdict, AltItem, JudgeFactor } from '@/lib/askTypes';
+import { classifySearch, type SearchClassification } from '@/lib/nlu/searchMode';
+import { rankByTitleIdentity, isExactTitle } from '@/lib/nlu/titleNormalize';
+import { validateTitleResult } from '@/lib/nlu/resultGuard';
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
 
@@ -164,16 +167,30 @@ export async function askJudgeTitle(
   supabase: SupabaseClient,
   userId: string,
   text: string,
+  cls?: SearchClassification,
 ): Promise<{ verdict: TitleVerdict; alternatives: AltItem[] } | null> {
   if (!looksLikeTitleAsk(text)) return null;
-  const cleaned = cleanTitleText(text);
+  // Classify to isolate the REQUESTED title + provider (so "Gone on BritBox"
+  // searches "Gone", not the raw string), then search on the clean title.
+  const c = cls ?? classifySearch(text);
+  const requestedTitle = c.requestedTitle ?? cleanTitleText(text);
+  const cleaned = requestedTitle;
   const results = await searchTitles(cleaned).catch(() => []);
   if (results.length === 0) return null;
 
-  const wantsTv = /\b(season|series|episodes?)\b/i.test(text);
-  const matches = results.filter((r) => titleMatches(cleaned, r.title));
-  if (matches.length === 0) return null;
-  const top = (wantsTv ? matches.find((m) => m.mediaType === 'tv') : undefined) ?? matches[0]!;
+  const wantsTv = c.contentType === 'tv' || /\b(season|series|episodes?)\b/i.test(text);
+  const wantsMovie = c.contentType === 'movie';
+  // Keep only candidates that are at least a near match, then RANK BY TITLE
+  // IDENTITY: an exact "Gone" always outranks a merely-contains "Gone Girl",
+  // regardless of popularity. This is the core anti-substitution fix.
+  const near = results.filter((r) => titleMatches(cleaned, r.title));
+  if (near.length === 0) return null;
+  const exacts = near.filter((r) => isExactTitle(cleaned, r.title));
+  const pool = exacts.length ? exacts : near;
+  const typed = wantsTv ? pool.filter((m) => m.mediaType === 'tv')
+    : wantsMovie ? pool.filter((m) => m.mediaType === 'movie') : pool;
+  const ranked = rankByTitleIdentity(cleaned, typed.length ? typed : pool, (r) => r.title, (r) => (r as { popularity?: number }).popularity ?? 0);
+  const top = ranked[0]!;
 
   const profile = await getProfile(supabase, userId);
   const region = regionFor(profile);
@@ -182,6 +199,27 @@ export async function askJudgeTitle(
 
   const { meta, providers } = await getScoringData(top.mediaType, top.id, region);
   const report = buildVerdict({ meta, providers, personal });
+
+  // ── Title-identity + provider guard ───────────────────────────────────────
+  // Verify the returned title actually IS the requested one, and (if a service
+  // was required) whether it's available there. TMDB provider data is often
+  // incomplete, so "not listed" is treated as UNVERIFIED (honest) — never as a
+  // confirmed absence, and never as grounds to substitute a different title.
+  const providerAvailability: 'verified' | 'unverified' | 'confirmed_absent' = (() => {
+    if (!c.requiredProvider) return 'verified';
+    const want = c.requiredProvider.name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const names = (providers?.options ?? []).map((o) => o.providerName.toLowerCase().replace(/[^a-z0-9]+/g, ''));
+    return names.some((n) => n.includes(want) || want.includes(n)) ? 'verified' : 'unverified';
+  })();
+  const guard = validateTitleResult({
+    requestedTitle: requestedTitle,
+    returnedTitle: meta.title,
+    requiredProvider: c.requiredProvider?.name ?? null,
+    providerStrength: c.providerStrength,
+    providerAvailability,
+    requestedType: c.contentType,
+    returnedType: top.mediaType === 'tv' ? 'tv' : 'movie',
+  });
 
   const keyFactors: JudgeFactor[] = report.personal.adjustments
     .filter((a) => a.trait !== 'base' && a.points !== 0)
@@ -208,6 +246,11 @@ export async function askJudgeTitle(
     where: whereFrom(providers),
     ratings: tileRatingsFromScore(report.general),
     deciderUrl: deciderSearchUrl(meta.title, meta.year),
+    matchStatus: guard.status,
+    matchMessage: guard.message,
+    isSubstitute: guard.blockAsAnswer,
+    requestedTitle,
+    requiredProvider: c.requiredProvider?.name ?? null,
   };
 
   // Better-for-you alternatives: the best-matching titles in the same lane. The

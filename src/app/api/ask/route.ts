@@ -7,6 +7,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
+import { classifySearch } from '@/lib/nlu/searchMode';
 
 /**
  * "Something like X" is best served by TMDB-similar ONLY when the reference is
@@ -69,10 +70,16 @@ export async function POST(req: Request) {
       /* empty */
     }
 
-    // 1) If they named a specific title, put THAT on trial (full verdict + reasons).
+    // 0) Classify the search mode up front. A title-plus-provider query
+    // ("Gone on BritBox") is an EXACT-TITLE lookup and must never be routed into
+    // recommendation/similarity search (which is what returned "Gone Girl").
     const text = typeof body.text === 'string' ? body.text.slice(0, 300) : '';
-    if (text.trim()) {
-      const titled = await askJudgeTitle(supabase, user.id, text);
+    const cls = text.trim() ? classifySearch(text) : null;
+
+    // 1) Named-title lookup → put THAT title on trial (with the identity guard,
+    // exact-match ranking and provider hard filter inside askJudgeTitle).
+    if (text.trim() && cls?.mode !== 'similar_to') {
+      const titled = await askJudgeTitle(supabase, user.id, text, cls ?? undefined);
       if (titled) return NextResponse.json({ kind: 'title', ...titled });
     }
 
@@ -86,8 +93,11 @@ export async function POST(req: Request) {
     // Mindhunter"), seed recommendations from THAT title's neighbors. Uses the
     // LLM's reference when present, else a regex on the raw text (so it still
     // works with no OpenAI key). Falls through to plain discovery on a miss.
-    const reference = (ai?.similarTo ?? '').trim() || (text ? extractReference(text) : null);
-    if (reference && !hasCompetingConstraints(text)) {
+    // Only route into similarity when the query is EXPLICITLY a "like X" ask
+    // (classifier mode), not merely because a title was named. A bare title —
+    // even with a provider — stays an exact-title lookup above.
+    const reference = (ai?.similarTo ?? '').trim() || (cls?.mode === 'similar_to' ? (cls.reference ?? (text ? extractReference(text) : null)) : null);
+    if (reference && cls?.mode === 'similar_to' && !hasCompetingConstraints(text)) {
       const wantCount = text ? parseRequestedCount(text) : 10;
       const similar = await askSimilarTo(supabase, user.id, reference, wantCount);
       if (similar) {
