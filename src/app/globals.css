@@ -304,7 +304,12 @@ body {
    produced when the measured tile came out short. Give it a guaranteed portrait
    min-height (the tile grows to fit via min-height, so nothing else is clipped);
    it still grows past this via flex-1 whenever there's room. */
-.wv-quiz-poster { min-height: clamp(120px, 26dvh, 300px); }
+/* overflow:hidden is the structural guarantee: the absolutely-positioned hero
+   poster is CLIPPED to this box and can never spill over the title or the
+   action buttons — even if a mobile browser miscomputes the flex/dvh height
+   (the iOS Safari case where the poster escaped onto the buttons). The floor is
+   gentle so the poster always yields space to the controls first. */
+.wv-quiz-poster { min-height: clamp(64px, 18dvh, 240px); overflow: hidden; }
 @media (max-height: 520px) {
   .wv-quiz-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   /* Short/landscape viewports: a smaller guaranteed minimum so the whole tile

@@ -46,8 +46,10 @@ export function AlgorithmScore({
       className={`rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 px-2 py-2 shadow-[0_0_16px_rgba(244,63,94,0.28)] ${className}`}
       title="Your VERD1CT — your taste blended with every rating into one 0–100 estimate of how much YOU will like it. The blue TV means it’s from WatchVerdict."
     >
-      {/* The VERD1CT badge (number + TV) beside the ruling (Stream It / …). */}
-      <div className="flex items-center gap-2.5">
+      {/* The VERD1CT badge (number + TV) beside the ruling (Stream It / …).
+          flex-wrap so the ruling drops below the badge on a narrow card instead
+          of clipping at the right edge. */}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         {score != null ? (
           <Verd1ctBadge score={score} px={44} />
         ) : (
