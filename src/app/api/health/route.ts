@@ -12,6 +12,53 @@ export const dynamic = 'force-dynamic';
  * whether it succeeded, so "my friends get kicked to login" is a one-request
  * diagnosis. No secrets returned.
  */
+/**
+ * SCHEMA PROBE — which Court migrations are actually live in this environment.
+ * Calls each RPC harmlessly (a room code that cannot exist) and classifies the
+ * response: a "does not exist" error means the migration has NOT been applied.
+ * Reports existence only — never data, never secrets — so a deploy can be
+ * verified from the browser without database credentials.
+ */
+async function probeSchema() {
+  const NO_SUCH_ROOM = '__schema_probe__';
+  const rpcs: { fn: string; migration: string; args: Record<string, unknown> }[] = [
+    { fn: 'court_state', migration: '0004_court', args: { p_code: NO_SUCH_ROOM } },
+    { fn: 'court_set_picks', migration: '0014_court_search', args: { p_code: NO_SUCH_ROOM, p_participant: '00000000-0000-0000-0000-000000000000', p_picks: [] } },
+    { fn: 'court_state_v2', migration: '0026_court_v2', args: { p_code: NO_SUCH_ROOM } },
+    { fn: 'court_set_tonight', migration: '0026_court_v2', args: { p_code: NO_SUCH_ROOM, p_participant: '00000000-0000-0000-0000-000000000000', p_tonight: {}, p_ready: false } },
+    { fn: 'court_react', migration: '0026_court_v2', args: { p_code: NO_SUCH_ROOM, p_participant: '00000000-0000-0000-0000-000000000000', p_key: 'x', p_reaction: 'for', p_reason: '' } },
+    { fn: 'court_chat_send', migration: '0026_court_v2', args: { p_code: NO_SUCH_ROOM, p_participant: '00000000-0000-0000-0000-000000000000', p_body: '' } },
+  ];
+  try {
+    const supabase = createServerClient(publicEnv.supabaseUrl(), publicEnv.supabasePublishableKey(), {
+      cookies: { getAll: () => [], setAll: () => {} },
+    });
+    const results: Record<string, boolean> = {};
+    for (const r of rpcs) {
+      const { error } = await supabase.rpc(r.fn, r.args);
+      // PostgREST reports an absent function with PGRST202 / "Could not find the
+      // function". Any other error (e.g. "Room not found") proves it EXISTS.
+      const missing = error?.code === 'PGRST202' || /could not find the function|does not exist/i.test(error?.message ?? '');
+      results[r.fn] = !missing;
+    }
+    const applied = (m: string) => rpcs.filter((r) => r.migration === m).every((r) => results[r.fn]);
+    return {
+      rpcs: results,
+      migrations: {
+        '0004_court': applied('0004_court'),
+        '0014_court_search': applied('0014_court_search'),
+        '0026_court_v2': applied('0026_court_v2'),
+      },
+      courtV2Ready: applied('0026_court_v2'),
+      hint: applied('0026_court_v2')
+        ? 'Court v2 is live: group chat, tonight setup, reactions and late join are available.'
+        : 'Apply supabase/migrations/0026_court_v2.sql — until then the Court falls back to the v1 snapshot (no chat, tonight setup, reactions or late join).',
+    };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 async function probeGuest() {
   try {
     const supabase = createServerClient(publicEnv.supabaseUrl(), publicEnv.supabasePublishableKey(), {
@@ -162,6 +209,15 @@ export async function GET(request: Request) {
   if (searchParams.get('probe') === 'guest') {
     return NextResponse.json(
       { probe: 'guest', result: await probeGuest() },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
+  // Schema probe: reports which Court migrations are live in THIS environment,
+  // so a deploy can be verified without database credentials. Publicly safe —
+  // it only reports whether named RPCs exist, never any data.
+  if (searchParams.get('probe') === 'schema') {
+    return NextResponse.json(
+      { probe: 'schema', result: await probeSchema() },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   }

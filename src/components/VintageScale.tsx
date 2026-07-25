@@ -1,18 +1,19 @@
+/**
+ * Vintage Mode used to switch the WHOLE app into "Simple view" and persist
+ * `wv_simple` in localStorage — which is why every later visit reopened in
+ * Simple View. Simple View is removed; the full result experience is the only
+ * view. This component now actively CLEARS the legacy flag so anyone who
+ * visited Vintage Mode before is migrated back to the full view.
+ */
 'use client';
 
 import { useEffect } from 'react';
 
-/**
- * Entering Vintage Mode turns on the big, high-contrast "Simple view" for the
- * whole app — so everything a senior taps into (the Taste Game, On TV, their
- * reminders) stays big too, not just this page. They can switch it off with the
- * "A" toggle in the header any time.
- */
 export function VintageScale() {
   useEffect(() => {
-    document.documentElement.setAttribute('data-simple', '1');
+    document.documentElement.removeAttribute('data-simple');
     try {
-      localStorage.setItem('wv_simple', '1');
+      localStorage.removeItem('wv_simple');
     } catch {
       /* ignore */
     }

@@ -12,7 +12,6 @@ import { deleteAccount } from '@/lib/actions/account';
 import { useToast } from '@/components/Toast';
 import { STREAMING_SERVICES, LIVE_TV_PROVIDERS } from '@/lib/services';
 import { EnableNotifications } from '@/components/EnableNotifications';
-import { SimpleModeToggle } from '@/components/SimpleModeToggle';
 
 export interface ShareRow {
   token: string;
@@ -406,7 +405,6 @@ export function SettingsView(props: {
           room. It’s saved on this device and toggles off just as easily.
         </p>
         <div className="mt-4">
-          <SimpleModeToggle variant="full" />
         </div>
       </section>
 

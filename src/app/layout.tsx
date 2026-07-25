@@ -56,11 +56,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* The single, runtime-controlled viewport meta — the Desktop view toggle
             rewrites its width. */}
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        {/* Apply Simple (Senior) view + Desktop-view preference before paint. */}
+        {/* SIMPLE VIEW IS REMOVED. This script used to restore `wv_simple`
+            before paint, which is why returning users kept reopening in Simple
+            View. It now performs a ONE-TIME CLEANUP instead — clearing the
+            legacy flag from localStorage, sessionStorage and cookies, stripping
+            any simple-view URL parameter, and removing the attribute if some
+            older cached page set it. The full result view is the only view.
+            The Desktop/Phone viewport preference (a separate feature) is
+            unaffected. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{if(localStorage.getItem('wv_simple')==='1')document.documentElement.setAttribute('data-simple','1');if(localStorage.getItem('wv_view')==='desktop'){var m=document.querySelector('meta[name=viewport]');if(m)m.setAttribute('content','width=1200, viewport-fit=cover');}}catch(e){}",
+              "try{['wv_simple','wv_simple_view','simpleView','simple_view','wv_view_mode'].forEach(function(k){localStorage.removeItem(k);sessionStorage.removeItem(k);document.cookie=k+'=; Max-Age=0; path=/';});document.documentElement.removeAttribute('data-simple');var u=new URL(location.href),d=0;['simple','simpleView','simple_view','view','viewMode','cardMode','resultMode'].forEach(function(p){var v=u.searchParams.get(p);if(v!==null&&/^(1|true|simple|compact|minimal)$/i.test(v)){u.searchParams.delete(p);d=1;}});if(d)history.replaceState(null,'',u.toString());if(localStorage.getItem('wv_view')==='desktop'){var m=document.querySelector('meta[name=viewport]');if(m)m.setAttribute('content','width=1200, viewport-fit=cover');}}catch(e){}",
           }}
         />
       </head>

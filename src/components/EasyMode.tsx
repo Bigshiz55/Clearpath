@@ -98,7 +98,6 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
   const [actorHits, setActorHits] = useState<{ id: number; name: string; knownFor: string; profileUrl: string | null }[]>([]);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-simple', '1');
     let taken = false;
     try {
       const raw = localStorage.getItem(PREFS_KEY);
@@ -115,13 +114,6 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
   }, []);
 
   // The quiz and The Docket are full-screen overlays with their own big touch
-  // targets — the extra 1.25x "simple" scaling on top makes them overflow the
-  // screen. Turn it off while an overlay is open; restore it after.
-  useEffect(() => {
-    const overlay = quizOpen || gameOpen;
-    if (overlay) document.documentElement.removeAttribute('data-simple');
-    else document.documentElement.setAttribute('data-simple', '1');
-  }, [quizOpen, gameOpen]);
 
   const savePrefs = useCallback((next: StoredPrefs) => {
     setPrefs(next);
@@ -208,7 +200,6 @@ export function EasyMode({ initialPicks, name, build = 'dev' }: { initialPicks: 
     setQuizOpen(false);
   }
   function useFullApp() {
-    document.documentElement.removeAttribute('data-simple');
     try {
       localStorage.removeItem('wv_simple');
     } catch {
