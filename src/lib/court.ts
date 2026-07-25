@@ -210,11 +210,25 @@ export async function computeFinalistsFromPicks(
     }
   }
   const picks = [...pickMap.values()];
-  if (picks.length === 0) return { error: 'Nobody added anything to watch yet. Search and add a few titles first.' };
 
   // Broaden the candidate pool with "more like this" for depth (veto / show more).
   const pool = new Map<string, { id: number; mediaType: MediaType }>();
   for (const p of picks) pool.set(keyOf(p.mediaType, p.id), { id: p.id, mediaType: p.mediaType });
+
+  // NOBODY has to nominate. With no picks at all, seed the pool from real
+  // popular titles for the room's media type — WatchVerd1ct still ranks them
+  // against every member, so the group is never stuck waiting on a searcher.
+  if (picks.length === 0) {
+    const types: MediaType[] = mediaType === 'any' ? ['movie', 'tv'] : [mediaType];
+    const seeded = await Promise.all(types.map((mt) => getPopular(mt, region).catch(() => [])));
+    for (const list of seeded) {
+      for (const s of list) {
+        if (!allow(s.mediaType)) continue;
+        pool.set(keyOf(s.mediaType, s.id), { id: s.id, mediaType: s.mediaType });
+      }
+    }
+    if (pool.size === 0) return { error: 'Couldn’t reach the catalogue just now — try again in a moment.' };
+  }
   const similarLists = await Promise.all(
     picks.slice(0, 8).map((p) => getSimilar(p.mediaType, p.id).catch(() => [])),
   );

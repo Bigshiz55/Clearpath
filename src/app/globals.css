@@ -533,19 +533,28 @@ body {
   color: #fff;
   font-weight: 900;
   transform-origin: 50% 50%;
-  backface-visibility: hidden;
+  /* NO backface-visibility: hidden. It was left over from an older two-face
+     flip and, combined with the 540deg spin, made the glyph invisible at every
+     odd half-turn — the brand rendered as "WatchVERD_CT". The 1 must always be
+     legible. */
 }
 .wv-logo-1--in { animation: wv-logo-1-in 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .wv-logo-1--spin { animation: wv-logo-1-spin 720ms cubic-bezier(0.4, 0, 0.2, 1) both; }
 .wv-logo-1--idle { transform: none; }
+/* The numeral 1 must ALWAYS be legible — it is part of the brand. A full
+   rotateY spin squeezed the glyph to ~0px edge-on (and the old keyframe also
+   started at opacity 0), so first paint could render "WatchVERD_CT" with the 1
+   missing. Motion is now BOUNDED to ±58deg — the glyph keeps real width and
+   full opacity at every frame. */
 @keyframes wv-logo-1-in {
-  0%   { transform: rotateY(-540deg); opacity: 0; }
-  60%  { opacity: 1; }
-  100% { transform: rotateY(0deg); opacity: 1; }
+  0%   { transform: rotateY(-58deg) translateY(-0.06em); }
+  70%  { transform: rotateY(10deg) translateY(0); }
+  100% { transform: rotateY(0deg) translateY(0); }
 }
 @keyframes wv-logo-1-spin {
-  from { transform: rotateY(0deg); }
-  to   { transform: rotateY(360deg); }
+  0%   { transform: rotateY(0deg); }
+  50%  { transform: rotateY(58deg); }
+  100% { transform: rotateY(0deg); }
 }
 
 /* Promise bar — a slow light band sweeping across the top tagline strip so it

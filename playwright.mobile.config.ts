@@ -26,7 +26,15 @@ export default defineConfig({
     launchOptions: { executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' },
   },
   webServer: {
-    command: 'MOBILE_HARNESS=1 PORT=3211 npm start',
+    // Dummy PUBLIC Supabase values so client components that construct a
+    // browser Supabase client render in the harness (no real project is
+    // contacted — the suites intercept every /rest/v1/rpc call). These are not
+    // secrets and grant no access.
+    command:
+      'MOBILE_HARNESS=1 PORT=3211 ' +
+      'NEXT_PUBLIC_SUPABASE_URL=https://harness.invalid ' +
+      'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=harness-anon-key ' +
+      'npm start',
     url: 'http://127.0.0.1:3211/dev/mobile-home',
     timeout: 90_000,
     reuseExistingServer: true,
