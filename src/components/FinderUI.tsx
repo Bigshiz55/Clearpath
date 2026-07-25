@@ -34,6 +34,21 @@ interface ResultItem {
   deciderUrl: string;
   ratings?: TileRatings;
   airing?: { network: string; time: string; airstamp: string } | null;
+  /** "Why this Verd1ct?" — real reasons/requirements/confidence from the engine. */
+  explain?: {
+    rose: string[];
+    heldBack: string[];
+    requirements: { label: string; satisfied: boolean; evidence: string }[];
+    availability: { text: string; confidence: string } | null;
+    confidence: { level: 'high' | 'medium' | 'low'; because: string[] };
+  };
+  /** Floor-weighted joint verdict when several people are watching. */
+  household?: {
+    score: number;
+    call: 'strong' | 'good' | 'toss_up' | 'warning';
+    perMember: { name: string; match: number }[];
+    explanation: string[];
+  } | null;
 }
 
 /** How far ahead a broadcast still counts as "what to watch" — 48 hours. A show
@@ -165,7 +180,10 @@ export function FinderUI({
 }) {
   const [text, setText] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
-  const [watcherIdx, setWatcherIdx] = useState(-1); // -1 = You
+  // Who's watching — MULTI-select co-watchers. "You" is always in the room;
+  // selecting anyone else switches to household mode (floor-weighted joint
+  // scoring server-side, never a blind average).
+  const [watcherSel, setWatcherSel] = useState<Set<number>>(new Set());
   const [items, setItems] = useState<ResultItem[] | null>(null);
   const [scoredFor, setScoredFor] = useState('Your match');
   const [relaxed, setRelaxed] = useState<string | null>(null);
@@ -239,10 +257,13 @@ export function FinderUI({
     abortRef.current = ac;
     setLoading(true);
     setError(null);
-    const watcher = watcherIdx >= 0 ? watchers[watcherIdx] : null;
+    // Selected co-watchers — any selection means the household (You + them)
+    // decides together.
+    const selected = watchers.filter((_, i) => watcherSel.has(i));
+    const householdMode = selected.length > 0;
     const effQuery = qOverride ?? q;
     const effText = (textOverride ?? text).trim();
-    const runKey = canonicalQueryKey(effQuery, effText, watcher?.name ?? null);
+    const runKey = canonicalQueryKey(effQuery, effText, ['You', ...selected.map((w) => w.name)].join('+'));
     const isRefinement = items != null;
     try {
       const res = await fetch('/api/finder', {
@@ -250,7 +271,13 @@ export function FinderUI({
         headers: { 'Content-Type': 'application/json' },
         // Send the raw ask too, so the server can parse it smartly (actor names,
         // counts, "over 70%", etc.). Falls back to the tools below when empty.
-        body: JSON.stringify({ query: effQuery, text: effText, watcher }),
+        body: JSON.stringify({
+          query: effQuery,
+          text: effText,
+          // Household (array): the server scores every member (You + each
+          // selected watcher) and ranks by the floor-weighted joint verdict.
+          ...(householdMode ? { watchers: selected } : {}),
+        }),
         signal: ac.signal,
       });
       const data = await res.json();
@@ -280,7 +307,11 @@ export function FinderUI({
 
   // Staleness: the controls' canonical key vs. the key the results were
   // fetched with. When they differ, the results no longer reflect the filters.
-  const currentKey = canonicalQueryKey(q, text.trim(), watcherIdx >= 0 ? (watchers[watcherIdx]?.name ?? null) : null);
+  const currentKey = canonicalQueryKey(
+    q,
+    text.trim(),
+    ['You', ...watchers.filter((_, i) => watcherSel.has(i)).map((w) => w.name)].join('+'),
+  );
   const filtersChanged = items != null && !loading && lastRunKey != null && currentKey !== lastRunKey;
   const filterChips = activeFilterChips(q);
   const ctaLabel = loading ? 'The court is deliberating…' : items != null ? '⚖️ Update results' : '⚖️ Submit evidence';
@@ -399,6 +430,66 @@ export function FinderUI({
                     posterPath={it.posterPath}
                   >
                     {it.reason && <p className="mt-1.5 line-clamp-3 text-xs text-slate-400">{it.reason}</p>}
+                    {it.household && (
+                      <div
+                        data-testid="household-verdict"
+                        data-call={it.household.call}
+                        className={`mt-2 rounded-lg border p-2 text-xs ${
+                          it.household.call === 'warning'
+                            ? 'border-amber-400/40 bg-amber-500/10 text-amber-100'
+                            : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'
+                        }`}
+                      >
+                        <div className="font-black">
+                          {it.household.call === 'warning' ? '⚠️ HOUSEHOLD WARNING' : `HOUSEHOLD MATCH: ${it.household.score}`}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums">
+                          {it.household.perMember.map((m) => (
+                            <span key={m.name}>{m.name}: <b>{m.match}</b></span>
+                          ))}
+                        </div>
+                        {it.household.explanation[0] && <p className="mt-1 opacity-90">{it.household.explanation[0]}</p>}
+                      </div>
+                    )}
+                    {it.explain && (
+                      <details data-testid="why-verdict" className="group mt-2 rounded-lg border border-white/10 bg-white/[0.03] text-xs">
+                        <summary className="cursor-pointer select-none px-2 py-1.5 font-bold text-brand-200 transition hover:text-white">
+                          ⚖️ Why this Verd1ct?
+                        </summary>
+                        <div className="space-y-2 px-2 pb-2">
+                          {it.explain.rose.length > 0 && (
+                            <div>
+                              <div className="font-black uppercase tracking-wide text-emerald-300">Why it won</div>
+                              {it.explain.rose.map((r) => <p key={r} className="text-slate-300">+ {r}</p>)}
+                            </div>
+                          )}
+                          {it.explain.heldBack.length > 0 && (
+                            <div>
+                              <div className="font-black uppercase tracking-wide text-amber-300">What held it back</div>
+                              {it.explain.heldBack.map((r) => <p key={r} className="text-slate-300">− {r}</p>)}
+                            </div>
+                          )}
+                          {it.explain.requirements.length > 0 && (
+                            <div>
+                              <div className="font-black uppercase tracking-wide text-slate-400">Requirements</div>
+                              {it.explain.requirements.map((r) => (
+                                <p key={r.label} className="text-slate-300">{r.satisfied ? '✓' : '✗'} {r.label} <span className="text-slate-500">({r.evidence})</span></p>
+                              ))}
+                            </div>
+                          )}
+                          {it.explain.availability && (
+                            <p className="text-slate-300">
+                              📺 {it.explain.availability.text}
+                              <span className="ml-1 text-slate-500">· {it.explain.availability.confidence}</span>
+                            </p>
+                          )}
+                          <p className="text-slate-400">
+                            Confidence: <b className="uppercase">{it.explain.confidence.level}</b>
+                            {it.explain.confidence.because[0] ? ` — ${it.explain.confidence.because[0]}` : ''}
+                          </p>
+                        </div>
+                      </details>
+                    )}
                     {(() => {
                       const info = it.mediaType === 'tv' && it.airing ? airingInfo(it.airing) : null;
                       if (!info) return null;
@@ -443,22 +534,35 @@ export function FinderUI({
             <div className="label">Who’s watching</div>
             <div className="flex flex-wrap gap-1.5">
               <button
-                onClick={() => setWatcherIdx(-1)}
-                className={`rounded-lg border px-3 py-1.5 text-sm transition ${watcherIdx === -1 ? 'border-gold-400/60 bg-gold-500/15 text-gold-400' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                aria-pressed="true"
+                title="You're always in the room — add co-watchers to decide together"
+                className="rounded-lg border border-gold-400/60 bg-gold-500/15 px-3 py-1.5 text-sm text-gold-400"
               >
-                You
+                ✓ You
               </button>
               {watchers.map((w, i) => (
                 <button
                   key={w.name}
-                  onClick={() => setWatcherIdx(i)}
-                  className={`rounded-lg border px-3 py-1.5 text-sm transition ${watcherIdx === i ? 'border-gold-400/60 bg-gold-500/15 text-gold-400' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                  aria-pressed={watcherSel.has(i)}
+                  onClick={() =>
+                    setWatcherSel((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(i)) next.delete(i);
+                      else next.add(i);
+                      return next;
+                    })
+                  }
+                  className={`rounded-lg border px-3 py-1.5 text-sm transition ${watcherSel.has(i) ? 'border-gold-400/60 bg-gold-500/15 text-gold-400' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
                 >
-                  {w.name}
+                  {watcherSel.has(i) ? '✓ ' : ''}{w.name}
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-slate-400">Scores every result against their taste — “{(watcherIdx >= 0 ? watchers[watcherIdx]!.name : 'You')} match”.</p>
+            <p className="mt-1 text-xs text-slate-400">
+              {watcherSel.size > 0
+                ? `Household mode — every result is scored for each of you and ranked by the joint verdict (never a plain average).`
+                : 'Add co-watchers to score every result for the whole room.'}
+            </p>
           </div>
         )}
 

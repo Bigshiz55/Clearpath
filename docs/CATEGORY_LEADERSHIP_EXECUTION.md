@@ -66,8 +66,8 @@ _Last updated: 2026-07-25 · baseline commit `48ac980` on `claude/watch-verdict-
 | 3-8 | Broken criticals, search correctness, constraints, refinement, availability, responsive | ✅ prior missions (evidence in `FINAL_RELEASE_EXECUTION.md`) |
 | 9 | Core DNA architecture | ✅ existing (three-DNA + confidence) |
 | 10 | Context DNA | ◐ parsing-level only |
-| 11 | Household intelligence | ◐ engine done (`householdVerdict.ts`, 8 tests) — UI wiring next |
-| 12 | Explanation system | ◐ engine done (`verdictExplain.ts`, 3 tests) — UI wiring next |
+| 11 | Household intelligence | ✅ WIRED — multi-select "Who's watching" in FinderUI → `watchers[]` → per-member scoring in `runFinder` → floor-weighted ranking → HOUSEHOLD MATCH/WARNING block on every card (E2E TEST B) |
+| 12 | Explanation system | ✅ WIRED — `buildItemExplanation` in `runFinder` attaches real reasons/requirements/confidence; expandable "Why this Verd1ct?" on every Finder result card (E2E TESTS A/F) |
 | 13 | Live-TV intelligence | ◐ rules done, EPG source external |
 | 14 | Onboarding | ✅ value-before-signup (home ask works pre-account) |
 | 15 | History & imports | ✗ not started (biggest gap) |
@@ -75,9 +75,7 @@ _Last updated: 2026-07-25 · baseline commit `48ac980` on `claude/watch-verdict-
 | 17-23 | Enhancements → release evidence | ongoing |
 
 ## 6. Next actions
-1. Wire `householdVerdict` + `explainVerdict` into the Finder result cards and
-   title page ("Why this Verd1ct?" sheet).
-2. Context-DNA persistence (per-context preference deltas keyed by
+1. Context-DNA persistence (per-context preference deltas keyed by
    weeknight/weekend/solo/couple).
 3. Import pipeline (CSV first — no external API needed; Letterboxd/Trakt need
    API terms review).

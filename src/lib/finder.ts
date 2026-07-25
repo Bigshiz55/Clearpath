@@ -12,6 +12,7 @@ import { getNextAiring, type NextAiring } from '@/lib/onTv';
 import { tileRatingsFromScore, type TileRatings } from '@/lib/ratings';
 import type { PersonalContext } from '@/lib/scoring/personal';
 import type { TitleMetadata } from '@/lib/types';
+import { buildItemExplanation, assembleHousehold, type VerdictExplanation, type HouseholdVerdict } from '@/lib/finderExplain';
 
 const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
 const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
@@ -105,6 +106,10 @@ export interface FinderItem {
   imdbId?: string | null;
   /** TV only: the next real broadcast/stream airing (channel + time), if any. */
   airing?: NextAiring | null;
+  /** "Why this Verd1ct?" — real reasons/requirements/confidence for the card. */
+  explain?: VerdictExplanation;
+  /** Floor-weighted joint verdict when several people are watching. */
+  household?: HouseholdVerdict | null;
 }
 
 export interface FinderResult {
@@ -134,29 +139,38 @@ export async function runFinder(
   supabase: SupabaseClient,
   userId: string,
   q: FinderQuery,
-  watcher?: Watcher | null,
+  watcher?: Watcher | Watcher[] | null,
   limit = 8,
 ): Promise<FinderResult> {
   const profile = await getProfile(supabase, userId);
   const region = regionFor(profile);
   const services = q.onMyServices ? await getMyServices(supabase, userId) : [];
 
+  // HOUSEHOLD MODE: an ARRAY of watchers means several people are deciding
+  // together — the user plus everyone named. Each candidate is scored for
+  // every member and ranked by the floor-weighted household verdict (never a
+  // blind average). A single watcher object keeps the legacy "score for that
+  // person" behaviour.
+  const householdWatchers = Array.isArray(watcher) ? watcher : [];
+  const singleWatcher = !Array.isArray(watcher) ? (watcher ?? null) : null;
+  const watcherContext = (w: Watcher): PersonalContext => ({
+    label: `${w.name} match`,
+    rules: [
+      ...w.avoid.map((t) => avoidRule(t as PreferenceTrait)),
+      ...w.love.map((t) => loveRule(t as PreferenceTrait)),
+    ],
+    likedFranchiseIds: [],
+    collectionId: null,
+  });
+
   let basePersonal: PersonalContext;
   let scoredFor: string;
-  if (watcher) {
-    basePersonal = {
-      label: `${watcher.name} match`,
-      rules: [
-        ...watcher.avoid.map((t) => avoidRule(t as PreferenceTrait)),
-        ...watcher.love.map((t) => loveRule(t as PreferenceTrait)),
-      ],
-      likedFranchiseIds: [],
-      collectionId: null,
-    };
-    scoredFor = `${watcher.name} match`;
+  if (singleWatcher) {
+    basePersonal = watcherContext(singleWatcher);
+    scoredFor = `${singleWatcher.name} match`;
   } else {
     basePersonal = await getPersonalContext(supabase, userId, null);
-    scoredFor = profile ? personalLabelFor(profile) : 'Your match';
+    scoredFor = householdWatchers.length > 0 ? 'Household match' : profile ? personalLabelFor(profile) : 'Your match';
   }
 
   // "Live TV" means TV shows with a real upcoming airing — always TV-only.
@@ -292,12 +306,47 @@ export async function runFinder(
           if (Math.abs(p - q.pace) > 35) return null;
           receipts.push(p >= 66 ? 'fast-paced' : p <= 33 ? 'slow burn' : 'balanced pace');
         }
-        // Match threshold.
-        if (q.minMatch != null && report.personal.score < q.minMatch) return null;
-        receipts.unshift(`${scoredFor.split(' ')[0]} ${report.personal.score}`);
+        // HOUSEHOLD: score this candidate for EVERY member (the user + each
+        // named watcher) and rank by the floor-weighted joint verdict — a
+        // 96/38 split must never look like an excellent joint pick.
+        let household: HouseholdVerdict | null = null;
+        if (householdWatchers.length > 0) {
+          const members = [
+            { name: 'You', match: report.personal.score },
+            ...householdWatchers.map((w) => {
+              const r = buildVerdict({ meta, providers, personal: { ...watcherContext(w), collectionId: null } });
+              return { name: w.name, match: r.personal.score };
+            }),
+          ];
+          household = assembleHousehold(members);
+        }
+        const effectiveMatch = household ? household.score : report.personal.score;
+
+        // Match threshold (against the score the user is actually shown).
+        if (q.minMatch != null && effectiveMatch < q.minMatch) return null;
+        receipts.unshift(`${scoredFor.split(' ')[0]} ${effectiveMatch}`);
 
         const where =
           included[0] ?? (providers ? streamingNames(providers.options)[0] ?? null : null);
+
+        const ratings = tileRatingsFromScore(report.general);
+        // "Why this Verd1ct?" — assembled from the SAME facts that filtered and
+        // scored this candidate; nothing invented.
+        const explain = buildItemExplanation(q, {
+          matchScore: effectiveMatch,
+          generalScore: report.general.score,
+          reasonsFor: report.reasonsFor,
+          reasonsAgainst: report.reasonsAgainst,
+          ratings,
+          where,
+          onUsersService: included.length > 0,
+          meta: {
+            mediaType,
+            runtimeMinutes: meta.runtimeMinutes ?? null,
+            year: meta.year,
+            englishAudio: meta.englishAvailability === 'native' || meta.englishAvailability === 'available',
+          },
+        });
 
         return {
           id,
@@ -305,15 +354,17 @@ export async function runFinder(
           title: meta.title,
           year: meta.year,
           posterPath: meta.posterPath,
-          matchScore: report.personal.score,
+          matchScore: effectiveMatch,
           generalScore: report.general.score,
           primaryCall: report.primaryCall,
           reason: report.oneLiner,
           where,
           receipts,
           deciderUrl: deciderSearchUrl(meta.title, meta.year),
-          ratings: tileRatingsFromScore(report.general),
+          ratings,
           imdbId: meta.imdbId ?? null,
+          explain,
+          household,
         } as FinderItem;
       } catch {
         return null;

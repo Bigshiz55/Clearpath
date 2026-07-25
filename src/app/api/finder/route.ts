@@ -90,17 +90,23 @@ export async function POST(req: Request) {
       }
     }
 
-    let watcher: Watcher | null = null;
-    const w = body.watcher as Partial<Watcher> | undefined;
-    if (w && typeof w.name === 'string' && Array.isArray(w.love) && Array.isArray(w.avoid)) {
-      watcher = {
-        name: w.name.slice(0, 40),
-        love: w.love.map(String).slice(0, 12),
-        avoid: w.avoid.map(String).slice(0, 12),
-      };
-    }
+    const coerceWatcher = (raw: unknown): Watcher | null => {
+      const w = raw as Partial<Watcher> | undefined;
+      if (w && typeof w.name === 'string' && Array.isArray(w.love) && Array.isArray(w.avoid)) {
+        return { name: w.name.slice(0, 40), love: w.love.map(String).slice(0, 12), avoid: w.avoid.map(String).slice(0, 12) };
+      }
+      return null;
+    };
+    // `watchers` (array) = HOUSEHOLD mode: the user plus everyone named decide
+    // together, ranked by the floor-weighted household verdict. `watcher`
+    // (single) keeps the legacy "score for that one person" behaviour.
+    const bodyWatchers = (body as { watchers?: unknown }).watchers;
+    const household = Array.isArray(bodyWatchers)
+      ? bodyWatchers.map(coerceWatcher).filter((x): x is Watcher => x !== null).slice(0, 6)
+      : null;
+    const watcher = coerceWatcher(body.watcher);
 
-    const result = await runFinder(supabase, user.id, query, watcher, limit);
+    const result = await runFinder(supabase, user.id, query, household && household.length > 0 ? household : watcher, limit);
     return NextResponse.json({
       query,
       scoredFor: result.scoredFor,
