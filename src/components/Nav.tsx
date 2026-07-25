@@ -1,10 +1,9 @@
 import Link from 'next/link';
 import { Logo } from './Logo';
-import { SignOutButton } from './SignOutButton';
 import { GuestSaveButton } from './GuestSaveButton';
 import { MoreMenu, type NavLink } from './nav/MoreMenu';
 import { MobileNav } from './nav/MobileNav';
-import { ViewModeToggle } from './ViewModeToggle';
+import { HeaderOverflow } from './nav/HeaderOverflow';
 import { Avatar } from './Avatar';
 
 // Primary destinations stay inline; secondary ones live under "More" so neither
@@ -43,21 +42,29 @@ export function Nav({
           overlaps the logo or the header controls. */}
       <header className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[calc(env(safe-area-inset-top)+1.5rem)] backdrop-blur">
         <div className="container-page flex h-16 items-center justify-between gap-2 sm:gap-4">
-          <div className="flex min-w-0 items-center gap-6">
+          {/* Spacing does NOT relax at wider viewports: `container-page` caps at
+              1152px, so the header has exactly as much room at 1600 as at 1280.
+              Restoring the roomier gaps above `xl` reintroduced the collision. */}
+          <div className="flex min-w-0 items-center gap-3">
             <Logo href="/app" size="lg" />
-            <nav className="hidden items-center gap-1 lg:flex">
+            <nav className="hidden items-center gap-0.5 lg:flex">
               {PRIMARY.map((l) => (
-                <Link key={l.href} href={l.href} className="btn-ghost px-3 py-2 text-sm">
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="btn-ghost whitespace-nowrap px-2 py-2 text-sm"
+                >
                   {l.label}
                 </Link>
               ))}
               <MoreMenu links={SECONDARY} />
             </nav>
           </div>
+          {/* The right cluster carries only what belongs in a header: upgrade,
+              identity, account. The desktop-view switch and Sign out live in the
+              overflow at every width — inline they cost ~220px, which is what
+              pushed the primary nav past this column and under them. */}
           <div className="flex shrink-0 items-center gap-2">
-            {/* Desktop-preview toggle is meaningless on the phone-native layout
-                and its width overflowed narrow headers — hide it on mobile. */}
-            <ViewModeToggle className="hidden sm:inline-flex" />
             <Link
               href="/app/pro"
               title="WatchVerdict Pro — AI-tuned verdicts, household profiles & more"
@@ -67,25 +74,23 @@ export function Nav({
               <span className="hidden sm:inline">Pro</span>
             </Link>
             {personalLabel && !isGuest && (
-              <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 md:inline">
+              <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 lg:inline">
                 {personalLabel}
               </span>
             )}
             {isGuest ? (
               <GuestSaveButton className="btn-primary hidden sm:inline-flex" />
             ) : (
-              <>
-                <SignOutButton className="btn-secondary hidden sm:inline-flex" />
-                <Link
-                  href="/app/settings"
-                  aria-label={`Account${pro ? ' · Pro member' : ''}`}
-                  title={pro ? 'Your account · Pro member' : 'Your account'}
-                  className="ml-0.5 inline-flex"
-                >
-                  <Avatar label={avatarLabel} px={34} pro={pro} />
-                </Link>
-              </>
+              <Link
+                href="/app/settings"
+                aria-label={`Account${pro ? ' · Pro member' : ''}`}
+                title={pro ? 'Your account · Pro member' : 'Your account'}
+                className="ml-0.5 inline-flex"
+              >
+                <Avatar label={avatarLabel} px={34} pro={pro} />
+              </Link>
             )}
+            <HeaderOverflow personalLabel={personalLabel} isGuest={isGuest} />
           </div>
         </div>
       </header>

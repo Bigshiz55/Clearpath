@@ -24,6 +24,8 @@ import type { RiskAssessment } from '@/lib/finish';
 import type { ContentDna } from '@/lib/contentDna';
 import type { Briefing } from '@/lib/briefing';
 import { originSummary } from '@/lib/origin';
+import { buildEvidence } from '@/lib/verdict/evidence';
+import { FactorBar, SourceConfidenceCard } from './ScoreEvidence';
 
 const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   none: 'bg-white/10 text-slate-400',
@@ -32,20 +34,6 @@ const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   high: 'bg-red-500/15 text-red-200',
   unknown: 'bg-white/5 text-slate-500',
 };
-
-function Bar({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="text-slate-400">{label}</span>
-        <span className="tabular-nums text-slate-300">{value}</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/5">
-        <div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-300" style={{ width: `${value}%` }} />
-      </div>
-    </div>
-  );
-}
 
 export interface WatchState {
   itemId: string | null;
@@ -76,6 +64,17 @@ export function VerdictReportView({
   const t = report.title;
   const origin = originSummary(t);
   const panel = buildPanel(report);
+  // What the score screen is allowed to claim, derived from what the engine
+  // actually had. Pure — it reads the engine's output and never alters it.
+  const evidence = buildEvidence({
+    sources: report.general.sources,
+    breakdown: report.general.breakdown,
+    voteCount: t.voteCount,
+    hasAudienceRating: t.voteAverage != null && t.voteCount > 0,
+    hasPopularity: t.popularity != null && t.popularity > 0,
+    hasProviders: report.providers != null,
+    mediaType: t.mediaType,
+  });
   const backdrop = tmdbImage(t.backdropPath, 'w780');
   const poster = tmdbImage(t.posterPath, 'w342');
   const runtime =
@@ -248,40 +247,26 @@ export function VerdictReportView({
       {/* Score explanation */}
       <section className="card p-5 sm:p-6">
         <h2 className="text-lg font-semibold text-white">How this score was built</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-3">
-            <Bar label="General quality" value={report.general.breakdown.quality} />
-            <Bar label="Audience reception" value={report.general.breakdown.audience} />
-            <Bar label="Watchability" value={report.general.breakdown.watchability} />
-            <Bar label="Engagement" value={report.general.breakdown.engagement} />
+        <div className="mt-4 grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:gap-6">
+          <div className="space-y-3.5" data-testid="score-factors">
+            {evidence.factors.map((f) => (
+              <FactorBar key={f.key} factor={f} />
+            ))}
           </div>
-          <div className="space-y-3">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="text-sm font-semibold text-white">Ratings used</div>
-              <div className="mt-2 space-y-1 text-sm">
-                {report.general.sources.map((s) => (
-                  <div key={s.name} className="flex items-center justify-between">
-                    <span className="text-slate-400">{s.name}</span>
-                    <span className={s.available ? 'text-slate-200' : 'text-slate-500'}>
-                      {s.available ? s.raw : 'Not available'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-slate-500">
-                Audience & critic scores shown as reported. When critic aggregators are
-                unavailable, quality is estimated from audience data (shrunk toward neutral when
-                few votes exist) and labeled as such — never presented as an official critic score.
-              </p>
-            </div>
-          </div>
+          <SourceConfidenceCard evidence={evidence} retrievedAt={report.generatedAt} />
         </div>
 
+        {/* Kept inside this section, under a divider — the personal adjustments
+            are the last step of the same score-building story, not a separate
+            topic that happens to sit nearby. */}
         {report.personal.adjustments.length > 0 && (
-          <div className="mt-5">
+          <div className="mt-5 border-t border-white/10 pt-5" data-testid="match-adjustments">
             <div className="text-sm font-semibold text-white">
               {report.personal.label} adjustments
             </div>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Applied to the score above, after the evidence was blended.
+            </p>
             <ul className="mt-2 space-y-2">
               {report.personal.adjustments.map((a, i) => (
                 <li key={i} className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
