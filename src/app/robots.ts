@@ -12,7 +12,7 @@ export default function robots(): MetadataRoute.Robots {
         // Public discovery platform is crawlable; the product, admin CMS,
         // internal harnesses and private routes are not.
         allow: ['/', '/share/', '/compare/', '/for/', '/guides/', '/discover/', '/explore'],
-        disallow: ['/app', '/api/', '/auth/', '/onboarding', '/admin', '/dev/', '/migrate', '/growth-os'],
+        disallow: ['/app', '/api/', '/auth/', '/onboarding', '/admin', '/dev/', '/migrate', '/growth-os', '/os'],
       },
     ],
     sitemap: `${base}/sitemap.xml`,
