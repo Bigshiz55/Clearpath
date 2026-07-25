@@ -190,9 +190,11 @@ function factorBases(input: EvidenceInput, counted: EvidenceSource[]): FactorBas
   const { breakdown, mediaType } = input;
 
   const qualityBasis =
-    counted.length > 0
-      ? `Blended from ${list(counted.map((s) => s.name))}, each weighted by how much evidence backs it.`
-      : 'No rating source was available, so this sits at the neutral baseline. It is not a measured quality score.';
+    counted.length === 0
+      ? 'No rating source was available, so this sits at the neutral baseline. It is not a measured quality score.'
+      : counted.length === 1
+        ? `${counted[0]!.name} — the only rating source available for this title. Nothing was blended with it.`
+        : `Blended from ${list(counted.map((s) => s.name))}, each weighted by how much evidence backs it.`;
 
   const audienceBasis = input.hasAudienceRating
     ? `TMDB audience rating and its vote volume (${input.voteCount.toLocaleString()} vote${input.voteCount === 1 ? '' : 's'}).`

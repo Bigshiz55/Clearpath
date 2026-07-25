@@ -178,6 +178,18 @@ describe('derived factors state their real basis', () => {
     expect(quality.neutralBaseline).toBe(false);
   });
 
+  it('does not describe a single source as a blend', () => {
+    // The live page hit this: one source read "Blended from TMDB Audience,
+    // each weighted by…", which claims a mixing that did not happen.
+    const quality = forScenario('A').evidence.factors.find((f) => f.key === 'quality')!;
+    expect(quality.basis).not.toMatch(/blended from|each weighted/i);
+    expect(quality.basis).toContain('the only rating source available');
+    expect(quality.basis).toContain('Nothing was blended with it');
+    // The multi-source wording is still used where it is true.
+    const multi = forScenario('B').evidence.factors.find((f) => f.key === 'quality')!;
+    expect(multi.basis).toMatch(/Blended from/);
+  });
+
   it('marks a neutral baseline as a baseline, not as a measurement', () => {
     // I: critics available, no audience rating at all.
     const { evidence } = forScenario('I');
