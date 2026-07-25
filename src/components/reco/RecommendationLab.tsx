@@ -203,6 +203,9 @@ export function RecommendationLab({ runner }: { runner?: LabRunner } = {}) {
               <p className="mt-1 text-xs text-slate-500">
                 Catalog {result.catalogSize.toLocaleString()} · {result.catalogCached ? 'cached' : `generated in ${result.catalogGenerationMs}ms`}
                 {' · '}ranking {result.rankingVersion} · total {result.totalMs}ms
+                {' · '}<span data-testid="data-provenance" className="font-bold text-amber-200">
+                  {result.semanticEmbeddings ? 'REAL semantic embeddings' : 'SYNTHETIC catalog + FIXTURE (non-semantic) vectors'}
+                </span>
               </p>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[520px] text-left text-xs">
@@ -283,6 +286,9 @@ function Pool({ title, testid, slots, onRemove }: {
               <span className="ml-auto text-xs font-bold tabular-nums text-brand-200">{s.score.toFixed(3)}</span>
             </div>
             <p className="mt-1 text-[11px] text-slate-400">{s.reason}{s.addsDimension.length > 0 && ` — ${s.addsDimension.join(', ')}`}</p>
+            {s.explanation?.sentence && (
+              <p data-testid="explanation" className="mt-1 text-[11px] italic text-slate-300">{s.explanation.sentence}</p>
+            )}
             <p className="mt-0.5 text-[11px] text-slate-500">
               {s.availability.length > 0
                 ? `On ${s.availability.join(', ')}`
@@ -298,6 +304,20 @@ function Pool({ title, testid, slots, onRemove }: {
                 <p>Retrieved via {s.retrievalChannels.map((c) => `${c.channel}#${c.rank}`).join(', ') || '—'}</p>
                 <p>Components: {Object.entries(s.fastComponents).map(([k, v]) => `${k} ${v == null ? 'n/a' : v.toFixed(2)}`).join(' · ')}</p>
                 <p>Priority {s.replacementPriority} · tags {s.tags.join(', ')}</p>
+                <div data-testid="evidence">
+                  <p className="font-semibold text-slate-300">Explanation evidence</p>
+                  <ul className="ml-3 list-disc">
+                    {(s.explanation?.evidence ?? []).map((e, i) => (
+                      <li key={i} className={e.supported ? '' : 'text-amber-200'}>
+                        “{e.claim}” ← {e.sourceField} = {e.value} (confidence {e.confidence.toFixed(2)})
+                        {!e.supported && ' — NOT asserted'}
+                      </li>
+                    ))}
+                  </ul>
+                  {(s.explanation?.gaps ?? []).length > 0 && (
+                    <p className="mt-0.5 text-amber-200">Gaps: {s.explanation.gaps.join('; ')}</p>
+                  )}
+                </div>
               </div>
             </details>
             {onRemove && (

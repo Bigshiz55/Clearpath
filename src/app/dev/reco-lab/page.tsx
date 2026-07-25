@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { RecoLabHarness } from '@/components/reco/RecoLabHarness';
+import { RecoLabClient } from '@/components/reco/RecoLabClient';
 
 /**
  * RECOMMENDATION LAB harness (MOBILE_HARNESS=1 only). Renders the REAL lab
@@ -12,5 +12,5 @@ export const dynamic = 'force-dynamic';
 
 export default function RecoLabHarnessPage() {
   if (process.env.MOBILE_HARNESS !== '1') notFound();
-  return <RecoLabHarness />;
+  return <RecoLabClient />;
 }

@@ -5,15 +5,20 @@ import { generateCatalog, catalogSummary, type SynthTitle } from '@/lib/reco/syn
 import { runFunnel } from '@/lib/reco/funnel';
 import { replaceInCourt, type RemovalReason } from '@/lib/reco/diversify';
 import { FixtureEmbeddingProvider } from '@/lib/reco/embedding';
+import { explainTitle } from '@/lib/reco/explain';
 import type { MemberProfile, GroupMethod } from '@/lib/reco/rank';
 import type { LabResult, LabSlot } from '@/lib/actions/recoLab';
 import type { CourtSize } from '@/lib/court/pool';
 
 /**
- * In-browser runner for the harness. Deliberately the SAME engine calls the
- * server action makes, so a browser test exercises the real funnel rather than
- * a stub — only the authorization boundary is bypassed, and only where the
- * route itself is already 404 outside the harness build.
+ * IN-BROWSER runner, shared by the founder route and the /dev harness.
+ *
+ * The funnel runs in the browser rather than in a server action for a concrete
+ * reason: generating a 50,000-title catalog peaks around 590 MB of heap, which
+ * is uncomfortably close to a Vercel function's default 1 GB and would OOM the
+ * request rather than degrade. The engine is pure and has no I/O, so the
+ * browser is simply the better place to run it — and it keeps the server doing
+ * the one thing only it can do, which is check authorization.
  */
 
 const cache = new Map<number, SynthTitle[]>();
@@ -74,6 +79,9 @@ const browserRunner: LabRunner = async (input) => {
       memberScores: deep?.memberScores ?? {}, groupMean: deep?.groupMean ?? 0,
       lowestMemberScore: deep?.lowestMemberScore ?? 0, disagreement: deep?.disagreement ?? 0,
       retrievalChannels: result.retrievalReasons.get(s.id) ?? [],
+      explanation: t
+        ? explainTitle(t, result.request.parsed, deep)
+        : { sentence: '', gaps: [], evidence: [] },
       fastComponents: (fast?.components ?? {}) as Record<string, number | null>,
       tags: t?.tags ?? [],
     };
@@ -96,6 +104,6 @@ const browserRunner: LabRunner = async (input) => {
   } satisfies LabResult;
 };
 
-export function RecoLabHarness() {
+export function RecoLabClient() {
   return <RecommendationLab runner={browserRunner} />;
 }

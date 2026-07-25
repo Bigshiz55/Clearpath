@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminEmail } from '@/lib/admin';
-import { RecommendationLab } from '@/components/reco/RecommendationLab';
+import { RecoLabClient } from '@/components/reco/RecoLabClient';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -28,5 +28,7 @@ export default async function RecommendationLabPage() {
   const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
   if (!user || !isAdminEmail(user.email)) notFound();
 
-  return <RecommendationLab />;
+  // The engine runs in the browser (see RecoLabClient): pure, no I/O, and it
+  // keeps a 50,000-title run off the serverless function's memory ceiling.
+  return <RecoLabClient />;
 }

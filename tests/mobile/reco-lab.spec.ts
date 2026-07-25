@@ -201,3 +201,64 @@ test.describe('accessibility basics', () => {
     expect(summaries).toBeGreaterThan(0);
   });
 });
+
+test.describe('data provenance and explanation evidence', () => {
+  test('the run states plainly that the data is synthetic and non-semantic', async ({ page }) => {
+    await runFunnel(page);
+    const prov = page.getByTestId('data-provenance');
+    await expect(prov).toBeVisible();
+    await expect(prov).toContainText('SYNTHETIC');
+    await expect(prov).toContainText('FIXTURE');
+    await expect(prov).not.toContainText('REAL semantic');
+  });
+
+  test('each title carries an explanation whose claims name their source field', async ({ page }) => {
+    await runFunnel(page);
+    await expect(page.getByTestId('explanation').first()).toBeVisible();
+    // Open the first diagnostics disclosure to reach the evidence list.
+    await page.getByTestId('active-pool').getByText('Diagnostics').first().click();
+    const evidence = page.getByTestId('evidence').first();
+    await expect(evidence).toBeVisible();
+    const text = await evidence.innerText();
+    // Every listed claim points at a real column and a value.
+    expect(text).toMatch(/←\s+\w+\.\w+\s+=/);
+    expect(text).toContain('confidence');
+  });
+
+  test('a stale availability row is shown as unconfirmed, never as available', async ({ page }) => {
+    await runFunnel(page);
+    const body = await page.getByTestId('lab-results').innerText();
+    if (body.includes('last checked over 14 days ago')) {
+      expect(body).toContain('unconfirmed');
+    }
+    // Whatever the sample, nothing may claim availability without a provider name.
+    expect(body).not.toMatch(/On\s*,/);
+  });
+});
+
+test.describe('member configuration', () => {
+  test('supports two to five members with distinct DNA and per-member scores', async ({ page }) => {
+    await page.goto(HARNESS);
+    for (let i = 0; i < 3; i++) await page.getByTestId('add-member').click();
+    await page.getByTestId('run-funnel').click();
+    await expect(page.getByTestId('lab-results')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('active-pool').getByText('Diagnostics').first().click();
+    const diag = await page.getByTestId('active-pool').innerText();
+    // Five members ⇒ five per-member scores on every title.
+    for (const id of ['m0', 'm1', 'm2', 'm3', 'm4']) expect(diag).toContain(id);
+    expect(diag).toMatch(/Group mean/);
+    expect(diag).toMatch(/lowest/);
+    expect(diag).toMatch(/disagreement/);
+    await page.screenshot({ path: path.join(SHOTS, 'five-members.png'), fullPage: true });
+  });
+
+  test('a member with no Watch DNA is still scored', async ({ page }) => {
+    await page.goto(HARNESS);
+    await page.getByLabel('Member 2 name').fill('NewPerson');
+    await page.locator('input[type="checkbox"]').nth(1).uncheck();
+    await page.getByTestId('run-funnel').click();
+    await expect(page.getByTestId('lab-results')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('active-pool').getByText('Diagnostics').first().click();
+    expect(await page.getByTestId('active-pool').innerText()).toContain('m1');
+  });
+});

@@ -8,6 +8,7 @@ import { generateCatalog, catalogSummary, type SynthTitle } from '@/lib/reco/syn
 import { runFunnel } from '@/lib/reco/funnel';
 import { replaceInCourt, type RemovalReason } from '@/lib/reco/diversify';
 import { FixtureEmbeddingProvider } from '@/lib/reco/embedding';
+import { explainTitle } from '@/lib/reco/explain';
 import type { MemberProfile, GroupMethod } from '@/lib/reco/rank';
 import type { CourtSize } from '@/lib/court/pool';
 
@@ -111,6 +112,8 @@ export interface LabSlot {
   lowestMemberScore: number;
   disagreement: number;
   retrievalChannels: { channel: string; rank: number; score: number }[];
+  /** Grounded explanation: sentence + the field behind every claim. */
+  explanation: { sentence: string; gaps: string[]; evidence: { claim: string; sourceField: string; value: string; confidence: number; supported: boolean }[] };
   fastComponents: Record<string, number | null>;
   tags: string[];
 }
@@ -186,6 +189,7 @@ export async function runLab(raw: unknown): Promise<LabResult> {
       lowestMemberScore: deep?.lowestMemberScore ?? 0,
       disagreement: deep?.disagreement ?? 0,
       retrievalChannels: result.retrievalReasons.get(s.id) ?? [],
+      explanation: t ? explainTitle(t, result.request.parsed, deep) : { sentence: '', gaps: [], evidence: [] },
       fastComponents: (fast?.components ?? {}) as Record<string, number | null>,
       tags: t?.tags ?? [],
     };

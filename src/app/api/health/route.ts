@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { envHealth, publicEnv } from '@/lib/env';
+import { envHealth, publicEnv, serverEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -199,6 +199,24 @@ async function probeWatchmode() {
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+    // Founder-access probe. Reports whether ADMIN_EMAILS is configured and how
+  // many entries it has — NEVER the addresses themselves, and never whether a
+  // particular address is on the list, which would make this an oracle for
+  // enumerating admins.
+  if (searchParams.get('probe') === 'founder') {
+    const admins = serverEnv.adminEmails();
+    return NextResponse.json({
+      probe: 'founder',
+      result: {
+        adminEmailsConfigured: admins.length > 0,
+        adminEmailCount: admins.length,
+        hint: admins.length > 0
+          ? 'ADMIN_EMAILS is set. /founder/recommendation-lab is reachable by those accounts once signed in.'
+          : 'ADMIN_EMAILS is EMPTY — /founder/recommendation-lab will 404 for everyone, including you. Set it in Vercel and redeploy.',
+      },
+    }, { headers: { 'cache-control': 'no-store' } });
+  }
+
   if (searchParams.get('probe') === 'tmdb') {
     return NextResponse.json(
       { probe: 'tmdb', result: await probeTmdb() },
