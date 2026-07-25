@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { publicEnv } from '@/lib/env';
 import { publishedEntries } from '@/lib/discovery/registry';
+import { titlePages } from '@/lib/discovery/titlePages';
 
 /**
  * The sitemap is generated from the page registry and contains ONLY pages that
@@ -18,7 +19,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/explore`, priority: 0.9, changeFrequency: 'weekly' },
     { url: `${base}/login`, priority: 0.3 },
   ];
-  const pages: MetadataRoute.Sitemap = publishedEntries().map((e) => ({
+  const pages: MetadataRoute.Sitemap = publishedEntries(new Date(), titlePages()).map((e) => ({
     url: `${base}${e.path}`,
     lastModified: new Date(e.page.updated),
     changeFrequency: 'monthly' as const,

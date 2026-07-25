@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminEmail } from '@/lib/admin';
 import { buildRegistry, countsByKind, duplicateSlugs } from '@/lib/discovery/registry';
+import { titlePages } from '@/lib/discovery/titlePages';
 import type { PageKind, PageStatus } from '@/lib/discovery/types';
 
 /**
@@ -46,9 +47,10 @@ export default async function AdminContentPage({
   } = await supabase.auth.getUser();
   if (!user?.email || !isAdminEmail(user.email)) notFound();
 
-  const registry = buildRegistry();
+  const titles = titlePages();
+  const registry = buildRegistry(new Date(), titles);
   const counts = countsByKind(registry);
-  const dupes = duplicateSlugs();
+  const dupes = duplicateSlugs([...registry.map((e) => e.page)]);
 
   const filtered = registry.filter((e) => {
     if (searchParams.kind && e.page.kind !== searchParams.kind) return false;

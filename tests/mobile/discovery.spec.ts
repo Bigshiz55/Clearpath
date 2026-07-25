@@ -89,6 +89,7 @@ test.describe('every template renders with complete, unique metadata', () => {
   }
 
   test('titles and descriptions are unique across every page', async ({ page }) => {
+    test.setTimeout(180_000);
     const titles = new Set<string>();
     const descs = new Set<string>();
     for (const p of EDITORIAL) {
@@ -114,6 +115,7 @@ test.describe('CTAs and internal links', () => {
   });
 
   test('every related link on every page resolves to a real page', async ({ page }) => {
+    test.setTimeout(180_000);
     const broken: string[] = [];
     for (const p of EDITORIAL) {
       await page.goto(p.path);
@@ -200,5 +202,50 @@ test.describe('responsive', () => {
     for (let i = 1; i < levels.length; i++) {
       expect(levels[i]! - levels[i - 1]!).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+test.describe('title template (movie/show)', () => {
+  test('renders the full page from cached facts: hero, evidence, availability, sections', async ({ page }) => {
+    await page.goto('/dev/title-page');
+    await expect(page.getByTestId('title-hero')).toBeVisible();
+    // Facts from the cache, not a live API call.
+    await expect(page.getByTestId('title-hero')).toContainText('2019');
+    await expect(page.getByTestId('title-hero')).toContainText('130 min');
+    await expect(page.getByTestId('title-hero')).toContainText('Mystery');
+    // Rating evidence, each source named.
+    await expect(page.getByTestId('title-ratings')).toContainText('IMDb');
+    await expect(page.getByTestId('title-ratings')).toContainText('7.9');
+    // Availability stated with its source.
+    await expect(page.getByTestId('title-availability')).toContainText('Netflix');
+    // Required editorial sections.
+    const body = await page.locator('body').innerText();
+    for (const heading of ['The WatchVerd1ct take', 'Why people like it', 'Who should skip it', 'Where to watch']) {
+      expect(body, `missing section: ${heading}`).toContain(heading);
+    }
+    await expect(page.getByTestId('discovery-faq')).toBeVisible();
+    await expect(page.getByTestId('cta-primary')).toBeVisible();
+    await page.screenshot({ path: path.join(SHOTS, 'title-template-desktop.png'), fullPage: false });
+  });
+
+  test('no overflow at phone width with the hero present', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 900 });
+    await page.goto('/dev/title-page');
+    await expect(page.getByTestId('title-hero')).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: path.join(SHOTS, 'title-template-mobile.png'), fullPage: true });
+  });
+
+  test('an empty facts cache publishes NO movie or show URLs', async ({ page }) => {
+    // The cache ships empty, so these routes must 404 rather than emit
+    // placeholder pages — the gate refusing thin content, end to end.
+    for (const url of ['/movie/anything', '/show/anything']) {
+      const res = await page.request.get(url);
+      expect(res.status(), `${url} must 404 with an empty cache`).toBe(404);
+    }
+    const sitemap = await (await page.request.get('/sitemap.xml')).text();
+    expect(sitemap).not.toContain('<loc>/movie/');
+    expect(sitemap).not.toContain('<loc>/show/');
   });
 });

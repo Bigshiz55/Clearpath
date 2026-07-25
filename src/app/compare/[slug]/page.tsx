@@ -4,6 +4,20 @@ import { PublicHeader, PublicFooter, DiscoveryArticle } from '@/components/disco
 import { findPage, isIndexable, publishedEntries } from '@/lib/discovery/registry';
 import { articleJsonLd, faqJsonLd, breadcrumbJsonLd, JsonLd } from '@/lib/discovery/structuredData';
 import { publicEnv } from '@/lib/env';
+import { loadOverrides, applyOverride } from '@/lib/discovery/overrides';
+
+/** CMS overrides are applied on top of the source content. Fail-open: if the
+ *  table or connection is unavailable the page renders from source. */
+async function withOverride(slug: string) {
+  const page = findPage(KIND, slug);
+  if (!page) return null;
+  try {
+    const overrides = await loadOverrides();
+    return applyOverride(page, overrides.get(`${KIND}/${slug}`));
+  } catch {
+    return page;
+  }
+}
 
 const KIND = 'compare' as const;
 const BASE_PATH = '/compare';
@@ -17,7 +31,7 @@ export function generateStaticParams() {
 export const revalidate = 3600;
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const page = findPage(KIND, params.slug);
+  const page = await withOverride(params.slug);
   if (!page) return {};
   const base = publicEnv.siteUrl();
   const url = `${base}${BASE_PATH}/${page.slug}`;
@@ -38,8 +52,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default function Page({ params }: { params: { slug: string } }) {
-  const page = findPage(KIND, params.slug);
+export default async function Page({ params }: { params: { slug: string } }) {
+  const page = await withOverride(params.slug);
   if (!page || page.status === 'retired') notFound();
   const base = publicEnv.siteUrl();
   const trail = [

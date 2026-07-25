@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PublicHeader, PublicFooter, Breadcrumbs } from '@/components/discovery/DiscoveryLayout';
 import { publishedEntries, countsByKind } from '@/lib/discovery/registry';
+import { titlePages } from '@/lib/discovery/titlePages';
 import { siteJsonLd, JsonLd } from '@/lib/discovery/structuredData';
 import { publicEnv } from '@/lib/env';
 import type { PageKind } from '@/lib/discovery/types';
@@ -25,7 +26,7 @@ const SECTIONS: { kind: PageKind; label: string; blurb: string }[] = [
 ];
 
 export default function ExplorePage() {
-  const entries = publishedEntries();
+  const entries = publishedEntries(new Date(), titlePages());
   const counts = countsByKind(entries);
   return (
     <div className="min-h-dvh">
