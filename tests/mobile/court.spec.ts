@@ -13,10 +13,17 @@ const SHOTS = 'test-results/court';
 
 interface RoomModel {
   status: 'lobby' | 'veto' | 'verdict';
-  participants: { id: string; name: string; ready?: boolean; pickCount?: number; reactionCount?: number; reactions?: Record<string, { r: string; reason?: string }> }[];
+  participants: { id: string; name: string; host?: boolean; ready?: boolean; pickCount?: number; reactionCount?: number; reactions?: Record<string, { r: string; reason?: string }> }[];
   finalists: unknown[] | null;
   messages: { id: string; sender: string; body: string; at: string }[];
+  /** Room-level setting, as court_state_v2 returns it. */
+  courtSize?: 'quick' | 'standard' | 'deep';
+  hostName?: string | null;
+  sizeLocked?: boolean;
 }
+
+/** The host token the harness treats as genuine. */
+const HOST_TOKEN = 'host-token-abcdefgh';
 
 function finalist(rank: number, id: number, title: string, fits: [string, number][], streaming = ['Netflix']) {
   return {
@@ -39,7 +46,33 @@ async function mockRoom(page: Page, initial: RoomModel) {
     const body = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
     calls.push({ fn, body });
     if (fn === 'court_state_v2' || fn === 'court_state') {
-      return route.fulfill({ json: room, headers: { 'content-type': 'application/json' } });
+      const host = room.participants.find((p) => p.host);
+      return route.fulfill({
+        json: {
+          ...room,
+          courtSize: room.courtSize ?? 'standard',
+          hostName: room.hostName ?? host?.name ?? null,
+          sizeLocked: room.sizeLocked ?? room.status !== 'lobby',
+        },
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (fn === 'court_claim_host') {
+      if (body.p_host_token !== HOST_TOKEN) {
+        return route.fulfill({ status: 400, json: { message: 'Not host' } });
+      }
+      const p = room.participants.find((x) => x.id === body.p_participant);
+      if (p) p.host = true;
+      return route.fulfill({ json: null });
+    }
+    if (fn === 'court_set_size') {
+      // Mirrors the RPC exactly: host token required, locked outside the lobby,
+      // and the size actually in force is returned either way.
+      if (body.p_host_token !== HOST_TOKEN) {
+        return route.fulfill({ status: 400, json: { message: 'Only the host can change the court size' } });
+      }
+      if (room.status === 'lobby') room.courtSize = body.p_size as 'quick' | 'standard' | 'deep';
+      return route.fulfill({ json: room.courtSize ?? 'standard' });
     }
     if (fn === 'court_join') {
       const name = String(body.p_name ?? 'Guest');
@@ -514,56 +547,133 @@ test.describe('TEST 11 — live sync', () => {
 });
 
 /**
- * TEST 12 — COURT SIZE in the real room. The size is the HOST's setting for
- * everyone, so a guest must not be able to change how many titles the room
- * considers.
+ * TEST 12 — COURT SIZE IS THE HOST'S CALL, AND THE ROOM'S FACT.
+ *
+ * The size belongs to the room. Exactly one member may write it; everyone else
+ * reads the same value. These tests drive the REAL CourtRoom against a mock
+ * that enforces the same host-token rule the RPC does.
  */
-test.describe('TEST 12 — court size is the host’s call', () => {
-  test('the host picks Quick / Standard / Deep, and Standard is the default', async ({ page }) => {
-    await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
-    await page.addInitScript(() => localStorage.setItem('court_host_HARNESS1', 'host-token-abcdefgh'));
-    await joinAs(page, 'Scott');
+async function asHost(page: Page) {
+  await page.addInitScript((token) => localStorage.setItem('court_host_HARNESS1', token), HOST_TOKEN);
+}
 
-    const picker = page.getByTestId('court-size-picker');
-    await expect(picker).toBeVisible();
+test.describe('TEST 12 — host controls the title count', () => {
+  test('the host gets the control, defaulted to Standard, and it reaches the room', async ({ page }) => {
+    const { room, calls } = await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Heather' }] });
+    await asHost(page);
+    await joinAs(page, 'Heather');
+
+    await expect(page.getByTestId('court-size-picker')).toBeVisible();
     await expect(page.getByTestId('court-size-standard')).toHaveAttribute('aria-checked', 'true');
-    await expect(picker).toContainText('Quick Court');
-    await expect(picker).toContainText('Deep Court');
-    await page.screenshot({ path: path.join(SHOTS, '12-size-host.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, '12-host.png'), fullPage: true });
 
     await page.getByTestId('court-size-deep').click();
     await expect(page.getByTestId('court-size-deep')).toHaveAttribute('aria-checked', 'true');
-    // The choice survives a reload — a host who drops out does not lose the room's setup.
-    await page.reload();
-    await expect(page.getByTestId('court-size-deep')).toHaveAttribute('aria-checked', 'true');
+
+    // Written to the ROOM through the host-gated RPC — not kept on the device.
+    await expect.poll(() => calls.filter((c) => c.fn === 'court_set_size').length).toBeGreaterThan(0);
+    expect(calls.find((c) => c.fn === 'court_set_size')!.body.p_size).toBe('deep');
+    expect(room.courtSize).toBe('deep');
   });
 
-  test('the chosen size is what the server is asked to build', async ({ page }) => {
+  test('a joining member gets a READ-ONLY card naming the host, never a selector', async ({ page }) => {
     await mockRoom(page, {
       ...EMPTY_LOBBY,
-      participants: [{ id: 'p-1', name: 'Scott', ready: true }, { id: 'p-2', name: 'Heather', ready: true }],
+      participants: [{ id: 'p-1', name: 'Heather', host: true }],
+      courtSize: 'standard',
     });
-    await page.addInitScript(() => localStorage.setItem('court_host_HARNESS1', 'host-token-abcdefgh'));
+    // No host token: this member arrived by invite link.
+    await joinAs(page, 'Amy');
 
-    let startBody: Record<string, unknown> | null = null;
-    await page.route('**/api/court/start', async (route) => {
-      startBody = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
-      await route.fulfill({ json: { ok: true } });
-    });
-
-    await joinAs(page, 'Scott');
-    await page.getByTestId('court-size-quick').click();
-    await page.getByTestId('tonight-ready').click();
-    await page.getByTestId('build-shortlist').click();
-
-    await expect.poll(() => startBody).not.toBeNull();
-    expect(startBody!.size, 'the host’s court size must reach the server').toBe('quick');
+    await expect(page.getByTestId('court-size-picker')).toHaveCount(0);
+    const card = page.getByTestId('court-size-readonly');
+    await expect(card).toBeVisible();
+    await expect(page.getByTestId('court-size-headline')).toHaveText('Standard Court selected by Heather');
+    await expect(page.getByTestId('court-size-detail')).toHaveText('12 titles · 6 in play · 6 in reserve');
+    await expect(card).toContainText('Only Heather can change this.');
+    await page.screenshot({ path: path.join(SHOTS, '12-member-readonly.png'), fullPage: true });
   });
 
-  test('a guest never sees the size control', async ({ page }) => {
-    await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
-    // No host token: this member joined by invite link.
-    await joinAs(page, 'Heather');
+  test('a member still completes their OWN tonight preferences', async ({ page }) => {
+    const { calls } = await mockRoom(page, {
+      ...EMPTY_LOBBY,
+      participants: [{ id: 'p-1', name: 'Heather', host: true }],
+    });
+    await joinAs(page, 'Amy');
+
+    const tonight = page.getByTestId('court-tonight');
+    // Content type, genres, exclusions and runtime are all still theirs to set.
+    await tonight.getByRole('button', { name: 'Show', exact: true }).click();
+    await tonight.getByRole('button', { name: 'Sounds good: Comedy' }).click();
+    await tonight.getByRole('button', { name: 'Avoid: Horror' }).click();
+    await tonight.getByRole('button', { name: 'Under 90 min' }).click();
+    await page.getByTestId('tonight-ready').click();
+
+    const sent = calls.filter((c) => c.fn === 'court_set_tonight');
+    expect(sent.length).toBeGreaterThan(0);
+    const payload = sent.at(-1)!.body.p_tonight as Record<string, unknown>;
+    expect(payload.kind).toBe('tv');
+    expect(payload.moods).toEqual(['Comedy']);
+    expect(payload.avoid).toEqual(['Horror']);
+    expect(payload.time).toBe('u90');
+  });
+
+  test("the host's change reaches a joined member's read-only card", async ({ page }) => {
+    const socket = await mockRealtime(page);
+    const { room } = await mockRoom(page, {
+      ...EMPTY_LOBBY,
+      participants: [{ id: 'p-1', name: 'Heather', host: true }],
+      courtSize: 'standard',
+    });
+    await joinAs(page, 'Amy');
+    await expect(page.getByTestId('court-size-headline')).toHaveText('Standard Court selected by Heather');
+
+    // The host (another device) changes it; the room broadcasts.
+    room.courtSize = 'quick';
+    await socket.broadcast('state');
+
+    await expect(page.getByTestId('court-size-headline')).toHaveText('Quick Court selected by Heather', { timeout: 3_000 });
+    await expect(page.getByTestId('court-size-detail')).toHaveText('8 titles · 4 in play · 4 in reserve');
+  });
+
+  test('the setting survives a refresh and a reconnection', async ({ page }) => {
+    await mockRoom(page, {
+      ...EMPTY_LOBBY,
+      participants: [{ id: 'p-1', name: 'Heather', host: true }],
+      courtSize: 'deep',
+    });
+    await joinAs(page, 'Amy');
+    await expect(page.getByTestId('court-size-headline')).toHaveText('Deep Court selected by Heather');
+    await page.reload();
+    // Read back from the room, not from this device's storage.
+    await expect(page.getByTestId('court-size-headline')).toHaveText('Deep Court selected by Heather');
+  });
+
+  test('it locks once candidate generation has begun — even for the host', async ({ page }) => {
+    await mockRoom(page, {
+      status: 'veto',
+      participants: [{ id: 'p-1', name: 'Heather', host: true }, { id: 'p-2', name: 'Amy' }],
+      finalists: [finalist(1, 11, 'The Quiet Room', [['Heather', 80], ['Amy', 74]])],
+      messages: [],
+      courtSize: 'deep',
+    });
+    await asHost(page);
+    await page.goto(HARNESS);
+    await page.evaluate(() => localStorage.setItem('court_part_HARNESS1', 'p-1'));
+    await page.reload();
+
+    // No editable control anywhere in the room once the court is built.
     await expect(page.getByTestId('court-size-picker')).toHaveCount(0);
+  });
+
+  test('the creator is clearly labelled Host in the roster', async ({ page }) => {
+    await mockRoom(page, {
+      ...EMPTY_LOBBY,
+      participants: [{ id: 'p-1', name: 'Heather', host: true }, { id: 'p-2', name: 'Amy' }],
+    });
+    await joinAs(page, 'Amy');
+    const badges = page.getByTestId('host-badge');
+    await expect(badges).toHaveCount(1);
+    await expect(badges.first()).toHaveText('Host');
   });
 });

@@ -3,6 +3,7 @@ import { getPopular, getTitle, getWatchProviders, getSimilar } from '@/lib/tmdb/
 import { tmdbImage } from '@/lib/tmdb/image';
 import { buildVerdict, avoidRule, loveRule } from '@/lib/scoring';
 import { selectVaried } from '@/lib/court/pool';
+import { violatesAvoid, type CombinedTonight, type MemberTonight } from '@/lib/court/tonight';
 import type { MediaType, PreferenceTrait, TitleMetadata } from '@/lib/types';
 
 export interface CourtMemberInput {
@@ -145,6 +146,8 @@ export interface CourtWishMember {
   name: string;
   mood: string;
   picks: CourtPick[];
+  /** This member's OWN tonight setup. Combined with everyone else's, never averaged. */
+  tonight?: MemberTonight | null;
 }
 export interface RankedFinalist {
   rank: number; // 1-based, ranked by combined best-fit
@@ -177,13 +180,20 @@ function memberFit(
   memberPicked: boolean,
   mood: string,
   meta: TitleMetadata,
+  /** What THIS member said sounded good tonight. */
+  tonightMoods: string[] = [],
 ): number {
   if (memberPicked) return 100;
   const genres = meta.genres.map((x) => x.toLowerCase());
   const overlap = genres.length > 0 ? genres.filter((x) => memberPickGenres.has(x)).length / genres.length : 0;
   const quality = Math.max(0, Math.min(1, ((meta.voteAverage ?? 5) - 5) / 5)); // 5..10 → 0..1
   const base = 40 + overlap * 40 + quality * 20; // 40..100
-  return clamp100(base + moodNudge(mood, meta));
+  // Tonight's stated moods are a bounded bonus, so a member who filled the
+  // setup in is served without letting one keyword dominate the ranking.
+  const wanted = tonightMoods.map((m) => m.toLowerCase());
+  const hits = wanted.length > 0 ? genres.filter((g) => wanted.some((w) => g.includes(w) || w.includes(g))).length : 0;
+  const tonightBonus = hits > 0 ? Math.min(12, 6 * hits) : 0;
+  return clamp100(base + moodNudge(mood, meta) + tonightBonus);
 }
 
 /**
@@ -204,6 +214,11 @@ export async function computeFinalistsFromPicks(
    * passes 8 / 12 / 16 from the host's chosen court size.
    */
   count = 3,
+  /**
+   * Everyone's tonight preferences, already combined (exclusions unioned,
+   * strictest runtime). Absent for callers that have no room context.
+   */
+  tonight?: CombinedTonight,
 ): Promise<{ finalists?: RankedFinalist[]; error?: string }> {
   const allow = (mt: MediaType) => (mediaType === 'any' ? true : mt === mediaType);
   const exclude = new Set(excludeKeys);
@@ -276,10 +291,27 @@ export async function computeFinalistsFromPicks(
     return { name: m.name, mood: m.mood, picked, genres };
   });
 
-  const scored = [...metaMap.entries()].map(([k, meta]) => {
+  // HARD GATES first — someone's exclusion is the room's exclusion, and the
+  // strictest runtime wins. A gated title is removed, never merely down-ranked,
+  // because a low score can still win a weak round.
+  const gated = [...metaMap.entries()].filter(([, meta]) => {
+    if (!tonight) return true;
+    if (violatesAvoid(tonight.avoid, [...meta.genres, ...attributes(meta)])) return false;
+    const runtime = meta.runtimeMinutes ?? null;
+    if (tonight.runtimeCapMinutes != null && runtime != null && runtime > tonight.runtimeCapMinutes) return false;
+    return true;
+  });
+  if (gated.length === 0) {
+    return { error: 'Nothing clears everyone’s must-avoids and time limit tonight. Try relaxing one of them.' };
+  }
+
+  const moodsOf = new Map((tonight?.perMember ?? []).map((p) => [p.name, p.moods]));
+  const scored = gated.map(([k, meta]) => {
     const perMember = memberCtx.map((mc) => ({
       name: mc.name,
-      score: memberFit(mc.genres, mc.picked.has(k), mc.mood, meta),
+      // Each member's own moods count toward THEIR score only — the floor-first
+      // ranking below is what protects the person who fits worst.
+      score: memberFit(mc.genres, mc.picked.has(k), mc.mood, meta, moodsOf.get(mc.name) ?? []),
       picked: mc.picked.has(k),
     }));
     const scores = perMember.map((p) => p.score);

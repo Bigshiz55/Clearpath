@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { WatchVerdictWordmark } from '@/components/WatchVerdictWordmark';
 import { CourtSizePicker } from '@/components/court/CourtSizePicker';
 import { COURT_SIZES, DEFAULT_COURT_SIZE, type CourtSize } from '@/lib/court/pool';
+import { asCourtSize } from '@/lib/court/roomSettings';
 import {
   channelName, pollIntervalMs, statusFromChannel, syncLabel, REFRESH_COALESCE_MS,
   type SyncEvent, type SyncStatus,
@@ -28,7 +29,7 @@ import {
 
 interface Pick { id: number; mediaType: 'movie' | 'tv'; title: string; year: number | null; posterPath: string | null; posterUrl?: string | null }
 interface SearchHit extends Pick { posterUrl: string | null; overview: string }
-interface Participant { id: string; name: string; ready?: boolean; pickCount?: number; reactionCount?: number; reactions?: Record<string, { r: Reaction; reason?: string }> }
+interface Participant { id: string; name: string; host?: boolean; ready?: boolean; pickCount?: number; reactionCount?: number; reactions?: Record<string, { r: Reaction; reason?: string }> }
 interface Finalist {
   rank: number; id: number; mediaType: 'movie' | 'tv'; title: string; year: number | null; posterUrl: string | null;
   attributes: string[]; genres: string[]; perMember: { name: string; score: number; picked: boolean }[];
@@ -41,6 +42,10 @@ interface State {
   finalists: Finalist[] | null;
   participants: Participant[];
   messages?: ChatMessage[];
+  /** Room-level court size, written only by the host. */
+  courtSize?: CourtSize;
+  hostName?: string | null;
+  sizeLocked?: boolean;
 }
 
 const keyOf = (p: { mediaType: string; id: number }) => `${p.mediaType}-${p.id}`;
@@ -79,9 +84,11 @@ export function CourtRoom({ code }: { code: string }) {
   // Stage 2 — tonight (TEMPORARY; never written to permanent DNA)
   const [tonight, setTonight] = useState<Tonight>(EMPTY_TONIGHT);
   const [tonightDone, setTonightDone] = useState(false);
-  // Court size is the HOST's setting for the whole room, so it lives beside
-  // tonight's preferences rather than inside them (guests never send it).
-  const [courtSize, setCourtSize] = useState<CourtSize>(DEFAULT_COURT_SIZE);
+  // Court size is a ROOM setting owned by the host. The server row is the
+  // authority; this is only the optimistic echo while a write is in flight, so
+  // two devices can never end up believing different sizes.
+  const [pendingSize, setPendingSize] = useState<CourtSize | null>(null);
+  const [sizeBusy, setSizeBusy] = useState(false);
 
   // Stage 3 — shortlist
   const [picks, setPicks] = useState<Pick[]>([]);
@@ -122,8 +129,6 @@ export function CourtRoom({ code }: { code: string }) {
       if (savedPicks) setPicks(JSON.parse(savedPicks) as Pick[]);
       const savedTonight = localStorage.getItem(`court_tonight_${code}`);
       if (savedTonight) { setTonight(JSON.parse(savedTonight) as Tonight); setTonightDone(true); }
-      const savedSize = localStorage.getItem(`court_size_${code}`);
-      if (savedSize === 'quick' || savedSize === 'standard' || savedSize === 'deep') setCourtSize(savedSize);
       const savedReactions = localStorage.getItem(`court_react_${code}`);
       if (savedReactions) setMyReactions(JSON.parse(savedReactions) as Record<string, Reaction>);
     } catch { /* ignore */ }
@@ -180,6 +185,20 @@ export function CourtRoom({ code }: { code: string }) {
     return () => { if (poll.current) clearInterval(poll.current); };
   }, [refresh, sync]);
 
+  /** Once the host has joined, link them to the room so every member can be
+   *  shown WHO set the size, and so the roster can label them Host. */
+  useEffect(() => {
+    if (!hostToken || !participantId) return;
+    if (state?.participants.some((p) => p.id === participantId && p.host)) return;
+    // Older schema (pre-0030) simply has no Host badge — never a hard failure.
+    void (async () => {
+      const { error } = await supabase.rpc('court_claim_host', {
+        p_code: code, p_host_token: hostToken, p_participant: participantId,
+      });
+      if (!error) void refresh();
+    })();
+  }, [hostToken, participantId, state?.participants, code, supabase, refresh]);
+
   /** Tell the room something changed. Best effort: a failed broadcast just
    *  means the others fall back to their poll. */
   const announce = useCallback((event: SyncEvent) => {
@@ -222,6 +241,30 @@ export function CourtRoom({ code }: { code: string }) {
     return list.includes(v) ? list.filter((x) => x !== v) : list.length >= max ? list : [...list, v];
   }
 
+  /** HOST ONLY. Writes to the room, then tells everyone to re-read. The RPC
+   *  returns the size actually in force, so a refused write (locked, or not the
+   *  host) corrects this client instead of leaving it lying to its user. */
+  async function changeCourtSize(next: CourtSize) {
+    if (!hostToken || sizeLocked || next === courtSize) return;
+    setPendingSize(next);
+    setSizeBusy(true);
+    const { data, error } = await supabase.rpc('court_set_size', {
+      p_code: code, p_host_token: hostToken, p_size: next,
+    });
+    setSizeBusy(false);
+    setPendingSize(null);
+    if (error) {
+      setErr('Could not change the court size. Everyone still sees the current setting.');
+      void refresh();
+      return;
+    }
+    if (typeof data === 'string' && data !== next) {
+      setErr('The court is already being built, so the size stayed as it was.');
+    }
+    announce('state');
+    void refresh();
+  }
+
   // ---- Stage 3: shortlist ----
   useEffect(() => {
     const term = q.trim();
@@ -262,7 +305,9 @@ export function CourtRoom({ code }: { code: string }) {
     setBuilding(true); setErr(null);
     const res = await fetch('/api/court/start', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, hostToken, size: courtSize }),
+      // No size in the body: the ROOM is the authority, so the server reads it
+      // from the row the host wrote.
+      body: JSON.stringify({ code, hostToken }),
     });
     const d = await res.json().catch(() => ({}));
     setBuilding(false);
@@ -375,6 +420,12 @@ export function CourtRoom({ code }: { code: string }) {
   }
 
   const isHost = !!hostToken;
+  // The room's value wins; `pendingSize` only covers the round-trip so the
+  // host's own tap feels instant without ever becoming a competing source.
+  const roomSize = asCourtSize(state?.courtSize);
+  const courtSize: CourtSize = pendingSize ?? roomSize;
+  const hostName = state?.hostName ?? null;
+  const sizeLocked = state?.sizeLocked ?? (state != null && state.status !== 'lobby');
 
   // =========================== STAGE 1 — JOIN ===============================
   // Shown whenever this device has no identity in the room — including a LATE
@@ -589,7 +640,14 @@ export function CourtRoom({ code }: { code: string }) {
               <span aria-hidden className="grid h-7 w-7 flex-none place-items-center rounded-full bg-brand-500/20 text-[11px] font-black text-brand-100">
                 {p.name.slice(0, 2).toUpperCase()}
               </span>
-              <span className="min-w-0 flex-1 truncate text-sm text-white">{p.name}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-white">
+                {p.name}
+                {p.host && (
+                  <span data-testid="host-badge" className="ml-1.5 rounded-md border border-brand-400/40 bg-brand-500/15 px-1.5 py-0.5 align-middle text-[10px] font-black uppercase tracking-wide text-brand-200">
+                    Host
+                  </span>
+                )}
+              </span>
               <span data-testid="participant-status" className={`flex-none text-[11px] ${p.ready ? 'text-emerald-300' : 'text-slate-400'}`}>
                 {participantStatus(p)}
               </span>
@@ -618,13 +676,29 @@ export function CourtRoom({ code }: { code: string }) {
             ? <button onClick={() => setTonightDone(false)} className="text-xs font-semibold text-brand-300">Edit</button>
             : <span className="text-xs text-slate-500">Takes ~20 seconds · tonight only</span>}
         </div>
+
+        {/* ROOM SETTING — the host controls it, everyone sees it. Shown above
+            the personal questions so a member knows how many titles the room
+            will weigh before deciding how much to fill in. */}
+        <div className="mt-3">
+          <CourtSizePicker
+            value={courtSize}
+            onChange={changeCourtSize}
+            isHost={isHost}
+            hostName={hostName}
+            locked={sizeLocked}
+            busy={sizeBusy}
+          />
+        </div>
+        <p className="mt-3 border-t border-white/10 pt-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+          Your own preferences
+        </p>
         {tonightDone ? (
           <p className="mt-2 text-sm text-slate-300">
             {KINDS.find((k) => k.k === tonight.kind)?.label}
             {tonight.moods.length > 0 ? ` · ${tonight.moods.join(', ')}` : ''}
             {tonight.avoid.length > 0 ? ` · avoiding ${tonight.avoid.join(', ')}` : ''}
             {tonight.time !== 'any' ? ` · ${TIMES.find((t) => t.k === tonight.time)?.label}` : ''}
-            {isHost ? ` · ${COURT_SIZES[courtSize].label} (${COURT_SIZES[courtSize].total} titles)` : ''}
           </p>
         ) : (
           <div className="mt-3 space-y-3">
@@ -635,12 +709,12 @@ export function CourtRoom({ code }: { code: string }) {
             </Field>
             <Field label="What sounds good? (up to 3)">
               {MOODS.map((m) => (
-                <Chip key={m} on={tonight.moods.includes(m)} onClick={() => setTonight({ ...tonight, moods: toggleIn(tonight.moods, m, 3) })}>{m}</Chip>
+                <Chip key={m} context="Sounds good" on={tonight.moods.includes(m)} onClick={() => setTonight({ ...tonight, moods: toggleIn(tonight.moods, m, 3) })}>{m}</Chip>
               ))}
             </Field>
             <Field label="Anything to avoid?">
               {AVOIDS.map((a) => (
-                <Chip key={a} on={tonight.avoid.includes(a)} onClick={() => setTonight({ ...tonight, avoid: toggleIn(tonight.avoid, a) })}>{a}</Chip>
+                <Chip key={a} context="Avoid" on={tonight.avoid.includes(a)} onClick={() => setTonight({ ...tonight, avoid: toggleIn(tonight.avoid, a) })}>{a}</Chip>
               ))}
             </Field>
             <Field label="How much time do we have?">
@@ -648,18 +722,6 @@ export function CourtRoom({ code }: { code: string }) {
                 <Chip key={t.k} on={tonight.time === t.k} onClick={() => setTonight({ ...tonight, time: t.k })}>{t.label}</Chip>
               ))}
             </Field>
-            {isHost && (
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                <CourtSizePicker
-                  value={courtSize}
-                  onChange={(next) => {
-                    setCourtSize(next);
-                    try { localStorage.setItem(`court_size_${code}`, next); } catch { /* ignore */ }
-                  }}
-                />
-                <p className="mt-2 text-[11px] text-slate-500">Only you set this — it applies to the whole room.</p>
-              </div>
-            )}
             <p className="text-[11px] text-slate-500">These apply to tonight only — your saved DNA is untouched.</p>
             <div className="flex flex-wrap gap-2">
               <button data-testid="tonight-ready" onClick={() => { setTonightDone(true); void saveTonight(tonight, true); }} className="btn-primary text-sm">I’m ready</button>
@@ -743,10 +805,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+function Chip({ on, onClick, children, context }: { on: boolean; onClick: () => void; children: React.ReactNode; context?: string }) {
   return (
     <button
       type="button"
+      // Several options appear in more than one list (Horror is both something
+      // you might want and something you might avoid). Without the context the
+      // two buttons are indistinguishable to a screen reader.
+      aria-label={context ? `${context}: ${String(children)}` : undefined}
       aria-pressed={on}
       onClick={onClick}
       className={`min-h-[36px] rounded-full border px-3 text-xs font-semibold transition ${

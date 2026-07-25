@@ -81,7 +81,14 @@ export default function CourtVoteHarness() {
     <main className="container-page py-6" data-testid="court-vote-harness">
       <h1 className="mb-4 text-xl font-black text-white">Court — voting floor</h1>
       <div className="mb-5">
-        <CourtSizePicker value={size} onChange={changeSize} warnOnChange={started} />
+        {/* The harness drives the pool engine directly, so it always renders the
+            host's control. The read-only member view is covered on /dev/court. */}
+        <CourtSizePicker value={size} onChange={changeSize} isHost hostName="You" />
+        {started && (
+          <p data-testid="court-size-warning" className="mt-2 text-[11px] text-amber-200">
+            Changing the size rebuilds the court. Votes already cast are cleared.
+          </p>
+        )}
         <p data-testid="court-size-summary" className="mt-2 text-xs text-slate-400">
           {COURT_SIZES[size].label}: {COURT_SIZES[size].total} titles, {COURT_SIZES[size].active} in play.
         </p>

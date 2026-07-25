@@ -6,6 +6,8 @@ import {
 import {
   channelName, pollIntervalMs, statusFromChannel, syncLabel, POLL_LIVE_MS, POLL_FALLBACK_MS,
 } from './liveSync';
+import { roomSizeView, participantRole, asCourtSize } from './roomSettings';
+import { combineTonight, violatesAvoid } from './tonight';
 import {
   canVote, vetoTokensLeft, ballotView, liveVoteScore, scoreCandidate, guestSentiment,
   finalThree, breakTie, DEFAULT_WEIGHTS, VETO_TOKENS_PER_MEMBER,
@@ -374,5 +376,107 @@ describe('live sync policy', () => {
     expect(syncLabel('polling')).toMatch(/still updating/i);
     // Degraded must never be silent — the label has to say something.
     expect(syncLabel('connecting').length).toBeGreaterThan(0);
+  });
+});
+
+// ------------------------------------------------------- room settings ------
+
+describe('court size is a room setting, not a personal one', () => {
+  it('lets only the host edit it', () => {
+    const host = roomSizeView({ size: 'standard', isHost: true, locked: false, hostName: 'Heather' });
+    const guest = roomSizeView({ size: 'standard', isHost: false, locked: false, hostName: 'Heather' });
+    expect(host.editable).toBe(true);
+    expect(guest.editable).toBe(false);
+    expect(guest.lockedReason).toBe('Only Heather can change this.');
+  });
+
+  it('shows joining members the exact wording asked for', () => {
+    const guest = roomSizeView({ size: 'standard', isHost: false, locked: false, hostName: 'Heather' });
+    expect(guest.headline).toBe('Standard Court selected by Heather');
+    expect(guest.detail).toBe('12 titles · 6 in play · 6 in reserve');
+  });
+
+  it('never hides the setting — a member always gets the counts', () => {
+    for (const size of ['quick', 'standard', 'deep'] as const) {
+      const guest = roomSizeView({ size, isHost: false, locked: false, hostName: 'Amy' });
+      expect(guest.headline).toContain(COURT_SIZES[size].label);
+      expect(guest.detail).toContain(`${COURT_SIZES[size].total} titles`);
+      expect(guest.detail).toContain(`${COURT_SIZES[size].active} in play`);
+      expect(guest.detail).toContain(`${COURT_SIZES[size].total - COURT_SIZES[size].active} in reserve`);
+    }
+  });
+
+  it('falls back to "the host" before the creator has joined and been named', () => {
+    const guest = roomSizeView({ size: 'deep', isHost: false, locked: false, hostName: null });
+    expect(guest.headline).toBe('Deep Court selected by the host');
+    expect(guest.lockedReason).toBe('Only the host can change this.');
+  });
+
+  it('locks for EVERYONE once candidate generation begins — including the host', () => {
+    const host = roomSizeView({ size: 'deep', isHost: true, locked: true, hostName: 'Heather' });
+    expect(host.editable).toBe(false);
+    expect(host.lockedReason).toMatch(/already been built/i);
+  });
+
+  it('labels only the creator as Host', () => {
+    expect(participantRole(true)).toBe('Host');
+    expect(participantRole(false)).toBe('Member');
+  });
+
+  it('coerces any untrusted value to a real size, defaulting to Standard', () => {
+    expect(asCourtSize('deep')).toBe('deep');
+    for (const bad of [null, undefined, '', 'DEEP', 'huge', 12, {}, []]) {
+      expect(asCourtSize(bad), String(bad)).toBe('standard');
+    }
+  });
+});
+
+// ------------------------------------------- combining tonight setups -------
+
+describe('combining every member’s tonight preferences', () => {
+  const room = [
+    { name: 'Scott', tonight: { kind: 'movie' as const, moods: ['Mystery'], avoid: ['Horror'], time: 'u120' as const } },
+    { name: 'Heather', tonight: { kind: 'movie' as const, moods: ['Thriller'], avoid: ['Sad'], time: 'u90' as const } },
+    { name: 'Amy', tonight: { kind: 'any' as const, moods: ['Comedy'], avoid: [], time: 'any' as const } },
+  ];
+
+  it('unions exclusions — one person’s hard-no is the room’s hard-no', () => {
+    expect(combineTonight(room).avoid).toEqual(['horror', 'sad']);
+  });
+
+  it('takes the STRICTEST runtime, never the average', () => {
+    expect(combineTonight(room).runtimeCapMinutes).toBe(90);
+  });
+
+  it('keeps each member’s moods separate rather than merging tastes', () => {
+    const c = combineTonight(room);
+    expect(c.perMember).toEqual([
+      { name: 'Scott', moods: ['mystery'] },
+      { name: 'Heather', moods: ['thriller'] },
+      { name: 'Amy', moods: ['comedy'] },
+    ]);
+  });
+
+  it('narrows the media type only when everyone who chose agrees', () => {
+    // Scott and Heather both said movie; Amy said "either" → still movie.
+    expect(combineTonight(room).mediaType).toBe('movie');
+    // One dissenter reopens it, rather than overruling them.
+    const split = [...room, { name: 'Jo', tonight: { kind: 'tv' as const } }];
+    expect(combineTonight(split).mediaType).toBe('any');
+  });
+
+  it('is a no-op when nobody filled anything in', () => {
+    const c = combineTonight([{ name: 'Scott' }, { name: 'Amy', tonight: null }]);
+    expect(c.anyExpressed).toBe(false);
+    expect(c.avoid).toEqual([]);
+    expect(c.runtimeCapMinutes).toBeNull();
+    expect(c.mediaType).toBe('any');
+  });
+
+  it('gates on exclusions by genre or attribute, case-insensitively', () => {
+    expect(violatesAvoid(['horror'], ['Horror', 'Thriller'])).toBe(true);
+    expect(violatesAvoid(['subtitles'], ['Drama', 'Subtitles'])).toBe(true);
+    expect(violatesAvoid(['horror'], ['Comedy', 'Family'])).toBe(false);
+    expect(violatesAvoid([], ['Horror'])).toBe(false);
   });
 });
