@@ -10,17 +10,17 @@ const siteUrl = publicEnv.siteUrl();
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'WatchVerdict — Thousands of choices, one verdict',
-    template: '%s · WatchVerdict',
+    default: 'WatchVerd1ct — Thousands of titles. One verd1ct.',
+    template: '%s · WatchVerd1ct',
   },
   description:
-    'Thousands of choices, one verdict. Personalized movie & TV recommendations — a clear verdict, a match score tuned to your taste, and where to watch it legally.',
-  applicationName: 'WatchVerdict',
+    'Thousands of titles. One verd1ct. Personalized movie & TV recommendations — a clear verdict, a match score tuned to your taste, and where to watch it legally.',
+  applicationName: 'WatchVerd1ct',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'WatchVerdict',
+    title: 'WatchVerd1ct',
   },
   icons: {
     icon: [
@@ -31,15 +31,15 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    siteName: 'WatchVerdict',
-    title: 'WatchVerdict — Thousands of choices, one verdict',
-    description: 'Thousands of choices, one verdict — personalized movie & TV recommendations with a match score tuned to your taste.',
+    siteName: 'WatchVerd1ct',
+    title: 'WatchVerd1ct — Thousands of titles. One verd1ct.',
+    description: 'Thousands of titles. One verd1ct. Personalized movie & TV recommendations with a match score tuned to your taste.',
     url: siteUrl,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'WatchVerdict — Thousands of choices, one verdict',
-    description: 'Thousands of choices, one verdict.',
+    title: 'WatchVerd1ct — Thousands of titles. One verd1ct.',
+    description: 'Thousands of titles. One verd1ct.',
   },
 };
 

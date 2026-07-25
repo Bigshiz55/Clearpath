@@ -109,7 +109,7 @@ export default async function SharePage({ params }: { params: { token: string } 
           <div className="card bg-cinema-radial p-6 text-center">
             <h2 className="text-xl font-bold text-white">Want verdicts tuned to your taste?</h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-slate-300">
-              WatchVerdict scores any movie or show for you personally and tells you where to watch it.
+              Thousands of titles. One verd1ct. WatchVerd1ct scores any movie or show for you personally and tells you where to watch it.
             </p>
             <Link href="/login" className="btn-primary mt-4 inline-flex px-6 py-3">
               Create your free account
@@ -119,7 +119,7 @@ export default async function SharePage({ params }: { params: { token: string } 
       </main>
 
       <footer className="container-page py-8 text-center text-xs text-slate-500">
-        Shared via WatchVerdict · Data from TMDB / JustWatch
+        Shared via WatchVerd1ct — Thousands of titles. One verd1ct. · Data from TMDB / JustWatch
       </footer>
     </div>
   );

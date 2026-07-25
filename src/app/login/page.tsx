@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Logo } from '@/components/Logo';
+import { Tagline } from '@/components/Tagline';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { getCurrentUser } from '@/lib/supabase/server';
 
@@ -29,8 +30,9 @@ export default async function LoginPage({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="container-page flex h-16 items-center">
+      <header className="container-page flex h-16 flex-wrap items-center gap-x-4 gap-y-1">
         <Logo />
+        <Tagline className="hidden text-sm sm:block" />
       </header>
       <main className="container-page flex flex-1 items-center justify-center py-10">
         <LoginForm next={next} />
