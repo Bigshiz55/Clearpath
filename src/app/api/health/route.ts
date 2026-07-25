@@ -28,6 +28,8 @@ async function probeSchema() {
     { fn: 'court_set_tonight', migration: '0026_court_v2', args: { p_code: NO_SUCH_ROOM, p_participant: '00000000-0000-0000-0000-000000000000', p_tonight: {}, p_ready: false } },
     { fn: 'court_react', migration: '0026_court_v2', args: { p_code: NO_SUCH_ROOM, p_participant: '00000000-0000-0000-0000-000000000000', p_key: 'x', p_reaction: 'for', p_reason: '' } },
     { fn: 'court_chat_send', migration: '0026_court_v2', args: { p_code: NO_SUCH_ROOM, p_participant: '00000000-0000-0000-0000-000000000000', p_body: '' } },
+    { fn: 'court_set_size', migration: '0030_court_size', args: { p_code: NO_SUCH_ROOM, p_host_token: 'probe', p_size: 'standard' } },
+    { fn: 'court_claim_host', migration: '0030_court_size', args: { p_code: NO_SUCH_ROOM, p_host_token: 'probe', p_participant: '00000000-0000-0000-0000-000000000000' } },
   ];
   try {
     const supabase = createServerClient(publicEnv.supabaseUrl(), publicEnv.supabasePublishableKey(), {
@@ -48,11 +50,20 @@ async function probeSchema() {
         '0004_court': applied('0004_court'),
         '0014_court_search': applied('0014_court_search'),
         '0026_court_v2': applied('0026_court_v2'),
+        '0030_court_size': applied('0030_court_size'),
       },
       courtV2Ready: applied('0026_court_v2'),
-      hint: applied('0026_court_v2')
-        ? 'Court v2 is live: group chat, tonight setup, reactions and late join are available.'
-        : 'Apply supabase/migrations/0026_court_v2.sql — until then the Court falls back to the v1 snapshot (no chat, tonight setup, reactions or late join).',
+      // 0030 is independent of 0026 — it only needs 0004 — so it is reported
+      // separately rather than folded into a single ready flag.
+      hostSizeReady: applied('0030_court_size'),
+      hint: [
+        applied('0026_court_v2')
+          ? 'Court v2 is live: group chat, tonight setup, reactions and late join are available.'
+          : 'Apply supabase/migrations/0026_court_v2.sql — until then the Court falls back to the v1 snapshot (no chat, tonight setup, reactions or late join).',
+        applied('0030_court_size')
+          ? 'Host-controlled court size is live: the room stores the setting and members see it read-only.'
+          : 'Apply supabase/migrations/0030_court_size.sql — until then every court uses the Standard 12 and the host cannot change it.',
+      ].join(' '),
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
