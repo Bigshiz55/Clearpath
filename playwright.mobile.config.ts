@@ -34,6 +34,11 @@ export default defineConfig({
       'MOBILE_HARNESS=1 PORT=3211 ' +
       'NEXT_PUBLIC_SUPABASE_URL=https://harness.invalid ' +
       'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=harness-anon-key ' +
+      // TEST-ONLY founder code. Not the production secret and never will be —
+      // the real one lives solely in Vercel's environment. It is long enough
+      // to satisfy the minimum-length guard so the flow is exercised as
+      // deployed rather than through a special short-code path.
+      'FOUNDER_ACCESS_CODE=harness-only-founder-code-not-a-secret-0123456789 ' +
       'npm start',
     url: 'http://127.0.0.1:3211/dev/mobile-home',
     timeout: 90_000,

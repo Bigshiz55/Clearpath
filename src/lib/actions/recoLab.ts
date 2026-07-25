@@ -2,8 +2,7 @@
 
 import 'server-only';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
-import { isAdminEmail } from '@/lib/admin';
+import { hasFounderAccess } from '@/lib/founder/gate';
 import { generateCatalog, catalogSummary, type SynthTitle } from '@/lib/reco/synthCatalog';
 import { runFunnel } from '@/lib/reco/funnel';
 import { replaceInCourt, type RemovalReason } from '@/lib/reco/diversify';
@@ -61,9 +60,10 @@ function catalogFor(size: number): { titles: SynthTitle[]; generationMs: number;
 }
 
 async function assertFounder(): Promise<void> {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
-  if (!user || !isAdminEmail(user.email)) throw new Error('Not authorized.');
+  // A server action is a public HTTP endpoint. Gating only the page that
+  // renders the form would leave this callable by anyone who knows its id, so
+  // it re-checks independently through the same adapter.
+  if (!(await hasFounderAccess())) throw new Error('Not authorized.');
 }
 
 export interface LabResult {

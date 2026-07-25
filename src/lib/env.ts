@@ -138,6 +138,20 @@ export const serverEnv = {
     return optional('MIGRATE_SECRET');
   },
   /**
+   * TEMPORARY founder access code. Server-only, never NEXT_PUBLIC, never
+   * logged, never returned by any API. Its presence alone enables the
+   * /founder/access flow; its absence disables that flow entirely (the route
+   * then behaves as if it does not exist).
+   *
+   * Must NOT be shared with any service credential — it is its own secret.
+   */
+  founderAccessCode(): string | undefined {
+    const v = optional('FOUNDER_ACCESS_CODE');
+    // A short code is not defensible behind any rate limiter; refuse to treat
+    // one as configured rather than offering false assurance.
+    return v && v.length >= 16 ? v : undefined;
+  },
+  /**
    * Allowlist of admin emails (ADMIN_EMAILS), separated by commas OR whitespace
    * — including newlines, because Vercel's env editor is a textarea and people
    * paste one address per line.

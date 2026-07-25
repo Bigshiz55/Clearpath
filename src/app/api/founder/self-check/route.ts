@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminEmail } from '@/lib/admin';
 import { serverEnv } from '@/lib/env';
+import { resolveFounderAccess } from '@/lib/founder/gate';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,14 +39,32 @@ export async function GET() {
   }
 
   const adminCount = serverEnv.adminEmails().length;
+  const codeConfigured = !!serverEnv.founderAccessCode();
+
+  // A valid temporary code session is sufficient on its own — report it first,
+  // because while public sign-in is disabled it is the ONLY workable path.
+  const access = await resolveFounderAccess();
+  if (access.allowed && access.method === 'founder_code') {
+    return NextResponse.json({
+      signedIn: false,
+      authorized: true,
+      via: 'founder_access_code',
+      expiresAt: access.expiresAt,
+      reason: 'valid_founder_code_session',
+      nextStep: 'Open /founder/recommendation-lab — it will load.',
+    }, { headers });
+  }
 
   if (!email) {
     return NextResponse.json({
       signedIn: false,
       authorized: false,
-      reason: 'not_signed_in',
+      reason: 'no_founder_session',
       adminEmailsConfigured: adminCount > 0,
-      nextStep: 'Sign in at /login, then reload this page.',
+      founderAccessCodeConfigured: codeConfigured,
+      nextStep: codeConfigured
+        ? 'Public sign-in is disabled. Enter your access code at /founder/access.'
+        : 'No founder access method is configured on this deployment. Set FOUNDER_ACCESS_CODE in Vercel and redeploy.',
     }, { headers });
   }
 
