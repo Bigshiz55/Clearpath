@@ -47,7 +47,9 @@ test.describe('authorization', () => {
     const robots = await (await page.request.get('/robots.txt')).text();
     const sitemap = await (await page.request.get('/sitemap.xml')).text();
     expect(sitemap).not.toContain('recommendation-lab');
-    expect(robots.length).toBeGreaterThan(0);
+    // The page carries noindex metadata, but the PATH must be blocked too —
+    // metadata only helps a crawler that already fetched the page.
+    expect(robots).toContain('/founder');
   });
 });
 
