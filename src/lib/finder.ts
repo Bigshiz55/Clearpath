@@ -135,12 +135,27 @@ function fmtRuntime(min: number | null): string | null {
  * satisfies. Unlike a chat that returns one vibe-matched guess, this honors the
  * filters and returns a set — and never invents anything.
  */
+
+/**
+ * How many results a browse-style query returns.
+ *
+ * This was 8, with a hard ceiling of 20. Eight is a answer-shaped number: it
+ * reads as "here is my pick and a few alternates", not as a catalog you can
+ * browse. "What's on Netflix tonight?" is a browsing request against thousands
+ * of titles, and it was being answered with eight of them.
+ *
+ * 24 fills a responsive grid at every breakpoint (2/3/4/6 columns) and clears
+ * the 20-per-page product target; the ceiling leaves room for an explicit
+ * larger ask without unbounding the TMDB fan-out behind it.
+ */
+export const DEFAULT_RESULT_LIMIT = 24;
+export const MAX_RESULT_LIMIT = 60;
 export async function runFinder(
   supabase: SupabaseClient,
   userId: string,
   q: FinderQuery,
   watcher?: Watcher | Watcher[] | null,
-  limit = 8,
+  limit = DEFAULT_RESULT_LIMIT,
 ): Promise<FinderResult> {
   const profile = await getProfile(supabase, userId);
   const region = regionFor(profile);
@@ -388,7 +403,10 @@ export async function runFinder(
   // Live TV: enrich a wider pool with real airings and keep only shows that are
   // actually on the air, best match first.
   if (q.liveOnly) {
-    const pool = items.slice(0, 16);
+    // Widened with the result limit: enriching only 16 candidates and then
+    // filtering to those actually on air was itself a collapse — most of a
+    // 24-result set could be discarded before the airing lookup ever ran.
+    const pool = items.slice(0, Math.max(32, limit * 2));
     await Promise.all(
       pool.map(async (i) => {
         if (i.airing === undefined) i.airing = await getNextAiring(i.imdbId ?? null);
@@ -400,7 +418,7 @@ export async function runFinder(
     }
   }
 
-  const finalItems = items.slice(0, Math.max(1, Math.min(limit, 20)));
+  const finalItems = items.slice(0, Math.max(1, Math.min(limit, MAX_RESULT_LIMIT)));
   // Attach the real next airing (channel + time) to every TV result, so "ask for
   // a show" always shows where and when it's on. Best-effort; null when unknown.
   await Promise.all(

@@ -153,13 +153,21 @@ export function OnTvGuide({
   // In windowed mode the airings are already the curated next-N-hours set, so we
   // keep them soonest-first (their given order) rather than re-filtering to prime time.
   const highlightPool = useMemo(() => {
-    if (windowed) return airings.filter((a) => !NOISE_TYPES.has(a.showType)).slice(0, 10);
+    // Windowed mode used to cap at 10 here AND the highlight strip cut that to
+    // 6, so a healthy schedule could never show more than six cards up top no
+    // matter how much real inventory arrived. The window set is already the
+    // curated result; show it all and let the list below carry the rest.
+    if (windowed) return airings.filter((a) => !NOISE_TYPES.has(a.showType));
     return airings
       .filter((a) => !NOISE_TYPES.has(a.showType) && a.rating != null && (streaming || (a.minutes >= 18 * 60 && a.minutes <= 23 * 60)))
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
       .slice(0, 10);
   }, [airings, streaming, windowed]);
-  const highlights = highlightPool.filter((a) => !hidden.has(a.id)).slice(0, 6);
+  // In windowed mode every valid airing is a result, not a "highlight" — the
+  // full schedule is the deliverable. Elsewhere a short highlight strip sits
+  // above the complete list, which is never shortened.
+  const highlightVisible = highlightPool.filter((a) => !hidden.has(a.id));
+  const highlights = windowed ? highlightVisible : highlightVisible.slice(0, 6);
 
   if (airings.length === 0) {
     return (

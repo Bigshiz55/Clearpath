@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { runFinder, type FinderQuery, type Watcher } from '@/lib/finder';
+import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from '@/lib/finder';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     // query, then the regex enrichment for actor/count. Scoring stays
     // deterministic in runFinder — the AI only fills search filters.
     let query: FinderQuery;
-    let limit = 8;
+    let limit = DEFAULT_RESULT_LIMIT;
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     const ai = text ? await parseAskWithAI(text) : null;
     if (ai) {

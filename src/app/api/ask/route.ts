@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { runFinder, type FinderQuery, type Watcher } from '@/lib/finder';
+import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from '@/lib/finder';
 import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
     // 2) Otherwise → smart discovery. Let the LLM parse the ask (handles
     // misspellings, actor names, counts); fall back to the regex parser.
     let query: FinderQuery;
-    let limit = 8;
+    let limit = DEFAULT_RESULT_LIMIT;
     const ai = text ? await parseAskWithAI(text) : null;
 
     // 1.5) "More like X" — if the ask compares to a title ("shows like
