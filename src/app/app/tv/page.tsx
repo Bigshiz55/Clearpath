@@ -5,6 +5,7 @@ import { getProfile, regionFor } from '@/lib/profile';
 import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle } from '@/lib/onTv';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
+import { hasFullGridProvider } from '@/lib/viewing/liveTv';
 import { TvDetective } from '@/components/TvDetective';
 
 export const dynamic = 'force-dynamic';
@@ -133,6 +134,29 @@ export default async function OnTvPage({
           )}
         </p>
       </section>
+
+      {/* COVERAGE HONESTY.
+          Without a full-grid provider the guide is reading a premiere feed —
+          roughly 42 rows for an entire US day, no reruns, movies, daytime or
+          local affiliates. A six-hour window can legitimately contain a single
+          row. Saying so is the difference between a thin list and a thin list
+          that pretends to be the national schedule. */}
+      {!hasFullGridProvider() && (
+        <section
+          className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-4"
+          data-testid="schedule-coverage-notice"
+        >
+          <h2 className="text-sm font-bold text-amber-100">
+            Partial listings — no full TV guide is connected
+          </h2>
+          <p className="mt-1 text-sm leading-snug text-amber-100/80">
+            This deployment has no full-schedule provider configured, so we can only show
+            first-run episodes on a small number of national networks. Reruns, movies,
+            daytime, sports and local channels are missing — this is <em>not</em> the
+            complete TV schedule.
+          </p>
+        </section>
+      )}
 
       <TvDetective />
 
