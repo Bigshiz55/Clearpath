@@ -1,7 +1,9 @@
 import 'server-only';
 import { resolveSchedule } from './registry';
+import { TvMediaAdapter, TVMEDIA_CAPABILITIES } from './adapters/tvMedia';
 import { SchedulesDirectAdapter } from './adapters/schedulesDirect';
 import { TvmazeAdapter } from './adapters/tvmaze';
+import { MockScheduleAdapter } from './adapters/mock';
 import {
   selectAvailable, rankListings, pickTopIndex,
   type ScheduleListing, type ContentType,
@@ -20,8 +22,50 @@ import { buildResultSet, traceIdFrom, type ResultSet, type RankingMethod } from 
 export const LIVE_TV_PAGE_SIZE = 30;
 export const MIN_USEFUL_RESULTS = 12;
 
+/**
+ * The registered chain, in priority order. Business logic never names a
+ * provider — it asks this module for a schedule and gets whichever source is
+ * configured, with the status attached.
+ *
+ *   0  TV Media          licensed primary, full national grid
+ *  10  Schedules Direct  licensed alternate, kept registered so a second
+ *                        contract is a config change, not a code change
+ *  50  TVmaze            premiere feed — supplement only, never a grid
+ *  90  Mock              MOCK_SCHEDULE=1 only; never active in production
+ */
 function adapters() {
-  return [new SchedulesDirectAdapter(), new TvmazeAdapter()];
+  return [
+    new TvMediaAdapter(),
+    new SchedulesDirectAdapter(),
+    new TvmazeAdapter(),
+    new MockScheduleAdapter(),
+  ];
+}
+
+/** Which providers are registered, configured, and what they can do. */
+export function providerCapabilities() {
+  const tvm = new TvMediaAdapter();
+  const sd = new SchedulesDirectAdapter();
+  const maze = new TvmazeAdapter();
+  const mock = new MockScheduleAdapter();
+  return [
+    {
+      providerId: tvm.providerId, priority: tvm.priority, configured: tvm.isConfigured(),
+      isFullGrid: true, capabilities: TVMEDIA_CAPABILITIES, role: 'primary' as const,
+    },
+    {
+      providerId: sd.providerId, priority: sd.priority, configured: sd.isConfigured(),
+      isFullGrid: true, role: 'alternate' as const,
+    },
+    {
+      providerId: maze.providerId, priority: maze.priority, configured: maze.isConfigured(),
+      isFullGrid: false, role: 'supplement' as const,
+    },
+    {
+      providerId: mock.providerId, priority: mock.priority, configured: mock.isConfigured(),
+      isFullGrid: true, role: 'mock' as const,
+    },
+  ];
 }
 
 export interface LiveTvQuery {
@@ -53,7 +97,8 @@ export async function getLiveSchedule(q: LiveTvQuery = {}): Promise<ResultSet<Sc
       windowStartUtc: nowMs,
       windowEndUtc: endMs,
       channels: q.channels ?? null,
-      lineupId: process.env.SCHEDULES_DIRECT_LINEUP ?? null,
+      lineupId: process.env.TVMEDIA_LINEUP_ID ?? process.env.SCHEDULES_DIRECT_LINEUP ?? null,
+      postalCode: process.env.TVMEDIA_DEFAULT_ZIP ?? null,
     },
   });
 
@@ -91,7 +136,20 @@ export async function getLiveSchedule(q: LiveTvQuery = {}): Promise<ResultSet<Sc
   });
 }
 
-/** Whether a full-grid provider is configured on this deployment. */
+/**
+ * Whether a COMPLETE schedule is available on this deployment.
+ *
+ * True only for a licensed full-grid provider — never for the TVmaze premiere
+ * feed, which is why the coverage banner stays up until a real contract is
+ * wired. The mock counts only when explicitly enabled for a harness run.
+ */
 export function hasFullGridProvider(): boolean {
-  return new SchedulesDirectAdapter().isConfigured();
+  return new TvMediaAdapter().isConfigured()
+    || new SchedulesDirectAdapter().isConfigured()
+    || new MockScheduleAdapter().isConfigured();
+}
+
+/** The active primary's id, for display. Null when none is configured. */
+export function activeProviderId(): string | null {
+  return providerCapabilities().find((p) => p.configured && p.role !== 'supplement')?.providerId ?? null;
 }

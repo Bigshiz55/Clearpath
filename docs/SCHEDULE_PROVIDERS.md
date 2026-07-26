@@ -138,3 +138,46 @@ silently returning nothing.
 A single national lineup is a reasonable default for a v1; per-user postal codes
 can be threaded through `ScheduleRequest.postalCode` without touching the
 pipeline, which already carries the field.
+
+---
+
+# TV Media — the chosen production provider
+
+TV Media is WatchVerd1ct's licensed primary listings provider. The architecture
+stays provider-agnostic: TV Media is `priority 0` in the registry, and adding
+Gracenote, TMS or any future source is a new file implementing `ScheduleAdapter`,
+with no change to routes, components, ranking, tests or the result contract.
+
+## Configuration
+
+All server-only. None may take a `NEXT_PUBLIC_` prefix — an architectural test
+(`src/lib/viewing/independence.test.ts`) fails the build if one ever does.
+
+| Variable | Required | Format |
+|---|---|---|
+| `TVMEDIA_API_KEY` | **Yes** | The API key from your TV Media account. Sent as a request header, never a query parameter |
+| `TVMEDIA_LINEUP_ID` | Yes (or ZIP) | Your market's lineup id |
+| `TVMEDIA_DEFAULT_ZIP` | Yes (or lineup) | 5-digit US ZIP, used when no lineup id is set |
+| `TVMEDIA_BASE_URL` | No | Overrides the API host — set only if TV Media gives you a sandbox endpoint |
+
+With none set, `/api/health/schedule` reports `"No TV Media credentials
+configured."` and the app runs in partial mode with an on-screen banner. It never
+implies a complete schedule.
+
+## Verifying the field mapping
+
+The adapter was written before we held API access, so its field names are an
+informed mapping (`FIELD_MAP` in `src/lib/viewing/adapters/tvMedia.ts`). It
+accepts several aliases per field, which covers most naming differences. If the
+first live call returns rows but maps zero, the adapter reports
+`CONTRACT_MISMATCH` explicitly rather than looking like an empty schedule — then:
+
+1. Save a sample response from TV Media to a file.
+2. Run `validateContract(payload)` from that module.
+3. It prints which fields resolved and which did not.
+4. Correct `FIELD_MAP` accordingly. Nothing else changes.
+
+## Migration to another provider
+
+Implement `ScheduleAdapter`, give it a priority, add it to `adapters()` in
+`src/lib/viewing/liveTv.ts`. That is the entire integration surface.

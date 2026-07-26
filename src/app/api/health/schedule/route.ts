@@ -1,77 +1,73 @@
 import { NextResponse } from 'next/server';
-import { SchedulesDirectAdapter, SD_USERNAME_ENV, SD_PASSWORD_ENV, SD_LINEUP_ENV } from '@/lib/viewing/adapters/schedulesDirect';
-import { TvmazeAdapter, COVERAGE } from '@/lib/viewing/adapters/tvmaze';
+import { providerCapabilities, getLiveSchedule, hasFullGridProvider } from '@/lib/viewing/liveTv';
+import {
+  TvMediaAdapter, TVM_API_KEY_ENV, TVM_BASE_URL_ENV, TVM_LINEUP_ENV, TVM_ZIP_ENV,
+} from '@/lib/viewing/adapters/tvMedia';
+import { COVERAGE } from '@/lib/viewing/adapters/tvmaze';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * SCHEDULE PROVIDER PROBE — "is Live TV actually wired up?"
+ * SCHEDULE PROVIDER HEALTH — "is Live TV actually wired up, and to what?"
  *
- * Reports whether each provider is configured and reachable. It reports the
- * PRESENCE of each variable and never its value: no username, no password, no
- * lineup contents, no listing data. That is what makes it safe to leave on.
- *
- * This endpoint exists because the previous failure was undiagnosable — the
- * grid source had been WAF-blocked for an unknown length of time and nothing
- * anywhere said so.
+ * Reports configuration by PRESENCE and results by COUNT. No credential, no
+ * lineup contents, no listing rows. Safe to leave publicly reachable, and the
+ * thing whose absence made the original outage undiagnosable: the grid source
+ * had been blocked for an unknown length of time and nothing anywhere said so.
  */
 export async function GET() {
   const headers = { 'cache-control': 'no-store' };
-  const sd = new SchedulesDirectAdapter();
-  const configured = sd.isConfigured();
+  const providers = providerCapabilities();
+  const tvm = new TvMediaAdapter();
 
   const env = {
-    [SD_USERNAME_ENV]: !!process.env[SD_USERNAME_ENV],
-    [SD_PASSWORD_ENV]: !!process.env[SD_PASSWORD_ENV],
-    [SD_LINEUP_ENV]: !!process.env[SD_LINEUP_ENV],
+    [TVM_API_KEY_ENV]: !!process.env[TVM_API_KEY_ENV],
+    [TVM_LINEUP_ENV]: !!process.env[TVM_LINEUP_ENV],
+    [TVM_ZIP_ENV]: !!process.env[TVM_ZIP_ENV],
+    [TVM_BASE_URL_ENV]: !!process.env[TVM_BASE_URL_ENV],
   };
 
-  if (!configured) {
+  if (!tvm.isConfigured() && !hasFullGridProvider()) {
     return NextResponse.json({
-      primary: {
-        providerId: sd.providerId,
-        configured: false,
-        status: 'misconfigured',
-        env,
-        nextStep:
-          'Live TV has no full-grid provider on this deployment. Follow docs/SCHEDULE_PROVIDERS.md — ' +
-          'create a Schedules Direct account, then set the three variables in Vercel (Production + Preview) and redeploy.',
-      },
+      mode: 'partial',
+      message: 'No TV Media credentials configured.',
+      liveTvComplete: false,
+      env,
+      providers,
       supplementary: {
-        providerId: new TvmazeAdapter().providerId,
-        configured: true,
+        providerId: 'tvmaze_premieres',
         isFullGrid: COVERAGE.isFullGrid,
         note: `Premiere feed only (~${COVERAGE.typicalRowsPerUsDay} rows per US day). Omits: ${COVERAGE.omits.join(', ')}.`,
       },
-      liveTvUsable: false,
+      nextStep:
+        `Set ${TVM_API_KEY_ENV} and ${TVM_LINEUP_ENV} (or ${TVM_ZIP_ENV}) in Vercel ` +
+        '(Production + Preview) and redeploy. See docs/SCHEDULE_PROVIDERS.md.',
     }, { headers });
   }
 
-  // Configured: make one real, bounded call and report only the shape of it.
+  // Configured: make one real bounded call and report only its shape.
   const now = Date.now();
-  const res = await sd.fetch({
-    region: 'US',
-    windowStartUtc: now,
-    windowEndUtc: now + 3_600_000,
-    lineupId: process.env[SD_LINEUP_ENV] ?? null,
-  }).catch(() => null);
+  const rs = await getLiveSchedule({ hours: 6, nowMs: now, pageSize: 30 }).catch(() => null);
 
   return NextResponse.json({
-    primary: {
-      providerId: sd.providerId,
-      configured: true,
-      env,
-      status: res?.status ?? 'unavailable',
-      // Counts only — never the listings themselves.
-      totalRaw: res?.totalRaw ?? 0,
-      totalNormalized: res?.totalNormalized ?? 0,
-      errorCode: res?.errorCode ?? null,
-      fetchedAt: res?.fetchedAt ?? null,
-    },
-    supplementary: {
-      providerId: new TvmazeAdapter().providerId,
-      isFullGrid: COVERAGE.isFullGrid,
-    },
-    liveTvUsable: res?.status === 'healthy',
+    mode: rs?.status === 'healthy' ? 'complete' : 'degraded',
+    liveTvComplete: rs?.status === 'healthy',
+    env,
+    providers,
+    probe: rs
+      ? {
+          status: rs.status,
+          statusMessage: rs.statusMessage,
+          totalAvailable: rs.totalAvailable,
+          totalReturned: rs.totalReturned,
+          fallbackUsed: rs.fallbackUsed,
+          traceId: rs.traceId,
+          // Counts and statuses only — never the listings themselves.
+          sources: rs.sources.map((s) => ({
+            sourceId: s.sourceId, status: s.status, rawCount: s.rawCount, errorCode: s.errorCode ?? null,
+          })),
+          distinctChannels: new Set(rs.results.map((r) => r.channelId)).size,
+        }
+      : null,
   }, { headers });
 }
