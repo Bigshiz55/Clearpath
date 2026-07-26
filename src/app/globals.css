@@ -280,6 +280,24 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
 }
+/* Voice DNA review: four decisions per row (Right / Backwards / Just now /
+   Drop it). Two columns on a phone so the labels never truncate, four across
+   once there is room — same reasoning as the rating grid above. */
+.wv-vd-decisions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+@media (min-width: 480px) {
+  .wv-vd-decisions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+/* The question is the whole screen on a phone; it must not overflow when a
+   prompt runs long, and it must not shout on a 320px viewport. */
+.wv-vd-prompt { overflow-wrap: anywhere; }
+@media (max-width: 380px) {
+  .wv-vd-prompt { font-size: 1.0625rem; line-height: 1.25; }
+}
+
 /* The hero poster must always be substantial — never the collapsed thumbnail iOS
    produced when the measured tile came out short. Give it a guaranteed portrait
    min-height (the tile grows to fit via min-height, so nothing else is clipped);
