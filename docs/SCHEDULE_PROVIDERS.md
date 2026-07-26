@@ -181,3 +181,28 @@ first live call returns rows but maps zero, the adapter reports
 
 Implement `ScheduleAdapter`, give it a priority, add it to `adapters()` in
 `src/lib/viewing/liveTv.ts`. That is the entire integration surface.
+
+## Cron scheduling constraint
+
+`/api/cron/tv-ingest` is deliberately **not** registered in `vercel.json`.
+
+Vercel's Hobby plan allows two cron jobs, and those two are already taken by
+`daily-scan` and `classify`. Registering a third fails the deployment outright —
+which is exactly what happened, and it silently blocked two commits from
+reaching production until the cause was traced.
+
+Hobby also restricts cron frequency to once per day, so the hourly schedule this
+route needs (each lineup runs at its own local 2 AM) is unavailable there
+regardless.
+
+The route itself is deployed and works. To schedule it:
+
+* **On Vercel Pro** — add to `vercel.json` and redeploy:
+  ```json
+  { "path": "/api/cron/tv-ingest", "schedule": "0 * * * *" }
+  ```
+* **Staying on Hobby** — trigger it hourly from an external scheduler
+  (GitHub Actions on a `schedule:` trigger, or Supabase's `pg_cron`) with the
+  `CRON_SECRET` bearer token. The route's auth check is the same either way.
+
+Either path needs no code change.
