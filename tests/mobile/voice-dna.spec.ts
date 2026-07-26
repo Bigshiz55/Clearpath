@@ -70,6 +70,17 @@ test.describe('entry', () => {
   });
 });
 
+test.describe('reachable from the app', () => {
+  // The in-app entry points live on authenticated screens, which redirect to
+  // /login in this harness — they are pinned in reachable.test.ts instead.
+  test('the page is not a dead end', async ({ page }) => {
+    await page.goto(R);
+    const back = page.getByTestId('back-to-app');
+    await expect(back).toBeVisible();
+    await expect(back).toHaveAttribute('href', '/app');
+  });
+});
+
 test.describe('the interview', () => {
   test('opens with an opening question and shows progress', async ({ page }) => {
     await page.goto(R);

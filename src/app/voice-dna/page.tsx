@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { audioAvailability } from '@/lib/voicedna/audio';
 import { createClient } from '@/lib/supabase/server';
 import { VoiceDnaClient } from '@/components/voicedna/VoiceDnaClient';
@@ -25,8 +26,18 @@ export default async function VoiceDnaPage() {
     canPersist = false;
   }
 
+  // This route is deliberately OUTSIDE /app: the interview works signed-out,
+  // and /app is gated. So it carries its own way back rather than inheriting
+  // the app header — without this the page is a dead end.
   return (
     <div className="container-page py-6">
+      <Link
+        href="/app"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 transition hover:text-white"
+        data-testid="back-to-app"
+      >
+        <span aria-hidden>←</span> Back to WatchVerd1ct
+      </Link>
       <VoiceDnaClient audio={audio} canPersist={canPersist} />
     </div>
   );

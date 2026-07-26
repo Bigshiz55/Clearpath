@@ -39,6 +39,37 @@ export default async function WatchDnaPage() {
         <p className="mt-1 text-sm text-slate-400">Your taste, learned from what you rate — the axes you lean on and how you watch.</p>
       </div>
 
+      {/* Rating titles one at a time is the slow path. These two teach it far
+          faster, so they belong here rather than only in the More menu. */}
+      <section className="grid gap-3 sm:grid-cols-2" data-testid="dna-faster-ways">
+        <Link
+          href="/voice-dna"
+          className="card p-4 transition hover:bg-white/10"
+          data-testid="link-voice-dna"
+        >
+          <div className="flex items-center gap-2 text-base font-bold text-white">
+            <span aria-hidden>🎙️</span> Talk it through
+          </div>
+          <p className="mt-1 text-sm text-slate-400">
+            A short interview in your own words — contradictions welcome. “I hate sci-fi but I loved
+            Severance” teaches it more than ten ratings.
+          </p>
+        </Link>
+        <Link
+          href="/import-taste"
+          className="card p-4 transition hover:bg-white/10"
+          data-testid="link-import-taste"
+        >
+          <div className="flex items-center gap-2 text-base font-bold text-white">
+            <span aria-hidden>📄</span> Bring your taste with you
+          </div>
+          <p className="mt-1 text-sm text-slate-400">
+            Import your Netflix history. You review every title before anything is kept — watched is
+            never read as liked.
+          </p>
+        </Link>
+      </section>
+
       {/* Personality */}
       <section className="card overflow-hidden p-0">
         <div className="bg-gradient-to-br from-brand-500/20 via-fuchsia-500/10 to-transparent p-5 sm:p-6">
@@ -100,7 +131,15 @@ export default async function WatchDnaPage() {
           <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-5 text-center">
             <div className="text-3xl">🍿</div>
             <p className="mt-2 text-sm text-slate-300">Rate a few titles and your dials will appear here.</p>
-            <Link href="/app/quiz" className="btn-primary mt-3 inline-flex">Play the Taste Quiz →</Link>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <Link href="/app/quiz" className="btn-primary inline-flex">Play the Taste Quiz →</Link>
+              <Link
+                href="/voice-dna"
+                className="inline-flex items-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+              >
+                Or just tell me →
+              </Link>
+            </div>
           </div>
         )}
         {ready && (
