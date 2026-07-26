@@ -85,7 +85,10 @@ describe('streaming and catalog flows are independent of the TV provider', () =>
       if (f.includes('/lib/viewing/')) continue;
       if (f.includes('/api/health/')) continue;
       const src = readFileSync(f, 'utf8');
-      if (src.includes('TVMEDIA_API_KEY') || src.includes('SCHEDULES_DIRECT_PASSWORD')) {
+      // Only actual credential ACCESS counts. Naming a variable in a setup
+      // message or a doc link is not a leak; reading its value outside the
+      // viewing layer is.
+      if (/process\.env(\.|\[['"`])\s*(TVMEDIA_[A-Z_]*|SCHEDULES_DIRECT_[A-Z_]*|TV_LISTINGS_API_KEY)/.test(src)) {
         offenders.push(f.replace(process.cwd() + '/', ''));
       }
     }
