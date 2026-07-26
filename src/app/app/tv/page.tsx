@@ -67,6 +67,9 @@ export default async function OnTvPage({
   // A human label for the filters: "Lifetime comedy movies".
   const filterLabel = [network ? titleCase(network) : null, genre?.toLowerCase(), movieOnly ? 'movies' : null].filter(Boolean).join(' ');
   const official = officialScheduleFor(network);
+  // Whether a full listings grid is connected. Drives both the coverage banner
+  // and the empty-state wording, so the two can never disagree.
+  const gridConnected = hasFullGridProvider();
 
   const airingsRaw = await getOnTvToday(region, date);
   // Add IMDb / Rotten Tomatoes / Metacritic to the placards (cached, bounded).
@@ -141,7 +144,7 @@ export default async function OnTvPage({
           local affiliates. A six-hour window can legitimately contain a single
           row. Saying so is the difference between a thin list and a thin list
           that pretends to be the national schedule. */}
-      {!hasFullGridProvider() && (
+      {!gridConnected && (
         <section
           className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-4"
           data-testid="schedule-coverage-notice"
@@ -166,20 +169,37 @@ export default async function OnTvPage({
         <>
           {genreEmpty ? (
             <>
-              {/* Honest empty-state: our live guide reads TVmaze's community
-                  broadcast schedule (strong for the big US networks, thin/none for
-                  cable and TV-movies). Don't dump unrelated shows as if they were
-                  the answer — say why, then point somewhere that can actually help. */}
+              {/* Honest empty-state.
+                  The distinction that matters: this is NOT "there is nothing on
+                  Lifetime tonight" — it is "we cannot see Lifetime from here".
+                  The previous copy described the gap as how the guide works,
+                  which read as a permanent product limit and would still have
+                  been on screen after a full provider was connected. It now
+                  names the real cause and changes on its own once one is. */}
               <div className="rounded-2xl border border-amber-400/30 bg-amber-500/[0.07] p-4 text-center sm:p-5">
                 <div className="text-2xl" aria-hidden>📭</div>
                 <h2 className="mt-1 text-lg font-bold text-white">
-                  No {filterLabel || 'matches'} on live TV in the next {withinHours}h
+                  {gridConnected
+                    ? `No ${filterLabel || 'matches'} on live TV in the next ${withinHours}h`
+                    : `We can’t see ${network ? titleCase(network) : 'that channel'}’s listings yet`}
                 </h2>
                 <p className="mx-auto mt-1.5 max-w-md text-sm text-slate-300">
-                  Our live guide reads real broadcast listings — strongest for major {region} networks
-                  (ABC, CBS, NBC, FOX, CW). It doesn’t reliably carry{' '}
-                  {network ? titleCase(network) : 'cable'}{movieOnly ? ' movies' : ''}, so rather than
-                  guess, we only show what we can actually confirm.
+                  {gridConnected ? (
+                    <>
+                      We checked every channel in your lineup for the next {withinHours} hours and
+                      found nothing matching. That’s a real result, not a gap in our data.
+                    </>
+                  ) : (
+                    <>
+                      This deployment has no full TV listings provider connected, so we can only see
+                      first-run episodes on a handful of national networks — not{' '}
+                      {network ? titleCase(network) : 'cable'}
+                      {movieOnly ? ' movies' : ''}, reruns or most cable. This is missing data on our
+                      side, not an empty schedule: {network ? titleCase(network) : 'that channel'} may
+                      well be showing exactly what you asked for. Rather than guess, we only show what
+                      we can actually confirm.
+                    </>
+                  )}
                 </p>
                 <div className="mt-3 flex flex-wrap justify-center gap-2">
                   {official && (

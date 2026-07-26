@@ -285,3 +285,49 @@ test.describe('responsive', () => {
     });
   }
 });
+
+/**
+ * THE REPORTED QUERY, end to end.
+ *
+ * "Lifetime crime movies on live TV in the next 10h" returned an empty state on
+ * production. That was correct — TVmaze cannot see Lifetime at all — but it is
+ * the exact request a real user made, so it gets a standing test proving the
+ * pipeline answers it the moment a full grid is connected.
+ */
+test.describe('Lifetime movies in the next 10 hours', () => {
+  test('returns a real set of Lifetime airings from a full grid', async ({ page }) => {
+    await page.goto('/dev/live-tv?channels=LIFE,LMN&hours=10');
+    const n = await cards(page).count();
+    expect(n, 'Lifetime + LMN over 10h must not be empty').toBeGreaterThan(5);
+
+    // Every card is genuinely on one of the requested channels.
+    const channels = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('[data-testid="airing-card"]'))
+        .map((c) => c.querySelector('.text-brand-100')?.textContent?.trim() ?? ''));
+    expect(new Set(channels).size).toBeGreaterThanOrEqual(1);
+    for (const c of channels) expect(c).toMatch(/Lifetime/i);
+  });
+
+  test('the movie filter narrows to movies without emptying the set', async ({ page }) => {
+    await page.goto('/dev/live-tv?channels=LIFE,LMN&hours=10');
+    await page.getByTestId('filter-movie').click();
+    expect(await cards(page).count()).toBeGreaterThan(5);
+  });
+
+  test('repeated airings of the same TV movie are preserved, not collapsed', async ({ page }) => {
+    await page.goto('/dev/live-tv?channels=LIFE,LMN&hours=10');
+    for (let i = 0; i < 20; i++) {
+      const more = page.getByTestId('load-more');
+      if (!(await more.count())) break;
+      await more.click();
+    }
+    const dupes = await page.evaluate(() => {
+      const t = Array.from(document.querySelectorAll('[data-testid="airing-card"]'))
+        .map((c) => c.querySelector('.text-lg.font-bold')?.textContent?.trim() ?? '');
+      const m = new Map<string, number>();
+      for (const x of t) m.set(x, (m.get(x) ?? 0) + 1);
+      return [...m.values()].filter((n) => n > 1).length;
+    });
+    expect(dupes, 'a movie channel repeats titles across the day').toBeGreaterThan(0);
+  });
+});
