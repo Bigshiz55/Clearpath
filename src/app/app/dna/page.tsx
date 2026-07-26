@@ -39,35 +39,50 @@ export default async function WatchDnaPage() {
         <p className="mt-1 text-sm text-slate-400">Your taste, learned from what you rate — the axes you lean on and how you watch.</p>
       </div>
 
-      {/* Rating titles one at a time is the slow path. These two teach it far
-          faster, so they belong here rather than only in the More menu. */}
-      <section className="grid gap-3 sm:grid-cols-2" data-testid="dna-faster-ways">
-        <Link
-          href="/voice-dna"
-          className="card p-4 transition hover:bg-white/10"
-          data-testid="link-voice-dna"
-        >
-          <div className="flex items-center gap-2 text-base font-bold text-white">
-            <span aria-hidden>🎙️</span> Talk it through
-          </div>
-          <p className="mt-1 text-sm text-slate-400">
-            A short interview in your own words — contradictions welcome. “I hate sci-fi but I loved
-            Severance” teaches it more than ten ratings.
-          </p>
-        </Link>
-        <Link
-          href="/import-taste"
-          className="card p-4 transition hover:bg-white/10"
-          data-testid="link-import-taste"
-        >
-          <div className="flex items-center gap-2 text-base font-bold text-white">
-            <span aria-hidden>📄</span> Bring your taste with you
-          </div>
-          <p className="mt-1 text-sm text-slate-400">
-            Import your Netflix history. You review every title before anything is kept — watched is
-            never read as liked.
-          </p>
-        </Link>
+      {/* Build Your Watch DNA offers three ways in, and they are genuinely
+          different jobs: tell me, react to titles, or bring what you already
+          have. The interview leads because it is the only one that captures
+          WHY — the other two only ever see what, not why. */}
+      <section data-testid="dna-build">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Build your Watch DNA</h2>
+        <div className="mt-2 grid gap-3 sm:grid-cols-3">
+          <Link href="/voice-dna" className="card p-4 transition hover:bg-white/10" data-testid="link-voice-dna">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>🎙️</span> Take the Taste Interview
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              Answer a few smart questions about what you love, what you avoid, and why. It asks
+              about specific titles and digs into each one.
+            </p>
+          </Link>
+          <Link href="/app/quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-title-quiz">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>🎬</span> Take the quick title quiz
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              React to titles using Looks Good, Skip and Seen It. Fastest way to cover a lot of
+              ground.
+            </p>
+          </Link>
+          <Link href="/import-taste" className="card p-4 transition hover:bg-white/10" data-testid="link-import-taste">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>📄</span> Import your history
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              Bring in your Netflix history. You review every title first — watched is never read as
+              liked.
+            </p>
+          </Link>
+        </div>
+        {/* Kept visibly apart: a permanent profile and tonight's request are not
+            the same function, and merging them is how both get worse. */}
+        <p className="mt-3 text-xs text-slate-500" data-testid="tonight-separate">
+          Looking for something to watch <em>right now</em> instead?{' '}
+          <Link href="/app" className="font-semibold text-brand-300 underline underline-offset-2" data-testid="link-tonight">
+            Describe exactly what you want tonight
+          </Link>{' '}
+          — that is a one-off brief, and it does not change your DNA.
+        </p>
       </section>
 
       {/* Personality */}

@@ -108,6 +108,8 @@ export interface SearchResultItem {
   posterPath: string | null;
   voteAverage: number | null;
   popularity: number | null;
+  /** TMDB genre ids, when the search payload carried them. Additive/optional. */
+  genreIds?: number[];
 }
 
 interface TmdbMultiResult {
@@ -123,6 +125,7 @@ interface TmdbMultiResult {
     poster_path?: string | null;
     vote_average?: number;
     popularity?: number;
+    genre_ids?: number[];
   }>;
 }
 
@@ -146,6 +149,7 @@ function toResult(r: MultiRow, forced?: MediaType): SearchResultItem | null {
     posterPath: r.poster_path ?? null,
     voteAverage: typeof r.vote_average === 'number' ? r.vote_average : null,
     popularity: typeof r.popularity === 'number' ? r.popularity : null,
+    ...(Array.isArray(r.genre_ids) ? { genreIds: r.genre_ids.filter((n) => typeof n === 'number') } : {}),
   };
 }
 

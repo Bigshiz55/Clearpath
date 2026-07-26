@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export default function ImportTastePage() {
   return (
-    <div className="container-page py-6">
+    <div className="container-page pb-6 pt-[calc(env(safe-area-inset-top)+2rem)]">
       {/* Public route, outside the gated /app tree — it carries its own way back. */}
       <Link
         href="/app"

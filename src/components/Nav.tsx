@@ -17,7 +17,7 @@ const PRIMARY: NavLink[] = [
 ];
 const SECONDARY: NavLink[] = [
   { href: '/app/dna', label: 'Your Watch DNA' },
-  { href: '/voice-dna', label: 'Voice DNA interview' },
+  { href: '/voice-dna', label: 'Taste Interview' },
   { href: '/import-taste', label: 'Bring your taste with you' },
   { href: '/app/subscriptions', label: 'Subscription check 💸' },
   { href: '/app/together', label: 'Movie night together' },

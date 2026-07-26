@@ -291,6 +291,39 @@ body {
 @media (min-width: 480px) {
   .wv-vd-decisions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+/* The stage rail. It scrolls sideways rather than wrapping, so a 320px phone
+   shows where it is without the rail eating four lines of the screen. */
+.wv-vd-stages {
+  display: flex;
+  gap: 0.375rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.125rem;
+}
+.wv-vd-stages::-webkit-scrollbar { display: none; }
+.wv-vd-stage {
+  flex: 0 0 auto;
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: rgb(148 163 184);
+  white-space: nowrap;
+}
+.wv-vd-stage--done { color: rgb(203 213 225); border-color: rgb(255 255 255 / 0.25); }
+.wv-vd-stage--now {
+  color: #fff;
+  border-color: rgb(129 140 248 / 0.7);
+  background: rgb(99 102 241 / 0.18);
+}
+
+/* Reason chips wrap freely — the sets run from three options to eighteen, so a
+   fixed grid would either waste a phone's width or clip the long labels. */
+.wv-vd-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.wv-vd-chips > button { max-width: 100%; overflow-wrap: anywhere; }
+
 /* The question is the whole screen on a phone; it must not overflow when a
    prompt runs long, and it must not shout on a 320px viewport. */
 .wv-vd-prompt { overflow-wrap: anywhere; }

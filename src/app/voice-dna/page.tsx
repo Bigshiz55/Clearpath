@@ -30,7 +30,7 @@ export default async function VoiceDnaPage() {
   // and /app is gated. So it carries its own way back rather than inheriting
   // the app header — without this the page is a dead end.
   return (
-    <div className="container-page py-6">
+    <div className="container-page pb-6 pt-[calc(env(safe-area-inset-top)+2rem)]">
       <Link
         href="/app"
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 transition hover:text-white"

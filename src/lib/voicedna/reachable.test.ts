@@ -49,4 +49,19 @@ describe('public taste-building routes are reachable', () => {
     const emptyState = dna.slice(dna.indexOf('your dials will appear here'));
     expect(emptyState).toContain('/voice-dna');
   });
+
+  it('the DNA hub offers all three ways to build, interview first', () => {
+    for (const id of ['link-voice-dna', 'link-title-quiz', 'link-import-taste']) {
+      expect(dna, id).toContain(id);
+    }
+    expect(dna.indexOf('link-voice-dna')).toBeLessThan(dna.indexOf('link-title-quiz'));
+  });
+
+  it('tonight is offered separately from the permanent interview', () => {
+    // Merging "what am I like" with "what do I want right now" is how both get
+    // worse: a bad Tuesday becomes a permanent rule.
+    expect(dna).toContain('tonight-separate');
+    const note = dna.slice(dna.indexOf('tonight-separate'));
+    expect(note).toMatch(/does not change your DNA/i);
+  });
 });

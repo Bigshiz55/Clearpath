@@ -2,12 +2,12 @@ import { test, expect, type Page } from '@playwright/test';
 import path from 'node:path';
 
 /**
- * VERD1CT VOICE DNA — the typed interview, driven the way a person would.
+ * VERD1CT VOICE DNA — the taste interview, driven the way a person would.
  *
- * The properties under test are the product's promises, not implementation
- * details: nothing reaches Viewer DNA without review, a guessed title blocks the
- * save, contradictions are asked about rather than resolved for you, and the
- * audio control never pretends to work.
+ * The properties under test are product promises, not implementation details:
+ * naming a title earns a follow-up about that title, giving up on a show is not
+ * read as hating it, a deal-breaker is graded before it becomes a ban, nothing
+ * reaches Viewer DNA without review, and the audio control never pretends.
  */
 
 const R = '/voice-dna';
@@ -21,18 +21,62 @@ const VIEWPORTS: [string, number, number][] = [
   ['desktop', 1440, 900],
 ];
 
-async function answer(page: Page, text: string) {
-  await page.getByTestId('answer-input').fill(text);
+/** Search needs TMDB, which the harness has no key for. Serve it a fixture. */
+async function stubSearch(page: Page, results: Array<{ titleId: string; text: string; year?: number; genres?: string[] }>) {
+  await page.route('**/api/voicedna/titles**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ available: true, results: results.map((r) => ({ posterUrl: null, mediaType: 'tv', ...r })) }),
+    }),
+  );
+}
+
+async function stubSearchDown(page: Page) {
+  await page.route('**/api/voicedna/titles**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ available: false, results: [], message: 'Title search is unavailable right now — type the name and I will confirm it with you at the end.' }),
+    }),
+  );
+}
+
+const prompt = (page: Page) => page.getByTestId('question-prompt');
+
+async function pickTitle(page: Page, query: string) {
+  await page.getByTestId('title-input').fill(query);
+  await page.getByTestId('title-result').first().click();
   await page.getByTestId('answer-submit').click();
 }
 
-/** Answer open questions until the review screen appears. */
-async function answerUntilReview(page: Page, answers: string[]) {
-  for (const a of answers) {
-    if (await page.getByTestId('review-list').isVisible().catch(() => false)) return;
-    if (await page.getByTestId('choice-group').isVisible().catch(() => false)) return;
-    await answer(page, a);
+async function typeTitle(page: Page, text: string) {
+  await page.getByTestId('title-input').fill(text);
+  await page.getByTestId('add-typed-title').click();
+  await page.getByTestId('answer-submit').click();
+}
+
+async function tapChips(page: Page, values: string[]) {
+  for (const v of values) await page.getByTestId(`chip-${v}`).click();
+  await page.getByTestId('answer-submit').click();
+}
+
+/** Jump to review — unless the interview already ended and took us there. */
+async function finishEarly(page: Page) {
+  const button = page.getByTestId('finish-early');
+  if (await button.isVisible().catch(() => false)) await button.click();
+}
+
+/** Advance until a question whose id/prompt matches, skipping the rest. */
+async function advanceTo(page: Page, match: RegExp, limit = 25): Promise<boolean> {
+  for (let i = 0; i < limit; i++) {
+    if (!(await prompt(page).isVisible().catch(() => false))) return false;
+    if (match.test(await prompt(page).innerText())) return true;
+    const skip = page.getByTestId('answer-skip');
+    if (await skip.isVisible().catch(() => false)) await skip.click();
+    else await page.getByTestId('choice-group').getByRole('button').last().click();
   }
+  return false;
 }
 
 test.describe('entry', () => {
@@ -45,28 +89,33 @@ test.describe('entry', () => {
     await expect(privacy).toContainText(/delete the whole thing/i);
   });
 
-  test('offers a short and a long interview', async ({ page }) => {
+  test('shows the stages it will cover, so it is visibly not one text box', async ({ page }) => {
     await page.goto(R);
-    await expect(page.getByTestId('start-quick')).toContainText('5 questions');
-    await expect(page.getByTestId('start-full')).toContainText('12 questions');
+    const preview = page.getByTestId('stage-preview');
+    for (const label of ['Your favourites', 'What does not work', 'Your deal-breakers', 'Exceptions', 'Review']) {
+      await expect(preview).toContainText(label);
+    }
   });
 
-  test('HARD: the audio control is disabled and says why', async ({ page }) => {
+  test('TEST 28: tonight is offered as a separate thing, not this', async ({ page }) => {
+    await page.goto(R);
+    await expect(page.getByTestId('tonight-pointer')).toContainText(/right now/i);
+    await expect(page.getByTestId('tonight-pointer')).toContainText(/about you in general/i);
+  });
+
+  test('TEST 27: the audio control is disabled and says why', async ({ page }) => {
     await page.goto(R);
     const btn = page.getByTestId('record-button');
     await expect(btn).toBeDisabled();
     await expect(btn).toContainText(/awaiting transcription setup/i);
-    await expect(page.getByTestId('audio-status'))
-      .toContainText(/no transcription service is configured/i);
-    // It must not claim the typed path is a lesser substitute.
+    await expect(page.getByTestId('audio-status')).toContainText(/no transcription service is configured/i);
     await expect(page.getByTestId('audio-status')).toContainText(/same engine/i);
   });
 
   test('never asks for a password or a service account', async ({ page }) => {
     await page.goto(R);
     await expect(page.locator('input[type="password"]')).toHaveCount(0);
-    const text = (await page.textContent('body')) ?? '';
-    expect(text).not.toMatch(/sign in to (netflix|hulu)/i);
+    expect((await page.textContent('body')) ?? '').not.toMatch(/sign in to (netflix|hulu)/i);
   });
 });
 
@@ -79,97 +128,312 @@ test.describe('reachable from the app', () => {
     await expect(back).toBeVisible();
     await expect(back).toHaveAttribute('href', '/app');
   });
+
+  test('the back link is not hidden under the build badge', async ({ page }) => {
+    // These pages render without the app header, so nothing else clears the
+    // fixed badge band. It sat on top of the link until the page added its own
+    // top padding.
+    await page.goto(R);
+    const link = await page.getByTestId('back-to-app').boundingBox();
+    const badge = await page.locator('[aria-label*="Build"], button:has-text("Development")').first()
+      .boundingBox().catch(() => null);
+    expect(link).not.toBeNull();
+    if (badge) expect(link!.y, 'back link starts below the badge').toBeGreaterThanOrEqual(badge.y + badge.height);
+  });
 });
 
-test.describe('the interview', () => {
-  test('opens with an opening question and shows progress', async ({ page }) => {
-    await page.goto(R);
-    await page.getByTestId('start-quick').click();
-    await expect(page.getByTestId('question-prompt')).toBeVisible();
-    await expect(page.getByTestId('progress')).toContainText('of 5');
+test.describe('stage 1 — favourites', () => {
+  test.beforeEach(async ({ page }) => {
+    await stubSearch(page, [
+      { titleId: 'tv:19885', text: 'Sherlock', year: 2010, genres: ['crime', 'mystery'] },
+    ]);
   });
 
-  test('an answer is turned into beliefs immediately', async ({ page }) => {
+  test('TEST 1: opens by asking for favourite titles, with a real search', async ({ page }) => {
     await page.goto(R);
     await page.getByTestId('start-quick').click();
-    await answer(page, 'I loved Severance');
-    await expect(page.getByTestId('live-reveal')).toBeVisible();
+    await expect(prompt(page)).toContainText(/three films or shows you absolutely loved/i);
+    await expect(page.getByTestId('title-picker')).toBeVisible();
+    await expect(page.getByTestId('stage-current')).toContainText('Your favourites');
   });
 
-  test('skipping costs nothing and moves on', async ({ page }) => {
+  test('a searched title is confirmed on the spot', async ({ page }) => {
     await page.goto(R);
     await page.getByTestId('start-quick').click();
-    const first = await page.getByTestId('question-prompt').innerText();
+    await page.getByTestId('title-input').fill('sherlock');
+    await expect(page.getByTestId('title-result').first()).toContainText('Sherlock');
+    await page.getByTestId('title-result').first().click();
+    await expect(page.getByTestId('picked-title')).toContainText('Sherlock');
+    await expect(page.getByTestId('picked-title')).not.toContainText(/unconfirmed/i);
+  });
+
+  test('TEST 2+3: naming a title earns a "why" follow-up about that title', async ({ page }) => {
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    await pickTitle(page, 'sherlock');
+    await expect(page.getByTestId('followup-badge')).toBeVisible();
+    await expect(prompt(page)).toContainText(/what did you love most about sherlock/i);
+  });
+
+  test('the follow-up chips fit the title, not a generic list', async ({ page }) => {
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    await pickTitle(page, 'sherlock');
+    // Crime vocabulary — deduction and the cases, not spectacle.
+    await expect(page.getByTestId('chip-investigation')).toBeVisible();
+    await expect(page.getByTestId('chip-clues')).toBeVisible();
+  });
+
+  test('the reasons become visible beliefs straight away', async ({ page }) => {
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    await pickTitle(page, 'sherlock');
+    await tapChips(page, ['investigation', 'clues']);
+    await expect(page.getByTestId('live-reveal')).toContainText(/investigation/i);
+  });
+
+  test('three favourites each get their own follow-up', async ({ page }) => {
+    await stubSearch(page, [
+      { titleId: 'tv:1', text: 'Sherlock', genres: ['crime'] },
+      { titleId: 'tv:2', text: 'Dexter', genres: ['crime'] },
+    ]);
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    await page.getByTestId('title-input').fill('she');
+    await page.getByTestId('title-result').nth(0).click();
+    await page.getByTestId('title-input').fill('dex');
+    await page.getByTestId('title-result').nth(1).click();
+    await expect(page.getByTestId('picked-title')).toHaveCount(2);
+    await page.getByTestId('answer-submit').click();
+
+    await expect(prompt(page)).toContainText('Sherlock');
     await page.getByTestId('answer-skip').click();
-    await expect(page.getByTestId('question-prompt')).not.toHaveText(first);
-    await expect(page.getByTestId('live-reveal')).toHaveCount(0);
+    await expect(prompt(page)).toContainText('Dexter');
   });
 
-  test('an answer we cannot read produces no beliefs rather than a guess', async ({ page }) => {
+  test('a hand-typed title is kept but flagged unconfirmed', async ({ page }) => {
+    await stubSearchDown(page);
     await page.goto(R);
     await page.getByTestId('start-quick').click();
-    await answer(page, 'hmm not sure really');
-    await expect(page.getByTestId('live-reveal')).toHaveCount(0);
+    await page.getByTestId('title-input').fill('Some Obscure Show');
+    await expect(page.getByTestId('search-unavailable')).toBeVisible();
+    await page.getByTestId('add-typed-title').click();
+    await expect(page.getByTestId('picked-title')).toContainText(/unconfirmed/i);
+  });
+});
+
+test.describe('stage 2+3 — dislikes and abandoned', () => {
+  test('TEST 4+5: a disliked title is asked why, with dislike reasons', async ({ page }) => {
+    await stubSearch(page, [{ titleId: 'tv:9', text: 'Succession', genres: ['drama'] }]);
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    await page.getByTestId('answer-skip').click();
+    await expect(prompt(page)).toContainText(/expected to like but didn/i);
+    await pickTitle(page, 'succession');
+    await expect(prompt(page)).toContainText(/what did not work about succession/i);
+    await expect(page.getByTestId('chip-too_slow')).toBeVisible();
+    await expect(page.getByTestId('chip-characters')).toBeVisible();
   });
 
-  test('HARD: a contradiction is asked about, not resolved for you', async ({ page }) => {
+  test('TEST 6+7: giving up asks how far you got, and mood is not a verdict', async ({ page }) => {
+    await stubSearch(page, [{ titleId: 'tv:5', text: 'Westworld', genres: ['science-fiction'] }]);
     await page.goto(R);
     await page.getByTestId('start-full').click();
-    await answer(page, 'I love slow burns');
-    await answerUntilReview(page, ['I hate slow shows', 'I like crime', 'I avoid horror']);
-    await expect(page.getByTestId('choice-group')).toBeVisible();
-    await expect(page.getByTestId('question-card')).toContainText(/let me check/i);
+    expect(await advanceTo(page, /stopped watching before the end/i)).toBe(true);
+    await pickTitle(page, 'westworld');
+
+    await expect(prompt(page)).toContainText(/how far into westworld/i);
+    await page.getByTestId('choice-most').click();
+
+    await expect(prompt(page)).toContainText(/what made you give up on westworld/i);
+    await tapChips(page, ['wrong_mood']);
+
+    await page.getByTestId('finish-early').click();
+    const row = page.getByTestId('review-item').filter({ hasText: 'Westworld' });
+    await expect(row).toContainText(/timing, not taste/i);
+  });
+});
+
+test.describe('stage 4+5 — genres and deal-breakers', () => {
+  test('TEST 8: picking a genre opens a question about what matters inside it', async ({ page }) => {
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    expect(await advanceTo(page, /kinds of story usually pull you in/i)).toBe(true);
+    await tapChips(page, ['investigation']);
+    await expect(prompt(page)).toContainText(/what matters most/i);
+    await expect(page.getByTestId('chip-investigation')).toBeVisible();
+  });
+
+  test('TEST 9: deal-breakers are graded, and only one grade is a ban', async ({ page }) => {
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    expect(await advanceTo(page, /can ruin a film or show for you/i)).toBe(true);
+    await tapChips(page, ['gore', 'romance_genre']);
+
+    await expect(prompt(page)).toContainText(/how bad is it/i);
+    await expect(page.getByTestId('choice-hard')).toContainText(/never show me this/i);
+    await expect(page.getByTestId('question-helper')).toContainText(/only the first option means never recommend/i);
+    await page.getByTestId('choice-hard').click();
+
+    await expect(prompt(page)).toContainText(/how bad is it/i);
+    await page.getByTestId('choice-mild').click();
+
+    await finishEarly(page);
+    await expect(page.getByTestId('review-section-name').filter({ hasText: 'Never recommend' })).toBeVisible();
+  });
+
+  test('a picked deal-breaker is not a ban until the user says so', async ({ page }) => {
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    expect(await advanceTo(page, /can ruin a film or show for you/i)).toBe(true);
+    await tapChips(page, ['violence']);
+    await finishEarly(page);
+    await expect(page.getByTestId('review-section-name').filter({ hasText: 'Never recommend' })).toHaveCount(0);
+  });
+});
+
+test.describe('adaptivity', () => {
+  test('TEST 11: a contradiction interrupts and is put to the user', async ({ page }) => {
+    await stubSearchDown(page);
+    await page.goto(R);
+    await page.getByTestId('start-full').click();
+    await page.getByTestId('answer-input').fill('I love slow burns');
+    await page.getByTestId('answer-submit').click();
+    expect(await advanceTo(page, /expected to like but didn/i)).toBe(true);
+    await page.getByTestId('answer-input').fill('I hate slow shows');
+    await page.getByTestId('answer-submit').click();
+
+    await expect(page.getByTestId('followup-badge')).toBeVisible();
     await expect(page.getByTestId('choice-depends')).toBeVisible();
   });
 
-  test('the user can stop early', async ({ page }) => {
+  test('TEST 12: a stated exception survives as an exception', async ({ page }) => {
+    await stubSearchDown(page);
     await page.goto(R);
     await page.getByTestId('start-full').click();
-    await answer(page, 'I hate reality TV');
+    expect(await advanceTo(page, /claim to hate but keep making exceptions/i)).toBe(true);
+    await page.getByTestId('answer-input').fill('I hate horror but I loved The Silence of the Lambs');
+    await page.getByTestId('answer-submit').click();
     await page.getByTestId('finish-early').click();
-    await expect(page.getByTestId('review-list')).toBeVisible();
+    await expect(page.getByTestId('review-list-anchor').or(page.getByTestId('review-section')).first()).toBeVisible();
+    await expect(page.getByText(/avoid horror/i).first()).toBeVisible();
+  });
+
+  test('TEST 19+20: quick is shorter than full', async ({ page }) => {
+    const runLength = async (mode: 'quick' | 'full') => {
+      await page.goto(R);
+      // A draft from the previous run would restore us past the intro.
+      await page.evaluate(() => window.localStorage.clear());
+      await page.reload();
+      await page.getByTestId(`start-${mode}`).click();
+      let n = 0;
+      for (; n < 40; n++) {
+        if (!(await prompt(page).isVisible().catch(() => false))) break;
+        const skip = page.getByTestId('answer-skip');
+        if (await skip.isVisible().catch(() => false)) await skip.click();
+        else await page.getByTestId('choice-group').getByRole('button').last().click();
+      }
+      return n;
+    };
+    const quick = await runLength('quick');
+    const full = await runLength('full');
+    expect(quick).toBeGreaterThanOrEqual(5);
+    expect(full).toBeGreaterThan(quick);
   });
 });
 
-test.describe('mandatory review', () => {
-  test('HARD: nothing is saved before the review is confirmed', async ({ page }) => {
+test.describe('moving around', () => {
+  test('TEST 14: skipping costs nothing', async ({ page }) => {
     await page.goto(R);
     await page.getByTestId('start-quick').click();
-    await answer(page, 'I hate reality TV');
+    const first = await prompt(page).innerText();
+    await page.getByTestId('answer-skip').click();
+    await expect(prompt(page)).not.toHaveText(first);
+    await expect(page.getByTestId('live-reveal')).toHaveCount(0);
+  });
+
+  test('TEST 13: Back returns to the previous question and un-does it', async ({ page }) => {
+    await stubSearch(page, [{ titleId: 'tv:1', text: 'Sherlock', genres: ['crime'] }]);
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    await expect(page.getByTestId('answer-back')).toBeDisabled();
+    await pickTitle(page, 'sherlock');
+    await expect(prompt(page)).toContainText('Sherlock');
+
+    await page.getByTestId('answer-back').click();
+    await expect(prompt(page)).toContainText(/three films or shows/i);
+    await expect(page.getByTestId('picked-title')).toHaveCount(0);
+    await expect(page.getByTestId('live-reveal')).toHaveCount(0);
+  });
+
+  test('TEST 15+16: a refresh does not erase the interview', async ({ page }) => {
+    await stubSearch(page, [{ titleId: 'tv:1', text: 'Sherlock', genres: ['crime'] }]);
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    await pickTitle(page, 'sherlock');
+    await tapChips(page, ['investigation']);
+    const before = await prompt(page).innerText();
+
+    await page.reload();
+    await expect(page.getByTestId('restored-note')).toBeVisible();
+    await expect(prompt(page)).toHaveText(before);
+    await expect(page.getByTestId('live-reveal')).toBeVisible();
+  });
+
+  test('starting over clears the restored draft', async ({ page }) => {
+    await stubSearchDown(page);
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    await typeTitle(page, 'Ozark');
+    await page.reload();
+    await expect(page.getByTestId('restored-note')).toBeVisible();
+    await finishEarly(page);
+    await page.getByTestId('cancel-voice-dna').click();
+    await page.reload();
+    await expect(page.getByTestId('privacy-note')).toBeVisible();
+  });
+});
+
+test.describe('review', () => {
+  async function shortInterview(page: Page) {
+    await stubSearch(page, [{ titleId: 'tv:1', text: 'Sherlock', genres: ['crime'] }]);
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    await pickTitle(page, 'sherlock');
+    await tapChips(page, ['investigation']);
     await page.getByTestId('finish-early').click();
-    await expect(page.getByTestId('review-list')).toBeVisible();
+  }
+
+  test('TEST 17: grouped into named sections, each quoting the user', async ({ page }) => {
+    await shortInterview(page);
+    await expect(page.getByTestId('review-section').first()).toBeVisible();
+    await expect(page.getByTestId('review-section-name').filter({ hasText: 'Titles discussed' })).toBeVisible();
+    for (const q of await page.getByTestId('review-quote').all()) {
+      expect((await q.innerText()).length).toBeGreaterThan(2);
+    }
+  });
+
+  test('HARD: nothing is saved before the review is confirmed', async ({ page }) => {
+    await shortInterview(page);
     await expect(page.getByTestId('dna-reveal')).toHaveCount(0);
     await page.getByTestId('apply-voice-dna').click();
     await expect(page.getByTestId('dna-reveal')).toBeVisible();
   });
 
-  test('every conclusion is shown next to the words that produced it', async ({ page }) => {
+  test('HARD: a hand-typed title blocks the save until confirmed', async ({ page }) => {
+    await stubSearchDown(page);
     await page.goto(R);
     await page.getByTestId('start-quick').click();
-    await answer(page, 'I hate reality TV');
-    await page.getByTestId('finish-early').click();
-    const item = page.getByTestId('review-item').first();
-    await expect(item.getByTestId('review-statement')).toContainText(/you avoid reality tv/i);
-    await expect(item.getByTestId('review-quote')).toContainText('I hate reality TV');
-  });
-
-  test('HARD: a guessed title blocks the save until it is confirmed', async ({ page }) => {
-    await page.goto(R);
-    await page.getByTestId('start-quick').click();
-    await answer(page, 'I loved Ozark');
+    await typeTitle(page, 'Ozark');
     await page.getByTestId('finish-early').click();
     await expect(page.getByTestId('review-blocked')).toBeVisible();
-    await expect(page.getByTestId('review-guess').first()).toBeVisible();
     await expect(page.getByTestId('apply-voice-dna')).toBeDisabled();
-    await page.getByTestId('review-item').first().getByTestId('decide-keep').click();
+    await page.getByTestId('review-item').filter({ hasText: 'Ozark' }).getByTestId('decide-keep').click();
     await expect(page.getByTestId('apply-voice-dna')).toBeEnabled();
   });
 
-  test('a conclusion can be flipped, demoted to a mood, or dropped', async ({ page }) => {
-    await page.goto(R);
-    await page.getByTestId('start-quick').click();
-    await answer(page, 'I hate reality TV');
-    await page.getByTestId('finish-early').click();
+  test('a conclusion can be flipped, demoted, dropped or escalated', async ({ page }) => {
+    await shortInterview(page);
     const item = page.getByTestId('review-item').first();
     for (const d of ['flip', 'mood', 'drop', 'keep']) {
       await item.getByTestId(`decide-${d}`).click();
@@ -177,121 +441,100 @@ test.describe('mandatory review', () => {
     }
   });
 
-  test('throwing it away keeps nothing', async ({ page }) => {
-    await page.goto(R);
-    await page.getByTestId('start-quick').click();
-    await answer(page, 'I hate reality TV');
-    await page.getByTestId('finish-early').click();
-    await page.getByTestId('cancel-voice-dna').click();
-    await expect(page.getByTestId('privacy-note')).toBeVisible();
-    await expect(page.getByTestId('review-list')).toHaveCount(0);
+  test('it names what it still does not know', async ({ page }) => {
+    await shortInterview(page);
+    await expect(page.getByTestId('still-unclear')).toContainText(/nothing on these yet/i);
   });
 
-  test('an empty interview says so instead of inventing a profile', async ({ page }) => {
-    await page.goto(R);
-    await page.getByTestId('start-quick').click();
-    await answer(page, 'qwerty asdf');
-    await page.getByTestId('finish-early').click();
-    await expect(page.getByTestId('review-empty')).toContainText(/nothing has been saved/i);
+  test('throwing it away keeps nothing', async ({ page }) => {
+    await shortInterview(page);
+    await page.getByTestId('cancel-voice-dna').click();
+    await expect(page.getByTestId('privacy-note')).toBeVisible();
   });
 });
 
 test.describe('the reveal', () => {
-  test('describes coverage as knowledge, never as accuracy', async ({ page }) => {
+  async function applied(page: Page) {
+    await stubSearch(page, [{ titleId: 'tv:1', text: 'Sherlock', genres: ['crime'] }]);
     await page.goto(R);
     await page.getByTestId('start-quick').click();
-    await answer(page, 'I hate reality TV');
+    await pickTitle(page, 'sherlock');
+    await tapChips(page, ['investigation']);
     await page.getByTestId('finish-early').click();
     await page.getByTestId('apply-voice-dna').click();
-    await expect(page.getByTestId('coverage-summary'))
-      .toContainText(/how much I know about you, not how accurate/i);
+  }
+
+  test('describes coverage as knowledge, never accuracy', async ({ page }) => {
+    await applied(page);
+    await expect(page.getByTestId('coverage-summary')).toContainText(/how much I know about you, not how accurate/i);
   });
 
-  test('a mood is labelled as a mood, not a rule', async ({ page }) => {
-    await page.goto(R);
-    await page.getByTestId('start-quick').click();
-    await answer(page, 'Tonight I want something feel-good');
-    await page.getByTestId('finish-early').click();
-    await page.getByTestId('apply-voice-dna').click();
-    await expect(page.getByTestId('reveal-mood').first()).toContainText(/mood, not a rule/i);
+  test('TEST 22: it does not send you back through the whole title quiz', async ({ page }) => {
+    await applied(page);
+    await expect(page.getByTestId('next-step')).toContainText(/do not need the full twenty-title run/i);
+    await expect(page.getByTestId('targeted-quiz')).toBeVisible();
   });
 
-  test('an exception is shown as an exception, and the rule survives', async ({ page }) => {
-    await page.goto(R);
-    await page.getByTestId('start-quick').click();
-    await answer(page, 'I hate horror, but I loved The Silence of the Lambs');
-    await page.getByTestId('finish-early').click();
-    // Confirm the guessed title, then apply.
-    for (const item of await page.getByTestId('review-item').all()) {
-      if (await item.getByTestId('review-guess').count()) {
-        await item.getByTestId('decide-keep').click();
-      }
-    }
-    await page.getByTestId('apply-voice-dna').click();
-    await expect(page.getByTestId('exceptions-summary')).toContainText(/exception/i);
-    await expect(page.getByTestId('dna-reveal')).toContainText(/avoid horror|lean away from horror/i);
-  });
-
-  test('it can be undone', async ({ page }) => {
-    await page.goto(R);
-    await page.getByTestId('start-quick').click();
-    await answer(page, 'I hate reality TV');
-    await page.getByTestId('finish-early').click();
-    await page.getByTestId('apply-voice-dna').click();
+  test('TEST 18: it can be undone', async ({ page }) => {
+    await applied(page);
     await page.getByTestId('undo-voice-dna').click();
-    await expect(page.getByTestId('review-list')).toBeVisible();
+    await expect(page.getByTestId('review-section').first()).toBeVisible();
   });
 });
 
 test.describe('responsive', () => {
   for (const [label, w, h] of VIEWPORTS) {
-    test(`usable at ${label}`, async ({ page }) => {
+    test(`TEST 23-25: usable at ${label}`, async ({ page }) => {
+      await stubSearch(page, [{ titleId: 'tv:1', text: 'Sherlock', genres: ['crime'] }]);
       await page.setViewportSize({ width: w, height: h });
       await page.goto(R);
       const overflow = async () => page.evaluate(() =>
         document.documentElement.scrollWidth - document.documentElement.clientWidth);
+
       expect(await overflow(), 'intro overflow').toBeLessThanOrEqual(0);
       await page.screenshot({ path: path.join(SHOTS, `${label}-intro.png`) });
 
       await page.getByTestId('start-quick').click();
-      await expect(page.getByTestId('question-prompt')).toBeVisible();
-      expect(await overflow(), 'question overflow').toBeLessThanOrEqual(0);
-      await page.screenshot({ path: path.join(SHOTS, `${label}-question.png`) });
+      await expect(page.getByTestId('title-picker')).toBeVisible();
+      expect(await overflow(), 'title question overflow').toBeLessThanOrEqual(0);
+      await page.screenshot({ path: path.join(SHOTS, `${label}-titles.png`) });
 
-      await answer(page, 'I hate horror, but I loved The Silence of the Lambs');
+      await pickTitle(page, 'sherlock');
+      await expect(page.getByTestId('chip-group')).toBeVisible();
+      expect(await overflow(), 'chip question overflow').toBeLessThanOrEqual(0);
+      await page.screenshot({ path: path.join(SHOTS, `${label}-why.png`) });
+
+      await tapChips(page, ['investigation']);
       await page.getByTestId('finish-early').click();
-      await expect(page.getByTestId('review-list')).toBeVisible();
+      await expect(page.getByTestId('review-section').first()).toBeVisible();
       expect(await overflow(), 'review overflow').toBeLessThanOrEqual(0);
       await page.screenshot({ path: path.join(SHOTS, `${label}-review.png`), fullPage: true });
     });
   }
 
-  test('the four review decisions sit in even rows with readable labels', async ({ page }) => {
+  test('the chip row never clips a label at 320px', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto(R);
     await page.getByTestId('start-quick').click();
-    await answer(page, 'I hate reality TV');
-    await page.getByTestId('finish-early').click();
-
-    const buttons = page.getByTestId('review-item').first().locator('[data-testid^="decide-"]');
-    await expect(buttons).toHaveCount(4);
-    const boxes = await buttons.evaluateAll((els) =>
-      els.map((el) => {
-        const r = el.getBoundingClientRect();
-        return { top: Math.round(r.top), w: Math.round(r.width), clipped: el.scrollWidth > el.clientWidth + 1 };
-      }));
-    const rows = new Set(boxes.map((b) => b.top));
-    expect(rows.size, 'two even rows at 320px').toBe(2);
-    const widths = boxes.map((b) => b.w);
-    expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(2);
-    expect(boxes.every((b) => !b.clipped), 'no clipped labels').toBe(true);
+    expect(await advanceTo(page, /kinds of story usually pull you in/i)).toBe(true);
+    const clipped = await page.getByTestId('chip-group').locator('button').evaluateAll((els) =>
+      els.filter((el) => el.scrollWidth > el.clientWidth + 1).length);
+    expect(clipped).toBe(0);
   });
 
-  test('one h1 per screen, and the answer box is labelled', async ({ page }) => {
+  test('the stage rail scrolls rather than eating the screen', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto(R);
+    await page.getByTestId('start-quick').click();
+    const height = await page.getByTestId('stage-rail').evaluate((el) => el.getBoundingClientRect().height);
+    expect(height).toBeLessThan(48);
+  });
+
+  test('one h1 per screen, and every input is labelled', async ({ page }) => {
     await page.goto(R);
     await expect(page.locator('h1')).toHaveCount(1);
     await page.getByTestId('start-quick').click();
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.getByTestId('answer-input')).toHaveAttribute('id', 'voice-answer');
+    await expect(page.getByTestId('title-input')).toHaveAttribute('id', 'title-search');
   });
 });

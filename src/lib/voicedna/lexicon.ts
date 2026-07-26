@@ -20,8 +20,14 @@ export interface DimTarget {
   target: number;
 }
 
+/** Which part of the review this attribute belongs under. */
+export type AttributeSection =
+  | 'genre' | 'pacing' | 'tone' | 'story' | 'content' | 'format' | 'language';
+
 export interface Attribute {
   key: string;
+  /** Review grouping. Defaults to 'story' when unset. */
+  section?: AttributeSection;
   /** Human label, used in review copy and the DNA reveal. */
   label: string;
   /** Short noun phrase that reads well inside a sentence ("slow-burn shows"). */
@@ -47,6 +53,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   // ── Genres ────────────────────────────────────────────────────────────────
   {
     key: 'sci_fi',
+    section: 'genre',
     label: 'Science fiction',
     phrase: 'science fiction',
     genres: ['science-fiction'],
@@ -55,6 +62,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'horror',
+    section: 'genre',
     label: 'Horror',
     phrase: 'horror',
     genres: ['horror'],
@@ -66,6 +74,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'fantasy',
+    section: 'genre',
     label: 'Fantasy',
     phrase: 'fantasy',
     genres: ['fantasy'],
@@ -74,6 +83,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'romance_genre',
+    section: 'genre',
     label: 'Romance',
     phrase: 'romance',
     genres: ['romance'],
@@ -82,6 +92,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'comedy',
+    section: 'genre',
     label: 'Comedy',
     phrase: 'comedy',
     genres: ['comedy'],
@@ -90,6 +101,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'documentary',
+    section: 'genre',
     label: 'Documentaries',
     phrase: 'documentaries',
     genres: ['documentary'],
@@ -98,6 +110,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'animation',
+    section: 'genre',
     label: 'Animation',
     phrase: 'animation',
     genres: ['animation'],
@@ -106,6 +119,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'reality',
+    section: 'genre',
     label: 'Reality TV',
     phrase: 'reality TV',
     genres: ['reality'],
@@ -117,6 +131,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'musical',
+    section: 'genre',
     label: 'Musicals',
     phrase: 'musicals',
     genres: ['music'],
@@ -124,6 +139,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'superhero',
+    section: 'genre',
     label: 'Superhero films',
     phrase: 'superhero films',
     genres: ['action', 'science-fiction'],
@@ -135,6 +151,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'crime',
+    section: 'genre',
     label: 'Crime',
     phrase: 'crime stories',
     genres: ['crime'],
@@ -143,6 +160,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'thriller',
+    section: 'genre',
     label: 'Thrillers',
     phrase: 'thrillers',
     genres: ['thriller'],
@@ -151,6 +169,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'war',
+    section: 'genre',
     label: 'War stories',
     phrase: 'war stories',
     genres: ['war'],
@@ -159,6 +178,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'western',
+    section: 'genre',
     label: 'Westerns',
     phrase: 'westerns',
     genres: ['western'],
@@ -166,6 +186,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'sports',
+    section: 'genre',
     label: 'Sports stories',
     phrase: 'sports stories',
     dims: [
@@ -176,6 +197,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'historical',
+    section: 'genre',
     label: 'Period pieces',
     phrase: 'period pieces',
     genres: ['history'],
@@ -183,9 +205,52 @@ export const ATTRIBUTES: readonly Attribute[] = [
     phrases: ['period pieces', 'period drama', 'period dramas', 'historical dramas', 'costume dramas'],
   },
 
+  {
+    key: 'action',
+    section: 'genre',
+    label: 'Action',
+    phrase: 'action',
+    genres: ['action'],
+    dims: [
+      { key: 'pacing', target: 85 },
+      { key: 'suspense', target: 75 },
+    ],
+    phrases: ['action', 'action movies', 'action films', 'shoot em up', 'car chases'],
+  },
+  {
+    key: 'supernatural',
+    section: 'content',
+    label: 'Supernatural elements',
+    phrase: 'supernatural stories',
+    genres: ['fantasy', 'horror'],
+    dims: [{ key: 'realism', target: 12 }],
+    phrases: ['supernatural', 'ghosts', 'vampires', 'zombies', 'demons', 'paranormal', 'the occult'],
+  },
+
   // ── Structural / availability facts ───────────────────────────────────────
+  // Content advisories. Deliberately NO dimension mapping: "no child harm" is a
+  // hard fact about a title, not a position on a taste axis, and blending it
+  // into an axis would let a strong preference elsewhere outvote it.
+  {
+    key: 'child_harm',
+    section: 'content',
+    label: 'Harm to children',
+    phrase: 'stories where children are hurt',
+    structural: true,
+    phrases: ['child harm', 'kids being hurt', 'children being hurt', 'harm to children', 'child abuse'],
+  },
+  {
+    key: 'animal_harm',
+    section: 'content',
+    label: 'Harm to animals',
+    phrase: 'stories where animals are hurt',
+    structural: true,
+    phrases: ['animal harm', 'animal cruelty', 'the dog dies', 'harm to animals', 'animals being hurt'],
+  },
+
   {
     key: 'foreign_language',
+    section: 'language',
     label: 'Foreign-language titles',
     phrase: 'foreign-language titles',
     structural: true,
@@ -196,6 +261,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'subtitles',
+    section: 'language',
     label: 'Subtitles',
     phrase: 'subtitles',
     structural: true,
@@ -203,6 +269,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'english_audio',
+    section: 'language',
     label: 'English audio',
     phrase: 'English audio',
     structural: true,
@@ -210,6 +277,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'long_runtime',
+    section: 'format',
     label: 'Very long films',
     phrase: 'very long films',
     structural: true,
@@ -218,6 +286,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'many_seasons',
+    section: 'format',
     label: 'Long-running series',
     phrase: 'long-running series',
     structural: true,
@@ -225,6 +294,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'limited_series',
+    section: 'format',
     label: 'Limited series',
     phrase: 'limited series',
     structural: true,
@@ -232,6 +302,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'unfinished',
+    section: 'format',
     label: 'Cancelled or unresolved endings',
     phrase: 'cancelled shows',
     structural: true,
@@ -241,6 +312,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   // ── Experience axes ───────────────────────────────────────────────────────
   {
     key: 'slow_pace',
+    section: 'pacing',
     label: 'Slow-burn pacing',
     phrase: 'slow-burn stories',
     dims: [{ key: 'pacing', target: 10 }],
@@ -248,6 +320,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'fast_pace',
+    section: 'pacing',
     label: 'Fast pacing',
     phrase: 'fast-moving stories',
     dims: [{ key: 'pacing', target: 90 }],
@@ -255,6 +328,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'dark_tone',
+    section: 'tone',
     label: 'Dark, heavy stories',
     phrase: 'dark, heavy stories',
     dims: [{ key: 'darkness', target: 90 }],
@@ -262,6 +336,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'feel_good',
+    section: 'tone',
     label: 'Feel-good stories',
     phrase: 'feel-good stories',
     dims: [
@@ -272,6 +347,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'emotional',
+    section: 'tone',
     label: 'Emotionally heavy stories',
     phrase: 'emotionally heavy stories',
     dims: [{ key: 'emotion', target: 90 }],
@@ -279,6 +355,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'scary',
+    section: 'content',
     label: 'Frightening content',
     phrase: 'frightening content',
     dims: [
@@ -289,6 +366,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'tense',
+    section: 'content',
     label: 'High tension',
     phrase: 'tense stories',
     dims: [{ key: 'suspense', target: 88 }],
@@ -296,6 +374,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'violence',
+    section: 'content',
     label: 'Violence',
     phrase: 'violence',
     dims: [{ key: 'violence', target: 88 }],
@@ -303,6 +382,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'gore',
+    section: 'content',
     label: 'Gore',
     phrase: 'gore',
     dims: [{ key: 'violence', target: 95 }],
@@ -310,6 +390,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'sex_content',
+    section: 'content',
     label: 'Explicit sexual content',
     phrase: 'explicit content',
     dims: [{ key: 'romance', target: 70 }],
@@ -317,6 +398,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'complex_plot',
+    section: 'story',
     label: 'Complicated plots',
     phrase: 'complicated plots',
     dims: [
@@ -327,6 +409,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'twists',
+    section: 'story',
     label: 'Twists',
     phrase: 'twists',
     dims: [{ key: 'suspense', target: 80 }],
@@ -334,6 +417,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'character_driven',
+    section: 'story',
     label: 'Character-driven stories',
     phrase: 'character-driven stories',
     dims: [{ key: 'character', target: 90 }],
@@ -341,6 +425,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'plot_driven',
+    section: 'story',
     label: 'Plot-driven stories',
     phrase: 'plot-driven stories',
     dims: [{ key: 'character', target: 12 }],
@@ -348,6 +433,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'grounded',
+    section: 'story',
     label: 'Grounded, realistic stories',
     phrase: 'grounded stories',
     dims: [{ key: 'realism', target: 90 }],
@@ -355,6 +441,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'true_story',
+    section: 'story',
     label: 'True stories',
     phrase: 'true stories',
     dims: [{ key: 'realism', target: 95 }],
@@ -362,6 +449,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'background_friendly',
+    section: 'format',
     label: 'Easy background watching',
     phrase: 'easy background watching',
     dims: [
@@ -372,6 +460,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'cynical',
+    section: 'tone',
     label: 'Cynical stories',
     phrase: 'cynical stories',
     dims: [{ key: 'warmth', target: 12 }],
@@ -379,6 +468,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'morally_grey',
+    section: 'tone',
     label: 'Morally grey characters',
     phrase: 'morally grey characters',
     dims: [{ key: 'morality', target: 90 }],
@@ -386,6 +476,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'serialized',
+    section: 'story',
     label: 'Serialized, ongoing stories',
     phrase: 'serialized stories',
     dims: [{ key: 'serialized', target: 90 }],
@@ -393,6 +484,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'episodic',
+    section: 'story',
     label: 'Episodic, standalone episodes',
     phrase: 'episodic shows',
     dims: [{ key: 'serialized', target: 10 }],
@@ -400,6 +492,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'epic_stakes',
+    section: 'story',
     label: 'Epic scale',
     phrase: 'epic stories',
     dims: [{ key: 'stakes', target: 92 }],
@@ -407,6 +500,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'intimate_stakes',
+    section: 'story',
     label: 'Small, intimate stories',
     phrase: 'small, intimate stories',
     dims: [{ key: 'stakes', target: 12 }],
@@ -414,6 +508,7 @@ export const ATTRIBUTES: readonly Attribute[] = [
   },
   {
     key: 'investigation',
+    section: 'story',
     label: 'A strong investigation',
     phrase: 'a strong investigation',
     dims: [

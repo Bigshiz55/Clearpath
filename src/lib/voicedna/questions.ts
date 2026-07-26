@@ -1,418 +1,678 @@
 /**
- * THE ADAPTIVE QUESTION ENGINE.
+ * THE ADAPTIVE INTERVIEW ENGINE.
  *
- * A fixed questionnaire wastes most of its questions. If someone opens with
- * "I hate horror and I can't stand subtitles", asking them about horror and
- * subtitles next is five questions spent learning nothing.
+ * The interview is a sequence of STAGES — favourites, what does not work, your
+ * viewing style, deal-breakers, exceptions — and each stage is a set of SLOTS.
+ * A slot is a main question. What makes it an interview rather than a form is
+ * what happens between the slots:
  *
- * So the next question is chosen by expected information gain: how much
- * uncertainty it would remove across the attributes it probes, given what we
- * already believe. Two things always jump the queue, because leaving them
- * unresolved poisons everything downstream:
+ *   * Naming a title generates a "why" follow-up for that title, and the chips
+ *     in it depend on what the title actually is: someone who loved Sherlock is
+ *     asked about deduction and the cases, not about spectacle.
+ *   * Picking deal-breakers generates a strength question for each one, because
+ *     "too much romance" and "never show me a child being hurt" are not the
+ *     same instruction.
+ *   * A contradiction or an unstated exception interrupts everything and is put
+ *     to the user directly, off-budget.
+ *   * A slot whose ground is already covered — by earlier answers or by an
+ *     import — is skipped rather than asked for form's sake.
  *
- *   1. A genuine contradiction — we ask instead of guessing a winner.
- *   2. An exception we noticed but the user never stated — we confirm instead
- *      of quietly overriding a rule they gave us.
- *
- * Pure and deterministic: the same state always produces the same question, so
- * the interview is reproducible and unit-testable end to end.
+ * The next question is therefore a pure function of the state. No queue, no
+ * cursor, nothing to get out of sync: the same answers always produce the same
+ * interview, which is what makes the whole thing testable.
  */
-import type { Claim, Conflict, VoiceProfile } from './types';
+import type { Claim, Conflict, Reaction, VoiceProfile } from './types';
 import { CONFIDENCE_HALF, unconfirmedExceptions } from './profile';
 import { attributePhrase } from './lexicon';
+import { decodeChips, decodeTitles } from './answerCodec';
+import {
+  COMEDY_OPTIONS, DEALBREAKER_CHIPS, DEALBREAKER_STRENGTHS, DISLIKE_REASONS, DNF_PROGRESS,
+  DNF_REASONS, FORMAT_QUESTIONS, GENRE_CHIPS, GENRE_DEPTH, TONE_OPTIONS, loveReasonsFor,
+  type ReasonChip,
+} from './reasons';
 
 export type InterviewMode = 'quick' | 'full';
 
-/** How many open questions each mode asks. Follow-ups are extra. */
-export const QUESTION_COUNT: Record<InterviewMode, number> = { quick: 5, full: 12 };
+/** Main questions per mode. Follow-ups and repairs are extra, by design. */
+export const MAIN_COUNT: Record<InterviewMode, number> = { quick: 5, full: 16 };
 
-export type QuestionStage = 'opening' | 'core' | 'edge' | 'closing';
+/** Per-title follow-ups we will ask before it starts feeling like an audit. */
+export const MAX_WHY_FOLLOWUPS: Record<InterviewMode, number> = { quick: 3, full: 8 };
+/** Deal-breakers we grade individually. The rest are recorded at their default. */
+export const MAX_STRENGTH_FOLLOWUPS: Record<InterviewMode, number> = { quick: 2, full: 5 };
+
+/** Below this expected gain a non-required slot is not worth the user's time. */
+export const GAIN_FLOOR = 0.35;
+
+export type StageId =
+  | 'favourites' | 'dislikes' | 'abandoned' | 'genres'
+  | 'dealbreakers' | 'format' | 'exceptions' | 'rewatch';
+
+/** The progress labels the user sees. Several stages share one label. */
+export const STAGE_LABEL: Record<StageId, string> = {
+  favourites: 'Your favourites',
+  dislikes: 'What does not work',
+  abandoned: 'What does not work',
+  genres: 'Your viewing style',
+  format: 'Your viewing style',
+  dealbreakers: 'Your deal-breakers',
+  exceptions: 'Exceptions',
+  rewatch: 'Exceptions',
+};
+
+/** Stage order. The interview always walks this front to back. */
+export const STAGE_ORDER: readonly StageId[] = [
+  'favourites', 'dislikes', 'abandoned', 'genres', 'dealbreakers', 'format', 'exceptions', 'rewatch',
+];
+
+/** The distinct labels, in order, for the progress rail. */
+export const PROGRESS_LABELS: readonly string[] = STAGE_ORDER
+  .map((s) => STAGE_LABEL[s])
+  .filter((label, i, all) => all.indexOf(label) === i)
+  .concat('Review');
+
+export type QuestionKind = 'titles' | 'chips' | 'choice' | 'open';
+
+export interface QuestionOption {
+  value: string;
+  label: string;
+  hint?: string;
+}
 
 export interface VoiceQuestion {
   id: string;
+  stage: StageId;
+  /** The progress label this question sits under. */
+  stageLabel: string;
   prompt: string;
-  /** Sub-line under the prompt. Sets expectations, never asks a second thing. */
   helper?: string;
+  kind: QuestionKind;
+  options?: QuestionOption[];
+  /** Chips answers are multi-select; choice answers are single. */
+  multi?: boolean;
   placeholder?: string;
-  kind: 'open' | 'choice';
-  options?: Array<{ value: string; label: string }>;
-  /** Attribute keys this question is likely to teach us about. */
+  /** Titles questions: how many the user may add, and what naming one means. */
+  maxTitles?: number;
+  impliedReaction?: Reaction;
+  /** Free text is accepted alongside chips or titles. */
+  allowFreeText?: boolean;
+  /** True for follow-ups and repairs — these do not spend the main budget. */
+  isFollowUp?: boolean;
+  /** Attributes this question would teach us about. */
   teaches: string[];
-  /** True when the honest answer is usually a title. */
-  solicitsTitle?: boolean;
-  /** How much of the profile the question moves at once. */
-  breadth: number;
-  stage: QuestionStage;
 }
 
-/**
- * The bank. Written to be answerable in a sentence — every one of these is a
- * question a person can answer out loud without thinking about taxonomy.
- */
-export const QUESTION_BANK: readonly VoiceQuestion[] = [
+interface Slot {
+  id: string;
+  stage: StageId;
+  prompt: string;
+  helper?: string;
+  kind: QuestionKind;
+  chips?: readonly ReasonChip[];
+  options?: QuestionOption[];
+  multi?: boolean;
+  placeholder?: string;
+  maxTitles?: number;
+  impliedReaction?: Reaction;
+  allowFreeText?: boolean;
+  /** In the quick interview? */
+  quick: boolean;
+  /** Always ask, even when the ground looks covered. */
+  required?: boolean;
+  teaches: string[];
+  relevantWhen?: (f: Facts) => boolean;
+}
+
+/** Everything a slot may consult when deciding whether it is worth asking. */
+export interface Facts {
+  answers: Record<string, string>;
+  profile: VoiceProfile;
+  claims: Claim[];
+  mode: InterviewMode;
+  /** Evidence already held from imports/quiz, keyed by attribute. */
+  priorEvidence: Record<string, number>;
+}
+
+const chipOptions = (chips: readonly ReasonChip[]): QuestionOption[] =>
+  chips.map((c) => ({ value: c.value, label: c.label }));
+
+const chipTeaches = (chips: readonly ReasonChip[]): string[] =>
+  Array.from(new Set(chips.map((c) => c.attribute).filter((a): a is string => Boolean(a))));
+
+/** Has the user given us any evidence on this attribute yet? */
+function evidenceOf(f: Facts, key: string): number {
+  return (f.profile.attributes[key]?.evidence ?? 0) + (f.priorEvidence[key] ?? 0);
+}
+
+// ── The slots ──────────────────────────────────────────────────────────────
+
+const SLOTS: readonly Slot[] = [
   {
-    id: 'last_loved',
-    prompt: 'What is the last film or show you genuinely loved?',
-    helper: 'One is plenty. Tell me why, if you know why.',
-    placeholder: 'e.g. I loved Severance — the weirdness never let up',
-    kind: 'open',
+    id: 'fav_titles',
+    stage: 'favourites',
+    prompt: 'What are three films or shows you absolutely loved?',
+    helper: 'One is plenty to start. Add them one at a time — I will ask what you loved about each.',
+    kind: 'titles',
+    maxTitles: 3,
+    impliedReaction: 'loved',
+    allowFreeText: true,
+    placeholder: 'Search for a title, or just type it',
+    quick: true,
+    required: true,
     teaches: [],
-    solicitsTitle: true,
-    breadth: 2.4,
-    stage: 'opening',
   },
   {
-    id: 'couldnt_get_into',
-    prompt: 'What is something everyone else loves that you could not get into?',
-    helper: 'This is often more useful than what you liked.',
-    placeholder: 'e.g. I gave up on Succession, everyone in it is awful',
-    kind: 'open',
-    teaches: ['cynical', 'morally_grey'],
-    solicitsTitle: true,
-    breadth: 2.2,
-    stage: 'opening',
+    id: 'dislike_title',
+    stage: 'dislikes',
+    prompt: 'What is something you expected to like but didn’t?',
+    helper: 'This is usually more useful than what you loved.',
+    kind: 'titles',
+    maxTitles: 1,
+    impliedReaction: 'disliked',
+    allowFreeText: true,
+    placeholder: 'Search for a title, or just type it',
+    quick: true,
+    required: true,
+    teaches: [],
   },
   {
-    id: 'never_again',
-    prompt: 'What will you never watch, no matter who recommends it?',
-    kind: 'open',
-    placeholder: 'e.g. I do not do horror, ever',
-    teaches: ['horror', 'reality', 'musical', 'animation', 'sci_fi', 'romance_genre', 'documentary', 'war', 'western', 'superhero', 'gore'],
-    breadth: 1.6,
-    stage: 'core',
+    id: 'popular_dislike',
+    stage: 'dislikes',
+    prompt: 'What is something everyone raves about that you could not stand?',
+    kind: 'titles',
+    maxTitles: 1,
+    impliedReaction: 'hated',
+    allowFreeText: true,
+    placeholder: 'Search for a title, or just type it',
+    quick: false,
+    teaches: [],
   },
   {
-    id: 'pace',
-    prompt: 'When a story takes its time, do you settle in or lose patience?',
-    kind: 'open',
-    placeholder: 'e.g. I need something happening, slow shows lose me',
-    teaches: ['slow_pace', 'fast_pace'],
-    breadth: 1.4,
-    stage: 'core',
+    id: 'dnf_title',
+    stage: 'abandoned',
+    prompt: 'What have you stopped watching before the end?',
+    helper: 'Giving up is not the same as disliking, and I will not treat it that way.',
+    kind: 'titles',
+    maxTitles: 1,
+    impliedReaction: 'abandoned',
+    allowFreeText: true,
+    placeholder: 'Search for a title, or just type it',
+    quick: false,
+    teaches: [],
+  },
+  {
+    id: 'genres',
+    stage: 'genres',
+    prompt: 'Which kinds of story usually pull you in?',
+    helper: 'Pick as many as fit.',
+    kind: 'chips',
+    chips: GENRE_CHIPS,
+    multi: true,
+    allowFreeText: true,
+    quick: true,
+    required: true,
+    teaches: chipTeaches(GENRE_CHIPS),
   },
   {
     id: 'tone',
-    prompt: 'After a hard day, do you want something dark or something that lifts you?',
-    kind: 'open',
-    placeholder: 'e.g. dark, always — the heavier the better',
-    teaches: ['dark_tone', 'feel_good', 'emotional'],
-    breadth: 1.4,
-    stage: 'core',
+    stage: 'genres',
+    prompt: 'After a hard day, what do you reach for?',
+    kind: 'choice',
+    chips: TONE_OPTIONS,
+    quick: true,
+    teaches: chipTeaches(TONE_OPTIONS),
   },
   {
-    id: 'attention',
-    prompt: 'Do you want something you can half-watch, or something that demands your full attention?',
-    kind: 'open',
-    placeholder: 'e.g. I want to concentrate, I hate background TV',
-    teaches: ['background_friendly', 'complex_plot'],
-    breadth: 1.3,
-    stage: 'core',
+    id: 'comedy_check',
+    stage: 'genres',
+    prompt: 'Does everything need a bit of humour in it?',
+    helper: 'You have not mentioned comedy either way, so I am guessing.',
+    kind: 'choice',
+    chips: COMEDY_OPTIONS,
+    quick: false,
+    teaches: chipTeaches(COMEDY_OPTIONS),
+    // Exactly the adaptive case: ask only when comedy is a genuine blank.
+    relevantWhen: (f) => evidenceOf(f, 'comedy') <= 0,
   },
   {
-    id: 'subtitles',
-    prompt: 'How do you feel about subtitles and foreign-language titles?',
-    kind: 'open',
-    placeholder: 'e.g. fine with subtitles, prefer English audio if it exists',
-    teaches: ['subtitles', 'foreign_language', 'english_audio'],
-    breadth: 1.2,
-    stage: 'core',
+    id: 'dealbreakers',
+    stage: 'dealbreakers',
+    prompt: 'What can ruin a film or show for you?',
+    helper: 'I will ask how badly for each one — not everything you pick becomes a ban.',
+    kind: 'chips',
+    chips: DEALBREAKER_CHIPS,
+    multi: true,
+    allowFreeText: true,
+    quick: true,
+    required: true,
+    teaches: chipTeaches(DEALBREAKER_CHIPS),
   },
+  ...FORMAT_QUESTIONS.map<Slot>((q) => ({
+    id: q.id,
+    stage: 'format' as const,
+    prompt: q.prompt,
+    kind: 'choice' as const,
+    chips: q.options,
+    quick: false,
+    teaches: chipTeaches(q.options),
+    ...(q.relevantWhen ? { relevantWhen: (f: Facts) => q.relevantWhen!(f.answers) } : {}),
+  })),
   {
-    id: 'violence',
-    prompt: 'Where is your line on violence?',
-    kind: 'open',
-    placeholder: 'e.g. I can take a lot as long as it is not gratuitous',
-    teaches: ['violence', 'gore', 'scary'],
-    breadth: 1.2,
-    stage: 'core',
-  },
-  {
-    id: 'people_or_plot',
-    prompt: 'Do you care more about the people or about what happens to them?',
-    kind: 'open',
-    placeholder: 'e.g. the people — I will watch anything with a great character',
-    teaches: ['character_driven', 'plot_driven'],
-    breadth: 1.2,
-    stage: 'core',
-  },
-  {
-    id: 'commitment',
-    prompt: 'Would you rather start an eight-season show or a six-part limited series?',
-    kind: 'open',
-    placeholder: 'e.g. limited series, I never finish the long ones',
-    teaches: ['many_seasons', 'limited_series', 'serialized', 'episodic'],
-    breadth: 1.2,
-    stage: 'core',
-  },
-  {
-    id: 'exception',
+    id: 'exception_open',
+    stage: 'exceptions',
     prompt: 'Is there a genre you claim to hate but keep making exceptions for?',
     helper: 'Exceptions tell me more than rules do.',
     kind: 'open',
     placeholder: 'e.g. I hate sci-fi but I loved Arrival',
+    quick: false,
     teaches: [],
-    solicitsTitle: true,
-    breadth: 1.8,
-    stage: 'edge',
   },
   {
-    id: 'stakes',
-    prompt: 'Saving the world, or one family falling apart?',
-    kind: 'open',
-    placeholder: 'e.g. small stories, every time',
-    teaches: ['epic_stakes', 'intimate_stakes', 'superhero'],
-    breadth: 1.1,
-    stage: 'edge',
-  },
-  {
-    id: 'real_or_not',
-    prompt: 'Do you prefer stories that could actually happen?',
-    kind: 'open',
-    placeholder: 'e.g. I like true stories, fantasy loses me',
-    teaches: ['grounded', 'true_story', 'fantasy', 'sci_fi', 'documentary'],
-    breadth: 1.3,
-    stage: 'edge',
-  },
-  {
-    id: 'morality',
-    prompt: 'Do you need someone to root for, or are you fine with everyone being awful?',
-    kind: 'open',
-    placeholder: 'e.g. I need one decent person in it',
-    teaches: ['morally_grey', 'cynical', 'feel_good'],
-    breadth: 1.2,
-    stage: 'edge',
-  },
-  {
-    id: 'humor',
-    prompt: 'Does everything need a bit of humour in it?',
-    kind: 'open',
-    placeholder: 'e.g. yes, even the grim stuff needs jokes',
-    teaches: ['comedy'],
-    breadth: 0.9,
-    stage: 'edge',
-  },
-  {
-    id: 'endings',
-    prompt: 'How much does an unresolved or cancelled ending ruin the whole thing?',
-    kind: 'open',
-    placeholder: 'e.g. completely — I will not start a cancelled show',
-    teaches: ['unfinished', 'twists'],
-    breadth: 0.9,
-    stage: 'edge',
-  },
-  {
-    id: 'rewatch',
-    prompt: 'What do you put on when you do not want to think?',
-    kind: 'open',
-    placeholder: 'e.g. I rewatch old sitcoms',
-    teaches: ['background_friendly', 'comedy', 'episodic'],
-    solicitsTitle: true,
-    breadth: 1.2,
-    stage: 'edge',
-  },
-  {
-    id: 'romance',
-    prompt: 'Does a love story make it better or worse?',
-    kind: 'open',
-    placeholder: 'e.g. worse, unless it is actually the point',
-    teaches: ['romance_genre', 'sex_content'],
-    breadth: 0.9,
-    stage: 'edge',
-  },
-  {
-    id: 'tension',
-    prompt: 'Do you enjoy being stressed out by a story?',
-    kind: 'open',
-    placeholder: 'e.g. no, I cannot do tense — I pause constantly',
-    teaches: ['tense', 'thriller', 'scary'],
-    breadth: 1.1,
-    stage: 'edge',
-  },
-  {
-    id: 'crime',
-    prompt: 'Detectives, heists, courtrooms — any of that your thing?',
-    kind: 'open',
-    placeholder: 'e.g. I love a proper investigation',
-    teaches: ['crime', 'investigation', 'thriller'],
-    breadth: 1.1,
-    stage: 'edge',
-  },
-  {
-    id: 'mood_now',
-    prompt: 'And just for tonight — what are you in the mood for?',
-    helper: 'I will keep this separate from the permanent stuff.',
-    kind: 'open',
-    placeholder: 'e.g. tonight I want something light',
+    id: 'rewatch_title',
+    stage: 'rewatch',
+    prompt: 'What would you happily watch again?',
+    kind: 'titles',
+    maxTitles: 1,
+    impliedReaction: 'loved',
+    allowFreeText: true,
+    placeholder: 'Search for a title, or just type it',
+    quick: false,
     teaches: [],
-    breadth: 0.6,
-    stage: 'closing',
   },
   {
-    id: 'anything_else',
-    prompt: 'Anything else I should know before I start picking?',
+    id: 'guilty_pleasure',
+    stage: 'rewatch',
+    prompt: 'What do you enjoy even though it does not fit your usual taste?',
+    helper: 'No judgement — this is often the most useful answer in the whole interview.',
     kind: 'open',
-    placeholder: 'Say it however you like',
+    placeholder: 'e.g. I will watch any daft disaster movie',
+    quick: false,
     teaches: [],
-    breadth: 0.8,
-    stage: 'closing',
   },
-] as const;
+];
 
-const STAGE_ORDER: Record<QuestionStage, number> = { opening: 0, core: 1, edge: 2, closing: 3 };
+export const ALL_SLOTS = SLOTS;
 
-export interface QuestionState {
-  mode: InterviewMode;
-  /** Ids already asked, including follow-ups. */
-  asked: string[];
-  profile: VoiceProfile;
-  claims: Claim[];
+// ── Follow-up ids ──────────────────────────────────────────────────────────
+
+export const SEP = '|';
+
+export function isFollowUp(id: string): boolean {
+  return id.includes(SEP);
 }
 
-/**
- * Follow-up ids embed claim ids, and claim ids already contain colons, so the
- * separator has to be something a claim id can never hold.
- */
-export const FOLLOWUP_SEP = '|';
-
-/** True for a repair question (conflict or exception), false for a bank one. */
-export function isFollowUp(questionId: string): boolean {
-  return questionId.includes(FOLLOWUP_SEP);
+export function followUpId(kind: string, ...parts: string[]): string {
+  return [kind, ...parts].join(SEP);
 }
 
-/** Stable id for a conflict follow-up, so answering it is idempotent. */
-export function conflictQuestionId(c: Conflict): string {
-  return ['conflict', c.positiveClaimId, c.negativeClaimId].join(FOLLOWUP_SEP);
-}
-
-/** Stable id for an exception confirmation. */
-export function exceptionQuestionId(ruleClaimId: string, exceptionClaimId: string): string {
-  return ['exception', ruleClaimId, exceptionClaimId].join(FOLLOWUP_SEP);
-}
-
-/** Split a follow-up id back into its parts. */
-export function parseFollowUpId(questionId: string): { kind: string; a: string; b: string } | null {
-  const parts = questionId.split(FOLLOWUP_SEP);
-  if (parts.length !== 3) return null;
+export function parseFollowUpId(id: string): { kind: string; a: string; b: string } | null {
+  const parts = id.split(SEP);
+  if (parts.length < 2) return null;
   return { kind: parts[0] ?? '', a: parts[1] ?? '', b: parts[2] ?? '' };
 }
 
-/** Remaining uncertainty about an attribute, 0..1. */
-export function uncertainty(profile: VoiceProfile, key: string): number {
-  const ev = profile.attributes[key]?.evidence ?? 0;
-  return CONFIDENCE_HALF / (ev + CONFIDENCE_HALF);
+export const conflictQuestionId = (c: Conflict) =>
+  followUpId('conflict', c.positiveClaimId, c.negativeClaimId);
+export const exceptionQuestionId = (ruleClaimId: string, exceptionClaimId: string) =>
+  followUpId('exception', ruleClaimId, exceptionClaimId);
+
+// ── Information gain ───────────────────────────────────────────────────────
+
+export function uncertainty(f: Facts, key: string): number {
+  return CONFIDENCE_HALF / (evidenceOf(f, key) + CONFIDENCE_HALF);
 }
 
-/**
- * Expected information gain: how much uncertainty this question could remove.
- * Title-soliciting questions keep some value even once the attributes they
- * touch are settled, because a named title teaches things no dial can.
- */
-export function expectedGain(q: VoiceQuestion, profile: VoiceProfile): number {
-  let gain = 0;
-  for (const key of q.teaches) gain += uncertainty(profile, key);
-  if (q.teaches.length > 0) gain /= Math.sqrt(q.teaches.length);
-  if (q.solicitsTitle) gain += 0.9 / (1 + profile.titles.length);
-  if (q.teaches.length === 0 && !q.solicitsTitle) gain += 0.35;
-  return gain * q.breadth;
+/** How much a slot could still teach us. Title slots always retain value. */
+export function expectedGain(slot: Slot, f: Facts): number {
+  if (slot.kind === 'titles' || slot.kind === 'open') {
+    // A named title teaches things no dial can, but a fifth one teaches less.
+    return 1.2 / (1 + f.profile.titles.length * 0.5) + 0.3;
+  }
+  if (slot.teaches.length === 0) return 0.5;
+  let g = 0;
+  for (const key of slot.teaches) g += uncertainty(f, key);
+  return g / Math.sqrt(slot.teaches.length);
+}
+
+// ── Follow-up derivation ───────────────────────────────────────────────────
+
+/** Title claims still owed a "why", oldest first. */
+export function pendingWhy(f: Facts, asked: Set<string>): Claim[] {
+  return f.claims.filter(
+    (c) =>
+      c.attribute === null &&
+      c.title &&
+      c.reaction &&
+      !c.unactionable &&
+      !asked.has(followUpId('why', c.id)),
+  );
+}
+
+/** Abandoned titles still owed a "how far did you get". */
+function pendingProgress(f: Facts, asked: Set<string>): Claim[] {
+  return f.claims.filter(
+    (c) =>
+      c.reaction === 'abandoned' &&
+      c.watchedFraction === undefined &&
+      !asked.has(followUpId('dnf_progress', c.id)),
+  );
+}
+
+/** Deal-breakers picked but not yet graded. */
+export function pendingStrength(f: Facts, asked: Set<string>): string[] {
+  const picked = decodeChips(f.answers.dealbreakers ?? '');
+  return picked.filter((v) => !asked.has(followUpId('db_strength', v)));
+}
+
+/** The genre they leaned on hardest that we can go deeper on. */
+export function depthGenre(f: Facts, asked: Set<string>): string | null {
+  const picked = decodeChips(f.answers.genres ?? '');
+  const candidates = picked.filter((v) => GENRE_DEPTH[v] && !asked.has(followUpId('genre_depth', v)));
+  if (candidates.length === 0) return null;
+  // Prefer the one with the most supporting evidence from the titles they named.
+  let best = candidates[0] ?? null;
+  let bestEv = -1;
+  for (const v of candidates) {
+    const chip = GENRE_CHIPS.find((c) => c.value === v);
+    const ev = chip?.attribute ? evidenceOf(f, chip.attribute) : 0;
+    if (ev > bestEv) { bestEv = ev; best = v; }
+  }
+  return best;
+}
+
+// ── Question construction ──────────────────────────────────────────────────
+
+function toQuestion(slot: Slot): VoiceQuestion {
+  return {
+    id: slot.id,
+    stage: slot.stage,
+    stageLabel: STAGE_LABEL[slot.stage],
+    prompt: slot.prompt,
+    kind: slot.kind,
+    teaches: slot.teaches,
+    ...(slot.helper ? { helper: slot.helper } : {}),
+    ...(slot.options ? { options: slot.options } : {}),
+    ...(slot.chips ? { options: chipOptions(slot.chips) } : {}),
+    ...(slot.multi ? { multi: true } : {}),
+    ...(slot.placeholder ? { placeholder: slot.placeholder } : {}),
+    ...(slot.maxTitles ? { maxTitles: slot.maxTitles } : {}),
+    ...(slot.impliedReaction ? { impliedReaction: slot.impliedReaction } : {}),
+    ...(slot.allowFreeText ? { allowFreeText: true } : {}),
+  };
+}
+
+/** The reason vocabulary for a title, chosen by what the reaction was. */
+export function whyChipsFor(claim: Claim, genres?: string[]): readonly ReasonChip[] {
+  switch (claim.reaction) {
+    case 'disliked':
+    case 'hated':
+      return DISLIKE_REASONS;
+    case 'abandoned':
+      return DNF_REASONS;
+    default:
+      return loveReasonsFor(genres);
+  }
+}
+
+function whyPrompt(claim: Claim): string {
+  const t = claim.title?.text ?? 'it';
+  switch (claim.reaction) {
+    case 'disliked':
+    case 'hated':
+      return `What did not work about ${t}?`;
+    case 'abandoned':
+      return `What made you give up on ${t}?`;
+    default:
+      return `What did you love most about ${t}?`;
+  }
+}
+
+function whyQuestion(claim: Claim, genres: string[] | undefined, stage: StageId): VoiceQuestion {
+  const chips = whyChipsFor(claim, genres);
+  return {
+    id: followUpId('why', claim.id),
+    stage,
+    stageLabel: STAGE_LABEL[stage],
+    prompt: whyPrompt(claim),
+    helper: 'Pick everything that applies. Add anything else in your own words.',
+    kind: 'chips',
+    multi: true,
+    allowFreeText: true,
+    isFollowUp: true,
+    options: chipOptions(chips),
+    teaches: chipTeaches(chips),
+    placeholder: 'Anything else?',
+  };
+}
+
+function progressQuestion(claim: Claim): VoiceQuestion {
+  return {
+    id: followUpId('dnf_progress', claim.id),
+    stage: 'abandoned',
+    stageLabel: STAGE_LABEL.abandoned,
+    prompt: `How far into ${claim.title?.text ?? 'it'} did you get?`,
+    helper: 'Bailing in the first ten minutes says more than stopping near the end.',
+    kind: 'choice',
+    isFollowUp: true,
+    options: DNF_PROGRESS.map((p) => ({ value: p.value ?? 'some', label: p.label })),
+    teaches: [],
+  };
+}
+
+function strengthQuestion(dealbreaker: string): VoiceQuestion {
+  const chip = DEALBREAKER_CHIPS.find((c) => c.value === dealbreaker);
+  return {
+    id: followUpId('db_strength', dealbreaker),
+    stage: 'dealbreakers',
+    stageLabel: STAGE_LABEL.dealbreakers,
+    prompt: `${chip?.label ?? dealbreaker} — how bad is it?`,
+    helper: 'Only the first option means never recommend.',
+    kind: 'choice',
+    isFollowUp: true,
+    options: DEALBREAKER_STRENGTHS.map((s) => ({ value: s.value, label: s.label, hint: s.hint })),
+    teaches: chip?.attribute ? [chip.attribute] : [],
+  };
+}
+
+function depthQuestion(genreValue: string): VoiceQuestion {
+  const chips = GENRE_DEPTH[genreValue] ?? [];
+  const label = GENRE_CHIPS.find((c) => c.value === genreValue)?.label ?? genreValue;
+  return {
+    id: followUpId('genre_depth', genreValue),
+    stage: 'genres',
+    stageLabel: STAGE_LABEL.genres,
+    prompt: `You picked ${label.toLowerCase()}. What matters most in one?`,
+    kind: 'chips',
+    multi: true,
+    isFollowUp: true,
+    allowFreeText: true,
+    options: chipOptions(chips),
+    teaches: chipTeaches(chips),
+    placeholder: 'Anything else?',
+  };
 }
 
 function conflictQuestion(c: Conflict): VoiceQuestion {
   return {
     id: conflictQuestionId(c),
+    stage: 'exceptions',
+    stageLabel: STAGE_LABEL.exceptions,
     prompt: c.question,
     helper: 'You told me both. I would rather ask than guess.',
     kind: 'choice',
+    isFollowUp: true,
     options: c.options,
     teaches: [c.attribute],
-    breadth: 2,
-    stage: 'core',
   };
 }
 
-function exceptionConfirmation(ruleAttribute: string, titleText: string, id: string): VoiceQuestion {
+function exceptionQuestion(ruleAttribute: string, titleText: string, id: string): VoiceQuestion {
   return {
     id,
-    prompt: `You avoid ${attributePhrase(ruleAttribute)}, but you liked ${titleText}. Is that an exception?`,
+    stage: 'exceptions',
+    stageLabel: STAGE_LABEL.exceptions,
+    prompt: `You avoid ${attributePhrase(ruleAttribute)}, but ${titleText} worked for you. Is that an exception?`,
     helper: 'I noticed this — you did not say it. Tell me which it is.',
     kind: 'choice',
+    isFollowUp: true,
     options: [
-      { value: 'exception', label: `Yes — ${titleText} is an exception` },
+      { value: 'exception', label: `Yes — ${titleText} is an exception`, hint: 'The rule stands, with a carve-out' },
       { value: 'rule_wrong', label: `No — I do not really avoid ${attributePhrase(ruleAttribute)}` },
       { value: 'title_wrong', label: `No — I did not actually like ${titleText}` },
     ],
     teaches: [ruleAttribute],
-    breadth: 1.8,
-    stage: 'core',
   };
+}
+
+// ── Selection ──────────────────────────────────────────────────────────────
+
+export interface QuestionState extends Facts {
+  asked: string[];
+}
+
+/** Titles the user named, with whatever genres came back from search. */
+export function genresForClaim(state: QuestionState, claim: Claim): string[] | undefined {
+  const id = claim.title?.titleId;
+  if (!id) return undefined;
+  for (const value of Object.values(state.answers)) {
+    if (!value.startsWith('{')) continue;
+    const hit = decodeTitles(value).titles.find((t) => t.titleId === id);
+    if (hit?.genres?.length) return hit.genres;
+  }
+  return undefined;
+}
+
+function mainAskedCount(asked: string[]): number {
+  return asked.filter((id) => !isFollowUp(id)).length;
+}
+
+/** Slots this mode would ask, in stage order. */
+function slotsFor(mode: InterviewMode): Slot[] {
+  const byStage = new Map(STAGE_ORDER.map((s, i) => [s, i]));
+  return SLOTS.filter((s) => mode === 'full' || s.quick).sort(
+    (a, b) => (byStage.get(a.stage) ?? 0) - (byStage.get(b.stage) ?? 0),
+  );
 }
 
 /**
  * The next question, or null when the interview is done.
  *
- * Pending contradictions and unconfirmed exceptions come first and do NOT count
- * against the question budget — resolving them is repair work, not new ground.
+ * Order of business:
+ *   1. contradictions and unstated exceptions — repair before building
+ *   2. follow-ups owed on what was just said — while it is still in mind
+ *   3. the next worthwhile slot in the earliest incomplete stage
  */
 export function nextQuestion(state: QuestionState): VoiceQuestion | null {
   const asked = new Set(state.asked);
 
+  // 1. Repairs.
   for (const c of state.profile.conflicts) {
-    const id = conflictQuestionId(c);
-    if (!asked.has(id)) return conflictQuestion(c);
+    if (!asked.has(conflictQuestionId(c))) return conflictQuestion(c);
   }
-
   for (const e of unconfirmedExceptions(state.profile, state.claims)) {
     const id = exceptionQuestionId(e.ruleClaimId, e.exceptionClaimId);
-    if (asked.has(id)) continue;
-    const titleText = e.title?.text;
-    if (!titleText) continue;
-    return exceptionConfirmation(e.ruleAttribute, titleText, id);
+    if (asked.has(id) || !e.title?.text) continue;
+    return exceptionQuestion(e.ruleAttribute, e.title.text, id);
   }
 
-  const openAsked = state.asked.filter((id) => !isFollowUp(id)).length;
-  if (openAsked >= QUESTION_COUNT[state.mode]) return null;
+  // 2. Follow-ups owed. "How far did you get" comes before "why", because the
+  //    answer changes how much the reasons are worth.
+  for (const claim of pendingProgress(state, asked)) return progressQuestion(claim);
 
-  const remaining = QUESTION_BANK.filter((q) => !asked.has(q.id));
-  if (remaining.length === 0) return null;
-
-  // Stage gating: openings first, closings last, so the interview has a shape
-  // even though the middle is chosen adaptively.
-  const budget = QUESTION_COUNT[state.mode];
-  const allowClosing = openAsked >= budget - 2;
-  // The first question is always an opening one: an interview that starts by
-  // interrogating your position on subtitles does not feel like a conversation.
-  const pool = remaining.filter((q) => {
-    if (openAsked === 0) return q.stage === 'opening';
-    if (q.stage === 'opening') return openAsked < 2;
-    if (q.stage === 'closing') return allowClosing;
-    return true;
-  });
-  const candidates = pool.length > 0 ? pool : remaining;
-
-  let best = candidates[0] ?? null;
-  let bestScore = -Infinity;
-  for (const q of candidates) {
-    const score = expectedGain(q, state.profile) - STAGE_ORDER[q.stage] * 0.001;
-    if (score > bestScore) {
-      bestScore = score;
-      best = q;
+  const whyBudget = MAX_WHY_FOLLOWUPS[state.mode];
+  const whyAsked = state.asked.filter((id) => id.startsWith(`why${SEP}`)).length;
+  if (whyAsked < whyBudget) {
+    const owed = pendingWhy(state, asked)[0];
+    if (owed) {
+      const stage: StageId =
+        owed.reaction === 'abandoned' ? 'abandoned'
+        : owed.reaction === 'disliked' || owed.reaction === 'hated' ? 'dislikes'
+        : 'favourites';
+      return whyQuestion(owed, genresForClaim(state, owed), stage);
     }
   }
-  return best;
+
+  const strengthBudget = MAX_STRENGTH_FOLLOWUPS[state.mode];
+  const strengthAsked = state.asked.filter((id) => id.startsWith(`db_strength${SEP}`)).length;
+  if (strengthAsked < strengthBudget) {
+    const owed = pendingStrength(state, asked)[0];
+    if (owed) return strengthQuestion(owed);
+  }
+
+  const depth = depthGenre(state, asked);
+  if (depth) return depthQuestion(depth);
+
+  // 3. The next slot worth asking.
+  if (mainAskedCount(state.asked) >= MAIN_COUNT[state.mode]) return null;
+
+  for (const slot of slotsFor(state.mode)) {
+    if (asked.has(slot.id)) continue;
+    if (slot.relevantWhen && !slot.relevantWhen(state)) continue;
+    // Already covered? Skip it — an interview that asks what it knows is a form.
+    if (!slot.required && expectedGain(slot, state) < GAIN_FLOOR) continue;
+    return toQuestion(slot);
+  }
+
+  return null;
 }
 
-/** Where the user is, for the progress indicator. */
-export function progress(state: QuestionState): { asked: number; total: number; pendingRepairs: number } {
-  const openAsked = state.asked.filter((id) => !isFollowUp(id)).length;
-  const askedSet = new Set(state.asked);
-  const pendingRepairs =
-    state.profile.conflicts.filter((c) => !askedSet.has(conflictQuestionId(c))).length +
+export interface Progress {
+  /** Main questions answered, capped at the budget. */
+  asked: number;
+  total: number;
+  /** Follow-ups and repairs still owed. */
+  pending: number;
+  /** Where we are on the progress rail. */
+  stageLabel: string;
+  stageIndex: number;
+  stageCount: number;
+}
+
+export function progress(state: QuestionState): Progress {
+  const q = nextQuestion(state);
+  const label = q?.stageLabel ?? 'Review';
+  const asked = new Set(state.asked);
+  const pending =
+    state.profile.conflicts.filter((c) => !asked.has(conflictQuestionId(c))).length +
     unconfirmedExceptions(state.profile, state.claims).filter(
-      (e) => !askedSet.has(exceptionQuestionId(e.ruleClaimId, e.exceptionClaimId)),
-    ).length;
-  return { asked: Math.min(openAsked, QUESTION_COUNT[state.mode]), total: QUESTION_COUNT[state.mode], pendingRepairs };
+      (e) => !asked.has(exceptionQuestionId(e.ruleClaimId, e.exceptionClaimId)),
+    ).length +
+    pendingWhy(state, asked).length +
+    pendingStrength(state, asked).length;
+
+  return {
+    asked: Math.min(mainAskedCount(state.asked), MAIN_COUNT[state.mode]),
+    total: MAIN_COUNT[state.mode],
+    pending,
+    stageLabel: label,
+    stageIndex: Math.max(0, PROGRESS_LABELS.indexOf(label)),
+    stageCount: PROGRESS_LABELS.length,
+  };
 }
 
-/** Look up a bank question by id (follow-ups are not in the bank). */
-export function bankQuestion(id: string): VoiceQuestion | undefined {
-  return QUESTION_BANK.find((q) => q.id === id);
+/**
+ * The chip vocabulary a given question was asked with, so an answer can be
+ * mapped back to attributes. Returns null for questions that are not chip-based
+ * (`db_strength` and `dnf_progress` carry their own vocabularies).
+ */
+export function chipsForQuestionId(
+  state: QuestionState,
+  id: string,
+): readonly ReasonChip[] | null {
+  const fu = parseFollowUpId(id);
+  if (fu) {
+    if (fu.kind === 'why') {
+      const claim = state.claims.find((c) => c.id === fu.a);
+      if (!claim) return null;
+      return whyChipsFor(claim, genresForClaim(state, claim));
+    }
+    if (fu.kind === 'genre_depth') return GENRE_DEPTH[fu.a] ?? null;
+    return null;
+  }
+  return slot(id)?.chips ?? null;
+}
+
+/** Look a main slot up by id. Follow-ups are constructed, not stored. */
+export function slot(id: string): Slot | undefined {
+  return SLOTS.find((s) => s.id === id);
 }

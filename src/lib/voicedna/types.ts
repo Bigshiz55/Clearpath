@@ -118,6 +118,20 @@ export interface Claim {
   contrasts?: string[];
   /** Set by review when the user corrects or confirms us. */
   reviewed?: boolean;
+  /**
+   * A NEVER-RECOMMEND line, not merely a strong dislike. Only ever set when the
+   * user picks it explicitly — inferring one from a negative answer is exactly
+   * the mistake that makes a recommender feel punitive.
+   */
+  hardExclusion?: boolean;
+  /**
+   * The user told us something real that we cannot turn into a filter ("the
+   * acting was great"). Recorded and shown back, weighted at zero, so we
+   * neither drop it silently nor pretend it steers anything.
+   */
+  unactionable?: boolean;
+  /** How much of a series they actually watched, for abandoned titles. */
+  watchedFraction?: 'barely' | 'some' | 'most';
 }
 
 /** A named carve-out: a general rule that a specific title or condition escapes. */
