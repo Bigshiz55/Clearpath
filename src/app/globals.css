@@ -262,13 +262,22 @@ body {
 .wv-quiz-legend .wv-quiz-ico { color: #fff; }
 /* 2×2 on phones. In short landscape the four equal buttons collapse to a single
    equal row so the whole card still fits without scrolling — never uneven. */
-/* THREE actions, not four. A 2×2 grid with one cell removed left a visible
-   hole where Save used to be; three equal columns keep the row balanced and
-   every target the same weight, which is the point — no action should look
-   more "default" than the others. */
+/* THREE primary actions. A 2×2 grid with one cell removed left a visible hole
+   where Save used to be; three equal columns keep the row balanced and every
+   target the same weight — no action should look more "default" than another. */
 .wv-quiz-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+/* FOUR ratings — a separate grid on purpose.
+   These two rows have different arities, and sharing one class meant narrowing
+   the primary row to three columns also narrowed this one, orphaning "Didn't
+   Like It" onto its own line and wrapping its label. Four items want 2×2 on a
+   phone and a single row of four once there is width for it. */
+.wv-rate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
 }
 /* The hero poster must always be substantial — never the collapsed thumbnail iOS
@@ -290,12 +299,19 @@ body {
   .wv-quiz-title { font-size: 1rem; line-height: 1.15; }
   .wv-quiz-meta { font-size: 0.6875rem; margin-top: 0; }
   .wv-title-in { gap: 0.25rem; }
+  /* Small phones only: a 14dvh floor instead of 18dvh. The poster keeps its
+     aspect ratio (this is a min-height, not a fixed size) and stays clearly
+     recognisable — it is the last ~30px needed to keep the metadata line off
+     the action row once the title wraps. Larger phones, tablets and desktop
+     are untouched. */
+  .wv-quiz-poster { min-height: clamp(64px, 14dvh, 240px); }
 }
 @media (max-width: 360px) {
   .wv-quiz-title { -webkit-line-clamp: 1; }
 }
 @media (max-height: 520px) {
   .wv-quiz-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .wv-rate-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   /* Short/landscape viewports: a smaller guaranteed minimum so the whole tile
      still fits a wide, short screen without needing to scroll. */
   .wv-quiz-poster { min-height: 4.5rem; }

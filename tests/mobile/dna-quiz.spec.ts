@@ -216,22 +216,8 @@ for (const { w, h } of LANDSCAPE) {
  * floor the metadata line ended up UNDERNEATH the buttons. Every prior layout
  * test passed — none of them checked for collision, only for overflow.
  */
-for (const w of [320, 375, 390, 430]) {
-  // KNOWN DEFECT at 320 and 375, recorded rather than hidden.
-  //
-  // At those widths the title wraps and the metadata line collides with the
-  // action row. The obvious lever — shrinking the poster — is blocked: an
-  // existing guard in responsive.spec.ts requires the poster stay ≥17dvh,
-  // because collapsing it to a thumbnail was a previous regression. Reducing
-  // the title block recovered some height but not enough at these two widths.
-  //
-  // Removing Save has already IMPROVED this (three buttons on one row are
-  // ~56px shorter than the old 2×2 grid), so the current state is strictly
-  // better than what shipped. Resolving it properly needs a deliberate
-  // decision about the poster floor on small phones, which is a design call
-  // rather than a safe unilateral fix.
-  const known = w === 320 || w === 375;
-  (known ? test.fixme : test)(`(layout) nothing overlaps the action row @${w}`, async ({ page }) => {
+for (const w of [320, 360, 375, 390, 430]) {
+  test(`(layout) nothing overlaps the action row @${w}`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: 568 });
     await page.goto('/dev/dna-quiz', { waitUntil: 'networkidle' });
     const collision = await page.evaluate(() => {
@@ -246,5 +232,40 @@ for (const w of [320, 375, 390, 430]) {
         .map((x) => x.t);
     });
     expect(collision, `overlapping the buttons @${w}`).toEqual([]);
+  });
+}
+
+/**
+ * The rating row has FOUR options and the action row has THREE.
+ *
+ * They shared one grid class, so narrowing the action row to three columns
+ * silently narrowed this one too — orphaning "Didn't Like It" onto its own line
+ * and wrapping its label. Different arities, different grids.
+ */
+for (const [label, w, h] of [['phone', 390, 844], ['tablet', 820, 1180], ['desktop', 1440, 900]] as const) {
+  test(`(layout) the rating row is balanced @${label}`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto('/dev/dna-quiz', { waitUntil: 'networkidle' });
+    await page.getByTestId('act-seen').click();
+    await expect(page.getByTestId('rating-step')).toBeVisible();
+
+    const boxes = await page.evaluate(() =>
+      Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="rate-"]'))
+        .filter((el) => el.dataset.testid !== 'rate-back')
+        .map((el) => { const r = el.getBoundingClientRect();
+          return { y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height),
+                   wrapped: el.scrollHeight > el.clientHeight + 1 }; }));
+
+    expect(boxes).toHaveLength(4);
+    // No orphan: four items divide evenly into whole rows (4×1 or 2×2).
+    const rows = new Map<number, number>();
+    for (const b of boxes) rows.set(b.y, (rows.get(b.y) ?? 0) + 1);
+    const perRow = [...rows.values()];
+    expect(new Set(perRow).size, `uneven rows @${label}: ${perRow.join('/')}`).toBe(1);
+
+    // Equal size, and no label clipped by its own button.
+    const ws = boxes.map((b) => b.w);
+    expect(Math.max(...ws) - Math.min(...ws), `equal widths @${label}`).toBeLessThanOrEqual(1);
+    for (const b of boxes) expect(b.wrapped, `label clipped @${label}`).toBe(false);
   });
 }

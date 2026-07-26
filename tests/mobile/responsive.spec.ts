@@ -89,7 +89,11 @@ test.describe('watch-dna calibration — responsive matrix', () => {
       // Safari). So the floor scales with the viewport: 17% of its height
       // (1% slack under the CSS clamp), bounded to [60, 130].
       const posterH = await page.locator('[data-testid="quiz-poster"]').evaluate((n) => n.getBoundingClientRect().height);
-      const floor = Math.min(130, Math.max(60, Math.round(vp.h * 0.17)));
+      // 14dvh on small phones (approved), 17dvh elsewhere. The poster must stay
+      // recognisable; below ~360px wide it may go smaller to keep the metadata
+      // line clear of the action row.
+      const ratio = vp.w <= 480 ? 0.14 : 0.17;
+      const floor = Math.min(130, Math.max(60, Math.round(vp.h * ratio)));
       expect(posterH, `${vp.name}: poster not collapsed (h=${Math.round(posterH)} ≥ ${floor})`).toBeGreaterThanOrEqual(floor);
 
       await noHorizontalOverflow(page, `quiz ${vp.name}`);

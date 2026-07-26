@@ -449,7 +449,7 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
               <span className="text-xs font-semibold text-slate-200">How was it?</span>
               <button onClick={() => setMode('primary')} className="text-xs font-semibold text-slate-300" data-testid="rate-back">← Back</button>
             </div>
-            <div className="wv-quiz-grid" role="group" aria-label="Rate this title">
+            <div className="wv-rate-grid" role="group" aria-label="Rate this title">
               {RATINGS.map((r) => (
                 <button key={r.key} onClick={() => onRate(r.key)} className={`wv-quiz-btn ${r.cls}`} data-testid={r.testid}>
                   <span aria-hidden className="wv-quiz-emoji">{r.emoji}</span>{r.label}
