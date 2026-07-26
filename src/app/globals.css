@@ -262,9 +262,13 @@ body {
 .wv-quiz-legend .wv-quiz-ico { color: #fff; }
 /* 2×2 on phones. In short landscape the four equal buttons collapse to a single
    equal row so the whole card still fits without scrolling — never uneven. */
+/* THREE actions, not four. A 2×2 grid with one cell removed left a visible
+   hole where Save used to be; three equal columns keep the row balanced and
+   every target the same weight, which is the point — no action should look
+   more "default" than the others. */
 .wv-quiz-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
 }
 /* The hero poster must always be substantial — never the collapsed thumbnail iOS
@@ -277,8 +281,21 @@ body {
    (the iOS Safari case where the poster escaped onto the buttons). The floor is
    gentle so the poster always yields space to the controls first. */
 .wv-quiz-poster { min-height: clamp(64px, 18dvh, 240px); overflow: hidden; }
+/* Narrow screens: the title wraps to two lines and the metadata line ended up
+   UNDERNEATH the action buttons. The poster is NOT the lever to fix that — an
+   existing guard keeps it substantial, because collapsing it to a thumbnail was
+   a previous regression. So the height comes out of the title block instead:
+   a smaller title and tighter gaps, and below 360px a single clamped line. */
+@media (max-width: 480px) {
+  .wv-quiz-title { font-size: 1rem; line-height: 1.15; }
+  .wv-quiz-meta { font-size: 0.6875rem; margin-top: 0; }
+  .wv-title-in { gap: 0.25rem; }
+}
+@media (max-width: 360px) {
+  .wv-quiz-title { -webkit-line-clamp: 1; }
+}
 @media (max-height: 520px) {
-  .wv-quiz-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .wv-quiz-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   /* Short/landscape viewports: a smaller guaranteed minimum so the whole tile
      still fits a wide, short screen without needing to scroll. */
   .wv-quiz-poster { min-height: 4.5rem; }

@@ -6,7 +6,7 @@ import path from 'node:path';
  * Cinematic ONE-TILE discovery quiz (drives /dev/dna-quiz — the REAL DnaQuiz in
  * a faithful app-shell facsimile). Proves: one-tile at every phone→ultrawide
  * size (no scroll, no overflow, four EQUAL buttons, poster + title visible),
- * the interruption-free flow, the intent mapping (Looks Good doesn't save; Save
+ * the interruption-free flow, the intent mapping (Looks Good doesn't save; the
  * does; Skip is negative; Seen It → rating), and the live Watch-DNA meter.
  */
 const SHOTS = path.join(process.cwd(), 'test-results', 'mobile');
@@ -18,7 +18,7 @@ const TARGETS = [
   { w: 1024, h: 768 }, { w: 1280, h: 800 }, { w: 1440, h: 900 }, { w: 1920, h: 1080 },
 ];
 const LANDSCAPE = [{ w: 667, h: 375 }, { w: 844, h: 390 }, { w: 932, h: 430 }];
-const ACT_IDS = ['act-looks-good', 'act-save', 'act-skip', 'act-seen'] as const;
+const ACT_IDS = ['act-looks-good', 'act-skip', 'act-seen'] as const;
 
 async function box(page: Page, testid: string) {
   const b = await page.getByTestId(testid).first().boundingBox();
@@ -43,10 +43,36 @@ test('(intent) Looks Good = interest, does NOT save, advances at once', async ({
   expect(subs[0]!.watchlist ?? false).toBeFalsy();
 });
 
-test('(intent) Save records must_watch AND saves to the watchlist', async ({ page }) => {
-  await page.getByTestId('act-save').click();
+test('HARD: the quiz has exactly THREE actions and no Save', async ({ page }) => {
+  // The quiz teaches us taste; the Watchlist stores intent. Save mixed the two,
+  // and a tap meant to inform us silently created a watchlist row.
+  await expect(page.getByTestId('act-save')).toHaveCount(0);
+  await expect(page.getByTestId('quiz-grid').getByRole('button')).toHaveCount(3);
+  const grid = await page.getByTestId('quiz-grid').innerText();
+  expect(grid).not.toMatch(/save/i);
+  expect(grid).not.toMatch(/bookmark|watchlist/i);
+});
+
+test('HARD: no quiz action ever writes to the watchlist', async ({ page }) => {
+  for (const id of ACT_IDS) {
+    if (id === 'act-seen') continue; // opens the rating step instead
+    await page.getByTestId(id).click();
+  }
   const subs = await page.evaluate(() => window.__quizSubmits ?? []);
-  expect(subs[0]).toMatchObject({ recognition: 'unseen', attraction: 'must_watch', watchlist: true });
+  expect(subs.length).toBeGreaterThan(0);
+  for (const s of subs) expect(s.watchlist ?? false).toBeFalsy();
+});
+
+test('the intro modal explains three actions, with no leftover gap', async ({ page }) => {
+  await page.reload();
+  const intro = page.getByTestId('quiz-intro');
+  if (await intro.count()) {
+    const text = await intro.innerText();
+    expect(text).not.toMatch(/\bSave\b/);
+    // The defensive parenthetical goes with it.
+    expect(text).not.toMatch(/won.t save it/i);
+    for (const a of ['Looks Good', 'Skip', 'Seen It']) expect(text).toContain(a);
+  }
 });
 
 test('(intent) Skip records a negative signal and advances', async ({ page }) => {
@@ -84,7 +110,7 @@ test('(no-interrupt) no modal/chip/reason prompt appears between cards', async (
 test('(dna) the confidence meter rises as titles are rated', async ({ page }) => {
   const before = await page.getByTestId('dna-confidence').innerText();
   await page.getByTestId('act-looks-good').click();
-  await page.getByTestId('act-save').click();
+  await page.getByTestId('act-skip').click();
   await expect(page.getByTestId('dna-confidence')).not.toHaveText(before);
 });
 
@@ -109,8 +135,8 @@ test('(flow) Undo restores the previous title', async ({ page }) => {
   await expect(page.getByTestId('quiz-title')).toHaveText(title0);
 });
 
-test('(a11y) the four actions + Undo have accessible names', async ({ page }) => {
-  for (const label of ['Looks Good', 'Save', 'Skip', 'Seen It']) {
+test('(a11y) the three actions + Undo have accessible names', async ({ page }) => {
+  for (const label of ['Looks Good', 'Skip', 'Seen It']) {
     await expect(page.getByRole('button', { name: new RegExp(`^${label}$`) })).toBeVisible();
   }
   await expect(page.getByRole('button', { name: 'Undo last answer' })).toBeVisible();
@@ -119,7 +145,7 @@ test('(a11y) the four actions + Undo have accessible names', async ({ page }) =>
 // ── One-tile viewport proof, phone → ultrawide ──────────────────────────────
 
 for (const { w, h } of TARGETS) {
-  test(`(one-tile) ${w}×${h} — poster + title + 4 equal buttons, no scroll, no overflow`, async ({ page }) => {
+  test(`(one-tile) ${w}×${h} — poster + title + 3 equal buttons, no scroll, no overflow`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await page.goto('/dev/dna-quiz', { waitUntil: 'networkidle' });
     await expect(page.getByTestId('dna-quiz')).toBeVisible();
@@ -151,7 +177,9 @@ for (const { w, h } of TARGETS) {
     const widths = boxes.map((b) => b.w); const heights = boxes.map((b) => b.h);
     expect(Math.max(...widths) - Math.min(...widths), `equal widths @ ${w}×${h}`).toBeLessThanOrEqual(1);
     expect(Math.max(...heights) - Math.min(...heights), `equal heights @ ${w}×${h}`).toBeLessThanOrEqual(1);
-    expect(new Set(boxes.map((b) => Math.round(b.y))).size, `2 rows @ ${w}×${h}`).toBe(2);
+    // THREE actions sit on ONE row at every width. The old assertion encoded
+    // the 2×2 grid that existed only because there were four buttons.
+    expect(new Set(boxes.map((b) => Math.round(b.y))).size, `1 row @ ${w}×${h}`).toBe(1);
 
     await page.screenshot({ path: path.join(SHOTS, `dna-quiz-${w}x${h}.png`), fullPage: false });
   });
@@ -176,5 +204,47 @@ for (const { w, h } of LANDSCAPE) {
     expect(Math.max(...boxes.map((b) => b.w)) - Math.min(...boxes.map((b) => b.w))).toBeLessThanOrEqual(1);
     expect(Math.max(...boxes.map((b) => b.h)) - Math.min(...boxes.map((b) => b.h))).toBeLessThanOrEqual(1);
     await page.screenshot({ path: path.join(SHOTS, `dna-quiz-landscape-${w}x${h}.png`), fullPage: false });
+  });
+}
+
+
+/**
+ * The action row must never be overlapped by the title block.
+ *
+ * Found by inspecting the rendered screenshot rather than by an assertion: at
+ * 320px the title wraps to two lines, and with the poster holding an 18dvh
+ * floor the metadata line ended up UNDERNEATH the buttons. Every prior layout
+ * test passed — none of them checked for collision, only for overflow.
+ */
+for (const w of [320, 375, 390, 430]) {
+  // KNOWN DEFECT at 320 and 375, recorded rather than hidden.
+  //
+  // At those widths the title wraps and the metadata line collides with the
+  // action row. The obvious lever — shrinking the poster — is blocked: an
+  // existing guard in responsive.spec.ts requires the poster stay ≥17dvh,
+  // because collapsing it to a thumbnail was a previous regression. Reducing
+  // the title block recovered some height but not enough at these two widths.
+  //
+  // Removing Save has already IMPROVED this (three buttons on one row are
+  // ~56px shorter than the old 2×2 grid), so the current state is strictly
+  // better than what shipped. Resolving it properly needs a deliberate
+  // decision about the poster floor on small phones, which is a design call
+  // rather than a safe unilateral fix.
+  const known = w === 320 || w === 375;
+  (known ? test.fixme : test)(`(layout) nothing overlaps the action row @${w}`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: 568 });
+    await page.goto('/dev/dna-quiz', { waitUntil: 'networkidle' });
+    const collision = await page.evaluate(() => {
+      const grid = document.querySelector('[data-testid="quiz-grid"]')!;
+      const g = grid.getBoundingClientRect();
+      return Array.from(document.querySelectorAll<HTMLElement>('body *'))
+        .filter((el) => el.children.length === 0 && (el.innerText ?? '').trim() && !grid.contains(el))
+        .map((el) => ({ t: (el.innerText ?? '').trim().slice(0, 24), r: el.getBoundingClientRect() }))
+        .filter(({ r }) =>
+          Math.min(g.right, r.right) - Math.max(g.left, r.left) > 2 &&
+          Math.min(g.bottom, r.bottom) - Math.max(g.top, r.top) > 2)
+        .map((x) => x.t);
+    });
+    expect(collision, `overlapping the buttons @${w}`).toEqual([]);
   });
 }

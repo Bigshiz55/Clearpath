@@ -95,9 +95,17 @@ const ICONS = {
   ),
 } as const;
 
+/**
+ * THREE actions. Save is deliberately absent.
+ *
+ * The quiz exists to learn taste; the Watchlist stores viewing intent. Mixing
+ * them made "Looks Good" and "Save" compete for the same reaction, and a tap
+ * meant to teach us something silently created a watchlist record. Saving lives
+ * on search results, title pages, recommendation cards and On TV — everywhere a
+ * user is actually deciding what to watch, rather than telling us who they are.
+ */
 const PRIMARY = {
   looksGood: { label: 'Looks Good', icon: ICONS.star, cls: 'wv-quiz-btn--liked', testid: 'act-looks-good' },
-  save: { label: 'Save', icon: ICONS.bookmark, cls: 'wv-quiz-btn--gold', testid: 'act-save' },
   skip: { label: 'Skip', icon: ICONS.skip, cls: 'wv-quiz-btn--nope', testid: 'act-skip' },
   seen: { label: 'Seen It', icon: ICONS.eye, cls: 'wv-quiz-btn--seen', testid: 'act-seen' },
 } as const;
@@ -284,7 +292,6 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
   );
 
   const onLooksGood = useCallback(() => void send({ recognition: 'unseen', attraction: 'interested' }), [send]);
-  const onSave = useCallback(() => void send({ recognition: 'unseen', attraction: 'must_watch', watchlist: true }), [send]);
   const onSkip = useCallback(() => void send({ recognition: 'unseen', attraction: 'not_interested' }), [send]);
   const onRate = useCallback((r: QuizRating) => void send({ recognition: 'seen', rating: r }), [send]);
 
@@ -416,21 +423,18 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
             )}
           </div>
           <div className="shrink-0">
-            <div data-testid="quiz-title" className="line-clamp-2 text-center text-lg font-black leading-tight text-white drop-shadow">{current.title}</div>
-            <div className="mt-0.5 text-center text-xs font-medium text-slate-300">
+            <div data-testid="quiz-title" className="wv-quiz-title line-clamp-2 text-center text-lg font-black leading-tight text-white drop-shadow">{current.title}</div>
+            <div className="wv-quiz-meta mt-0.5 text-center text-xs font-medium text-slate-300">
               {[current.year, current.mediaType === 'tv' ? 'TV' : 'Movie', current.genre].filter(Boolean).join(' · ')}
             </div>
           </div>
         </div>
 
-        {/* 4 · Four equal buttons — actions, or the "Seen it" rating step */}
+        {/* 4 · Three equal actions, or the "Seen it" rating step */}
         {mode === 'primary' ? (
           <div className="wv-quiz-grid shrink-0" data-testid="quiz-grid" role="group" aria-label="What do you think of this title?">
             <button onClick={onLooksGood} className={`wv-quiz-btn ${PRIMARY.looksGood.cls}`} data-testid={PRIMARY.looksGood.testid}>
               <span aria-hidden className="wv-quiz-ico">{PRIMARY.looksGood.icon}</span>{PRIMARY.looksGood.label}
-            </button>
-            <button onClick={onSave} className={`wv-quiz-btn ${PRIMARY.save.cls}`} data-testid={PRIMARY.save.testid}>
-              <span aria-hidden className="wv-quiz-ico">{PRIMARY.save.icon}</span>{PRIMARY.save.label}
             </button>
             <button onClick={onSkip} className={`wv-quiz-btn ${PRIMARY.skip.cls}`} data-testid={PRIMARY.skip.testid}>
               <span aria-hidden className="wv-quiz-ico">{PRIMARY.skip.icon}</span>{PRIMARY.skip.label}
@@ -484,10 +488,9 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
                 {cal.showQuizProgress ? `${cal.total} quick titles — one tap each. ` : ''}Two things move: <span className="font-semibold text-brand-200">Quiz Progress</span> (how far along) and <span className="font-semibold text-emerald-300">DNA Confidence</span> (how well we know you).
               </p>
               <ul className="mt-5 space-y-3">
-                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--liked"><span className="wv-quiz-ico">{ICONS.star}</span> Looks Good</span><span className="text-base text-slate-200">Caught your eye <span className="text-slate-400">(won’t save it)</span></span></li>
-                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--gold"><span className="wv-quiz-ico">{ICONS.bookmark}</span> Save</span><span className="text-base text-slate-200">You want to watch it</span></li>
+                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--liked"><span className="wv-quiz-ico">{ICONS.star}</span> Looks Good</span><span className="text-base text-slate-200">Caught your eye</span></li>
                 <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--nope"><span className="wv-quiz-ico">{ICONS.skip}</span> Skip</span><span className="text-base text-slate-200">Not for you</span></li>
-                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--seen"><span className="wv-quiz-ico">{ICONS.eye}</span> Seen It</span><span className="text-base text-slate-200">Already watched — rate it</span></li>
+                <li className="flex items-center gap-3"><span className="wv-quiz-legend wv-quiz-btn--seen"><span className="wv-quiz-ico">{ICONS.eye}</span> Seen It</span><span className="text-base text-slate-200">Already watched — give it a quick rating</span></li>
               </ul>
               <button onClick={dismissIntro} className="btn-primary mt-6 w-full py-3.5 text-lg" data-testid="quiz-intro-dismiss">Got it — let’s go</button>
             </div>

@@ -6,7 +6,6 @@ import { recordEvents, undoEvent } from '@/lib/preference/store';
 import { getCachedDimensions } from '@/lib/titleDimensions';
 import { quizAnswerToEvent, legacyRatingFor, type QuizAnswer } from '@/lib/preference/quizMap';
 import { rateQuizTitle } from '@/lib/actions/quiz';
-import { addToWatchlist } from '@/lib/actions/watchlist';
 
 /**
  * The ONE write path from the redesigned two-step quiz into the real Watch DNA
@@ -26,7 +25,12 @@ const schema = z.object({
   rating: z.enum(['loved', 'liked', 'okay', 'disliked', 'hated']).optional(),
   /** Pre-watch intent for unseen titles (Looks Good / Add to Watchlist / Not Interested). */
   attraction: z.enum(['must_watch', 'interested', 'maybe_interested', 'not_interested', 'absolutely_not']).optional(),
-  /** Strong intent: also save the title to the high-intent watchlist. */
+  /**
+   * DEPRECATED and inert. The quiz no longer has a Save action, so nothing
+   * sends this. Kept in the schema (rather than removed) so an old client still
+   * in a browser tab cannot fail validation mid-session — but it is ignored, so
+   * a stale client can no longer create watchlist rows from a quiz tap.
+   */
   watchlist: z.boolean().optional(),
   dnf: z.boolean().optional(),
   reasons: z.array(z.string().max(40)).max(6).optional(),
@@ -91,18 +95,11 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
     }).catch(() => {});
   }
 
-  // 3) Strong intent ("Add to Watchlist") ALSO saves to the high-intent list.
-  //    "Looks Good" never does — the watchlist stays a deliberate list.
-  if (a.watchlist) {
-    await addToWatchlist({
-      tmdbId: a.tmdbId,
-      mediaType: a.mediaType,
-      title: a.title,
-      year: a.year ?? null,
-      posterPath: a.posterPath ?? null,
-      status: 'strict',
-    }).catch(() => {});
-  }
+  // 3) The quiz used to write a watchlist row for its Save action. That branch
+  //    is GONE, not disabled: saving is a decision about what to watch, and the
+  //    quiz is about who you are. `a.watchlist` is accepted by the schema so a
+  //    stale client mid-session still validates, but it is read by nothing —
+  //    which is what stops an old tab creating watchlist rows from quiz taps.
 
   return { ok: true };
 }
