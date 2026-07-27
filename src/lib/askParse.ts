@@ -4,6 +4,7 @@ import type { FinderQuery } from '@/lib/finder';
 import { EMPTY_QUERY } from '@/lib/finderParse';
 import { genreIdFromName } from '@/lib/finderGenres';
 import { searchPeople, searchKeywords } from '@/lib/tmdb/client';
+import { DEFAULT_RESULT_COUNT, MAX_REQUESTED_COUNT } from '@/lib/nlu/count';
 
 /**
  * Turn a free-form ask into structured search filters using the LLM — so the
@@ -61,7 +62,7 @@ Fields:
 - pace: 0 (slow burn) to 100 (fast/adrenaline). Infer from vibe: "slow-burn/meditative/quiet/atmospheric" -> ~15; "cozy/comfort/easy" -> ~35; "fast-paced/edge-of-your-seat/relentless/pulse-pounding" -> ~90.
 - similarTo: a single reference TITLE if they compare ("like Succession", "in the vein of Fargo") — the show/movie name only.
 - people: array of actor/director names mentioned
-- count: number of results requested ("five" -> 5)
+- count: how many RESULTS they asked for ("give me five movies" -> 5). ONLY set this when the number counts the titles they want back. A number attached to anything else is NOT a count: "under two hours" is a runtime, "the last 3 years" is a date window, "8/10 or better" is a rating, "3 seasons" is a length. If they did not say how many to return, OMIT this field.
 
 INFERENCE RULES:
 - "like Succession but a movie" -> {"mediaType":"movie","similarTo":"Succession","keywords":["corporate","family drama"],"genres":["drama"]}
@@ -121,7 +122,14 @@ async function toQuery(raw: RawAi): Promise<AiAsk> {
     }
   }
 
-  const limit = typeof raw.count === 'number' && raw.count >= 1 && raw.count <= 20 ? Math.round(raw.count) : 8;
+  // A stated count wins; otherwise it is a browse and gets a full page. The
+  // fallback here used to be a literal 8 — the AI parser is the live path for
+  // every free-text ask, so that 8 was the real result limit of the product no
+  // matter what `DEFAULT_RESULT_LIMIT` said.
+  const limit =
+    typeof raw.count === 'number' && raw.count >= 1 && raw.count <= MAX_REQUESTED_COUNT
+      ? Math.round(raw.count)
+      : DEFAULT_RESULT_COUNT;
   const similarTo = typeof raw.similarTo === 'string' && raw.similarTo.trim() ? raw.similarTo.trim() : undefined;
   return { query: q, limit, similarTo };
 }

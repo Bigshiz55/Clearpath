@@ -13,6 +13,16 @@ import { tileRatingsFromScore, type TileRatings } from '@/lib/ratings';
 import type { PersonalContext } from '@/lib/scoring/personal';
 import type { TitleMetadata } from '@/lib/types';
 import { buildItemExplanation, assembleHousehold, type VerdictExplanation, type HouseholdVerdict } from '@/lib/finderExplain';
+import {
+  candidateTarget,
+  discoverPages,
+  enoughSurvivors,
+  mapPool,
+  waves,
+  HYDRATE_CONCURRENCY,
+  WAVE_SIZE,
+} from '@/lib/finderPool';
+import { DEFAULT_RESULT_COUNT, MAX_REQUESTED_COUNT } from '@/lib/nlu/count';
 
 const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
 const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
@@ -120,7 +130,13 @@ export interface FinderResult {
   total: number;
 }
 
-const CANDIDATE_CAP = 16;
+/**
+ * There is no fixed candidate cap any more. There was — 16, unrelated to the
+ * requested limit — which made it the real ceiling on every search in the app:
+ * a browse could not return more than sixteen titles, and after the hard
+ * filters it returned about eight. Pool size now follows the ask; see
+ * `finderPool.ts` for the sizing and the bounds that keep the fan-out sane.
+ */
 
 function fmtRuntime(min: number | null): string | null {
   if (!min) return null;
@@ -139,17 +155,19 @@ function fmtRuntime(min: number | null): string | null {
 /**
  * How many results a browse-style query returns.
  *
- * This was 8, with a hard ceiling of 20. Eight is a answer-shaped number: it
- * reads as "here is my pick and a few alternates", not as a catalog you can
- * browse. "What's on Netflix tonight?" is a browsing request against thousands
- * of titles, and it was being answered with eight of them.
+ * Eight is an answer-shaped number: it reads as "here is my pick and a few
+ * alternates", not as a catalogue you can browse. "Movies under two hours" is a
+ * browsing request against thousands of titles, and it was being answered with
+ * eight of them.
  *
- * 24 fills a responsive grid at every breakpoint (2/3/4/6 columns) and clears
- * the 20-per-page product target; the ceiling leaves room for an explicit
- * larger ask without unbounding the TMDB fan-out behind it.
+ * These constants USED TO SAY 24 while the live path still said 8 in two other
+ * files, so raising them here changed nothing anybody could see. They now come
+ * from the one place the count parsers read too, and the pool below is sized
+ * from the limit rather than from a fixed 16 — the three ceilings that each,
+ * independently, capped the product at about eight results.
  */
-export const DEFAULT_RESULT_LIMIT = 24;
-export const MAX_RESULT_LIMIT = 60;
+export const DEFAULT_RESULT_LIMIT = DEFAULT_RESULT_COUNT;
+export const MAX_RESULT_LIMIT = MAX_REQUESTED_COUNT;
 export async function runFinder(
   supabase: SupabaseClient,
   userId: string,
@@ -204,10 +222,13 @@ export async function runFinder(
       .map((r) => `${r.media_type}-${r.tmdb_id}`),
   );
 
-  // Pull candidates per type (two pages for depth).
+  // Pull candidates per type. Depth follows the ask: a request for 24 results
+  // needs a pool several times that size, because hard filters below kill
+  // candidates AFTER hydration. Two fixed pages could never fill a grid.
+  const pages = discoverPages(limit, types.length);
   const pools = await Promise.all(
     types.flatMap((mt) =>
-      [1, 2].map((page) =>
+      pages.map((page) =>
         discoverTitles(mt, {
           genreIds: q.genreIds,
           providerIds:
@@ -248,146 +269,164 @@ export async function runFinder(
       candMap.set(key, { id: c.id, mediaType: c.mediaType });
     }
   }
-  const candidates = Array.from(candMap.values()).slice(0, CANDIDATE_CAP);
+  const candidates = Array.from(candMap.values()).slice(0, candidateTarget(limit));
 
-  // Hydrate + score + hard-filter each candidate.
-  const scored = await Promise.all(
-    candidates.map(async ({ id, mediaType }) => {
-      try {
-        const { meta, providers } = await getScoringData(mediaType, id, region);
-        const report = buildVerdict({
-          meta,
-          providers,
-          personal: { ...basePersonal, collectionId: null },
-        });
+  // Hydrate + score + hard-filter one candidate. Returns null when it fails any
+  // hard constraint — which is most of why the pool has to be bigger than the
+  // answer.
+  const scoreCandidate = async ({ id, mediaType }: { id: number; mediaType: MediaType }): Promise<FinderItem | null> => {
+    try {
+      const { meta, providers } = await getScoringData(mediaType, id, region);
+      const report = buildVerdict({
+        meta,
+        providers,
+        personal: { ...basePersonal, collectionId: null },
+      });
 
-        const receipts: string[] = [];
-        // Runtime — movies by feature length, TV by per-episode length. For TV we
-        // only filter when the episode runtime is actually known (never guess).
-        if (q.maxRuntime != null && meta.mediaType === 'movie') {
-          if ((meta.runtimeMinutes ?? 9999) > q.maxRuntime) return null;
-          const rt = fmtRuntime(meta.runtimeMinutes);
-          if (rt) receipts.push(rt);
-        } else if (q.maxRuntime != null && meta.mediaType === 'tv') {
-          const ep = meta.episodeRuntimeMinutes ?? 0;
-          if (ep > 0 && ep > q.maxRuntime) return null;
-          if (ep > 0) receipts.push(`${ep}m episodes`);
-        }
-        // Recency.
-        if (q.sinceMonths != null && meta.year != null) {
-          const cutoff = new Date().getUTCFullYear() - Math.ceil(q.sinceMonths / 12);
-          if (meta.year < cutoff) return null;
-        }
-        // Era window.
-        if (q.maxYear != null && meta.year != null && meta.year > q.maxYear) return null;
-        if (q.minYear != null && meta.year != null && meta.year < q.minYear) return null;
-        if (meta.year != null) receipts.push(String(meta.year));
-        // Upcoming: hasn't been released yet. Skip the rating gates below since
-        // unreleased titles have no crowd/critic scores to judge on.
-        if (q.upcoming) receipts.push('upcoming');
-        // Audience (TMDB crowd score).
-        if (q.minAudience != null && !q.upcoming) {
-          const aud = meta.voteAverage != null ? Math.round(meta.voteAverage * 10) : null;
-          if (aud == null || aud < q.minAudience) return null;
-          receipts.push(`${aud}% audience`);
-        }
-        // IMDb rating (from OMDb, when we have it).
-        if (q.minImdb != null && !q.upcoming) {
-          if (meta.imdbRating == null || meta.imdbRating < q.minImdb) return null;
-          receipts.push(`IMDb ${meta.imdbRating.toFixed(1)}`);
-        }
-        // English audio.
-        if (q.englishAudioOnly && !(meta.englishAvailability === 'native' || meta.englishAvailability === 'available')) {
-          return null;
-        }
-        if (q.englishAudioOnly) receipts.push('English audio');
-        // On my services.
-        const included = providers ? includedServiceNames(providers.options, services) : [];
-        if (q.onMyServices) {
-          if (included.length === 0) return null;
-          receipts.push(`on ${included[0]}`);
-        }
-        // Stream It only (our WATCH IT verdict).
-        if (q.streamItOnly && report.primaryCall !== 'WATCH IT') return null;
-        if (q.streamItOnly) receipts.push('Stream It');
-        // Bingeable now (TV, all episodes of the current season out).
-        if (q.bingeableOnly && meta.mediaType === 'tv') {
-          if (!isBingeable(meta)) return null;
-          receipts.push('all episodes out');
-        }
-        // Pace band.
-        if (q.pace != null) {
-          const p = paceScore(meta);
-          if (Math.abs(p - q.pace) > 35) return null;
-          receipts.push(p >= 66 ? 'fast-paced' : p <= 33 ? 'slow burn' : 'balanced pace');
-        }
-        // HOUSEHOLD: score this candidate for EVERY member (the user + each
-        // named watcher) and rank by the floor-weighted joint verdict — a
-        // 96/38 split must never look like an excellent joint pick.
-        let household: HouseholdVerdict | null = null;
-        if (householdWatchers.length > 0) {
-          const members = [
-            { name: 'You', match: report.personal.score },
-            ...householdWatchers.map((w) => {
-              const r = buildVerdict({ meta, providers, personal: { ...watcherContext(w), collectionId: null } });
-              return { name: w.name, match: r.personal.score };
-            }),
-          ];
-          household = assembleHousehold(members);
-        }
-        const effectiveMatch = household ? household.score : report.personal.score;
-
-        // Match threshold (against the score the user is actually shown).
-        if (q.minMatch != null && effectiveMatch < q.minMatch) return null;
-        receipts.unshift(`${scoredFor.split(' ')[0]} ${effectiveMatch}`);
-
-        const where =
-          included[0] ?? (providers ? streamingNames(providers.options)[0] ?? null : null);
-
-        const ratings = tileRatingsFromScore(report.general);
-        // "Why this Verd1ct?" — assembled from the SAME facts that filtered and
-        // scored this candidate; nothing invented.
-        const explain = buildItemExplanation(q, {
-          matchScore: effectiveMatch,
-          generalScore: report.general.score,
-          reasonsFor: report.reasonsFor,
-          reasonsAgainst: report.reasonsAgainst,
-          ratings,
-          where,
-          onUsersService: included.length > 0,
-          meta: {
-            mediaType,
-            runtimeMinutes: meta.runtimeMinutes ?? null,
-            year: meta.year,
-            englishAudio: meta.englishAvailability === 'native' || meta.englishAvailability === 'available',
-          },
-        });
-
-        return {
-          id,
-          mediaType,
-          title: meta.title,
-          year: meta.year,
-          posterPath: meta.posterPath,
-          matchScore: effectiveMatch,
-          generalScore: report.general.score,
-          primaryCall: report.primaryCall,
-          reason: report.oneLiner,
-          where,
-          receipts,
-          deciderUrl: deciderSearchUrl(meta.title, meta.year),
-          ratings,
-          imdbId: meta.imdbId ?? null,
-          explain,
-          household,
-        } as FinderItem;
-      } catch {
+      const receipts: string[] = [];
+      // Runtime — movies by feature length, TV by per-episode length. For TV we
+      // only filter when the episode runtime is actually known (never guess).
+      if (q.maxRuntime != null && meta.mediaType === 'movie') {
+        if ((meta.runtimeMinutes ?? 9999) > q.maxRuntime) return null;
+        const rt = fmtRuntime(meta.runtimeMinutes);
+        if (rt) receipts.push(rt);
+      } else if (q.maxRuntime != null && meta.mediaType === 'tv') {
+        const ep = meta.episodeRuntimeMinutes ?? 0;
+        if (ep > 0 && ep > q.maxRuntime) return null;
+        if (ep > 0) receipts.push(`${ep}m episodes`);
+      }
+      // Recency.
+      if (q.sinceMonths != null && meta.year != null) {
+        const cutoff = new Date().getUTCFullYear() - Math.ceil(q.sinceMonths / 12);
+        if (meta.year < cutoff) return null;
+      }
+      // Era window.
+      if (q.maxYear != null && meta.year != null && meta.year > q.maxYear) return null;
+      if (q.minYear != null && meta.year != null && meta.year < q.minYear) return null;
+      if (meta.year != null) receipts.push(String(meta.year));
+      // Upcoming: hasn't been released yet. Skip the rating gates below since
+      // unreleased titles have no crowd/critic scores to judge on.
+      if (q.upcoming) receipts.push('upcoming');
+      // Audience (TMDB crowd score).
+      if (q.minAudience != null && !q.upcoming) {
+        const aud = meta.voteAverage != null ? Math.round(meta.voteAverage * 10) : null;
+        if (aud == null || aud < q.minAudience) return null;
+        receipts.push(`${aud}% audience`);
+      }
+      // IMDb rating (from OMDb, when we have it).
+      if (q.minImdb != null && !q.upcoming) {
+        if (meta.imdbRating == null || meta.imdbRating < q.minImdb) return null;
+        receipts.push(`IMDb ${meta.imdbRating.toFixed(1)}`);
+      }
+      // English audio.
+      if (q.englishAudioOnly && !(meta.englishAvailability === 'native' || meta.englishAvailability === 'available')) {
         return null;
       }
-    }),
-  );
+      if (q.englishAudioOnly) receipts.push('English audio');
+      // On my services.
+      const included = providers ? includedServiceNames(providers.options, services) : [];
+      if (q.onMyServices) {
+        if (included.length === 0) return null;
+        receipts.push(`on ${included[0]}`);
+      }
+      // Stream It only (our WATCH IT verdict).
+      if (q.streamItOnly && report.primaryCall !== 'WATCH IT') return null;
+      if (q.streamItOnly) receipts.push('Stream It');
+      // Bingeable now (TV, all episodes of the current season out).
+      if (q.bingeableOnly && meta.mediaType === 'tv') {
+        if (!isBingeable(meta)) return null;
+        receipts.push('all episodes out');
+      }
+      // Pace band.
+      if (q.pace != null) {
+        const p = paceScore(meta);
+        if (Math.abs(p - q.pace) > 35) return null;
+        receipts.push(p >= 66 ? 'fast-paced' : p <= 33 ? 'slow burn' : 'balanced pace');
+      }
+      // HOUSEHOLD: score this candidate for EVERY member (the user + each
+      // named watcher) and rank by the floor-weighted joint verdict — a
+      // 96/38 split must never look like an excellent joint pick.
+      let household: HouseholdVerdict | null = null;
+      if (householdWatchers.length > 0) {
+        const members = [
+          { name: 'You', match: report.personal.score },
+          ...householdWatchers.map((w) => {
+            const r = buildVerdict({ meta, providers, personal: { ...watcherContext(w), collectionId: null } });
+            return { name: w.name, match: r.personal.score };
+          }),
+        ];
+        household = assembleHousehold(members);
+      }
+      const effectiveMatch = household ? household.score : report.personal.score;
 
-  let items = scored.filter((x): x is FinderItem => x !== null).sort((a, b) => b.matchScore - a.matchScore);
+      // Match threshold (against the score the user is actually shown).
+      if (q.minMatch != null && effectiveMatch < q.minMatch) return null;
+      receipts.unshift(`${scoredFor.split(' ')[0]} ${effectiveMatch}`);
+
+      const where =
+        included[0] ?? (providers ? streamingNames(providers.options)[0] ?? null : null);
+
+      const ratings = tileRatingsFromScore(report.general);
+      // "Why this Verd1ct?" — assembled from the SAME facts that filtered and
+      // scored this candidate; nothing invented.
+      const explain = buildItemExplanation(q, {
+        matchScore: effectiveMatch,
+        generalScore: report.general.score,
+        reasonsFor: report.reasonsFor,
+        reasonsAgainst: report.reasonsAgainst,
+        ratings,
+        where,
+        onUsersService: included.length > 0,
+        meta: {
+          mediaType,
+          runtimeMinutes: meta.runtimeMinutes ?? null,
+          year: meta.year,
+          englishAudio: meta.englishAvailability === 'native' || meta.englishAvailability === 'available',
+        },
+      });
+
+      return {
+        id,
+        mediaType,
+        title: meta.title,
+        year: meta.year,
+        posterPath: meta.posterPath,
+        matchScore: effectiveMatch,
+        generalScore: report.general.score,
+        primaryCall: report.primaryCall,
+        reason: report.oneLiner,
+        where,
+        receipts,
+        deciderUrl: deciderSearchUrl(meta.title, meta.year),
+        ratings,
+        imdbId: meta.imdbId ?? null,
+        explain,
+        household,
+      } as FinderItem;
+    } catch {
+      return null;
+    }
+  };
+
+  // HYDRATE IN WAVES, WITH BOUNDED CONCURRENCY.
+  //
+  // One `Promise.all` over the whole pool opens a request per candidate at
+  // once — with ~6 upstream calls per hydration that is hundreds of concurrent
+  // requests, which TMDB and the ratings aggregators answer with rate limits
+  // rather than data. Waves also mean a request that fills up early stops
+  // early: the common case costs one or two waves, not the whole pool.
+  //
+  // Live TV is the exception — its real filter (does this show actually have an
+  // upcoming airing?) runs after scoring, so it needs everything we pulled.
+  const survivors: FinderItem[] = [];
+  const enough = q.liveOnly ? Number.POSITIVE_INFINITY : enoughSurvivors(limit);
+  for (const wave of waves(candidates, WAVE_SIZE)) {
+    const got = await mapPool(wave, HYDRATE_CONCURRENCY, scoreCandidate);
+    for (const item of got) if (item) survivors.push(item);
+    if (survivors.length >= enough) break;
+  }
+
+  let items = survivors.sort((a, b) => b.matchScore - a.matchScore);
   let relaxed: string | null = null;
 
   // Honest fallback: if nothing hit every constraint, relax match, then services.

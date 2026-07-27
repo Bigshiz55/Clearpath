@@ -7,6 +7,7 @@
  * No I/O; unit-tested.
  */
 import { normalizeMediaWord, resolveSource, type MediaKind, type CanonicalSource } from '@/lib/nlu/mediaOntology';
+import { extractResultCount } from '@/lib/nlu/count';
 
 export interface PlannedSource {
   canonicalName: string;
@@ -38,19 +39,16 @@ export interface QueryPlan {
   rawQuery: string;
 }
 
-const WORD_NUM: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, couple: 2, few: 3, several: 4 };
-
-/** Extract an explicit requested count. Null when unspecified. */
+/**
+ * Extract an explicit requested count. Null when unspecified.
+ *
+ * Shares one definition of "is this number a count?" with the production
+ * detectors — see `count.ts`. It used to grab the first number in the string,
+ * so a plan for "movies under two hours" carried `count=2` as a HARD
+ * CONSTRAINT and the planner reported a two-result request nobody made.
+ */
 export function extractCount(text: string): number | null {
-  const t = text.toLowerCase();
-  const digit = t.match(/\b(\d{1,3})\b/);
-  if (digit) { const n = Number(digit[1]); if (n >= 1 && n <= 100) return n; }
-  const word = t.match(/\b(a couple(?: of)?|a few|several|one|two|three|four|five|six|seven|eight|nine|ten)\b/);
-  if (word) {
-    const key = word[1]!.replace(/^a /, '').replace(/ of$/, '').trim();
-    return WORD_NUM[key] ?? null;
-  }
-  return null;
+  return extractResultCount(text, { fuzzy: true, max: 100 });
 }
 
 const PERSONAL_CUE = /\b(i should watch|i'?d (?:like|enjoy|love)|i would (?:like|enjoy|love)|i (?:want|need)|for me|recommend|my match|i'?ll like|we'?d (?:both )?like|for (?:me|us|my)|good for me)\b/i;

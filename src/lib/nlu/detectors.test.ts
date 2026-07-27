@@ -11,6 +11,7 @@ import {
   detectOrigin,
   extractCount,
   parseRequestedCount,
+  DEFAULT_COUNT,
 } from './detectors';
 
 // Characterization tests: these freeze the *current* production behaviour of
@@ -50,7 +51,23 @@ describe('count parsing', () => {
     expect(extractCount('give me five movies')).toBe(5);
     expect(extractCount('show me 3 shows')).toBe(3);
     expect(extractCount('a good movie')).toBeNull();
-    expect(parseRequestedCount('a good movie')).toBe(8); // default
+    // The default is a full page, not a shortlist, and lives in one place —
+    // see count.ts. It was written 8 here and 8 again in askParse while
+    // finder.ts documented 24, so the product returned eight of everything.
+    expect(parseRequestedCount('a good movie')).toBe(DEFAULT_COUNT);
+    expect(DEFAULT_COUNT).toBeGreaterThanOrEqual(20);
+  });
+
+  it('a number that is not counting results is not a count', () => {
+    // The bug the user hit: "a great movie under two hours" returned two.
+    expect(extractCount('a great movie under two hours')).toBeNull();
+    expect(extractCount('from the last 3 years')).toBeNull();
+    expect(parseRequestedCount('a great movie under two hours')).toBe(DEFAULT_COUNT);
+  });
+
+  it('reads a count separated from its noun by qualifiers', () => {
+    expect(extractCount('Pull up five Lifetime movies coming on in the next 24 hours')).toBe(5);
+    expect(extractCount('three really good crime thrillers')).toBe(3);
   });
   it('reads fuzzy spoken counts "a couple"/"a few"', () => {
     expect(extractCount('a couple of movies on Netflix')).toBe(2);

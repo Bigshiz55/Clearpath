@@ -8,6 +8,8 @@ import { streamingNames } from '@/lib/services';
 import { tileRatingsFromScore } from '@/lib/ratings';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { deciderSearchUrl } from '@/lib/tmdb/meta-helpers';
+import { MAX_REQUESTED_COUNT } from '@/lib/nlu/count';
+import { candidateTarget, mapPool, HYDRATE_CONCURRENCY } from '@/lib/finderPool';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { genreIdFromName } from '@/lib/finderGenres';
 import { runFinder, type FinderItem, type FinderQuery } from '@/lib/finder';
@@ -148,41 +150,43 @@ export async function askSimilarTo(
   );
 
   const seedKey = `${seed.mediaType}-${seed.id}`;
+  // Sized from the ask, like the Finder's pool. This was a flat 16 — below both
+  // the requested limit and the size of the neighbour list it was cutting.
   const cands = similar
     .filter((s) => `${s.mediaType}-${s.id}` !== seedKey && !seen.has(`${s.mediaType}-${s.id}`))
-    .slice(0, 16);
+    .slice(0, candidateTarget(limit));
 
-  const scored = await Promise.all(
-    cands.map(async (c) => {
-      try {
-        const { meta, providers } = await getScoringData(c.mediaType, c.id, region);
-        const report = buildVerdict({ meta, providers, personal: { ...personal, collectionId: null } });
-        return {
-          id: c.id,
-          mediaType: c.mediaType,
-          title: meta.title,
-          year: meta.year,
-          posterPath: meta.posterPath,
-          matchScore: report.personal.score,
-          generalScore: report.general.score,
-          primaryCall: report.primaryCall,
-          reason: report.oneLiner,
-          where: whereFrom(providers),
-          receipts: [`${scoredFor.split(' ')[0]} ${report.personal.score}`, ...(meta.year ? [String(meta.year)] : [])],
-          deciderUrl: deciderSearchUrl(meta.title, meta.year),
-          ratings: tileRatingsFromScore(report.general),
-          imdbId: meta.imdbId ?? null,
-        } as FinderItem;
-      } catch {
-        return null;
-      }
-    }),
-  );
+  const scored = await mapPool(cands, HYDRATE_CONCURRENCY, async (c) => {
+    try {
+      const { meta, providers } = await getScoringData(c.mediaType, c.id, region);
+      const report = buildVerdict({ meta, providers, personal: { ...personal, collectionId: null } });
+      return {
+        id: c.id,
+        mediaType: c.mediaType,
+        title: meta.title,
+        year: meta.year,
+        posterPath: meta.posterPath,
+        matchScore: report.personal.score,
+        generalScore: report.general.score,
+        primaryCall: report.primaryCall,
+        reason: report.oneLiner,
+        where: whereFrom(providers),
+        receipts: [`${scoredFor.split(' ')[0]} ${report.personal.score}`, ...(meta.year ? [String(meta.year)] : [])],
+        deciderUrl: deciderSearchUrl(meta.title, meta.year),
+        ratings: tileRatingsFromScore(report.general),
+        imdbId: meta.imdbId ?? null,
+      } as FinderItem;
+    } catch {
+      return null;
+    }
+  });
 
   const items = scored
     .filter((x): x is FinderItem => x !== null)
     .sort((a, b) => b.matchScore - a.matchScore)
-    .slice(0, Math.max(1, Math.min(limit, 20)));
+    // A "more like this" ask is a browse too — its own 20 was one more ceiling
+    // below the requested limit.
+    .slice(0, Math.max(1, Math.min(limit, MAX_REQUESTED_COUNT)));
   if (items.length === 0) return null;
 
   const query: FinderQuery = { ...EMPTY_QUERY, mediaType: seed.mediaType, similarTo: seed.title };
@@ -296,6 +300,9 @@ export async function askJudgeTitle(
       userId,
       { ...EMPTY_QUERY, mediaType: top.mediaType, genreIds, minMatch: Math.max(report.personal.score + 1, 65) },
       null,
+      // Five alternatives are shown; ask for a few more so the match floor has
+      // something to cut, not for a whole browse page nobody sees.
+      12,
     );
     alternatives = altRun.items
       .filter((i) => !(i.mediaType === top.mediaType && i.id === top.id))
