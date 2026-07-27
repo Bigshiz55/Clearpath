@@ -5,6 +5,7 @@ import { SaveButton } from './SaveButton';
 import { TasteFeedback } from './TasteFeedback';
 import { LikeButton } from './LikeButton';
 import { WCheck } from './WCheck';
+import { RCheck } from './RCheck';
 import { CardSynopsis } from './CardSynopsis';
 
 interface PosterCardProps {
@@ -123,7 +124,12 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             three buttons wide and a fourth breaks at 320px, and the stamp has
             to be in the same place on every surface to read as one gesture. */}
         {overlay !== null && saveId != null && (
-          <WCheck tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterUrl={posterUrl ?? null} />
+          <>
+            <WCheck tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterUrl={posterUrl ?? null} />
+            {/* The R sits below the W, never beside it: two 44px targets side by
+                side in a poster corner is a mis-tap waiting to happen. */}
+            <RCheck tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterUrl={posterUrl ?? null} />
+          </>
         )}
         {onOpen ? (
           <button type="button" onClick={onOpen} className="block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
