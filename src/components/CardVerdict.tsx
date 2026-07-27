@@ -86,6 +86,11 @@ export function CardVerdict({
 
   const status = ruledMessage(ruling);
 
+  // NO `min-w-0` ON THESE BUTTONS. A flex item with `min-width: 0` may shrink
+  // below its own content, and in a narrow card that gave each button 48px to
+  // hold an 11px "AGAINST" that measures 57 — so the word rendered outside its
+  // own border. The floor lives in `.wv-act` (min-width: fit-content); when
+  // three genuinely do not fit, `.wv-act-row` wraps instead.
   const button = (side: Ruling) => {
     const active = ruling === side;
     const tone =
@@ -106,7 +111,7 @@ export function CardVerdict({
         data-testid={`card-verdict-${side}`}
         data-active={active ? 'true' : 'false'}
         disabled={busy}
-        className={`wv-act flex w-full min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-70 ${tone}`}
+        className={`wv-act flex w-full flex-1 items-center justify-center gap-1 rounded-lg border-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-70 ${tone}`}
       >
         {/* THE ICON IS THE UNDO AFFORDANCE, and swapping it costs no layout.
             A ruled card must not change size. A status line under the row was

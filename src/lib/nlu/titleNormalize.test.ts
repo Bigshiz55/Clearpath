@@ -1,7 +1,5 @@
-import {
-  rankAndLimit, describe, it, expect } from 'vitest';
-import {
-  rankAndLimit, normalizeTitle, titleMatchTier, isExactTitle, rankByTitleIdentity } from './titleNormalize';
+import { describe, it, expect } from 'vitest';
+import { rankAndLimit, normalizeTitle, titleMatchTier, isExactTitle, rankByTitleIdentity } from './titleNormalize';
 
 describe('titleNormalize', () => {
   it('normalizes safely', () => {

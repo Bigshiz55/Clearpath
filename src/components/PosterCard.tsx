@@ -146,7 +146,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             line and the buttons would change width the moment you tapped —
             which is the same "everything moved" complaint one level down. */}
         {overlay !== null && saveId != null && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-2">
+          <div className="wv-act-row mt-1.5 sm:mt-2">
             <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
             {resolvedOverlay}
           </div>

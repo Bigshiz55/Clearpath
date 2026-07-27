@@ -27,7 +27,7 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
                 <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
                   {t.mediaType === 'movie' ? 'Movie' : 'TV'}
                 </span>
-                <div className="flex flex-1 items-center gap-1.5">
+                <div className="wv-act-row flex-1">
                   <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
                   <CardVerdict
                     tmdbId={t.id}

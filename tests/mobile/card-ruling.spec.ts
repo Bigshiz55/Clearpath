@@ -191,6 +191,30 @@ for (const [w, h] of [[320, 800], [390, 900], [1024, 1200], [1366, 900]] as cons
   });
 }
 
+/**
+ * A BUTTON IS NEVER NARROWER THAN THE WORD ON IT.
+ *
+ * Found while measuring the On TV strip, but it was never confined to it: the
+ * verdict buttons were `flex-1 min-w-0`, and a flex item with `min-width: 0`
+ * may shrink below its own content. In a 320px poster card each button was
+ * given 50px to hold an 11px "AGAINST" that measures 57 — so the word rendered
+ * 3.5px outside its own border on both sides, on the main grid, on the most
+ * common small phone. The floor is `.wv-act { min-width: fit-content }`, and
+ * `.wv-act-row` drops the decorative icons before it lets a word be cut.
+ */
+for (const w of [320, 360, 390, 414] as const) {
+  test(`no verdict label escapes its own button @ ${w}`, async ({ page }) => {
+    await open(page, w, 900);
+    const card = page.getByTestId('qa-grid').locator('> div').first();
+    for (const id of ['card-verdict-for', 'card-verdict-against']) {
+      const btn = card.getByTestId(id);
+      const [b, l] = [await btn.boundingBox(), await btn.locator('.wv-act-label').boundingBox()];
+      expect(l!.x, `${id} label starts left of its border`).toBeGreaterThanOrEqual(b!.x);
+      expect(l!.x + l!.width, `${id} label ends past its border`).toBeLessThanOrEqual(b!.x + b!.width);
+    }
+  });
+}
+
 test('the ratings row is one line at every width, so its height cannot vary', async ({ page }) => {
   const heights: number[] = [];
   for (const [w, h] of [[320, 800], [390, 900], [1024, 1200]] as const) {

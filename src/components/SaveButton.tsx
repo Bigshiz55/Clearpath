@@ -122,7 +122,7 @@ export function SaveButton({
       disabled={busy}
       aria-label={saved ? 'Saved — remove from your list' : 'Save'}
       title={saved ? 'Saved — tap to remove' : 'Save'}
-      className={`wv-act flex min-w-0 items-center justify-center gap-0.5 rounded-lg border font-semibold text-white transition ${wide ? 'w-full flex-1' : 'w-11'} ${
+      className={`wv-act flex items-center justify-center gap-0.5 rounded-lg border font-semibold text-white transition ${wide ? 'w-full flex-1' : 'w-11'} ${
         saved
           ? 'border-pink-200/70 bg-gradient-to-b from-[#ff62b6] to-[#ff1493]'
           : 'border-2 border-[#ff1493]/70 bg-[#ff1493]/30 text-pink-50 hover:bg-[#ff1493]/45 hover:text-white'

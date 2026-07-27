@@ -230,7 +230,7 @@ export function ReleaseWall({
                       reflowed every tile after it, and it took the undo with it —
                       each control now shows its own state in place and can be
                       tapped again to reverse it. */}
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="release-actions">
+                  <div className="wv-act-row mt-2" data-testid="release-actions">
                     {/* FOR · AGAINST · SAVE, in that order, on every surface.
                         Save came first here, so the verdict pair was split and
                         the same three controls sat in a different sequence from

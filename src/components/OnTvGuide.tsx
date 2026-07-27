@@ -254,7 +254,15 @@ export function OnTvGuide({
                 : 'Best-reviewed shows in prime time'}{' '}
             — rating is TVmaze’s community score.
           </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {/* THE SHARED CARD SHAPE, not a third copy of one.
+              This strip drew TWO columns on a phone with a hand-rolled card. At
+              390px that made each cell ~173px, and an action row inside it had
+              ~157px for FOR · AGAINST · SAVE — about 48px a button for a word
+              that measures 57. The row is now the full width of the card and
+              the card is `.poster-grid` + `.wv-card`: a row on a phone (poster
+              at a third of the width, the facts beside it), a column from `sm`,
+              exactly like every other grid in the app. */}
+          <div className="poster-grid" data-testid="tv-highlights">
             {highlights.map((a) => {
               const posterSrc = posterSrcFor(a);
               const poster = posterSrc ? (
@@ -266,64 +274,65 @@ export function OnTvGuide({
               const resolved = a.tmdbId != null && a.mediaType != null;
               return (
                 <div key={a.id} className="card flex flex-col overflow-hidden">
-                  {/* Action row on top of the placard — For · Against · Save —
-                      the same groove as every other card in the app.
+                  <div className="wv-card flex-1">
+                    {/* The W, on the artwork, exactly where it is on every other
+                        card — so putting an airing on the docket is the same
+                        gesture as putting a poster on it. */}
+                    <div className="wv-card-art bg-ink-800">
+                      {resolved && (
+                        <WCheck tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterUrl={a.image ?? null} />
+                      )}
+                      {resolved ? (
+                        <Link href={`/app/title/${a.mediaType}/${a.tmdbId}`} className="block h-full">{poster}</Link>
+                      ) : (
+                        poster
+                      )}
+                    </div>
+                    <div className="wv-card-body">
+                      <div className="line-clamp-2 text-sm font-semibold leading-snug text-white">{a.showName}</div>
+                      <div className="mt-1 flex items-center justify-between gap-1">
+                        <span suppressHydrationWarning className="truncate text-base font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.airstamp, a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
+                        {a.rating != null && <span className={`flex-none text-sm font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
+                      </div>
+                      {/* The showings this card stands in for. Deduping the strip
+                          must not lose a time somebody could have watched. */}
+                      {(() => {
+                        const note = repeatNote((alsoAiring.get(a.id) ?? []).map((o) => fmtTime(o.airstamp, o.time)));
+                        return note ? (
+                          <div suppressHydrationWarning className="mt-0.5 truncate text-[11px] font-semibold text-slate-400" data-testid="also-airing">
+                            {note}
+                          </div>
+                        ) : null;
+                      })()}
+                      {(a.criticRt != null || a.criticImdb != null) && (
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-bold tabular-nums">
+                          {a.criticRt != null && <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes">🍅 {a.criticRt}%</span>}
+                          {a.criticImdb != null && <span className="rounded bg-[#f5c518] px-1 text-[10px] font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>}
+                        </div>
+                      )}
+                      <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
+                      {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
+                    </div>
+                  </div>
+                  {/* For · Against · Save, ACROSS THE WHOLE CARD. They used to
+                      sit in a lit strip above the placard, at half the width and
+                      on top of the one part of a card doing real work.
 
-                      THE ROW IS ALWAYS THERE, even when the listing has not been
-                      matched to a TMDB title and there is nothing to act on. It
-                      used to be omitted entirely, so an unmatched card's poster
-                      started ~95px higher than its neighbours' and the strip
-                      read as broken rather than as one card being different.
-                      An empty slot that says why keeps four cards in a row. */}
-                  <div className="flex min-h-[3.5rem] flex-wrap items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-2 lg:min-h-[4.25rem]">
+                      When the listing has not been matched to a TMDB title there
+                      is nothing to act on, and the row says so rather than
+                      leaving a silent gap — the controls are missing for a
+                      reason, and the reason is worth a line. */}
+                  <div className="px-3 pb-3">
                     {resolved ? (
-                      <>
+                      <div className="wv-act-row">
                         <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
                         <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
-                      </>
+                      </div>
                     ) : (
-                      <span className="w-full text-center text-[11px] font-semibold text-slate-500" data-testid="airing-unmatched">
+                      <div className="rounded-lg border border-white/10 bg-white/5 py-3 text-center text-[11px] font-semibold text-slate-500" data-testid="airing-unmatched">
                         Not matched to a title yet
-                      </span>
-                    )}
-                  </div>
-                  {/* The W, on the artwork, exactly where it is on every other
-                      card — so putting an airing on the docket is the same
-                      gesture as putting a poster on it. */}
-                  <div className="relative aspect-[2/3] overflow-hidden bg-ink-800">
-                    {resolved && (
-                      <WCheck tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterUrl={a.image ?? null} />
-                    )}
-                    {resolved ? (
-                      <Link href={`/app/title/${a.mediaType}/${a.tmdbId}`} className="block h-full">{poster}</Link>
-                    ) : (
-                      poster
-                    )}
-                  </div>
-                  <div className="flex flex-1 flex-col p-2">
-                    <div className="line-clamp-2 text-xs font-semibold text-white">{a.showName}</div>
-                    <div className="mt-1 flex items-center justify-between gap-1">
-                      <span suppressHydrationWarning className="truncate text-sm font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.airstamp, a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
-                      {a.rating != null && <span className={`flex-none text-xs font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
-                    </div>
-                    {/* The showings this card stands in for. Deduping the strip
-                        must not lose a time somebody could have watched. */}
-                    {(() => {
-                      const note = repeatNote((alsoAiring.get(a.id) ?? []).map((o) => fmtTime(o.airstamp, o.time)));
-                      return note ? (
-                        <div suppressHydrationWarning className="mt-0.5 truncate text-[11px] font-semibold text-slate-400" data-testid="also-airing">
-                          {note}
-                        </div>
-                      ) : null;
-                    })()}
-                    {(a.criticRt != null || a.criticImdb != null) && (
-                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-bold tabular-nums">
-                        {a.criticRt != null && <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes">🍅 {a.criticRt}%</span>}
-                        {a.criticImdb != null && <span className="rounded bg-[#f5c518] px-1 text-[10px] font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>}
                       </div>
                     )}
-                    <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
-                    {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
                   </div>
                 </div>
               );

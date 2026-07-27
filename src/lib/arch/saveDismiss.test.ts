@@ -98,8 +98,18 @@ describe('the shared card shape', () => {
     for (const cls of SHAPE) expect(css, cls).toContain(`${cls} {`);
   });
 
+  // The On TV highlight strip was the THIRD copy of a card layout, and it broke
+  // the same way the New Releases wall did: hand-rolled, it drew two columns on
+  // a phone with an action row ~157px wide, which is 48px a button for a word
+  // that measures 57. That is what "iPhone view" was a picture of.
+  const CARD_GRIDS = [
+    'src/components/PosterCard.tsx',
+    'src/components/ReleaseWall.tsx',
+    'src/components/OnTvGuide.tsx',
+  ];
+
   it('every card grid uses the shared classes', () => {
-    for (const f of ['src/components/PosterCard.tsx', 'src/components/ReleaseWall.tsx']) {
+    for (const f of CARD_GRIDS) {
       const src = read(f);
       expect(src, `${f} wv-card`).toMatch(/className="[^"]*\bwv-card\b/);
       expect(src, `${f} wv-card-art`).toContain('wv-card-art');
@@ -110,8 +120,62 @@ describe('the shared card shape', () => {
   it('no card grid restates the row layout inline', () => {
     // A full-width `aspect-[2/3]` poster is the old shape. If one reappears in
     // a card grid, that grid has drifted off the shared definition.
-    for (const f of ['src/components/PosterCard.tsx', 'src/components/ReleaseWall.tsx']) {
+    for (const f of CARD_GRIDS) {
       expect(read(f), f).not.toMatch(/aspect-\[2\/3\]\s+w-full/);
+    }
+  });
+
+  it('and none of them lays out its own columns on a phone', () => {
+    // `grid-cols-2` with no breakpoint is the specific mistake: two 170px cells
+    // on a 390px screen, which is narrower than the controls they have to hold.
+    for (const f of CARD_GRIDS) {
+      expect(read(f), `${f} hand-rolls a phone grid`).not.toMatch(/className="[^"]*\bgrid-cols-[234]\b/);
+    }
+  });
+});
+
+/**
+ * A BUTTON IS NEVER NARROWER THAN THE WORD ON IT.
+ *
+ * Every action row in the app hand-rolled its own flex, and they were all wrong
+ * the same way: `flex-1 min-w-0`. A flex item with `min-width: 0` is allowed to
+ * shrink BELOW ITS OWN CONTENT, so in a narrow card the buttons kept dividing
+ * the space evenly and let "AGAINST" render outside its own border. Measured at
+ * 320px on the main poster grid — not only on the TV strip — and 9px past the
+ * border in the two-up strip that was screenshotted.
+ */
+describe('the action row', () => {
+  const css = read('src/app/globals.css');
+
+  it('has one definition, and it is a container', () => {
+    expect(css).toContain('.wv-act-row {');
+    // A viewport media query answers the wrong question here: the same row is
+    // ~334px wide in a single column and ~157px in a two-up strip on the SAME
+    // phone. The row has to measure itself.
+    expect(css).toMatch(/\.wv-act-row \{[\s\S]{0,200}container-type: inline-size/);
+    expect(css).toMatch(/@container[\s\S]{0,120}\.wv-act-icon \{[\s\S]{0,40}display: none/);
+  });
+
+  it('gives every control a floor of its own content', () => {
+    expect(css).toMatch(/\.wv-act \{[\s\S]{0,120}min-width: fit-content/);
+  });
+
+  it('and no control opts back out with min-w-0', () => {
+    for (const f of ['src/components/CardVerdict.tsx', 'src/components/SaveButton.tsx']) {
+      const src = read(f);
+      const rows = src.split('\n').filter((l) => l.includes('wv-act') && l.includes('min-w-0'));
+      expect(rows, `${f} still shrinks a control below its label`).toEqual([]);
+    }
+  });
+
+  it('is used by every grid that shows the verdict pair', () => {
+    for (const f of [
+      'src/components/PosterCard.tsx',
+      'src/components/ReleaseWall.tsx',
+      'src/components/WatchNowGrid.tsx',
+      'src/components/OnTvGuide.tsx',
+    ]) {
+      expect(read(f), `${f} hand-rolls the action row`).toContain('wv-act-row');
     }
   });
 });

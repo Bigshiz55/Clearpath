@@ -847,8 +847,36 @@ body {
    is a floor for touch, never a target — there is no reason to sit on it when
    there is a thousand points of width available.
 --------------------------------------------------------------------------- */
+/* ── THE ACTION ROW, IN ONE PLACE ────────────────────────────────────────
+   FOR · AGAINST · SAVE. Every grid in the app hand-rolled this row, and they
+   were all wrong the same way: the buttons were `flex-1 min-w-0`, and a flex
+   item with `min-width: 0` is allowed to shrink BELOW ITS OWN CONTENT. In a
+   two-up strip on a 390px phone each button got 48px to hold an 11px
+   "AGAINST" that measures 57 — so the word rendered outside its own border,
+   which is what the iPhone screenshot showed. `fit-content` is the floor: a
+   button is never narrower than what is written on it, and when three of them
+   genuinely do not fit, the row wraps instead of lying about it.
+
+   The row is its own CONTAINER so the icons can go when THE ROW is tight
+   rather than when the SCREEN is. On one phone the same row is 334px wide in
+   a single-column grid and 157px in a two-up strip, so a viewport media query
+   would be answering the wrong question. The gavels are decoration; the words
+   are the control, and the words are what survive. */
+.wv-act-row {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+@container (max-width: 230px) {
+  .wv-act-icon {
+    display: none;
+  }
+}
 .wv-act {
   min-height: 44px;
+  min-width: fit-content;
 }
 .wv-act-label {
   font-size: 11px;
