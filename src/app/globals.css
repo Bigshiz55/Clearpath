@@ -68,6 +68,14 @@ body {
   .wv-card-body {
     @apply flex min-w-0 flex-1 flex-col sm:p-3;
   }
+
+  /* The tray's status word shares one line with Clear and Deliver. Below 360px
+     those two take the width and the word truncates to "Read…", which is worse
+     than absent — the count badge and the Deliver button already carry the
+     state. The accessible name on the toggle keeps it for screen readers. */
+  @media (max-width: 359px) {
+    .wv-tray-status { display: none; }
+  }
   @media (min-width: 640px) {
     .poster-grid {
       /* Content-aware minimum: a card must fit FOR/PASS/SAVE + all three rating

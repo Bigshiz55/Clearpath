@@ -44,34 +44,35 @@ export function DocketTray() {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-40 px-3 lg:bottom-4"
+      className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-40 px-2 lg:bottom-4"
       data-testid="docket-tray"
     >
       <div className="container-page">
         {/* Opaque, and no backdrop-filter — same iOS fixed-layer repaint trap
             the bottom nav hit. See MobileNav. */}
-        <div className="rounded-2xl border-2 border-[#ff1493]/50 bg-ink-950 p-3 shadow-[0_10px_40px_-8px_rgba(0,0,0,0.8)]">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="rounded-2xl border-2 border-[#ff1493]/50 bg-ink-950 px-2 py-2 shadow-[0_10px_40px_-8px_rgba(0,0,0,0.8)]">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => setOpen((o) => !o)}
               aria-expanded={open}
+              aria-label={`${status.message} — ${status.count} on the docket. Tap to see them.`}
               data-testid="docket-toggle"
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-lg px-1 text-sm font-bold text-white"
+              className="inline-flex min-h-[36px] min-w-0 items-center gap-1.5 rounded-lg px-0.5 text-sm font-bold text-white"
             >
-              <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-gradient-to-b from-[#ff62b6] to-[#ff1493] text-xs font-black text-white">
+              <span data-testid="docket-count" className="grid h-7 w-7 flex-none place-items-center rounded-full bg-gradient-to-b from-[#ff62b6] to-[#ff1493] text-xs font-black text-white">
                 {status.count}
               </span>
-              <span data-testid="docket-status">{status.message}</span>
+              <span data-testid="docket-status" className="wv-tray-status truncate">{status.message}</span>
               <span aria-hidden className="text-slate-500">{open ? '▾' : '▸'}</span>
             </button>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex flex-none items-center gap-1">
               <button
                 type="button"
                 onClick={clearDocket}
                 data-testid="docket-clear"
-                className="inline-flex min-h-[40px] items-center rounded-lg px-3 text-xs font-semibold text-slate-400 transition hover:text-slate-200"
+                className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-xs font-semibold text-slate-400 transition hover:text-slate-200"
               >
                 Clear
               </button>
@@ -79,13 +80,16 @@ export function DocketTray() {
                 <Link
                   href="/app/verdict"
                   data-testid="docket-deliver"
-                  className="inline-flex min-h-[44px] items-center rounded-lg border-2 border-pink-200/60 bg-gradient-to-b from-[#ff62b6] to-[#ff1493] px-5 text-sm font-black text-white transition hover:brightness-110"
+                  className="inline-flex min-h-[40px] flex-none items-center rounded-lg border-2 border-pink-200/60 bg-gradient-to-b from-[#ff62b6] to-[#ff1493] px-3.5 text-sm font-black text-white transition hover:brightness-110"
                 >
-                  Deliver the Verd1ct →
+                  Deliver →
                 </Link>
               ) : (
-                <span className="text-xs font-semibold text-slate-500" data-testid="docket-not-ready">
-                  {MIN_FOR_VERDICT} minimum
+                // Nothing here. The message already says how many more are
+                // needed, and restating it as "3 minimum" cost the row the
+                // width that made it wrap in the first place.
+                <span className="sr-only" data-testid="docket-not-ready">
+                  {MIN_FOR_VERDICT} needed for a verdict
                 </span>
               )}
             </div>

@@ -119,7 +119,10 @@ test('the docket survives a reload — it is tonight’s question', async ({ pag
   await open(page);
   await put(page, 101, 102, 103);
   await page.reload({ waitUntil: 'networkidle' });
-  await expect(page.getByTestId('docket-status')).toContainText('3 on the docket');
+  // The count lives on the badge; the words carry the state. Asserting them
+  // separately is what lets the copy change without the test lying.
+  await expect(page.getByTestId('docket-count')).toHaveText('3');
+  await expect(page.getByTestId('docket-status')).toContainText('Ready');
   await expect(page.getByTestId('w-check-101')).toHaveAttribute('aria-pressed', 'true');
 });
 
@@ -137,7 +140,8 @@ test('taking one off the tray takes it off the poster too', async ({ page }) => 
   await page.getByTestId('docket-toggle').click();
   await page.getByTestId('docket-remove-102').click();
   await expect(page.getByTestId('w-check-102')).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('docket-status')).toContainText('2 on the docket');
+  await expect(page.getByTestId('docket-count')).toHaveText('2');
+  await expect(page.getByTestId('docket-status')).toContainText('1 more');
 });
 
 test('no overflow at any width, and the tray is reachable everywhere', async ({ page }) => {

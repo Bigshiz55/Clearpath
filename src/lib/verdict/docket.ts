@@ -136,19 +136,25 @@ export function docketStatus(docket: readonly DocketEntry[]): DocketStatus {
   if (count === 0) {
     return { count, ready: false, full: false, message: 'Nothing on the docket yet.' };
   }
+  // SHORT, because the tray is a fixed bar sharing one line with Clear and
+  // Deliver. The original sentence wrapped, which put the controls on a second
+  // line and doubled the height of the thing covering the page; the obvious fix
+  // — truncate it — just produced "3 on the…", which says less than nothing.
+  //
+  // So the message stops repeating the count. It is already rendered, larger,
+  // in the badge immediately to its left. All the words have to carry is what
+  // the badge cannot: how much further there is to go.
   if (count < MIN_FOR_VERDICT) {
     const need = MIN_FOR_VERDICT - count;
     return {
       count,
       ready: false,
       full: false,
-      message: `${count} on the docket — ${need} more and I can call it.`,
+      message: `${need} more to rule`,
     };
   }
-  return {
-    count,
-    ready: true,
-    full: count >= MAX_DOCKET,
-    message: `${count} on the docket — ready for a verdict.`,
-  };
+  // One word once the Deliver button appears beside it: at 320px the button
+  // takes the width, and "Ready to rule" next to "Deliver →" says the same
+  // thing twice anyway.
+  return { count, ready: true, full: count >= MAX_DOCKET, message: 'Ready' };
 }
