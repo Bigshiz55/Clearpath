@@ -637,7 +637,7 @@ function Reveal({
           Change an answer
         </button>
         <Link
-          href="/app/quiz"
+          href="/app/taste-quiz?mode=titles"
           data-testid="reveal-calibrate"
           className="inline-flex min-h-[44px] items-center rounded-lg border border-white/15 px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
         >

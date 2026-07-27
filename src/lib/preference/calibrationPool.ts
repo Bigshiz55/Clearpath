@@ -33,6 +33,30 @@ export interface PoolBucket {
   family?: boolean;
 }
 
+/**
+ * RECOGNISABILITY FLOORS.
+ *
+ * A calibration card only teaches us something if the person has heard of the
+ * title. If they have not, the honest answer is "no idea", and the quiz has no
+ * such button — so the answer becomes Skip, which the engine records as
+ * `not_interested`. That turns ignorance into a stated dislike, which is a
+ * fabricated preference, and twenty of them is a profile built out of nothing.
+ *
+ * So every bucket carries a vote-count floor. The rare categories keep LOWER
+ * floors than the mainstream ones — a Hallmark TV movie genuinely never
+ * accumulates blockbuster vote counts, and dropping the category entirely would
+ * be worse than showing a moderately known example — but none of them may sit
+ * so low that TMDB starts returning titles nobody could name.
+ */
+export const RECOGNISABLE = {
+  /** Mainstream film and TV: no excuse for anything obscure here. */
+  mainstream: 800,
+  /** Genres with smaller audiences but real hits. */
+  niche: 300,
+  /** Categories that never chart: reality, soap, Hallmark, family TV. */
+  rare: 120,
+} as const;
+
 // TMDB genre ids (movie + tv share some; reality/soap are tv-only).
 const G = {
   action: 28, actionTv: 10759, adventure: 12, animation: 16, comedy: 35, crime: 80,
@@ -50,42 +74,42 @@ const G = {
  */
 export const CALIBRATION_BUCKETS: readonly PoolBucket[] = [
   // Mainstream movie genres
-  { id: 'drama-movie', mediaType: 'movie', genreIds: [G.drama], genres: ['drama'], take: 3, minVotes: 800, prestige: true },
-  { id: 'comedy-movie', mediaType: 'movie', genreIds: [G.comedy], genres: ['comedy'], take: 3, minVotes: 800 },
-  { id: 'crime-thriller-movie', mediaType: 'movie', genreIds: [G.crime, G.thriller], genres: ['crime', 'thriller'], take: 3, minVotes: 800 },
-  { id: 'action-movie', mediaType: 'movie', genreIds: [G.action, G.adventure], genres: ['action'], take: 2, minVotes: 800 },
-  { id: 'scifi-movie', mediaType: 'movie', genreIds: [G.scifi], genres: ['scifi'], take: 2, minVotes: 800, polarizing: true },
-  { id: 'horror-movie', mediaType: 'movie', genreIds: [G.horror], genres: ['horror'], take: 2, minVotes: 600, polarizing: true },
-  { id: 'romance-movie', mediaType: 'movie', genreIds: [G.romance], genres: ['romance'], take: 2, minVotes: 500 },
-  { id: 'fantasy-movie', mediaType: 'movie', genreIds: [G.fantasy], genres: ['fantasy'], take: 1, minVotes: 600 },
-  { id: 'family-animation-movie', mediaType: 'movie', genreIds: [G.animation, G.family], genres: ['animation', 'family'], take: 2, minVotes: 800, family: true },
-  { id: 'documentary', mediaType: 'movie', genreIds: [G.documentary], genres: ['documentary'], take: 2, minVotes: 150 },
+  { id: 'drama-movie', mediaType: 'movie', genreIds: [G.drama], genres: ['drama'], take: 3, minVotes: RECOGNISABLE.mainstream, prestige: true },
+  { id: 'comedy-movie', mediaType: 'movie', genreIds: [G.comedy], genres: ['comedy'], take: 3, minVotes: RECOGNISABLE.mainstream },
+  { id: 'crime-thriller-movie', mediaType: 'movie', genreIds: [G.crime, G.thriller], genres: ['crime', 'thriller'], take: 3, minVotes: RECOGNISABLE.mainstream },
+  { id: 'action-movie', mediaType: 'movie', genreIds: [G.action, G.adventure], genres: ['action'], take: 2, minVotes: RECOGNISABLE.mainstream },
+  { id: 'scifi-movie', mediaType: 'movie', genreIds: [G.scifi], genres: ['scifi'], take: 2, minVotes: RECOGNISABLE.mainstream, polarizing: true },
+  { id: 'horror-movie', mediaType: 'movie', genreIds: [G.horror], genres: ['horror'], take: 2, minVotes: RECOGNISABLE.mainstream, polarizing: true },
+  { id: 'romance-movie', mediaType: 'movie', genreIds: [G.romance], genres: ['romance'], take: 2, minVotes: RECOGNISABLE.mainstream },
+  { id: 'fantasy-movie', mediaType: 'movie', genreIds: [G.fantasy], genres: ['fantasy'], take: 1, minVotes: RECOGNISABLE.mainstream },
+  { id: 'family-animation-movie', mediaType: 'movie', genreIds: [G.animation, G.family], genres: ['animation', 'family'], take: 2, minVotes: RECOGNISABLE.mainstream, family: true },
+  { id: 'documentary', mediaType: 'movie', genreIds: [G.documentary], genres: ['documentary'], take: 2, minVotes: RECOGNISABLE.niche },
 
   // TV genres
-  { id: 'drama-tv', mediaType: 'tv', genreIds: [G.drama], genres: ['drama'], take: 3, minVotes: 300, prestige: true },
-  { id: 'comedy-tv', mediaType: 'tv', genreIds: [G.comedy], genres: ['comedy'], take: 2, minVotes: 300 },
-  { id: 'crime-tv', mediaType: 'tv', genreIds: [G.crime, G.mystery], genres: ['crime', 'mystery'], take: 2, minVotes: 200 },
-  { id: 'scifi-tv', mediaType: 'tv', genreIds: [G.scifiTv], genres: ['scifi'], take: 1, minVotes: 200 },
-  { id: 'reality-tv', mediaType: 'tv', genreIds: [G.reality], genres: ['reality'], take: 2, minVotes: 30 },
-  { id: 'soap-tv', mediaType: 'tv', genreIds: [G.soap], genres: ['soap'], take: 1, minVotes: 10 },
-  { id: 'family-tv', mediaType: 'tv', genreIds: [G.family], genres: ['family'], take: 1, minVotes: 60, family: true },
+  { id: 'drama-tv', mediaType: 'tv', genreIds: [G.drama], genres: ['drama'], take: 3, minVotes: RECOGNISABLE.niche, prestige: true },
+  { id: 'comedy-tv', mediaType: 'tv', genreIds: [G.comedy], genres: ['comedy'], take: 2, minVotes: RECOGNISABLE.niche },
+  { id: 'crime-tv', mediaType: 'tv', genreIds: [G.crime, G.mystery], genres: ['crime', 'mystery'], take: 2, minVotes: RECOGNISABLE.niche },
+  { id: 'scifi-tv', mediaType: 'tv', genreIds: [G.scifiTv], genres: ['scifi'], take: 1, minVotes: RECOGNISABLE.niche },
+  { id: 'reality-tv', mediaType: 'tv', genreIds: [G.reality], genres: ['reality'], take: 2, minVotes: RECOGNISABLE.rare },
+  { id: 'soap-tv', mediaType: 'tv', genreIds: [G.soap], genres: ['soap'], take: 1, minVotes: RECOGNISABLE.rare },
+  { id: 'family-tv', mediaType: 'tv', genreIds: [G.family], genres: ['family'], take: 1, minVotes: RECOGNISABLE.rare, family: true },
 
   // Anime (capped to 1 by the planner regardless of how many we source)
-  { id: 'anime-tv', mediaType: 'tv', genreIds: [G.animation], genres: ['animation'], take: 2, minVotes: 200, originalLanguage: 'ja', anime: true },
+  { id: 'anime-tv', mediaType: 'tv', genreIds: [G.animation], genres: ['animation'], take: 2, minVotes: RECOGNISABLE.niche, originalLanguage: 'ja', anime: true },
 
   // International (non-domestic origin)
-  { id: 'kdrama-tv', mediaType: 'tv', genreIds: [G.drama], genres: ['drama'], take: 2, minVotes: 150, originalLanguage: 'ko', originCountry: 'KR' },
-  { id: 'intl-movie-es', mediaType: 'movie', genreIds: [G.drama], genres: ['drama'], take: 1, minVotes: 300, originalLanguage: 'es' },
+  { id: 'kdrama-tv', mediaType: 'tv', genreIds: [G.drama], genres: ['drama'], take: 2, minVotes: RECOGNISABLE.niche, originalLanguage: 'ko', originCountry: 'KR' },
+  { id: 'intl-movie-es', mediaType: 'movie', genreIds: [G.drama], genres: ['drama'], take: 1, minVotes: RECOGNISABLE.niche, originalLanguage: 'es' },
 
   // Hallmark / Lifetime style — TV movies, romance/family
-  { id: 'hallmark', mediaType: 'movie', genreIds: [G.tvMovie, G.romance], genres: ['romance', 'family'], take: 1, minVotes: 10, hallmark: true },
+  { id: 'hallmark', mediaType: 'movie', genreIds: [G.tvMovie, G.romance], genres: ['romance', 'family'], take: 1, minVotes: RECOGNISABLE.rare, hallmark: true },
 
   // Classics (older, acclaimed) — great taste signal. Spread across genres so
   // old titles don't all collide on the per-genre cap (and to widen taste range).
-  { id: 'classic-drama-movie', mediaType: 'movie', genreIds: [G.drama], genres: ['drama'], take: 2, minVotes: 800, minYear: 1970, maxYear: 2004, prestige: true },
-  { id: 'classic-thriller-movie', mediaType: 'movie', genreIds: [G.thriller, G.mystery], genres: ['thriller', 'mystery'], take: 2, minVotes: 700, minYear: 1970, maxYear: 2004 },
-  { id: 'classic-scifi-movie', mediaType: 'movie', genreIds: [G.scifi], genres: ['scifi'], take: 1, minVotes: 700, minYear: 1970, maxYear: 2004, polarizing: true },
-  { id: 'classic-tv', mediaType: 'tv', genreIds: [G.comedy], genres: ['comedy'], take: 1, minVotes: 150, minYear: 1975, maxYear: 2004 },
+  { id: 'classic-drama-movie', mediaType: 'movie', genreIds: [G.drama], genres: ['drama'], take: 2, minVotes: RECOGNISABLE.mainstream, minYear: 1970, maxYear: 2004, prestige: true },
+  { id: 'classic-thriller-movie', mediaType: 'movie', genreIds: [G.thriller, G.mystery], genres: ['thriller', 'mystery'], take: 2, minVotes: RECOGNISABLE.mainstream, minYear: 1970, maxYear: 2004 },
+  { id: 'classic-scifi-movie', mediaType: 'movie', genreIds: [G.scifi], genres: ['scifi'], take: 1, minVotes: RECOGNISABLE.mainstream, minYear: 1970, maxYear: 2004, polarizing: true },
+  { id: 'classic-tv', mediaType: 'tv', genreIds: [G.comedy], genres: ['comedy'], take: 1, minVotes: RECOGNISABLE.niche, minYear: 1975, maxYear: 2004 },
 ] as const;
 
 /** The origin country a bucket's titles carry (for international detection). */

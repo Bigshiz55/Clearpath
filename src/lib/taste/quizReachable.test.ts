@@ -23,7 +23,7 @@ describe('entry points', () => {
   it('the route exists and renders the quiz', () => {
     const page = read('src/app/app/taste-quiz/page.tsx');
     expect(page).toContain('QuickTasteQuiz');
-    expect(page).toContain("title: 'Quick Taste Quiz");
+    expect(page).toContain("title: 'Taste Quiz");
   });
 
   it('the landing hero offers exactly two calls to action', () => {
@@ -59,6 +59,25 @@ describe('entry points', () => {
     expect(hub).toContain('data-testid="link-title-quiz"');
     expect(hub).toContain('data-testid="link-import-taste"');
     expect(hub).toContain(QUIZ_HREF);
+  });
+
+  it('both quiz lanes live under the one Taste Quiz route', () => {
+    const page = read('src/app/app/taste-quiz/page.tsx');
+    expect(page).toContain('QuickTasteQuiz');
+    expect(page).toContain('DnaQuiz');
+    expect(page).toContain('TasteQuizModes');
+
+    // Nothing may link at a second copy of the title quiz.
+    const hub = read('src/app/app/dna/page.tsx');
+    expect(hub).not.toMatch(/href="\/app\/quiz"/);
+  });
+
+  it('the old title-quiz URL forwards instead of holding a second copy', () => {
+    const legacy = read('src/app/app/quiz/page.tsx');
+    expect(legacy).toContain('redirect(');
+    expect(legacy).toContain("mode: 'titles'");
+    // A founder session must survive the hop, or isolated calibration breaks.
+    expect(legacy).toContain('session');
   });
 
   it('the nav carries the quiz', () => {

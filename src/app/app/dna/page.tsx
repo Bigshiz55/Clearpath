@@ -58,7 +58,7 @@ export default async function WatchDnaPage() {
               &ldquo;depends&rdquo; is a real answer.
             </p>
           </Link>
-          <Link href="/app/quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-title-quiz">
+          <Link href="/app/taste-quiz?mode=titles" className="card p-4 transition hover:bg-white/10" data-testid="link-title-quiz">
             <div className="flex items-center gap-2 text-base font-bold text-white">
               <span aria-hidden>🎬</span> React to real titles
             </div>
@@ -129,7 +129,7 @@ export default async function WatchDnaPage() {
           <h2 className="text-lg font-bold text-white">Your taste dials</h2>
           <div className="flex items-center gap-3">
             <Link href="/app/dna/packs" className="text-sm font-semibold text-emerald-300 hover:text-emerald-200">🎯 Boosters</Link>
-            <Link href="/app/quiz" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
+            <Link href="/app/taste-quiz?mode=titles" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
           </div>
         </div>
         {ready && dials.length > 0 ? (
