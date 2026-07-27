@@ -16,14 +16,12 @@ import { useToast } from '@/components/Toast';
 // "More ideas". Each `text` is the full query dropped into the box; `hint` is the
 // short chip label. Kept broad and mainstream — not tuned to one person's taste.
 const PRIMARY_EXAMPLES: { hint: string; text: string }[] = [
-  { hint: 'What’s on TV tonight?', text: 'What’s on TV tonight?' },
-  { hint: 'Best movies on Netflix', text: 'The best movies on Netflix right now' },
-  { hint: 'Family movie night', text: 'A great family movie for tonight' },
-];
-const MORE_EXAMPLES: { hint: string; text: string }[] = [
-  { hint: 'Where can I stream Barbie?', text: 'Where can I stream Barbie?' },
-  { hint: 'On in the next 2 hours', text: 'Movies coming on in the next 2 hours' },
-  { hint: 'A really good scary movie', text: 'A really good scary movie' },
+  { hint: '📺 On TV tonight', text: 'What’s on TV tonight?' },
+  { hint: '🍿 Under 2 hours', text: 'A great movie under two hours' },
+  { hint: '👨‍👩‍👧 Family night', text: 'A great family movie for tonight' },
+  { hint: '😂 Something funny', text: 'Something genuinely funny' },
+  { hint: '😱 Actually scary', text: 'A really good scary movie' },
+  { hint: '🔥 New this week', text: 'The best things released this week' },
 ];
 
 export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
@@ -31,7 +29,6 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   const toast = useToast();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
-  const [showMore, setShowMore] = useState(false);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const lastCase = useRef<{ id: string | null; at: number }>({ id: null, at: 0 });
 
@@ -82,14 +79,14 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   }
 
   return (
-    <div data-testid="statecase-card" className="mx-auto max-w-2xl rounded-2xl border border-brand-400/40 bg-gradient-to-br from-brand-500/15 via-fuchsia-500/10 to-transparent p-4 shadow-[0_12px_40px_-16px_rgba(236,72,153,0.45)] sm:p-5">
+    <div data-testid="statecase-card" className="mx-auto max-w-2xl rounded-2xl border border-brand-400/40 bg-gradient-to-br from-brand-500/15 via-fuchsia-500/10 to-transparent p-3.5 shadow-[0_12px_40px_-16px_rgba(236,72,153,0.45)] sm:p-5">
       {/* Title + one concise supporting line (max two lines). */}
       <div className="flex items-center gap-2.5">
         <span className={hero ? 'text-2xl' : 'text-xl'} aria-hidden>⚖️</span>
         <h2 className={hero ? 'text-lg font-black text-white sm:text-2xl' : 'text-base font-extrabold text-white sm:text-lg'}>State Your Case</h2>
       </div>
-      <p className="mt-1 text-sm leading-snug text-slate-300">
-        Describe what you want, or name a few shows and movies you love.
+      <p className="mt-0.5 text-sm leading-snug text-slate-300">
+        Describe what you want, or name a few shows you love.
       </p>
 
       {/* Textarea — the primary action. ~110px tall, strong border + focus ring. */}
@@ -100,41 +97,25 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}
         aria-label="Describe what you like to watch"
         placeholder="Try: Clever thrillers with a twist, but nothing too slow or gory."
-        className="mt-3 h-[112px] w-full resize-none rounded-xl border border-white/25 bg-ink-950/70 px-3.5 py-3 text-base leading-snug text-white placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/40 focus:outline-none"
+        className="mt-2.5 h-[84px] w-full resize-none rounded-xl border border-white/25 bg-ink-950/70 px-3.5 py-3 text-base leading-snug text-white placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/40 focus:outline-none"
       />
 
-      {/* Three suggestion chips, then "More ideas" reveals the rest. Consistent
-          height/padding, wrap cleanly, readable at 320px. */}
-      <div className="mt-3 flex flex-wrap gap-2">
+      {/* Six quick asks, all visible. They used to be three behind a "More
+          ideas" toggle, which spent a whole chip slot on a control that only
+          revealed more chips. The 44px tap floor means a chip cannot be made
+          shorter, so showing the real ones is the only way to make this row
+          worth its height. */}
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
         {PRIMARY_EXAMPLES.map((ex) => (
           <button
             key={ex.hint}
             type="button"
             onClick={() => fill(ex.text)}
-            className="min-h-[44px] rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[13px] font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white active:scale-95"
+            className="min-h-[44px] rounded-full border border-white/15 bg-white/[0.06] px-2.5 text-[13px] font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white active:scale-95"
           >
             {ex.hint}
           </button>
         ))}
-        {showMore &&
-          MORE_EXAMPLES.map((ex) => (
-            <button
-              key={ex.hint}
-              type="button"
-              onClick={() => fill(ex.text)}
-              className="min-h-[44px] rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[13px] font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white active:scale-95"
-            >
-              {ex.hint}
-            </button>
-          ))}
-        <button
-          type="button"
-          onClick={() => setShowMore((v) => !v)}
-          aria-expanded={showMore}
-          className="min-h-[44px] rounded-full border border-brand-300/40 bg-transparent px-3 py-1.5 text-[13px] font-semibold text-brand-200 transition hover:bg-brand-500/15 active:scale-95"
-        >
-          {showMore ? 'Fewer ideas' : 'More ideas'}
-        </button>
       </div>
 
       {/* Primary CTA — full width, ≥48px, always looks pressable (only dims while
@@ -142,14 +123,14 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
       <button
         onClick={() => void submit()}
         disabled={busy}
-        className="wv-cta-3d mt-4 w-full py-3.5 text-lg"
+        className="wv-cta-3d mt-3 w-full py-3 text-base"
       >
         {busy ? 'Ruling…' : 'Hit the Gavel →'}
       </button>
 
       <Link
         href="/app/mentalist"
-        className="mt-2 flex min-h-[44px] items-center justify-center px-2 text-center text-xs font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline"
+        className="mt-1 flex min-h-[44px] items-center justify-center px-2 text-center text-xs font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline"
       >
         Or name a few titles you love — we’ll figure out your taste →
       </Link>

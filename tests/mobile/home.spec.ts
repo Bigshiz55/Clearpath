@@ -50,14 +50,17 @@ for (const width of WIDTHS) {
     const clipped = await headline.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
     expect(clipped, `headline not clipped @ ${width}px`).toBe(false);
 
-    // 3) State Your Case card, exactly three chips up front + a "More ideas" toggle.
+    // 3) State Your Case card, with every quick ask visible up front. They used
+    //    to be three behind a "More ideas" toggle — a control that spent a whole
+    //    chip slot on revealing more chips. Six real asks fit in the same space.
     await expect(page.getByRole('heading', { name: 'State Your Case' })).toBeVisible();
-    const primaryChips = ['What’s on TV tonight?', 'Best movies on Netflix', 'Family movie night'];
-    for (const label of primaryChips) {
-      await expect(page.getByRole('button', { name: label })).toBeVisible();
+    const chips = page.locator('[data-testid="statecase-card"] .rounded-full');
+    expect(await chips.count(), `quick asks @ ${width}px`).toBe(6);
+    for (const label of ['On TV tonight', 'Family night', 'New this week']) {
+      await expect(page.getByRole('button', { name: new RegExp(label) })).toBeVisible();
     }
-    // The extra ideas are hidden until "More ideas" is tapped.
-    await expect(page.getByRole('button', { name: 'Where can I stream Barbie?' })).toHaveCount(0);
+    // The toggle is gone, not hidden.
+    await expect(page.getByRole('button', { name: /More ideas/ })).toHaveCount(0);
 
     // 4) No horizontal overflow.
     await noHorizontalScroll(page, width);
@@ -87,20 +90,18 @@ for (const width of WIDTHS) {
   });
 }
 
-test('chips fill the box, More ideas expands, and the CTA submits (mocked)', async ({ page }) => {
+test('chips fill the box, and the CTA submits (mocked)', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: HEIGHT });
   await page.goto('/dev/mobile-home', { waitUntil: 'networkidle' });
 
-  // Tapping a chip fills the textarea.
-  await page.getByRole('button', { name: 'Family movie night' }).click();
+  // Tapping a chip fills the textarea with the FULL query, not the short label.
+  await page.getByRole('button', { name: /Family night/ }).click();
   const box = page.getByLabel('Describe what you like to watch');
   await expect(box).toHaveValue(/family movie/i);
 
-  // "More ideas" reveals the rest, then collapses.
-  await page.getByRole('button', { name: 'More ideas' }).click();
-  await expect(page.getByRole('button', { name: 'Where can I stream Barbie?' })).toBeVisible();
-  await page.getByRole('button', { name: 'Fewer ideas' }).click();
-  await expect(page.getByRole('button', { name: 'Where can I stream Barbie?' })).toHaveCount(0);
+  // Every quick ask drops a real sentence in, not its own chip text.
+  await page.getByRole('button', { name: /Under 2 hours/ }).click();
+  await expect(box).toHaveValue(/under two hours/i);
 
   // Typing + submit hits /api/build-case exactly once (mocked) — no dup on rapid taps.
   await box.fill('Clever thrillers with a twist, but nothing too slow.');
