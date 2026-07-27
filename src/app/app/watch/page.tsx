@@ -79,7 +79,7 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
                 year={r.year}
                 mediaType={r.mediaType}
                 posterUrl={tmdbImage(r.posterPath, 'w342')}
-                overlay={<SaveButton wide removeOnSave tmdbId={r.id} mediaType={r.mediaType} title={r.title} year={r.year} posterPath={r.posterPath} />}
+                overlay={<SaveButton wide tmdbId={r.id} mediaType={r.mediaType} title={r.title} year={r.year} posterPath={r.posterPath} />}
               />
             ))}
           </div>
@@ -104,7 +104,7 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
                   year={t.year}
                   mediaType={t.mediaType}
                   posterUrl={tmdbImage(t.posterPath, 'w342')}
-                  overlay={<SaveButton wide removeOnSave tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />}
+                  overlay={<SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />}
                 />
               ))}
             </div>

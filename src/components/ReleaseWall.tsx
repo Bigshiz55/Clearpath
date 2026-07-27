@@ -5,7 +5,7 @@ import { releasesEmptyState } from '@/lib/releasesDiagnostics';
 import { SaveButton } from './SaveButton';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { AlgorithmScore } from './AlgorithmScore';
-import { TasteFeedback } from './TasteFeedback';
+import { CardVerdict } from './CardVerdict';
 import type { MediaType } from '@/lib/types';
 
 export interface WallService {
@@ -84,7 +84,6 @@ export function ReleaseWall({
   const [items, setItems] = useState<WallItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<QuickLookTarget | null>(null);
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [errored, setErrored] = useState(false);
   // Monotonic request id: a slower earlier fetch must never overwrite a newer
   // filter combination's results (latest state wins).
@@ -176,7 +175,7 @@ export function ReleaseWall({
         </div>
       ) : items && items.length > 0 ? (
         <div className={`poster-grid ${loading ? 'opacity-60' : ''}`}>
-          {items.filter((t) => !hidden.has(`${t.mediaType}-${t.id}`)).map((t) => {
+          {items.map((t) => {
             const label = dateLabel(t.releaseDate);
             const d = daysUntil(t.releaseDate);
             const soon = win === 'upcoming' && d != null && d <= 14;
@@ -220,10 +219,12 @@ export function ReleaseWall({
                   <AlgorithmScore mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-2" />
                   {/* Actions sit with the information they act on, rather than in
                       a toolbar above the artwork. Save is the ordinary watchlist
-                      save; "Not for me" teaches DNA and says so. Both take the
-                      card out of the wall — a saved title is handled, and this
-                      is a wall of things to decide about. */}
-                  <div className="mt-2 flex items-center gap-1.5" data-testid="release-actions">
+                      save; FOR / AGAINST teach the DNA and say so.
+                      NONE of them take the card out of the wall. Removing a tile
+                      reflowed every tile after it, and it took the undo with it —
+                      each control now shows its own state in place and can be
+                      tapped again to reverse it. */}
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="release-actions">
                     <SaveButton
                       wide
                       tmdbId={t.id}
@@ -231,17 +232,13 @@ export function ReleaseWall({
                       title={t.title}
                       year={t.year}
                       posterPath={t.posterPath}
-                      onRemove={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
                     />
-                    <TasteFeedback
-                      compact
-                      wide
+                    <CardVerdict
                       tmdbId={t.id}
                       mediaType={t.mediaType}
                       title={t.title}
                       year={t.year}
                       posterPath={t.posterPath}
-                      onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
                     />
                   </div>
                 </div>

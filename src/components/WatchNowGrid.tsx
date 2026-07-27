@@ -3,15 +3,17 @@
 import { useState } from 'react';
 import { SaveButton } from './SaveButton';
 import { AlgorithmScore } from './AlgorithmScore';
-import { TasteFeedback } from './TasteFeedback';
+import { CardVerdict } from './CardVerdict';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import type { WatchNowItem } from '@/lib/watchNow';
 
 export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
   const [open, setOpen] = useState<QuickLookTarget | null>(null);
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
 
-  const shown = items.filter((t) => !hidden.has(`${t.mediaType}-${t.id}`));
+  // Every item stays. Flagging one used to pull it out of the grid, which
+  // resequenced everything after it and left nothing to undo with — the card
+  // now shows its ruling in place and can be un-ruled.
+  const shown = items;
 
   return (
     <>
@@ -26,15 +28,12 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
                 </span>
                 <div className="flex flex-1 items-center gap-1.5">
                   <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
-                  <TasteFeedback
-                    compact
-                    wide
+                  <CardVerdict
                     tmdbId={t.id}
                     mediaType={t.mediaType}
                     title={t.title}
                     year={t.year}
                     posterPath={t.posterPath}
-                    onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
                   />
                 </div>
               </div>

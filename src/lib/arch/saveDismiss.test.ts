@@ -1,16 +1,16 @@
 /**
- * SAVED MEANS HANDLED.
+ * THE GRID DOES NOT MOVE UNDER YOUR THUMB.
  *
- * A browsing grid is a set of things you have not decided about yet. Once a
- * title is on your watchlist you HAVE decided, so leaving the card sitting
- * there — with the button now reading "Saved" — makes the grid a list of
- * decisions you already made, and every scroll past it is wasted attention.
+ * Every action on a card used to remove it: Save faded the placard out, FOR and
+ * AGAINST did the same. Removing a cell collapses it, so every card after it
+ * jumped up a slot mid-scan — and a decision you could not see was a decision
+ * you could not take back.
  *
- * Two exceptions, both deliberate:
- *   • A grid that IS somebody's list (a friend's profile) keeps its cards. A
- *     card vanishing there would read as editing their list.
- *   • Removal never happens on un-save. `hideCard` is only reachable from the
- *     add branch.
+ * The rule now: NOTHING REMOVES A CARD. Each control shows its own state in
+ * place and can be tapped again to reverse it. Titles you have handled are
+ * filtered out of the picks server-side, so they are gone on the NEXT load —
+ * which is the right split. Within a session a ruling is revisitable; between
+ * sessions it is something you told the recommender.
  *
  * Source-level because these grids need a session to render, so a browser test
  * would assert against a login page and prove nothing.
@@ -23,45 +23,30 @@ const ROOT = join(__dirname, '..', '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 describe('SaveButton', () => {
-  it('removes the card only after a successful add, never on removal', () => {
+  it('never removes the card — the Saved state IS the undo', () => {
     const src = read('src/components/SaveButton.tsx');
-    const addBranch = src.slice(src.indexOf('addToWatchlist('), src.indexOf('} finally'));
-    expect(addBranch).toContain('hideCard()');
-
-    const removeBranch = src.slice(src.indexOf('removeWatchlistItem('), src.indexOf('addToWatchlist('));
-    expect(removeBranch).not.toContain('hideCard');
+    // The fade-and-vanish machinery, and the props that reached it, are gone.
+    expect(src).not.toContain('hideCard');
+    expect(src).not.toContain('removeOnSave');
+    expect(src).not.toMatch(/display\s*=\s*'none'/);
   });
 
-  it('lets the grid drop the row itself rather than only hiding the DOM node', () => {
+  it('saving is reversible on the spot', () => {
     const src = read('src/components/SaveButton.tsx');
-    expect(src).toContain('onRemove');
-    expect(src).toContain('if (onRemove) onRemove();');
-    // An onRemove caller should not also have to remember removeOnSave.
-    expect(src).toContain('if (removeOnSave || onRemove) hideCard();');
-  });
-
-  it('leaves a beat before the card goes, so the bookmark fill registers', () => {
-    const src = read('src/components/SaveButton.tsx');
-    const hide = src.slice(src.indexOf('function hideCard'), src.indexOf('async function toggle'));
-    expect(hide).toMatch(/setTimeout\([\s\S]*?, 450\)/);
+    // Tapping a saved button takes the title back off the list. That only
+    // helps while the card is still there to tap.
+    expect(src).toContain('removeWatchlistItem(itemId)');
+    expect(src).toMatch(/saved \? 'Saved' : 'Save'/);
   });
 });
 
-describe('the card fade hook', () => {
-  it('every placard keeps the `card` class the fade depends on', () => {
-    // Five components find the placard with closest('.card'). Restyling the
-    // card by replacing its classes — rather than overriding them — silently
-    // breaks all five, and nothing about the page looks wrong afterwards.
-    const src = read('src/components/PosterCard.tsx');
-    expect(src).toMatch(/className="card /);
-
-    for (const f of [
-      'src/components/SaveButton.tsx',
-      'src/components/TasteFeedback.tsx',
-      'src/components/LikeButton.tsx',
-    ]) {
-      expect(read(f), f).toContain("closest('.card')");
-    }
+describe('the card class', () => {
+  it('every placard keeps the `card` class components anchor to', () => {
+    // CardVerdict finds the placard with closest('.card') to centre its burst.
+    // Restyling the card by REPLACING its classes rather than overriding them
+    // breaks that silently, and nothing about the page looks wrong afterwards.
+    expect(read('src/components/PosterCard.tsx')).toMatch(/className="card /);
+    expect(read('src/components/CardVerdict.tsx')).toContain("closest('.card')");
   });
 });
 
@@ -87,22 +72,21 @@ describe('the card fade hook', () => {
  * thinking they deferred. The accessible name keeps the full phrase.
  */
 describe('the FOR / AGAINST pair', () => {
-  it('labels the red button AGAINST rather than a deferral word', () => {
-    const src = read('src/components/TasteFeedback.tsx');
-    expect(src).toMatch(/>Against</);
-    for (const deferral of ['>Pass<', '>Skip<', '>Later<', '>Not now<']) {
+  it('labels the red side AGAINST rather than a deferral word', () => {
+    const src = read('src/lib/verdict/cardRuling.ts');
+    expect(src).toMatch(/against:\s*'Against'/);
+    for (const deferral of ["'Pass'", "'Skip'", "'Later'", "'Not now'"]) {
       expect(src, deferral).not.toContain(deferral);
     }
   });
 
   it('keeps the full meaning in the accessible name, not only the visible word', () => {
-    const src = read('src/components/TasteFeedback.tsx');
-    expect(src).toContain('aria-label="Not for me — teaches your Viewer DNA"');
-    expect(src).toMatch(/title="Not for me[^"]*teaches your Viewer DNA/);
+    const src = read('src/lib/verdict/cardRuling.ts');
+    expect(src).toMatch(/teaches your Viewer DNA/);
   });
 
-  it('pairs it with a one-word green FOR, so neither side is longer', () => {
-    expect(read('src/components/LikeButton.tsx')).toMatch(/>For</);
+  it('pairs it with a one-word FOR, so neither side is longer', () => {
+    expect(read('src/lib/verdict/cardRuling.ts')).toMatch(/for:\s*'For'/);
   });
 });
 
@@ -132,38 +116,61 @@ describe('the shared card shape', () => {
   });
 });
 
-describe('the browsing grids', () => {
-  it('every placard dismisses on save by default', () => {
-    const src = read('src/components/PosterCard.tsx');
-    expect(src).toContain('dismissOnSave = true');
-    expect(src).toContain('removeOnSave={dismissOnSave}');
-  });
+describe('no grid pulls a card out from under you', () => {
+  const GRIDS = [
+    'src/components/PosterCard.tsx',
+    'src/components/ReleaseWall.tsx',
+    'src/components/WatchNowGrid.tsx',
+    'src/components/OnTvGuide.tsx',
+    'src/components/Mentalist.tsx',
+    'src/components/RecommendedForYou.tsx',
+    'src/app/app/watch/page.tsx',
+  ];
 
-  it('the New Releases wall drops the row from its own state', () => {
-    const src = read('src/components/ReleaseWall.tsx');
-    const save = src.slice(src.indexOf('<SaveButton'), src.indexOf('<TasteFeedback'));
-    expect(save).toContain('onRemove');
-  });
-
-  it('every hand-rolled SaveButton in a suggestion grid opts in', () => {
-    // A grid that supplies its own overlay bypasses PosterCard's default, so
-    // each one has to say so itself. These are the suggestion surfaces.
-    for (const file of [
-      'src/app/app/watch/page.tsx',
-      'src/components/Mentalist.tsx',
-      'src/components/RecommendedForYou.tsx',
-    ]) {
-      const src = read(file);
-      const buttons = src.match(/<SaveButton[\s\S]*?\/>/g) ?? [];
-      expect(buttons.length, file).toBeGreaterThan(0);
-      for (const b of buttons) expect(b, `${file}: ${b.slice(0, 60)}`).toContain('removeOnSave');
+  it('no card grid asks for a card to be dismissed', () => {
+    for (const f of GRIDS) {
+      const src = read(f);
+      expect(src, `${f} removeOnSave`).not.toContain('removeOnSave');
+      expect(src, `${f} dismissOnSave`).not.toContain('dismissOnSave');
     }
   });
 
-  it("a friend's profile keeps its cards — that list is theirs, not a feed", () => {
-    const src = read('src/app/app/u/[username]/page.tsx');
-    const buttons = src.match(/<SaveButton[\s\S]*?\/>/g) ?? [];
-    expect(buttons.length).toBeGreaterThan(0);
-    for (const b of buttons) expect(b).not.toContain('removeOnSave');
+  it('no grid hides a ruled card from its own state either', () => {
+    // Filtering the list by a `hidden` set is the same reflow by another route.
+    for (const f of ['src/components/ReleaseWall.tsx', 'src/components/WatchNowGrid.tsx', 'src/components/OnTvGuide.tsx']) {
+      expect(read(f), f).not.toMatch(/setHidden\(/);
+    }
+  });
+
+  it('the verdict pair is the single component every grid uses', () => {
+    // Two independent buttons could not agree on what the card said, which is
+    // why neither could offer an undo.
+    for (const f of GRIDS) {
+      const src = read(f);
+      expect(src, `${f} TasteFeedback`).not.toContain('<TasteFeedback');
+      expect(src, `${f} LikeButton`).not.toContain('<LikeButton');
+    }
+  });
+});
+
+describe('a ruling can be taken back', () => {
+  const src = read('src/components/CardVerdict.tsx');
+
+  it('the ruled button is itself the undo, and really retracts the signal', () => {
+    expect(src).toContain('nextRuling(');
+    expect(src).toContain('isUndo(');
+    // Not just a visual reset — the recorded feedback is withdrawn.
+    expect(src).toContain('undoPassFeedback');
+  });
+
+  it('nothing about a ruling changes the card\'s size', () => {
+    // A visible status line under the action row cost 42px and pushed every
+    // card below it down the page. The ruling rides on the button instead.
+    expect(src).toContain('sr-only');
+    expect(src).not.toMatch(/basis-full/);
+  });
+
+  it('a failed write does not leave the card claiming it succeeded', () => {
+    expect(src).toMatch(/catch[\s\S]{0,120}setRuling\(ruling\)/);
   });
 });

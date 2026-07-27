@@ -6,7 +6,7 @@ import { SeasonWhereToWatch } from '@/components/SeasonWhereToWatch';
 import { Poster } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
 import { CardRatings } from '@/components/CardRatings';
-import { TasteFeedback } from '@/components/TasteFeedback';
+import { CardVerdict } from '@/components/CardVerdict';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
 import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
@@ -151,8 +151,9 @@ export function VerdictReportView({
                 initialItemId={watchState?.itemId ?? null}
                 variant="inline"
               />
-              {/* Not for you? Flag it here too — feeds your DNA, same as the cards. */}
-              <TasteFeedback
+              {/* Rule on it here too — feeds your DNA, same as the cards, and
+                  reversible in the same way. */}
+              <CardVerdict
                 tmdbId={t.id}
                 mediaType={t.mediaType}
                 title={t.title}

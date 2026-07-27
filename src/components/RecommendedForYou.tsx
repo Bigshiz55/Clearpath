@@ -92,7 +92,6 @@ export function RecommendedForYou({ label }: { label?: string | null }) {
               overlay={
                 <SaveButton
                   wide
-                  removeOnSave
                   tmdbId={r.id}
                   mediaType={r.mediaType}
                   title={r.title}

@@ -24,8 +24,7 @@ function posterSrcFor(a: { image: string | null; posterPath?: string | null }, s
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
 import { SaveButton } from '@/components/SaveButton';
-import { TasteFeedback } from '@/components/TasteFeedback';
-import { LikeButton } from '@/components/LikeButton';
+import { CardVerdict } from '@/components/CardVerdict';
 import { CardDna } from '@/components/CardDna';
 import type { Airing } from '@/lib/onTv';
 
@@ -121,8 +120,6 @@ export function OnTvGuide({
   const [reminded, setReminded] = useState<Set<number>>(new Set(remindedIds));
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [hidden, setHidden] = useState<Set<number>>(new Set());
-  const remove = (id: number) => setHidden((s) => new Set(s).add(id));
 
   async function toggleReminder(a: Airing) {
     setBusy(a.id);
@@ -202,7 +199,7 @@ export function OnTvGuide({
   // In windowed mode every valid airing is a result, not a "highlight" — the
   // full schedule is the deliverable. Elsewhere a short highlight strip sits
   // above the complete list, which is never shortened.
-  const highlightVisible = highlightPool.filter((a) => !hidden.has(a.id));
+  const highlightVisible = highlightPool;
   const highlights = windowed ? highlightVisible : highlightVisible.slice(0, 6);
 
   if (airings.length === 0) {
@@ -261,10 +258,9 @@ export function OnTvGuide({
                   {/* Action row on top of the placard — For · Pass · Save — the
                       same groove as every other card in the app. */}
                   {resolved && (
-                    <div className="flex items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
-                      <LikeButton tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onFlagged={() => remove(a.id)} />
-                      <TasteFeedback compact wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onFlagged={() => remove(a.id)} />
-                      <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onSaved={() => remove(a.id)} />
+                    <div className="flex flex-wrap items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
+                      <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                      <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
                     </div>
                   )}
                   {resolved ? (

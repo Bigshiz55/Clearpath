@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
 import { CardDna } from '@/components/CardDna';
 import { SaveButton } from '@/components/SaveButton';
-import { TasteFeedback } from '@/components/TasteFeedback';
+import { CardVerdict } from '@/components/CardVerdict';
 import type { MediaType } from '@/lib/types';
 
 const VISIBLE = 12; // show a window of the pool; hiding one slides the next in
@@ -254,14 +254,12 @@ export function TvDetective() {
                               wide
                               onSaved={() => remove(p.id, 'Added to your list — pulled in another pick.')}
                             />
-                            <TasteFeedback
+                            <CardVerdict
                               tmdbId={p.tmdbId}
                               mediaType={p.mediaType}
                               title={p.showName}
                               year={null}
                               posterPath={null}
-                              wide
-                              onFlagged={() => remove(p.id)}
                             />
                           </>
                         )}
