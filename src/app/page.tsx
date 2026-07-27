@@ -6,25 +6,6 @@ import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
-const FEATURES = [
-  {
-    title: 'A verdict, not a shrug',
-    body: 'Every title gets a clear call — Must Watch to Skip — with a one-line recommendation you can act on.',
-  },
-  {
-    title: 'Tuned to your taste',
-    body: 'A personal match score adjusts for what you love and what you avoid. Your profile, your rules.',
-  },
-  {
-    title: 'Where to watch, legally',
-    body: 'See streaming, rental, and purchase options for your region — with honest, up-to-date availability.',
-  },
-  {
-    title: 'Share the call',
-    body: 'Send a friend a verdict page. No account needed to open it.',
-  },
-];
-
 /**
  * How far along is this person's Watch DNA?
  *
@@ -109,23 +90,8 @@ export default async function LandingPage() {
               No account needed to look ·{' '}
               <Link href="/import-taste" className="underline underline-offset-2 hover:text-slate-300" data-testid="cta-import">
                 already have a watch history? Import it
-              </Link>{' '}
-              ·{' '}
-              <a href="#how" className="underline underline-offset-2 hover:text-slate-300">
-                how it works
-              </a>
+              </Link>
             </p>
-          </div>
-        </section>
-
-        <section id="how" className="container-page pb-20">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="card p-6">
-                <h3 className="text-lg font-semibold text-white">{f.title}</h3>
-                <p className="mt-2 text-sm text-slate-400">{f.body}</p>
-              </div>
-            ))}
           </div>
         </section>
 
