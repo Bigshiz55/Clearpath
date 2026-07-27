@@ -68,7 +68,7 @@ test('tapping a poster selects it, tapping again clears it', async ({ page }) =>
   await expect(like).toHaveAttribute('aria-pressed', 'false');
   await like.click();
   await expect(like).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('title-grid-submit')).toContainText('Use these 1');
+  await expect(page.getByTestId('title-grid-submit')).toContainText('add 1 to my DNA');
   await like.click();
   await expect(like).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByTestId('title-grid-submit')).toBeDisabled();
@@ -174,7 +174,9 @@ test('every round tells the server what it has already shown', async ({ page }) 
   expect(urls.length).toBeGreaterThanOrEqual(2);
   const first = new URL(urls[0]!);
   const second = new URL(urls[urls.length - 1]!);
-  expect(first.searchParams.get('size')).toBe('12');
+  // The client over-fetches on purpose so it has headroom to top up a round
+  // that comes back thin — it still only ever RENDERS twelve.
+  expect(Number(first.searchParams.get('size'))).toBeGreaterThanOrEqual(12);
   // The first round has nothing to exclude; the second must exclude twelve.
   expect((first.searchParams.get('exclude') ?? '').split(',').filter(Boolean)).toHaveLength(0);
   expect((second.searchParams.get('exclude') ?? '').split(',').filter(Boolean)).toHaveLength(12);
@@ -187,4 +189,76 @@ test('says so honestly when there is genuinely nothing left', async ({ page }) =
   await expect(page.locator('[data-testid^="grid-tile-"]')).toHaveCount(12);
   await page.getByTestId('title-grid-shuffle').click();
   await expect(page.getByTestId('title-grid-empty')).toContainText('everything I can find');
+});
+
+test('never repeats even when the server ignores what it was told', async ({ page }) => {
+  // A stale deployment or a cached response can hand back the same set. The
+  // grid makes the no-repeat promise on screen, so it has to keep it itself.
+  await page.route('**/api/calibration*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: items(40), answered: 0, size: 20, complete: false }),
+    }),
+  );
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/dev/title-grid', { waitUntil: 'networkidle' });
+  await expect(page.getByTestId('title-grid')).toBeVisible();
+
+  const first = await page.locator('[data-testid^="grid-tile-"]').evaluateAll((els) =>
+    els.map((e) => e.getAttribute('data-testid')),
+  );
+  await page.getByTestId('title-grid-shuffle').click();
+  await expect(page.locator('[data-testid^="grid-tile-"]')).toHaveCount(12);
+  const second = await page.locator('[data-testid^="grid-tile-"]').evaluateAll((els) =>
+    els.map((e) => e.getAttribute('data-testid')),
+  );
+
+  expect(second.filter((k) => first.includes(k))).toHaveLength(0);
+});
+
+test('THE BUG: dealing 12 more keeps the picks you already made', async ({ page }) => {
+  await open(page, 1280, 800, 40);
+  await page.getByTestId('grid-like-100').click();
+  await page.getByTestId('grid-like-101').click();
+  await page.getByTestId('grid-like-102').click();
+  await expect(page.getByTestId('grid-running-total')).toContainText('3 picked so far');
+
+  await page.getByTestId('title-grid-shuffle').click();
+  await expect(page.locator('[data-testid^="grid-tile-"]')).toHaveCount(12);
+
+  // Six picked, then "12 more", used to wipe the six without ever saving them.
+  await expect(page.getByTestId('grid-running-total')).toContainText('3 picked so far');
+  await expect(page.getByTestId('title-grid-submit')).toContainText('add 3 to my DNA');
+});
+
+test('the end button writes everything picked across every round', async ({ page }) => {
+  const posts: string[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'POST') posts.push(r.postData() ?? '');
+  });
+
+  await open(page, 1280, 800, 40);
+  await page.getByTestId('grid-like-100').click();
+  await page.getByTestId('title-grid-shuffle').click();
+  await expect(page.locator('[data-testid^="grid-tile-"]')).toHaveCount(12);
+
+  const secondRoundId = (await page.locator('[data-testid^="grid-like-"]').first().getAttribute('data-testid'))!
+    .replace('grid-like-', '');
+  await page.getByTestId(`grid-like-${secondRoundId}`).click();
+  expect(posts, 'nothing is written until the end button').toHaveLength(0);
+
+  await page.getByTestId('title-grid-submit').click();
+  await expect(page.getByTestId('title-grid-done')).toBeVisible();
+
+  const body = posts.join('\n');
+  // The round-one pick is still in there, even though its card is long gone.
+  expect(body).toContain('Test Title 1');
+  expect(body).toContain(`"tmdbId":${secondRoundId}`);
+});
+
+test('a pick pops the DNA animation', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('grid-like-100').click();
+  await expect(page.getByText(/DNA/i).first()).toBeVisible();
 });

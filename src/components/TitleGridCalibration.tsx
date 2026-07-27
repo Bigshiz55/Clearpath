@@ -23,6 +23,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { recordQuizAnswer } from '@/lib/actions/dnaQuiz';
+import { DnaBurst } from '@/components/DnaBurst';
 
 const GRID_SIZE = 12;
 
@@ -66,6 +67,14 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
   const [savedCount, setSavedCount] = useState<number | null>(null);
   const [round, setRound] = useState(0);
   const [exhausted, setExhausted] = useState(false);
+  // The DNA pop, in the centre of the tile you just chose. Same moment the
+  // rest of the app gives you for a For/Pass — this is the only feedback that
+  // a tap did anything, so it belongs here more than anywhere.
+  const [burst, setBurst] = useState<{ cx: number; cy: number } | null>(null);
+  // Every title picked across EVERY round, not just the one on screen. A round
+  // is a dealer, not a session: dealing twelve more used to wipe the six you
+  // had already chosen, which threw the work away without ever saving it.
+  const chosenItems = useRef<Map<string, Item>>(new Map());
   // Every key this session has already put on screen. Sent to the server so a
   // fresh round genuinely deals fresh cards: the plan is deterministic, so
   // without it "show me 12 more" re-deals the same twelve — which it did.
@@ -76,30 +85,57 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
   const load = useCallback(async () => {
     setItems(null);
     setError(null);
-    setPicks({});
     setOpenRating(null);
-    setSavedCount(null);
+    // NOT `setPicks({})`. A new round adds twelve more cards; it does not
+    // discard what you already chose.
     try {
-      const qs = new URLSearchParams({ size: String(GRID_SIZE) });
-      // Walk TMDB deeper each round so the pool itself refreshes rather than
-      // being re-planned from the same forty titles. Wraps rather than running
-      // off the end of what TMDB will serve.
-      qs.set('page', String((round % 5) + 1));
-      if (sessionId) qs.set('session', sessionId);
-      const already = Array.from(seen.current).slice(-200);
-      if (already.length > 0) qs.set('exclude', already.join(','));
+      // NO REPEATS, GUARANTEED HERE.
+      //
+      // The server excludes what it knows about, but this component is the one
+      // making the promise on screen, so it enforces it itself: anything this
+      // session has already shown is filtered out again on arrival, and if a
+      // page comes back thin we walk deeper until we have a full twelve or run
+      // out of catalog. A stale deployment, a cached response or a server that
+      // ignores `exclude` can no longer produce the same twelve twice.
+      const fresh: Item[] = [];
+      let lastError: string | null = null;
 
-      const res = await fetch(`/api/calibration?${qs.toString()}`, { cache: 'no-store' });
-      const data = (await res.json()) as { items?: Item[]; error?: string };
-      if (!res.ok) {
-        setError(data.error ?? 'Could not load titles right now.');
+      for (let attempt = 0; attempt < 5 && fresh.length < GRID_SIZE; attempt++) {
+        const qs = new URLSearchParams({ size: String(GRID_SIZE * 2) });
+        // Walk TMDB deeper so the pool itself refreshes rather than being
+        // re-planned from the same forty titles.
+        qs.set('page', String(((round + attempt) % 5) + 1));
+        if (sessionId) qs.set('session', sessionId);
+        const already = Array.from(seen.current).slice(-200);
+        if (already.length > 0) qs.set('exclude', already.join(','));
+
+        const res = await fetch(`/api/calibration?${qs.toString()}`, { cache: 'no-store' });
+        const data = (await res.json()) as { items?: Item[]; error?: string };
+        if (!res.ok) {
+          lastError = data.error ?? 'Could not load titles right now.';
+          break;
+        }
+        let added = 0;
+        for (const i of data.items ?? []) {
+          const k = `${i.mediaType}:${i.id}`;
+          if (seen.current.has(k) || fresh.some((f) => keyOf(f) === k)) continue;
+          fresh.push(i);
+          added += 1;
+          if (fresh.length >= GRID_SIZE) break;
+        }
+        // A page that produced nothing new means deeper pages are unlikely to
+        // either — stop rather than hammering TMDB.
+        if (added === 0 && attempt > 0) break;
+      }
+
+      if (fresh.length === 0 && lastError) {
+        setError(lastError);
         setItems([]);
         return;
       }
-      const next = (data.items ?? []).slice(0, GRID_SIZE);
-      for (const i of next) seen.current.add(`${i.mediaType}:${i.id}`);
-      setExhausted(next.length === 0 && seen.current.size > 0);
-      setItems(next);
+      for (const i of fresh) seen.current.add(keyOf(i));
+      setExhausted(fresh.length === 0 && seen.current.size > 0);
+      setItems(fresh);
     } catch {
       setError('Could not load titles right now.');
       setItems([]);
@@ -112,28 +148,49 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
 
   const chosen = Object.keys(picks).length;
 
-  function toggleLike(i: Item) {
+  /** After a save, the next twelve start a fresh run — the picks just written
+   *  must not be counted (or re-written) a second time. */
+  function startNewRun() {
+    setPicks({});
+    chosenItems.current.clear();
+    setSavedCount(null);
+    setRound((r) => r + 1);
+  }
+
+  function toggleLike(i: Item, el: HTMLElement | null) {
     const k = keyOf(i);
     setOpenRating(null);
     setPicks((p) => {
       const next = { ...p };
-      if (next[k]?.kind === 'like') delete next[k];
-      else next[k] = { kind: 'like' };
+      if (next[k]?.kind === 'like') {
+        delete next[k];
+        chosenItems.current.delete(k);
+      } else {
+        next[k] = { kind: 'like' };
+        chosenItems.current.set(k, i);
+        const r = el?.getBoundingClientRect();
+        if (r) setBurst({ cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+      }
       return next;
     });
   }
 
-  function setRating(i: Item, rating: Rating) {
+  function setRating(i: Item, rating: Rating, el: HTMLElement | null) {
     const k = keyOf(i);
     setPicks((p) => ({ ...p, [k]: { kind: 'seen', rating } }));
+    chosenItems.current.set(k, i);
     setOpenRating(null);
+    const r = el?.closest('li')?.getBoundingClientRect();
+    if (r) setBurst({ cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
   }
 
   async function submit() {
-    if (!items || chosen === 0) return;
+    if (chosen === 0) return;
     setSaving(true);
+    // Everything picked across every round — a title chosen three rounds ago is
+    // still a title you chose.
     const results = await Promise.all(
-      items.flatMap((i) => {
+      Array.from(chosenItems.current.values()).flatMap((i) => {
         const pick = picks[keyOf(i)];
         if (!pick) return []; // untouched → nothing is sent. This is the point.
         const base = {
@@ -179,11 +236,11 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setRound((r) => r + 1)}
-            className="btn-primary inline-flex min-h-[44px] items-center px-5"
+            onClick={startNewRun}
+            className="btn-primary inline-flex min-h-[48px] items-center px-6 text-base"
             data-testid="title-grid-more"
           >
-            Show me 12 more
+            Keep going — 12 more
           </button>
           <a
             href="/app/dna"
@@ -232,7 +289,7 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
               <li key={k} className="min-w-0" data-testid={`grid-tile-${i.mediaType}-${i.id}`}>
                 <button
                   type="button"
-                  onClick={() => toggleLike(i)}
+                  onClick={(e) => toggleLike(i, e.currentTarget)}
                   aria-pressed={liked}
                   data-testid={`grid-like-${i.id}`}
                   className={[
@@ -270,9 +327,9 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
                       <button
                         key={r.key}
                         type="button"
-                        onClick={() => setRating(i, r.key)}
+                        onClick={(e) => setRating(i, r.key, e.currentTarget)}
                         data-testid={`grid-rate-${i.id}-${r.key}`}
-                        className="inline-flex min-h-[32px] flex-1 items-center justify-center rounded-md border border-white/12 bg-white/5 px-1 text-[11px] font-semibold text-slate-200 hover:bg-white/10"
+                        className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg border border-white/12 bg-white/5 px-1 text-base text-slate-200 hover:bg-white/10"
                         title={r.label}
                       >
                         {r.emoji}
@@ -284,7 +341,7 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
                     type="button"
                     onClick={() => setOpenRating(k)}
                     data-testid={`grid-seen-${i.id}`}
-                    className="mt-0.5 inline-flex min-h-[36px] items-center text-[11px] font-semibold text-brand-300 underline underline-offset-2 hover:text-brand-200"
+                    className="mt-1 inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-[#ff1493]/45 bg-[#ff1493]/10 px-2 text-xs font-bold text-pink-200 transition hover:bg-[#ff1493]/20"
                   >
                     {seen ? `Seen it · ${RATINGS.find((r) => r.key === seen)?.label}` : 'Seen it?'}
                   </button>
@@ -295,28 +352,39 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
         </ul>
       )}
 
-      {items.length > 0 && (
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={submit}
-            disabled={chosen === 0 || saving}
-            data-testid="title-grid-submit"
-            className="btn-primary inline-flex min-h-[44px] items-center px-5 disabled:opacity-40"
-          >
-            {saving ? 'Saving…' : chosen === 0 ? 'Tap a few first' : `Use these ${chosen} →`}
-          </button>
+      {/* Keep going for as long as you like. The end button is the ONLY thing
+          that writes — dealing another twelve never discards what you picked,
+          and the running total says so. More rounds is the fastest way to a
+          real profile, so nothing here rushes you off the screen. */}
+      <div className="sticky bottom-0 mt-5 flex flex-wrap items-center gap-2 bg-gradient-to-t from-ink-950 via-ink-950/95 to-transparent pb-2 pt-4">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={chosen === 0 || saving}
+          data-testid="title-grid-submit"
+          className="btn-primary inline-flex min-h-[48px] items-center px-6 text-base disabled:opacity-40"
+        >
+          {saving ? 'Saving…' : chosen === 0 ? 'Pick a few first' : `Done — add ${chosen} to my DNA →`}
+        </button>
+        {items.length > 0 && (
           <button
             type="button"
             onClick={() => setRound((r) => r + 1)}
             disabled={saving}
             data-testid="title-grid-shuffle"
-            className="inline-flex min-h-[44px] items-center rounded-lg border border-white/15 px-4 text-sm font-semibold text-slate-300 transition hover:bg-white/10 disabled:opacity-40"
+            className="inline-flex min-h-[48px] items-center rounded-lg border-2 border-[#ff1493]/45 bg-[#ff1493]/10 px-5 text-sm font-bold text-pink-100 transition hover:bg-[#ff1493]/20 disabled:opacity-40"
           >
-            Nothing here I know — show me 12 more
+            Show me 12 more
           </button>
-        </div>
-      )}
+        )}
+        {chosen > 0 && (
+          <span className="text-sm font-semibold text-slate-300" data-testid="grid-running-total">
+            {chosen} picked so far · keep going, nothing is saved until you finish
+          </span>
+        )}
+      </div>
+
+      {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind="up" onDone={() => setBurst(null)} />}
     </div>
   );
 }

@@ -30,33 +30,41 @@ export function TasteQuizModes({ active, sessionId }: { active: QuizMode; sessio
   };
 
   return (
-    <nav className="flex flex-wrap items-center gap-2" aria-label="Taste Quiz mode" data-testid="quiz-modes">
-      {MODES.map((m) => {
-        const on = m.key === active;
-        return (
-          <Link
-            key={m.key}
-            href={qs(m.key)}
-            aria-current={on ? 'page' : undefined}
-            data-testid={`quiz-mode-${m.key}`}
-            className={[
-              'inline-flex min-h-[44px] flex-col justify-center rounded-lg border px-3 py-1.5 transition',
-              on
-                ? 'border-brand-400/60 bg-brand-500/20 text-white'
-                : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10',
-            ].join(' ')}
-          >
-            <span className="text-sm font-bold leading-tight">{m.label}</span>
-            <span className="text-[10px] leading-tight text-slate-400">{m.hint}</span>
-          </Link>
-        );
-      })}
+    <nav aria-label="Taste Quiz mode" data-testid="quiz-modes">
+      {/* This is the first choice on the screen and it decides what the next two
+          minutes look like, so it is sized like a choice rather than a filter
+          chip. Brand pink, because that is the colour the product uses for the
+          thing it wants you to press. */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {MODES.map((m) => {
+          const on = m.key === active;
+          return (
+            <Link
+              key={m.key}
+              href={qs(m.key)}
+              aria-current={on ? 'page' : undefined}
+              data-testid={`quiz-mode-${m.key}`}
+              className={[
+                'flex min-h-[74px] flex-col justify-center rounded-2xl border-2 px-5 py-4 transition',
+                on
+                  ? 'border-pink-300/60 bg-gradient-to-b from-[#ff62b6] to-[#ff1493] text-white shadow-[0_10px_30px_-10px_rgba(255,20,147,0.65)]'
+                  : 'border-[#ff1493]/40 bg-[#ff1493]/[0.07] text-pink-100 hover:border-[#ff1493]/70 hover:bg-[#ff1493]/15',
+              ].join(' ')}
+            >
+              <span className="text-lg font-black leading-tight sm:text-xl">{m.label}</span>
+              <span className={`mt-0.5 text-sm leading-tight ${on ? 'text-pink-50/90' : 'text-pink-200/70'}`}>
+                {m.hint}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
       {/* The third way in is a different kind of act — you are handing over data
           rather than answering anything — so it is a link, not a third tab. */}
       <Link
         href="/import-taste"
         data-testid="quiz-mode-import"
-        className="ml-1 text-xs font-semibold text-brand-300 underline underline-offset-2 hover:text-brand-200"
+        className="mt-2 inline-flex min-h-[36px] items-center text-sm font-semibold text-pink-300 underline underline-offset-2 hover:text-pink-200"
       >
         Or import your history →
       </Link>

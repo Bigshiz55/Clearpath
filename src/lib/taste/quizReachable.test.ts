@@ -90,6 +90,15 @@ describe('entry points', () => {
     expect(grid).toContain('not recognising something is not a dislike');
   });
 
+  it('the lane switch is a real choice, sized and coloured like one', () => {
+    const modes = read('src/components/TasteQuizModes.tsx');
+    // It is the first decision on the screen and it changes the next two
+    // minutes — a filter-chip-sized control undersold it.
+    expect(modes).toMatch(/min-h-\[7\d\w*px\]/);
+    expect(modes).toContain('#ff1493');
+    expect(modes).toContain('sm:grid-cols-2');
+  });
+
   it('the nav carries the quiz', () => {
     expect(read('src/components/Nav.tsx')).toContain(QUIZ_HREF);
   });
