@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { airingStatus, displayClock, liveLabel } from '@/lib/viewing/clock';
 import { tmdbImage, type TmdbImageSize } from '@/lib/tmdb/image';
 
 /** Poster art comes from the canonical TMS CDN; if it fails to load, swap to the
@@ -32,14 +33,22 @@ type TimeFilter = 'all' | 'primetime' | 'nownext';
 type SortFilter = 'time' | 'rating';
 export type GuideMode = 'broadcast' | 'streaming';
 
-function fmtTime(t: string): string | null {
-  const m = t.match(/^(\d{1,2}):(\d{2})/);
-  if (!m) return null;
-  let h = Number(m[1]);
-  const min = m[2];
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${h}:${min} ${ampm}`;
+/**
+ * The clock label for an airing, IN THE VIEWER'S OWN ZONE.
+ *
+ * `a.time` is a pre-formatted string from the provider, in the NETWORK's
+ * timezone (Eastern, for both Gracenote and TVmaze's US grid). Printing it to
+ * everybody meant a Pacific viewer saw "3:42 AM" for something starting in
+ * forty minutes — a time that reads as already past, and that contradicted the
+ * "next 2 hours" heading above it. The window was always computed on the real
+ * instant; only the label was wrong.
+ *
+ * `suppressHydrationWarning` on the elements below: the server renders in its
+ * own zone (UTC) and the browser corrects on hydration. That is the intended
+ * behaviour for a wall-clock time, not a mismatch to fix.
+ */
+function fmtTime(airstamp: string | null | undefined, providerTime: string): string | null {
+  return displayClock(airstamp, providerTime);
 }
 
 /** "Today" / "Tomorrow" / weekday for an airing, from its real UTC timestamp. */
@@ -145,6 +154,15 @@ export function OnTvGuide({
     }
   }
   const [time, setTime] = useState<TimeFilter>(streaming || windowed ? 'all' : 'primetime');
+  // "Now" for the live/upcoming split. Set on mount and ticked every minute, so
+  // a card that starts while you are looking at it flips to "On now" instead of
+  // sitting there with a time that has quietly passed. Rendering it on the
+  // SERVER would freeze it at request time, which is how a stale label survives.
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
   const [sort, setSort] = useState<SortFilter>(streaming ? 'rating' : 'time');
   const [media, setMedia] = useState<'all' | 'movie' | 'tv'>('all');
 
@@ -222,7 +240,7 @@ export function OnTvGuide({
           </h2>
           <p className="mb-3 text-xs text-slate-400">
             {windowed
-              ? 'Real listings between now and then, soonest first'
+              ? 'Real listings between now and then, soonest first — times are your local time, and anything already running says so'
               : streaming
                 ? 'Highest-rated premieres on the major services'
                 : 'Best-reviewed shows in prime time'}{' '}
@@ -257,7 +275,7 @@ export function OnTvGuide({
                   <div className="flex flex-1 flex-col p-2">
                     <div className="line-clamp-2 text-xs font-semibold text-white">{a.showName}</div>
                     <div className="mt-1 flex items-center justify-between gap-1">
-                      <span className="truncate text-sm font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
+                      <span suppressHydrationWarning className="truncate text-sm font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.airstamp, a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
                       {a.rating != null && <span className={`flex-none text-xs font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
                     </div>
                     {(a.criticRt != null || a.criticImdb != null) && (
@@ -311,16 +329,37 @@ export function OnTvGuide({
       ) : (
         <div className="space-y-2">
           {filtered.map((a) => {
-            const t = fmtTime(a.time);
+            const t = fmtTime(a.airstamp, a.time);
+            const status = airingStatus(a.airstamp, a.runtime, nowMs);
             return (
-              <div key={a.id} className="card wv-tv-row p-3" data-testid="airing-row">
+              <div
+                key={a.id}
+                className="card wv-tv-row p-3"
+                data-testid="airing-row"
+                data-state={status.state}
+              >
                 <div className="wv-tv-when text-center">
                   {(() => {
                     const dl = dayLabel(a.airstamp);
+                    // Already running. The window includes these on purpose —
+                    // joining twenty minutes late is a real option — but a start
+                    // time in the past under a "coming on" heading reads as a
+                    // broken clock, so say what it actually is.
+                    if (status.state === 'live') {
+                      return (
+                        <div
+                          suppressHydrationWarning
+                          data-testid="airing-live"
+                          className="rounded-md bg-emerald-500/20 px-1 py-1 text-[11px] font-black uppercase leading-tight tracking-wide text-emerald-200"
+                        >
+                          {liveLabel(status.startedMinutesAgo)}
+                        </div>
+                      );
+                    }
                     if (t && a.minutes > 0) {
                       return (
                         <>
-                          <div className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white">{t}</div>
+                          <div suppressHydrationWarning className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white">{t}</div>
                           {dl !== 'Today' && <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">{dl}</div>}
                         </>
                       );
