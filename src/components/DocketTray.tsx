@@ -35,7 +35,9 @@ export function DocketTray() {
       data-testid="docket-tray"
     >
       <div className="container-page">
-        <div className="rounded-2xl border-2 border-[#ff1493]/50 bg-ink-950/95 p-3 shadow-[0_10px_40px_-8px_rgba(0,0,0,0.8)] backdrop-blur">
+        {/* Opaque, and no backdrop-filter — same iOS fixed-layer repaint trap
+            the bottom nav hit. See MobileNav. */}
+        <div className="rounded-2xl border-2 border-[#ff1493]/50 bg-ink-950 p-3 shadow-[0_10px_40px_-8px_rgba(0,0,0,0.8)]">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"

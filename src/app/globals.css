@@ -15,7 +15,11 @@ body {
   background-image:
     radial-gradient(1100px 560px at 82% -12%, rgba(47, 107, 255, 0.16), transparent),
     radial-gradient(820px 460px at -8% 4%, rgba(230, 173, 51, 0.07), transparent);
-  background-attachment: fixed;
+  /* NOT `background-attachment: fixed`. On iOS Safari it forces the whole page
+     into a compositing path where `position: fixed` layers are repainted
+     lazily, so the bottom nav and the docket tray could be left stranded
+     mid-screen after a scroll. The gradients are decorative and look identical
+     scrolling with the page. */
   min-height: 100dvh;
 }
 
@@ -25,19 +29,22 @@ body {
   }
 
   /* The one poster-grid used across the app.
-     ONE-UP ON A PHONE. Two columns at 390px leaves each card about 170px wide,
-     which is where "NOT FOR ME" wraps onto three lines, titles truncate
-     mid-word and the verdict panel has to shrink its own type. A full-width
-     card fixes all three at once without touching a single font size. Two-up
-     returns at 480px, where there is actually room for it, and from `sm` the
-     grid auto-fills. */
+     ONE COLUMN OF ROWS ON A PHONE. Two narrow columns is the wrong way to fit
+     more titles on a phone screen — at 390px each cell is ~170px, which is
+     where "NOT FOR ME" wraps onto three lines and titles truncate mid-word, and
+     there is nowhere at all to say what the thing is about. So the CARD turns
+     sideways instead (see PosterCard): poster on the left at about a third of
+     the width, facts and synopsis beside it. Three or four fit on a screen
+     where one used to, and each one tells you what it is.
+     From `sm` there is room for real columns, the card goes back to being a
+     column, and the grid auto-fills. */
   .poster-grid {
-    @apply grid gap-4;
+    @apply grid gap-3;
     grid-template-columns: minmax(0, 1fr);
   }
-  @media (min-width: 480px) {
+  @media (min-width: 640px) {
     .poster-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      @apply gap-4;
     }
   }
   @media (min-width: 640px) {

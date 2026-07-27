@@ -30,11 +30,17 @@ export async function GET(_req: Request, { params }: { params: { type: string; i
       imdb: meta.imdbRating ?? null,
       metacritic: meta.metascore ?? null,
     };
+    // The synopsis rides along on a hydration we were already doing. A card
+    // that shows a poster and a number but not what the thing is about asks the
+    // viewer to judge a film by its artwork; TMDB has already given us the
+    // sentence, and it cost nothing to carry it here. Null when TMDB has none —
+    // never a placeholder, never invented.
+    const overview = meta.overview?.trim() ? meta.overview.trim() : null;
     return NextResponse.json(
-      { ratings },
+      { ratings, overview },
       { headers: { 'Cache-Control': 'public, s-maxage=43200, stale-while-revalidate=86400' } },
     );
   } catch {
-    return NextResponse.json({ ratings: EMPTY_TILE_RATINGS });
+    return NextResponse.json({ ratings: EMPTY_TILE_RATINGS, overview: null });
   }
 }

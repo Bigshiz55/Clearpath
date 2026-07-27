@@ -5,6 +5,7 @@ import { SaveButton } from './SaveButton';
 import { TasteFeedback } from './TasteFeedback';
 import { LikeButton } from './LikeButton';
 import { WCheck } from './WCheck';
+import { CardSynopsis } from './CardSynopsis';
 
 interface PosterCardProps {
   href?: string;
@@ -103,9 +104,21 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   // break every one of them. The BORDER is what goes: the poster's own edge is
   // the boundary, depth comes from a shadow, and a page of results stops being
   // a grid of boxes.
+  // A ROW ON A PHONE, A COLUMN FROM `sm` UP.
+  //
+  // Full-width column cards meant one poster filled a 956px screen on its own —
+  // 2:3 at 406px wide is 609px of artwork before the title even appears. You
+  // could see exactly one title at a time, and nothing telling you what it was
+  // about. Turning the card on its side fixes both at once: the poster drops to
+  // roughly a third of the width, three or four cards fit on a screen, and the
+  // space beside the artwork is exactly where a synopsis belongs.
+  //
+  // From `sm` the grid has real columns again, so the card goes back to being a
+  // column — a sideways card in a 250px cell would leave a thumbnail and a
+  // sliver.
   return (
-    <div className="card group flex h-full flex-col overflow-hidden !border-transparent shadow-[0_6px_24px_-6px_rgba(0,0,0,0.8)] transition hover:shadow-[0_10px_32px_-6px_rgba(0,0,0,0.95)]">
-      <div className="relative aspect-[2/3] overflow-hidden">
+    <div className="card group flex h-full gap-3 overflow-hidden !border-transparent p-3 shadow-[0_6px_24px_-6px_rgba(0,0,0,0.8)] transition hover:shadow-[0_10px_32px_-6px_rgba(0,0,0,0.95)] sm:block sm:gap-0 sm:p-0">
+      <div className="relative aspect-[2/3] w-[34%] max-w-[150px] flex-none self-start overflow-hidden rounded-lg sm:w-full sm:max-w-none sm:rounded-none">
         {/* The W sits ON the artwork, not in the action row: the row is already
             three buttons wide and a fourth breaks at 320px, and the stamp has
             to be in the same place on every surface to read as one gesture. */}
@@ -120,17 +133,8 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           poster
         )}
       </div>
-      {/* The actions sit UNDER the artwork, not in a lit strip above it. They
-          were competing with the poster for the top of the card, which is the
-          one part of a placard that is doing real work. */}
-      {overlay !== null && saveId != null && (
-        <div className="flex items-center gap-1 px-2 pt-2">
-          <LikeButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
-          {feedback}
-          {resolvedOverlay}
-        </div>
-      )}
-      <div className="flex flex-1 flex-col p-3">
+
+      <div className="flex min-w-0 flex-1 flex-col sm:p-3">
         {onOpen ? (
           <button type="button" onClick={onOpen} className="block w-full text-left">{heading}</button>
         ) : href ? (
@@ -138,10 +142,26 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         ) : (
           heading
         )}
+
+        {/* What it is about, straight from TMDB. Renders nothing when there is
+            no synopsis rather than showing a placeholder. */}
+        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1.5 sm:line-clamp-2" />}
+
         {/* One pink box: the algorithm score (your DNA + every rating) + will-you-
             like-it call, with the ratings underneath. */}
         {saveId != null && (
           <AlgorithmScore mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-2" />
+        )}
+
+        {/* The actions sit UNDER the artwork on a wide card and under the facts
+            on a row — never in a lit strip above the poster, which is the one
+            part of a placard doing real work. */}
+        {overlay !== null && saveId != null && (
+          <div className="mt-2 flex items-center gap-1">
+            <LikeButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+            {feedback}
+            {resolvedOverlay}
+          </div>
         )}
         {children}
       </div>

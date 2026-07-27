@@ -27,8 +27,11 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
 
   return (
     <>
+      {/* No blur on the scrim either — a full-screen fixed layer with a
+          backdrop filter is the same iOS compositing trap. A plain scrim does
+          the job. */}
       {open && (
-        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-40 bg-black/70 lg:hidden" onClick={() => setOpen(false)}>
           <div
             className="absolute inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] mx-2 overflow-hidden rounded-2xl border border-white/10 bg-ink-850 p-2 shadow-card"
             onClick={(e) => e.stopPropagation()}
@@ -46,16 +49,25 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
         </div>
       )}
 
-      {/* A FLOATING PILL, not a bar welded to the bottom edge.
-          The bar shape reads as a browser chrome element; a pill that sits
-          above the content reads as part of the app. It is also the single
-          cheapest change that makes the whole product look current — the
-          content scrolls behind and under it instead of stopping at a rule. */}
+      {/* WELDED TO THE BOTTOM EDGE, AND OPAQUE.
+          It shipped briefly as a floating translucent pill inset from the edges.
+          Two problems, and the second is the serious one:
+            • Content showed through and around it, so it read as something
+              stuck on top of the page rather than part of the app.
+            • `backdrop-filter` on a `position: fixed` element is the classic
+              iOS Safari repaint trap. Combined with `background-attachment:
+              fixed` on the body (now also gone), Safari can leave the fixed
+              layer painted at a stale offset during a scroll — which is how a
+              bottom bar ends up sitting in the middle of the screen over a
+              poster. It measures correctly in Chromium, so the layout was never
+              wrong; the compositing was.
+          So: no blur, no translucency, no inset. An opaque bar on the edge
+          cannot be composited to the wrong place, and nothing shows through. */}
       <div
         data-app-bottomnav
-        className="fixed inset-x-0 bottom-[env(safe-area-inset-bottom)] z-40 px-3 pb-2 lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-ink-950 pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        <nav className="mx-auto flex max-w-md items-center justify-around gap-0.5 rounded-2xl border border-white/10 bg-ink-900/90 p-1 shadow-[0_8px_32px_-4px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+        <nav className="mx-auto flex max-w-md items-center justify-around gap-0.5 px-2 py-1">
           {primary.map((l) => {
             const on = isActive(l.href);
             return (
