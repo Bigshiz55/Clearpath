@@ -97,7 +97,16 @@ export function TasteFeedback({
             <path d="m21 11-8-8" />
           </svg>
         )}
-        {compact ? wide && <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-tight">Not for me</span> : ' Not for me'}
+        {/* "AGAINST", not "Pass".
+            One word, so it fits at 320px, and symmetric with the green FOR —
+            the two read as a verdict pair rather than one word against three.
+            "Pass" was the tempting alternative and it is the wrong word: it
+            means "skip / not tonight", which is `not_now` in the signal model —
+            weight 0.4 with MOOD decay. This button writes `not_for_me`, weight
+            0.8 and PERMANENT. Labelling a durable judgement as a deferral is
+            how someone teaches the recommender something they did not mean to.
+            The full phrase stays in the aria-label and the tooltip. */}
+        {compact ? wide && <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wide">Against</span> : ' Against'}
       </button>
       {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind="down" onDone={() => { fadeCard(); setBurst(null); }} />}
     </>

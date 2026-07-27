@@ -77,6 +77,35 @@ describe('the card fade hook', () => {
  * it rather than restating the classes, because a fourth copy is how this
  * happens again.
  */
+/**
+ * THE VERDICT PAIR.
+ *
+ * The red button is labelled AGAINST, not "Pass". `not_for_me` is weight 0.8
+ * and PERMANENT; `not_now` is weight 0.4 with mood decay. "Pass" reads as "skip
+ * / not tonight" — it describes `not_now` — so putting it on the button that
+ * writes `not_for_me` invites someone to record a durable judgement while
+ * thinking they deferred. The accessible name keeps the full phrase.
+ */
+describe('the FOR / AGAINST pair', () => {
+  it('labels the red button AGAINST rather than a deferral word', () => {
+    const src = read('src/components/TasteFeedback.tsx');
+    expect(src).toMatch(/>Against</);
+    for (const deferral of ['>Pass<', '>Skip<', '>Later<', '>Not now<']) {
+      expect(src, deferral).not.toContain(deferral);
+    }
+  });
+
+  it('keeps the full meaning in the accessible name, not only the visible word', () => {
+    const src = read('src/components/TasteFeedback.tsx');
+    expect(src).toContain('aria-label="Not for me — teaches your Viewer DNA"');
+    expect(src).toMatch(/title="Not for me[^"]*teaches your Viewer DNA/);
+  });
+
+  it('pairs it with a one-word green FOR, so neither side is longer', () => {
+    expect(read('src/components/LikeButton.tsx')).toMatch(/>For</);
+  });
+});
+
 describe('the shared card shape', () => {
   const SHAPE = ['.wv-card', '.wv-card-art', '.wv-card-body'];
 
