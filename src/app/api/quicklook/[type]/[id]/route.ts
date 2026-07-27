@@ -67,6 +67,8 @@ export async function GET(req: Request, { params }: { params: { type: string; id
       runtime,
       score: general.score,
       standardScore: general.standardScore ?? general.score,
+      // The arithmetic behind the number, for surfaces that show their working.
+      standardContributions: general.standardContributions ?? [],
       ratings,
       where,
     });

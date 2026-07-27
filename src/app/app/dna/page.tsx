@@ -9,6 +9,7 @@ import { ShareCard, WatchDnaCardArt } from '@/components/ShareCards';
 import { TasteDials } from '@/components/TasteDials';
 import { DnaConfidencePanel } from '@/components/DnaConfidencePanel';
 import { RecommendationSlate } from '@/components/RecommendationSlate';
+import { Top10Slate } from '@/components/Top10Slate';
 import { loadDnaConfidence } from '@/lib/preference/dnaSignals';
 import { RetiredInterviewNotice } from '@/components/RetiredInterviewNotice';
 
@@ -171,6 +172,13 @@ export default async function WatchDnaPage() {
           </p>
         )}
       </section>
+
+      {/* The Top 10, with the arithmetic behind every number one tap away. */}
+      {ready && (
+        <section>
+          <Top10Slate />
+        </section>
+      )}
 
       {/* Fresh, refreshable, validated recommendations — refresh preserves DNA */}
       {ready && (

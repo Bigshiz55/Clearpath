@@ -193,7 +193,18 @@ export function computeGeneralScore(
     },
   ];
 
-  return { score, breakdown, confidence, sources, standardScore: standard.score, standardConfidence: standard.confidence };
+  // The contributions come out too, so a surface can SHOW THE WORKING rather
+  // than just printing the number. Nothing consumes them by default — they are
+  // the same objects the blend already computed, not a second calculation.
+  return {
+    score,
+    breakdown,
+    confidence,
+    sources,
+    standardScore: standard.score,
+    standardConfidence: standard.confidence,
+    standardContributions: standard.contributions,
+  };
 }
 
 function overallConfidence(

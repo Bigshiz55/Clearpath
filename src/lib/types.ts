@@ -165,6 +165,12 @@ export interface WatchVerdictScore {
    *  sources (0..100). Its own confidence travels alongside. */
   standardScore?: number;
   standardConfidence?: Confidence;
+  /**
+   * The per-source contributions the blend actually used — `{key, value,
+   * weight}` — so a surface can SHOW THE WORKING instead of only printing the
+   * number. Optional because older cached reports predate it.
+   */
+  standardContributions?: Array<{ key: string; value: number; weight: number }>;
 }
 
 export interface RatingSource {

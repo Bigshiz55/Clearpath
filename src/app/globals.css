@@ -48,6 +48,34 @@ body {
       grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     }
   }
+  /* ── The Top 10 rail ────────────────────────────────────────────────────
+     A horizontal run of posters that scrolls ITSELF rather than widening the
+     document — a rail that stretches the page is how a phone ends up scrolling
+     sideways. Snap points so a flick lands on a poster instead of between two.
+     The scrollbar is hidden because the rank numerals already say there is
+     more to the right. */
+  .wv-rail {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.25rem;
+  }
+  .wv-rail::-webkit-scrollbar { display: none; }
+  .wv-rail-item {
+    flex: 0 0 auto;
+    width: 8.5rem;
+    scroll-snap-align: start;
+  }
+  @media (min-width: 640px) {
+    .wv-rail-item { width: 10rem; }
+  }
+  @media (min-width: 1024px) {
+    .wv-rail-item { width: 11rem; }
+  }
+
   /* Safari/WebKit min-content guard: a grid child's implicit min-width is
      auto, which lets long unbreakable content (ratings row, badges) stretch
      the track and escape the card. Force it to 0 so cards clip/wrap instead. */
