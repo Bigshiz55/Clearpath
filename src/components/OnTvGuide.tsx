@@ -27,6 +27,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { CardVerdict } from '@/components/CardVerdict';
 import { SignalIcon } from '@/components/RemindButton';
 import { WCheck } from '@/components/WCheck';
+import { groupByShow, repeatNote } from '@/lib/tvHighlights';
 import { CardDna } from '@/components/CardDna';
 import type { Airing } from '@/lib/onTv';
 
@@ -198,10 +199,18 @@ export function OnTvGuide({
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
       .slice(0, 10);
   }, [airings, streaming, windowed]);
-  // In windowed mode every valid airing is a result, not a "highlight" — the
-  // full schedule is the deliverable. Elsewhere a short highlight strip sits
-  // above the complete list, which is never shortened.
-  const highlightVisible = highlightPool;
+  // ONE CARD PER SHOW. A back-to-back double bill — "World War II with Tom
+  // Hanks" at 8:00 and again at 9:00 — took two of six highlight slots to name
+  // one programme. The extra showings are kept, not dropped, so a card can say
+  // "also at 9:00" rather than quietly losing a time somebody was planning
+  // around. The full list below still carries every airing; that IS the
+  // schedule, and this only governs the shortlist.
+  const highlightGroups = useMemo(() => groupByShow(highlightPool), [highlightPool]);
+  const alsoAiring = useMemo(
+    () => new Map(highlightGroups.map((g) => [g.pick.id, g.others])),
+    [highlightGroups],
+  );
+  const highlightVisible = useMemo(() => highlightGroups.map((g) => g.pick), [highlightGroups]);
   const highlights = windowed ? highlightVisible : highlightVisible.slice(0, 6);
 
   if (airings.length === 0) {
@@ -284,6 +293,16 @@ export function OnTvGuide({
                       <span suppressHydrationWarning className="truncate text-sm font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.airstamp, a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
                       {a.rating != null && <span className={`flex-none text-xs font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
                     </div>
+                    {/* The showings this card stands in for. Deduping the strip
+                        must not lose a time somebody could have watched. */}
+                    {(() => {
+                      const note = repeatNote((alsoAiring.get(a.id) ?? []).map((o) => fmtTime(o.airstamp, o.time)));
+                      return note ? (
+                        <div suppressHydrationWarning className="mt-0.5 truncate text-[11px] font-semibold text-slate-400" data-testid="also-airing">
+                          {note}
+                        </div>
+                      ) : null;
+                    })()}
                     {(a.criticRt != null || a.criticImdb != null) && (
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-bold tabular-nums">
                         {a.criticRt != null && <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes">🍅 {a.criticRt}%</span>}
