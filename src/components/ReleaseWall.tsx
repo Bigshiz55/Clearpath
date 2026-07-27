@@ -171,7 +171,7 @@ export function ReleaseWall({
       {loading && items == null ? (
         <div className="poster-grid">
           {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] animate-pulse rounded-2xl bg-white/5" />
+            <div key={i} className="h-[13rem] animate-pulse rounded-2xl bg-white/5 sm:aspect-[2/3] sm:h-auto" />
           ))}
         </div>
       ) : items && items.length > 0 ? (
@@ -181,10 +181,10 @@ export function ReleaseWall({
             const d = daysUntil(t.releaseDate);
             const soon = win === 'upcoming' && d != null && d <= 14;
             return (
-              <div key={`${t.mediaType}-${t.id}`} className="card group h-full overflow-hidden text-left transition hover:border-white/20 hover:shadow-glow">
+              <div key={`${t.mediaType}-${t.id}`} className="card group wv-card text-left transition hover:border-white/20 hover:shadow-glow">
                 <button
                   onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
-                  className="relative block aspect-[2/3] w-full overflow-hidden"
+                  className="wv-card-art block"
                   aria-label={`Quick look at ${t.title}`}
                 >
                   {t.posterUrl ? (
@@ -202,7 +202,7 @@ export function ReleaseWall({
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
                   </span>
                 </button>
-                <div className="p-3">
+                <div className="wv-card-body">
                   <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block text-left">
                     <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>
                     <div className="mt-0.5 text-xs text-slate-400">{t.year ?? '—'}</div>

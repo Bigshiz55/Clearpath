@@ -47,6 +47,21 @@ body {
       @apply gap-4;
     }
   }
+  /* ── The card shape, in ONE place ────────────────────────────────────────
+     A row on a phone, a column from `sm`. These live here rather than inline
+     because the shape was fixed on PosterCard and the New Releases wall — which
+     hand-rolls its own card — kept the old full-bleed poster and filled the
+     whole screen with one title. Two copies of a layout is how that happens, so
+     there is now one definition and every grid uses it. */
+  .wv-card {
+    @apply flex h-full gap-3 overflow-hidden p-3 sm:block sm:gap-0 sm:p-0;
+  }
+  .wv-card-art {
+    @apply relative aspect-[2/3] w-[34%] max-w-[150px] flex-none self-start overflow-hidden rounded-lg sm:w-full sm:max-w-none sm:rounded-none;
+  }
+  .wv-card-body {
+    @apply flex min-w-0 flex-1 flex-col sm:p-3;
+  }
   @media (min-width: 640px) {
     .poster-grid {
       /* Content-aware minimum: a card must fit FOR/PASS/SAVE + all three rating

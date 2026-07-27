@@ -85,7 +85,7 @@ for (const { w, h } of PHONES) {
 
     // The poster is a column beside the facts, not the whole card.
     const card = await cards.first().boundingBox();
-    const poster = await cards.first().locator('.aspect-\\[2\\/3\\]').first().boundingBox();
+    const poster = await cards.first().locator('.wv-card-art').first().boundingBox();
     expect(poster!.width, 'poster width').toBeLessThan(card!.width * 0.5);
 
     // And every card carries its synopsis.
@@ -106,7 +106,7 @@ test('the card goes back to a column once there is room for real grid columns', 
   await open(page, 1024, 768);
   const card = page.getByTestId('qa-grid').locator('> div').first();
   const cardBox = await card.boundingBox();
-  const poster = await card.locator('.aspect-\\[2\\/3\\]').first().boundingBox();
+  const poster = await card.locator('.wv-card-art').first().boundingBox();
   // Full-bleed poster across the top of the cell, not a thumbnail beside a sliver.
   expect(poster!.width).toBeGreaterThan(cardBox!.width * 0.9);
 });

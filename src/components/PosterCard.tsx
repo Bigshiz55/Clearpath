@@ -117,8 +117,8 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   // column — a sideways card in a 250px cell would leave a thumbnail and a
   // sliver.
   return (
-    <div className="card group flex h-full gap-3 overflow-hidden !border-transparent p-3 shadow-[0_6px_24px_-6px_rgba(0,0,0,0.8)] transition hover:shadow-[0_10px_32px_-6px_rgba(0,0,0,0.95)] sm:block sm:gap-0 sm:p-0">
-      <div className="relative aspect-[2/3] w-[34%] max-w-[150px] flex-none self-start overflow-hidden rounded-lg sm:w-full sm:max-w-none sm:rounded-none">
+    <div className="card group wv-card !border-transparent shadow-[0_6px_24px_-6px_rgba(0,0,0,0.8)] transition hover:shadow-[0_10px_32px_-6px_rgba(0,0,0,0.95)]">
+      <div className="wv-card-art">
         {/* The W sits ON the artwork, not in the action row: the row is already
             three buttons wide and a fourth breaks at 320px, and the stamp has
             to be in the same place on every surface to read as one gesture. */}
@@ -134,7 +134,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         )}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col sm:p-3">
+      <div className="wv-card-body">
         {onOpen ? (
           <button type="button" onClick={onOpen} className="block w-full text-left">{heading}</button>
         ) : href ? (

@@ -65,6 +65,44 @@ describe('the card fade hook', () => {
   });
 });
 
+/**
+ * ONE CARD SHAPE, NOT THREE COPIES OF IT.
+ *
+ * PosterCard was turned into a row on phones so more than one title fits a
+ * screen. The New Releases wall hand-rolls its OWN card, kept the full-bleed
+ * poster, and so still filled the entire screen with a single title — the exact
+ * bug, still live, on a surface nobody thought to check.
+ *
+ * The shape now lives once, in globals.css. These pin that every card grid uses
+ * it rather than restating the classes, because a fourth copy is how this
+ * happens again.
+ */
+describe('the shared card shape', () => {
+  const SHAPE = ['.wv-card', '.wv-card-art', '.wv-card-body'];
+
+  it('is defined exactly once, in the stylesheet', () => {
+    const css = read('src/app/globals.css');
+    for (const cls of SHAPE) expect(css, cls).toContain(`${cls} {`);
+  });
+
+  it('every card grid uses the shared classes', () => {
+    for (const f of ['src/components/PosterCard.tsx', 'src/components/ReleaseWall.tsx']) {
+      const src = read(f);
+      expect(src, `${f} wv-card`).toMatch(/className="[^"]*\bwv-card\b/);
+      expect(src, `${f} wv-card-art`).toContain('wv-card-art');
+      expect(src, `${f} wv-card-body`).toContain('wv-card-body');
+    }
+  });
+
+  it('no card grid restates the row layout inline', () => {
+    // A full-width `aspect-[2/3]` poster is the old shape. If one reappears in
+    // a card grid, that grid has drifted off the shared definition.
+    for (const f of ['src/components/PosterCard.tsx', 'src/components/ReleaseWall.tsx']) {
+      expect(read(f), f).not.toMatch(/aspect-\[2\/3\]\s+w-full/);
+    }
+  });
+});
+
 describe('the browsing grids', () => {
   it('every placard dismisses on save by default', () => {
     const src = read('src/components/PosterCard.tsx');
