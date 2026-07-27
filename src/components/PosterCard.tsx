@@ -145,19 +145,19 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
 
         {/* What it is about, straight from TMDB. Renders nothing when there is
             no synopsis rather than showing a placeholder. */}
-        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1.5 sm:line-clamp-2" />}
+        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={2} className="mt-1" />}
 
         {/* One pink box: the algorithm score (your DNA + every rating) + will-you-
             like-it call, with the ratings underneath. */}
         {saveId != null && (
-          <AlgorithmScore mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-2" />
+          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-1.5 sm:mt-2" />
         )}
 
         {/* The actions sit UNDER the artwork on a wide card and under the facts
             on a row — never in a lit strip above the poster, which is the one
             part of a placard doing real work. */}
         {overlay !== null && saveId != null && (
-          <div className="mt-2 flex items-center gap-1">
+          <div className="mt-1.5 flex items-center gap-1.5 sm:mt-2">
             <LikeButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
             {feedback}
             {resolvedOverlay}

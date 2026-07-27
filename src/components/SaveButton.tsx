@@ -144,12 +144,12 @@ export function SaveButton({
       title={saved ? 'Saved — tap to remove' : 'Save'}
       className={`flex min-h-[44px] min-w-0 items-center justify-center gap-0.5 rounded-lg border font-semibold text-white transition ${wide ? 'w-full flex-1' : 'w-11'} ${
         saved
-          ? 'border-pink-200/60 bg-gradient-to-b from-[#ff62b6] to-[#ff1493]'
-          : 'border-[#ff1493]/45 bg-[#ff1493]/12 text-pink-100 hover:bg-[#ff1493]/25'
+          ? 'border-pink-200/70 bg-gradient-to-b from-[#ff62b6] to-[#ff1493]'
+          : 'border-2 border-[#ff1493]/70 bg-[#ff1493]/30 text-pink-50 hover:bg-[#ff1493]/45 hover:text-white'
       }`}
     >
       {icon}
-      {wide && <span className="text-[10px] font-black uppercase tracking-wide">{saved ? 'Saved' : 'Save'}</span>}
+      {wide && <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wide">{saved ? 'Saved' : 'Save'}</span>}
     </button>
   );
 }

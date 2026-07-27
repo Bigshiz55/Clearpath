@@ -56,8 +56,14 @@ body {
   .wv-card {
     @apply flex h-full gap-3 overflow-hidden p-3 sm:block sm:gap-0 sm:p-0;
   }
+  /* On a phone the artwork STRETCHES to the card's height rather than holding
+     2:3 and leaving a dead gap beneath it. A row card's height is set by its
+     text, so a fixed-ratio poster wasted 60–80px of column on every single
+     card. Filling it costs nothing and makes the artwork bigger. The ratio
+     comes back from `sm`, where the card is a column and the poster sets the
+     height itself. */
   .wv-card-art {
-    @apply relative aspect-[2/3] w-[34%] max-w-[150px] flex-none self-start overflow-hidden rounded-lg sm:w-full sm:max-w-none sm:rounded-none;
+    @apply relative min-h-[9rem] w-[34%] max-w-[150px] flex-none self-stretch overflow-hidden rounded-lg sm:aspect-[2/3] sm:min-h-0 sm:w-full sm:max-w-none sm:self-auto sm:rounded-none;
   }
   .wv-card-body {
     @apply flex min-w-0 flex-1 flex-col sm:p-3;
