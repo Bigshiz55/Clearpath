@@ -4,6 +4,7 @@ import { AlgorithmScore } from './AlgorithmScore';
 import { SaveButton } from './SaveButton';
 import { TasteFeedback } from './TasteFeedback';
 import { LikeButton } from './LikeButton';
+import { WCheck } from './WCheck';
 
 interface PosterCardProps {
   href?: string;
@@ -107,6 +108,12 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         {resolvedOverlay}
       </div>
       <div className="relative aspect-[2/3] overflow-hidden">
+        {/* The W sits ON the artwork, not in the action row: the row is already
+            three buttons wide and a fourth breaks at 320px, and the stamp has
+            to be in the same place on every surface to read as one gesture. */}
+        {overlay !== null && saveId != null && (
+          <WCheck tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterUrl={posterUrl ?? null} />
+        )}
         {onOpen ? (
           <button type="button" onClick={onOpen} className="block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
         ) : href ? (
