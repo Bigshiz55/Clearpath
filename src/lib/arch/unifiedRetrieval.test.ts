@@ -75,3 +75,38 @@ describe('unified retrieval pipeline (architectural invariant)', () => {
     expect(offenders, `these NL-retrieval routes bypass the constraint layer: ${offenders.join(', ')}`).toEqual([]);
   });
 });
+
+
+/**
+ * SEARCH RANKS BEFORE IT CUTS.
+ *
+ * "I searched for gone and only pulled up gone girl." The endpoint sorted
+ * TMDB's hundreds of "gone" matches by popularity and kept twenty — so the film
+ * actually called Gone was discarded before anything downstream could rank it
+ * up. Every ranker in the codebase was working correctly on a list that no
+ * longer contained the right answer.
+ *
+ * The unit test for the behaviour is in `nlu/titleNormalize.test.ts`. This pins
+ * the WIRING, because `tmdb/client.ts` is server-only and the truncation is one
+ * line that is very easy to "tidy" back into a popularity sort.
+ */
+describe('title search', () => {
+  const client = readFileSync(join(process.cwd(), 'src/lib/tmdb/client.ts'), 'utf8');
+
+  it('orders by title identity, not by fame alone', () => {
+    expect(client).toContain('rankAndLimit(');
+  });
+
+  it('no bare popularity sort decides which results survive', () => {
+    expect(client, 'searchTitles truncates a popularity-sorted list again').not.toMatch(
+      /sort\(\(a, b\) => \(b\.popularity[^)]*\)[^)]*\)\.slice\(/,
+    );
+  });
+
+  it('the cut happens inside the ranker, so it cannot be applied first', () => {
+    const rank = readFileSync(join(process.cwd(), 'src/lib/nlu/titleNormalize.ts'), 'utf8');
+    const fn = rank.slice(rank.indexOf('export function rankAndLimit'));
+    // rankByTitleIdentity(...).slice(...) — one expression, one order.
+    expect(fn).toMatch(/rankByTitleIdentity\([\s\S]{0,200}\)\.slice\(/);
+  });
+});

@@ -108,3 +108,30 @@ export function rankByTitleIdentity<T>(
     return getPopularity(y) - getPopularity(x);
   });
 }
+
+
+/**
+ * RANK BY IDENTITY, *THEN* CUT.
+ *
+ * Searching "Gone" returned Gone Girl and nothing else useful. Not because the
+ * ranker was wrong — because there was no ranker: the search endpoint sorted
+ * TMDB's hundreds of "gone" matches by POPULARITY and kept the top 20. Gone
+ * Girl, Gone in 60 Seconds, Gone Baby Gone and Gone with the Wind fill that
+ * list on fame alone, and the 2012 film actually called "Gone" never survives
+ * the cut. Ranking afterwards cannot help: by then the right answer has already
+ * been thrown away.
+ *
+ * So the order is: tier every candidate by title identity, sort, and only then
+ * take the first `limit`. Popularity still decides between titles of the SAME
+ * tier — which is what picks a Cinderella — it just no longer decides whether
+ * an exact match is in the list at all.
+ */
+export function rankAndLimit<T>(
+  requested: string,
+  candidates: readonly T[],
+  getTitle: (c: T) => string,
+  getPopularity: (c: T) => number,
+  limit: number,
+): T[] {
+  return rankByTitleIdentity(requested, [...candidates], getTitle, getPopularity).slice(0, Math.max(0, limit));
+}

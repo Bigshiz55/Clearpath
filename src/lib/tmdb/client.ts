@@ -8,6 +8,7 @@ import type {
   WatchProviders,
 } from '@/lib/types';
 import { computeEnglishAvailability } from './meta-helpers';
+import { rankAndLimit } from '@/lib/nlu/titleNormalize';
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 export { TMDB_IMAGE_BASE, tmdbImage } from './image';
@@ -181,7 +182,11 @@ export async function searchTitles(query: string): Promise<SearchResultItem[]> {
     });
   }
 
-  return results.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0)).slice(0, 20);
+  // Identity first, popularity only within a tier — and CUT AFTERWARDS. A
+  // straight popularity sort put Gone Girl, Gone in 60 Seconds and Gone with
+  // the Wind in the top 20 for "gone" and dropped the film actually called
+  // Gone before anything downstream could rank it back up. See rankAndLimit.
+  return rankAndLimit(trimmed, results, (r) => r.title, (r) => r.popularity ?? 0, 20);
 }
 
 // ---------------------------------------------------------------------------
