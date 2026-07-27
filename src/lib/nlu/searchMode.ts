@@ -15,6 +15,7 @@
  * No I/O; unit-tested. Provider resolution reuses the shared detectors.
  */
 import { detectPlatform, detectNetwork, detectGenre } from '@/lib/nlu/detectors';
+import { naiveParseQuery } from '@/lib/finderParse';
 
 export type SearchMode = 'exact_title' | 'person' | 'provider_catalog' | 'forensic' | 'similar_to';
 
@@ -90,6 +91,23 @@ function extractProvider(raw: string): { provider: RequiredProvider | null; resi
 }
 
 /** Isolate the requested title from the residual (post-provider) text. */
+/**
+ * The media type the ask states OUTRIGHT, or null when it does not say.
+ *
+ * A "more like X" request took its type from whatever the seed title happened
+ * to be, so "a boxing movie kinda like Rocky" could read back as "Shows". What
+ * the user typed is not a guess and outranks an inference.
+ */
+export function statedMediaType(
+  text: string,
+  cls?: { contentType: 'movie' | 'tv' | 'unknown' } | null,
+): 'movie' | 'tv' | null {
+  const parsed = naiveParseQuery(text).mediaType;
+  if (parsed === 'movie' || parsed === 'tv') return parsed;
+  if (cls?.contentType === 'movie' || cls?.contentType === 'tv') return cls.contentType;
+  return null;
+}
+
 function extractTitle(residual: string): { title: string | null; contentType: 'movie' | 'tv' | 'unknown' } {
   let t = residual.replace(LEAD_VERBS, '');
   let contentType: 'movie' | 'tv' | 'unknown' = 'unknown';

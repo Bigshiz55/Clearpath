@@ -7,7 +7,7 @@ import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askP
 import { augmentInternational } from '@/lib/askInternational';
 import { applyOverrides, sanitizeOverrides } from '@/lib/finderOverrides';
 import { askSimilarTo, extractReference } from '@/lib/askJudge';
-import { classifySearch } from '@/lib/nlu/searchMode';
+import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -87,7 +87,10 @@ export async function POST(req: Request) {
       (text ? extractReference(text) : null) ||
       (cls?.mode === 'similar_to' ? (cls.reference ?? null) : null);
     if (reference && cls?.mode === 'similar_to') {
-      const similar = await askSimilarTo(supabase, user.id, reference, limit);
+      // An explicitly stated media type ("a boxing MOVIE like Rocky") is not a
+      // guess and must survive into the results. Without it the seed's own type
+      // became the filter, and a movie request read back as "Shows".
+      const similar = await askSimilarTo(supabase, user.id, reference, limit, statedMediaType(text, cls));
       if (similar) {
         return NextResponse.json({
           query: similar.query,

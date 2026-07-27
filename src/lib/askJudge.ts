@@ -1,6 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { searchTitles, getSimilar } from '@/lib/tmdb/client';
+import { searchTitles, getSimilar, type SearchResultItem } from '@/lib/tmdb/client';
 import { getScoringData } from '@/lib/titleData';
 import { buildVerdict } from '@/lib/scoring';
 import { getProfile, getPersonalContext, regionFor, personalLabelFor } from '@/lib/profile';
@@ -15,7 +15,8 @@ import { genreIdFromName } from '@/lib/finderGenres';
 import { runFinder, type FinderItem, type FinderQuery } from '@/lib/finder';
 import type { TitleVerdict, AltItem, JudgeFactor } from '@/lib/askTypes';
 import { classifySearch, type SearchClassification } from '@/lib/nlu/searchMode';
-import { rankByTitleIdentity, isExactTitle } from '@/lib/nlu/titleNormalize';
+import { rankByTitleIdentity, isExactTitle, titleMatchTier } from '@/lib/nlu/titleNormalize';
+import { referenceCandidates, resolveNamedTitle } from '@/lib/nlu/titleReference';
 import { validateTitleResult } from '@/lib/nlu/resultGuard';
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -30,11 +31,17 @@ function cleanTitleText(text: string): string {
     .trim();
 }
 
+/**
+ * Is this result even in the running for the requested title?
+ *
+ * This was a raw `includes` in both directions, which is how "Cinderella Man"
+ * matched "Cinderella" — and, on a whole sentence, how "Man", "Seen" and "That"
+ * all counted as titles. The tiering in `titleNormalize` requires whole-WORD
+ * containment, so a mid-string coincidence no longer qualifies; the caller
+ * still narrows to a genuine exact match after this.
+ */
 function titleMatches(cleaned: string, resultTitle: string): boolean {
-  const a = norm(cleaned);
-  const b = norm(resultTitle);
-  if (a.length < 3 || b.length < 3) return false;
-  return a === b || a.includes(b) || b.includes(a);
+  return titleMatchTier(cleaned, resultTitle) !== 'none';
 }
 
 /** Only treat the input as a named-title lookup when it isn't a constraint
@@ -113,25 +120,73 @@ export function extractReference(text: string): string | null {
 }
 
 /**
- * "More like X" — resolve the reference title, pull TMDB's similar/recommended
+ * Resolve every title a comparison names, strictly.
+ *
+ * "kinda like Rocky or Cinderella Man that I probably haven't seen" is two
+ * titles and a clause. It used to be searched as ONE string against a raw
+ * substring test, which accepted "Man", "Seen" and "That" as matches — so the
+ * first junk result became the seed, its media type became the filter, and a
+ * boxing request came back as a cartoon shortlist filtered to Shows.
+ *
+ * Now each named title is resolved on its own and only an EXACT title identity
+ * counts. That is also what separates "Cinderella Man" from "Cinderella":
+ * containment is not identity, and no popularity ranking can fix it, because
+ * the fairy tale outranks the boxing picture on both questions.
+ */
+async function resolveSeeds(
+  refText: string,
+  max: number,
+  wantType: 'movie' | 'tv' | null,
+): Promise<SearchResultItem[]> {
+  const candidates = referenceCandidates(cleanTitleText(refText)).filter((s) => s.length >= 2);
+  const seeds: SearchResultItem[] = [];
+  const taken = new Set<string>();
+  for (const name of candidates) {
+    if (seeds.length >= max) break;
+    const results = await searchTitles(name).catch(() => []);
+    // When they said "movie", prefer a movie of that name — "Fargo" is both a
+    // film and a series, and the reference decides the whole result set's type.
+    const typed = wantType ? results.filter((r) => r.mediaType === wantType) : [];
+    const { match } = resolveNamedTitle(name, typed.length > 0 ? typed : results);
+    // No exact title? Then we do not know what they meant, and substituting the
+    // nearest famous thing is how "Cinderella Man" became "Cinderella". Skip it.
+    if (!match) continue;
+    const key = `${match.mediaType}-${match.id}`;
+    if (taken.has(key)) continue;
+    taken.add(key);
+    seeds.push(match);
+  }
+  return seeds;
+}
+
+/**
+ * "More like X" — resolve the reference title(s), pull TMDB's similar/recommended
  * titles, and score each through the deterministic engine for this user. Real
- * neighbors of what they named, best match first. Returns null when the title
- * can't be confidently resolved, so the caller falls back to the plain Finder.
+ * neighbors of what they named, best match first. Returns null when no title
+ * can be confidently resolved, so the caller falls back to the plain Finder.
  */
 export async function askSimilarTo(
   supabase: SupabaseClient,
   userId: string,
   refText: string,
   limit = 10,
+  /** The media type the ask states outright ("a boxing movie like…"), if any. */
+  wantType: 'movie' | 'tv' | null = null,
 ): Promise<{ query: FinderQuery; scoredFor: string; items: FinderItem[] } | null> {
   const cleaned = cleanTitleText(refText);
   if (cleaned.length < 2) return null;
-  const results = await searchTitles(cleaned).catch(() => []);
-  const matches = results.filter((r) => titleMatches(cleaned, r.title));
-  const seed = matches[0];
+
+  // BOTH titles, when they named two. "Like Rocky or Cinderella Man" is a
+  // request for the intersection of two neighbourhoods, and answering from one
+  // of them throws away half of what they told us.
+  const seeds = await resolveSeeds(refText, 2, wantType);
+  const seed = seeds[0];
   if (!seed) return null; // no confident title → not a "more like this" ask
 
-  const similar = await getSimilar(seed.mediaType, seed.id).catch(() => []);
+  const neighbourhoods = await Promise.all(
+    seeds.map((s) => getSimilar(s.mediaType, s.id).catch(() => [])),
+  );
+  const similar = neighbourhoods.flat();
   if (similar.length === 0) return null;
 
   const profile = await getProfile(supabase, userId);
@@ -149,12 +204,25 @@ export async function askSimilarTo(
       .map((r) => `${r.media_type}-${r.tmdb_id}`),
   );
 
-  const seedKey = `${seed.mediaType}-${seed.id}`;
+  // A title that neighbours BOTH named references is the best answer to "like
+  // Rocky or Cinderella Man" there is, so it gets looked at first. This orders
+  // which candidates are considered — it does not touch anyone's score, which
+  // stays the deterministic engine's call.
+  const seedKeys = new Set(seeds.map((s) => `${s.mediaType}-${s.id}`));
+  const pool = new Map<string, { item: (typeof similar)[number]; hits: number }>();
+  for (const s of similar) {
+    const key = `${s.mediaType}-${s.id}`;
+    if (seedKeys.has(key) || seen.has(key)) continue;
+    const prior = pool.get(key);
+    if (prior) prior.hits++;
+    else pool.set(key, { item: s, hits: 1 });
+  }
   // Sized from the ask, like the Finder's pool. This was a flat 16 — below both
   // the requested limit and the size of the neighbour list it was cutting.
-  const cands = similar
-    .filter((s) => `${s.mediaType}-${s.id}` !== seedKey && !seen.has(`${s.mediaType}-${s.id}`))
-    .slice(0, candidateTarget(limit));
+  const cands = [...pool.values()]
+    .sort((a, b) => b.hits - a.hits)
+    .slice(0, candidateTarget(limit))
+    .map((e) => e.item);
 
   const scored = await mapPool(cands, HYDRATE_CONCURRENCY, async (c) => {
     try {
@@ -189,7 +257,15 @@ export async function askSimilarTo(
     .slice(0, Math.max(1, Math.min(limit, MAX_REQUESTED_COUNT)));
   if (items.length === 0) return null;
 
-  const query: FinderQuery = { ...EMPTY_QUERY, mediaType: seed.mediaType, similarTo: seed.title };
+  // WHAT THEY SAID BEATS WHAT THE SEED HAPPENS TO BE. The read-back chip said
+  // "Shows" for a request that began "a boxing movie" — because the seed's own
+  // type was copied straight into the filter. An explicit media type in the ask
+  // is not a guess and must not be overwritten by one.
+  const query: FinderQuery = {
+    ...EMPTY_QUERY,
+    mediaType: wantType ?? seed.mediaType,
+    similarTo: seeds.map((s) => s.title).join(' / '),
+  };
   return { query, scoredFor, items };
 }
 

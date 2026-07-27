@@ -7,7 +7,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
-import { classifySearch } from '@/lib/nlu/searchMode';
+import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
 import { buildQueryPlan } from '@/lib/nlu/queryPlan';
 import { mediaTypeSatisfies } from '@/lib/nlu/mediaOntology';
 
@@ -109,7 +109,10 @@ export async function POST(req: Request) {
       (cls?.mode === 'similar_to' ? (cls.reference ?? null) : null);
     if (reference && cls?.mode === 'similar_to' && !hasCompetingConstraints(text)) {
       const wantCount = text ? parseRequestedCount(text) : 10;
-      const similar = await askSimilarTo(supabase, user.id, reference, wantCount);
+      // An explicitly stated media type ("a boxing MOVIE like Rocky") is not a
+      // guess and must survive into the results. Without it the seed's own type
+      // became the filter, and a movie request read back as "Shows".
+      const similar = await askSimilarTo(supabase, user.id, reference, wantCount, statedMediaType(text, cls));
       if (similar) {
         return NextResponse.json({
           kind: 'search',
