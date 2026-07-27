@@ -5,6 +5,7 @@ import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
+import { applyOverrides, sanitizeOverrides } from '@/lib/finderOverrides';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
-    let body: { query?: unknown; text?: string; watcher?: unknown } = {};
+    let body: { query?: unknown; text?: string; watcher?: unknown; overrides?: unknown } = {};
     try {
       body = await req.json();
     } catch {
@@ -70,6 +71,18 @@ export async function POST(req: Request) {
     // "movie" and leak wrong-origin results. Restricts the pool to the real
     // origin/language + runtime and requires English audio at verification.
     query = augmentInternational(query, text);
+    // WHAT YOU SET BY HAND BEATS WHAT WE READ IN YOUR SENTENCE.
+    //
+    // The free text is re-parsed on every run, so without this a user who ran
+    // an ask and then dragged a slider got their sentence's value back and the
+    // same results — the control looked broken because it WAS being discarded.
+    // `overrides` is the list of fields the user has touched since that
+    // sentence was typed; each one is copied from the client's query on top of
+    // whatever the parse produced. Typing a new ask clears the list.
+    if (body.query) {
+      const overrides = sanitizeOverrides(body.overrides, EMPTY_QUERY);
+      if (overrides.length > 0) query = applyOverrides(query, coerceQuery(body.query), overrides);
+    }
     // An explicit provider from the deep-link — e.g. tapping "Best movies on
     // Netflix" sends ?providers=8 → body.query.providerIds=[8] — must survive AI
     // parsing. The AI fills genre/mood from the free text but doesn't read the

@@ -192,6 +192,12 @@ export function FinderUI({
   // it to the key of the CURRENT controls is what detects "these results are
   // stale relative to the filters" — no guessing from individual fields.
   const [lastRunKey, setLastRunKey] = useState<string | null>(null);
+  // Fields the user has set BY HAND since the current ask was typed. The server
+  // re-parses the free text on every run, so without this list a slider drag
+  // after a text search is silently overwritten by the sentence and the results
+  // come back identical — the control looks broken because it is being
+  // discarded. Typing a new ask clears it; so does adopting the server's parse.
+  const [touched, setTouched] = useState<Set<string>>(new Set());
   const [justUpdated, setJustUpdated] = useState(false);
   // Latest-request-wins: a monotonic id + AbortController so a slow older
   // response can never overwrite a newer result set.
@@ -201,6 +207,8 @@ export function FinderUI({
   function onText(v: string) {
     setText(v);
     setQ(naiveParseQuery(v));
+    // A new sentence supersedes the manual edits made against the old one.
+    setTouched(new Set());
   }
 
   // Deep-link support: "State Your Case" (and links) can open the Finder pre-
@@ -242,12 +250,14 @@ export function FinderUI({
   }, [loading, items]);
   function set<K extends keyof FinderQuery>(key: K, val: FinderQuery[K]) {
     setQ((prev) => ({ ...prev, [key]: val }));
+    setTouched((prev) => new Set(prev).add(key as string));
   }
   function toggleGenre(id: number) {
     setQ((prev) => ({
       ...prev,
       genreIds: prev.genreIds.includes(id) ? prev.genreIds.filter((g) => g !== id) : [...prev.genreIds, id],
     }));
+    setTouched((prev) => new Set(prev).add('genreIds'));
   }
   async function find(qOverride?: FinderQuery, textOverride?: string) {
     const mySeq = ++seqRef.current;
@@ -273,6 +283,8 @@ export function FinderUI({
         body: JSON.stringify({
           query: effQuery,
           text: effText,
+          // Hand-set fields win over the re-parse of `text`.
+          overrides: Array.from(touched),
           // Household (array): the server scores every member (You + each
           // selected watcher) and ranks by the floor-weighted joint verdict.
           ...(householdMode ? { watchers: selected } : {}),
@@ -285,7 +297,21 @@ export function FinderUI({
       setItems(data.items ?? []);
       setScoredFor(data.scoredFor ?? 'Your match');
       setRelaxed(data.relaxed ?? null);
-      setLastRunKey(runKey);
+      // ADOPT WHAT ACTUALLY RAN. The server parses the ask far better than the
+      // client's regex does, so the sliders and the "Filtering by" chips must
+      // show ITS constraints, not the client's guess — otherwise the chips
+      // claim "Last 16 yr / Match 40+" while the search really ran "24 months /
+      // 80+", and any subsequent drag starts from a number the user never saw.
+      const applied = data.query ? ({ ...EMPTY_QUERY, ...(data.query as Partial<FinderQuery>) }) : null;
+      if (applied) {
+        setQ(applied);
+        setTouched(new Set());
+      }
+      setLastRunKey(
+        applied
+          ? canonicalQueryKey(applied, effText, ['You', ...selected.map((w) => w.name)].join('+'))
+          : runKey,
+      );
       if (isRefinement) {
         setJustUpdated(true);
         window.setTimeout(() => setJustUpdated(false), 4000);
@@ -333,8 +359,10 @@ export function FinderUI({
           </div>
         )}
 
-        {/* Hero — the judge & the bench on the left, your plain-English ask on the right */}
-        <div className={`grid gap-4 ${embedded ? '' : 'lg:grid-cols-2'}`}>
+        {/* One column. This was `lg:grid-cols-2` from when a second panel sat
+            beside the ask; that panel is long gone, so on a laptop it left the
+            box stranded in the left half with an empty column beside it. */}
+        <div className="grid gap-4">
 
         <div className={embedded ? 'flex flex-col gap-3' : 'card flex flex-col gap-3 p-4'}>
           {!embedded && <div className="eyebrow-lg">Refine your search</div>}
