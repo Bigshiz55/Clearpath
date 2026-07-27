@@ -1,28 +1,38 @@
 /**
  * THE QUIZ HAS TO BE REACHABLE.
  *
- * A route nobody links to is not a feature. The previous version of this work
+ * A route nobody links to is not a feature. An earlier version of this work
  * shipped a whole interview behind a URL with no entry point anywhere in the
  * product, and nobody noticed until it was asked for by hand — so the entry
  * points are pinned here rather than trusted.
+ *
+ * THE TASTE QUIZ IS NOW ONE INSTRUMENT, NOT TWO. It used to offer a chooser
+ * between a 12-statement questionnaire and a grid of real titles. The
+ * statements lane is gone; agreeing with a sentence about yourself is a guess
+ * about your own taste, and it had to be translated into attribute claims
+ * before it could move anything, while a rating on a real title is already the
+ * evidence the engine wants. Every entry point still lands somewhere real —
+ * which is the whole point of this file, and the thing a deletion is most
+ * likely to break.
  *
  * Source-level on purpose: `/app/*` redirects to the login page without a
  * session, so a browser test asserting "the DNA hub links to the quiz" would
  * pass against a login screen and prove nothing.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
+const gone = (p: string) => !existsSync(join(ROOT, p));
 
 const QUIZ_HREF = '/app/taste-quiz';
 
 describe('entry points', () => {
-  it('the route exists and renders the quiz', () => {
+  it('the route exists and renders the title grid', () => {
     const page = read('src/app/app/taste-quiz/page.tsx');
-    expect(page).toContain('QuickTasteQuiz');
+    expect(page).toContain('TitleGridCalibration');
     expect(page).toContain("title: 'Taste Quiz");
   });
 
@@ -65,26 +75,21 @@ describe('entry points', () => {
     expect(hub).toContain(QUIZ_HREF);
   });
 
-  it('both quiz lanes live under the one Taste Quiz route', () => {
-    const page = read('src/app/app/taste-quiz/page.tsx');
-    expect(page).toContain('QuickTasteQuiz');
-    expect(page).toContain('TitleGridCalibration');
-    expect(page).toContain('TasteQuizModes');
-
-    // Nothing may link at a second copy of the title quiz.
-    const hub = read('src/app/app/dna/page.tsx');
-    expect(hub).not.toMatch(/href="\/app\/quiz"/);
-  });
-
   it('the old title-quiz URL forwards instead of holding a second copy', () => {
     const legacy = read('src/app/app/quiz/page.tsx');
     expect(legacy).toContain('redirect(');
-    expect(legacy).toContain("mode: 'titles'");
+    expect(legacy).toContain(QUIZ_HREF);
     // A founder session must survive the hop, or isolated calibration breaks.
     expect(legacy).toContain('session');
   });
 
-  it('the title lane never turns "never heard of it" into a dislike', () => {
+  it('the nav carries the quiz', () => {
+    expect(read('src/components/Nav.tsx')).toContain(QUIZ_HREF);
+  });
+});
+
+describe('honesty and safety of the title lane', () => {
+  it('never turns "never heard of it" into a dislike', () => {
     const grid = read('src/components/TitleGridCalibration.tsx');
     // Untouched tiles must send nothing at all. A negative attraction from this
     // surface would be a preference the user never stated.
@@ -94,74 +99,51 @@ describe('entry points', () => {
     expect(grid).toContain('not recognising something is not a dislike');
   });
 
-  it('the lane switch is a real choice, sized and coloured like one', () => {
-    const modes = read('src/components/TasteQuizModes.tsx');
-    // It is the first decision on the screen and it changes the next two
-    // minutes — a filter-chip-sized control undersold it.
-    expect(modes).toMatch(/min-h-\[7\d\w*px\]/);
-    expect(modes).toContain('#ff1493');
-    expect(modes).toContain('sm:grid-cols-2');
+  it('writes DNA through the one preference log rather than a second model', () => {
+    expect(read('src/components/TitleGridCalibration.tsx')).toContain('recordQuizAnswer');
   });
 
-  it('the nav carries the quiz', () => {
-    expect(read('src/components/Nav.tsx')).toContain(QUIZ_HREF);
+  it('ends on the payoff, not on an offer to go round again', () => {
+    expect(read('src/components/TitleGridCalibration.tsx')).toContain('SeeRecommendations');
   });
 });
 
-describe('honesty and safety', () => {
-  it('never hard-codes the response weights in the UI', () => {
-    const ui = read('src/components/QuickTasteQuiz.tsx');
-    expect(ui).toContain('RESPONSE_VALUES');
-    // The four prices live in the model. Finding them written out in a
-    // component means the two can drift apart.
-    expect(ui).not.toMatch(/[^.\w]0\.75\b/);
-    expect(ui).not.toMatch(/[^.\w]0\.6\b/);
-  });
-
-  it('shows coverage and confidence as two separate numbers', () => {
-    const ui = read('src/components/QuickTasteQuiz.tsx');
-    expect(ui).toContain('testid="dna-coverage"');
-    expect(ui).toContain('testid="dna-confidence"');
-    expect(ui).toContain('data-testid={testid}');
-    expect(ui).toContain('how much of you I have asked about');
-  });
-
-  it('keeps the "Depends" clarifier inline — no modal, no second screen', () => {
-    const ui = read('src/components/QuickTasteQuiz.tsx');
-    expect(ui).not.toMatch(/<dialog|role="dialog"|Modal/);
-  });
-
-  it('does not log the answers', () => {
-    const action = read('src/lib/actions/tasteQuiz.ts');
-    expect(action).not.toMatch(/console\.(log|info)\(/);
-    // The one warning that exists must not carry the answers with it.
-    const warns = action.match(/console\.warn\([^)]*\)/g) ?? [];
-    for (const w of warns) {
-      expect(w).not.toContain('answers');
-      expect(w).not.toContain('rows');
+/**
+ * THE DELETION IS COMPLETE.
+ *
+ * A half-removed feature is worse than either state: dead components that still
+ * compile, a chooser with one option, a route parameter nothing reads. These
+ * pin that the statements lane left nothing behind.
+ */
+describe('the statements quiz is gone, not hidden', () => {
+  it('its component, its model and its action are deleted', () => {
+    for (const f of [
+      'src/components/QuickTasteQuiz.tsx',
+      'src/components/TasteQuizModes.tsx',
+      'src/lib/taste/quickQuiz.ts',
+      'src/lib/actions/tasteQuiz.ts',
+      'src/app/dev/taste-quiz/page.tsx',
+    ]) {
+      expect(gone(f), `${f} is still here`).toBe(true);
     }
   });
 
-  it('writes DNA through the one preference log rather than a second model', () => {
-    const action = read('src/lib/actions/tasteQuiz.ts');
-    expect(action).toContain('recordEvents');
-    expect(action).toContain('toPreferenceEvents');
+  it('nothing imports it', () => {
+    for (const f of ['src/app/app/taste-quiz/page.tsx', 'src/app/app/quiz/page.tsx', 'src/app/app/dna/page.tsx']) {
+      const src = read(f);
+      expect(src, `${f} still references the statements quiz`).not.toMatch(/QuickTasteQuiz|TasteQuizModes|quickQuiz|actions\/tasteQuiz/);
+    }
   });
 
-  it('survives a missing provenance table instead of losing the answers', () => {
-    const action = read('src/lib/actions/tasteQuiz.ts');
-    expect(action).toContain('42P01');
-    expect(action).toContain('provenanceStored');
+  it('the route no longer reads a mode it cannot honour', () => {
+    const page = read('src/app/app/taste-quiz/page.tsx');
+    expect(page).not.toContain("mode: QuizMode");
+    expect(page).not.toContain("'statements'");
   });
 
-  it('registers migration 0034 so the provenance table can actually be created', () => {
-    expect(read('src/lib/pendingMigrations.ts')).toContain('0034_taste_quiz');
-  });
-
-  it('keeps the provenance log append-only in the database, not just in code', () => {
-    const sql = read('supabase/migrations/0034_taste_quiz.sql');
-    expect(sql).toContain('for insert with check (auth.uid() = user_id)');
-    expect(sql).toContain('enable row level security');
-    expect(sql).not.toContain('for update using');
+  it('but a founder session still survives the legacy hop', () => {
+    // The one thing the mode parameter shared its URL with, and the one that
+    // actually matters: isolated founder calibration.
+    expect(read('src/app/app/quiz/page.tsx')).toContain('session');
   });
 });

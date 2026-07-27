@@ -267,13 +267,26 @@ export function OnTvGuide({
               return (
                 <div key={a.id} className="card flex flex-col overflow-hidden">
                   {/* Action row on top of the placard — For · Against · Save —
-                      the same groove as every other card in the app. */}
-                  {resolved && (
-                    <div className="flex flex-wrap items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
-                      <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
-                      <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
-                    </div>
-                  )}
+                      the same groove as every other card in the app.
+
+                      THE ROW IS ALWAYS THERE, even when the listing has not been
+                      matched to a TMDB title and there is nothing to act on. It
+                      used to be omitted entirely, so an unmatched card's poster
+                      started ~95px higher than its neighbours' and the strip
+                      read as broken rather than as one card being different.
+                      An empty slot that says why keeps four cards in a row. */}
+                  <div className="flex min-h-[3.5rem] flex-wrap items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-2 lg:min-h-[4.25rem]">
+                    {resolved ? (
+                      <>
+                        <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                        <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                      </>
+                    ) : (
+                      <span className="w-full text-center text-[11px] font-semibold text-slate-500" data-testid="airing-unmatched">
+                        Not matched to a title yet
+                      </span>
+                    )}
+                  </div>
                   {/* The W, on the artwork, exactly where it is on every other
                       card — so putting an airing on the docket is the same
                       gesture as putting a poster on it. */}

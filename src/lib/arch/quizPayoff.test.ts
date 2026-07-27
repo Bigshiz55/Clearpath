@@ -6,9 +6,10 @@
  * taught the recommender something was the moment the app gave them nowhere to
  * go and see what it did.
  *
- * Four completion screens, four different answers: two offered a route to
- * recommendations under two different names, and two offered none at all. The
- * reward for finishing depended on which route you took to get there.
+ * There were four completion screens and four different answers: two offered a
+ * route to recommendations under two different names, and two offered none at
+ * all. The reward for finishing depended on which route you took to get there.
+ * (The statements quiz was one of the four; it has since been removed.)
  *
  * One button now, same words, PRIMARY on every one — with a single deliberate
  * exception, below.
@@ -26,7 +27,6 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 /** Every screen that can say "you're done". */
 const COMPLETION_SCREENS = [
   'src/components/RapidFire.tsx',
-  'src/components/QuickTasteQuiz.tsx',
   'src/components/DnaQuiz.tsx',
   'src/components/TitleGridCalibration.tsx',
 ];
