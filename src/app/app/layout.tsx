@@ -5,7 +5,6 @@ import { isPro } from '@/lib/pro';
 import { Nav } from '@/components/Nav';
 import { NavArrows } from '@/components/NavArrows';
 import { DocketTray } from '@/components/DocketTray';
-import { ReVerdictTray } from '@/components/ReVerdictTray';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,10 +46,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <NavArrows />
         {children}
       </main>
-      {/* Both dockets, wherever you are. Each renders nothing when empty, and
-          the rewatch tray stacks above the other when both exist. */}
+      {/* The docket, wherever you are. Renders nothing when it is empty. */}
       <DocketTray />
-      <ReVerdictTray />
     </div>
   );
 }
