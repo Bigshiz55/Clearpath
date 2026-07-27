@@ -42,10 +42,18 @@ export function Nav({
 }) {
   return (
     <>
-      {/* Top padding clears the fixed build badge (~1.5rem band) so it never
-          overlaps the logo or the header controls. */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[calc(env(safe-area-inset-top)+1.5rem)] backdrop-blur">
-        <div className="container-page flex h-16 items-center justify-between gap-2 sm:gap-4">
+      {/* Top padding clears the build badge band so it never overlaps the logo
+          or the header controls.
+
+          NOT STICKY ON A PHONE. Header + badge is ~148px, and sticking it means
+          148px of every screen is permanently spent on chrome — card titles
+          slide under it the moment you scroll, which is the "it chops off the
+          top" complaint. On mobile the bottom nav is welded to the edge and
+          already carries navigation, so a second persistent bar earns nothing.
+          It scrolls away with the content and comes straight back at the top.
+          From `sm` there is no bottom nav, so it sticks as before. */}
+      <header className="relative z-40 border-b border-white/10 bg-ink-950/80 pt-[calc(env(safe-area-inset-top)+1.5rem)] backdrop-blur sm:sticky sm:top-0">
+        <div className="container-page flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-4">
           {/* Spacing does NOT relax at wider viewports: `container-page` caps at
               1152px, so the header has exactly as much room at 1600 as at 1280.
               Restoring the roomier gaps above `xl` reintroduced the collision. */}

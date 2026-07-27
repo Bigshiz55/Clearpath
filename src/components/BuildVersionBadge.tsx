@@ -55,7 +55,11 @@ export function BuildVersionBadge() {
           ABOVE the logo/controls and never overlaps them. The row is
           pointer-events-none; only the pill is interactive. */}
       <div
-        className="pointer-events-none fixed inset-x-0 top-0 z-[200] flex justify-center"
+        // Absolute on a phone so it scrolls away with the header it sits on;
+        // fixed from `sm`, where the header is sticky and the badge should ride
+        // with it. Either way it is at the top of the document on load, which
+        // is where a QA screenshot is taken.
+        className="pointer-events-none absolute inset-x-0 top-0 z-[200] flex justify-center sm:fixed"
         style={{ paddingTop: 'max(env(safe-area-inset-top), 2px)' }}
         data-testid="build-badge-row"
       >

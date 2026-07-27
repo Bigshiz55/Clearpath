@@ -110,3 +110,36 @@ test('the card goes back to a column once there is room for real grid columns', 
   // Full-bleed poster across the top of the cell, not a thumbnail beside a sliver.
   expect(poster!.width).toBeGreaterThan(cardBox!.width * 0.9);
 });
+
+/**
+ * THE TOP OF THE SCREEN IS NOT PERMANENTLY SPENT.
+ *
+ * Header + build badge is ~148px on a real phone (safe-area inset included).
+ * Sticking that meant every scroll slid card titles underneath it — "it chops
+ * off the top so you have to scroll back". On mobile the bottom nav is welded
+ * to the edge and already carries navigation, so the top bar earns nothing by
+ * persisting; it scrolls away and returns at the top of the page.
+ *
+ * From `sm` there is no bottom nav, so it still sticks.
+ */
+test('on a phone the header scrolls away instead of covering the content', async ({ page }) => {
+  await open(page, 390, 844);
+  await expect(page.getByTestId('build-badge')).toBeVisible();
+
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await page.waitForTimeout(150);
+
+  const header = await page.locator('header').first().boundingBox();
+  const covered = header ? Math.max(0, header.y + header.height) : 0;
+  expect(covered, 'viewport top still covered after scrolling').toBe(0);
+});
+
+test('on a laptop the header still sticks — there is no bottom nav there', async ({ page }) => {
+  await open(page, 1280, 900);
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await page.waitForTimeout(150);
+
+  const header = await page.locator('header').first().boundingBox();
+  expect(header!.y, 'header pinned to the top').toBeLessThanOrEqual(1);
+  expect(header!.height, 'header still occupying its band').toBeGreaterThan(40);
+});
