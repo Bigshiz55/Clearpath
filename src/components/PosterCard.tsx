@@ -95,20 +95,16 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
     </>
   );
 
-  // The poster and title link out; the top bar and `children` are siblings of
+  // The poster and title link out; the actions and `children` are siblings of
   // the link (never nested inside it) so they may hold interactive controls.
+  //
+  // The wrapper keeps its `card` class — five components find their placard
+  // with `closest('.card')` to fade it out, and dropping it would silently
+  // break every one of them. The BORDER is what goes: the poster's own edge is
+  // the boundary, depth comes from a shadow, and a page of results stops being
+  // a grid of boxes.
   return (
-    <div className="card group flex h-full flex-col overflow-hidden transition hover:border-white/20 hover:shadow-glow">
-      {/* One tidy action row — a clean groove, all the same size and OFF the art:
-          👍 more like this · 👎 not for me · ＋ Save. The Movie/TV tag moved down to
-          the title line; the score lives in the pink box below. */}
-      <div className="flex items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
-        {overlay !== null && saveId != null && (
-          <LikeButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
-        )}
-        {feedback}
-        {resolvedOverlay}
-      </div>
+    <div className="card group flex h-full flex-col overflow-hidden !border-transparent shadow-[0_6px_24px_-6px_rgba(0,0,0,0.8)] transition hover:shadow-[0_10px_32px_-6px_rgba(0,0,0,0.95)]">
       <div className="relative aspect-[2/3] overflow-hidden">
         {/* The W sits ON the artwork, not in the action row: the row is already
             three buttons wide and a fourth breaks at 320px, and the stamp has
@@ -124,6 +120,16 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           poster
         )}
       </div>
+      {/* The actions sit UNDER the artwork, not in a lit strip above it. They
+          were competing with the poster for the top of the card, which is the
+          one part of a placard that is doing real work. */}
+      {overlay !== null && saveId != null && (
+        <div className="flex items-center gap-1 px-2 pt-2">
+          <LikeButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+          {feedback}
+          {resolvedOverlay}
+        </div>
+      )}
       <div className="flex flex-1 flex-col p-3">
         {onOpen ? (
           <button type="button" onClick={onOpen} className="block w-full text-left">{heading}</button>

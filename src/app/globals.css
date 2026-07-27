@@ -120,14 +120,18 @@ body {
     @apply mb-1.5 block text-sm font-medium text-slate-200;
   }
 
-  /* Section "eyebrow" label — modern, bright, legible. Replaces the old small
-     gold serif treatment. Bright brand-blue, larger, and set in the UI sans. */
+  /* Section headings.
+     These were small gold uppercase eyebrows, which is a quiet treatment doing
+     a loud job: on a dense screen the heading is the thing that lets you skip
+     a whole block, and it was smaller than the body text under it. Now white,
+     larger, sentence-case weight — hierarchy from size and colour rather than
+     from letter-spacing. Gold is freed up for the things that actually mean
+     something (ratings, warnings). */
   .eyebrow {
-    @apply inline-flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-[0.12em] text-gold-300;
+    @apply inline-flex items-center gap-1.5 text-lg font-extrabold tracking-tight text-white;
   }
-  /* A slightly larger hero variant for the top of a page/card. */
   .eyebrow-lg {
-    @apply inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.1em] text-gold-300;
+    @apply inline-flex items-center gap-1.5 text-xl font-black tracking-tight text-white sm:text-2xl;
   }
   /* Small helper/caption text with enough contrast to actually read on dark. */
   .helper {

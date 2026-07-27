@@ -40,7 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const avatarLabel = avatar ?? (user.email?.[0] ?? '🍿').toUpperCase();
 
   return (
-    <div className="min-h-dvh pb-20 lg:pb-0">
+    <div className="min-h-dvh pb-24 lg:pb-0">
       <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} pro={pro} avatarLabel={avatarLabel} />
       <main className="container-page py-6">
         <NavArrows />

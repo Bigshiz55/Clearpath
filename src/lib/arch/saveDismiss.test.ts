@@ -47,6 +47,24 @@ describe('SaveButton', () => {
   });
 });
 
+describe('the card fade hook', () => {
+  it('every placard keeps the `card` class the fade depends on', () => {
+    // Five components find the placard with closest('.card'). Restyling the
+    // card by replacing its classes — rather than overriding them — silently
+    // breaks all five, and nothing about the page looks wrong afterwards.
+    const src = read('src/components/PosterCard.tsx');
+    expect(src).toMatch(/className="card /);
+
+    for (const f of [
+      'src/components/SaveButton.tsx',
+      'src/components/TasteFeedback.tsx',
+      'src/components/LikeButton.tsx',
+    ]) {
+      expect(read(f), f).toContain("closest('.card')");
+    }
+  });
+});
+
 describe('the browsing grids', () => {
   it('every placard dismisses on save by default', () => {
     const src = read('src/components/PosterCard.tsx');

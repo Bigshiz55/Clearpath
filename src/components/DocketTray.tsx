@@ -31,7 +31,7 @@ export function DocketTray() {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.25rem)] z-40 px-3 lg:bottom-4"
+      className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-40 px-3 lg:bottom-4"
       data-testid="docket-tray"
     >
       <div className="container-page">

@@ -76,7 +76,9 @@ for (const width of WIDTHS) {
     expect(opacity, `CTA not dimmed @ ${width}px`).toBeGreaterThan(0.9);
 
     // 6) Bottom nav: six tabs, each ≥44px tall, clear of content, safe-area padded.
-    const nav = page.locator('nav.fixed');
+    // `[data-app-bottomnav]` is the stable hook; the nav element itself is now
+    // a pill INSIDE a fixed wrapper rather than being the fixed element.
+    const nav = page.locator('[data-app-bottomnav]');
     await expect(nav).toBeVisible();
     const tabs = nav.locator('a, button');
     expect(await tabs.count(), 'six bottom-nav tabs').toBe(6);

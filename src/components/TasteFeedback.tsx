@@ -81,7 +81,7 @@ export function TasteFeedback({
         title="Not for me — this teaches your Viewer DNA, it does not just hide the card"
         className={
           compact
-            ? `flex min-h-[44px] min-w-0 items-center justify-center gap-0.5 rounded-md border border-red-400/50 bg-red-500/15 text-red-200 transition hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:opacity-60 ${wide ? 'w-full flex-1' : 'w-11'}`
+            ? `flex min-h-[44px] min-w-0 items-center justify-center gap-0.5 rounded-lg border border-white/10 bg-white/[0.06] text-slate-300 transition hover:border-red-400/50 hover:bg-red-500/15 hover:text-red-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:opacity-60 ${wide ? 'w-full flex-1' : 'w-11'}`
             : `items-center gap-1 rounded-lg border border-red-400/50 bg-black/60 font-bold text-red-100 backdrop-blur transition hover:bg-red-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:opacity-60 ${wide ? 'flex w-full justify-center px-3 py-3 text-sm' : 'inline-flex px-2 py-1 text-[11px]'}`
         }
       >

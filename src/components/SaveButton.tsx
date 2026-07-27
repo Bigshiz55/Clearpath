@@ -142,10 +142,10 @@ export function SaveButton({
       disabled={busy}
       aria-label={saved ? 'Saved — remove from your list' : 'Save'}
       title={saved ? 'Saved — tap to remove' : 'Save'}
-      className={`flex min-h-[44px] min-w-0 items-center justify-center gap-0.5 rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-11'} ${
+      className={`flex min-h-[44px] min-w-0 items-center justify-center gap-0.5 rounded-lg border font-semibold text-white transition ${wide ? 'w-full flex-1' : 'w-11'} ${
         saved
-          ? 'border-brand-300 bg-brand-500'
-          : 'border-brand-400/60 bg-brand-500/35 hover:bg-brand-500/60'
+          ? 'border-pink-200/60 bg-gradient-to-b from-[#ff62b6] to-[#ff1493]'
+          : 'border-[#ff1493]/45 bg-[#ff1493]/12 text-pink-100 hover:bg-[#ff1493]/25'
       }`}
     >
       {icon}
