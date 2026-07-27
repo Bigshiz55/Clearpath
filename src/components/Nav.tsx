@@ -19,6 +19,7 @@ const SECONDARY: NavLink[] = [
   { href: '/app/verdict', label: 'The Verd1ct 🔨' },
   { href: '/app/dna', label: 'Your Watch DNA' },
   { href: '/app/taste-quiz', label: 'Quick Taste Quiz' },
+  { href: '/app/rapid-fire', label: 'Rapid Fire ⚡️' },
   { href: '/import-taste', label: 'Bring your taste with you' },
   { href: '/app/subscriptions', label: 'Subscription check 💸' },
   { href: '/app/together', label: 'Movie night together' },

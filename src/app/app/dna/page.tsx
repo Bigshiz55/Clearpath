@@ -67,6 +67,15 @@ export default async function WatchDnaPage() {
               React to a selection of films and shows so Verd1ct can begin learning your taste.
             </p>
           </Link>
+          <Link href="/app/rapid-fire" className="card p-4 transition hover:bg-white/10" data-testid="link-rapid-fire">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>⚡️</span> Rapid Fire
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              Import your history, then rate it at a tap a title. Turns &ldquo;you pressed play&rdquo; into
+              something worth ranking on. Try it on sample data first.
+            </p>
+          </Link>
           <Link href="/import-taste" className="card p-4 transition hover:bg-white/10" data-testid="link-import-taste">
             <div className="flex items-center gap-2 text-base font-bold text-white">
               <span aria-hidden>📄</span> Import your history
