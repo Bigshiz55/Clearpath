@@ -898,3 +898,25 @@ body {
 }
 .wv-signal-arc-1 { animation: wv-signal-out 1.8s ease-out infinite; transform-origin: 20% 80%; }
 .wv-signal-arc-2 { animation: wv-signal-out 1.8s ease-out infinite 0.45s; transform-origin: 20% 80%; }
+
+
+/* ---------------------------------------------------------------------------
+   THE RATINGS ROW, ON A BIG SCREEN.
+   "Use the extra real estate to increase ratings." An iPad card is ~470px wide
+   and the evidence under it — Rotten Tomatoes, the audience score, IMDb — was
+   drawn at 14px with 10px labels, the size it needs to be on a 390px phone.
+   The scores are the reason to trust the number above them, so on a screen
+   with room they get read at a glance rather than squinted at.
+
+   Scoped to `.wv-ratings` so it lifts the row wherever it appears — card,
+   release wall, recommendation slate — from one definition.
+--------------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  .wv-ratings { font-size: 1rem; gap: 0.5rem; }
+  .wv-ratings .wv-ratings-row { font-size: 1.0625rem; gap: 0.875rem; }
+  .wv-ratings .wv-ratings-tag { font-size: 0.75rem; }
+  .wv-ratings .wv-ratings-emoji { font-size: 1.25rem; }
+}
+@media (min-width: 1280px) {
+  .wv-ratings .wv-ratings-row { font-size: 1.125rem; }
+}

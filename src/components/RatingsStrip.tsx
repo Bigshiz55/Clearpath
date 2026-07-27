@@ -66,7 +66,7 @@ export function RatingsStrip({
     );
 
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
+    <div className={`wv-ratings flex flex-col gap-1.5 ${className}`}>
       {/* Line 1 — the one call, on its own line so it reads as the headline.
           Skipped when the card already shows the call in its top bar. */}
       {!hideCall && (
@@ -84,7 +84,7 @@ export function RatingsStrip({
           no pills on 🍅/🍿 (just icon + value) so tomato, popcorn and IMDb fit. */}
       {/* flex-wrap: on a card too narrow for all three chips, the row wraps —
           IMDb must never escape the panel border (Safari min-content included). */}
-      <div className="flex min-w-0 flex-wrap items-center gap-2.5 text-sm font-black tabular-nums">
+      <div className="wv-ratings-row flex min-w-0 flex-wrap items-center gap-2.5 text-sm font-black tabular-nums">
         <RatingChip
           label="🍅"
           value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
@@ -101,7 +101,7 @@ export function RatingsStrip({
           className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
           title="IMDb rating"
         >
-          <span className="text-[10px] font-black opacity-80">IMDb</span> {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
+          <span className="wv-ratings-tag text-[10px] font-black opacity-80">IMDb</span> {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
         </span>
       </div>
     </div>
@@ -116,7 +116,7 @@ function RatingChip({ label, value, tone, title }: { label: string; value: strin
       className={`inline-flex items-center gap-1 whitespace-nowrap ${value != null ? tone : 'text-slate-500'}`}
       title={title}
     >
-      <span aria-hidden className="text-base leading-none">{label}</span>
+      <span aria-hidden className="wv-ratings-emoji text-base leading-none">{label}</span>
       {value ?? '–'}
     </span>
   );

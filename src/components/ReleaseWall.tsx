@@ -231,15 +231,20 @@ export function ReleaseWall({
                       each control now shows its own state in place and can be
                       tapped again to reverse it. */}
                   <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="release-actions">
-                    <SaveButton
-                      wide
+                    {/* FOR · AGAINST · SAVE, in that order, on every surface.
+                        Save came first here, so the verdict pair was split and
+                        the same three controls sat in a different sequence from
+                        every other card — muscle memory from one grid tapped
+                        the wrong thing on the next. */}
+                    <CardVerdict
                       tmdbId={t.id}
                       mediaType={t.mediaType}
                       title={t.title}
                       year={t.year}
                       posterPath={t.posterPath}
                     />
-                    <CardVerdict
+                    <SaveButton
+                      wide
                       tmdbId={t.id}
                       mediaType={t.mediaType}
                       title={t.title}

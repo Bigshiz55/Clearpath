@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { buildRecommendationSlate, recordRecommendationOutcome, type SlateItem } from '@/lib/actions/recommendations';
+import { WCheck } from '@/components/WCheck';
+import { AlgorithmScore } from '@/components/AlgorithmScore';
 
 /**
  * A refreshable, self-validating recommendation slate.
@@ -96,17 +98,29 @@ export function RecommendationSlate({
           return (
             <div key={key} className="card overflow-hidden p-0" data-testid="reco-item">
               <div className="relative aspect-[2/3] bg-black/30">
+                {/* The W goes upper-RIGHT, where it is on every other card, so
+                    putting a pick on the docket is one gesture everywhere. The
+                    predicted score moves left to make room — it is this
+                    surface's own number (logged for accuracy tracking) and is
+                    not the same thing as the Verd1ct below. */}
+                <WCheck tmdbId={it.id} mediaType={it.mediaType} title={it.title} year={it.year} posterUrl={it.posterUrl} />
                 {it.posterUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={it.posterUrl} alt={it.title} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full items-center justify-center p-2 text-center text-xs font-bold text-white">{it.title}</div>
                 )}
-                <span className="absolute right-1 top-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] font-black text-white">{it.predicted}</span>
+                <span className="absolute left-1 top-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] font-black text-white" title="Predicted match for you">{it.predicted}</span>
               </div>
               <div className="p-2">
                 <div className="line-clamp-1 text-xs font-bold text-white">{it.title}</div>
                 {it.matchReason && <div className="mt-0.5 line-clamp-1 text-[10px] text-slate-400" title={it.matchReason}>{it.matchReason}</div>}
+                {/* The same ratings box every other card carries — Rotten
+                    Tomatoes, the audience score and IMDb. This surface showed a
+                    bare number in the poster corner and nothing else, so the
+                    one grid built to be judged on accuracy was the one with no
+                    evidence on it. */}
+                <AlgorithmScore compact mediaType={it.mediaType} tmdbId={it.id} title={it.title} year={it.year} className="mt-1.5" />
                 {/* WORDS, NOT EMOJI. This row was 👍 📌 ✕ — three glyphs with
                     no shared vocabulary: the thumb could mean "watched", the
                     pin could mean "pinned to top", and a bare ✕ reads as
@@ -115,8 +129,8 @@ export function RecommendationSlate({
                     app uses, with the same colours. */}
                 <div className="mt-1.5 flex gap-1">
                   <button type="button" onClick={() => react(it, 'rated_up')} className={`wv-act flex flex-1 items-center justify-center rounded-md border-2 px-1 ${r === 'up' ? 'border-emerald-300 bg-emerald-500/60 text-white' : 'border-emerald-400/70 bg-emerald-500/20 text-emerald-100'}`} data-testid="reco-up" aria-label="For it — more like this"><span className="wv-act-label font-black uppercase tracking-wide">For</span></button>
-                  <button type="button" onClick={() => react(it, 'saved')} className={`wv-act flex flex-1 items-center justify-center rounded-md border-2 px-1 ${r === 'saved' ? 'border-pink-200/70 bg-gradient-to-b from-[#ff62b6] to-[#ff1493] text-white' : 'border-[#ff1493]/70 bg-[#ff1493]/25 text-pink-50'}`} data-testid="reco-save" aria-label="Save to your list"><span className="wv-act-label font-black uppercase tracking-wide">{r === 'saved' ? 'Saved' : 'Save'}</span></button>
                   <button type="button" onClick={() => react(it, 'dismissed')} className={`wv-act flex flex-1 items-center justify-center rounded-md border-2 px-1 ${r === 'down' ? 'border-red-300 bg-red-500/60 text-white' : 'border-red-400/70 bg-red-500/20 text-red-100'}`} data-testid="reco-down" aria-label="Not for me — teaches your Viewer DNA"><span className="wv-act-label font-black uppercase tracking-wide">Against</span></button>
+                  <button type="button" onClick={() => react(it, 'saved')} className={`wv-act flex flex-1 items-center justify-center rounded-md border-2 px-1 ${r === 'saved' ? 'border-pink-200/70 bg-gradient-to-b from-[#ff62b6] to-[#ff1493] text-white' : 'border-[#ff1493]/70 bg-[#ff1493]/25 text-pink-50'}`} data-testid="reco-save" aria-label="Save to your list"><span className="wv-act-label font-black uppercase tracking-wide">{r === 'saved' ? 'Saved' : 'Save'}</span></button>
                 </div>
               </div>
             </div>

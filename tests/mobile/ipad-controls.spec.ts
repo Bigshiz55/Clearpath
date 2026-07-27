@@ -77,3 +77,53 @@ test('the labels still fit — bigger text must not wrap the row', async ({ page
     expect(wrapped, `label wrapped at ${w}px`).toBe(false);
   }
 });
+
+
+/**
+ * "Use the extra real estate to increase ratings."
+ *
+ * The evidence under the score — Rotten Tomatoes, the audience score, IMDb —
+ * was drawn at the size it needs to be on a 390px phone, on a card nearly 500px
+ * wide. Those numbers are the reason to trust the VERD1CT above them, so on a
+ * screen with room they should be read at a glance, not squinted at.
+ */
+async function ratingsMetrics(page: Page) {
+  const row = page.getByTestId('qa-grid').locator('> div').first().locator('.wv-ratings-row').first();
+  await expect(row).toBeVisible();
+  return row.evaluate((el) => ({ fontSize: parseFloat(getComputedStyle(el).fontSize) }));
+}
+
+test('the ratings row is bigger on an iPad than on a phone', async ({ page }) => {
+  await open(page, 390, 844);
+  const phone = await ratingsMetrics(page);
+  await open(page, 1024, 1366);
+  const ipad = await ratingsMetrics(page);
+
+  expect(ipad.fontSize, 'iPad ratings text').toBeGreaterThan(phone.fontSize);
+
+  // Type size ONLY. Row height is not a property of this fix: it depends on
+  // whether the chips wrap, which depends on how many ratings the title
+  // actually has. Measured with a full set it is 54px on a phone (two lines)
+  // and 24px on an iPad (one) — bigger text AND shorter — and with a sparse
+  // set it is 24px at both. An assertion on height would have failed the fix
+  // for succeeding in one case and been meaningless in the other.
+});
+
+test('and bigger again on a wide screen', async ({ page }) => {
+  await open(page, 1024, 1366);
+  const ipad = await ratingsMetrics(page);
+  await open(page, 1366, 1024);
+  const wide = await ratingsMetrics(page);
+  expect(wide.fontSize).toBeGreaterThanOrEqual(ipad.fontSize);
+});
+
+test('the bigger ratings still fit inside their panel at every width', async ({ page }) => {
+  for (const [w, h] of [[1024, 1366], [1280, 900], [1440, 900]] as const) {
+    await open(page, w, h);
+    const card = page.getByTestId('qa-grid').locator('> div').first();
+    const row = card.locator('.wv-ratings-row').first();
+    const [cardBox, rowBox] = [await card.boundingBox(), await row.boundingBox()];
+    // IMDb escaping the pink panel is the old bug this row already had once.
+    expect(rowBox!.x + rowBox!.width, `ratings overflow the card at ${w}px`).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
+  }
+});
