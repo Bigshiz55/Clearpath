@@ -24,6 +24,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { recordQuizAnswer } from '@/lib/actions/dnaQuiz';
 import { DnaBurst } from '@/components/DnaBurst';
+import { RecommendationSlate } from '@/components/RecommendationSlate';
+import { analysePicks, type AnalysedPick, type PickAnalysis } from '@/lib/preference/pickAnalysis';
 
 const GRID_SIZE = 12;
 
@@ -65,6 +67,9 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
   const [openRating, setOpenRating] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState<number | null>(null);
+  // The read-back is built from the picks AS SUBMITTED — snapshotted here so a
+  // later round cannot rewrite what a finished run said about you.
+  const [analysis, setAnalysis] = useState<PickAnalysis | null>(null);
   const [round, setRound] = useState(0);
   const [exhausted, setExhausted] = useState(false);
   // The DNA pop, in the centre of the tile you just chose. Same moment the
@@ -154,6 +159,7 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
     setPicks({});
     chosenItems.current.clear();
     setSavedCount(null);
+    setAnalysis(null);
     setRound((r) => r + 1);
   }
 
@@ -213,6 +219,25 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
       }),
     );
     setSaving(false);
+    setAnalysis(
+      analysePicks(
+        Array.from(chosenItems.current.values()).flatMap((i): AnalysedPick[] => {
+          const p = picks[keyOf(i)];
+          if (!p) return [];
+          return [
+            {
+              title: i.title,
+              year: i.year,
+              mediaType: i.mediaType,
+              genre: i.genre,
+              kind: p.kind,
+              ...(p.kind === 'seen' ? { rating: p.rating } : {}),
+            },
+          ];
+        }),
+        new Date().getFullYear(),
+      ),
+    );
     setSavedCount(results.filter((r) => r.ok).length);
   }
 
@@ -225,30 +250,69 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
   }
 
   if (savedCount !== null) {
+    // The payoff. Finishing used to say "Got it." and stop — the one moment
+    // someone has just done the work, and it handed back nothing. Read the
+    // picks straight back to them, then show what those picks actually buy.
     return (
-      <div className="card p-6" data-testid="title-grid-done">
-        <h2 className="text-xl font-bold text-white">Got it.</h2>
-        <p className="mt-1 text-sm text-slate-300">
-          {savedCount === 0
-            ? 'Nothing was recorded — the ones you did not tap are not held against you.'
-            : `${savedCount} ${savedCount === 1 ? 'title' : 'titles'} went into your Watch DNA.`}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={startNewRun}
-            className="btn-primary inline-flex min-h-[48px] items-center px-6 text-base"
-            data-testid="title-grid-more"
-          >
-            Keep going — 12 more
-          </button>
-          <a
-            href="/app/dna"
-            className="inline-flex min-h-[44px] items-center rounded-lg border border-white/15 px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-          >
-            See my Watch DNA →
-          </a>
-        </div>
+      <div className="space-y-5" data-testid="title-grid-done">
+        <section className="card p-5 sm:p-6">
+          <div className="text-xs font-bold uppercase tracking-wide text-[#ff1493]">What your picks say</div>
+          <h2 className="mt-1 text-2xl font-black text-white sm:text-3xl" data-testid="analysis-headline">
+            {analysis?.headline ?? 'Saved.'}
+          </h2>
+          <p className="mt-1 text-sm text-slate-300">
+            {savedCount === 0
+              ? 'Nothing was recorded — the ones you did not tap are not held against you.'
+              : `${savedCount} ${savedCount === 1 ? 'title' : 'titles'} went into your Watch DNA.`}
+          </p>
+
+          {analysis && analysis.facts.length > 0 && (
+            <dl className="mt-4 grid gap-3 sm:grid-cols-2" data-testid="analysis-facts">
+              {analysis.facts.map((f) => (
+                <div key={f.key} className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                  <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{f.label}</dt>
+                  <dd className="mt-0.5 text-sm font-semibold text-white">{f.detail}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          {analysis && (
+            <p className="mt-3 text-xs text-slate-500" data-testid="analysis-caveat">
+              {analysis.caveat}
+              {!analysis.enough && ' Another round or two and this gets a lot sharper.'}
+            </p>
+          )}
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={startNewRun}
+              className="btn-primary inline-flex min-h-[48px] items-center px-6 text-base"
+              data-testid="title-grid-more"
+            >
+              Keep going — 12 more
+            </button>
+            <a
+              href="/app/dna"
+              className="inline-flex min-h-[48px] items-center rounded-lg border-2 border-[#ff1493]/45 bg-[#ff1493]/10 px-5 text-sm font-bold text-pink-100 transition hover:bg-[#ff1493]/20"
+            >
+              See my full Watch DNA →
+            </a>
+          </div>
+        </section>
+
+        {/* What it bought. The slate ranks from the DNA that just changed, so
+            this is the first real evidence the picks did anything. */}
+        <section className="card p-5 sm:p-6" data-testid="analysis-recommendations">
+          <h3 className="text-lg font-bold text-white">Because of those picks</h3>
+          <p className="mt-0.5 text-sm text-slate-400">
+            Ranked against your Watch DNA as it stands right now — react to any of them and it keeps learning.
+          </p>
+          <div className="mt-4">
+            <RecommendationSlate surface="grid-calibration" {...(sessionId ? { sessionId } : {})} />
+          </div>
+        </section>
       </div>
     );
   }

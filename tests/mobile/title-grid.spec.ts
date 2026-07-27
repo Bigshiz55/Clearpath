@@ -262,3 +262,48 @@ test('a pick pops the DNA animation', async ({ page }) => {
   await page.getByTestId('grid-like-100').click();
   await expect(page.getByText(/DNA/i).first()).toBeVisible();
 });
+
+test('finishing reads the picks back and shows what they bought', async ({ page }) => {
+  await open(page, 1280, 800, 40);
+  // Six crime-ish picks, enough for the analysis to name a pattern.
+  for (const id of [100, 101, 102, 103, 104, 105]) {
+    await page.getByTestId(`grid-like-${id}`).click();
+  }
+  await page.getByTestId('title-grid-submit').click();
+  await expect(page.getByTestId('title-grid-done')).toBeVisible();
+
+  // It says something about the picks rather than just "Got it."
+  const headline = await page.getByTestId('analysis-headline').innerText();
+  expect(headline.length).toBeGreaterThan(10);
+  expect(headline).not.toBe('Got it.');
+  await expect(page.getByTestId('analysis-facts')).toBeVisible();
+
+  // And it never claims more than the taps support.
+  await expect(page.getByTestId('analysis-caveat')).toContainText('not recorded as a dislike');
+
+  // Then it shows what the DNA now surfaces.
+  await expect(page.getByTestId('analysis-recommendations')).toBeVisible();
+  await expect(page.getByTestId('analysis-recommendations')).toContainText('Because of those picks');
+});
+
+test('the read-back refuses to describe a person from two taps', async ({ page }) => {
+  await open(page, 1280, 800, 40);
+  await page.getByTestId('grid-like-100').click();
+  await page.getByTestId('grid-like-101').click();
+  await page.getByTestId('title-grid-submit').click();
+  await expect(page.getByTestId('analysis-headline')).toContainText('not enough to describe you yet');
+  await expect(page.getByTestId('analysis-caveat')).toContainText('sharper');
+});
+
+test('"Keep going" after finishing starts a clean run', async ({ page }) => {
+  await open(page, 1280, 800, 40);
+  await page.getByTestId('grid-like-100').click();
+  await page.getByTestId('title-grid-submit').click();
+  await expect(page.getByTestId('title-grid-done')).toBeVisible();
+
+  await page.getByTestId('title-grid-more').click();
+  await expect(page.getByTestId('title-grid')).toBeVisible();
+  // The already-written pick must not be counted a second time.
+  await expect(page.getByTestId('title-grid-submit')).toBeDisabled();
+  await expect(page.getByTestId('grid-running-total')).toHaveCount(0);
+});
