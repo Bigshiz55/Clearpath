@@ -104,7 +104,7 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
                   year={t.year}
                   mediaType={t.mediaType}
                   posterUrl={tmdbImage(t.posterPath, 'w342')}
-                  overlay={<SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />}
+                  overlay={<SaveButton wide removeOnSave tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />}
                 />
               ))}
             </div>

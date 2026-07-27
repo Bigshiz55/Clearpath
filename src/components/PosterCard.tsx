@@ -23,6 +23,14 @@ interface PosterCardProps {
   /** If provided, the poster/title open this (e.g. a QuickLook modal) instead of
    *  navigating via `href`. Requires `tmdbId` so the card can still score itself. */
   onOpen?: () => void;
+  /**
+   * Saving a placard means "handled" — it belongs on your list now, not in the
+   * grid you are browsing — so by default the card leaves once it is saved.
+   * Set false where the grid is somebody's list rather than a set of
+   * suggestions (a friend's profile), because there a card vanishing would read
+   * as editing THEIR list.
+   */
+  dismissOnSave?: boolean;
 }
 
 export function Poster({ posterUrl, title, className = '' }: { posterUrl?: string | null; title: string; className?: string }) {
@@ -47,7 +55,7 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
   );
 }
 
-export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen }: PosterCardProps) {
+export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen, dismissOnSave = true }: PosterCardProps) {
   const poster = (
     <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04]" />
   );
@@ -61,7 +69,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
     overlay !== undefined
       ? overlay
       : saveId != null
-        ? <SaveButton wide tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+        ? <SaveButton wide removeOnSave={dismissOnSave} tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
         : null;
   // Every placard everywhere also gets the "not for me" flag (feeds your DNA),
   // unless the caller explicitly opts out of overlays with `overlay={null}`.

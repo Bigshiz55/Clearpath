@@ -21,6 +21,12 @@ interface Props {
   onSaved?: () => void;
   /** In recommendation feeds: once saved (handled), fade the card out of view. */
   removeOnSave?: boolean;
+  /**
+   * Preferred way to remove the card when the grid owns its own list: fires
+   * after the fade, so React drops the row instead of the DOM being left with
+   * an inline `display: none` a re-render can undo. Implies `removeOnSave`.
+   */
+  onRemove?: () => void;
 }
 
 export function SaveButton({
@@ -35,6 +41,7 @@ export function SaveButton({
   wide = false,
   onSaved,
   removeOnSave = false,
+  onRemove,
 }: Props) {
   const toast = useToast();
   const [saved, setSaved] = useState(initialSaved);
@@ -42,16 +49,22 @@ export function SaveButton({
   const [busy, setBusy] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
 
-  // Saved in a recommendation feed = handled → fade the card out (brief beat so
-  // the bookmark-fill registers first). It won't be re-recommended on reload.
+  // Saved in a browsing grid = handled → the card leaves (brief beat so the
+  // bookmark-fill registers first, then a short fade). It won't be
+  // re-recommended on reload. A grid that owns its own list passes `onRemove`
+  // and drops the row itself; otherwise we fade the DOM node.
   function hideCard() {
-    const card = btnRef.current?.closest('.card');
-    if (!(card instanceof HTMLElement)) return;
     window.setTimeout(() => {
-      card.style.transition = 'opacity .3s ease, transform .3s ease';
-      card.style.opacity = '0';
-      card.style.transform = 'scale(0.96)';
-      window.setTimeout(() => { card.style.display = 'none'; }, 300);
+      const card = btnRef.current?.closest('.card');
+      if (card instanceof HTMLElement) {
+        card.style.transition = 'opacity .3s ease, transform .3s ease';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.96)';
+      }
+      window.setTimeout(() => {
+        if (onRemove) onRemove();
+        else if (card instanceof HTMLElement) card.style.display = 'none';
+      }, 300);
     }, 450);
   }
 
@@ -79,7 +92,7 @@ export function SaveButton({
           setSaved(true);
           toast.show('Added to your list.', 'success');
           onSaved?.();
-          if (removeOnSave) hideCard();
+          if (removeOnSave || onRemove) hideCard();
         } else {
           toast.show(res.error ?? 'Sign in to save to your list.', 'error');
         }

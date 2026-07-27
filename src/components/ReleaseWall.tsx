@@ -220,9 +220,19 @@ export function ReleaseWall({
                   <AlgorithmScore mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-2" />
                   {/* Actions sit with the information they act on, rather than in
                       a toolbar above the artwork. Save is the ordinary watchlist
-                      save; "Not for me" teaches DNA and says so. */}
+                      save; "Not for me" teaches DNA and says so. Both take the
+                      card out of the wall — a saved title is handled, and this
+                      is a wall of things to decide about. */}
                   <div className="mt-2 flex items-center gap-1.5" data-testid="release-actions">
-                    <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
+                    <SaveButton
+                      wide
+                      tmdbId={t.id}
+                      mediaType={t.mediaType}
+                      title={t.title}
+                      year={t.year}
+                      posterPath={t.posterPath}
+                      onRemove={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
+                    />
                     <TasteFeedback
                       compact
                       wide
