@@ -98,7 +98,15 @@ export async function POST(req: Request) {
     // Only route into similarity when the query is EXPLICITLY a "like X" ask
     // (classifier mode), not merely because a title was named. A bare title —
     // even with a provider — stays an exact-title lookup above.
-    const reference = (ai?.similarTo ?? '').trim() || (cls?.mode === 'similar_to' ? (cls.reference ?? (text ? extractReference(text) : null)) : null);
+    // Precedence matters: the classifier's `reference` is the raw matched
+    // span — for "Looking for something similar to Tulsa King that I would
+    // like" that is the WHOLE SENTENCE, which resolves to no title at all.
+    // The AI's extraction first, then the regex, and the raw span only as a
+    // last resort.
+    const reference =
+      (ai?.similarTo ?? '').trim() ||
+      (text ? extractReference(text) : null) ||
+      (cls?.mode === 'similar_to' ? (cls.reference ?? null) : null);
     if (reference && cls?.mode === 'similar_to' && !hasCompetingConstraints(text)) {
       const wantCount = text ? parseRequestedCount(text) : 10;
       const similar = await askSimilarTo(supabase, user.id, reference, wantCount);

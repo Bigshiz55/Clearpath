@@ -6,6 +6,8 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
 import { applyOverrides, sanitizeOverrides } from '@/lib/finderOverrides';
+import { askSimilarTo, extractReference } from '@/lib/askJudge';
+import { classifySearch } from '@/lib/nlu/searchMode';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -57,6 +59,7 @@ export async function POST(req: Request) {
     let query: FinderQuery;
     let limit = DEFAULT_RESULT_LIMIT;
     const text = typeof body.text === 'string' ? body.text.trim() : '';
+    const cls = text ? classifySearch(text) : null;
     const ai = text ? await parseAskWithAI(text) : null;
     if (ai) {
       query = ai.query;
@@ -65,6 +68,36 @@ export async function POST(req: Request) {
       query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
       if (text) limit = parseRequestedCount(text);
     }
+    // "SOMETHING LIKE TULSA KING" IS A DIFFERENT QUESTION.
+    //
+    // The Refine box posts here, but only the ask route knew how to answer a
+    // "more like X" request — this one read `ai.query` and dropped `ai.similarTo`
+    // on the floor. The reference vanished, the ask degraded to generic
+    // discovery, and someone asking for something like a mob drama got six
+    // unrelated new releases. Same retrieval path as the ask route now: resolve
+    // the named title, seed from its neighbours, and fall through to ordinary
+    // discovery when there is no confident match rather than guessing.
+    // Precedence matters: the classifier's `reference` is the raw matched
+    // span — for "Looking for something similar to Tulsa King that I would
+    // like" that is the WHOLE SENTENCE, which resolves to no title at all.
+    // The AI's extraction first, then the regex, and the raw span only as a
+    // last resort.
+    const reference =
+      (ai?.similarTo ?? '').trim() ||
+      (text ? extractReference(text) : null) ||
+      (cls?.mode === 'similar_to' ? (cls.reference ?? null) : null);
+    if (reference && cls?.mode === 'similar_to') {
+      const similar = await askSimilarTo(supabase, user.id, reference, limit);
+      if (similar) {
+        return NextResponse.json({
+          query: similar.query,
+          scoredFor: similar.scoredFor,
+          relaxed: null,
+          items: similar.items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+        });
+      }
+    }
+
     // Foreign-origin / English-audio / runtime augmentation — the SAME unified
     // step the ask route applies. Neither parser extracts these, so without it
     // "a Spanish film with English audio under two hours" would keep only

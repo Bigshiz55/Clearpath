@@ -24,12 +24,21 @@ body {
     @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
   }
 
-  /* The one poster-grid used across the app. Two-up on phones; from `sm` up it
-     auto-fills columns but never lets a card shrink below a readable width, so
-     cards stay big enough on every screen instead of squeezing to 6-across. */
+  /* The one poster-grid used across the app.
+     ONE-UP ON A PHONE. Two columns at 390px leaves each card about 170px wide,
+     which is where "NOT FOR ME" wraps onto three lines, titles truncate
+     mid-word and the verdict panel has to shrink its own type. A full-width
+     card fixes all three at once without touching a single font size. Two-up
+     returns at 480px, where there is actually room for it, and from `sm` the
+     grid auto-fills. */
   .poster-grid {
     @apply grid gap-4;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 480px) {
+    .poster-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
   @media (min-width: 640px) {
     .poster-grid {

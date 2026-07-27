@@ -57,25 +57,57 @@ const REF_CUE =
   /\b(?:in the vein of|reminds me of|if i (?:really )?(?:like|liked|enjoy|enjoyed|love|loved)|similar to|(?:something|stuff|shows?|movies?|a show|a movie|more|kinda|kind of|sort of|just|a lot) like|like the (?:show|movie)|like watching|like)\b/gi;
 
 /**
- * Pull the reference title out of a "more like X" ask. Takes what follows the
- * LAST comparison cue (so "shows I'd like if I like Fargo" → "Fargo"), then
- * strips leading filler. Returns null when there's no comparison in the text.
+ * Preference clauses people tack on the end: "…that I would like", "…I'd
+ * enjoy", "…for me". They are not part of the title and they are extremely
+ * common, so leaving them attached means the reference never resolves.
+ */
+const TRAILING_FILLER =
+  /\s*,?\s*\b(?:that\s+)?(?:i(?:'d|’d| would| will| might)?\s+(?:would\s+)?(?:like|enjoy|love|dig|go for)|for me|please)\b.*$/i;
+
+/**
+ * Pull the reference title out of a "more like X" ask, and only the title.
+ * Returns null when there is no comparison in the text at all.
  */
 export function extractReference(text: string): string | null {
   REF_CUE.lastIndex = 0;
-  let last: RegExpExecArray | null = null;
+  const hits: RegExpExecArray[] = [];
   let m: RegExpExecArray | null;
   while ((m = REF_CUE.exec(text)) !== null) {
-    last = m;
+    hits.push(m);
     if (m.index === REF_CUE.lastIndex) REF_CUE.lastIndex++;
   }
-  if (!last) return null;
-  const tail = text
-    .slice(last.index + last[0].length)
-    .replace(/^\s*(?:to|the|a|an|watch|watching|some|something)\s+/i, '')
-    .replace(/[?!.]+\s*$/, '')
-    .trim();
-  return tail.length >= 2 ? tail : null;
+  if (hits.length === 0) return null;
+
+  const tailOf = (hit: RegExpExecArray): string =>
+    text
+      .slice(hit.index + hit[0].length)
+      .replace(TRAILING_FILLER, '')
+      .replace(/^\s*(?:to|the|a|an|watch|watching|some|something)\s+/i, '')
+      .replace(/[?!.,]+\s*$/, '')
+      .trim();
+
+  // SPECIFIC CUES BEAT A BARE "LIKE", and a cue with nothing after it is not a
+  // cue at all. Both rules exist because of real sentences:
+  //
+  //   "…similar to Tulsa King that I would like" ends on a bare "like" with an
+  //   empty tail. Taking the last cue unconditionally returned nothing, the
+  //   similarity path bailed, and the ask silently degraded to generic
+  //   discovery — which from the outside looks like the feature not existing.
+  //
+  //   "something like Like Water for Chocolate" has a bare "like" INSIDE the
+  //   title. Preferring the compound cue keeps the title whole.
+  //
+  // Among equally specific cues the last still wins, so "shows I'd enjoy if I
+  // liked Fargo" resolves to Fargo.
+  const specific = hits.filter((h) => /\s/.test(h[0]));
+  const bare = hits.filter((h) => !/\s/.test(h[0]));
+  for (const group of [specific, bare]) {
+    for (let i = group.length - 1; i >= 0; i--) {
+      const tail = tailOf(group[i]!);
+      if (tail.length >= 2) return tail;
+    }
+  }
+  return null;
 }
 
 /**

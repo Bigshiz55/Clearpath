@@ -80,8 +80,10 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
     ) : null;
   const heading = (
     <>
-      <div className="line-clamp-2 text-sm font-semibold text-white">{title}</div>
-      <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+      {/* Full-width cards on a phone mean the title has room to be read rather
+          than scanned, so it is sized for reading. */}
+      <div className="line-clamp-2 text-base font-semibold leading-snug text-white sm:text-sm">{title}</div>
+      <div className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-400 sm:text-xs">
         <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
           {mediaType === 'movie' ? 'Movie' : 'TV'}
         </span>
