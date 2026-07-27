@@ -191,9 +191,8 @@ export function TvDetective() {
                     .filter(Boolean)
                     .join(' · ');
                   return (
-                    <div key={p.id} className="flex gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                      {/* Left column — poster + the actions, stacked under it. */}
-                      <div className="flex w-32 flex-none flex-col gap-2 sm:w-36">
+                    <div key={p.id} className="wv-det-row rounded-2xl border border-white/10 bg-white/[0.04] p-4" data-testid="detective-row">
+                      <div className="wv-det-art">
                         <div className="aspect-[2/3] w-full overflow-hidden rounded-xl border border-white/10 bg-ink-800">
                           {p.image ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -202,7 +201,39 @@ export function TvDetective() {
                             <div className="grid h-full w-full place-items-center text-xs text-slate-500">TV</div>
                           )}
                         </div>
+                      </div>
 
+                      {/* The listing itself. */}
+                      <div className="wv-det-info">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-lg border border-brand-400/40 bg-brand-500/20 px-2.5 py-1 text-sm font-black text-brand-100">
+                            {whenLabel(p.airstamp)}
+                          </span>
+                          <span className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-sm font-bold text-white">
+                            📺 {p.network}
+                          </span>
+                        </div>
+
+                        {p.tmdbId && p.mediaType ? (
+                          <Link href={`/app/title/${p.mediaType}/${p.tmdbId}`} className="mt-2 line-clamp-2 block text-lg font-black leading-tight text-white hover:text-brand-200">
+                            {p.showName}
+                          </Link>
+                        ) : (
+                          <div className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white">{p.showName}</div>
+                        )}
+                        {ep && <div className="mt-0.5 line-clamp-1 text-sm text-slate-300">{ep}</div>}
+                        {p.showType && <div className="mt-0.5 text-xs uppercase tracking-wide text-slate-500">{p.showType}</div>}
+
+                        <div className="mt-2"><Ratings p={p} /></div>
+                      </div>
+
+                      {/* Your DNA score gets its own column rather than being
+                          stretched across whatever the text column left over. */}
+                      <div className="wv-det-verdict">
+                        {p.tmdbId && p.mediaType && <CardDna mediaType={p.mediaType} tmdbId={p.tmdbId} />}
+                      </div>
+
+                      <div className="wv-det-act">
                         <button
                           onClick={() => toggle(p)}
                           disabled={busy === p.id}
@@ -234,32 +265,6 @@ export function TvDetective() {
                             />
                           </>
                         )}
-                      </div>
-
-                      {/* Right column — the listing details. */}
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-lg border border-brand-400/40 bg-brand-500/20 px-2.5 py-1 text-base font-black text-brand-100">
-                            {whenLabel(p.airstamp)}
-                          </span>
-                          <span className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-base font-bold text-white">
-                            📺 {p.network}
-                          </span>
-                        </div>
-
-                        {p.tmdbId && p.mediaType ? (
-                          <Link href={`/app/title/${p.mediaType}/${p.tmdbId}`} className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white hover:text-brand-200">
-                            {p.showName}
-                          </Link>
-                        ) : (
-                          <div className="mt-2 line-clamp-2 text-lg font-black leading-tight text-white">{p.showName}</div>
-                        )}
-                        {ep && <div className="mt-0.5 line-clamp-1 text-sm text-slate-300">{ep}</div>}
-                        {p.showType && <div className="mt-0.5 text-xs uppercase tracking-wide text-slate-500">{p.showType}</div>}
-
-                        <div className="mt-2"><Ratings p={p} /></div>
-                        {/* Your DNA score for this show (when it resolves + you're personalized). */}
-                        {p.tmdbId && p.mediaType && <CardDna mediaType={p.mediaType} tmdbId={p.tmdbId} className="mt-2" />}
                       </div>
                     </div>
                   );

@@ -295,6 +295,46 @@ body {
    The interview was removed from the product. Its layout classes went with it;
    the On TV row and quiz styles below are unrelated and stay. */
 
+/* ── TV Guide Detective row ──────────────────────────────────────────────
+   The old two-column layout put the poster and three stacked buttons in a
+   9rem rail and gave everything else one wide track, so on a laptop the
+   verdict panel stretched to 900px of mostly empty gradient while the actions
+   sat squashed in a column. Same fix as the On TV row: name the zones, and let
+   the verdict and the actions have their own columns instead of inheriting the
+   text column's width. */
+.wv-det-row {
+  display: grid;
+  grid-template-areas:
+    'art info'
+    'verdict verdict'
+    'act act';
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+.wv-det-art { grid-area: art; }
+.wv-det-info { grid-area: info; min-width: 0; }
+.wv-det-verdict { grid-area: verdict; min-width: 0; }
+.wv-det-act {
+  grid-area: act;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.wv-det-act > * { flex: 1 1 7rem; min-width: 0; }
+@media (min-width: 640px) {
+  .wv-det-row { grid-template-columns: 7rem minmax(0, 1fr); gap: 1rem; }
+}
+@media (min-width: 1024px) {
+  .wv-det-row {
+    grid-template-areas: 'art info verdict act';
+    grid-template-columns: 8rem minmax(0, 1fr) 15rem 10rem;
+    align-items: center;
+  }
+  .wv-det-act { flex-direction: column; flex-wrap: nowrap; }
+  .wv-det-act > * { flex: 0 0 auto; width: 100%; }
+}
+
 /* ── Quick Taste Quiz ────────────────────────────────────────────────────
    Two different shapes from one markup. On a phone the statement sits above a
    full-width row of answers, because a 360px screen cannot hold both side by

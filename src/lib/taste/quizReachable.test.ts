@@ -64,7 +64,7 @@ describe('entry points', () => {
   it('both quiz lanes live under the one Taste Quiz route', () => {
     const page = read('src/app/app/taste-quiz/page.tsx');
     expect(page).toContain('QuickTasteQuiz');
-    expect(page).toContain('DnaQuiz');
+    expect(page).toContain('TitleGridCalibration');
     expect(page).toContain('TasteQuizModes');
 
     // Nothing may link at a second copy of the title quiz.
@@ -78,6 +78,16 @@ describe('entry points', () => {
     expect(legacy).toContain("mode: 'titles'");
     // A founder session must survive the hop, or isolated calibration breaks.
     expect(legacy).toContain('session');
+  });
+
+  it('the title lane never turns "never heard of it" into a dislike', () => {
+    const grid = read('src/components/TitleGridCalibration.tsx');
+    // Untouched tiles must send nothing at all. A negative attraction from this
+    // surface would be a preference the user never stated.
+    expect(grid).toContain('if (!pick) return []');
+    expect(grid).not.toMatch(/attraction:\s*'not_interested'/);
+    expect(grid).not.toMatch(/attraction:\s*'absolutely_not'/);
+    expect(grid).toContain('not recognising something is not a dislike');
   });
 
   it('the nav carries the quiz', () => {

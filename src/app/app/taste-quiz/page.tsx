@@ -1,10 +1,8 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { QuickTasteQuiz } from '@/components/QuickTasteQuiz';
-import { DnaQuiz } from '@/components/DnaQuiz';
+import { TitleGridCalibration } from '@/components/TitleGridCalibration';
 import { TasteQuizModes, type QuizMode } from '@/components/TasteQuizModes';
-import { loadDnaSignals, countCalibrationAnswers } from '@/lib/preference/dnaSignals';
-import { CALIBRATION_SIZE, EARLY_COMPLETE } from '@/lib/preference/calibration';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Taste Quiz · WatchVerdict' };
@@ -40,7 +38,7 @@ export default async function TasteQuizPage({
     <div className="mx-auto w-full max-w-5xl space-y-5">
       <TasteQuizModes active={mode} sessionId={sessionId} />
       {mode === 'titles' ? (
-        <TitlesLane userId={user?.id ?? null} sessionId={sessionId} />
+        <TitlesLane sessionId={sessionId} />
       ) : (
         <StatementsLane userId={user?.id ?? null} />
       )}
@@ -74,30 +72,10 @@ async function StatementsLane({ userId }: { userId: string | null }) {
 }
 
 /**
- * The title lane is the existing calibration, unchanged — same component, same
- * three actions, same finite length. Both metrics start at their real server
- * values and are computed independently: `answered` drives quiz progress,
- * `tally` drives DNA confidence, and the two must never mirror each other.
+ * The title lane is a grid of twelve, not a stack of one-at-a-time judgements.
+ * Recognition is the scarce thing here: showing twelve at once lets someone tap
+ * what they know and ignore what they do not, and ignoring costs them nothing.
  */
-async function TitlesLane({ userId, sessionId }: { userId: string | null; sessionId?: string | undefined }) {
-  const supabase = createClient();
-  const tally = userId ? await loadDnaSignals(supabase, userId, sessionId ? { sessionId } : {}) : undefined;
-  const answered = userId ? await countCalibrationAnswers(supabase, userId, sessionId) : 0;
-
-  return (
-    <DnaQuiz
-      initialTally={tally}
-      calibration={{
-        total: CALIBRATION_SIZE,
-        answered,
-        showQuizProgress: true,
-        checkpointAt: EARLY_COMPLETE,
-        source: 'calibration',
-        endpoint: '/api/calibration',
-        sessionId,
-        doneHref: sessionId ? '/app/dna' : '/app/watch',
-        label: 'Watch DNA calibration',
-      }}
-    />
-  );
+function TitlesLane({ sessionId }: { sessionId?: string | undefined }) {
+  return <TitleGridCalibration sessionId={sessionId} />;
 }
