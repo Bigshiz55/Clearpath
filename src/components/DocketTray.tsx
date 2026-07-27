@@ -10,8 +10,17 @@
  *
  * It sits above the mobile tab bar rather than over it — covering navigation to
  * advertise a feature is how a tray becomes a nuisance.
+ *
+ * AND IT IS NOT ON THE VERDICT PAGE. The tray's entire job is to carry you TO
+ * the ruling; once you are reading one, it is offering to take you where you
+ * already are. Worse, it sat on top of that page's own two buttons — "Take me
+ * to it" and "Start a new docket" — so the one screen with a decision on it was
+ * the one screen where you could not act on it. Anything the tray does there,
+ * the page does better: Clear is "Start a new docket", and Deliver is the thing
+ * you just did.
  */
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useSyncExternalStore, useState } from 'react';
 import {
   clearDocket,
@@ -20,14 +29,18 @@ import {
   removeFromDocketStore,
   subscribeDocket,
 } from '@/lib/docketStore';
-import { docketStatus, MIN_FOR_VERDICT } from '@/lib/verdict/docket';
+import { docketStatus, trayHidden, MIN_FOR_VERDICT } from '@/lib/verdict/docket';
 
 export function DocketTray() {
   const docket = useSyncExternalStore(subscribeDocket, getDocket, getDocketServerSnapshot);
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const status = docketStatus(docket);
 
-  if (docket.length === 0) return null;
+  // Hooks run first, unconditionally — an early return above them would break
+  // the rules of hooks the moment either condition changed between renders.
+  // The decision itself is pure and lives in `docket.ts`, where it is tested.
+  if (trayHidden(pathname, docket.length)) return null;
 
   return (
     <div

@@ -5,6 +5,8 @@ import {
   addToDocket,
   docketKey,
   docketStatus,
+  trayHidden,
+  VERDICT_ROUTE,
   pruneDocket,
   removeFromDocket,
   type DocketEntry,
@@ -248,5 +250,52 @@ describe('marginBetween', () => {
       5,
     );
     expect(m).toContain('65 minutes shorter');
+  });
+});
+
+/**
+ * THE TRAY MUST NOT SIT ON THE RULING.
+ *
+ * It shipped fixed to the bottom of every screen, including the verdict page —
+ * where it covered that page's own "Take me to it" and "Start a new docket"
+ * buttons. The one screen with a decision on it was the one screen you could
+ * not act on, and everything the tray offered there was redundant: Clear is
+ * "Start a new docket", Deliver is what you had just done.
+ *
+ * Pure, so it is pinned here rather than by a browser test — the real route
+ * redirects to /login without a session, so a browser assertion would be made
+ * against a login page and prove nothing.
+ */
+describe('trayHidden', () => {
+  it('hides the tray on the verdict page even with a full docket', () => {
+    expect(trayHidden(VERDICT_ROUTE, 5)).toBe(true);
+  });
+
+  it('hides it on anything nested under the verdict route', () => {
+    expect(trayHidden(`${VERDICT_ROUTE}/history`, 5)).toBe(true);
+  });
+
+  it('does NOT hide it on a route that merely starts with the same characters', () => {
+    // `/app/verdicts` is a different page and would lose its tray to a naive
+    // `startsWith` check.
+    expect(trayHidden('/app/verdicts', 5)).toBe(false);
+  });
+
+  it('still shows the tray everywhere else a docket exists', () => {
+    for (const path of ['/app', '/app/watch', '/app/tv', '/app/watchlist', '/app/dna']) {
+      expect(trayHidden(path, 3), path).toBe(false);
+    }
+  });
+
+  it('hides it whenever the docket is empty, wherever you are', () => {
+    for (const path of ['/app', VERDICT_ROUTE, null, undefined]) {
+      expect(trayHidden(path, 0), String(path)).toBe(true);
+    }
+  });
+
+  it('shows it when the pathname is unknown but a docket exists', () => {
+    // usePathname can be null on a first render; losing the tray then would be
+    // a flicker, and the docket is the thing that actually matters.
+    expect(trayHidden(null, 3)).toBe(false);
   });
 });

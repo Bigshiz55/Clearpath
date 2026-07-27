@@ -106,6 +106,31 @@ export interface DocketStatus {
   message: string;
 }
 
+/**
+ * The route the tray must never appear on.
+ *
+ * The tray's entire job is to carry you TO the ruling. On the ruling itself it
+ * is offering to take you where you already are — and it sat on top of that
+ * page's own two buttons, so the one screen with a decision on it was the one
+ * screen where you could not act on it. Everything the tray offers there, the
+ * page already does: Clear is "Start a new docket", Deliver is what you just
+ * did.
+ */
+export const VERDICT_ROUTE = '/app/verdict';
+
+/**
+ * Should the tray render at all? Pure so it can be tested without a DOM — the
+ * component is a thin wrapper over this, and the two conditions that hide it
+ * are exactly the two worth pinning.
+ */
+export function trayHidden(pathname: string | null | undefined, docketCount: number): boolean {
+  if (docketCount <= 0) return true;
+  if (!pathname) return false;
+  // Match the route and anything nested under it, but never a route that merely
+  // starts with the same characters (`/app/verdicts`).
+  return pathname === VERDICT_ROUTE || pathname.startsWith(`${VERDICT_ROUTE}/`);
+}
+
 export function docketStatus(docket: readonly DocketEntry[]): DocketStatus {
   const count = docket.length;
   if (count === 0) {
