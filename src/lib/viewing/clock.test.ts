@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { airingClock, airingStatus, clockFromProviderTime, displayClock, liveLabel } from './clock';
 
 // 2026-07-28T03:42:00Z. In Eastern (UTC-4 in July) that is 11:42 PM the night
@@ -91,5 +93,44 @@ describe('liveLabel', () => {
     expect(liveLabel(18)).toBe('On now · 18m in');
     expect(liveLabel(60)).toBe('On now · 1h in');
     expect(liveLabel(95)).toBe('On now · 1h 35m in');
+  });
+});
+
+/**
+ * WHERE THE CLOCK IS ALLOWED TO BE RENDERED.
+ *
+ * `displayClock` being correct is worth nothing if a surface prints its own
+ * time instead, and a SERVER component that does so cannot be rescued by
+ * hydration — its HTML is never re-rendered in the browser, so the server's
+ * zone (UTC on Vercel) is what the viewer reads, permanently. That is exactly
+ * how the home strip ended up showing times hours off the heading above it
+ * after the guide itself had already been fixed.
+ *
+ * Source-level: these surfaces need a session and live listings, so a browser
+ * test would assert against a login page and prove nothing.
+ */
+describe('the surfaces that print airing times', () => {
+  const ROOT = join(__dirname, '..', '..', '..');
+  const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
+
+  it('the home page hands airings to a client rail instead of formatting them', () => {
+    const src = read('src/app/app/page.tsx');
+    expect(src).toContain('<UpcomingTvRail');
+    // A server component formatting a wall clock is the bug itself.
+    expect(src).not.toMatch(/toLocaleTimeString/);
+  });
+
+  it('the home rail is a client component and goes through displayClock', () => {
+    const src = read('src/components/UpcomingTvRail.tsx');
+    expect(src.startsWith("'use client'")).toBe(true);
+    expect(src).toContain('displayClock');
+    // Server HTML renders in UTC and the browser corrects it — intended.
+    expect(src).toContain('suppressHydrationWarning');
+  });
+
+  it('the home rail says "On now" rather than a start time already past', () => {
+    const src = read('src/components/UpcomingTvRail.tsx');
+    expect(src).toContain('airingStatus');
+    expect(src).toContain('liveLabel');
   });
 });
