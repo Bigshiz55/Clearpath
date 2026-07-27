@@ -295,6 +295,52 @@ body {
    The interview was removed from the product. Its layout classes went with it;
    the On TV row and quiz styles below are unrelated and stay. */
 
+/* ── Quick Taste Quiz ────────────────────────────────────────────────────
+   Two different shapes from one markup. On a phone the statement sits above a
+   full-width row of answers, because a 360px screen cannot hold both side by
+   side without the answers becoming unhittable. From `sm` up the row goes
+   horizontal and compact — that is what puts six to ten statements on a laptop
+   screen at once, which is the whole point of a quiz over an interview. */
+.wv-qtq-row {
+  display: grid;
+  grid-template-areas:
+    'text'
+    'answers'
+    'chips';
+  gap: 0.5rem;
+}
+.wv-qtq-text { grid-area: text; }
+/* Two by two on a phone. Four answers in one 320px row would either overflow or
+   shrink below a hittable target, and both are worse than a second line. */
+.wv-qtq-answers {
+  grid-area: answers;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+.wv-qtq-answers > button { flex: 1 1 calc(50% - 0.1875rem); min-width: 0; }
+.wv-qtq-chips {
+  grid-area: chips;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding-top: 0.125rem;
+}
+@media (min-width: 640px) {
+  .wv-qtq-row {
+    grid-template-areas:
+      'text answers'
+      'chips chips';
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 1rem;
+    row-gap: 0.375rem;
+  }
+  .wv-qtq-answers { flex-wrap: nowrap; }
+  .wv-qtq-answers > button { flex: 0 0 auto; }
+}
+
 /* The hero poster must always be substantial — never the collapsed thumbnail iOS
    produced when the measured tile came out short. Give it a guaranteed portrait
    min-height (the tile grows to fit via min-height, so nothing else is clipped);

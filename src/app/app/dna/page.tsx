@@ -42,15 +42,25 @@ export default async function WatchDnaPage() {
 
       <RetiredInterviewNotice />
 
-      {/* Two ways in. Your DNA also keeps growing on its own from what you do
-          across the app — rating, saving, passing — so neither of these is a
-          gate you have to pass before WatchVerd1ct is useful. */}
+      {/* Three ways in, in the order of what they cost you. Your DNA also keeps
+          growing on its own from what you do across the app — rating, saving,
+          passing — so none of these is a gate you have to pass before
+          WatchVerd1ct is useful. */}
       <section data-testid="dna-build">
         <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Build your Watch DNA</h2>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Link href="/app/taste-quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-taste-quiz">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>⚡</span> Quick Taste Quiz
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              A dozen short statements about what you actually like. Two minutes, and
+              &ldquo;depends&rdquo; is a real answer.
+            </p>
+          </Link>
           <Link href="/app/quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-title-quiz">
             <div className="flex items-center gap-2 text-base font-bold text-white">
-              <span aria-hidden>🎬</span> Quick title quiz
+              <span aria-hidden>🎬</span> React to real titles
             </div>
             <p className="mt-1 text-sm text-slate-400">
               React to a selection of films and shows so Verd1ct can begin learning your taste.
@@ -143,7 +153,7 @@ export default async function WatchDnaPage() {
             <div className="text-3xl">🍿</div>
             <p className="mt-2 text-sm text-slate-300">Rate a few titles and your dials will appear here.</p>
             <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <Link href="/app/quiz" className="btn-primary inline-flex">Play the Taste Quiz →</Link>
+              <Link href="/app/taste-quiz" className="btn-primary inline-flex">Take the Quick Taste Quiz →</Link>
               <Link
                 href="/import-taste"
                 className="inline-flex items-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"

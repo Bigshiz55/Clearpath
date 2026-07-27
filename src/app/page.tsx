@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { Tagline } from '@/components/Tagline';
 import { PromiseBar } from '@/components/PromiseBar';
+import { createClient } from '@/lib/supabase/server';
+
+export const dynamic = 'force-dynamic';
 
 const FEATURES = [
   {
@@ -22,7 +25,41 @@ const FEATURES = [
   },
 ];
 
-export default function LandingPage() {
+/**
+ * How far along is this person's Watch DNA?
+ *
+ * Only enough to choose the wording of one button — deliberately cheap, and
+ * deliberately fail-open: a signed-out visitor, or a database that will not
+ * answer, gets the cold-start copy rather than an error page.
+ */
+async function dnaStage(): Promise<'none' | 'started' | 'developed'> {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return 'none';
+    const { count } = await supabase
+      .from('preference_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+    const n = count ?? 0;
+    if (n >= 15) return 'developed';
+    if (n > 0) return 'started';
+    return 'none';
+  } catch {
+    return 'none';
+  }
+}
+
+const DNA_CTA: Record<'none' | 'started' | 'developed', string> = {
+  none: 'Build my Watch DNA',
+  started: 'Keep building my Watch DNA',
+  developed: 'Sharpen my Watch DNA',
+};
+
+export default async function LandingPage() {
+  const stage = await dnaStage();
   return (
     <div className="min-h-dvh">
       <PromiseBar />
@@ -57,15 +94,27 @@ export default function LandingPage() {
               WatchVerdict scores any movie or show two ways — a general recommendation and a match
               tuned to <em>your</em> taste — then tells you exactly where to watch it.
             </p>
-            <div className="mt-8 flex animate-fade-up items-center justify-center gap-3">
-              <Link href="/app" className="btn-primary px-6 py-3 text-base">
-                Start watching — no signup
+            {/* Exactly two calls to action, because the product does exactly two
+                things: answer tonight's question, and learn who you are. Every
+                other route in is a text link, not a button. */}
+            <div className="mt-8 flex animate-fade-up flex-wrap items-center justify-center gap-3" data-testid="hero-ctas">
+              <Link href="/app" className="btn-primary px-6 py-3 text-base" data-testid="cta-find">
+                Find something to watch
               </Link>
-              <a href="#how" className="btn-secondary px-6 py-3 text-base">
-                How it works
-              </a>
+              <Link href="/app/taste-quiz" className="btn-secondary px-6 py-3 text-base" data-testid="cta-dna">
+                {DNA_CTA[stage]}
+              </Link>
             </div>
-            <p className="mt-4 text-xs text-slate-500">No account needed · Works on your phone · Install as an app</p>
+            <p className="mt-4 text-xs text-slate-500">
+              No account needed to look ·{' '}
+              <Link href="/import-taste" className="underline underline-offset-2 hover:text-slate-300" data-testid="cta-import">
+                already have a watch history? Import it
+              </Link>{' '}
+              ·{' '}
+              <a href="#how" className="underline underline-offset-2 hover:text-slate-300">
+                how it works
+              </a>
+            </p>
           </div>
         </section>
 
