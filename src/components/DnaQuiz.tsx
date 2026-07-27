@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SeeRecommendations } from '@/components/SeeRecommendations';
 import Link from 'next/link';
 import { recordQuizAnswer, undoQuizAnswer } from '@/lib/actions/dnaQuiz';
 import type { QuizRating, Recognition } from '@/lib/preference/quizMap';
@@ -356,9 +357,7 @@ export function DnaQuiz({ initialTally, calibration, items, onSubmit, onUndo }: 
         ) : (
           <p className="mt-2 text-2xl font-black text-white">That’s a wrap for now</p>
         )}
-        <Link href={cal.doneHref ?? '/app/watch'} className="btn-primary mt-5 inline-flex" data-testid="quiz-done-cta">
-          See my recommendations
-        </Link>
+        <SeeRecommendations className="mt-5" />
       </div>
     );
   }

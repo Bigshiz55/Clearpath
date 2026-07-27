@@ -121,3 +121,34 @@ test('a missing poster degrades to the title rather than a broken image', async 
   await expect(card).toBeVisible();
   expect(await card.locator('img').count()).toBe(0);
 });
+
+
+/**
+ * THE END OF THE RUN HAS A WAY OUT.
+ *
+ * The finish panel offered only "Keep going". The one moment somebody had just
+ * taught the recommender something was the moment the app gave them nowhere to
+ * go and look at what it did.
+ *
+ * The demo is the deliberate exception: it writes nothing, so it must NOT offer
+ * to show you what it changed.
+ */
+async function playToTheEnd(page: import('@playwright/test').Page) {
+  for (let i = 0; i < 60; i++) {
+    if ((await page.getByTestId('rapid-done').count()) > 0) return;
+    const liked = page.getByTestId('rapid-answer-liked');
+    if ((await liked.count()) === 0) return;
+    await liked.click();
+  }
+}
+
+test('the demo finishes without offering a payoff it cannot deliver', async ({ page }) => {
+  await open(page);
+  await playToTheEnd(page);
+  await expect(page.getByTestId('rapid-done')).toBeVisible();
+
+  // Nothing was saved, so there is nothing to go and see.
+  await expect(page.getByTestId('see-recommendations')).toHaveCount(0);
+  // But the run still ends on a real next step rather than a dead end.
+  await expect(page.getByTestId('rapid-done').locator('..').getByRole('link', { name: /import your real history/i })).toBeVisible();
+});

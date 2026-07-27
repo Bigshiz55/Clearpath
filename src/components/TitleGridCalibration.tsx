@@ -22,6 +22,7 @@
  * rating they gave a title they have seen.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SeeRecommendations } from '@/components/SeeRecommendations';
 import { recordQuizAnswer } from '@/lib/actions/dnaQuiz';
 import { DnaBurst } from '@/components/DnaBurst';
 import { RecommendationSlate } from '@/components/RecommendationSlate';
@@ -284,11 +285,16 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
             </p>
           )}
 
-          <div className="mt-5 flex flex-wrap gap-2">
+          {/* The picks just moved the DNA, so the default action is to go see
+              what that bought. "Keep going" was primary here and there was no
+              route to recommendations at all — the reward for finishing was
+              the offer to do it again. */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <SeeRecommendations taught={savedCount} />
             <button
               type="button"
               onClick={startNewRun}
-              className="btn-primary inline-flex min-h-[48px] items-center px-6 text-base"
+              className="inline-flex min-h-[48px] items-center rounded-lg border border-white/15 px-5 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
               data-testid="title-grid-more"
             >
               Keep going — 12 more

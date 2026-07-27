@@ -20,6 +20,7 @@
  * a name. A miss shows the title, which is honest.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SeeRecommendations } from '@/components/SeeRecommendations';
 import {
   answersFor,
   questionFor,
@@ -97,11 +98,18 @@ export function RapidFire({
   onFinish,
   /** Shown above the card — used by the demo to say the data is not real. */
   notice,
+  /**
+   * Does this run actually teach the DNA? The demo does not, so it must not
+   * offer "see my recommendations" as the reward for finishing — nothing it
+   * did would be reflected there.
+   */
+  savesToDna = true,
 }: {
   queue: RapidFireItem[];
   onAnswer?: (item: RapidFireItem, answer: AnswerKey) => void;
   onFinish?: (answers: AnswerKey[]) => void;
   notice?: React.ReactNode;
+  savesToDna?: boolean;
 }) {
   const [answers, setAnswers] = useState<AnswerKey[]>([]);
   const [done, setDone] = useState(false);
@@ -155,16 +163,22 @@ export function RapidFire({
             ? `Those ${summary.taught} are worth far more than the rows they replaced — an opinion you stated counts for five to eight times what "you pressed play" does.`
             : 'Nothing was recorded, which is the right outcome when you could not remember them.'}
         </p>
-        {summary.remaining > 0 && (
-          <button
-            type="button"
-            onClick={() => setDone(false)}
-            data-testid="rapid-continue"
-            className="btn-primary mt-4 inline-flex min-h-[44px] items-center px-5"
-          >
-            Keep going — {summary.remaining} left →
-          </button>
-        )}
+        {/* THE WAY OUT. This screen used to offer only "keep going", so the
+            one moment somebody had just taught the recommender something was
+            the moment the app gave them nowhere to go and see it. */}
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          {savesToDna && <SeeRecommendations taught={summary.taught} />}
+          {summary.remaining > 0 && (
+            <button
+              type="button"
+              onClick={() => setDone(false)}
+              data-testid="rapid-continue"
+              className={`inline-flex min-h-[48px] items-center rounded-lg border border-white/15 px-5 text-sm font-semibold text-slate-200 transition hover:bg-white/10 ${savesToDna ? '' : 'btn-primary text-base'}`}
+            >
+              Keep going — {summary.remaining} left →
+            </button>
+          )}
+        </div>
       </div>
     );
   }

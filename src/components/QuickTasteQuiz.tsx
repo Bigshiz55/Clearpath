@@ -20,6 +20,7 @@
  *    numbers, and the label takes the lower of them.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SeeRecommendations } from '@/components/SeeRecommendations';
 import Link from 'next/link';
 import {
   RESPONSE_ORDER,
@@ -653,9 +654,7 @@ function Reveal({
       )}
 
       <div className="mt-6 flex flex-wrap gap-2">
-        <Link href="/app/watch" className="btn-primary inline-flex min-h-[44px] items-center px-5">
-          Find something to watch →
-        </Link>
+        <SeeRecommendations />
         <button
           type="button"
           onClick={onResume}

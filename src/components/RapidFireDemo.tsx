@@ -57,6 +57,10 @@ export function RapidFireDemo() {
 
       <RapidFire
         queue={queue}
+        // Nothing here reaches the DNA, so the finish screen must not offer to
+        // show you what it changed. The honest next step is the import link
+        // below, and that is the only one this screen makes.
+        savesToDna={false}
         // Deliberately local-only. See the note at the top of this file.
         onAnswer={(_item: RapidFireItem, key: AnswerKey) => setAnswers((prev) => [...prev, key])}
       />
