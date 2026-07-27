@@ -29,6 +29,7 @@ import {
   dnaState,
   missingSections,
   selectQuestions,
+  splitQuote,
   type QuizAnswer,
   type QuizQuestion,
   type ResponseKey,
@@ -201,9 +202,12 @@ export function QuickTasteQuiz({ asked = [], known = {}, canSave = true }: Props
       res.ok
         ? {
             ok: true,
+            // Still honest about the missing per-answer log, but in the user's
+            // terms. "Migration 0034" is a fact about our database, not about
+            // their taste, and it told them nothing they could act on.
             message: res.provenanceStored
               ? 'Saved to your Watch DNA.'
-              : 'Saved to your Watch DNA. The per-answer record needs migration 0034 before it is kept.',
+              : 'Saved to your Watch DNA. Your individual answers are not being kept yet, so “that’s not right” only works while this page is open.',
           }
         : { ok: false, message: res.error ?? 'Could not save that.' },
     );
@@ -531,6 +535,27 @@ function Meter({
   );
 }
 
+/**
+ * The evidence under a claim: the statement they were shown, and the answer
+ * they gave, kept visibly apart. Run together they read as one sentence, which
+ * is how "You avoid subtitles" ended up quoting "Reading subtitles is no
+ * obstacle at all" and looking like it contradicted itself — the "— Not me"
+ * that resolved it was the first thing the truncation ate.
+ */
+function QuoteLine({ quote }: { quote: string }) {
+  const { statement, answer } = splitQuote(quote);
+  return (
+    <p className="mt-2 text-sm leading-relaxed text-slate-300" data-testid="reveal-quote">
+      <span className="text-slate-400">“{statement}”</span>
+      {answer && (
+        <span className="ml-2 inline-block whitespace-nowrap rounded-md border border-[#ff1493]/40 bg-[#ff1493]/15 px-2 py-0.5 text-xs font-bold text-pink-100">
+          {answer}
+        </span>
+      )}
+    </p>
+  );
+}
+
 function Reveal({
   lines,
   state,
@@ -568,13 +593,13 @@ function Reveal({
   return (
     <div className="mx-auto max-w-2xl" data-testid="taste-quiz-reveal">
       <h1 className="text-2xl font-bold text-white sm:text-3xl">Here is what I heard</h1>
-      <p className="mt-1 text-sm text-slate-400">{state.summary}</p>
+      <p className="mt-1 text-base leading-relaxed text-slate-300">{state.summary}</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="rounded-full border border-brand-400/40 bg-brand-500/15 px-3 py-1 text-xs font-bold text-brand-100">
+        <span className="rounded-full border border-brand-400/40 bg-brand-500/15 px-3 py-1 text-sm font-bold text-brand-100">
           {state.label}
         </span>
-        <span className="text-xs text-slate-500">
+        <span className="text-sm text-slate-400">
           Coverage {Math.round(state.coverage * 100)}% · Confidence {Math.round(state.confidence * 100)}%
         </span>
       </div>
@@ -599,19 +624,22 @@ function Reveal({
           {lines.map((l, i) => {
             const qid = l.attribute ? sourceQuestion.get(l.attribute) : undefined;
             return (
-              <li key={`${l.attribute}-${i}`} className="card flex items-start justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white">{l.text}</p>
-                  {l.quote && <p className="mt-0.5 truncate text-xs italic text-slate-500">“{l.quote}”</p>}
-                </div>
+              // Stacked, not a two-column row. Squeezing the evidence into the
+              // space a side button leaves is what forced the truncation, and a
+              // half-sentence ending in "…" is unreadable AND incomplete — the
+              // worst of both. Full width, wrapping, at a size that survives a
+              // phone.
+              <li key={`${l.attribute}-${i}`} className="card p-4">
+                <p className="text-base font-bold leading-snug text-white sm:text-lg">{l.text}</p>
+                {l.quote && <QuoteLine quote={l.quote} />}
                 {qid && (
                   <button
                     type="button"
                     onClick={() => onCorrect(qid)}
                     data-testid={`correct-${l.attribute}`}
-                    className="inline-flex min-h-[36px] flex-none items-center rounded-lg border border-white/15 px-3 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+                    className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-white/20 bg-white/[0.06] px-4 text-sm font-bold text-slate-200 transition hover:bg-white/10"
                   >
-                    Not right
+                    That’s not right
                   </button>
                 )}
               </li>

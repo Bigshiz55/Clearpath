@@ -704,6 +704,31 @@ export interface SelectionInput {
   count?: number;
 }
 
+/**
+ * A quiz claim's `quote` is `"<the statement> — <the answer they gave>"`, built
+ * in `claimsFrom` below. Rendered as one run of text it reads as a single
+ * sentence, so a statement someone rejected looks like something they said:
+ * "You avoid subtitles" sitting above "Reading subtitles is no obstacle at all
+ * — Not me" reads as a contradiction until you get to the very end, and on a
+ * phone the end is exactly what gets truncated away.
+ *
+ * So split it, and show the answer as its own thing. Deterministic: the tail
+ * only counts as an answer when it is literally one of the four response
+ * labels, otherwise the whole string stays the statement. Never invents, never
+ * drops text — `statement` plus `answer` always reconstitutes the input.
+ */
+const RESPONSE_LABELS: ReadonlySet<string> = new Set(
+  Object.values(RESPONSE_VALUES).map((r) => r.label),
+);
+
+export function splitQuote(quote: string): { statement: string; answer: string | null } {
+  const at = quote.lastIndexOf(' — ');
+  if (at < 0) return { statement: quote, answer: null };
+  const answer = quote.slice(at + 3).trim();
+  if (!RESPONSE_LABELS.has(answer)) return { statement: quote, answer: null };
+  return { statement: quote.slice(0, at).trim(), answer };
+}
+
 /** Evidence at which an attribute counts as fully known for selection purposes. */
 export const KNOWN_SATURATION = 1.5;
 

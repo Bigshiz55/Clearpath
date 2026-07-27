@@ -6,6 +6,7 @@ import {
   RESPONSE_ORDER,
   SESSION_LENGTH,
   BANK_VERSION,
+  splitQuote,
   CALIBRATED_MIN_ANSWERS,
   STRONG_MIN_ANSWERS,
   selectQuestions,
@@ -366,5 +367,52 @@ describe('into the existing taste model', () => {
       now: NOW,
     });
     expect(profile.attributes.subtitles!.conditions[0]!.text).toBe('I am giving it my full attention');
+  });
+});
+
+/**
+ * The evidence line under a claim used to render as one run of text ending in
+ * "— Not me", and on a phone that tail was the first thing truncated away —
+ * leaving "You avoid subtitles" quoting "Reading subtitles is no obstacle at
+ * all…", which reads as the app contradicting itself.
+ */
+describe('splitQuote', () => {
+  it('separates the statement from the answer', () => {
+    expect(splitQuote('Reading subtitles is no obstacle at all. — Not me')).toEqual({
+      statement: 'Reading subtitles is no obstacle at all.',
+      answer: 'Not me',
+    });
+  });
+
+  it('splits on the LAST separator, so a statement may contain one', () => {
+    expect(splitQuote('I want something — anything — that moves. — Mostly')).toEqual({
+      statement: 'I want something — anything — that moves.',
+      answer: 'Mostly',
+    });
+  });
+
+  it('recognises every response label the bank can produce', () => {
+    for (const rv of Object.values(RESPONSE_VALUES)) {
+      expect(splitQuote(`A statement. — ${rv.label}`).answer).toBe(rv.label);
+    }
+  });
+
+  it('keeps the whole string when the tail is not an answer — never guesses', () => {
+    const q = 'Some quote — with an em dash in it';
+    expect(splitQuote(q)).toEqual({ statement: q, answer: null });
+    expect(splitQuote('No separator at all')).toEqual({
+      statement: 'No separator at all',
+      answer: null,
+    });
+  });
+
+  it('loses no text: statement + answer always reconstitutes the input', () => {
+    for (const q of QUESTION_BANK) {
+      for (const rv of Object.values(RESPONSE_VALUES)) {
+        const quote = `${q.prompt} — ${rv.label}`;
+        const { statement, answer } = splitQuote(quote);
+        expect(answer == null ? statement : `${statement} — ${answer}`).toBe(quote);
+      }
+    }
   });
 });

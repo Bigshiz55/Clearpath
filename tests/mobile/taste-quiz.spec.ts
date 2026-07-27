@@ -184,3 +184,71 @@ test('the reveal survives a quiz that taught us nothing', async ({ page }) => {
   await expect(page.getByTestId('taste-quiz-reveal')).toBeVisible();
   await expect(page.locator('body')).not.toContainText('undefined');
 });
+
+/**
+ * THE REVEAL HAS TO BE READABLE ON A PHONE.
+ *
+ * It shipped as a two-column row: the claim and its evidence squeezed into
+ * whatever width a side button left over, with `truncate` on the evidence. On a
+ * 320px screen that produced 11px italic grey text cut off mid-sentence — and
+ * the part it cut was the answer, so "You avoid subtitles" appeared to quote
+ * "Reading subtitles is no obstacle at all…" and read as a contradiction.
+ *
+ * These assert the two things that actually made it unreadable — clipped text
+ * and small text — rather than a screenshot, so they keep holding as the
+ * wording changes.
+ */
+for (const { w, h } of PHONES) {
+  test(`the reveal is legible and never clipped @ ${w}x${h}`, async ({ page }) => {
+    await open(page, w, h);
+    for (let i = 0; i < 6; i++) {
+      const id = await currentRowId(page);
+      if (!id) break;
+      await page.getByTestId(`answer-${id}-exactly`).click();
+    }
+    await page.getByTestId('quiz-finish').click();
+    await expect(page.getByTestId('taste-quiz-reveal')).toBeVisible();
+
+    const rows = page.getByTestId('reveal-lines').locator('li');
+    const n = await rows.count();
+    expect(n).toBeGreaterThan(0);
+
+    for (let i = 0; i < n; i++) {
+      const row = rows.nth(i);
+
+      // The claim, at a size a person can read at arm's length.
+      const claim = row.locator('p').first();
+      const claimPx = await claim.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      expect(claimPx, 'claim font-size').toBeGreaterThanOrEqual(16);
+
+      const quote = row.getByTestId('reveal-quote');
+      if ((await quote.count()) === 0) continue;
+
+      const quotePx = await quote.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      expect(quotePx, 'evidence font-size').toBeGreaterThanOrEqual(14);
+
+      // Nothing clipped: no ellipsis, and the text is not scrolling inside its
+      // own box. Both are how a truncated line hides the answer.
+      const clipped = await quote.evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return {
+          ellipsis: cs.textOverflow === 'ellipsis',
+          overflowing: el.scrollWidth > el.clientWidth + 1,
+        };
+      });
+      expect(clipped.ellipsis, 'evidence must not truncate').toBe(false);
+      expect(clipped.overflowing, 'evidence must not overflow its box').toBe(false);
+
+      // And the correction button stays a real tap target.
+      const fix = row.locator('button');
+      if ((await fix.count()) > 0) {
+        const box = await fix.first().boundingBox();
+        expect(box!.height, 'correction button height').toBeGreaterThanOrEqual(44);
+      }
+    }
+
+    // No horizontal scroll introduced by the wider type.
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, 'page must not scroll sideways').toBeLessThanOrEqual(1);
+  });
+}
