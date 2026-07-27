@@ -2,7 +2,6 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Claim } from './types';
 import type { Answer, VoiceSession } from './session';
-import type { InterviewMode } from './questions';
 
 /**
  * Server bridge between `voice_dna_sessions` and the pure session machine.
@@ -26,7 +25,7 @@ export interface LoadResult {
 
 interface Row {
   id: string;
-  mode: string;
+  extra_depth: number | null;
   stage: string;
   answers: unknown;
   claims: unknown;
@@ -39,7 +38,7 @@ interface Row {
 function rowToSession(r: Row): StoredSession {
   const session: StoredSession = {
     id: r.id,
-    mode: (r.mode === 'full' ? 'full' : 'quick') as InterviewMode,
+    extraDepth: typeof r.extra_depth === 'number' ? r.extra_depth : 0,
     stage: (['interview', 'review', 'applied'].includes(r.stage) ? r.stage : 'interview') as VoiceSession['stage'],
     answers: Array.isArray(r.answers) ? (r.answers as Answer[]) : [],
     claims: Array.isArray(r.claims) ? (r.claims as Claim[]) : [],
@@ -51,7 +50,7 @@ function rowToSession(r: Row): StoredSession {
   return session;
 }
 
-const SELECT = 'id, mode, stage, answers, claims, asked, input_mode, started_at, applied_at';
+const SELECT = 'id, extra_depth, stage, answers, claims, asked, input_mode, started_at, applied_at';
 
 /** The user's most recent interview, or null when they have never done one. */
 export async function loadLatestSession(
@@ -105,7 +104,7 @@ export async function saveSession(
   const payload = {
     id: session.id,
     user_id: userId,
-    mode: session.mode,
+    extra_depth: session.extraDepth,
     stage: session.stage,
     answers: session.answers,
     claims: session.claims,

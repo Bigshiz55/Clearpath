@@ -14,7 +14,8 @@
 create table if not exists public.voice_dna_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  mode text not null default 'quick' check (mode in ('quick', 'full')),
+  -- Extra follow-ups the user asked for. Never adds main questions.
+  extra_depth integer not null default 0 check (extra_depth between 0 and 3),
   stage text not null default 'interview' check (stage in ('interview', 'review', 'applied')),
   -- The transcript: [{ questionId, value, at }]
   answers jsonb not null default '[]'::jsonb,

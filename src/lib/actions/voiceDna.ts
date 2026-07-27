@@ -50,11 +50,16 @@ const claimSchema = z.object({
   at: z.number().int().min(0),
   contrasts: z.array(z.string().max(160)).max(20).optional(),
   reviewed: z.boolean().optional(),
+  hardExclusion: z.boolean().optional(),
+  aspect: z.string().max(40).optional(),
+  unactionable: z.boolean().optional(),
+  unresolved: z.boolean().optional(),
+  watchedFraction: z.enum(['barely', 'some', 'most']).optional(),
 });
 
 const sessionSchema = z.object({
   id: z.string().uuid(),
-  mode: z.enum(['quick', 'full']),
+  extraDepth: z.number().int().min(0).max(3).default(0),
   stage: z.enum(['interview', 'review', 'applied']),
   inputMode: z.enum(['typed', 'voice']),
   asked: z.array(z.string().max(200)).max(120),
@@ -118,7 +123,8 @@ export async function applyVoiceDna(input: z.infer<typeof sessionSchema>): Promi
     return { ok: false, error: 'Invalid session', written: 0, unresolved: [], persisted: false };
   }
 
-  const claims = parsed.data.claims as Claim[];
+  // A fragment we never got a direction for is not evidence of anything.
+  const claims = (parsed.data.claims as Claim[]).filter((c) => !c.unresolved);
   const unconfirmed = claims.filter((c) => c.title?.needsConfirmation === true);
   if (unconfirmed.length > 0) {
     return {

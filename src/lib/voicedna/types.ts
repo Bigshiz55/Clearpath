@@ -125,11 +125,23 @@ export interface Claim {
    */
   hardExclusion?: boolean;
   /**
-   * The user told us something real that we cannot turn into a filter ("the
-   * acting was great"). Recorded and shown back, weighted at zero, so we
-   * neither drop it silently nor pretend it steers anything.
+   * A verdict on one part of one title ("the story was weak"). It explains the
+   * reaction and shows back as a reason on that title, but it deliberately
+   * moves no dial: liking one film's writing is not a standing preference, and
+   * pretending otherwise would be both wrong and unfalsifiable.
+   */
+  aspect?: string;
+  /**
+   * Kept for stored sessions written before aspects existed. Equivalent to
+   * `aspect` with no known part — never shown as an error.
    */
   unactionable?: boolean;
+  /**
+   * We heard something about a title but not which way they meant it ("the
+   * performances — F1"). Carries no weight and produces a follow-up question
+   * rather than a guess.
+   */
+  unresolved?: boolean;
   /** How much of a series they actually watched, for abandoned titles. */
   watchedFraction?: 'barely' | 'some' | 'most';
 }

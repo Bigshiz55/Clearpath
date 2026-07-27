@@ -21,7 +21,7 @@ export function VoiceDnaClient({
   const onApply = useCallback(async (session: VoiceSession) => {
     const res = await applyVoiceDna({
       id: session.id,
-      mode: session.mode,
+      extraDepth: session.extraDepth,
       stage: 'applied',
       inputMode: 'typed',
       asked: session.asked,

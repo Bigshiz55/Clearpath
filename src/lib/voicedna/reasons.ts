@@ -34,10 +34,62 @@ export interface ReasonChip {
   polarity?: -1 | 1;
   /** 0..1 relative to the other chips in its set. */
   weight?: number;
-  /** True when the reason is real but cannot become a filter. */
+  /**
+   * The part of the title this reason is about. Set for reasons that explain a
+   * reaction without implying a standing preference ("the performances").
+   */
+  aspect?: string;
+  /** True when the reason moves no dial — it is a note on one title. */
   unactionable?: boolean;
   /** True when picking this should open a further question. */
   opensFollowUp?: boolean;
+}
+
+/**
+ * ASPECTS — the parts of a title someone comments on.
+ *
+ * These are NOT taste axes. "The story was weak" is a verdict on one film, not
+ * a standing preference for weak stories, and forcing it into a dial would be
+ * both wrong and unfalsifiable. So an aspect is stored as a reason attached to
+ * a title: it explains the reaction, shows back in review as "The Notebook —
+ * the story was weak", and never becomes a search filter.
+ */
+export interface Aspect {
+  key: string;
+  /** How it reads inside "the ___". */
+  label: string;
+  phrases: string[];
+}
+
+export const ASPECTS: readonly Aspect[] = [
+  { key: 'story', label: 'story', phrases: ['the story', 'the plot', 'the storyline', 'the script'] },
+  { key: 'writing', label: 'writing', phrases: ['the writing', 'the screenplay'] },
+  { key: 'acting', label: 'performances', phrases: ['the acting', 'the performances', 'the performance', 'the cast'] },
+  { key: 'pacing', label: 'pacing', phrases: ['the pacing', 'the pace'] },
+  { key: 'ending', label: 'ending', phrases: ['the ending', 'the finale', 'the last episode'] },
+  { key: 'characters', label: 'characters', phrases: ['the characters', 'the character'] },
+  { key: 'humour', label: 'humour', phrases: ['the humour', 'the humor', 'the jokes', 'the comedy in it'] },
+  { key: 'dialogue', label: 'dialogue', phrases: ['the dialogue', 'the dialog'] },
+  { key: 'visuals', label: 'look', phrases: ['the visuals', 'the cinematography', 'the look of it', 'the effects'] },
+  { key: 'music', label: 'music', phrases: ['the music', 'the soundtrack', 'the score'] },
+  { key: 'atmosphere', label: 'atmosphere', phrases: ['the atmosphere', 'the mood of it', 'the vibe'] },
+];
+
+const ASPECT_INDEX = ASPECTS
+  .flatMap((a) => a.phrases.map((p) => ({ phrase: p, key: a.key })))
+  .sort((a, b) => b.phrase.length - a.phrase.length);
+
+export function aspectLabel(key: string): string {
+  return ASPECTS.find((a) => a.key === key)?.label ?? key;
+}
+
+/** The first aspect mentioned in a piece of text, if any. */
+export function findAspect(text: string): string | null {
+  const lower = text.toLowerCase();
+  for (const { phrase, key } of ASPECT_INDEX) {
+    if (lower.includes(phrase)) return key;
+  }
+  return null;
 }
 
 // ── Why they loved it ──────────────────────────────────────────────────────
@@ -55,8 +107,8 @@ export const LOVE_REASONS: readonly ReasonChip[] = [
   { value: 'slow_burn', label: 'It took its time', attribute: 'slow_pace', polarity: 1, weight: 0.8 },
   { value: 'realism', label: 'It felt real', attribute: 'grounded', polarity: 1, weight: 0.8 },
   { value: 'ending', label: 'It stuck the landing', attribute: 'unfinished', polarity: -1, weight: 0.7 },
-  { value: 'acting', label: 'The performances', unactionable: true },
-  { value: 'look', label: 'How it looked', unactionable: true },
+  { value: 'acting', label: 'The performances', aspect: 'acting', unactionable: true },
+  { value: 'look', label: 'How it looked', aspect: 'visuals', unactionable: true },
 ];
 
 /** Crime, mystery and detective stories get their own vocabulary. */
@@ -68,7 +120,7 @@ export const CRIME_LOVE_REASONS: readonly ReasonChip[] = [
   { value: 'psych', label: 'The psychological side', attribute: 'tense', polarity: 1, weight: 0.85 },
   { value: 'dark', label: 'How dark it was', attribute: 'dark_tone', polarity: 1, weight: 0.8 },
   { value: 'resolution', label: 'A satisfying resolution', attribute: 'unfinished', polarity: -1, weight: 0.8 },
-  { value: 'atmosphere', label: 'The atmosphere', unactionable: true },
+  { value: 'atmosphere', label: 'The atmosphere', aspect: 'atmosphere', unactionable: true },
 ];
 
 export const SFF_LOVE_REASONS: readonly ReasonChip[] = [
@@ -78,7 +130,7 @@ export const SFF_LOVE_REASONS: readonly ReasonChip[] = [
   { value: 'tension', label: 'The tension', attribute: 'tense', polarity: 1, weight: 0.8 },
   { value: 'emotion', label: 'It got to me', attribute: 'emotional', polarity: 1, weight: 0.8 },
   { value: 'spectacle', label: 'The spectacle', attribute: 'epic_stakes', polarity: 1, weight: 0.75 },
-  { value: 'look', label: 'How it looked', unactionable: true },
+  { value: 'look', label: 'How it looked', aspect: 'visuals', unactionable: true },
 ];
 
 export const COMEDY_LOVE_REASONS: readonly ReasonChip[] = [
@@ -87,7 +139,7 @@ export const COMEDY_LOVE_REASONS: readonly ReasonChip[] = [
   { value: 'comfort', label: 'It is easy to put on', attribute: 'background_friendly', polarity: 1, weight: 0.8 },
   { value: 'warmth', label: 'It has a good heart', attribute: 'feel_good', polarity: 1, weight: 0.85 },
   { value: 'sharp', label: 'It has a mean streak', attribute: 'cynical', polarity: 1, weight: 0.75 },
-  { value: 'acting', label: 'The performances', unactionable: true },
+  { value: 'acting', label: 'The performances', aspect: 'acting', unactionable: true },
 ];
 
 /** Pick the vocabulary that fits what we know about the title. */
@@ -114,8 +166,8 @@ export const DISLIKE_REASONS: readonly ReasonChip[] = [
   { value: 'sci_fi', label: 'Too science-fiction', attribute: 'sci_fi', polarity: -1, weight: 0.9 },
   { value: 'bad_ending', label: 'The ending', attribute: 'unfinished', polarity: -1, weight: 0.8 },
   { value: 'humour', label: 'The humour did not land', attribute: 'comedy', polarity: -1, weight: 0.7 },
-  { value: 'weak_story', label: 'The story was weak', unactionable: true },
-  { value: 'acting', label: 'The acting', unactionable: true },
+  { value: 'weak_story', label: 'The story was weak', aspect: 'story', unactionable: true },
+  { value: 'acting', label: 'The acting', aspect: 'acting', unactionable: true },
 ];
 
 // ── Why they gave up ───────────────────────────────────────────────────────
@@ -381,10 +433,11 @@ export function chipToClaim(
 ): Claim | null {
   if (!chip.attribute) {
     if (!chip.unactionable) return null;
-    // Recorded, shown back, weighted at zero.
+    // Recorded and shown back as a reason on the title, weighted at zero.
     return {
       id: ctx.id,
       attribute: null,
+      ...(chip.aspect ? { aspect: chip.aspect } : {}),
       polarity: 1,
       strength: 0,
       confidence: 0.9,

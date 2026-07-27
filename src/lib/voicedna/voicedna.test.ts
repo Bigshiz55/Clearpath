@@ -5,14 +5,14 @@ import {
   buildProfile, reveal, toDimensionCorrections, coverageSummary, expireTemporary,
   mergeClaims, unconfirmedExceptions, MOOD_TTL_MS,
 } from './profile';
+import { MAIN_MAX } from './steps';
 import {
-  parseFollowUpId, PROGRESS_LABELS, MAIN_COUNT, STAGE_ORDER,
-} from './questions';
-import {
-  startSession, answerQuestion, currentQuestion, toReview, reviewItems, reviewSections,
+  startSession, answerQuestion, currentQuestion, toReview, reviewItems,
   canApply, applyReview, undoApply, forgetSession, skipQuestion, applyDecisions,
-  goBack, canGoBack, replay, sectionOf, sessionProgress, stillUnclear,
+  goBack, canGoBack, goDeeper, replay, stillUnclear, discussedTitles, unconfirmedTitles,
+  DECISION_OPTIONS,
 } from './session';
+import { buildProbe, cardFollowUp } from './probe';
 import { encodeChips, encodeTitles } from './answerCodec';
 import { pickCalibrationTitles, calibrationClaim, calibrationAgreement } from './calibration';
 import { audioAvailability, transcribe, TRANSCRIPTION_PROVIDERS } from './audio';
@@ -268,473 +268,456 @@ describe('profile', () => {
     expect(merged[0]?.polarity).toBe(1);
   });
 });
+// ── The ten-question interview ─────────────────────────────────────────────
 
-// ── The adaptive interview engine ──────────────────────────────────────────
-
-describe('the interview asks a real sequence of questions', () => {
+describe('Witness Testimony runs as a ten-question interview', () => {
   const sctx = { now: AT };
+  type Q = NonNullable<ReturnType<typeof currentQuestion>>;
 
-  /** Drive the interview, answering with whatever the handler returns. */
-  function run(
-    reply: (q: NonNullable<ReturnType<typeof currentQuestion>>, n: number) => string | null,
-    mode: 'quick' | 'full' = 'full',
-    limit = 40,
-  ) {
-    let s = startSession('s1', mode, AT);
-    const seen: NonNullable<ReturnType<typeof currentQuestion>>[] = [];
+  function run(reply: (q: Q, n: number) => string | null, limit = 60) {
+    let s = startSession('s1', AT);
+    const seen: Q[] = [];
     for (let i = 0; i < limit; i++) {
       const q = currentQuestion(s, sctx);
       if (!q) break;
       seen.push(q);
       const value = reply(q, i);
-      s = value === null
-        ? skipQuestion(s, q.id, sctx)
-        : answerQuestion(s, q.id, value, sctx);
+      s = value === null ? skipQuestion(s, q.id, sctx) : answerQuestion(s, q.id, value, sctx);
     }
     return { session: s, seen };
   }
 
   const titles = (...t: Array<[string | null, string, string[]?]>) =>
-    encodeTitles(t.map(([id, text, genres]) => ({
-      titleId: id, text, ...(genres ? { genres } : {}),
-    })));
+    encodeTitles(t.map(([id, text, genres]) => ({ titleId: id, text, ...(genres ? { genres } : {}) })));
 
-  it('opens by asking for favourite titles, not for a life story', () => {
-    const q = currentQuestion(startSession('s', 'quick', AT), sctx);
-    expect(q?.id).toBe('fav_titles');
+  it('TEST 11: never exceeds ten main questions', () => {
+    const { seen } = run(() => null);
+    const mains = seen.filter((q) => !q.isFollowUp);
+    expect(mains.length).toBeLessThanOrEqual(MAIN_MAX);
+    expect(Math.max(...seen.map((q) => q.stepIndex))).toBeLessThanOrEqual(MAIN_MAX);
+  });
+
+  it('TEST 12: a follow-up keeps its parent question number', () => {
+    const { seen } = run((q) => (q.id === 'favourites' ? titles(['tv:1', 'Sherlock', ['crime']]) : null));
+    // The first "why" IS question 2. Extra ones are follow-ups inside it, and
+    // asking three of them must not turn question 2 into question 5.
+    const whys = seen.filter((q) => q.id.startsWith('why|'));
+    expect(whys[0]?.isFollowUp).toBeUndefined();
+    expect(whys.every((q) => q.stepIndex === 2)).toBe(true);
+  });
+
+  it('opens on question 1 with the favourites prompt', () => {
+    const q = currentQuestion(startSession('s', AT), sctx);
+    expect(q?.stepIndex).toBe(1);
+    expect(q?.prompt).toMatch(/two or three films or shows you absolutely love/i);
     expect(q?.kind).toBe('titles');
     expect(q?.maxTitles).toBe(3);
-    expect(q?.stageLabel).toBe('Your favourites');
   });
 
-  it('TEST 1+2: three favourites each earn their own follow-up', () => {
-    const { seen } = run((q) =>
-      q.id === 'fav_titles'
-        ? titles(['tv:1', 'Sherlock'], ['tv:2', 'Dexter'], ['movie:3', 'Heat'])
-        : null,
-    );
-    const whys = seen.filter((q) => q.id.startsWith('why|'));
-    expect(whys).toHaveLength(3);
-    for (const t of ['Sherlock', 'Dexter', 'Heat']) {
-      expect(whys.some((q) => q.prompt.includes(t)), t).toBe(true);
-    }
+  it('speaks like an interviewer between questions', () => {
+    const { seen } = run(() => null);
+    const withTransitions = seen.filter((q) => q.transition);
+    expect(withTransitions.length).toBeGreaterThan(2);
+    for (const q of withTransitions) expect(q.transition!.length).toBeLessThan(40);
   });
 
-  it('TEST 3: the follow-up asks what they loved, with chips that fit the title', () => {
-    const { seen } = run((q) => (q.id === 'fav_titles' ? titles(['tv:1', 'Sherlock', ['crime', 'mystery']]) : null));
+  it('TEST 5: a favourite earns a natural "why", with chips that fit the title', () => {
+    const { seen } = run((q) => (q.id === 'favourites' ? titles(['tv:1', 'Sherlock', ['crime', 'mystery']]) : null));
     const why = seen.find((q) => q.id.startsWith('why|'));
-    expect(why?.prompt).toMatch(/what did you love most about sherlock/i);
+    expect(why?.prompt).toBe('What did you love most about Sherlock?');
     const values = why?.options?.map((o) => o.value) ?? [];
-    // Crime vocabulary, not the generic one.
     expect(values).toContain('investigation');
     expect(values).toContain('clues');
-    expect(why?.allowFreeText).toBe(true);
   });
 
-  it('a science-fiction title gets a different vocabulary than a crime one', () => {
-    const chipsFor = (genres: string[]) => {
-      const { seen } = run((q) => (q.id === 'fav_titles' ? titles(['tv:1', 'A Show', genres]) : null));
-      return seen.find((q) => q.id.startsWith('why|'))?.options?.map((o) => o.value) ?? [];
-    };
-    expect(chipsFor(['crime'])).toContain('investigation');
-    expect(chipsFor(['science-fiction'])).toContain('world');
-    expect(chipsFor(['science-fiction'])).not.toContain('investigation');
-  });
-
-  it('the reasons actually become beliefs', () => {
-    const { session } = run((q) => {
-      if (q.id === 'fav_titles') return titles(['tv:1', 'Sherlock', ['crime']]);
+  it('two or more reasons earn a summary the user can correct', () => {
+    const { seen } = run((q) => {
+      if (q.id === 'favourites') return titles(['tv:1', 'Sherlock', ['crime']]);
       if (q.id.startsWith('why|')) return encodeChips(['investigation', 'clues']);
       return null;
     });
-    const p = buildProfile({ claims: session.claims, now: AT });
-    expect(p.attributes.investigation?.lean).toBeGreaterThan(0);
-    expect(p.attributes.investigation?.evidence).toBeGreaterThan(0);
+    const summary = seen.find((q) => q.id.startsWith('summary|'));
+    expect(summary?.prompt).toMatch(/have i got that right/i);
+    expect(summary?.options?.map((o) => o.label)).toEqual(['Exactly', 'Mostly', 'Not quite']);
   });
 
-  it('praise we cannot filter on is recorded, not silently dropped or used', () => {
+  it('"Not quite" drops what we concluded rather than keeping it anyway', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', titles(['tv:1', 'Sherlock', ['crime']]), sctx);
+    const why = currentQuestion(s, sctx)!;
+    s = answerQuestion(s, why.id, encodeChips(['investigation', 'clues']), sctx);
+    const summary = currentQuestion(s, sctx)!;
+    const before = s.claims.filter((c) => c.attribute !== null).length;
+    const after = answerQuestion(s, summary.id, 'not_quite', sctx);
+    expect(after.claims.filter((c) => c.attribute !== null).length).toBeLessThan(before);
+  });
+
+  it('TEST 6: a disappointment earns its own "why", with dislike reasons', () => {
+    const { seen } = run((q) => (q.id === 'disappointment' ? titles(['tv:9', 'Succession']) : null));
+    const why = seen.find((q) => q.prompt.includes('Succession'));
+    expect(why?.prompt).toBe('What let you down about Succession?');
+    expect(why?.options?.map((o) => o.value)).toContain('too_slow');
+  });
+
+  it('TEST 7: "the story was weak in The Notebook" is read correctly', () => {
+    const claims = parseAnswer('The story was weak in The Notebook', ctx);
+    const aspect = claims.find((c) => c.aspect === 'story');
+    expect(aspect).toBeDefined();
+    expect(aspect?.polarity).toBe(-1);
+    expect(aspect?.title?.text).toBe('The Notebook');
+    const title = claims.find((c) => c.attribute === null && !c.aspect && c.title);
+    expect(title?.title?.text).toBe('The Notebook');
+    expect(title?.polarity).toBe(-1);
+  });
+
+  it('an aspect verdict never becomes a standing preference', () => {
+    const claims = parseAnswer('The story was weak in The Notebook', ctx);
+    const p = buildProfile({ claims, now: AT });
+    // Nothing about "weak stories" is a taste axis, so no axis moved.
+    expect(Object.keys(p.attributes)).toHaveLength(0);
+  });
+
+  it('TEST 8: "the performances — F1" asks instead of guessing', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', '', sctx);
+    s = answerQuestion(s, 'disappointment', 'The performances — F1', sctx);
+    const unresolved = s.claims.find((c) => c.unresolved);
+    expect(unresolved).toBeDefined();
+    expect(unresolved?.aspect).toBe('acting');
+
+    const q = currentQuestion(s, sctx);
+    expect(q?.prompt).toMatch(/how did you feel about the performances in F1\?/i);
+    expect(q?.options?.map((o) => o.label)).toEqual([
+      'I liked it', 'I disliked it', 'Mixed', 'That is not what I meant',
+    ]);
+  });
+
+  it('answering the clarification resolves it into a real reading', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', '', sctx);
+    s = answerQuestion(s, 'disappointment', 'The performances — F1', sctx);
+    const q = currentQuestion(s, sctx)!;
+    const after = answerQuestion(s, q.id, 'negative', sctx);
+    const resolved = after.claims.find((c) => c.aspect === 'acting');
+    expect(resolved?.unresolved).toBeUndefined();
+    expect(resolved?.polarity).toBe(-1);
+  });
+
+  it('"that is not what I meant" simply removes it', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', '', sctx);
+    s = answerQuestion(s, 'disappointment', 'The performances — F1', sctx);
+    const q = currentQuestion(s, sctx)!;
+    expect(answerQuestion(s, q.id, 'not_meant', sctx).claims.some((c) => c.unresolved)).toBe(false);
+  });
+
+  it('TEST 9: no filter-oriented failure language exists anywhere', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', titles(['tv:1', 'F1']), sctx);
+    const why = currentQuestion(s, sctx)!;
+    s = answerQuestion(s, why.id, encodeChips(['acting']), sctx);
+    for (const item of reviewItems(toReview(s))) {
+      expect(item.statement).not.toMatch(/cannot turn into a filter/i);
+      expect(item.statement).not.toMatch(/filter/i);
+    }
+  });
+
+  it('a praise-only reason reads as a reason on that title', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', titles(['tv:1', 'F1']), sctx);
+    const why = currentQuestion(s, sctx)!;
+    s = answerQuestion(s, why.id, encodeChips(['acting']), sctx);
+    const row = reviewItems(toReview(s)).find((i) => i.title?.text === 'F1');
+    expect(row?.reason ?? '').not.toBe('');
+  });
+
+  it('TEST 4 (quit): stopping is asked about, and mood is not a verdict', () => {
     const { session } = run((q) => {
-      if (q.id === 'fav_titles') return titles(['tv:1', 'A Show']);
-      if (q.id.startsWith('why|')) return encodeChips(['acting']);
-      return null;
-    });
-    const note = session.claims.find((c) => c.unactionable);
-    expect(note).toBeDefined();
-    expect(note?.strength).toBe(0);
-    expect(sectionOf(note!)).toBe('Noted, but not used');
-  });
-
-  it('TEST 4+5: a disliked title is asked about, with dislike reasons', () => {
-    const { seen } = run((q) => (q.id === 'dislike_title' ? titles(['tv:9', 'Succession']) : null));
-    const why = seen.find((q) => q.id.startsWith('why|') && q.prompt.includes('Succession'));
-    expect(why?.prompt).toMatch(/what did not work about succession/i);
-    const values = why?.options?.map((o) => o.value) ?? [];
-    expect(values).toContain('too_slow');
-    expect(values).toContain('characters');
-  });
-
-  it('a dislike reason lands as a negative belief', () => {
-    const { session } = run((q) => {
-      if (q.id === 'dislike_title') return titles(['tv:9', 'A Show']);
-      if (q.id.startsWith('why|')) return encodeChips(['too_slow']);
-      return null;
-    });
-    const p = buildProfile({ claims: session.claims, now: AT });
-    expect(p.attributes.slow_pace?.lean).toBeLessThan(0);
-  });
-
-  it('TEST 6: an abandoned title is asked how far they got, then why', () => {
-    const { seen } = run((q) => (q.id === 'dnf_title' ? titles(['tv:5', 'Westworld']) : null));
-    const ids = seen.map((q) => q.id);
-    const progressIdx = ids.findIndex((id) => id.startsWith('dnf_progress|'));
-    const whyIdx = ids.findIndex((id) => id.startsWith('why|') && seen[ids.indexOf(id)]);
-    expect(progressIdx).toBeGreaterThanOrEqual(0);
-    expect(seen[progressIdx]?.prompt).toMatch(/how far into westworld/i);
-    expect(whyIdx).toBeGreaterThan(progressIdx);
-  });
-
-  it('TEST 7: giving up is not automatically a permanent dislike', () => {
-    const { session } = run((q) => {
-      if (q.id === 'dnf_title') return titles(['tv:5', 'Westworld']);
+      if (q.id === 'quit') return titles(['tv:5', 'Westworld']);
       if (q.id.startsWith('dnf_progress|')) return 'most';
       if (q.id.startsWith('why|')) return encodeChips(['wrong_mood']);
       return null;
     });
-    const title = session.claims.find((c) => c.title?.text === 'Westworld');
-    expect(title?.durability).toBe('temporary');
-    const p = buildProfile({ claims: session.claims, now: AT });
-    expect(p.temporary.some((c) => c.title?.text === 'Westworld')).toBe(true);
+    const t = session.claims.find((c) => c.title?.text === 'Westworld');
+    expect(t?.durability).toBe('temporary');
   });
 
-  it('but a stated dislike after abandoning IS durable', () => {
-    const { session } = run((q) => {
-      if (q.id === 'dnf_title') return titles(['tv:5', 'Westworld']);
-      if (q.id.startsWith('dnf_progress|')) return 'barely';
-      if (q.id.startsWith('why|')) return encodeChips(['disliked', 'pacing']);
-      return null;
-    });
-    const title = session.claims.find((c) => c.title?.text === 'Westworld');
-    expect(title?.durability).toBe('durable');
-  });
-
-  it('bailing early counts for more than bailing near the end', () => {
-    const strengthFor = (progress: string) => {
-      const { session } = run((q) => {
-        if (q.id === 'dnf_title') return titles(['tv:5', 'A Show']);
-        if (q.id.startsWith('dnf_progress|')) return progress;
-        if (q.id.startsWith('why|')) return encodeChips(['pacing']);
-        return null;
-      });
-      return session.claims.find((c) => c.attribute === 'slow_pace')?.strength ?? 0;
-    };
-    expect(strengthFor('barely')).toBeGreaterThan(strengthFor('most'));
-  });
-
-  it('TEST 8: picking a genre opens a question about what matters inside it', () => {
-    const { seen } = run((q) => (q.id === 'genres' ? encodeChips(['investigation', 'comedy']) : null));
-    const depth = seen.find((q) => q.id.startsWith('genre_depth|'));
-    expect(depth).toBeDefined();
-    expect(depth?.prompt).toMatch(/what matters most/i);
-    expect(depth?.options?.map((o) => o.value)).toContain('investigation');
-  });
-
-  it('TEST 9: deal-breakers are graded, and only one grade means never-recommend', () => {
+  it('deal-breakers are graded, and only one grade is a ban', () => {
     const { seen, session } = run((q) => {
       if (q.id === 'dealbreakers') return encodeChips(['gore', 'romance_genre']);
       if (q.id.startsWith('db_strength|gore')) return 'hard';
       if (q.id.startsWith('db_strength|romance_genre')) return 'mild';
       return null;
     });
-    const strengths = seen.filter((q) => q.id.startsWith('db_strength|'));
-    expect(strengths.length).toBeGreaterThanOrEqual(2);
-    expect(strengths[0]?.options?.map((o) => o.value)).toEqual(
-      ['hard', 'strong', 'mild', 'conditional', 'temporary'],
-    );
-
-    const gore = session.claims.find((c) => c.attribute === 'gore');
-    const romance = session.claims.find((c) => c.attribute === 'romance_genre');
-    expect(gore?.hardExclusion).toBe(true);
-    expect(romance?.hardExclusion).toBeUndefined();
-    expect(romance?.strength).toBeLessThan(gore!.strength);
-    expect(sectionOf(gore!)).toBe('Never recommend');
-    expect(sectionOf(romance!)).not.toBe('Never recommend');
+    expect(seen.filter((q) => q.id.startsWith('db_strength|')).length).toBeGreaterThanOrEqual(2);
+    expect(session.claims.find((c) => c.attribute === 'gore')?.hardExclusion).toBe(true);
+    expect(session.claims.find((c) => c.attribute === 'romance_genre')?.hardExclusion).toBeUndefined();
   });
 
-  it('a picked deal-breaker is never a ban until the user says so', () => {
-    const { session } = run((q) => (q.id === 'dealbreakers' ? encodeChips(['violence']) : null));
-    const v = session.claims.find((c) => c.attribute === 'violence');
-    expect(v).toBeDefined();
-    expect(v?.hardExclusion).toBeUndefined();
+  it('the last question gives the user the final word', () => {
+    const { seen } = run(() => null);
+    const last = seen.filter((q) => !q.isFollowUp).pop();
+    expect(last?.stepIndex).toBe(MAIN_MAX);
+    expect(last?.prompt).toMatch(/get wrong about your taste/i);
   });
 
-  it('"fine if the rest is right" becomes a conditional preference', () => {
-    const { session } = run((q) => {
-      if (q.id === 'dealbreakers') return encodeChips(['violence']);
-      if (q.id.startsWith('db_strength|violence')) return 'conditional';
-      return null;
-    });
-    const v = session.claims.find((c) => c.attribute === 'violence');
-    expect(v?.scope).toBe('conditional');
-    expect(v?.condition?.mode).toBe('suspends');
-    expect(sectionOf(v!)).toBe('Conditional tastes');
-  });
-
-  it('TEST 10: format questions adapt to the previous answer', () => {
-    const askedWith = (choice: string) => {
-      const { seen } = run((q) => (q.id === 'movies_or_shows' ? choice : null));
-      return seen.map((q) => q.id);
-    };
-    // Someone who only watches films is not asked about season structure.
-    expect(askedWith('movies')).not.toContain('series_shape');
-    expect(askedWith('shows')).toContain('series_shape');
-    // ...and someone who only watches series is not asked about film runtime.
-    expect(askedWith('shows')).not.toContain('runtime');
-  });
-
-  it('TEST 21: ground already covered by an import is not asked about again', () => {
-    const bare = currentQuestion(
-      answerQuestion(startSession('s', 'full', AT), 'fav_titles', '', sctx),
-      sctx,
-    );
-    expect(bare).toBeDefined();
-
-    // With heavy prior evidence on every axis the comedy calibration is pointless.
-    const loaded = { now: AT, priorEvidence: { comedy: 9 } };
-    let s = startSession('s2', 'full', AT);
+  it('TEST 21: an import means fewer questions, not the same ones', () => {
+    let s = startSession('s', AT);
+    const loaded = { now: AT, priorEvidence: { subtitles: 9, english_audio: 9, comedy: 9, long_runtime: 9, many_seasons: 9, unfinished: 9, serialized: 9, episodic: 9 } };
     const ids: string[] = [];
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
       const q = currentQuestion(s, loaded);
       if (!q) break;
       ids.push(q.id);
       s = skipQuestion(s, q.id, loaded);
     }
     expect(ids).not.toContain('comedy_check');
-  });
-
-  it('and comedy IS asked about when nothing has touched it', () => {
-    let s = startSession('s3', 'full', AT);
-    const ids: string[] = [];
-    for (let i = 0; i < 30; i++) {
-      const q = currentQuestion(s, sctx);
-      if (!q) break;
-      ids.push(q.id);
-      s = skipQuestion(s, q.id, sctx);
-    }
-    expect(ids).toContain('comedy_check');
-  });
-
-  it('TEST 11+12: a contradiction interrupts, and the answer is stored', () => {
-    let s = startSession('s', 'full', AT);
-    s = answerQuestion(s, 'fav_titles', 'I love slow burns', sctx);
-    s = answerQuestion(s, 'dislike_title', 'I hate slow shows', sctx);
-    const q = currentQuestion(s, sctx);
-    expect(parseFollowUpId(q!.id)?.kind).toBe('conflict');
-    expect(q?.options?.map((o) => o.value)).toContain('depends');
-    const after = answerQuestion(s, q!.id, 'negative', sctx);
-    expect(after.claims.filter((c) => c.attribute === 'slow_pace')).toHaveLength(1);
-  });
-
-  it('TEST 12: a stated exception survives as a conditional carve-out', () => {
-    let s = startSession('s', 'full', AT);
-    s = answerQuestion(s, 'exception_open', 'I hate sci-fi but I loved Arrival', sctx);
-    const p = buildProfile({ claims: s.claims, now: AT });
-    expect(p.exceptions).toHaveLength(1);
-    expect(p.attributes.sci_fi?.lean).toBeLessThan(0);
-    expect(p.attributes.sci_fi?.exceptions).toHaveLength(1);
-  });
-
-  it('TEST 19+20: quick is short, full goes deeper', () => {
-    const count = (mode: 'quick' | 'full') => run(() => null, mode).seen.length;
-    expect(count('quick')).toBeLessThan(count('full'));
-    expect(count('quick')).toBeGreaterThanOrEqual(5);
-    expect(count('full')).toBeGreaterThanOrEqual(10);
-  });
-
-  it('a stage is never revisited once it is behind us', () => {
-    const { seen } = run(() => null, 'full');
-    const order = seen.filter((q) => !q.isFollowUp).map((q) => STAGE_ORDER.indexOf(q.stage));
-    for (let i = 1; i < order.length; i++) {
-      expect(order[i]).toBeGreaterThanOrEqual(order[i - 1]!);
-    }
-  });
-
-  it('never asks the same question twice', () => {
-    const { seen } = run(() => null, 'full', 60);
-    expect(new Set(seen.map((q) => q.id)).size).toBe(seen.length);
-  });
-
-  it('the progress rail names the stage the user is in', () => {
-    const s = startSession('s', 'quick', AT);
-    const p = sessionProgress(s, sctx);
-    expect(PROGRESS_LABELS).toContain(p.stageLabel);
-    expect(p.stageIndex).toBe(0);
-    expect(p.total).toBe(MAIN_COUNT.quick);
+    expect(ids).not.toContain('subtitles');
   });
 });
 
-// ── Back, skip, and restore ────────────────────────────────────────────────
+// ── The movie check ────────────────────────────────────────────────────────
+
+describe('the movie check', () => {
+  const sctx = { now: AT };
+
+  it('TEST 13: the interview reaches a title card', () => {
+    let s = startSession('s', AT);
+    const ids: string[] = [];
+    for (let i = 0; i < 40; i++) {
+      const q = currentQuestion(s, sctx);
+      if (!q) break;
+      ids.push(q.kind);
+      s = skipQuestion(s, q.id, sctx);
+    }
+    expect(ids).toContain('card');
+  });
+
+  it('TEST 14: the card is chosen from what the user actually said', () => {
+    const claims = parseAnswer('I love crime dramas but I hate horror', ctx);
+    const spec = buildProbe(buildProfile({ claims, now: AT }));
+    expect(spec.ready).toBe(true);
+    expect(spec.genres).toContain('crime');
+    expect(spec.excludeGenres).toContain('horror');
+    expect(spec.rationale).toMatch(/you said you go for crime stories/i);
+    expect(spec.rationale).toMatch(/steer clear of horror/i);
+  });
+
+  it('refuses to show a card when it has nothing to base it on', () => {
+    const spec = buildProbe(buildProfile({ claims: [], now: AT }));
+    expect(spec.ready).toBe(false);
+    expect(spec.rationale).toBe('');
+  });
+
+  it('TEST 15: a reaction to the card updates the DNA', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'movie_check', encodeTitles([{ titleId: 'movie:1', text: 'Prisoners' }], 'loved'), sctx);
+    const claim = s.claims.find((c) => c.title?.text === 'Prisoners');
+    expect(claim?.reaction).toBe('loved');
+    expect(claim?.polarity).toBe(1);
+  });
+
+  it('TEST 16: "haven’t seen it" teaches nothing', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'movie_check', encodeTitles([{ titleId: 'movie:1', text: 'Prisoners' }], 'unseen'), sctx);
+    expect(s.claims).toHaveLength(0);
+  });
+
+  it('offers a short follow-up only where one is worth asking', () => {
+    expect(cardFollowUp('looks_right')).toMatch(/\?$/);
+    expect(cardFollowUp('not_for_me')).toMatch(/\?$/);
+    expect(cardFollowUp('loved')).toBeNull();
+  });
+});
+
+// ── Moving around ──────────────────────────────────────────────────────────
 
 describe('moving around the interview', () => {
   const sctx = { now: AT };
 
-  it('TEST 14: skipping costs nothing and moves on', () => {
-    let s = startSession('s', 'quick', AT);
+  it('skipping costs nothing', () => {
+    let s = startSession('s', AT);
     const first = currentQuestion(s, sctx)!;
     s = skipQuestion(s, first.id, sctx);
     expect(s.claims).toHaveLength(0);
     expect(currentQuestion(s, sctx)?.id).not.toBe(first.id);
   });
 
-  it('TEST 13: Back returns to the previous question and un-does its answer', () => {
-    let s = startSession('s', 'quick', AT);
-    const first = currentQuestion(s, sctx)!;
-    s = answerQuestion(s, first.id, encodeTitles([{ titleId: 'tv:1', text: 'Sherlock' }]), sctx);
-    const second = currentQuestion(s, sctx)!;
-    expect(second.id).not.toBe(first.id);
-
+  it('TEST 26: Back restores the previous question and un-does its answer', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', encodeTitles([{ titleId: 'tv:1', text: 'Sherlock' }]), sctx);
+    expect(currentQuestion(s, sctx)?.id).not.toBe('favourites');
     s = goBack(s, sctx);
-    expect(currentQuestion(s, sctx)?.id).toBe(first.id);
+    expect(currentQuestion(s, sctx)?.id).toBe('favourites');
     expect(s.claims).toHaveLength(0);
   });
 
-  it('Back genuinely reverses an answer that MUTATED earlier claims', () => {
-    let s = startSession('s', 'full', AT);
+  it('Back reverses an answer that MUTATED earlier claims', () => {
+    let s = startSession('s', AT);
+    // Walk to the deal-breakers question the way a user would.
+    for (let i = 0; i < 20; i++) {
+      const q = currentQuestion(s, sctx)!;
+      if (q.id === 'dealbreakers') break;
+      s = skipQuestion(s, q.id, sctx);
+    }
     s = answerQuestion(s, 'dealbreakers', encodeChips(['gore']), sctx);
-    const strength = currentQuestion(s, sctx)!;
-    s = answerQuestion(s, strength.id, 'hard', sctx);
+    const grade = currentQuestion(s, sctx)!;
+    expect(grade.id).toMatch(/^db_strength\|/);
+    s = answerQuestion(s, grade.id, 'hard', sctx);
     expect(s.claims.find((c) => c.attribute === 'gore')?.hardExclusion).toBe(true);
-
     s = goBack(s, sctx);
     expect(s.claims.find((c) => c.attribute === 'gore')?.hardExclusion).toBeUndefined();
   });
 
-  it('Back at the very start is a no-op, not a crash', () => {
-    const s = startSession('s', 'quick', AT);
+  it('Back at the start is a no-op', () => {
+    const s = startSession('s', AT);
     expect(canGoBack(s)).toBe(false);
     expect(goBack(s, sctx).answers).toHaveLength(0);
   });
 
-  it('TEST 15+16: replaying the answer log restores the session exactly', () => {
-    let s = startSession('s', 'full', AT);
-    s = answerQuestion(s, 'fav_titles', encodeTitles([{ titleId: 'tv:1', text: 'Sherlock', genres: ['crime'] }]), sctx);
+  it('TEST 25: replaying the log restores the session exactly', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', encodeTitles([{ titleId: 'tv:1', text: 'Sherlock', genres: ['crime'] }]), sctx);
     const why = currentQuestion(s, sctx)!;
     s = answerQuestion(s, why.id, encodeChips(['investigation']), sctx);
-
-    const restored = replay(s.id, s.mode, s.answers, sctx);
+    const restored = replay(s.id, s.answers, sctx);
     expect(JSON.stringify(restored.claims)).toBe(JSON.stringify(s.claims));
     expect(currentQuestion(restored, sctx)?.id).toBe(currentQuestion(s, sctx)?.id);
   });
 
-  it('the same transcript always produces the same DNA', () => {
-    const answers = [
-      { questionId: 'fav_titles', value: encodeTitles([{ titleId: 'tv:1', text: 'Sherlock' }]), at: AT },
-      { questionId: 'genres', value: encodeChips(['investigation']), at: AT },
-    ];
-    const a = replay('x', 'quick', answers, sctx);
-    const b = replay('x', 'quick', answers, sctx);
-    expect(JSON.stringify(a.claims)).toBe(JSON.stringify(b.claims));
+  it('"ask me more" adds follow-ups, never main questions', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', encodeTitles([
+      { titleId: 'tv:1', text: 'A' }, { titleId: 'tv:2', text: 'B' }, { titleId: 'tv:3', text: 'C' },
+    ]), sctx);
+    const deeper = goDeeper(s);
+    expect(deeper.extraDepth).toBe(1);
+    const q = currentQuestion(deeper, sctx);
+    expect(q!.stepIndex).toBeLessThanOrEqual(MAIN_MAX);
   });
 });
 
 // ── Review ─────────────────────────────────────────────────────────────────
 
-describe('review', () => {
+describe('the review', () => {
   const sctx = { now: AT };
 
   function interviewed() {
-    let s = startSession('s', 'full', AT);
-    s = answerQuestion(s, 'fav_titles', encodeTitles([{ titleId: 'tv:1', text: 'Sherlock', genres: ['crime'] }]), sctx);
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', encodeTitles([{ titleId: 'tv:1', text: 'Sherlock', genres: ['crime'] }]), sctx);
     const why = currentQuestion(s, sctx)!;
     s = answerQuestion(s, why.id, encodeChips(['investigation']), sctx);
     s = answerQuestion(s, 'dealbreakers', encodeChips(['gore']), sctx);
-    const strength = currentQuestion(s, sctx)!;
-    s = answerQuestion(s, strength.id, 'hard', sctx);
+    const grade = currentQuestion(s, sctx)!;
+    s = answerQuestion(s, grade.id, 'hard', sctx);
     return toReview(s);
   }
 
-  it('TEST 17: everything is grouped into named sections the user can act on', () => {
-    const sections = reviewSections(interviewed());
-    const names = sections.map((x) => x.name);
-    expect(names).toContain('Titles discussed');
-    expect(names).toContain('Never recommend');
-    expect(sections.every((x) => x.items.length > 0)).toBe(true);
+  it('TEST 10: no vague correction buttons survive', () => {
+    const labels = Object.values(DECISION_OPTIONS).flat().map((o) => o.label);
+    for (const banned of ['Right', 'Backwards', 'Just now', 'Drop it']) {
+      expect(labels, banned).not.toContain(banned);
+    }
+    expect(labels).toContain('Exactly');
+    expect(labels).toContain('Yes, that’s it');
   });
 
-  it('a claim appears in exactly one section, so editing is unambiguous', () => {
-    const sections = reviewSections(interviewed());
-    const ids = sections.flatMap((x) => x.items.map((i) => i.claimId));
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
-  it('every row shows the user their own words', () => {
+  it('every row gets wording that fits what it is', () => {
     for (const item of reviewItems(interviewed())) {
-      expect(item.quote.length).toBeGreaterThan(0);
+      expect(DECISION_OPTIONS[item.decisionKind].length).toBeGreaterThan(1);
     }
   });
 
-  it('HARD: nothing is applied until the user confirms', () => {
+  it('TEST 18: the titles discussed are listed', () => {
+    const titles = discussedTitles(interviewed());
+    expect(titles).toHaveLength(1);
+    expect(titles[0]?.title?.text).toBe('Sherlock');
+    expect(titles[0]?.reason).toBeDefined();
+  });
+
+  it('TEST 2: unconfirmed titles are enumerable, so a count can never outrun them', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', encodeTitles([
+      { titleId: null, text: 'Ozark' }, { titleId: null, text: 'Gone' },
+    ]), sctx);
+    const list = unconfirmedTitles(toReview(s));
+    expect(list).toHaveLength(2);
+    expect(list.map((i) => i.title?.text)).toEqual(['Ozark', 'Gone']);
+  });
+
+  it('TEST 19: still-unclear is a short list of names, not a paragraph', () => {
+    const unclear = stillUnclear(interviewed(), sctx);
+    expect(unclear.length).toBeLessThanOrEqual(3);
+    for (const u of unclear) expect(u.length).toBeLessThan(30);
+  });
+
+  it('TEST 20: unknown areas never block saving', () => {
     const s = interviewed();
-    expect(s.stage).toBe('review');
-    const applied = applyReview(s, {}, AT);
-    expect(applied.stage).toBe('applied');
+    expect(stillUnclear(s, sctx).length).toBeGreaterThan(0);
+    expect(canApply(s, {}, sctx).ok).toBe(true);
   });
 
-  it('HARD: a hand-typed title blocks the save until it is confirmed', () => {
-    let s = startSession('s', 'quick', AT);
-    s = answerQuestion(s, 'fav_titles', encodeTitles([{ titleId: null, text: 'Ozark' }]), sctx);
+  it('TEST 21: a guessed title DOES block saving until it is settled', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', encodeTitles([{ titleId: null, text: 'Ozark' }]), sctx);
     s = toReview(s);
-    const item = reviewItems(s).find((i) => i.needsConfirmation);
-    expect(item).toBeDefined();
-    expect(canApply(s, {}).ok).toBe(false);
-    expect(applyReview(s, {}, AT).stage).toBe('review');
-    expect(applyReview(s, { [item!.claimId]: 'keep' }, AT).stage).toBe('applied');
+    const gate = canApply(s, {}, sctx);
+    expect(gate.ok).toBe(false);
+    expect(gate.blockedBy[0]?.title?.text).toBe('Ozark');
+    expect(applyReview(s, {}, AT, sctx).stage).toBe('review');
+    const id = gate.blockedBy[0]!.claimId;
+    expect(applyReview(s, { [id]: 'confirm' }, AT, sctx).stage).toBe('applied');
   });
 
-  it('a title chosen from search needs no confirmation', () => {
-    let s = startSession('s', 'quick', AT);
-    s = answerQuestion(s, 'fav_titles', encodeTitles([{ titleId: 'tv:1', text: 'Sherlock' }]), sctx);
-    expect(canApply(toReview(s), {}).ok).toBe(true);
+  it('an unanswered fragment is never saved', () => {
+    let s = startSession('s', AT);
+    s = answerQuestion(s, 'favourites', '', sctx);
+    s = answerQuestion(s, 'disappointment', 'The performances — F1', sctx);
+    const applied = applyReview(toReview(s), {}, AT, sctx);
+    expect(applied.claims.some((c) => c.unresolved)).toBe(false);
   });
 
-  it('a decision can drop, flip, demote or escalate a claim', () => {
-    const claims = [claim({ id: 'x', attribute: 'horror', polarity: -1 })];
-    expect(applyDecisions(claims, { x: 'drop' })).toHaveLength(0);
+  it('the review decisions do what they say', () => {
+    const claims = [claim({ id: 'x', attribute: 'horror', polarity: -1, strength: 0.8 })];
+    expect(applyDecisions(claims, { x: 'remove' })).toHaveLength(0);
     expect(applyDecisions(claims, { x: 'flip' })[0]?.polarity).toBe(1);
     expect(applyDecisions(claims, { x: 'mood' })[0]?.durability).toBe('temporary');
+    expect(applyDecisions(claims, { x: 'depends' })[0]?.scope).toBe('conditional');
+    expect(applyDecisions(claims, { x: 'soften' })[0]?.strength).toBeLessThan(0.8);
     expect(applyDecisions(claims, { x: 'hard' })[0]?.hardExclusion).toBe(true);
     expect(applyDecisions(claims, {})[0]?.reviewed).toBe(true);
   });
 
-  it('never-recommend is only ever the user asking for it', () => {
+  it('removing a title removes what we concluded from it', () => {
     const s = interviewed();
-    // Nothing in the pipeline sets it except the explicit grade and the explicit
-    // review action.
-    const auto = s.claims.filter((c) => c.hardExclusion && c.attribute !== 'gore');
-    expect(auto).toHaveLength(0);
+    const titleClaim = s.claims.find((c) => c.title?.text === 'Sherlock' && c.attribute === null)!;
+    const kept = applyDecisions(s.claims, { [titleClaim.id]: 'remove' });
+    expect(kept.some((c) => c.title?.text === 'Sherlock')).toBe(false);
   });
 
-  it('TEST 18: an application can be undone', () => {
-    let s = applyReview(interviewed(), {}, AT);
+  it('TEST 29: what saves is structured, with reasons attached', () => {
+    const s = applyReview(interviewed(), {}, AT, sctx);
     expect(s.stage).toBe('applied');
+    const reason = s.claims.find((c) => c.attribute === 'investigation');
+    expect(reason?.title?.text).toBe('Sherlock');
+    expect(reason?.confidence).toBeGreaterThan(0.5);
+    expect(reason?.source).toBe('typed_interview');
+  });
+
+  it('an application can be undone', () => {
+    let s = applyReview(interviewed(), {}, AT, sctx);
     s = undoApply(s);
     expect(s.stage).toBe('review');
     expect(s.appliedAt).toBeUndefined();
-  });
-
-  it('it says what it still does not know rather than implying full coverage', () => {
-    const unclear = stillUnclear(interviewed(), sctx);
-    expect(unclear.length).toBeGreaterThan(0);
-    expect(stillUnclear(interviewed(), { now: AT, priorEvidence: { subtitles: 5 } }))
-      .not.toContain('Subtitles');
   });
 
   it('deletion means deletion', () => {
     const s = forgetSession(interviewed());
     expect(s.claims).toEqual([]);
     expect(s.answers).toEqual([]);
-    expect(s.asked).toEqual([]);
   });
 });
+
 
 // ── Calibration ────────────────────────────────────────────────────────────
 

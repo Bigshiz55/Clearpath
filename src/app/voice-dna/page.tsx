@@ -5,8 +5,8 @@ import { createClient } from '@/lib/supabase/server';
 import { VoiceDnaClient } from '@/components/voicedna/VoiceDnaClient';
 
 export const metadata: Metadata = {
-  title: 'Verd1ct Voice DNA · WatchVerd1ct',
-  description: 'A short conversation about what you actually like, contradictions included.',
+  title: 'Witness Testimony · WatchVerd1ct',
+  description: 'Ten questions about what you actually like, contradictions included.',
   robots: { index: false, follow: false },
 };
 

@@ -1,37 +1,32 @@
 /**
- * THE INTERVIEW SESSION.
+ * WITNESS TESTIMONY — the session.
  *
  * A pure reducer over an append-only answer log. `asked` and `claims` are both
- * DERIVED from the answers — never stored independently — which is what makes
- * Back trivial and correct: drop the last answer and replay. There is no undo
- * logic to get wrong, because there is nothing to undo.
+ * DERIVED from the answers, never stored independently, which is what makes
+ * Back correct rather than approximate: drop the last answer and replay. An
+ * answer that mutated earlier claims — a contradiction resolved, a deal-breaker
+ * graded — genuinely un-happens.
  *
- * That same property gives the product three things it promises:
- *
- *   * MANDATORY REVIEW — nothing reaches Viewer DNA until the user has seen
- *     every conclusion next to the words that produced it. `canApply` enforces
- *     it, rather than the UI remembering to.
- *   * REPRODUCIBILITY — the same transcript always yields the same DNA, so a
- *     support question can be answered by replaying it.
- *   * A REFRESH COSTS NOTHING — the answer log is the whole session, so saving
- *     and restoring it is saving and restoring a list of strings.
+ * The same property gives a refresh nothing to lose (the log is a list of
+ * strings) and makes the whole interview reproducible from its transcript.
  *
  * No I/O. Persistence wraps this; it does not live inside it.
  */
 import type { Claim, Durability, VoiceProfile } from './types';
 import type { KnownTitle } from './parse';
-import { parseAnswer } from './parse';
+import { findUnresolved, parseAnswer } from './parse';
 import { buildProfile, mergeClaims, reveal, type BuildInput } from './profile';
 import { resolveConflict } from './contradiction';
 import { attributeLabel, attributePhrase, attribute as attributeDef, type AttributeSection } from './lexicon';
-import { decodeChips, decodeTitles, toTitleRef } from './answerCodec';
+import { decodeChips, decodeTitles, toTitleRef, type PickedTitle } from './answerCodec';
 import {
-  DEALBREAKER_CHIPS, DEALBREAKER_STRENGTHS, DNF_PROGRESS, chipToClaim, findChip,
+  DEALBREAKER_CHIPS, DEALBREAKER_STRENGTHS, DNF_PROGRESS, aspectLabel, chipToClaim, findChip,
 } from './reasons';
 import {
-  chipsForQuestionId, nextQuestion, parseFollowUpId, progress,
-  type InterviewMode, type QuestionState, type VoiceQuestion,
+  chipsForQuestionId, mainAnswered, nextQuestion, parseFollowUpId, progress,
+  type QuestionState, type VoiceQuestion,
 } from './questions';
+import { MAIN_MAX } from './steps';
 
 export type SessionStage = 'interview' | 'review' | 'applied';
 
@@ -44,13 +39,14 @@ export interface Answer {
 
 export interface VoiceSession {
   id: string;
-  mode: InterviewMode;
   stage: SessionStage;
   /** Derived from `answers`. Stored so the persisted row is self-describing. */
   asked: string[];
   answers: Answer[];
   claims: Claim[];
   startedAt: number;
+  /** Extra follow-ups the user asked for. Never adds main questions. */
+  extraDepth: number;
   appliedAt?: number;
 }
 
@@ -58,14 +54,12 @@ export interface SessionContext {
   now: number;
   knownTitles?: KnownTitle[];
   titleFacts?: BuildInput['titleFacts'];
-  /** Evidence already held from an import or the quiz, keyed by attribute. */
   priorEvidence?: Record<string, number>;
-  /** Voice sessions record a different evidence source. Defaults to typed. */
   source?: Claim['source'];
 }
 
-export function startSession(id: string, mode: InterviewMode, now: number): VoiceSession {
-  return { id, mode, stage: 'interview', asked: [], answers: [], claims: [], startedAt: now };
+export function startSession(id: string, now: number): VoiceSession {
+  return { id, stage: 'interview', asked: [], answers: [], claims: [], startedAt: now, extraDepth: 0 };
 }
 
 export function profileOf(session: VoiceSession, ctx: SessionContext): VoiceProfile {
@@ -80,16 +74,15 @@ function questionState(session: VoiceSession, ctx: SessionContext): QuestionStat
   const answers: Record<string, string> = {};
   for (const a of session.answers) answers[a.questionId] = a.value;
   return {
-    mode: session.mode,
     asked: session.asked,
     answers,
     profile: profileOf(session, ctx),
     claims: session.claims,
     priorEvidence: ctx.priorEvidence ?? {},
+    extraDepth: session.extraDepth,
   };
 }
 
-/** The question to put on screen now, or null when the interview is finished. */
 export function currentQuestion(session: VoiceSession, ctx: SessionContext): VoiceQuestion | null {
   if (session.stage !== 'interview') return null;
   return nextQuestion(questionState(session, ctx));
@@ -99,12 +92,23 @@ export function sessionProgress(session: VoiceSession, ctx: SessionContext) {
   return progress(questionState(session, ctx));
 }
 
+export function mainQuestionsAnswered(session: VoiceSession): number {
+  return Math.min(mainAnswered({ asked: session.asked } as QuestionState), MAIN_MAX);
+}
+
 // ── The reducer ────────────────────────────────────────────────────────────
 
-const claimId = (session: VoiceSession, questionId: string, suffix: string) =>
+const cid = (session: VoiceSession, questionId: string, suffix: string) =>
   `${session.id}:${questionId}:${suffix}`;
 
-/** Apply one answer to the claim set. Pure; returns the new claims. */
+/** The title this step is about, so a reason without one still lands somewhere. */
+function stepTitle(session: VoiceSession, questionId: string): Claim['title'] | undefined {
+  const answer = session.answers.find((a) => a.questionId === questionId);
+  if (!answer?.value.startsWith('{')) return undefined;
+  const first = decodeTitles(answer.value).titles[0];
+  return first ? toTitleRef(first) : undefined;
+}
+
 function reduceAnswer(
   session: VoiceSession,
   questionId: string,
@@ -114,7 +118,7 @@ function reduceAnswer(
   const source = ctx.source ?? 'typed_interview';
   const state = questionState(session, ctx);
   let claims = session.claims;
-  if (!value) return claims; // skipped — costs nothing, teaches nothing
+  if (!value) return claims;
 
   const fu = parseFollowUpId(questionId);
 
@@ -135,6 +139,40 @@ function reduceAnswer(
     return claims.map((c) => (c.id === fu.a || c.id === fu.b ? { ...c, reviewed: true } : c));
   }
 
+  // ── "How did you feel about the performances in F1?" ─────────────────────
+  if (fu?.kind === 'clarify') {
+    const target = claims.find((c) => c.id === fu.a);
+    if (!target) return claims;
+    if (value === 'not_meant') return claims.filter((c) => c.id !== fu.a);
+    const polarity: -1 | 1 = value === 'negative' ? -1 : 1;
+    return claims.map((c) => {
+      if (c.id !== fu.a) return c;
+      const next: Claim = {
+        ...c,
+        polarity,
+        strength: value === 'mixed' ? 0.35 : 0.7,
+        confidence: 0.9,
+        reviewed: true,
+        reaction: value === 'negative' ? 'disliked' : value === 'mixed' ? 'mixed' : 'liked',
+      };
+      delete next.unresolved;
+      return next;
+    });
+  }
+
+  // ── "So it was mostly the deduction and the cases?" ──────────────────────
+  if (fu?.kind === 'summary') {
+    const target = claims.find((c) => c.id === fu.a);
+    const titleText = target?.title?.text;
+    if (!titleText) return claims;
+    const isReason = (c: Claim) => c.title?.text === titleText && c.attribute !== null;
+    if (value === 'not_quite') return claims.filter((c) => !isReason(c));
+    if (value === 'mostly') {
+      return claims.map((c) => (isReason(c) ? { ...c, strength: c.strength * 0.75, reviewed: true } : c));
+    }
+    return claims.map((c) => (isReason(c) ? { ...c, confidence: 0.95, reviewed: true } : c));
+  }
+
   // ── How far into an abandoned title they got ─────────────────────────────
   if (fu?.kind === 'dnf_progress') {
     const step = DNF_PROGRESS.find((p) => p.value === value);
@@ -146,29 +184,20 @@ function reduceAnswer(
     );
   }
 
-  // ── How badly a deal-breaker bites ───────────────────────────────────────
+  // ── How strong a deal-breaker is ─────────────────────────────────────────
   if (fu?.kind === 'db_strength') {
-    const grade = DEALBREAKER_STRENGTHS.find((s) => s.value === value);
+    const grade = DEALBREAKER_STRENGTHS.find((x) => x.value === value);
     const chip = DEALBREAKER_CHIPS.find((c) => c.value === fu.a);
     if (!grade || !chip?.attribute) return claims;
-    const id = claimId(session, 'dealbreakers', fu.a);
+    const id = cid(session, 'dealbreakers', fu.a);
     return claims.map((c) => {
       if (c.id !== id) return c;
-      const next: Claim = {
-        ...c,
-        strength: grade.strength,
-        durability: grade.durability,
-        reviewed: true,
-      };
+      const next: Claim = { ...c, strength: grade.strength, durability: grade.durability, reviewed: true };
       if (grade.hardExclusion) next.hardExclusion = true;
       else delete next.hardExclusion;
       if (grade.conditional) {
         next.scope = 'conditional';
-        next.condition = {
-          text: 'the rest of it is right',
-          attributes: [],
-          mode: 'suspends',
-        };
+        next.condition = { text: 'the rest of it is right', attributes: [], mode: 'suspends' };
       } else {
         next.scope = 'general';
         delete next.condition;
@@ -177,7 +206,37 @@ function reduceAnswer(
     });
   }
 
-  // ── Chip answers ─────────────────────────────────────────────────────────
+  // ── The title card ───────────────────────────────────────────────────────
+  if (questionId === 'movie_check') {
+    const { titles, note } = decodeTitles(value);
+    const picked = titles[0];
+    if (!picked || note === 'unseen') return claims;
+    const map: Record<string, { polarity: -1 | 1; strength: number; reaction: Claim['reaction'] }> = {
+      loved: { polarity: 1, strength: 0.95, reaction: 'loved' },
+      liked: { polarity: 1, strength: 0.8, reaction: 'liked' },
+      looks_right: { polarity: 1, strength: 0.5, reaction: 'curious' },
+      not_for_me: { polarity: -1, strength: 0.6, reaction: 'avoided' },
+      hated: { polarity: -1, strength: 0.95, reaction: 'hated' },
+    };
+    const m = map[note];
+    if (!m) return claims;
+    return mergeClaims(claims, [{
+      id: cid(session, 'movie_check', picked.titleId ?? 'card'),
+      attribute: null,
+      polarity: m.polarity,
+      strength: m.strength,
+      confidence: 0.9,
+      durability: 'durable',
+      scope: 'general',
+      title: toTitleRef(picked),
+      ...(m.reaction ? { reaction: m.reaction } : {}),
+      source,
+      quote: `${picked.text} — ${note.replace(/_/g, ' ')}`,
+      at: ctx.now,
+    }]);
+  }
+
+  // ── Chips ────────────────────────────────────────────────────────────────
   const chips = chipsForQuestionId(state, questionId);
   if (chips) {
     const isWhy = fu?.kind === 'why';
@@ -192,10 +251,10 @@ function reduceAnswer(
       const chip = findChip(chips, v);
       if (!chip) continue;
       const c = chipToClaim(chip, {
-        id: claimId(session, questionId, v),
+        id: cid(session, questionId, v),
         at: ctx.now,
         source,
-        quote: `${chip.label}${target?.title ? ` — ${target.title.text}` : ''}`,
+        quote: chip.label,
         factor,
         ...(target?.title ? { title: target.title } : {}),
       });
@@ -203,26 +262,24 @@ function reduceAnswer(
     }
     claims = mergeClaims(claims, made);
 
-    // Not finishing is not the same as disliking. If the only reasons they
-    // give are mood or drift, the title reaction stops being a durable verdict.
+    // Not finishing is not disliking. If the only reasons are mood or drift,
+    // the reaction stops being a verdict about the title.
     if (isWhy && target?.reaction === 'abandoned') {
-      const softOnly = picked.length > 0 && picked.every((v) => v === 'wrong_mood' || v === 'lost_interest');
-      if (softOnly) {
+      const soft = picked.length > 0 && picked.every((v) => v === 'wrong_mood' || v === 'lost_interest');
+      if (soft) {
         claims = claims.map((c) =>
           c.id === target.id ? { ...c, durability: 'temporary' as Durability } : c,
         );
       }
     }
 
-    // A deal-breaker starts at "strong" and is regraded by its follow-up. It is
-    // never a hard exclusion until the user picks that explicitly.
     if (questionId === 'dealbreakers') {
       const defaults: Claim[] = [];
       for (const v of picked) {
         const chip = DEALBREAKER_CHIPS.find((c) => c.value === v);
         if (!chip?.attribute) continue;
         defaults.push({
-          id: claimId(session, 'dealbreakers', v),
+          id: cid(session, 'dealbreakers', v),
           attribute: chip.attribute,
           polarity: -1,
           strength: 0.85,
@@ -230,7 +287,7 @@ function reduceAnswer(
           durability: 'durable',
           scope: 'general',
           source,
-          quote: `Deal-breaker: ${chip.label}`,
+          quote: chip.label,
           at: ctx.now,
         });
       }
@@ -243,46 +300,65 @@ function reduceAnswer(
   if (decoded && decoded.titles.length > 0) {
     const q = nextQuestion(state);
     const reaction = q?.id === questionId ? q.impliedReaction : undefined;
-    const made: Claim[] = decoded.titles.map((t, i) => {
-      const c: Claim = {
-        id: claimId(session, questionId, `t${i}`),
-        attribute: null,
-        polarity: reaction === 'disliked' || reaction === 'hated' || reaction === 'abandoned' ? -1 : 1,
-        strength: reaction === 'hated' ? 0.95 : reaction === 'abandoned' ? 0.6 : 0.9,
-        confidence: t.titleId ? 0.95 : 0.6,
-        durability: 'durable',
-        scope: 'general',
-        title: toTitleRef(t),
-        reaction: reaction ?? 'liked',
-        source,
-        quote: t.text,
-        at: ctx.now,
-      };
-      return c;
-    });
-    claims = mergeClaims(claims, made);
+    const negative = reaction === 'disliked' || reaction === 'hated' || reaction === 'abandoned';
+    claims = mergeClaims(claims, decoded.titles.map((t, i) => ({
+      id: cid(session, questionId, `t${i}`),
+      attribute: null,
+      polarity: (negative ? -1 : 1) as -1 | 1,
+      strength: reaction === 'hated' ? 0.95 : reaction === 'abandoned' ? 0.6 : 0.9,
+      confidence: t.titleId ? 0.95 : 0.6,
+      durability: 'durable' as Durability,
+      scope: 'general' as const,
+      title: toTitleRef(t),
+      reaction: reaction ?? 'liked',
+      source,
+      quote: t.text,
+      at: ctx.now,
+    })));
   }
 
-  // ── Free text, on any question that allows it ────────────────────────────
-  const note = decoded ? decoded.note : chips || fu ? '' : value;
-  const freeText = decoded ? decoded.note : chips ? '' : fu ? '' : value;
-  const text = (note || freeText).trim();
+  // ── Free text ────────────────────────────────────────────────────────────
+  const text = (decoded ? decoded.note : chips || fu ? '' : value).trim();
   if (text) {
-    claims = mergeClaims(
-      claims,
-      parseAnswer(text, {
-        source,
-        at: ctx.now,
-        idPrefix: `${session.id}:${questionId}:txt`,
-        ...(ctx.knownTitles ? { knownTitles: ctx.knownTitles } : {}),
-      }),
+    const parseCtx = {
+      source,
+      at: ctx.now,
+      idPrefix: `${session.id}:${questionId}:txt`,
+      ...(ctx.knownTitles ? { knownTitles: ctx.knownTitles } : {}),
+    };
+    const parsed = parseAnswer(text, parseCtx).map((c) =>
+      // A reason with no title of its own belongs to the title this step is about.
+      c.aspect && !c.title && stepTitle(session, questionId)
+        ? { ...c, title: stepTitle(session, questionId)! }
+        : c,
     );
+    claims = mergeClaims(claims, parsed);
+
+    // Anything we heard but could not read a direction from becomes a question,
+    // never a guess.
+    if (parsed.length === 0) {
+      const unresolved = findUnresolved(text, parseCtx).slice(0, 2).map<Claim>((u, i) => ({
+        id: `${session.id}:${questionId}:unres${i}`,
+        attribute: null,
+        polarity: 1,
+        strength: 0,
+        confidence: 0,
+        durability: 'unknown',
+        scope: 'general',
+        source,
+        quote: u.quote,
+        at: ctx.now,
+        unresolved: true,
+        ...(u.aspect ? { aspect: u.aspect } : {}),
+        ...(u.title ? { title: u.title } : stepTitle(session, questionId) ? { title: stepTitle(session, questionId)! } : {}),
+      }));
+      claims = mergeClaims(claims, unresolved);
+    }
   }
 
   return claims;
 }
 
-/** Record an answer. An empty value is a skip, which costs nothing. */
 export function answerQuestion(
   session: VoiceSession,
   questionId: string,
@@ -291,50 +367,40 @@ export function answerQuestion(
 ): VoiceSession {
   if (session.stage !== 'interview') return session;
   if (session.asked.includes(questionId)) return session;
-  const claims = reduceAnswer(session, questionId, value, ctx);
   return {
     ...session,
     answers: [...session.answers, { questionId, value, at: ctx.now }],
     asked: [...session.asked, questionId],
-    claims,
+    claims: reduceAnswer(session, questionId, value, ctx),
   };
 }
 
-/** Skip without answering. Recorded so the engine does not re-ask. */
 export function skipQuestion(session: VoiceSession, questionId: string, ctx: SessionContext): VoiceSession {
   return answerQuestion(session, questionId, '', ctx);
 }
 
-/** Rebuild a session from its answer log. The basis of Back and of restore. */
-export function replay(
-  id: string,
-  mode: InterviewMode,
-  answers: readonly Answer[],
-  ctx: SessionContext,
-): VoiceSession {
-  let s = startSession(id, mode, answers[0]?.at ?? ctx.now);
-  for (const a of answers) {
-    s = answerQuestion(s, a.questionId, a.value, { ...ctx, now: a.at });
-  }
+/** The user asked for more depth. Adds follow-ups only — never main questions. */
+export function goDeeper(session: VoiceSession): VoiceSession {
+  return { ...session, extraDepth: Math.min(3, session.extraDepth + 1), stage: 'interview' };
+}
+
+export function replay(id: string, answers: readonly Answer[], ctx: SessionContext, extraDepth = 0): VoiceSession {
+  let s = { ...startSession(id, answers[0]?.at ?? ctx.now), extraDepth };
+  for (const a of answers) s = answerQuestion(s, a.questionId, a.value, { ...ctx, now: a.at });
   return s;
 }
 
-/**
- * Go back one question. Implemented as replay-without-the-last-answer, so an
- * answer that MUTATED earlier claims (a conflict resolution, a deal-breaker
- * grade) is genuinely undone rather than approximately undone.
- */
+/** Back: replay without the last answer, so mutations genuinely reverse. */
 export function goBack(session: VoiceSession, ctx: SessionContext): VoiceSession {
   if (session.answers.length === 0) return session;
-  const kept = session.answers.slice(0, -1);
-  return { ...replay(session.id, session.mode, kept, ctx), stage: 'interview' };
+  return {
+    ...replay(session.id, session.answers.slice(0, -1), ctx, session.extraDepth),
+    stage: 'interview',
+  };
 }
 
-export function canGoBack(session: VoiceSession): boolean {
-  return session.answers.length > 0 && session.stage !== 'applied';
-}
+export const canGoBack = (s: VoiceSession) => s.answers.length > 0 && s.stage !== 'applied';
 
-/** Move to review. Allowed at any point — the user can stop early. */
 export function toReview(session: VoiceSession): VoiceSession {
   return session.stage === 'applied' ? session : { ...session, stage: 'review' };
 }
@@ -345,52 +411,78 @@ export function backToInterview(session: VoiceSession): VoiceSession {
 
 // ── Review ─────────────────────────────────────────────────────────────────
 
-export type ReviewDecision = 'keep' | 'drop' | 'mood' | 'flip' | 'hard';
+/**
+ * What the user can say about a line. The wording is always chosen for the KIND
+ * of line — a title match and a taste reading need different questions, and a
+ * generic "Backwards" button makes the user reverse-engineer our data model.
+ */
+export type ReviewDecision = 'confirm' | 'soften' | 'flip' | 'mood' | 'depends' | 'remove' | 'hard';
+export type DecisionKind = 'title' | 'interpretation' | 'permanence' | 'direction';
+
+export const DECISION_OPTIONS: Record<DecisionKind, Array<{ value: ReviewDecision; label: string }>> = {
+  title: [
+    { value: 'confirm', label: 'Yes, that’s it' },
+    { value: 'remove', label: 'Wrong title' },
+  ],
+  interpretation: [
+    { value: 'confirm', label: 'Exactly' },
+    { value: 'soften', label: 'Mostly' },
+    { value: 'remove', label: 'Not quite' },
+  ],
+  permanence: [
+    { value: 'confirm', label: 'Usually true' },
+    { value: 'mood', label: 'Only tonight' },
+    { value: 'depends', label: 'Depends' },
+    { value: 'remove', label: 'Remove this' },
+  ],
+  direction: [
+    { value: 'confirm', label: 'I like this' },
+    { value: 'flip', label: 'I dislike this' },
+    { value: 'depends', label: 'It depends' },
+    { value: 'remove', label: 'Remove this' },
+  ],
+};
 
 export interface ReviewItem {
   claimId: string;
   statement: string;
   quote: string;
-  kind: 'rule' | 'exception' | 'condition' | 'mood' | 'title' | 'note';
+  decisionKind: DecisionKind;
   durability: Durability;
   confidence: number;
   needsConfirmation: boolean;
   hardExclusion: boolean;
+  /** Set for rows that represent a named title. */
+  title?: { titleId: string | null; text: string };
+  /** For the titles strip: the reaction and its main reason. */
+  reaction?: Claim['reaction'];
+  reason?: string;
 }
 
-/** The named sections of the review, in the order they are shown. */
 export const REVIEW_SECTIONS = [
   'Core loves',
   'Never recommend',
-  'Strong avoidances',
-  'Conditional tastes',
+  'Avoidances',
+  'It depends',
   'Just for now',
-  'Pacing',
-  'Tone',
-  'Story preferences',
-  'Content tolerance',
-  'Format preferences',
-  'Language and audio',
   'Titles discussed',
-  'Noted, but not used',
+  'Still checking',
 ] as const;
 
 export type ReviewSectionName = (typeof REVIEW_SECTIONS)[number];
 
-const SECTION_OF: Record<AttributeSection, ReviewSectionName> = {
-  genre: 'Core loves',
-  pacing: 'Pacing',
-  tone: 'Tone',
-  story: 'Story preferences',
-  content: 'Content tolerance',
-  format: 'Format preferences',
-  language: 'Language and audio',
-};
+const LOVE_SECTIONS: AttributeSection[] = ['genre', 'pacing', 'tone', 'story', 'content', 'format', 'language'];
 
-function statementFor(c: Claim): string {
-  if (c.unactionable) {
-    const what = c.title?.text ? ` about ${c.title.text}` : '';
-    return `You mentioned something${what} that I cannot turn into a filter.`;
+function statementFor(c: Claim, claims: Claim[]): string {
+  if (c.unresolved) {
+    const part = c.aspect ? `the ${aspectLabel(c.aspect)}` : 'something';
+    const where = c.title?.text ? ` in ${c.title.text}` : '';
+    return `You mentioned ${part}${where} — I did not want to guess which way you meant it.`;
+  }
+  if (c.aspect) {
+    const where = c.title?.text ? `${c.title.text} — ` : '';
+    const verdict = c.polarity === 1 ? 'worked for you' : 'let you down';
+    return `${where}the ${aspectLabel(c.aspect)} ${verdict}.`;
   }
   if (c.attribute) {
     const phrase = attributePhrase(c.attribute);
@@ -404,53 +496,65 @@ function statementFor(c: Claim): string {
   }
   const what = c.title?.text ?? 'that';
   const verb: Record<string, string> = {
-    loved: 'You loved',
-    liked: 'You liked',
-    mixed: 'You were mixed on',
-    disliked: 'You did not like',
-    hated: 'You could not stand',
-    abandoned: 'You gave up on',
-    avoided: 'You avoid',
-    curious: 'You are curious about',
+    loved: 'You loved', liked: 'You liked', mixed: 'You were mixed on',
+    disliked: 'You did not like', hated: 'You could not stand',
+    abandoned: 'You gave up on', avoided: 'You avoid', curious: 'You liked the look of',
   };
   const line = `${verb[c.reaction ?? 'liked'] ?? 'You mentioned'} ${what}`;
   if (c.reaction === 'abandoned' && c.durability === 'temporary') {
-    return `${line} — but that reads as timing, not taste.`;
+    return `${line} — that reads as timing, not taste.`;
   }
+  void claims;
   return `${line}.`;
 }
 
-function kindFor(c: Claim): ReviewItem['kind'] {
-  if (c.unactionable) return 'note';
-  if (c.durability === 'temporary') return 'mood';
-  if (c.condition) return 'condition';
-  if (c.attribute === null) return 'title';
-  return 'rule';
+function decisionKindFor(c: Claim): DecisionKind {
+  if (c.unresolved) return 'direction';
+  if (c.attribute === null && c.title && !c.aspect) return 'title';
+  if (c.durability === 'temporary') return 'permanence';
+  if (c.aspect) return 'interpretation';
+  return 'interpretation';
 }
 
-function itemFor(c: Claim): ReviewItem {
+/** The main reason recorded against a title, for the titles strip. */
+function reasonFor(c: Claim, claims: Claim[]): string | undefined {
+  const text = c.title?.text;
+  if (!text) return undefined;
+  const reasons = claims.filter(
+    (r) => r.id !== c.id && r.title?.text === text && !r.unresolved && (r.strength > 0 || r.aspect),
+  );
+  const best = reasons.sort((a, b) => b.strength - a.strength)[0];
+  if (!best) return undefined;
+  if (best.aspect) return `the ${aspectLabel(best.aspect)}`;
+  if (best.attribute) return attributeLabel(best.attribute).toLowerCase();
+  return undefined;
+}
+
+function itemFor(c: Claim, claims: Claim[]): ReviewItem {
   return {
     claimId: c.id,
-    statement: statementFor(c),
+    statement: statementFor(c, claims),
     quote: c.quote,
-    kind: kindFor(c),
+    decisionKind: decisionKindFor(c),
     durability: c.durability,
     confidence: c.confidence,
     needsConfirmation: c.title?.needsConfirmation === true && !c.reviewed,
     hardExclusion: c.hardExclusion === true,
+    ...(c.title ? { title: { titleId: c.title.titleId, text: c.title.text } } : {}),
+    ...(c.reaction ? { reaction: c.reaction } : {}),
+    ...(reasonFor(c, claims) ? { reason: reasonFor(c, claims)! } : {}),
   };
 }
 
-/** Which review section a claim belongs to. Exactly one, so editing is unambiguous. */
 export function sectionOf(c: Claim): ReviewSectionName {
-  if (c.unactionable) return 'Noted, but not used';
+  if (c.unresolved) return 'Still checking';
   if (c.attribute === null) return 'Titles discussed';
   if (c.hardExclusion) return 'Never recommend';
   if (c.durability === 'temporary') return 'Just for now';
-  if (c.scope === 'conditional' || c.condition) return 'Conditional tastes';
-  if (c.polarity === -1 && c.strength >= 0.7) return 'Strong avoidances';
-  const section = attributeDef(c.attribute)?.section ?? 'story';
-  return SECTION_OF[section];
+  if (c.scope === 'conditional' || c.condition) return 'It depends';
+  if (c.polarity === -1) return 'Avoidances';
+  void LOVE_SECTIONS;
+  return 'Core loves';
 }
 
 export interface ReviewSection {
@@ -458,18 +562,20 @@ export interface ReviewSection {
   items: ReviewItem[];
 }
 
-/** Everything we concluded, grouped, with unconfirmed guesses first. */
 export function reviewSections(session: VoiceSession): ReviewSection[] {
   const grouped = new Map<ReviewSectionName, ReviewItem[]>();
   for (const c of session.claims) {
+    // Aspect reasons ride along with their title rather than getting their own
+    // row — "The Notebook — the story was weak" belongs to The Notebook.
+    if (c.aspect && !c.unresolved && c.title) continue;
     const name = sectionOf(c);
     const list = grouped.get(name) ?? [];
-    list.push(itemFor(c));
+    list.push(itemFor(c, session.claims));
     grouped.set(name, list);
   }
   return REVIEW_SECTIONS.flatMap((name) => {
     const items = grouped.get(name);
-    if (!items || items.length === 0) return [];
+    if (!items?.length) return [];
     items.sort((a, b) => {
       if (a.needsConfirmation !== b.needsConfirmation) return a.needsConfirmation ? -1 : 1;
       return b.confidence - a.confidence;
@@ -478,52 +584,65 @@ export function reviewSections(session: VoiceSession): ReviewSection[] {
   });
 }
 
-/** Flat view, unconfirmed guesses first. */
 export function reviewItems(session: VoiceSession): ReviewItem[] {
-  return reviewSections(session)
-    .flatMap((s) => s.items)
-    .sort((a, b) => {
-      if (a.needsConfirmation !== b.needsConfirmation) return a.needsConfirmation ? -1 : 1;
-      return b.confidence - a.confidence;
-    });
+  return reviewSections(session).flatMap((s) => s.items);
 }
 
-/** Axes we still know nothing about, named plainly for the review. */
-export function stillUnclear(session: VoiceSession, ctx: SessionContext): string[] {
+/** Titles we guessed at and still need confirmed — always rendered, never just counted. */
+export function unconfirmedTitles(session: VoiceSession): ReviewItem[] {
+  const unresolved = new Set(session.claims.filter((c) => c.unresolved).map((c) => c.id));
+  // A fragment we never got a direction for is dropped rather than saved, so it
+  // has no business blocking the save.
+  return reviewItems(session).filter((i) => i.needsConfirmation && !unresolved.has(i.claimId));
+}
+
+/** Short chip labels for what we still do not know. */
+export function stillUnclear(session: VoiceSession, ctx: SessionContext, limit = 3): string[] {
   const profile = profileOf(session, ctx);
-  const wanted = ['slow_pace', 'dark_tone', 'comedy', 'violence', 'subtitles', 'complex_plot', 'romance_genre', 'unfinished'];
+  const wanted = ['violence', 'subtitles', 'complex_plot', 'slow_pace', 'romance_genre', 'unfinished'];
   return wanted
     .filter((k) => (profile.attributes[k]?.evidence ?? 0) <= 0 && (ctx.priorEvidence?.[k] ?? 0) <= 0)
+    .slice(0, limit)
     .map((k) => attributeLabel(k));
 }
 
 /**
- * Can the review be applied? Only once every guessed title has been decided —
- * the one place where we refuse to proceed on an assumption.
+ * Save is blocked only by things that would make the DNA wrong: a title we
+ * guessed at, or a contradiction nobody settled. Not knowing how someone feels
+ * about subtitles is fine — we simply will not assume.
  */
 export function canApply(
   session: VoiceSession,
   decisions: Record<string, ReviewDecision>,
-): { ok: boolean; blockedBy: string[] } {
-  const blockedBy = reviewItems(session)
-    .filter((i) => i.needsConfirmation && !decisions[i.claimId])
-    .map((i) => i.claimId);
-  return { ok: blockedBy.length === 0, blockedBy };
+  ctx: SessionContext,
+): { ok: boolean; blockedBy: ReviewItem[]; conflicts: number } {
+  const blockedBy = unconfirmedTitles(session).filter((i) => !decisions[i.claimId]);
+  const conflicts = profileOf(session, ctx).conflicts.length;
+  return { ok: blockedBy.length === 0 && conflicts === 0, blockedBy, conflicts };
 }
 
-/** Apply the user's review decisions to the claims. */
 export function applyDecisions(claims: Claim[], decisions: Record<string, ReviewDecision>): Claim[] {
+  const removedTitles = new Set(
+    claims.filter((c) => decisions[c.id] === 'remove' && c.title?.text).map((c) => c.title!.text),
+  );
   const out: Claim[] = [];
   for (const c of claims) {
-    const d = decisions[c.id] ?? 'keep';
-    if (d === 'drop') continue;
+    const d = decisions[c.id] ?? 'confirm';
+    if (d === 'remove') continue;
+    // Dropping a title drops what we concluded from it.
+    if (c.title?.text && removedTitles.has(c.title.text) && !decisions[c.id]) continue;
+    if (c.unresolved) continue; // never saved unanswered
     if (d === 'mood') { out.push({ ...c, durability: 'temporary', reviewed: true }); continue; }
+    if (d === 'depends') {
+      out.push({ ...c, scope: 'conditional', strength: Math.min(c.strength, 0.6), reviewed: true });
+      continue;
+    }
+    if (d === 'soften') { out.push({ ...c, strength: c.strength * 0.7, reviewed: true }); continue; }
     if (d === 'flip') {
       out.push({ ...c, polarity: (c.polarity === 1 ? -1 : 1) as -1 | 1, reviewed: true, confidence: 0.95 });
       continue;
     }
     if (d === 'hard') {
-      // Promoting to never-recommend is only ever the user's own doing.
       out.push({ ...c, hardExclusion: true, polarity: -1, strength: 1, durability: 'durable', reviewed: true });
       continue;
     }
@@ -540,25 +659,30 @@ export function applyReview(
   session: VoiceSession,
   decisions: Record<string, ReviewDecision>,
   now: number,
+  ctx: SessionContext,
 ): VoiceSession {
   if (session.stage === 'applied') return session;
-  if (!canApply(session, decisions).ok) return session;
+  if (!canApply(session, decisions, ctx).ok) return session;
   return { ...session, stage: 'applied', appliedAt: now, claims: applyDecisions(session.claims, decisions) };
 }
 
-/** Undo an application: back to review, nothing kept. */
 export function undoApply(session: VoiceSession): VoiceSession {
   if (session.stage !== 'applied') return session;
   const { appliedAt: _appliedAt, ...rest } = session;
   return { ...rest, stage: 'review' };
 }
 
-/** The Instant DNA reveal for this session. */
 export function sessionReveal(session: VoiceSession, ctx: SessionContext) {
   return reveal(profileOf(session, ctx), session.claims);
 }
 
-/** Everything about this session, gone. Deletion means deletion. */
 export function forgetSession(session: VoiceSession): VoiceSession {
-  return { ...session, answers: [], claims: [], asked: [], stage: 'interview' };
+  return { ...session, answers: [], claims: [], asked: [], stage: 'interview', extraDepth: 0 };
 }
+
+/** The titles the interview discussed, for the review strip. */
+export function discussedTitles(session: VoiceSession): ReviewItem[] {
+  return reviewSections(session).find((s) => s.name === 'Titles discussed')?.items ?? [];
+}
+
+export type { PickedTitle };

@@ -25,6 +25,7 @@
  */
 import type { Claim, Condition, ConditionMode, Durability, Reaction, TitleRef } from './types';
 import { findAttributes } from './lexicon';
+import { findAspect } from './reasons';
 
 /** How clauses relate to the one before them. */
 type Connective = 'contrast' | 'suspend' | 'require' | 'additive' | 'none';
@@ -65,7 +66,38 @@ interface Sentiment {
   reaction?: Reaction;
 }
 
+/**
+ * Evaluative adjectives. People rarely say "I disliked The Notebook" — they say
+ * "the story was weak in The Notebook", and a parser that only knows verbs
+ * hears nothing at all. These carry the verdict.
+ */
 const SENTIMENTS: Array<[string, Sentiment]> = [
+  // Negative verdicts
+  ['was weak', { polarity: -1, strength: 0.7 }],
+  ['were weak', { polarity: -1, strength: 0.7 }],
+  ['was terrible', { polarity: -1, strength: 0.9 }],
+  ['was awful', { polarity: -1, strength: 0.9 }],
+  ['was boring', { polarity: -1, strength: 0.8 }],
+  ['was dull', { polarity: -1, strength: 0.75 }],
+  ['was predictable', { polarity: -1, strength: 0.7 }],
+  ['was confusing', { polarity: -1, strength: 0.7 }],
+  ['was disappointing', { polarity: -1, strength: 0.75 }],
+  ['were terrible', { polarity: -1, strength: 0.9 }],
+  ['were awful', { polarity: -1, strength: 0.9 }],
+  ['were weak', { polarity: -1, strength: 0.7 }],
+  ['is overrated', { polarity: -1, strength: 0.75 }],
+  ['was overrated', { polarity: -1, strength: 0.75 }],
+  // Positive verdicts
+  ['was great', { polarity: 1, strength: 0.8 }],
+  ['were great', { polarity: 1, strength: 0.8 }],
+  ['was brilliant', { polarity: 1, strength: 0.9 }],
+  ['was amazing', { polarity: 1, strength: 0.9 }],
+  ['was excellent', { polarity: 1, strength: 0.9 }],
+  ['was fantastic', { polarity: 1, strength: 0.9 }],
+  ['was gripping', { polarity: 1, strength: 0.85 }],
+  ['were brilliant', { polarity: 1, strength: 0.9 }],
+  ['were amazing', { polarity: 1, strength: 0.9 }],
+  ['is underrated', { polarity: 1, strength: 0.75 }],
   // Strong negative
   ["can't stand", { polarity: -1, strength: 0.95 }],
   ['cannot stand', { polarity: -1, strength: 0.95 }],
@@ -458,6 +490,7 @@ export function parseAnswer(text: string, ctx: ParseContext): Claim[] {
       const mods = readModifiers(lower);
       const found = findSentiment(lower);
       const attrs = findAttributes(clause.text);
+      const aspect = findAspect(clause.text);
       const title = findTitle(clause.text, known);
 
       let polarity: -1 | 1;
@@ -482,7 +515,7 @@ export function parseAnswer(text: string, ctx: ParseContext): Claim[] {
         continue; // nothing stated — say nothing
       }
 
-      if (attrs.length === 0 && !title) continue;
+      if (attrs.length === 0 && !title && !aspect) continue;
 
       strength = clamp(strength * mods.strengthFactor, 0.05, 1);
       confidence = clamp(confidence * mods.confidenceFactor, 0.1, 0.95);
@@ -517,6 +550,28 @@ export function parseAnswer(text: string, ctx: ParseContext): Claim[] {
         claims.push(claim);
       }
 
+      // "The story was weak" — a verdict on one part of one title. It explains
+      // the reaction; it is never promoted to a standing preference.
+      if (aspect) {
+        const id = nextId();
+        madeIds.push(id);
+        const claim: Claim = {
+          id,
+          attribute: null,
+          aspect,
+          polarity,
+          strength,
+          confidence,
+          durability: 'durable',
+          scope: 'general',
+          source: ctx.source,
+          quote: clause.text,
+          at: ctx.at,
+        };
+        if (title) claim.title = title;
+        claims.push(claim);
+      }
+
       if (title) {
         const id = nextId();
         madeIds.push(id);
@@ -545,4 +600,42 @@ export function parseAnswer(text: string, ctx: ParseContext): Claim[] {
   }
 
   return claims;
+}
+
+
+/** A fragment we heard but could not read a direction from. */
+export interface Unresolved {
+  /** Verbatim span. */
+  quote: string;
+  /** The part of the title they were talking about, if we could tell. */
+  aspect?: string;
+  title?: TitleRef;
+}
+
+/**
+ * Fragments that mention a title or a part of one, with no indication of which
+ * way the user meant it — "the performances — F1".
+ *
+ * These are deliberately NOT claims. Guessing a direction here is how a
+ * recommender ends up confidently wrong, so the interview asks instead.
+ * Attribute-only fragments are ignored: "horror movies exist" is not something
+ * worth interrupting a conversation over.
+ */
+export function findUnresolved(text: string, ctx: ParseContext): Unresolved[] {
+  const known = ctx.knownTitles ?? [];
+  const out: Unresolved[] = [];
+  for (const sentence of splitSentences(text)) {
+    for (const clause of splitClauses(sentence)) {
+      if (findSentiment(normalize(clause.text))) continue;
+      const aspect = findAspect(clause.text);
+      const title = findTitle(clause.text, known);
+      if (!aspect && !title) continue;
+      out.push({
+        quote: clause.text,
+        ...(aspect ? { aspect } : {}),
+        ...(title ? { title } : {}),
+      });
+    }
+  }
+  return out;
 }

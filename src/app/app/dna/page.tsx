@@ -48,11 +48,11 @@ export default async function WatchDnaPage() {
         <div className="mt-2 grid gap-3 sm:grid-cols-3">
           <Link href="/voice-dna" className="card p-4 transition hover:bg-white/10" data-testid="link-voice-dna">
             <div className="flex items-center gap-2 text-base font-bold text-white">
-              <span aria-hidden>🎙️</span> Take the Taste Interview
+              <span aria-hidden>🎙️</span> Give your testimony
             </div>
             <p className="mt-1 text-sm text-slate-400">
-              Answer a few smart questions about what you love, what you avoid, and why. It asks
-              about specific titles and digs into each one.
+              Ten questions about what you love, what you avoid, and why. It asks about specific
+              titles, digs into each one, and tests what it heard before saving anything.
             </p>
           </Link>
           <Link href="/app/quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-title-quiz">
