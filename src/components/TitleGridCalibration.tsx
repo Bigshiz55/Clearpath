@@ -21,7 +21,7 @@
  * understand. Everything sent from this grid is a positive the user chose, or a
  * rating they gave a title they have seen.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { recordQuizAnswer } from '@/lib/actions/dnaQuiz';
 
 const GRID_SIZE = 12;
@@ -65,6 +65,11 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState<number | null>(null);
   const [round, setRound] = useState(0);
+  const [exhausted, setExhausted] = useState(false);
+  // Every key this session has already put on screen. Sent to the server so a
+  // fresh round genuinely deals fresh cards: the plan is deterministic, so
+  // without it "show me 12 more" re-deals the same twelve — which it did.
+  const seen = useRef<Set<string>>(new Set());
 
   const keyOf = (i: Item) => `${i.mediaType}:${i.id}`;
 
@@ -75,26 +80,35 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
     setOpenRating(null);
     setSavedCount(null);
     try {
-      const url = sessionId
-        ? `/api/calibration?session=${encodeURIComponent(sessionId)}`
-        : '/api/calibration';
-      const res = await fetch(url, { cache: 'no-store' });
+      const qs = new URLSearchParams({ size: String(GRID_SIZE) });
+      // Walk TMDB deeper each round so the pool itself refreshes rather than
+      // being re-planned from the same forty titles. Wraps rather than running
+      // off the end of what TMDB will serve.
+      qs.set('page', String((round % 5) + 1));
+      if (sessionId) qs.set('session', sessionId);
+      const already = Array.from(seen.current).slice(-200);
+      if (already.length > 0) qs.set('exclude', already.join(','));
+
+      const res = await fetch(`/api/calibration?${qs.toString()}`, { cache: 'no-store' });
       const data = (await res.json()) as { items?: Item[]; error?: string };
       if (!res.ok) {
         setError(data.error ?? 'Could not load titles right now.');
         setItems([]);
         return;
       }
-      setItems((data.items ?? []).slice(0, GRID_SIZE));
+      const next = (data.items ?? []).slice(0, GRID_SIZE);
+      for (const i of next) seen.current.add(`${i.mediaType}:${i.id}`);
+      setExhausted(next.length === 0 && seen.current.size > 0);
+      setItems(next);
     } catch {
       setError('Could not load titles right now.');
       setItems([]);
     }
-  }, [sessionId]);
+  }, [sessionId, round]);
 
   useEffect(() => {
     void load();
-  }, [load, round]);
+  }, [load]);
 
   const chosen = Object.keys(picks).length;
 
@@ -203,7 +217,9 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
 
       {items.length === 0 && !error ? (
         <p className="mt-4 text-sm text-slate-400" data-testid="title-grid-empty">
-          Nothing left to show you — you have been through the calibration set.
+          {exhausted
+            ? 'That is everything I can find that you have not already seen here. Come back later and there will be more.'
+            : 'Nothing to show right now.'}
         </p>
       ) : (
         <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">

@@ -31,12 +31,16 @@ function items(n: number) {
   }));
 }
 
+/** A server that honours `exclude`, like the real one now does. */
 async function open(page: Page, w = 1280, h = 800, n = 20) {
   await page.route('**/api/calibration*', async (route) => {
+    const url = new URL(route.request().url());
+    const excluded = new Set((url.searchParams.get('exclude') ?? '').split(',').filter(Boolean));
+    const pool = items(n).filter((i) => !excluded.has(`${i.mediaType}:${i.id}`));
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: items(n), answered: 0, size: 20, complete: false }),
+      body: JSON.stringify({ items: pool, answered: 0, size: 20, complete: false }),
     });
   });
   await page.setViewportSize({ width: w, height: h });
@@ -136,4 +140,51 @@ test('an API failure says so instead of showing an empty grid', async ({ page })
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/dev/title-grid', { waitUntil: 'networkidle' });
   await expect(page.getByTestId('title-grid-error')).toBeVisible();
+});
+
+test('THE BUG: "12 more" deals twelve DIFFERENT titles', async ({ page }) => {
+  await open(page, 1280, 800, 40);
+  const first = await page.locator('[data-testid^="grid-tile-"]').evaluateAll((els) =>
+    els.map((e) => e.getAttribute('data-testid')),
+  );
+  expect(first).toHaveLength(12);
+
+  await page.getByTestId('title-grid-shuffle').click();
+  await expect(page.getByTestId('title-grid')).toBeVisible();
+  await expect(page.locator('[data-testid^="grid-tile-"]')).toHaveCount(12);
+  const second = await page.locator('[data-testid^="grid-tile-"]').evaluateAll((els) =>
+    els.map((e) => e.getAttribute('data-testid')),
+  );
+
+  // Not one card may repeat. The plan is deterministic, so before the exclude
+  // list existed this returned the identical twelve.
+  expect(second.filter((k) => first.includes(k))).toHaveLength(0);
+});
+
+test('every round tells the server what it has already shown', async ({ page }) => {
+  const urls: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/api/calibration')) urls.push(r.url());
+  });
+
+  await open(page, 1280, 800, 40);
+  await page.getByTestId('title-grid-shuffle').click();
+  await expect(page.locator('[data-testid^="grid-tile-"]')).toHaveCount(12);
+
+  expect(urls.length).toBeGreaterThanOrEqual(2);
+  const first = new URL(urls[0]!);
+  const second = new URL(urls[urls.length - 1]!);
+  expect(first.searchParams.get('size')).toBe('12');
+  // The first round has nothing to exclude; the second must exclude twelve.
+  expect((first.searchParams.get('exclude') ?? '').split(',').filter(Boolean)).toHaveLength(0);
+  expect((second.searchParams.get('exclude') ?? '').split(',').filter(Boolean)).toHaveLength(12);
+  // And it walks TMDB deeper so the pool itself refreshes.
+  expect(second.searchParams.get('page')).not.toBe(first.searchParams.get('page'));
+});
+
+test('says so honestly when there is genuinely nothing left', async ({ page }) => {
+  await open(page, 1280, 800, 12);
+  await expect(page.locator('[data-testid^="grid-tile-"]')).toHaveCount(12);
+  await page.getByTestId('title-grid-shuffle').click();
+  await expect(page.getByTestId('title-grid-empty')).toContainText('everything I can find');
 });
