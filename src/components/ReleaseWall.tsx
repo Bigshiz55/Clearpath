@@ -182,25 +182,6 @@ export function ReleaseWall({
             const soon = win === 'upcoming' && d != null && d <= 14;
             return (
               <div key={`${t.mediaType}-${t.id}`} className="card group h-full overflow-hidden text-left transition hover:border-white/20 hover:shadow-glow">
-                {/* Top bar — Movie/TV · ＋ · O. Score lives in the pink box below. */}
-                <div className="flex items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
-                  <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
-                    {t.mediaType === 'movie' ? 'Movie' : 'TV'}
-                  </span>
-                  <div className="flex flex-1 items-center gap-1.5">
-                    <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
-                    <TasteFeedback
-                      compact
-                      wide
-                      tmdbId={t.id}
-                      mediaType={t.mediaType}
-                      title={t.title}
-                      year={t.year}
-                      posterPath={t.posterPath}
-                      onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
-                    />
-                  </div>
-                </div>
                 <button
                   onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
                   className="relative block aspect-[2/3] w-full overflow-hidden"
@@ -232,7 +213,27 @@ export function ReleaseWall({
                       </div>
                     )}
                   </button>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    <span className="rounded bg-white/10 px-1.5 py-0.5">{t.mediaType === 'movie' ? 'Movie' : 'TV'}</span>
+                    {label && <span data-testid="release-date">{label}</span>}
+                  </div>
                   <AlgorithmScore mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-2" />
+                  {/* Actions sit with the information they act on, rather than in
+                      a toolbar above the artwork. Save is the ordinary watchlist
+                      save; "Not for me" teaches DNA and says so. */}
+                  <div className="mt-2 flex items-center gap-1.5" data-testid="release-actions">
+                    <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
+                    <TasteFeedback
+                      compact
+                      wide
+                      tmdbId={t.id}
+                      mediaType={t.mediaType}
+                      title={t.title}
+                      year={t.year}
+                      posterPath={t.posterPath}
+                      onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
+                    />
+                  </div>
                 </div>
               </div>
             );

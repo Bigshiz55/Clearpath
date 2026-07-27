@@ -1,44 +1,18 @@
-import type { Metadata } from 'next';
-import Link from 'next/link';
-import { audioAvailability } from '@/lib/voicedna/audio';
-import { createClient } from '@/lib/supabase/server';
-import { VoiceDnaClient } from '@/components/voicedna/VoiceDnaClient';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = {
-  title: 'Witness Testimony · WatchVerd1ct',
-  description: 'Ten questions about what you actually like, contradictions included.',
-  robots: { index: false, follow: false },
-};
-
+/**
+ * RETIRED — the Taste Interview.
+ *
+ * The interview is no longer part of the product. The route stays only so the
+ * old URL does not 404 for anyone who bookmarked it: it redirects to the Viewer
+ * DNA hub, carrying a marker so that page can explain where they landed. The
+ * notice is shown only to people who actually arrived this way.
+ *
+ * The taste-modelling code the interview was built on survives in
+ * `src/lib/taste/` — it now serves imports and ordinary product feedback.
+ */
 export const dynamic = 'force-dynamic';
 
-export default async function VoiceDnaPage() {
-  // `audioAvailability` only reports whether a credential is PRESENT. No secret
-  // value crosses this boundary — the returned object is booleans and labels.
-  const audio = audioAvailability(process.env);
-
-  let canPersist = false;
-  try {
-    const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    canPersist = Boolean(data.user);
-  } catch {
-    canPersist = false;
-  }
-
-  // This route is deliberately OUTSIDE /app: the interview works signed-out,
-  // and /app is gated. So it carries its own way back rather than inheriting
-  // the app header — without this the page is a dead end.
-  return (
-    <div className="container-page pb-6 pt-[calc(env(safe-area-inset-top)+2rem)]">
-      <Link
-        href="/app"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 transition hover:text-white"
-        data-testid="back-to-app"
-      >
-        <span aria-hidden>←</span> Back to WatchVerd1ct
-      </Link>
-      <VoiceDnaClient audio={audio} canPersist={canPersist} />
-    </div>
-  );
+export default function RetiredInterviewRoute() {
+  redirect('/app/dna?from=interview');
 }

@@ -72,6 +72,24 @@ function ratingTone(r: number): string {
 
 const NOISE_TYPES = new Set(['News', 'Talk Show', 'Variety']);
 
+/** The ratings we hold, labelled by source. Renders nothing when we hold none. */
+function ratingRow(a: Airing) {
+  if (a.rating == null && a.criticRt == null && a.criticImdb == null) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold tabular-nums" data-testid="airing-ratings">
+      {a.rating != null && (
+        <span className={ratingTone(a.rating)} title="TVmaze community score">★ {a.rating.toFixed(1)}</span>
+      )}
+      {a.criticRt != null && (
+        <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {a.criticRt}%</span>
+      )}
+      {a.criticImdb != null && (
+        <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>
+      )}
+    </div>
+  );
+}
+
 export function OnTvGuide({
   airings,
   dateLabel,
@@ -295,62 +313,81 @@ export function OnTvGuide({
           {filtered.map((a) => {
             const t = fmtTime(a.time);
             return (
-              <div key={a.id} className="card flex items-center gap-3 p-3.5">
-                <div className="w-[5rem] flex-none text-center sm:w-28">
+              <div key={a.id} className="card wv-tv-row p-3" data-testid="airing-row">
+                <div className="wv-tv-when text-center">
                   {(() => {
                     const dl = dayLabel(a.airstamp);
                     if (t && a.minutes > 0) {
                       return (
                         <>
-                          <div className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white sm:text-2xl">{t}</div>
-                          {dl !== 'Today' && <div className="mt-1 text-xs font-bold uppercase tracking-wide text-amber-300">{dl}</div>}
+                          <div className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white">{t}</div>
+                          {dl !== 'Today' && <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">{dl}</div>}
                         </>
                       );
                     }
-                    return <div className="rounded-md bg-emerald-500/20 px-1.5 py-1.5 text-base font-black uppercase tracking-wide text-emerald-200">{streaming ? dl : 'New'}</div>;
+                    return <div className="rounded-md bg-emerald-500/20 px-1 py-1 text-xs font-black uppercase tracking-wide text-emerald-200">{streaming ? dl : 'New'}</div>;
                   })()}
-                  <div className="mt-2 line-clamp-2 rounded-lg border border-brand-400/30 bg-brand-500/15 px-2 py-1.5 text-sm font-bold leading-tight text-brand-100 sm:text-base">{a.network}</div>
+                  <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-tight text-brand-200" data-testid="airing-channel">{a.network}</div>
                 </div>
-                <div className="h-20 w-14 flex-none overflow-hidden rounded-md border border-white/10 bg-ink-800">
-                  {posterSrcFor(a, 'w185') ? (
+
+                <div className="wv-tv-poster">
+                  {posterSrcFor(a, 'w342') ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={posterSrcFor(a, 'w185')!} alt="" loading="lazy" onError={posterFallback} className="h-full w-full object-cover" />
+                    <img src={posterSrcFor(a, 'w342')!} alt="" loading="lazy" onError={posterFallback} className="wv-tv-art" data-testid="airing-poster" />
                   ) : (
-                    <div className="grid h-full w-full place-items-center text-[9px] text-slate-500">TV</div>
+                    <div className="wv-tv-art grid place-items-center text-[10px] text-slate-500">TV</div>
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="line-clamp-2 text-lg font-bold leading-snug text-white sm:text-xl">{a.showName}</div>
+
+                <div className="wv-tv-info">
+                  <div className="line-clamp-2 text-base font-bold leading-snug text-white sm:text-lg">{a.showName}</div>
                   <div className="truncate text-xs text-slate-400">
                     {a.showType}
                     {a.episodeName ? ` · ${a.episodeName}` : ''}
                     {a.season && a.number ? ` (S${a.season}E${a.number})` : ''}
                     {a.genres.length ? ` · ${a.genres.slice(0, 2).join(', ')}` : ''}
                   </div>
-                  {(a.rating != null || a.criticRt != null || a.criticImdb != null) && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm font-bold tabular-nums">
-                      {a.rating != null && (
-                        <span className={ratingTone(a.rating)} title="TVmaze community score">★ {a.rating.toFixed(1)}</span>
-                      )}
-                      {a.criticRt != null && (
-                        <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {a.criticRt}%</span>
-                      )}
-                      {a.criticImdb != null && (
-                        <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>
-                      )}
-                    </div>
-                  )}
+                  {/* Ratings stay in the info column below `lg`, where the panel
+                      is hidden — they must never disappear with the zone. */}
+                  <div className="mt-1 lg:hidden">{ratingRow(a)}</div>
                 </div>
-                <div className="flex flex-none items-center gap-1.5">
+
+                {/* What we actually know. When we hold nothing it says so —
+                    an empty coloured block claiming a verdict is worse than
+                    an honest blank. */}
+                <div className="wv-tv-verdict" data-testid="airing-verdict">
+                  <div className="wv-tv-panel">
+                    {(a.rating != null || a.criticRt != null || a.criticImdb != null) ? (
+                      <>
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">What we know</div>
+                        <div className="mt-1">{ratingRow(a)}</div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-slate-500" data-testid="no-ratings">
+                        No ratings for this one yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="wv-tv-actions">
                   <button
                     onClick={() => toggleReminder(a)}
                     disabled={busy === a.id}
-                    className={`whitespace-nowrap rounded-lg border px-2.5 py-2 text-sm font-semibold transition disabled:opacity-50 sm:px-3 ${reminded.has(a.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10'}`}
-                    title="Get a phone/PC notification 1 hour and 5 minutes before it airs"
+                    className={`wv-tv-act ${reminded.has(a.id) ? 'wv-tv-act--on' : ''}`}
+                    title="Get a notification 1 hour and 5 minutes before it airs"
+                    data-testid="airing-remind"
                   >
-                    🔔<span className="ml-1 hidden sm:inline">{reminded.has(a.id) ? 'On' : 'Remind'}</span>
+                    🔔<span className="hidden sm:inline">{reminded.has(a.id) ? 'On' : 'Remind'}</span>
                   </button>
-                  <a href={calendarUrl(a)} target="_blank" rel="noopener noreferrer" className="hidden rounded-lg border border-white/12 bg-white/5 px-2 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 sm:inline-flex" title="Or add it to your calendar">
+                  <a
+                    href={calendarUrl(a)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="wv-tv-act"
+                    title="Add it to your calendar"
+                    data-testid="airing-calendar"
+                  >
                     📅
                   </a>
                 </div>

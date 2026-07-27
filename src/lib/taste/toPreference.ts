@@ -1,11 +1,11 @@
 /**
- * VOICE DNA → THE PREFERENCE ENGINE.
+ * THE TASTE MODEL → THE PREFERENCE ENGINE.
  *
- * The bridge is deliberately narrow. Voice DNA does not get its own scoring
+ * The bridge is deliberately narrow. This layer does not get its own scoring
  * path; it writes into the same append-only `preference_events` log every other
  * surface writes to, so there is exactly one model of the user.
  *
- * Two kinds of event come out of an interview:
+ * Two kinds of event come out of it:
  *
  *  1. AXIS CORRECTIONS — "I hate slow shows" is a deliberate statement about an
  *     axis, so it becomes a `corrections` event, which the engine already
@@ -30,8 +30,8 @@ export type EventDraft = Partial<PreferenceEvent> & {
 };
 
 /** The synthetic title the axis corrections hang off. Never a real title. */
-export const CORRECTIONS_TITLE_ID = 'voice:profile';
-export const SOURCE = 'voice_dna';
+export const CORRECTIONS_TITLE_ID = 'taste:profile';
+export const SOURCE = 'taste_model';
 
 function gradesFor(claim: Claim): {
   action: PrimaryAction;
@@ -84,7 +84,7 @@ export function toPreferenceEvents(
   const corrections = toDimensionCorrections(profile, opts.minEvidence ?? 0.5);
   if (corrections.length > 0) {
     out.push({
-      id: `voice:${opts.sessionId}:corrections`,
+      id: `taste:${opts.sessionId}:corrections`,
       titleId: CORRECTIONS_TITLE_ID,
       action: 'skip', // zero DNA on its own; the corrections are the payload
       corrections,
@@ -104,7 +104,7 @@ export function toPreferenceEvents(
 
     const { action, experienceGrade, attractionGrade } = gradesFor(c);
     const draft: EventDraft = {
-      id: `voice:${opts.sessionId}:${c.id}`,
+      id: `taste:${opts.sessionId}:${c.id}`,
       titleId: c.title.titleId,
       action,
       at: c.at,

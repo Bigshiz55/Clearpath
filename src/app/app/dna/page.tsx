@@ -10,6 +10,7 @@ import { TasteDials } from '@/components/TasteDials';
 import { DnaConfidencePanel } from '@/components/DnaConfidencePanel';
 import { RecommendationSlate } from '@/components/RecommendationSlate';
 import { loadDnaConfidence } from '@/lib/preference/dnaSignals';
+import { RetiredInterviewNotice } from '@/components/RetiredInterviewNotice';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Your Watch DNA' };
@@ -39,29 +40,20 @@ export default async function WatchDnaPage() {
         <p className="mt-1 text-sm text-slate-400">Your taste, learned from what you rate — the axes you lean on and how you watch.</p>
       </div>
 
-      {/* Build Your Watch DNA offers three ways in, and they are genuinely
-          different jobs: tell me, react to titles, or bring what you already
-          have. The interview leads because it is the only one that captures
-          WHY — the other two only ever see what, not why. */}
+      <RetiredInterviewNotice />
+
+      {/* Two ways in. Your DNA also keeps growing on its own from what you do
+          across the app — rating, saving, passing — so neither of these is a
+          gate you have to pass before WatchVerd1ct is useful. */}
       <section data-testid="dna-build">
         <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Build your Watch DNA</h2>
-        <div className="mt-2 grid gap-3 sm:grid-cols-3">
-          <Link href="/voice-dna" className="card p-4 transition hover:bg-white/10" data-testid="link-voice-dna">
-            <div className="flex items-center gap-2 text-base font-bold text-white">
-              <span aria-hidden>🎙️</span> Give your testimony
-            </div>
-            <p className="mt-1 text-sm text-slate-400">
-              Ten questions about what you love, what you avoid, and why. It asks about specific
-              titles, digs into each one, and tests what it heard before saving anything.
-            </p>
-          </Link>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
           <Link href="/app/quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-title-quiz">
             <div className="flex items-center gap-2 text-base font-bold text-white">
-              <span aria-hidden>🎬</span> Take the quick title quiz
+              <span aria-hidden>🎬</span> Quick title quiz
             </div>
             <p className="mt-1 text-sm text-slate-400">
-              React to titles using Looks Good, Skip and Seen It. Fastest way to cover a lot of
-              ground.
+              React to a selection of films and shows so Verd1ct can begin learning your taste.
             </p>
           </Link>
           <Link href="/import-taste" className="card p-4 transition hover:bg-white/10" data-testid="link-import-taste">
@@ -69,11 +61,15 @@ export default async function WatchDnaPage() {
               <span aria-hidden>📄</span> Import your history
             </div>
             <p className="mt-1 text-sm text-slate-400">
-              Bring in your Netflix history. You review every title first — watched is never read as
-              liked.
+              Bring in titles you have watched, rated, saved or abandoned. You review everything
+              first — watched is never read as liked.
             </p>
           </Link>
         </div>
+        <p className="mt-2 text-xs text-slate-500" data-testid="dna-grows">
+          Your DNA also keeps learning from what you do — ratings, saves, passes and the titles you
+          finish or give up on.
+        </p>
         {/* Kept visibly apart: a permanent profile and tonight's request are not
             the same function, and merging them is how both get worse. */}
         <p className="mt-3 text-xs text-slate-500" data-testid="tonight-separate">
@@ -149,10 +145,10 @@ export default async function WatchDnaPage() {
             <div className="mt-3 flex flex-wrap justify-center gap-2">
               <Link href="/app/quiz" className="btn-primary inline-flex">Play the Taste Quiz →</Link>
               <Link
-                href="/voice-dna"
+                href="/import-taste"
                 className="inline-flex items-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
               >
-                Or just tell me →
+                Or import your history →
               </Link>
             </div>
           </div>

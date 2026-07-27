@@ -1,7 +1,7 @@
 /**
- * VERD1CT VOICE DNA — the structured reason graph.
+ * THE STRUCTURED REASON GRAPH.
  *
- * A taste interview is not a survey. When someone says "I hate science fiction,
+ * Preference evidence is not a rating. When someone says "I hate science fiction,
  * but I loved Severance" they have told us four separate things: a durable
  * dislike, a named exception to it, a positive reaction to a title, and — by
  * using the word "but" — that they themselves consider these in tension. A
@@ -21,7 +21,7 @@
  * and reversible (drop a claim, rebuild the profile).
  *
  * This lives OUTSIDE `src/lib/scoring/`: the deterministic Watchability engine
- * is untouched. Voice DNA feeds the personalization layer only.
+ * is untouched. This feeds the personalization layer only.
  */
 
 /** How a user reacted to a specific title. */

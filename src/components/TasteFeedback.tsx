@@ -77,8 +77,8 @@ export function TasteFeedback({
         type="button"
         onClick={nope}
         disabled={done}
-        aria-label="Not for me"
-        title="Not for me"
+        aria-label="Not for me — teaches your Viewer DNA"
+        title="Not for me — this teaches your Viewer DNA, it does not just hide the card"
         className={
           compact
             ? `flex min-h-[44px] min-w-0 items-center justify-center gap-0.5 rounded-md border border-red-400/50 bg-red-500/15 text-red-200 transition hover:bg-red-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 disabled:opacity-60 ${wide ? 'w-full flex-1' : 'w-11'}`
@@ -92,7 +92,7 @@ export function TasteFeedback({
           <path d="m9 7 8 8" />
           <path d="m21 11-8-8" />
         </svg>
-        {compact ? wide && <span className="text-[10px] font-black uppercase tracking-wide">Pass</span> : ' Not for me'}
+        {compact ? wide && <span className="text-[10px] font-black uppercase tracking-wide">Not for me</span> : ' Not for me'}
       </button>
       {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind="down" onDone={() => { fadeCard(); setBurst(null); }} />}
     </>

@@ -261,6 +261,19 @@ export const COMEDY_OPTIONS: readonly ReasonChip[] = [
   { value: 'sometimes', label: 'Only when it is the point' },
 ];
 
+/** Answers to the standalone choice steps, mapped to what they mean. */
+export const PACE_OPTIONS: readonly ReasonChip[] = [
+  { value: 'settle', label: 'I settle in', attribute: 'slow_pace', polarity: 1, weight: 0.8 },
+  { value: 'impatient', label: 'I lose patience', attribute: 'slow_pace', polarity: -1, weight: 0.8 },
+  { value: 'depends_pace', label: 'Depends what it is doing with the time' },
+];
+
+export const COMMITMENT_OPTIONS: readonly ReasonChip[] = [
+  { value: 'long', label: 'The long one', attribute: 'many_seasons', polarity: 1, weight: 0.7 },
+  { value: 'limited', label: 'The limited series', attribute: 'limited_series', polarity: 1, weight: 0.8 },
+  { value: 'either_len', label: 'Either, if it is good' },
+];
+
 // ── Deal-breakers ──────────────────────────────────────────────────────────
 
 export const DEALBREAKER_CHIPS: readonly ReasonChip[] = [
