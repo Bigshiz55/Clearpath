@@ -23,12 +23,12 @@ async function open(page: Page, w = 390, h = 844) {
   await expect(page.getByTestId('qa-grid')).toBeVisible();
 }
 
-/** Top-left corner of every card in the grid, in document coordinates. */
-async function layout(page: Page): Promise<{ x: number; y: number }[]> {
+/** Top-left corner and height of every card, in document coordinates. */
+async function layout(page: Page): Promise<{ x: number; y: number; h: number }[]> {
   return page.getByTestId('qa-grid').locator('> div').evaluateAll((els) =>
     els.map((el) => {
       const r = el.getBoundingClientRect();
-      return { x: Math.round(r.x + window.scrollX), y: Math.round(r.y + window.scrollY) };
+      return { x: Math.round(r.x + window.scrollX), y: Math.round(r.y + window.scrollY), h: Math.round(r.height) };
     }),
   );
 }
@@ -139,4 +139,72 @@ test('saving does not remove the card either', async ({ page }) => {
 
   expect(await cards.count()).toBe(before);
   await expect(cards.first()).toBeVisible();
+});
+
+
+/**
+ * THE OTHER WAY TILES MOVE — and the one the earlier fix missed entirely.
+ *
+ * Ruling a card was made zero-reflow, and measured as such. Tiles still moved.
+ * They were not moving because of the tap: each card fetches its ratings and
+ * synopsis after paint, and BOTH rendered smaller while loading than after.
+ * The ratings skeleton was a 16px bar that became a 24px row; the synopsis
+ * rendered nothing at all and then added two lines. Every card in the grid grew
+ * ~54px a few hundred milliseconds in, so the row below dropped out from under
+ * your thumb while you were reaching for a button.
+ *
+ * Worse, the ratings row WRAPPED when the cell was narrow, so its height also
+ * depended on the card's width and on how many ratings the title happened to
+ * have — 24px here, 54px there, and changing on arrival.
+ *
+ * The earlier tests could not see any of this: they stub the endpoint to
+ * resolve instantly and wait for networkidle before measuring, so every card
+ * was already settled by the first measurement.
+ */
+const LATE = 'A former Prohibition-era gangster returns to the Lower East Side of Manhattan thirty years later.';
+
+async function openWithLateData(page: Page, w: number, h: number) {
+  await page.setViewportSize({ width: w, height: h });
+  let n = 0;
+  await page.route('**/api/ratings/**', async (r) => {
+    // Staggered, like a real grid: each card lands at a different moment.
+    await new Promise((res) => setTimeout(res, 400 + (n++ % 4) * 250));
+    await r.fulfill({
+      json: { ratings: { standardScore: 84, audience: 78, rtAudience: 81, tomatometer: 90, imdb: 7.8 }, overview: LATE },
+    });
+  });
+  await page.goto('/dev/visual-qa');
+  await expect(page.getByTestId('qa-grid')).toBeVisible();
+}
+
+for (const [w, h] of [[320, 800], [390, 900], [1024, 1200], [1366, 900]] as const) {
+  test(`no tile moves while the grid's data arrives @ ${w}`, async ({ page }) => {
+    await openWithLateData(page, w, h);
+    const atPaint = await layout(page);
+    await page.waitForTimeout(2500);
+    const settled = await layout(page);
+
+    expect(settled.length).toBe(atPaint.length);
+    for (let i = 0; i < atPaint.length; i++) {
+      expect(settled[i], `card ${i} moved once its data landed`).toEqual(atPaint[i]);
+    }
+  });
+}
+
+test('the ratings row is one line at every width, so its height cannot vary', async ({ page }) => {
+  const heights: number[] = [];
+  for (const [w, h] of [[320, 800], [390, 900], [1024, 1200]] as const) {
+    await openWithLateData(page, w, h);
+    await page.waitForTimeout(2000);
+    const card = page.getByTestId('qa-grid').locator('> div').first();
+    const row = card.locator('.wv-ratings-row').first();
+    const [cardBox, rowBox] = [await card.boundingBox(), await row.boundingBox()];
+    heights.push(Math.round(rowBox!.height));
+    // The wrap was the original fix for IMDb escaping the panel. A three-column
+    // grid has to keep that guarantee without buying it with a variable height.
+    expect(rowBox!.x + rowBox!.width, `ratings escape the card at ${w}px`).toBeLessThanOrEqual(cardBox!.x + cardBox!.width);
+  }
+  // One line everywhere: 320 and 390 must agree, and only the deliberate
+  // large-screen scale-up may differ.
+  expect(heights[0]).toBe(heights[1]);
 });

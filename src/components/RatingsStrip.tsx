@@ -37,7 +37,18 @@ export function RatingsStrip({
   className?: string;
 }) {
   if (loading) {
-    return <div className={`h-4 w-24 animate-pulse rounded bg-white/10 ${className}`} />;
+    // THE SKELETON IS THE SAME HEIGHT AS THE ROW IT BECOMES. It was a 16px bar
+    // that turned into a 24px row of chips, so every card in the grid grew the
+    // moment its ratings landed — and the cards below it moved. A placeholder
+    // that is not its content's size is not a placeholder, it is a second
+    // layout.
+    return (
+      <div className={`wv-ratings flex flex-col gap-1.5 ${className}`}>
+        <div className="wv-ratings-row flex items-center gap-2.5 text-sm">
+          <span className="h-4 w-24 animate-pulse rounded bg-white/10" />
+        </div>
+      </div>
+    );
   }
 
   // Our own Stream It / Skip It call, on every card. Derived from the blended
@@ -82,9 +93,16 @@ export function RatingsStrip({
 
       {/* Line 2 — all three source ratings on one line, sized up for legibility:
           no pills on 🍅/🍿 (just icon + value) so tomato, popcorn and IMDb fit. */}
-      {/* flex-wrap: on a card too narrow for all three chips, the row wraps —
-          IMDb must never escape the panel border (Safari min-content included). */}
-      <div className="wv-ratings-row flex min-w-0 flex-wrap items-center gap-2.5 text-sm font-black tabular-nums">
+      {/* THREE COLUMNS, ONE LINE, ALWAYS.
+          This wrapped when the card was too narrow for three chips, which made
+          the row's height depend on the card's width AND on how many ratings
+          the title happened to have — so it was 24px on one card and 54px on
+          the next, and it changed the moment the numbers arrived. Every card in
+          the grid grew and the row below it dropped.
+          A three-column grid is one line at every width. `min-w-0` on each cell
+          is what stops IMDb escaping the panel — the original reason for the
+          wrap — without letting the height vary. */}
+      <div className="wv-ratings-row grid min-w-0 grid-cols-3 items-center gap-1.5 text-sm font-black tabular-nums">
         <RatingChip
           label="🍅"
           value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
@@ -98,7 +116,7 @@ export function RatingsStrip({
           title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
         />
         <span
-          className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
+          className={`inline-flex min-w-0 items-center justify-self-start gap-1 overflow-hidden whitespace-nowrap rounded px-1.5 py-0.5 ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
           title="IMDb rating"
         >
           <span className="wv-ratings-tag text-[10px] font-black opacity-80">IMDb</span> {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
@@ -113,7 +131,7 @@ export function RatingsStrip({
 function RatingChip({ label, value, tone, title }: { label: string; value: string | null; tone: string; title: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap ${value != null ? tone : 'text-slate-500'}`}
+      className={`inline-flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap ${value != null ? tone : 'text-slate-500'}`}
       title={title}
     >
       <span aria-hidden className="wv-ratings-emoji text-base leading-none">{label}</span>

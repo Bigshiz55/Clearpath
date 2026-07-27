@@ -911,7 +911,10 @@ body {
    Scoped to `.wv-ratings` so it lifts the row wherever it appears — card,
    release wall, recommendation slate — from one definition.
 --------------------------------------------------------------------------- */
+/* The row claims its height before the numbers arrive — see RatingsStrip. */
+.wv-ratings-row { min-height: 1.5rem; }
 @media (min-width: 1024px) {
+  .wv-ratings-row { min-height: 1.75rem; }
   .wv-ratings { font-size: 1rem; gap: 0.5rem; }
   .wv-ratings .wv-ratings-row { font-size: 1.0625rem; gap: 0.875rem; }
   .wv-ratings .wv-ratings-tag { font-size: 0.75rem; }
