@@ -82,7 +82,7 @@ export default async function LandingPage() {
               <Link href="/app" className="btn-primary px-6 py-3 text-base" data-testid="cta-find">
                 Find something to watch
               </Link>
-              <Link href="/app/taste-quiz" className="btn-secondary px-6 py-3 text-base" data-testid="cta-dna">
+              <Link href="/app/taste-quiz" className="btn-pulse px-6 py-3 text-base" data-testid="cta-dna">
                 {DNA_CTA[stage]}
               </Link>
             </div>

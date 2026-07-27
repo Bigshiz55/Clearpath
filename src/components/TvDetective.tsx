@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
+import { RemindButton } from '@/components/RemindButton';
+import { WCheck } from '@/components/WCheck';
 import { CardDna } from '@/components/CardDna';
 import { SaveButton } from '@/components/SaveButton';
 import { CardVerdict } from '@/components/CardVerdict';
@@ -62,7 +63,6 @@ export function TvDetective() {
   const [picks, setPicks] = useState<Pick[]>([]);
   const [reminded, setReminded] = useState<Set<number>>(new Set());
   const [hidden, setHidden] = useState<Set<number>>(new Set());
-  const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   // Triage: drop a pick and let the next reserve item slide into view.
@@ -113,31 +113,6 @@ export function TvDetective() {
     </div>
   );
 
-  async function toggle(p: Pick) {
-    setBusy(p.id);
-    try {
-      if (reminded.has(p.id)) {
-        await removeTvReminder(p.id);
-        setReminded((s) => {
-          const n = new Set(s);
-          n.delete(p.id);
-          return n;
-        });
-      } else {
-        const r = await setTvReminder({ airingId: p.id, showName: p.showName, network: p.network, airstamp: p.airstamp, url: '/app/tv' });
-        if (!r.ok) {
-          setNotice(r.error ?? 'Could not set the reminder.');
-          return;
-        }
-        setReminded((s) => new Set(s).add(p.id));
-        setNotice(r.needsNotifications ? 'On the case! Turn on notifications in Settings so we can ping you before it airs.' : 'On the case — we’ll ping you 1 hour and 5 minutes before it starts. 🕵️');
-      }
-    } catch {
-      setNotice('Something went wrong. Please try again.');
-    } finally {
-      setBusy(null);
-    }
-  }
 
   return (
     <section className="overflow-hidden rounded-2xl border border-brand-400/30 bg-gradient-to-br from-brand-500/12 to-ink-850 p-5">
@@ -193,7 +168,14 @@ export function TvDetective() {
                   return (
                     <div key={p.id} className="wv-det-row rounded-2xl border border-white/10 bg-white/[0.04] p-4" data-testid="detective-row">
                       <div className="wv-det-art">
-                        <div className="aspect-[2/3] w-full overflow-hidden rounded-xl border border-white/10 bg-ink-800">
+                        {/* The W sits on the artwork here exactly as it does on
+                            every card — same gesture, same place, so putting a
+                            listing on the docket is the same action as putting
+                            a poster on it. */}
+                        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-white/10 bg-ink-800">
+                          {p.tmdbId && p.mediaType && (
+                            <WCheck tmdbId={p.tmdbId} mediaType={p.mediaType} title={p.showName} year={null} posterUrl={p.image ?? null} />
+                          )}
                           {p.image ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={p.image} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -234,14 +216,16 @@ export function TvDetective() {
                       </div>
 
                       <div className="wv-det-act">
-                        <button
-                          onClick={() => toggle(p)}
-                          disabled={busy === p.id}
-                          className={`flex w-full items-center justify-center gap-1.5 rounded-xl border py-3 text-sm font-bold transition disabled:opacity-50 ${reminded.has(p.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-brand-400/50 bg-brand-500/15 text-brand-100 hover:bg-brand-500/25'}`}
-                          title="Get a notification 1 hour and 5 minutes before it airs"
-                        >
-                          {reminded.has(p.id) ? '🔔 On' : '🔔 Remind'}
-                        </button>
+                        {/* Not a bell. See RemindButton — the arcs only move
+                            while the reminder is actually set. */}
+                        <RemindButton
+                          airingId={p.id}
+                          showName={p.showName}
+                          network={p.network}
+                          airstamp={p.airstamp}
+                          initialOn={reminded.has(p.id)}
+                          onError={(m) => setNotice(m)}
+                        />
                         {p.tmdbId && p.mediaType && (
                           <>
                             <SaveButton

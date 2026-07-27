@@ -29,8 +29,11 @@ describe('entry points', () => {
   it('the landing hero offers exactly two calls to action', () => {
     const page = read('src/app/page.tsx');
     const heroBlock = page.slice(page.indexOf('data-testid="hero-ctas"'), page.indexOf('data-testid="cta-import"'));
-    const buttons = heroBlock.match(/btn-primary|btn-secondary/g) ?? [];
+    const buttons = heroBlock.match(/btn-primary|btn-secondary|btn-pulse/g) ?? [];
     expect(buttons).toHaveLength(2);
+    // The DNA button is the pink, breathing one — it was a grey outline
+    // indistinguishable from every dismissable control on the page.
+    expect(heroBlock).toContain('btn-pulse');
     expect(page).toContain('data-testid="cta-find"');
     expect(page).toContain('data-testid="cta-dna"');
     expect(page).toContain(QUIZ_HREF);
@@ -42,6 +45,7 @@ describe('entry points', () => {
     const link = page.slice(page.lastIndexOf('<Link', at), page.indexOf('</Link>', at));
     expect(link).not.toContain('btn-primary');
     expect(link).not.toContain('btn-secondary');
+    expect(link).not.toContain('btn-pulse');
     expect(link).toContain('/import-taste');
   });
 

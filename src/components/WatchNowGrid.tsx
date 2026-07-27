@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { SaveButton } from './SaveButton';
 import { AlgorithmScore } from './AlgorithmScore';
 import { CardVerdict } from './CardVerdict';
+import { WCheck } from './WCheck';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import type { WatchNowItem } from '@/lib/watchNow';
 
@@ -37,9 +38,12 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
                   />
                 </div>
               </div>
+              {/* The W on the artwork, same as every other card. */}
+              <div className="relative aspect-[2/3] w-full overflow-hidden">
+              <WCheck tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterUrl={t.posterUrl} />
               <button
                 onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
-                className="relative block aspect-[2/3] w-full overflow-hidden"
+                className="block h-full w-full"
                 aria-label={`Quick look at ${t.title}`}
               >
                 {t.posterUrl ? (
@@ -56,6 +60,7 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
                   <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
                 </span>
               </button>
+              </div>
               <div className="p-3">
                 <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block w-full text-left">
                   <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>

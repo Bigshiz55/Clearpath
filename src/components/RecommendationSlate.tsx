@@ -107,10 +107,16 @@ export function RecommendationSlate({
               <div className="p-2">
                 <div className="line-clamp-1 text-xs font-bold text-white">{it.title}</div>
                 {it.matchReason && <div className="mt-0.5 line-clamp-1 text-[10px] text-slate-400" title={it.matchReason}>{it.matchReason}</div>}
+                {/* WORDS, NOT EMOJI. This row was 👍 📌 ✕ — three glyphs with
+                    no shared vocabulary: the thumb could mean "watched", the
+                    pin could mean "pinned to top", and a bare ✕ reads as
+                    "close" far more often than "not for me". They now say what
+                    they do, in the same three words every other card in the
+                    app uses, with the same colours. */}
                 <div className="mt-1.5 flex gap-1">
-                  <button type="button" onClick={() => react(it, 'rated_up')} className={`flex-1 rounded-md border px-1 py-1 text-[11px] font-bold ${r === 'up' ? 'border-emerald-400 bg-emerald-500/20 text-emerald-200' : 'border-white/15 text-slate-200'}`} data-testid="reco-up" aria-label="I'd watch this">👍</button>
-                  <button type="button" onClick={() => react(it, 'saved')} className={`flex-1 rounded-md border px-1 py-1 text-[11px] font-bold ${r === 'saved' ? 'border-amber-400 bg-amber-500/20 text-amber-200' : 'border-white/15 text-slate-200'}`} data-testid="reco-save" aria-label="Save">📌</button>
-                  <button type="button" onClick={() => react(it, 'dismissed')} className={`flex-1 rounded-md border px-1 py-1 text-[11px] font-bold ${r === 'down' ? 'border-rose-400 bg-rose-500/20 text-rose-200' : 'border-white/15 text-slate-200'}`} data-testid="reco-down" aria-label="Not for me">✕</button>
+                  <button type="button" onClick={() => react(it, 'rated_up')} className={`wv-act flex flex-1 items-center justify-center rounded-md border-2 px-1 ${r === 'up' ? 'border-emerald-300 bg-emerald-500/60 text-white' : 'border-emerald-400/70 bg-emerald-500/20 text-emerald-100'}`} data-testid="reco-up" aria-label="For it — more like this"><span className="wv-act-label font-black uppercase tracking-wide">For</span></button>
+                  <button type="button" onClick={() => react(it, 'saved')} className={`wv-act flex flex-1 items-center justify-center rounded-md border-2 px-1 ${r === 'saved' ? 'border-pink-200/70 bg-gradient-to-b from-[#ff62b6] to-[#ff1493] text-white' : 'border-[#ff1493]/70 bg-[#ff1493]/25 text-pink-50'}`} data-testid="reco-save" aria-label="Save to your list"><span className="wv-act-label font-black uppercase tracking-wide">{r === 'saved' ? 'Saved' : 'Save'}</span></button>
+                  <button type="button" onClick={() => react(it, 'dismissed')} className={`wv-act flex flex-1 items-center justify-center rounded-md border-2 px-1 ${r === 'down' ? 'border-red-300 bg-red-500/60 text-white' : 'border-red-400/70 bg-red-500/20 text-red-100'}`} data-testid="reco-down" aria-label="Not for me — teaches your Viewer DNA"><span className="wv-act-label font-black uppercase tracking-wide">Against</span></button>
                 </div>
               </div>
             </div>

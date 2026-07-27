@@ -60,7 +60,7 @@ export function DocketTray() {
               data-testid="docket-toggle"
               className="inline-flex min-h-[36px] min-w-0 items-center gap-1.5 rounded-lg px-0.5 text-sm font-bold text-white"
             >
-              <span data-testid="docket-count" className="grid h-7 w-7 flex-none place-items-center rounded-full bg-gradient-to-b from-[#ff62b6] to-[#ff1493] text-xs font-black text-white">
+              <span data-testid="docket-count" className="wv-tray-count grid h-7 w-7 flex-none place-items-center rounded-full bg-gradient-to-b from-[#ff62b6] to-[#ff1493] text-xs font-black text-white">
                 {status.count}
               </span>
               <span data-testid="docket-status" className="wv-tray-status truncate">{status.message}</span>

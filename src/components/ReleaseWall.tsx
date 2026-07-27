@@ -5,6 +5,7 @@ import { releasesEmptyState } from '@/lib/releasesDiagnostics';
 import { SaveButton } from './SaveButton';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { AlgorithmScore } from './AlgorithmScore';
+import { WCheck } from './WCheck';
 import { CardVerdict } from './CardVerdict';
 import type { MediaType } from '@/lib/types';
 
@@ -181,9 +182,13 @@ export function ReleaseWall({
             const soon = win === 'upcoming' && d != null && d <= 14;
             return (
               <div key={`${t.mediaType}-${t.id}`} className="card group wv-card text-left transition hover:border-white/20 hover:shadow-glow">
+                {/* The W lives on the artwork on every surface — a new release
+                    goes on the docket with the same gesture as anything else. */}
+                <div className="wv-card-art">
+                  <WCheck tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterUrl={t.posterUrl} />
                 <button
                   onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
-                  className="wv-card-art block"
+                  className="block h-full w-full"
                   aria-label={`Quick look at ${t.title}`}
                 >
                   {t.posterUrl ? (
@@ -201,6 +206,7 @@ export function ReleaseWall({
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
                   </span>
                 </button>
+                </div>
                 <div className="wv-card-body">
                   <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block text-left">
                     <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>

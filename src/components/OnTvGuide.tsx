@@ -25,6 +25,8 @@ import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
 import { SaveButton } from '@/components/SaveButton';
 import { CardVerdict } from '@/components/CardVerdict';
+import { SignalIcon } from '@/components/RemindButton';
+import { WCheck } from '@/components/WCheck';
 import { CardDna } from '@/components/CardDna';
 import type { Airing } from '@/lib/onTv';
 
@@ -255,19 +257,27 @@ export function OnTvGuide({
               const resolved = a.tmdbId != null && a.mediaType != null;
               return (
                 <div key={a.id} className="card flex flex-col overflow-hidden">
-                  {/* Action row on top of the placard — For · Pass · Save — the
-                      same groove as every other card in the app. */}
+                  {/* Action row on top of the placard — For · Against · Save —
+                      the same groove as every other card in the app. */}
                   {resolved && (
                     <div className="flex flex-wrap items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
                       <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
                       <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
                     </div>
                   )}
-                  {resolved ? (
-                    <Link href={`/app/title/${a.mediaType}/${a.tmdbId}`} className="block aspect-[2/3] overflow-hidden bg-ink-800">{poster}</Link>
-                  ) : (
-                    <div className="aspect-[2/3] overflow-hidden bg-ink-800">{poster}</div>
-                  )}
+                  {/* The W, on the artwork, exactly where it is on every other
+                      card — so putting an airing on the docket is the same
+                      gesture as putting a poster on it. */}
+                  <div className="relative aspect-[2/3] overflow-hidden bg-ink-800">
+                    {resolved && (
+                      <WCheck tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterUrl={a.image ?? null} />
+                    )}
+                    {resolved ? (
+                      <Link href={`/app/title/${a.mediaType}/${a.tmdbId}`} className="block h-full">{poster}</Link>
+                    ) : (
+                      poster
+                    )}
+                  </div>
                   <div className="flex flex-1 flex-col p-2">
                     <div className="line-clamp-2 text-xs font-semibold text-white">{a.showName}</div>
                     <div className="mt-1 flex items-center justify-between gap-1">
@@ -413,7 +423,10 @@ export function OnTvGuide({
                     title="Get a notification 1 hour and 5 minutes before it airs"
                     data-testid="airing-remind"
                   >
-                    🔔<span className="hidden sm:inline">{reminded.has(a.id) ? 'On' : 'Remind'}</span>
+                    {/* Not a bell — the same broadcast mark the Detective uses,
+                        and it only pulses once the reminder is actually set. */}
+                    <SignalIcon on={reminded.has(a.id)} className="h-4 w-4" />
+                    <span className="hidden sm:inline">{reminded.has(a.id) ? 'On' : 'Remind'}</span>
                   </button>
                   <a
                     href={calendarUrl(a)}
