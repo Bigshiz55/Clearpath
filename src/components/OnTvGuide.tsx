@@ -278,6 +278,22 @@ export function OnTvGuide({
               const resolved = a.tmdbId != null && a.mediaType != null;
               return (
                 <div key={a.id} className="card wv-tile flex flex-col overflow-hidden">
+                  {/* THE DECISION ROW LEADS THE CARD — same order as PosterCard:
+                      rule at the top, then drop to the W on the artwork. The
+                      unmatched note keeps the row's height so every card's
+                      artwork starts at the same offset. */}
+                  {resolved ? (
+                    <div className="wv-act-row border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
+                      <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                      <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                    </div>
+                  ) : (
+                    <div className="border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
+                      <div className="flex min-h-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 px-2 text-center text-[11px] font-semibold text-slate-500" data-testid="airing-unmatched">
+                        Not matched to a title yet
+                      </div>
+                    </div>
+                  )}
                   <div className="wv-card flex-1">
                     {/* The W, on the artwork, exactly where it is on every other
                         card — so putting an airing on the docket is the same
@@ -333,26 +349,8 @@ export function OnTvGuide({
                       {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
                     </div>
                   </div>
-                  {/* For · Against · Save, ACROSS THE WHOLE CARD. They used to
-                      sit in a lit strip above the placard, at half the width and
-                      on top of the one part of a card doing real work.
-
-                      When the listing has not been matched to a TMDB title there
-                      is nothing to act on, and the row says so rather than
-                      leaving a silent gap — the controls are missing for a
-                      reason, and the reason is worth a line. */}
-                  <div className="px-3 pb-3">
-                    {resolved ? (
-                      <div className="wv-act-row">
-                        <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
-                        <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-white/10 bg-white/5 py-3 text-center text-[11px] font-semibold text-slate-500" data-testid="airing-unmatched">
-                        Not matched to a title yet
-                      </div>
-                    )}
-                  </div>
+                  {/* For · Against · Save moved to the TOP of the card — see
+                      the block above `.wv-card`. */}
                 </div>
               );
             })}

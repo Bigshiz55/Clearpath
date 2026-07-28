@@ -129,6 +129,8 @@ test('the docket survives a reload — it is tonight’s question', async ({ pag
 test('clearing the docket puts everything back', async ({ page }) => {
   await open(page);
   await put(page, 101, 102, 103);
+  // Clear lives inside the expanded panel on the compact floating widget.
+  await page.getByTestId('docket-toggle').click();
   await page.getByTestId('docket-clear').click();
   await expect(page.getByTestId('docket-tray')).toHaveCount(0);
   await expect(page.getByTestId('w-check-101')).toHaveAttribute('aria-pressed', 'false');

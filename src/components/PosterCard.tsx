@@ -125,6 +125,17 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
        globals.css. The fill stays near-black so the poster is still the
        brightest thing on the card. */
     <div className="card wv-tile group flex flex-col bg-ink-950/85">
+      {/* THE DECISION ROW LEADS THE CARD. FOR · AGAINST · SAVE used to sit at
+          the very bottom, which on the new shorter tiles meant scrolling past
+          poster, facts, score and synopsis before you could act. On request
+          the row is now the FIRST thing on every card — rule at the top, then
+          drop down to the W on the artwork if it belongs on the docket. */}
+      {overlay !== null && saveId != null && (
+        <div className="wv-act-row border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
+          <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+          {resolvedOverlay}
+        </div>
+      )}
       <div className="wv-card">
       <div className="wv-card-art">
         {/* THE MATTE, FROM `sm` ONLY. A blurred, scaled-up copy of the SAME
@@ -226,23 +237,8 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             "Why this Verd1ct?" panel. */}
         {evidence && <div className="space-y-2">{evidence}</div>}
 
-        {/* The actions sit UNDER the artwork on a wide card and under the facts
-            on a row — never in a lit strip above the poster, which is the one
-            part of a placard doing real work. */}
-        {/* WRAPPING, so a ruled card can show its status + Undo on a line of
-            their own. Without it the row would squeeze four things onto one
-            line and the buttons would change width the moment you tapped —
-            which is the same "everything moved" complaint one level down. */}
-        {/* AIR ABOVE THE DECISION. The buttons sat 6px under the evidence, so
-            the last fact and the first control read as one block — and the row
-            you are about to tap is the one place on the card that should be
-            obviously separate from what it is about. */}
-        {overlay !== null && saveId != null && (
-          <div className="wv-act-row mt-3 sm:mt-3.5">
-            <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
-            {resolvedOverlay}
-          </div>
-        )}
+        {/* The FOR/AGAINST/SAVE row lives at the TOP of the card now — see the
+            block above `.wv-card`. The foot ends on the evidence. */}
       </div>
     </div>
   );

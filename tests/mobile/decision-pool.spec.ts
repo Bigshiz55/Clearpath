@@ -237,6 +237,9 @@ test('and the spacer exists only while the tray does', async ({ page }) => {
   await expect(page.getByTestId('docket-spacer')).toHaveCount(0);
   await select(page, 1);
   await expect(page.getByTestId('docket-spacer')).toHaveCount(1);
+  // Clear-everything lives inside the expanded panel — on a compact floating
+  // widget, a one-tap destroy-the-whole-docket button is an accident.
+  await page.getByTestId('docket-toggle').click();
   await page.getByTestId('docket-clear').click();
   await expect(page.getByTestId('docket-spacer')).toHaveCount(0);
 });

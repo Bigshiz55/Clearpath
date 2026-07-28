@@ -83,7 +83,7 @@ body {
      SAME height regardless of which title's key art is unusually tall, and
      puts the rest of the card back in view. */
   .wv-card-art {
-    @apply relative aspect-[2/3] w-[38%] max-w-[160px] flex-none self-start overflow-hidden rounded-lg sm:aspect-auto sm:h-[236px] sm:w-full sm:max-w-none sm:self-auto sm:rounded-none lg:h-[264px];
+    @apply relative aspect-[2/3] w-[38%] max-w-[160px] flex-none self-start overflow-hidden rounded-lg sm:aspect-auto sm:h-[196px] sm:w-full sm:max-w-none sm:self-auto sm:rounded-none lg:h-[216px];
   }
   .wv-card-body {
     @apply flex min-w-0 flex-1 flex-col sm:p-3;

@@ -19,7 +19,7 @@ const HARNESS = '/dev/finder';
 
 function finderItem(id: number, title: string, opts: { where?: string | null } = {}) {
   return {
-    id, mediaType: 'movie' as const, title, year: 2020 + id, posterPath: null, posterUrl: null,
+    id, mediaType: 'movie' as const, title, year: 2020 + id, posterPath: null, posterUrl: null as string | null,
     matchScore: 80 - id, generalScore: 75, primaryCall: 'MAYBE', reason: 'Fixture verdict.',
     where: opts.where ?? null, receipts: [], deciderUrl: `/app/title/movie/${id}`,
   };

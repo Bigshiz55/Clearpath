@@ -185,14 +185,19 @@ test.describe('the decision buttons', () => {
     }
   });
 
-  test('have real air above them', async ({ page }) => {
+  test('lead the card — rule first, then drop to the W on the artwork', async ({ page }) => {
+    // On request the FOR/AGAINST/SAVE row moved to the TOP of every card: on
+    // the shorter tiles it sat below poster, facts, score and synopsis, which
+    // meant scrolling past everything before you could act.
     await open(page);
-    const gap = await card(page).evaluate((el) => {
-      const row = el.querySelector('.wv-act-row') as HTMLElement;
-      const above = row.previousElementSibling as HTMLElement;
-      return Math.round(row.getBoundingClientRect().top - above.getBoundingClientRect().bottom);
+    const layout = await card(page).evaluate((el) => {
+      const row = el.querySelector('.wv-act-row')!.getBoundingClientRect();
+      const art = el.querySelector('.wv-card-art')!.getBoundingClientRect();
+      return { rowTop: Math.round(row.top), rowBottom: Math.round(row.bottom), artTop: Math.round(art.top) };
     });
-    expect(gap, 'the buttons still touch the evidence').toBeGreaterThanOrEqual(10);
+    expect(layout.rowTop, 'the decision row is above the artwork').toBeLessThan(layout.artTop);
+    // And the artwork does not crowd it — the border under the row needs air.
+    expect(layout.artTop - layout.rowBottom, 'the row touches the artwork').toBeGreaterThanOrEqual(6);
   });
 });
 
@@ -247,11 +252,10 @@ test('the reading order down the card is what a decision needs', async ({ page }
       actions: y('.wv-act-row'),
     };
   });
-  // At a glance: poster, title, what it costs you, how well it fits you.
-  // Then what it is about, then the decision itself. (The personalization
-  // status block is gone at the user's request — the honest "not personal
-  // yet" state lives in the badge's own label now.)
+  // The decision row LEADS the card (moved to the top on request — rule
+  // first, then drop to the W). Below it the glance order is unchanged:
+  // what it costs you, how well it fits you, then what it is about.
+  expect(order.actions).toBeLessThan(order.facts);
   expect(order.facts).toBeLessThan(order.score);
   expect(order.score).toBeLessThan(order.synopsis);
-  expect(order.synopsis).toBeLessThan(order.actions);
 });

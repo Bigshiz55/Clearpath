@@ -451,6 +451,12 @@ export function FinderUI({
                 </div>
               )}
               <div className="poster-grid">
+                {/* `it.reason` used to render inside each card as a sentence
+                    beside the poster ("A near-perfect match — …"). Removed on
+                    request: it restated what the badge and Why-this-Verd1ct
+                    already say, and was a third of every card's height. The
+                    reasons live on in the Why-this-Verd1ct panel, which is
+                    where a reader who wants them goes. */}
                 {items.map((it) => (
                   <PosterCard
                     key={`${it.mediaType}-${it.id}`}
@@ -536,9 +542,7 @@ export function FinderUI({
                         {it.explain && <WhyVerdict data={it.explain} />}
                       </>
                     }
-                  >
-                    {it.reason && <p className="mt-1.5 line-clamp-3 text-[13px] leading-snug text-slate-300">{it.reason}</p>}
-                  </PosterCard>
+                  />
                 ))}
               </div>
             </div>
