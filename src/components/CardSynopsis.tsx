@@ -50,9 +50,9 @@ export function CardSynopsis({
     };
   }, [mediaType, tmdbId]);
 
-  // 13px at leading-relaxed is ~21px a line. The reservation is the clamp
+  // 14px at leading-relaxed is ~22.75px a line. The reservation is the clamp
   // height exactly, so text arriving changes nothing about the layout.
-  const reserve = lines === 2 ? 'min-h-[2.65rem]' : 'min-h-[3.95rem]';
+  const reserve = lines === 2 ? 'min-h-[2.85rem]' : 'min-h-[4.3rem]';
 
   // No synopsis (or not yet): hold the space, render no words. There is
   // deliberately no `card-synopsis` testid here — an empty box is not a
@@ -82,16 +82,16 @@ export function CardSynopsis({
   // budget, and the rest is available on request rather than taking the card
   // over. The control appears only for the titles whose text actually runs
   // past the clamp; a "More" that expands onto nothing is worse than none, so
-  // the estimate is deliberately conservative (~54 characters a line at the
-  // card's own width, three lines).
+  // the estimate is deliberately conservative (~50 characters a line at the
+  // card's own width at 14px, three lines).
   const clamped = lines === 2 ? 2 : 3;
-  const hasMore = overview.length > clamped * 54;
+  const hasMore = overview.length > clamped * 50;
 
   return (
     <div className={className}>
       <p
         data-testid="card-synopsis"
-        className={`${open ? '' : `${reserve} ${clamped === 2 ? 'line-clamp-2' : 'line-clamp-3'}`} text-[13px] leading-relaxed text-slate-400`}
+        className={`${open ? '' : `${reserve} ${clamped === 2 ? 'line-clamp-2' : 'line-clamp-3'}`} text-[14px] leading-relaxed text-slate-300`}
       >
         {overview}
       </p>

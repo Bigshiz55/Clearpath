@@ -23,7 +23,7 @@ import type { MediaType } from '@/lib/types';
  * lands is the same "everything moved under my thumb" defect as text arriving
  * into no space — see `card-ruling.spec`.
  */
-const RESERVE = 'h-[34px] overflow-hidden';
+const RESERVE = 'h-[38px] overflow-hidden';
 
 export function CardFacts({
   mediaType,
@@ -52,12 +52,12 @@ export function CardFacts({
   return (
     <div className={`${RESERVE} ${className}`} data-testid="card-facts">
       {facts.primary.length > 0 && (
-        <div className="truncate text-[12px] font-semibold leading-[17px] text-slate-300" data-testid="card-facts-primary">
+        <div className="truncate text-[13px] font-semibold leading-[19px] text-slate-200" data-testid="card-facts-primary">
           {facts.primary.join(' · ')}
         </div>
       )}
       {facts.genres.length > 0 && (
-        <div className="truncate text-[12px] leading-[17px] text-slate-500" data-testid="card-facts-genres">
+        <div className="truncate text-[13px] leading-[19px] text-slate-400" data-testid="card-facts-genres">
           {facts.genres.join(' · ')}
         </div>
       )}

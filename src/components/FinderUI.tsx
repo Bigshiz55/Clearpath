@@ -521,7 +521,7 @@ export function FinderUI({
                       </>
                     }
                   >
-                    {it.reason && <p className="mt-1.5 line-clamp-3 text-xs text-slate-400">{it.reason}</p>}
+                    {it.reason && <p className="mt-1.5 line-clamp-3 text-[13px] leading-snug text-slate-300">{it.reason}</p>}
                   </PosterCard>
                 ))}
               </div>
