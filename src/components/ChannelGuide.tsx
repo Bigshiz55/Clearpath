@@ -1,7 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { buildChannelGuide, filterGuide, guideSummary } from '@/lib/tv/channelGuide';
+import {
+  GUIDE_CATEGORIES,
+  buildChannelGuide,
+  filterGuide,
+  filterGuideByCategory,
+  filterGuideByMedia,
+  guideSummary,
+  type GuideMediaFilter,
+} from '@/lib/tv/channelGuide';
 import { rankGuideForTaste, type TasteRule } from '@/lib/tv/channelAffinity';
 import { displayClock } from '@/lib/viewing/clock';
 import { setTvReminder } from '@/lib/actions/tvReminders';
@@ -36,6 +44,8 @@ export function ChannelGuide({
   taste?: TasteRule[];
 }) {
   const [query, setQuery] = useState('');
+  const [media, setMedia] = useState<GuideMediaFilter>('all');
+  const [cat, setCat] = useState<string | null>(null);
   const [reminded, setReminded] = useState<Set<number>>(() => new Set(remindedIds));
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -44,8 +54,13 @@ export function ChannelGuide({
   // before ESPN for a true-crime lover, Syfy sunk for a sci-fi avoider —
   // and zero-affinity channels keep their alphabetical place.
   const rows = useMemo(() => rankGuideForTaste(buildChannelGuide(airings, nowMs), taste), [airings, nowMs, taste]);
-  const shown = useMemo(() => filterGuide(rows, query), [rows, query]);
-  const stats = guideSummary(rows);
+  // One-tap narrowing on top of the ranked rows: movie/show first, then a
+  // channel group. Order is preserved — filters never re-rank.
+  const narrowed = useMemo(() => filterGuideByCategory(filterGuideByMedia(rows, media), cat), [rows, media, cat]);
+  const shown = useMemo(() => filterGuide(narrowed, query), [narrowed, query]);
+  // The header sentence counts what the toggles have left in view.
+  const stats = guideSummary(narrowed);
+  const filtersOn = media !== 'all' || cat != null;
 
   // A QUICK REMINDER, RIGHT ON THE ROW. The guide is where you notice that a
   // Hallmark movie starts at 10 — making you leave for another screen to be
@@ -103,6 +118,51 @@ export function ChannelGuide({
         </p>
       </div>
 
+      {/* ONE-TAP NARROWING. A 188-channel dial needs more than a search box:
+          movie-or-show first, then the channel groups a cable viewer actually
+          thinks in. Groups come from channel identity (the grid has no
+          per-programme genre to filter by) — a channel matching no group just
+          stays under All. */}
+      <div className="flex flex-wrap items-center gap-2" data-testid="guide-filters">
+        <div className="inline-flex flex-none rounded-lg border border-white/12 bg-white/5 p-0.5">
+          {([['all', 'All'], ['movie', '🎬 Movies'], ['tv', '📺 Shows']] as const).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setMedia(v)}
+              aria-pressed={media === v}
+              data-testid={`guide-media-${v}`}
+              className={`min-h-[36px] rounded-md px-3 text-sm font-semibold transition ${
+                media === v ? 'bg-brand-500 text-white shadow-glow' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5" data-testid="guide-cats">
+          {GUIDE_CATEGORIES.map((c) => {
+            const active = cat === c.key;
+            return (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => setCat(active ? null : c.key)}
+                aria-pressed={active}
+                data-testid={`guide-cat-${c.key}`}
+                className={`min-h-[36px] flex-none whitespace-nowrap rounded-full border px-3 text-xs font-bold transition ${
+                  active
+                    ? 'border-[#ff1493]/60 bg-[#ff1493]/20 text-pink-100'
+                    : 'border-white/15 bg-white/[0.04] text-slate-300 hover:border-white/30 hover:text-white'
+                }`}
+              >
+                {c.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {notice && (
         <p role="status" className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-100" data-testid="guide-note">
           {notice}
@@ -110,9 +170,26 @@ export function ChannelGuide({
       )}
 
       {shown.length === 0 ? (
-        <p className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400" data-testid="guide-no-match">
-          Nothing in the guide matches “{query.trim()}” — by channel name or by what’s on.
-        </p>
+        <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-4" data-testid="guide-no-match">
+          <p className="text-sm text-slate-400">
+            {query.trim()
+              ? `Nothing in the guide matches “${query.trim()}” — by channel name or by what’s on.`
+              : 'No channel we can see matches those filters right now — that’s the schedule, not missing data.'}
+          </p>
+          {filtersOn && (
+            <button
+              type="button"
+              onClick={() => {
+                setMedia('all');
+                setCat(null);
+              }}
+              data-testid="guide-clear"
+              className="rounded-lg border border-white/15 bg-white/[0.05] px-3 py-1.5 text-xs font-bold text-slate-200 transition hover:border-brand-300 hover:text-white"
+            >
+              Show every channel
+            </button>
+          )}
+        </div>
       ) : (
         <ul className="space-y-2">
           {shown.map((r) => (

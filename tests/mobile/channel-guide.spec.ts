@@ -181,6 +181,47 @@ test.describe('ranked by the programme itself', () => {
   });
 });
 
+/**
+ * ONE-TAP NARROWING. Movie-or-show toggle plus channel-group chips, on top of
+ * search — nobody types "hallmark" when a chip can do it. Filters narrow the
+ * ranked rows without re-ranking them, the header counts what is actually in
+ * view, and an empty result says so with a one-tap way back.
+ */
+test.describe('toggles narrow the dial', () => {
+  test('Movies keeps only channels with a movie on or next; Shows the inverse; All restores', async ({ page }) => {
+    await open(page);
+    await page.getByTestId('guide-media-movie').click();
+    let names = (await channels(page).locator('h3').allInnerTexts()).map((n) => n.trim().toLowerCase());
+    expect(names.sort()).toEqual(['hallmark', 'lifetime', 'tcm']);
+    // The header sentence recounts what the toggle left in view.
+    await expect(page.getByTestId('guide-stats')).toContainText('3 channels');
+    await page.getByTestId('guide-media-tv').click();
+    names = (await channels(page).locator('h3').allInnerTexts()).map((n) => n.trim().toLowerCase());
+    expect(names.sort()).toEqual(['espn', 'food network', 'history']);
+    await page.getByTestId('guide-media-all').click();
+    await expect(channels(page)).toHaveCount(6);
+  });
+
+  test('a channel-group chip narrows to that group; tapping it again clears it', async ({ page }) => {
+    await open(page);
+    await page.getByTestId('guide-cat-sports').click();
+    await expect(channels(page)).toHaveCount(1);
+    await expect(channels(page)).toContainText(/espn/i);
+    await page.getByTestId('guide-cat-sports').click();
+    await expect(channels(page)).toHaveCount(6);
+  });
+
+  test('an impossible combination says so and offers the way back', async ({ page }) => {
+    await open(page);
+    // Movies + Sports: ESPN has no movie in view — an honest empty, not a blank.
+    await page.getByTestId('guide-media-movie').click();
+    await page.getByTestId('guide-cat-sports').click();
+    await expect(page.getByTestId('guide-no-match')).toBeVisible();
+    await page.getByTestId('guide-clear').click();
+    await expect(channels(page)).toHaveCount(6);
+  });
+});
+
 for (const w of [320, 390, 768, 1440]) {
   test(`no sideways scroll at ${w}px`, async ({ page }) => {
     await open(page, w);

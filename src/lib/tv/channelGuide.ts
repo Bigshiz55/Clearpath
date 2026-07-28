@@ -132,3 +132,71 @@ export function filterGuide(rows: readonly ChannelRow[], query: string): Channel
     return r.upNext.some((a) => a.showName.toLowerCase().includes(q));
   });
 }
+
+/** The guide's one-tap type toggle: everything, movies, or shows. */
+export type GuideMediaFilter = 'all' | 'movie' | 'tv';
+
+/**
+ * Keep the channels with a movie (or a show) on now or up next. Uses the
+ * grid's own `is_movie` typing — a channel row survives when ANY of its
+ * visible listings is the wanted type, so "Movies" keeps a channel whose
+ * series ends at 9 to start a film. Generic so ranked rows keep their extras.
+ */
+export function filterGuideByMedia<T extends ChannelRow>(rows: readonly T[], media: GuideMediaFilter): T[] {
+  if (media === 'all') return [...rows];
+  const wantMovie = media === 'movie';
+  return rows.filter((r) => {
+    const listings = r.onNow ? [r.onNow, ...r.upNext] : r.upNext;
+    return listings.some((a) => (a.showType === 'Movie') === wantMovie);
+  });
+}
+
+/**
+ * ONE-TAP CHANNEL GROUPS. The grid rows carry no per-programme genre, so a
+ * "genre" filter here would be invention — what IS defensible is a channel's
+ * programming identity (the same reasoning as the DNA channel affinity):
+ * ESPN is sports, CNN is news, TCM shows movies. Matched against the display
+ * name; a channel matching no group simply only appears under "All" — never
+ * guessed into one.
+ */
+export interface GuideCategory {
+  key: string;
+  label: string;
+  re: RegExp;
+}
+
+export const GUIDE_CATEGORIES: GuideCategory[] = [
+  {
+    key: 'movies',
+    label: '🎬 Movie channels',
+    re: /hbo|cinemax|showtime|starz|encore|epix|mgm|^tcm\b|turner classic|^amc\b|hdnet movie|sony movie|movieplex|flix|hallmark movie|lifetime movie|lmn|cine/i,
+  },
+  { key: 'feelgood', label: '💜 Hallmark & Lifetime', re: /hallmark|lifetime|lmn|uptv|gac/i },
+  {
+    key: 'crime',
+    label: '🔎 Crime & mystery',
+    re: /investigation discovery|^id\b|oxygen|a&e|court tv|usa network|^ion\b|^tnt\b/i,
+  },
+  {
+    key: 'sports',
+    label: '🏈 Sports',
+    re: /espn|fox sports|fs[12]\b|nfl|nba|mlb|nhl|golf|tennis|cbs sports|accn|sec network|big ten|btn\b|olympic/i,
+  },
+  {
+    key: 'kids',
+    label: '🧒 Kids & family',
+    re: /disney|nick|cartoon network|boomerang|pbs kids|universal kids|discovery family/i,
+  },
+  {
+    key: 'news',
+    label: '📰 News',
+    re: /cnn|fox news|msnbc|cnbc|newsnation|newsmax|bbc (world )?news|c-?span|weather/i,
+  },
+];
+
+/** Keep the channels in one named group. Null or unknown key = everything. */
+export function filterGuideByCategory<T extends ChannelRow>(rows: readonly T[], key: string | null): T[] {
+  const cat = key ? GUIDE_CATEGORIES.find((c) => c.key === key) : null;
+  if (!cat) return [...rows];
+  return rows.filter((r) => cat.re.test(r.network.trim()));
+}

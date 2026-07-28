@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { buildChannelGuide, filterGuide, guideSummary, onNowOf, UP_NEXT } from './channelGuide';
+import {
+  GUIDE_CATEGORIES,
+  buildChannelGuide,
+  filterGuide,
+  filterGuideByCategory,
+  filterGuideByMedia,
+  guideSummary,
+  onNowOf,
+  UP_NEXT,
+} from './channelGuide';
 import type { Airing } from '@/lib/onTv';
 
 const NOW = Date.parse('2026-07-28T20:30:00Z');
@@ -140,5 +149,70 @@ describe('finding a channel in three hundred', () => {
 
   it('an empty query is the whole guide', () => {
     expect(filterGuide(rows, '  ')).toHaveLength(3);
+  });
+});
+
+describe('the movie / show toggle', () => {
+  const grid = buildChannelGuide(
+    [
+      airing({ network: 'TCM', showName: 'Casablanca', showType: 'Movie', runtime: 120 }),
+      // A series on now, but a film starts next — "Movies" must keep this row.
+      airing({ network: 'AMC', showName: 'A Rerun', runtime: 60 }),
+      airing({ network: 'AMC', showName: 'Die Hard', showType: 'Movie', airstamp: '2026-07-28T21:00:00Z' }),
+      airing({ network: 'ESPN', showName: 'SportsCenter', runtime: 120 }),
+    ],
+    NOW,
+  );
+
+  it('Movies keeps every channel with a movie on now OR up next', () => {
+    expect(filterGuideByMedia(grid, 'movie').map((r) => r.network).sort()).toEqual(['AMC', 'TCM']);
+  });
+
+  it('Shows keeps the channels with a series in view', () => {
+    expect(filterGuideByMedia(grid, 'tv').map((r) => r.network).sort()).toEqual(['AMC', 'ESPN']);
+  });
+
+  it('All is the untouched guide', () => {
+    expect(filterGuideByMedia(grid, 'all')).toHaveLength(3);
+  });
+
+  it('ranked extras survive the filter — the order stays the taste order', () => {
+    const ranked = grid.map((r) => ({ ...r, rankScore: 70 }));
+    expect(filterGuideByMedia(ranked, 'movie').every((r) => r.rankScore === 70)).toBe(true);
+  });
+});
+
+describe('one-tap channel groups', () => {
+  const grid = buildChannelGuide(
+    [
+      airing({ network: 'TCM', showName: 'Casablanca', showType: 'Movie', runtime: 120 }),
+      airing({ network: 'ESPN', showName: 'SportsCenter', runtime: 120 }),
+      airing({ network: 'Hallmark', showName: 'Autumn in the City', showType: 'Movie', runtime: 120 }),
+      airing({ network: 'Food Network', showName: 'Chopped', runtime: 120 }),
+    ],
+    NOW,
+  );
+
+  it('a channel is grouped only where its identity is defensible', () => {
+    expect(filterGuideByCategory(grid, 'movies').map((r) => r.network)).toEqual(['TCM']);
+    expect(filterGuideByCategory(grid, 'sports').map((r) => r.network)).toEqual(['ESPN']);
+    expect(filterGuideByCategory(grid, 'feelgood').map((r) => r.network)).toEqual(['Hallmark']);
+  });
+
+  it('a channel matching no group appears only under All — never guessed into one', () => {
+    for (const c of GUIDE_CATEGORIES) {
+      expect(filterGuideByCategory(grid, c.key).some((r) => r.network === 'Food Network')).toBe(false);
+    }
+  });
+
+  it('no group selected (or an unknown key) is the whole guide', () => {
+    expect(filterGuideByCategory(grid, null)).toHaveLength(4);
+    expect(filterGuideByCategory(grid, 'nope')).toHaveLength(4);
+  });
+
+  it('every group key is unique and labelled', () => {
+    const keys = GUIDE_CATEGORIES.map((c) => c.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(GUIDE_CATEGORIES.every((c) => c.label.length > 0)).toBe(true);
   });
 });
