@@ -17,8 +17,8 @@ export const dynamic = 'force-dynamic';
 const LONG = 'The Extraordinarily Long and Unabbreviated Title of a Motion Picture That Refuses to Wrap Nicely';
 
 const CARDS = [
-  { title: 'Se7en', year: 1995, mediaType: 'movie' as const, posterUrl: null, meta: 'Crime · Thriller' },
-  { title: LONG, year: 2024, mediaType: 'movie' as const, posterUrl: null, meta: 'Drama' },
+  { title: 'Se7en', year: 1995, mediaType: 'movie' as const, posterUrl: null, meta: null },
+  { title: LONG, year: 2024, mediaType: 'movie' as const, posterUrl: null, meta: null },
   { title: 'A', year: 2023, mediaType: 'tv' as const, posterUrl: null, meta: null },
   { title: 'Gōngfu Sūpermán 功夫超人 — Édition Spéciale', year: 2022, mediaType: 'movie' as const, posterUrl: null, meta: 'Acción · Comedia' },
   { title: 'No Poster Available Here', year: null, mediaType: 'movie' as const, posterUrl: null, meta: 'Documentary' },

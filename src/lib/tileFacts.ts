@@ -13,15 +13,18 @@
  * its facts still renders its poster and title.
  */
 import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
+import type { CardFactsInput } from '@/lib/verdict/cardFacts';
 import type { MediaType } from '@/lib/types';
 
 export interface TileFacts {
   ratings: TileRatings;
   /** TMDB's own synopsis. Null when TMDB has none — never a placeholder. */
   overview: string | null;
+  /** Length, certificate, genre, size of the run — see `verdict/cardFacts`. */
+  facts: CardFactsInput | null;
 }
 
-const EMPTY: TileFacts = { ratings: EMPTY_TILE_RATINGS, overview: null };
+const EMPTY: TileFacts = { ratings: EMPTY_TILE_RATINGS, overview: null, facts: null };
 
 const cache = new Map<string, Promise<TileFacts>>();
 
@@ -34,6 +37,7 @@ export function loadTileFacts(mediaType: MediaType, tmdbId: number): Promise<Til
       .then((d) => ({
         ratings: (d?.ratings as TileRatings) ?? EMPTY_TILE_RATINGS,
         overview: typeof d?.overview === 'string' && d.overview.trim() ? (d.overview as string) : null,
+        facts: (d?.facts as CardFactsInput | null) ?? null,
       }))
       .catch(() => EMPTY);
     cache.set(key, p);

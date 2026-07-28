@@ -6,6 +6,7 @@ import { CardVerdict } from './CardVerdict';
 import { WCheck } from './WCheck';
 import { CardSynopsis } from './CardSynopsis';
 import { CardWhyItFits } from './CardWhyItFits';
+import { CardFacts } from './CardFacts';
 
 interface PosterCardProps {
   href?: string;
@@ -156,7 +157,26 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           heading
         )}
 
+        {/* THE COLUMN BESIDE THE POSTER WAS EMPTY, AND THE FACTS WERE MISSING.
+            A 2:3 poster is ~210px tall and a title is two lines, so every card
+            carried ~150px of black beside its artwork — while runtime,
+            certificate, genre and season count, all of which we already hydrate
+            to compute the score, appeared nowhere. Same fetch, no new request. */}
+        {saveId != null && <CardFacts mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+
         {children}
+
+        {/* THE NUMBER GOES NEXT TO THE ARTWORK, where the eye already is.
+            It was drawn full-width below the poster, which pushed the whole
+            card ~75px taller to say something that fits in the space that was
+            already sitting empty. Poster, title, facts and verdict now read as
+            one at-a-glance block; the detail follows underneath.
+            `mt-auto` pins it to the bottom of the column, so the block ends
+            level with the poster instead of leaving the gap it was put there
+            to fill. */}
+        {saveId != null && (
+          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-auto pt-2" />
+        )}
       </div>
       </div>
 
@@ -172,16 +192,6 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             reserved height grows with it, so nothing moves when the text
             lands. */}
         {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1" />}
-
-        {/* THE ORDER A DECISION IS ACTUALLY MADE IN.
-            What it is → how well it fits YOU → the evidence behind that → the
-            optional deep explanation → what you want to do about it. The score
-            used to sit below the reasons and the explanation used to sit above
-            the synopsis, so the card argued its case before saying what the
-            thing was. */}
-        {saveId != null && (
-          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-2" />
-        )}
 
         {/* Personalization status — what the recommendation is based on, from
             the axes this user demonstrably rates highly. Says so honestly when

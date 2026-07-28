@@ -36,11 +36,24 @@ export async function GET(_req: Request, { params }: { params: { type: string; i
     // sentence, and it cost nothing to carry it here. Null when TMDB has none —
     // never a placeholder, never invented.
     const overview = meta.overview?.trim() ? meta.overview.trim() : null;
+    // THE FACTS THE CARD HAD NO ROOM FOR — and then had nothing but room for.
+    // Runtime, certificate, genre and season count all come out of the SAME
+    // hydration that produced the scores above, so carrying them costs nothing
+    // and fills the column that was sitting empty beside every poster. Each is
+    // null when TMDB has none; the card shortens rather than inventing.
+    const facts = {
+      runtimeMinutes: meta.runtimeMinutes ?? null,
+      episodeRuntimeMinutes: meta.episodeRuntimeMinutes ?? null,
+      seasons: meta.numberOfSeasons ?? null,
+      episodes: meta.episodesAired ?? meta.numberOfEpisodes ?? null,
+      contentRating: meta.contentRating ?? null,
+      genres: Array.isArray(meta.genres) ? meta.genres.slice(0, 4) : [],
+    };
     return NextResponse.json(
-      { ratings, overview },
+      { ratings, overview, facts },
       { headers: { 'Cache-Control': 'public, s-maxage=43200, stale-while-revalidate=86400' } },
     );
   } catch {
-    return NextResponse.json({ ratings: EMPTY_TILE_RATINGS, overview: null });
+    return NextResponse.json({ ratings: EMPTY_TILE_RATINGS, overview: null, facts: null });
   }
 }

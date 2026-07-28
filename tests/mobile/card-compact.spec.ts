@@ -13,12 +13,13 @@ import { test, expect, type Page } from '@playwright/test';
  * removed to achieve any of it.
  */
 const FULL = { standardScore: 81, tomatometer: 91, rtAudience: 78, imdb: 7.8 };
+const FACTS = { runtimeMinutes: 105, contentRating: 'PG-13', genres: ['Crime', 'Thriller', 'Mystery'] };
 const SYNOPSIS =
   'A weary detective returns to the coastal town he grew up in to investigate a disappearance everybody there would rather forget, and finds his own family at the centre of it.';
 
-async function open(page: Page, w = 390, ratings: Record<string, unknown> = FULL) {
+async function open(page: Page, w = 390, ratings: Record<string, unknown> = FULL, facts: unknown = FACTS) {
   await page.setViewportSize({ width: w, height: 1000 });
-  await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings, overview: SYNOPSIS } }));
+  await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings, overview: SYNOPSIS, facts } }));
   await page.route('**/api/dna/**', (r) =>
     r.fulfill({ json: { dna: { score: 81, confidence: 0.2, tasteScore: null, available: false, sampleSize: 0, fit: null } } }),
   );
@@ -49,14 +50,23 @@ test.describe('the verdict panel', () => {
   test('holds the score, the call and the ratings without a wasted row', async ({ page }) => {
     await open(page);
     const h = (await panel(page).boundingBox())!.height;
-    // It was ~99px on a phone: two stacked rows with air between them. One row
-    // of content plus its padding is ~70.
-    expect(h, `the panel is ${Math.round(h)}px tall`).toBeLessThanOrEqual(76);
+    // Two rows AT MOST — badge and call, then the ratings — inside the column
+    // beside the poster. It was two stacked rows plus air, full-width, below.
+    expect(h, `the panel is ${Math.round(h)}px tall`).toBeLessThanOrEqual(110);
 
     // Nothing was dropped to get there.
     await expect(panel(page)).toContainText('81');
     await expect(panel(page)).toContainText('STREAM IT');
     await expect(panel(page).locator('.wv-ratings-row > span')).toHaveCount(3);
+  });
+
+  test('sits beside the artwork, where the eye already is', async ({ page }) => {
+    await open(page);
+    const art = (await card(page).locator('.wv-card-art').boundingBox())!;
+    const p = (await panel(page).boundingBox())!;
+    // Beside the poster, not under it: this is the space that was black.
+    expect(p.x, 'the panel is back under the poster').toBeGreaterThan(art.x + art.width - 1);
+    expect(p.y).toBeLessThan(art.y + art.height);
   });
 
   test('the score and the call are the loudest things in it', async ({ page }) => {
@@ -160,6 +170,43 @@ test.describe('the decision buttons', () => {
   });
 });
 
+/**
+ * THE COLUMN BESIDE THE POSTER IS NOT BLACK ANY MORE.
+ *
+ * "Is there any way to get some additional information in all of that extra
+ * black space." A 2:3 poster is ~210px tall and a title is two lines, so every
+ * card carried ~150px of unused column — while runtime, certificate, genre and
+ * season count, which the app already hydrates to score the title, were on no
+ * card at all.
+ */
+test.describe('the space beside the poster', () => {
+  test('carries the facts we already hold', async ({ page }) => {
+    await open(page);
+    const facts = card(page).getByTestId('card-facts');
+    await expect(facts).toContainText('1h 45m');
+    await expect(facts).toContainText('PG-13');
+    await expect(facts).toContainText('Crime');
+    await expect(facts).toContainText('Thriller');
+  });
+
+  test('claims nothing when TMDB gave us nothing', async ({ page }) => {
+    await open(page, 390, FULL, null);
+    await expect(card(page).getByTestId('card-facts')).toHaveCount(0);
+  });
+
+  test('is filled, not merely occupied', async ({ page }) => {
+    await open(page);
+    const slack = await card(page).evaluate((el) => {
+      const art = el.querySelector('.wv-card-art')!.getBoundingClientRect();
+      const body = el.querySelector('.wv-card-body')!;
+      const last = body.lastElementChild!.getBoundingClientRect();
+      return Math.round(art.bottom - last.bottom);
+    });
+    // The block beside the poster ends level with it, give or take a line.
+    expect(slack, `${slack}px of dead column beside the poster`).toBeLessThanOrEqual(24);
+  });
+});
+
 test('the reading order down the card is what a decision needs', async ({ page }) => {
   await open(page);
   const order = await card(page).evaluate((el) => {
@@ -168,14 +215,18 @@ test('the reading order down the card is what a decision needs', async ({ page }
       return e ? Math.round(e.getBoundingClientRect().top) : -1;
     };
     return {
+      facts: y('[data-testid="card-facts"]'),
+      score: y('.wv-score'),
       synopsis: y('[data-testid="card-synopsis"]'),
       status: y('[data-testid="why-it-fits"]'),
-      score: y('.wv-score'),
       actions: y('.wv-act-row'),
     };
   });
-  // What it is → how well it fits you → the evidence → what you do.
-  expect(order.synopsis).toBeLessThan(order.score);
-  expect(order.score).toBeLessThan(order.status);
+  // At a glance: poster, title, what it costs you, how well it fits you.
+  // Then the detail: what it is about, what that judgement rests on, and the
+  // decision itself.
+  expect(order.facts).toBeLessThan(order.score);
+  expect(order.score).toBeLessThan(order.synopsis);
+  expect(order.synopsis).toBeLessThan(order.status);
   expect(order.status).toBeLessThan(order.actions);
 });
