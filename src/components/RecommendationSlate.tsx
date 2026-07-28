@@ -108,7 +108,7 @@ export function RecommendationSlate({
           const key = `${it.mediaType}:${it.id}`;
           const r = reacted[key];
           return (
-            <div key={key} className="card overflow-hidden p-0" data-testid="reco-item">
+            <div key={key} className="card wv-tile overflow-hidden p-0" data-testid="reco-item">
               <div className="relative aspect-[2/3] bg-black/30">
                 {/* The W goes upper-RIGHT, where it is on every other card, so
                     putting a pick on the docket is one gesture everywhere. The

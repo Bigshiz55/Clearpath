@@ -21,7 +21,7 @@ export function WatchNowGrid({ items }: { items: WatchNowItem[] }) {
       <div className="poster-grid">
         {shown.map((t) => {
           return (
-            <div key={`${t.mediaType}-${t.id}`} className="card group h-full overflow-hidden transition hover:border-white/20 hover:shadow-glow">
+            <div key={`${t.mediaType}-${t.id}`} className="card wv-tile group h-full overflow-hidden">
               {/* Top bar — Movie/TV · ＋ · O. Score lives in the pink box below. */}
               <div className="flex items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
                 <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">

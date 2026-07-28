@@ -38,20 +38,39 @@ export function LogoMark({
   );
 }
 
+/**
+ * THE WORDMARK YIELDS WHEN THE BAR CANNOT HOLD IT.
+ *
+ * The app header is a logo plus search, account and overflow. That was sized at
+ * 390px, where it fits with four pixels to spare — and never checked narrower.
+ * At 360 the wordmark ran 26px under the search button and at 320 it ran 66px
+ * under it, with "VERD1CT" printed through a control.
+ *
+ * There is no type size that fixes 320: the three controls plus padding leave
+ * ~100px, and the shortest legible wordmark is half again that. So it steps
+ * down at 390, and below 360 the mark carries the brand alone — which it is
+ * designed to do. Only the crowded header opts in; a page that gives the logo
+ * a line of its own keeps the full wordmark at every width.
+ */
+const CROWDED_WORD = 'hidden min-[360px]:inline text-base min-[390px]:text-xl sm:text-3xl';
+
 export function Logo({
   href = '/',
   compact = false,
   size = 'md',
+  crowded = false,
 }: {
   href?: string;
   compact?: boolean;
   size?: 'md' | 'lg';
+  /** Set on bars that also carry controls — see `CROWDED_WORD`. */
+  crowded?: boolean;
 }) {
   // `lg` shrinks on small phones so the header (logo + right controls) never
   // exceeds a narrow viewport, then grows from `sm` up.
   const box = size === 'lg' ? 'h-11 w-11 rounded-xl sm:h-14 sm:w-14 sm:rounded-2xl' : 'h-9 w-9 rounded-xl';
   const inner = size === 'lg' ? 'h-9 w-9 sm:h-11 sm:w-11' : 'h-7 w-7';
-  const word = size === 'lg' ? 'text-xl sm:text-3xl' : 'text-lg';
+  const word = crowded ? CROWDED_WORD : size === 'lg' ? 'text-xl sm:text-3xl' : 'text-lg';
 
   return (
     <Link href={href} className="group inline-flex items-center gap-2.5">

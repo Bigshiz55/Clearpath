@@ -105,13 +105,14 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   // column — a sideways card in a 250px cell would leave a thumbnail and a
   // sliver.
   return (
-    /* A PREMIUM NEAR-BLACK SURFACE, framed by a hairline rather than an
-       outline. The card was a translucent panel with a heavy drop shadow doing
-       the separation; on a dark page that reads as smoke, not structure. A
-       near-black fill with a one-pixel ring gives a definite edge at a fraction
-       of the visual weight, and lets the poster be the brightest thing on the
-       card — which is the only thing that should be. */
-    <div className="card group flex flex-col !border-transparent bg-ink-950/85 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.9)] ring-1 ring-white/[0.07] transition hover:ring-white/15">
+    /* A PREMIUM NEAR-BLACK SURFACE WITH A VISIBLE EDGE.
+       The hairline that replaced the old border went too far: a 7%-white ring
+       on a near-black fill is invisible, so a column of tall cards read as one
+       continuous scroll and you could not tell whose buttons you were looking
+       at. `.wv-tile` puts the boundary back in the app's accent blue — see
+       globals.css. The fill stays near-black so the poster is still the
+       brightest thing on the card. */
+    <div className="card wv-tile group flex flex-col bg-ink-950/85">
       <div className="wv-card">
       <div className="wv-card-art">
         {/* HOW FAR YOU HAVE COME. In an endless feed the count is the only

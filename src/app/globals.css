@@ -39,7 +39,9 @@ body {
      From `sm` there is room for real columns, the card goes back to being a
      column, and the grid auto-fills. */
   .poster-grid {
-    @apply grid gap-3;
+    /* 16px between tiles, not 12. An edge draws the boundary; the gap is what
+       makes two boundaries read as two objects rather than a seam. */
+    @apply grid gap-4;
     grid-template-columns: minmax(0, 1fr);
   }
   @media (min-width: 640px) {
@@ -158,6 +160,50 @@ body {
 
   .card {
     @apply rounded-2xl border border-white/10 bg-ink-850/70 shadow-card backdrop-blur;
+  }
+
+  /* ── ONE TILE, ONE EDGE ───────────────────────────────────────────────────
+     A RESULT TILE HAS TO LOOK LIKE AN OBJECT, NOT A STRETCH OF PAGE.
+
+     The premium-surface pass replaced the card's border with a hairline ring
+     at 7% white. On a near-black fill that is invisible on a phone, so a column
+     of tall cards read as one continuous scroll — you could not see where one
+     title's poster, reasons, verdict and buttons ended and the next one's
+     began, and the buttons in particular could belong to either.
+
+     The fix is the app's own accent, not more white: brand blue is already the
+     colour of "this is a thing you act on" (primary buttons, focus rings), it
+     separates cleanly from the pink of the decision pool and the green/red of
+     a verdict, and it is the only hue on the page that a near-black surface
+     cannot swallow. A solid one-pixel border draws the boundary; a wider, much
+     fainter halo outside it keeps the boundary readable on the darkest
+     backgrounds without turning the grid into a set of glowing boxes.
+
+     `.card` still comes first, so tiles keep the radius, blur and fill; this
+     only replaces the edge. It is defined AFTER `.card` on purpose — same
+     specificity, source order decides. */
+  .wv-tile {
+    @apply transition;
+    border-color: rgb(79 134 255 / 0.55);
+    box-shadow:
+      0 0 0 1px rgb(79 134 255 / 0.16),
+      0 6px 18px -10px rgb(0 0 0 / 0.95);
+  }
+  .wv-tile:hover {
+    border-color: rgb(79 134 255 / 0.9);
+    box-shadow:
+      0 0 0 1px rgb(79 134 255 / 0.3),
+      0 10px 24px -12px rgb(0 0 0 / 0.95);
+  }
+  /* NO `:focus-within` BRIGHTENING. It was the obvious thing to add and it is
+     wrong: tapping the W focuses a button inside the tile, so the whole edge
+     would light up and stay lit — a second, competing signal for "this one is
+     selected", which is the pink W's job alone. The edge says WHERE THE TILE
+     IS and nothing else. Focus is drawn on the control that has it. */
+  @media (prefers-contrast: more) {
+    .wv-tile {
+      border-color: rgb(122 168 255 / 0.95);
+    }
   }
 
   .btn {

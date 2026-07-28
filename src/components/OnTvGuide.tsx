@@ -273,7 +273,7 @@ export function OnTvGuide({
               );
               const resolved = a.tmdbId != null && a.mediaType != null;
               return (
-                <div key={a.id} className="card flex flex-col overflow-hidden">
+                <div key={a.id} className="card wv-tile flex flex-col overflow-hidden">
                   <div className="wv-card flex-1">
                     {/* The W, on the artwork, exactly where it is on every other
                         card — so putting an airing on the docket is the same
@@ -381,7 +381,7 @@ export function OnTvGuide({
             return (
               <div
                 key={a.id}
-                className="card wv-tv-row p-3"
+                className="card wv-tile wv-tv-row p-3"
                 data-testid="airing-row"
                 data-state={status.state}
               >

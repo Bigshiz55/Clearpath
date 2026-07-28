@@ -59,7 +59,7 @@ export function Nav({
               1152px, so the header has exactly as much room at 1600 as at 1280.
               Restoring the roomier gaps above `xl` reintroduced the collision. */}
           <div className="flex min-w-0 items-center gap-3">
-            <Logo href="/app" size="lg" />
+            <Logo href="/app" size="lg" crowded />
             <nav className="hidden items-center gap-0.5 lg:flex">
               {PRIMARY.map((l) => (
                 <Link

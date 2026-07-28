@@ -181,7 +181,7 @@ export function ReleaseWall({
             const d = daysUntil(t.releaseDate);
             const soon = win === 'upcoming' && d != null && d <= 14;
             return (
-              <div key={`${t.mediaType}-${t.id}`} className="card group wv-card text-left transition hover:border-white/20 hover:shadow-glow">
+              <div key={`${t.mediaType}-${t.id}`} className="card wv-tile group wv-card text-left">
                 {/* The W lives on the artwork on every surface — a new release
                     goes on the docket with the same gesture as anything else. */}
                 <div className="wv-card-art">
