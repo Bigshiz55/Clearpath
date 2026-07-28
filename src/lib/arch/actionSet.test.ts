@@ -185,7 +185,14 @@ describe('controls scale with the screen', () => {
 
   it('the action row has a size that grows past the touch floor', () => {
     expect(css).toContain('.wv-act {');
-    expect(css).toMatch(/@media \(min-width: 1024px\)[\s\S]{0,400}\.wv-act \{[\s\S]{0,80}min-height: 52px/);
+    // Above the 44px floor on a bigger screen, but not by much: the buttons
+    // were 56px tall on a laptop, which is a block of colour, not a target.
+    // The 1024 block that IS the action rule — not merely one that precedes it.
+    const bigger = /@media \(min-width: 1024px\) \{\s*\.wv-act \{\s*min-height: (\d+)px/.exec(css);
+    expect(bigger, 'no wv-act height at 1024').not.toBeNull();
+    const px = Number(bigger![1]);
+    expect(px).toBeGreaterThan(44);
+    expect(px).toBeLessThanOrEqual(50);
   });
 
   it('every action control uses it, so none is left at phone scale', () => {

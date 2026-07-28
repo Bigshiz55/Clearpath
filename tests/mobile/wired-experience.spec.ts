@@ -49,20 +49,32 @@ test.describe('TEST A — Why this Verd1ct? on real result cards', () => {
 
     const why = page.getByTestId('why-verdict');
     await expect(why).toBeVisible();
-    await why.locator('summary').click();
-    await expect(why).toContainText('Why it won');
+    await why.locator('summary').first().click();
+    // Three NAMED sections, in decision order.
+    await expect(why).toContainText('Why it matched');
     await expect(why).toContainText('Fast investigative storytelling');
-    await expect(why).toContainText('What held it back');
+    await expect(why).toContainText('Things to know');
     await expect(why).toContainText('Darker than your usual weeknight choice');
+    await expect(why).toContainText('Your requirements');
     await expect(why).toContainText('✓ Under 100 min');
     await expect(why).toContainText('Netflix · Included with subscription');
     await expect(why).toContainText('likely');
     await expect(why).toContainText(/Confidence: high/i);
+
+    // THE MATHS IS KEPT, ONE LAYER DOWN. "(88 match)" is off the reason and
+    // behind the details toggle — not deleted.
+    await expect(why.getByTestId('why-matched')).toContainText('Strong personal fit');
+    await expect(why.getByTestId('why-matched')).not.toContainText('88 match');
+    const details = why.getByTestId('scoring-details');
+    await expect(details).toBeVisible();
+    await details.locator('summary').click();
+    await expect(details).toContainText('88 match');
+
     await page.screenshot({ path: path.join(SHOTS, 'A-why-verdict-open-desktop.png'), fullPage: false });
 
     // Close works too.
-    await why.locator('summary').click();
-    await expect(why.getByText('Why it won')).not.toBeVisible();
+    await why.locator('summary').first().click();
+    await expect(why.getByText('Why it matched')).not.toBeVisible();
   });
 });
 
@@ -187,8 +199,8 @@ test.describe('TEST F — mobile result card', () => {
 
     const why = page.getByTestId('why-verdict');
     await expect(why).toBeVisible();
-    await why.locator('summary').click();
-    await expect(why).toContainText('Why it won');
+    await why.locator('summary').first().click();
+    await expect(why).toContainText('Why it matched');
 
     // No horizontal overflow with the explanation open on a phone.
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -198,7 +210,7 @@ test.describe('TEST F — mobile result card', () => {
     await expect(page.getByTestId('household-verdict')).toBeVisible();
     await page.screenshot({ path: path.join(SHOTS, 'F-mobile-card-expanded.png'), fullPage: true });
 
-    await why.locator('summary').click();
-    await expect(why.getByText('Why it won')).not.toBeVisible();
+    await why.locator('summary').first().click();
+    await expect(why.getByText('Why it matched')).not.toBeVisible();
   });
 });

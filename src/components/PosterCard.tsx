@@ -27,6 +27,12 @@ interface PosterCardProps {
   onOpen?: () => void;
   /** 1-based position in an endless feed. Drawn on the artwork; omitted elsewhere. */
   rank?: number;
+  /** Supporting evidence for the decision — pills, the household verdict, the
+   *  "Why this Verd1ct?" panel. Rendered at the card's FULL width, after the
+   *  score and before the buttons, which is the order a decision is made in:
+   *  what it is → how well it fits you → why → what you want to do about it.
+   *  `children` stays beside the poster, for the one line that belongs there. */
+  evidence?: React.ReactNode;
 }
 
 export function Poster({ posterUrl, title, className = '' }: { posterUrl?: string | null; title: string; className?: string }) {
@@ -51,7 +57,7 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
   );
 }
 
-export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen, rank }: PosterCardProps) {
+export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen, rank, evidence }: PosterCardProps) {
   const poster = (
     <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04]" />
   );
@@ -167,16 +173,24 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             lands. */}
         {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1" />}
 
-        {/* WHY IT FITS YOU — one line for, one against, both from the axes this
-            user demonstrably rates highly. Says so honestly when there is not
-            enough profile to speak; never invents a reason. */}
+        {/* THE ORDER A DECISION IS ACTUALLY MADE IN.
+            What it is → how well it fits YOU → the evidence behind that → the
+            optional deep explanation → what you want to do about it. The score
+            used to sit below the reasons and the explanation used to sit above
+            the synopsis, so the card argued its case before saying what the
+            thing was. */}
+        {saveId != null && (
+          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-2" />
+        )}
+
+        {/* Personalization status — what the recommendation is based on, from
+            the axes this user demonstrably rates highly. Says so honestly when
+            there is not enough profile to speak; never invents a reason. */}
         {saveId != null && <CardWhyItFits mediaType={mediaType} tmdbId={saveId} className="mt-2" />}
 
-        {/* One pink box: the algorithm score (your DNA + every rating) + will-you-
-            like-it call, with the ratings underneath. */}
-        {saveId != null && (
-          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-1.5 sm:mt-2" />
-        )}
+        {/* Supporting evidence: the pills, the household verdict, and the
+            "Why this Verd1ct?" panel. */}
+        {evidence && <div className="space-y-2">{evidence}</div>}
 
         {/* The actions sit UNDER the artwork on a wide card and under the facts
             on a row — never in a lit strip above the poster, which is the one
@@ -185,8 +199,12 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             their own. Without it the row would squeeze four things onto one
             line and the buttons would change width the moment you tapped —
             which is the same "everything moved" complaint one level down. */}
+        {/* AIR ABOVE THE DECISION. The buttons sat 6px under the evidence, so
+            the last fact and the first control read as one block — and the row
+            you are about to tap is the one place on the card that should be
+            obviously separate from what it is about. */}
         {overlay !== null && saveId != null && (
-          <div className="wv-act-row mt-1.5 sm:mt-2">
+          <div className="wv-act-row mt-3 sm:mt-3.5">
             <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
             {resolvedOverlay}
           </div>

@@ -40,6 +40,7 @@ export function CardSynopsis({
   className?: string;
 }) {
   const [overview, setOverview] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -56,14 +57,57 @@ export function CardSynopsis({
   // No synopsis (or not yet): hold the space, render no words. There is
   // deliberately no `card-synopsis` testid here — an empty box is not a
   // synopsis, and nothing should be able to mistake it for one.
-  if (!overview) return <div aria-hidden className={`${reserve} ${className}`} />;
+  // The toggle's row is reserved WHETHER OR NOT there is a toggle. It is 18px,
+  // and a control that appears only on some titles, a few hundred milliseconds
+  // after paint, is the same "everything moved under my thumb" defect as text
+  // arriving into no reserved space.
+  const toggleRow = 'h-[18px]';
+
+  // The placeholder mirrors the loaded structure exactly — text box AND toggle
+  // row. Padding on a single box does not work here: `box-sizing: border-box`
+  // means `min-h` swallows it, so the reservation came out 18px short and every
+  // card grew by that the moment its synopsis landed.
+  if (!overview) {
+    return (
+      <div aria-hidden className={className}>
+        <div className={reserve} />
+        <div className={toggleRow} />
+      </div>
+    );
+  }
+
+  // "More" ONLY WHEN THERE IS MORE.
+  //
+  // A synopsis is context for a decision, not the decision — three lines is the
+  // budget, and the rest is available on request rather than taking the card
+  // over. The control appears only for the titles whose text actually runs
+  // past the clamp; a "More" that expands onto nothing is worse than none, so
+  // the estimate is deliberately conservative (~54 characters a line at the
+  // card's own width, three lines).
+  const clamped = lines === 2 ? 2 : 3;
+  const hasMore = overview.length > clamped * 54;
 
   return (
-    <p
-      data-testid="card-synopsis"
-      className={`${reserve} ${lines === 2 ? 'line-clamp-2' : 'line-clamp-3'} text-[13px] leading-relaxed text-slate-400 ${className}`}
-    >
-      {overview}
-    </p>
+    <div className={className}>
+      <p
+        data-testid="card-synopsis"
+        className={`${open ? '' : `${reserve} ${clamped === 2 ? 'line-clamp-2' : 'line-clamp-3'}`} text-[13px] leading-relaxed text-slate-400`}
+      >
+        {overview}
+      </p>
+      <div className={`${toggleRow} flex items-start`}>
+        {hasMore && (
+          <button
+            type="button"
+            data-testid="synopsis-more"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            className="text-[11px] font-bold uppercase leading-[18px] tracking-wide text-slate-400 transition hover:text-white"
+          >
+            {open ? 'Less' : 'More'}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

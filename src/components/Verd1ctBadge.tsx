@@ -5,6 +5,15 @@
  * The whole shape says "WatchVerdict". Pure presentational; `px` is the TV
  * screen size and scales it from the title-page badge to a grid chip.
  */
+/**
+ * The badge's REAL rendered height for a given screen size — antennas and feet
+ * included. `px` is the screen, not the box, so a placeholder sized to `px`
+ * is 17px short at 38 and the card grows the moment a score arrives.
+ */
+export function verd1ctBadgeHeight(px: number, tv = true): number {
+  return (tv ? Math.round(px * 0.32) : 0) + px + (tv ? Math.round(px * 0.14) : 0);
+}
+
 export function Verd1ctBadge({
   score,
   px = 44,

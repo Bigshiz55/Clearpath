@@ -164,3 +164,39 @@ export const MAX_FIT_CHARS = 84;
 export function fitsInTwoLines(sentence: string): boolean {
   return sentence.length <= MAX_FIT_CHARS;
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   ONE SECTION INSTEAD OF TWO.
+
+   The honest fallback shipped as two labelled blocks — "What we can say" and
+   "Why it is not personal yet" — which is two headings, two sentences and four
+   lines to say one thing, in a shape that reads as two separate findings. It
+   also framed the state as a deficiency twice over.
+
+   It is one status with one sentence now, and it leads with what the
+   recommendation IS based on before naming what would sharpen it. Same
+   information, same honesty, a third of the height. When there IS a profile,
+   the section keeps saying exactly what the axes say — it never inherits the
+   generic sentence.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+export const PERSONALIZATION_LABEL = 'Personalization status';
+
+/** The one sentence for a profile too thin to speak from. */
+export const NOT_PERSONAL_YET =
+  'This recommendation is currently based on the title’s themes and audience reception. Rate a few more titles to improve your personal match.';
+
+export interface PersonalizationStatus {
+  /** True only when the sentence is built from the user's own rated history. */
+  personalized: boolean;
+  /** Always present. Never a flattering generic when we have nothing. */
+  sentence: string;
+  /** The one honest caveat, when there is a real one. */
+  note: string | null;
+}
+
+export function personalizationStatus(input: FitInput): PersonalizationStatus {
+  const r = buildFitReasons(input);
+  if (!r.personalized) return { personalized: false, sentence: NOT_PERSONAL_YET, note: null };
+  return { personalized: true, sentence: r.positive, note: r.caution };
+}

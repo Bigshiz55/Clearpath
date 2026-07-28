@@ -42,7 +42,10 @@ test('an iPad gets a bigger control than a phone', async ({ page }) => {
 
   expect(ipad.height, 'iPad button height').toBeGreaterThan(phone.height);
   expect(ipad.fontSize, 'iPad label size').toBeGreaterThan(phone.fontSize);
-  expect(ipad.height, 'iPad button is comfortably above the touch floor').toBeGreaterThanOrEqual(52);
+  // Above the 44px floor, but no longer 52+: "make them slightly shorter and
+  // give them a little more breathing room above them". A taller button is not
+  // a more tappable one past ~48px; the air around it is what makes it usable.
+  expect(ipad.height, 'iPad button is comfortably above the touch floor').toBeGreaterThanOrEqual(48);
 });
 
 test('a large iPad / laptop gets bigger still', async ({ page }) => {

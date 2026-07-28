@@ -1,0 +1,181 @@
+import { test, expect, type Page } from '@playwright/test';
+
+/**
+ * THE CARD, CLEANED UP — same information, less of it shouting.
+ *
+ * "There is too much empty space inside it, and the score information feels
+ * spread out… tone down the amount of pink… do not show rating source icons
+ * with a dash when no score is available."
+ *
+ * Every assertion here is one of those, measured on the real card rather than
+ * eyeballed: the panel's own height and fill, the absence of placeholder
+ * dashes, the reading order down the card, and the fact that nothing was
+ * removed to achieve any of it.
+ */
+const FULL = { standardScore: 81, tomatometer: 91, rtAudience: 78, imdb: 7.8 };
+const SYNOPSIS =
+  'A weary detective returns to the coastal town he grew up in to investigate a disappearance everybody there would rather forget, and finds his own family at the centre of it.';
+
+async function open(page: Page, w = 390, ratings: Record<string, unknown> = FULL) {
+  await page.setViewportSize({ width: w, height: 1000 });
+  await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings, overview: SYNOPSIS } }));
+  await page.route('**/api/dna/**', (r) =>
+    r.fulfill({ json: { dna: { score: 81, confidence: 0.2, tasteScore: null, available: false, sampleSize: 0, fit: null } } }),
+  );
+  await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
+  await expect(page.getByTestId('qa-grid')).toBeVisible();
+  await page.waitForTimeout(400);
+}
+
+const card = (page: Page) => page.getByTestId('qa-grid').locator('> div').first();
+const panel = (page: Page) => card(page).locator('.wv-score').first();
+
+test.describe('the verdict panel', () => {
+  test('is a dark panel with a pink edge, not a pink block', async ({ page }) => {
+    await open(page);
+    const s = await panel(page).evaluate((el) => {
+      const c = getComputedStyle(el);
+      return { bg: c.backgroundColor, ring: c.boxShadow };
+    });
+    const [r, g, b] = /rgba?\(([^)]+)\)/.exec(s.bg)![1]!.split(',').map((n) => Number(n.trim()));
+    // Near-black, and NOT tinted toward magenta: the old fill was pink at 9%,
+    // which on this surface reads as a coloured block behind the numbers.
+    expect(Math.max(r!, g!, b!), `panel fill is ${s.bg}`).toBeLessThan(40);
+    expect(r! - g!, 'the fill is still tinted pink').toBeLessThan(12);
+    // The pink survives as the frame.
+    expect(s.ring).toMatch(/255,\s*20,\s*147/);
+  });
+
+  test('holds the score, the call and the ratings without a wasted row', async ({ page }) => {
+    await open(page);
+    const h = (await panel(page).boundingBox())!.height;
+    // It was ~99px on a phone: two stacked rows with air between them. One row
+    // of content plus its padding is ~70.
+    expect(h, `the panel is ${Math.round(h)}px tall`).toBeLessThanOrEqual(76);
+
+    // Nothing was dropped to get there.
+    await expect(panel(page)).toContainText('81');
+    await expect(panel(page)).toContainText('STREAM IT');
+    await expect(panel(page).locator('.wv-ratings-row > span')).toHaveCount(3);
+  });
+
+  test('the score and the call are the loudest things in it', async ({ page }) => {
+    await open(page);
+    const sizes = await panel(page).evaluate((el) => {
+      const call = [...el.querySelectorAll('span')].find((s) => /STREAM IT|SKIP IT|WORTH IT/i.test(s.textContent ?? ''));
+      const label = el.querySelector('.text-\\[10px\\]');
+      return {
+        call: call ? parseFloat(getComputedStyle(call).fontSize) : 0,
+        label: label ? parseFloat(getComputedStyle(label).fontSize) : 0,
+      };
+    });
+    expect(sizes.call).toBeGreaterThan(sizes.label);
+  });
+});
+
+test.describe('an unavailable rating is not drawn as a dash', () => {
+  test('a source we do not hold simply is not there', async ({ page }) => {
+    await open(page, 390, { standardScore: 81, imdb: 7.8 });
+    const chips = card(page).locator('.wv-ratings-row > span');
+    await expect(chips).toHaveCount(1);
+    await expect(chips.first()).toContainText('7.8');
+    expect(await card(page).innerText(), 'a placeholder dash is back').not.toContain('–');
+  });
+
+  test('holding none of them is stated in words, once', async ({ page }) => {
+    await open(page, 390, { standardScore: 81 });
+    await expect(card(page).getByTestId('ratings-none')).toBeVisible();
+    await expect(card(page).getByTestId('ratings-none')).toContainText(/not available/i);
+    expect(await card(page).innerText()).not.toContain('–');
+  });
+
+  test('and the row is the same height either way, so nothing moves', async ({ page }) => {
+    await open(page, 390, FULL);
+    const full = (await card(page).locator('.wv-ratings-row').first().boundingBox())!.height;
+    await open(page, 390, { standardScore: 81 });
+    const none = (await card(page).locator('.wv-ratings-row').first().boundingBox())!.height;
+    expect(Math.round(none)).toBe(Math.round(full));
+  });
+});
+
+test.describe('personalization status', () => {
+  test('is one section, with the positive framing', async ({ page }) => {
+    await open(page);
+    const block = card(page).getByTestId('why-it-fits');
+    await expect(block).toContainText('Personalization status');
+    await expect(block).not.toContainText('What we can say');
+    await expect(block).not.toContainText('not personal yet');
+    await expect(block.getByTestId('fit-caution')).toHaveCount(0);
+  });
+
+  test('takes less room than the two blocks it replaced', async ({ page }) => {
+    await open(page);
+    const h = (await card(page).getByTestId('why-it-fits').boundingBox())!.height;
+    expect(h, `${Math.round(h)}px`).toBeLessThanOrEqual(90); // was 112
+  });
+});
+
+test.describe('the synopsis knows its place', () => {
+  test('stops at three lines and offers the rest', async ({ page }) => {
+    await open(page);
+    const syn = card(page).getByTestId('card-synopsis');
+    const short = (await syn.boundingBox())!.height;
+    expect(short).toBeLessThanOrEqual(70); // three lines at 13px/relaxed
+
+    const more = card(page).getByTestId('synopsis-more');
+    await expect(more).toBeVisible();
+    await more.click();
+    const long = (await syn.boundingBox())!.height;
+    expect(long, 'More opened onto nothing').toBeGreaterThan(short);
+    await expect(more).toHaveText('Less');
+  });
+
+  test('does not offer More when there is no more', async ({ page }) => {
+    await open(page, 390, FULL);
+    await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings: FULL, overview: 'Short.' } }));
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(400);
+    await expect(card(page).getByTestId('synopsis-more')).toHaveCount(0);
+  });
+});
+
+test.describe('the decision buttons', () => {
+  test('keep the tap-target floor and lose the bulk above it', async ({ page }) => {
+    for (const w of [390, 1024, 1440]) {
+      await open(page, w);
+      const h = (await card(page).getByTestId('card-verdict-for').first().boundingBox())!.height;
+      expect(h, `FOR is ${Math.round(h)}px at ${w}`).toBeGreaterThanOrEqual(44);
+      expect(h, `FOR is ${Math.round(h)}px at ${w}`).toBeLessThanOrEqual(50);
+    }
+  });
+
+  test('have real air above them', async ({ page }) => {
+    await open(page);
+    const gap = await card(page).evaluate((el) => {
+      const row = el.querySelector('.wv-act-row') as HTMLElement;
+      const above = row.previousElementSibling as HTMLElement;
+      return Math.round(row.getBoundingClientRect().top - above.getBoundingClientRect().bottom);
+    });
+    expect(gap, 'the buttons still touch the evidence').toBeGreaterThanOrEqual(10);
+  });
+});
+
+test('the reading order down the card is what a decision needs', async ({ page }) => {
+  await open(page);
+  const order = await card(page).evaluate((el) => {
+    const y = (s: string) => {
+      const e = el.querySelector(s);
+      return e ? Math.round(e.getBoundingClientRect().top) : -1;
+    };
+    return {
+      synopsis: y('[data-testid="card-synopsis"]'),
+      status: y('[data-testid="why-it-fits"]'),
+      score: y('.wv-score'),
+      actions: y('.wv-act-row'),
+    };
+  });
+  // What it is → how well it fits you → the evidence → what you do.
+  expect(order.synopsis).toBeLessThan(order.score);
+  expect(order.score).toBeLessThan(order.status);
+  expect(order.status).toBeLessThan(order.actions);
+});

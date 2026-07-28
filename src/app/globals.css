@@ -964,6 +964,43 @@ body {
     display: none;
   }
 }
+/* SCORE · CALL · RATINGS ON ONE LINE, WHEN THE PANEL CAN HOLD ONE.
+   The badge and the call need ~150px and the three rating chips ~140px, so
+   below ~310px of panel the ratings take their own row instead of being
+   crushed. A container query, because the panel's width is set by the CARD
+   (a 252px grid cell at 1440, a 310px card foot on a phone), not by the
+   viewport — the `sm:` breakpoint gets this exactly backwards. */
+.wv-score {
+  container-type: inline-size;
+}
+.wv-score-ratings {
+  flex-basis: 100%;
+}
+@container (min-width: 310px) {
+  .wv-score-ratings {
+    flex-basis: auto;
+    margin-left: auto;
+  }
+}
+/* …but the chips are deliberately BIGGER from `lg` (they are the evidence
+   under the score), so the same panel that holds them on one line at 390px
+   cannot at 1366. Left to the 310px threshold the row fitted while the
+   skeleton was 96px wide and wrapped once the real numbers arrived — the card
+   grew 32px a few hundred milliseconds after paint, which is the exact defect
+   `card-ruling.spec` exists to catch. The threshold moves with the type. */
+@media (min-width: 1024px) {
+  @container (max-width: 420px) {
+    .wv-score-ratings {
+      flex-basis: 100%;
+      margin-left: 0;
+    }
+  }
+}
+
+/* 44px is the tap-target floor and stays the floor at every width. What went is
+   the extra height ABOVE it on wide screens: a 56px button is not more tappable
+   than a 50px one, it is just a bigger block of colour under the thing you are
+   deciding about. */
 .wv-act {
   min-height: 44px;
   min-width: fit-content;
@@ -973,7 +1010,7 @@ body {
 }
 @media (min-width: 1024px) {
   .wv-act {
-    min-height: 52px;
+    min-height: 48px;
   }
   .wv-act-label {
     font-size: 13px;
@@ -986,7 +1023,7 @@ body {
 }
 @media (min-width: 1280px) {
   .wv-act {
-    min-height: 56px;
+    min-height: 50px;
   }
   .wv-act-label {
     font-size: 14px;

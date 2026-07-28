@@ -8,6 +8,8 @@ import { STREAMING_SERVICES } from '@/lib/services';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { PosterCard } from '@/components/PosterCard';
 import { MatchMark } from '@/components/MatchMark';
+import { WhyVerdict } from '@/components/verdict/WhyVerdict';
+import { buildPills } from '@/lib/verdict/pills';
 import { type TileRatings } from '@/lib/ratings';
 import type { FinderQuery } from '@/lib/finder';
 
@@ -454,86 +456,72 @@ export function FinderUI({
                     year={it.year}
                     posterUrl={it.posterUrl}
                     posterPath={it.posterPath}
-                  >
-                    {it.reason && <p className="mt-1.5 line-clamp-3 text-xs text-slate-400">{it.reason}</p>}
-                    {it.household && (
-                      <div
-                        data-testid="household-verdict"
-                        data-call={it.household.call}
-                        className={`mt-2 rounded-lg border p-2 text-xs ${
-                          it.household.call === 'warning'
-                            ? 'border-amber-400/40 bg-amber-500/10 text-amber-100'
-                            : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'
-                        }`}
-                      >
-                        <div className="font-black">
-                          {it.household.call === 'warning' ? '⚠️ HOUSEHOLD WARNING' : `HOUSEHOLD MATCH: ${it.household.score}`}
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums">
-                          {it.household.perMember.map((m) => (
-                            <span key={m.name}>{m.name}: <b>{m.match}</b></span>
-                          ))}
-                        </div>
-                        {it.household.explanation[0] && <p className="mt-1 opacity-90">{it.household.explanation[0]}</p>}
-                      </div>
-                    )}
-                    {it.explain && (
-                      <details data-testid="why-verdict" className="group mt-2 rounded-lg border border-white/10 bg-white/[0.03] text-xs">
-                        <summary className="cursor-pointer select-none px-2 py-1.5 font-bold text-brand-200 transition hover:text-white">
-                          Why this Verd1ct?
-                        </summary>
-                        <div className="space-y-2 px-2 pb-2">
-                          {it.explain.rose.length > 0 && (
-                            <div>
-                              <div className="font-black uppercase tracking-wide text-emerald-300">Why it won</div>
-                              {it.explain.rose.map((r) => <p key={r} className="text-slate-300">+ {r}</p>)}
-                            </div>
-                          )}
-                          {it.explain.heldBack.length > 0 && (
-                            <div>
-                              <div className="font-black uppercase tracking-wide text-amber-300">What held it back</div>
-                              {it.explain.heldBack.map((r) => <p key={r} className="text-slate-300">− {r}</p>)}
-                            </div>
-                          )}
-                          {it.explain.requirements.length > 0 && (
-                            <div>
-                              <div className="font-black uppercase tracking-wide text-slate-400">Requirements</div>
-                              {it.explain.requirements.map((r) => (
-                                <p key={r.label} className="text-slate-300">{r.satisfied ? '✓' : '✗'} {r.label} <span className="text-slate-500">({r.evidence})</span></p>
+                    evidence={
+                      <>
+                        {/* THE PILLS, RANKED. Your match is the reason the
+                            result is on the screen; the year and the audience
+                            score are evidence. They were five identical bright
+                            outlines, so the eye had to read all of them to find
+                            the one it wanted. */}
+                        {(() => {
+                          const pills = buildPills({ receipts: it.receipts, where: it.where });
+                          if (pills.length === 0) return null;
+                          return (
+                            <div data-testid="result-pills" className="flex flex-wrap gap-1">
+                              {pills.map((p) => (
+                                <span
+                                  key={p.label}
+                                  data-tone={p.tone}
+                                  className={
+                                    p.tone === 'match'
+                                      ? 'rounded-md border border-[#ff1493]/60 bg-[#ff1493]/15 px-2 py-0.5 text-[11px] font-black text-pink-100'
+                                      : p.tone === 'watch'
+                                        ? 'rounded-md border border-brand-400/40 bg-brand-500/10 px-2 py-0.5 text-[11px] font-semibold text-brand-100'
+                                        : 'rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-slate-400'
+                                  }
+                                >
+                                  {p.tone === 'match' ? p.label : p.tone === 'watch' ? `📺 ${p.label}` : `✓ ${p.label}`}
+                                </span>
                               ))}
                             </div>
-                          )}
-                          {it.explain.availability && (
-                            <p className="text-slate-300">
-                              📺 {it.explain.availability.text}
-                              <span className="ml-1 text-slate-500">· {it.explain.availability.confidence}</span>
-                            </p>
-                          )}
-                          <p className="text-slate-400">
-                            Confidence: <b className="uppercase">{it.explain.confidence.level}</b>
-                            {it.explain.confidence.because[0] ? ` — ${it.explain.confidence.because[0]}` : ''}
-                          </p>
-                        </div>
-                      </details>
-                    )}
-                    {(() => {
-                      const info = it.mediaType === 'tv' && it.airing ? airingInfo(it.airing) : null;
-                      if (!info) return null;
-                      return (
-                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-2 py-1 text-xs font-bold text-white">
-                          <span aria-hidden>📺</span>
-                          <span className="tabular-nums">{info.text}</span>
-                        </div>
-                      );
-                    })()}
-                    {(it.receipts.length > 0 || it.where) && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {it.receipts.map((r) => (
-                          <span key={r} className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">✓ {r}</span>
-                        ))}
-                        {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
-                      </div>
-                    )}
+                          );
+                        })()}
+                        {(() => {
+                          const info = it.mediaType === 'tv' && it.airing ? airingInfo(it.airing) : null;
+                          if (!info) return null;
+                          return (
+                            <div className="inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-2 py-1 text-xs font-bold text-white">
+                              <span aria-hidden>📺</span>
+                              <span className="tabular-nums">{info.text}</span>
+                            </div>
+                          );
+                        })()}
+                        {it.household && (
+                          <div
+                            data-testid="household-verdict"
+                            data-call={it.household.call}
+                            className={`rounded-lg border p-2 text-xs ${
+                              it.household.call === 'warning'
+                                ? 'border-amber-400/40 bg-amber-500/10 text-amber-100'
+                                : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'
+                            }`}
+                          >
+                            <div className="font-black">
+                              {it.household.call === 'warning' ? '⚠️ HOUSEHOLD WARNING' : `HOUSEHOLD MATCH: ${it.household.score}`}
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums">
+                              {it.household.perMember.map((m) => (
+                                <span key={m.name}>{m.name}: <b>{m.match}</b></span>
+                              ))}
+                            </div>
+                            {it.household.explanation[0] && <p className="mt-1 opacity-90">{it.household.explanation[0]}</p>}
+                          </div>
+                        )}
+                        {it.explain && <WhyVerdict data={it.explain} />}
+                      </>
+                    }
+                  >
+                    {it.reason && <p className="mt-1.5 line-clamp-3 text-xs text-slate-400">{it.reason}</p>}
                   </PosterCard>
                 ))}
               </div>

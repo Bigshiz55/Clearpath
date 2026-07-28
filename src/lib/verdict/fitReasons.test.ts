@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { buildFitReasons, fitsInTwoLines, MAX_FIT_CHARS, MIN_SAMPLES_FOR_FIT } from './fitReasons';
+import {
+  buildFitReasons,
+  fitsInTwoLines,
+  MAX_FIT_CHARS,
+  MIN_SAMPLES_FOR_FIT,
+  NOT_PERSONAL_YET,
+  PERSONALIZATION_LABEL,
+  personalizationStatus,
+} from './fitReasons';
 
 const AGREE = [
   { label: 'Tension', note: 'edge-of-seat' },
@@ -102,6 +110,48 @@ describe('honesty when there is nothing to say', () => {
     expect(
       buildFitReasons({ agree: [{ label: '', note: '' }], samples: 99 }).personalized,
     ).toBe(false);
+  });
+});
+
+describe('personalization status — one section, not two', () => {
+  it('is one heading', () => {
+    expect(PERSONALIZATION_LABEL).toBe('Personalization status');
+  });
+
+  it('says what the recommendation IS based on before what would sharpen it', () => {
+    const s = personalizationStatus({ samples: 0 });
+    expect(s.personalized).toBe(false);
+    expect(s.sentence).toBe(NOT_PERSONAL_YET);
+    expect(s.note, 'the second block is gone, not moved').toBeNull();
+    // Leads with the basis, closes with the action.
+    expect(s.sentence.indexOf('themes')).toBeLessThan(s.sentence.indexOf('Rate a few more'));
+  });
+
+  it('does not claim a taste profile it does not have', () => {
+    for (const samples of [0, 1, MIN_SAMPLES_FOR_FIT - 1]) {
+      const s = personalizationStatus({ agree: AGREE, clash: CLASH, samples });
+      expect(s.personalized, `samples=${samples}`).toBe(false);
+      expect(s.sentence).not.toMatch(/you rate/i);
+    }
+  });
+
+  it('speaks from the real axes the moment there are enough', () => {
+    const s = personalizationStatus({ agree: AGREE, clash: CLASH, samples: 144 });
+    expect(s.personalized).toBe(true);
+    expect(s.sentence).toContain('edge-of-seat tension');
+    expect(s.sentence, 'the generic line must never leak in here').not.toBe(NOT_PERSONAL_YET);
+    expect(s.note).toContain('humor');
+  });
+
+  it('offers no caveat when there is nothing truthful to caution about', () => {
+    expect(personalizationStatus({ agree: AGREE, clash: [], samples: 144 }).note).toBeNull();
+  });
+
+  it('is shorter than the two blocks it replaced', () => {
+    const old = buildFitReasons({ samples: 0 });
+    const now = personalizationStatus({ samples: 0 });
+    const oldLen = old.positiveLabel.length + old.positive.length + (old.cautionLabel + (old.caution ?? '')).length;
+    expect(now.sentence.length + PERSONALIZATION_LABEL.length).toBeLessThan(oldLen);
   });
 });
 

@@ -337,23 +337,38 @@ for (const w of [320, 375, 390, 430, 768, 1024, 1440] as const) {
   });
 }
 
-test('the honest fallback is shown in full too', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 900 });
-  await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings: { standardScore: 86 }, overview: 'A synopsis.' } }));
-  await page.route('**/api/dna/**', (r) => r.fulfill({ json: { dna: { score: 86, confidence: 0.2, tasteScore: null, available: false, sampleSize: 0, fit: null } } }));
-  await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(500);
+/**
+ * THE HONEST FALLBACK IS ONE SECTION NOW, NOT TWO.
+ *
+ * It was "What we can say" + "Why it is not personal yet" — two headings and
+ * two sentences describing one state. Still honest, still complete, and it must
+ * still fit without being cut at the narrowest column the card ever gets.
+ */
+for (const w of [320, 390, 768, 1440] as const) {
+  test(`the honest fallback is shown in full too @ ${w}`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: 900 });
+    await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings: { standardScore: 86 }, overview: 'A synopsis.' } }));
+    await page.route('**/api/dna/**', (r) => r.fulfill({ json: { dna: { score: 86, confidence: 0.2, tasteScore: null, available: false, sampleSize: 0, fit: null } } }));
+    await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
 
-  const block = page.getByTestId('why-it-fits').first();
-  await expect(block).toHaveAttribute('data-personalized', 'false');
-  for (const id of ['fit-positive', 'fit-caution']) {
-    const p = block.getByTestId(id);
+    const block = page.getByTestId('why-it-fits').first();
+    await expect(block).toHaveAttribute('data-personalized', 'false');
+    await expect(block).toContainText('Personalization status');
+    // ONE sentence — the second block is gone, not hidden.
+    await expect(block.getByTestId('fit-caution')).toHaveCount(0);
+
+    const p = block.getByTestId('fit-positive');
     const overflow = await p.evaluate((el) => el.scrollHeight - el.clientHeight);
-    expect(overflow, `${id} fallback is cut`).toBeLessThanOrEqual(1);
-  }
-  // And it does not pretend to be personal.
-  await expect(block.getByTestId('fit-positive')).toContainText(/not on your taste yet/i);
-});
+    const text = (await p.innerText()).trim();
+    expect(overflow, `the fallback is cut at ${w}px: "${text}"`).toBeLessThanOrEqual(1);
+    expect(text.endsWith('…') || text.endsWith('...'), `it ends in an ellipsis at ${w}`).toBe(false);
+    // And it does not pretend to be personal, while still sounding like a
+    // recommendation rather than an apology.
+    await expect(p).toContainText(/themes and audience reception/i);
+    await expect(p).toContainText(/rate a few more titles/i);
+  });
+}
 
 test('the verdict block uses the card’s full width, not the column beside the poster', async ({ page }) => {
   await open(page);

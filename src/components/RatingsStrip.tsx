@@ -112,7 +112,28 @@ export function RatingsStrip({
           A no-wrap flex row lets each take what it needs and puts the spare in
           the gaps. `flex-nowrap` keeps the guarantee the grid was there for:
           one line, one height, at every width. */}
-      <div className="wv-ratings-row flex min-w-0 flex-nowrap items-center justify-between gap-1 overflow-hidden text-sm font-black tabular-nums">
+      {/* AN ICON WITH A DASH IS NOT A RATING.
+          A source we do not hold was rendering as "🍅 –", which reads as a
+          panel that failed to finish loading rather than as a title nobody has
+          scored. Sources we have are shown; sources we do not are simply not
+          claimed. When we hold NONE, the row says so in words once — the state
+          is named, not left as three empty boxes. The row keeps its height
+          either way, so nothing in the grid moves. */}
+      {/* THE CHIPS SIT TOGETHER, and the slack goes at the end.
+          `justify-between` pushed the spare width BETWEEN them, so whenever the
+          row had room — a wide card, or the row wrapping onto a line of its
+          own — three related numbers were spread across the panel with holes
+          between them. They are one piece of evidence, so they group. */}
+      <div className="wv-ratings-row flex min-w-0 flex-nowrap items-center justify-start gap-2 overflow-hidden text-sm font-black tabular-nums">
+        {ratings.tomatometer == null && popcorn == null && ratings.imdb == null && (
+          <span
+            data-testid="ratings-none"
+            className="inline-flex h-[26px] items-center whitespace-nowrap text-[11px] font-semibold text-slate-500"
+            title="No critic, audience or IMDb score is published for this title yet"
+          >
+            Ratings not available yet
+          </span>
+        )}
         <RatingChip
           mark={<span aria-hidden className="wv-ratings-emoji flex-none text-[11px] leading-none sm:text-sm">🍅</span>}
           value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
@@ -151,8 +172,12 @@ export function RatingsStrip({
  * Now: one neutral chip, one height, one type scale. Colour is carried by the
  * NUMBER (a fresh tomato stays green, a rotten one red) rather than by the
  * container, so recognition survives without any of them competing with
- * FOR/AGAINST/SAVE. Missing values render "–" in the same box rather than
- * leaving a hole.
+ * FOR/AGAINST/SAVE.
+ *
+ * A SOURCE WE DO NOT HOLD RENDERS NOTHING. It used to render "–" in the same
+ * box, which is a claim shaped like data: an empty tomato and an empty IMDb
+ * make the panel look unfinished rather than making the title look unrated.
+ * The row names that state once, in words, when it holds nothing at all.
  */
 function RatingChip({
   mark,
@@ -165,6 +190,7 @@ function RatingChip({
   tone: string;
   title: string;
 }) {
+  if (value == null) return null;
   return (
     <span
       /* TIGHT ON PURPOSE. In a row card the body is ~186px wide, so each of
@@ -178,9 +204,7 @@ function RatingChip({
          So below `sm` the chips lose their fill, ring and padding and keep only
          what the requirement actually asks for: one height, one type scale, one
          spacing. The chip treatment returns from `sm`, where it fits. */
-      className={`inline-flex h-[26px] min-w-0 items-center gap-0.5 overflow-hidden whitespace-nowrap rounded-md text-xs sm:gap-1 sm:bg-white/[0.06] sm:px-1.5 sm:text-[13px] sm:ring-1 sm:ring-white/10 ${
-        value != null ? tone : 'text-slate-500'
-      }`}
+      className={`inline-flex h-[26px] min-w-0 items-center gap-0.5 overflow-hidden whitespace-nowrap rounded-md text-xs sm:gap-1 sm:bg-white/[0.06] sm:px-1.5 sm:text-[13px] sm:ring-1 sm:ring-white/10 ${tone}`}
       title={title}
     >
       {mark}
@@ -188,7 +212,7 @@ function RatingChip({
           absent — it looks like data we have and cannot show. If it genuinely
           will not fit, the chip clips at its own edge and the test below
           catches it. */}
-      <span className="font-black">{value ?? '–'}</span>
+      <span className="font-black">{value}</span>
     </span>
   );
 }
