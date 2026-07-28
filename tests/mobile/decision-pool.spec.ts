@@ -284,3 +284,86 @@ test('the ratings do not look like the actions', async ({ page }) => {
   const forBtn = (await page.getByTestId('card-verdict-for').first().boundingBox())!;
   expect(heights[0]!).toBeLessThan(forBtn.height);
 });
+
+/**
+ * THE WHOLE SENTENCE, OR IT IS NOT A REASON.
+ *
+ * "I want the entire sentences of why it's either the recommended or not
+ * recommended visible. There's free space."
+ *
+ * Both were being drawn in the ~200px column beside the poster and cut mid-word
+ * ("…and how it was…"), while a ~300×320 block under the poster sat empty. They
+ * now span the card's full width. A clamped reason is worse than no reason: it
+ * reads as a system that had something to say and would not finish.
+ */
+for (const w of [320, 375, 390, 430, 768, 1024, 1440] as const) {
+  test(`the fit reasons are shown in full @ ${w}`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: 900 });
+    await page.route('**/api/ratings/**', (r) =>
+      r.fulfill({ json: { ratings: { standardScore: 86, rtAudience: 83, tomatometer: 51, imdb: 6.8 }, overview: 'A synopsis.' } }),
+    );
+    await page.route('**/api/dna/**', (r) =>
+      r.fulfill({
+        json: {
+          dna: {
+            score: 86, confidence: 0.8, tasteScore: 80, available: true, sampleSize: 144,
+            fit: {
+              // The longest axes the dimension set can produce.
+              agree: [
+                { label: 'Mystery Complexity', note: 'puzzle-forward, rewards attention' },
+                { label: 'Supernatural Intensity', note: 'heavily supernatural' },
+              ],
+              clash: [{ label: 'Humor', note: 'you lean broad' }],
+            },
+          },
+        },
+      }),
+    );
+    await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+
+    const block = page.getByTestId('why-it-fits').first();
+    await expect(block).toBeVisible();
+    for (const id of ['fit-positive', 'fit-caution']) {
+      const p = block.getByTestId(id);
+      await expect(p, `${id} missing at ${w}`).toBeVisible();
+      // A clamped paragraph scrolls its own overflow. Nothing may.
+      const overflow = await p.evaluate((el) => el.scrollHeight - el.clientHeight);
+      const text = (await p.innerText()).trim();
+      expect(overflow, `${id} is cut at ${w}px: "${text}"`).toBeLessThanOrEqual(1);
+      expect(text.endsWith('…') || text.endsWith('...'), `${id} ends in an ellipsis at ${w}`).toBe(false);
+      expect(text.length, `${id} is empty at ${w}`).toBeGreaterThan(20);
+    }
+  });
+}
+
+test('the honest fallback is shown in full too', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings: { standardScore: 86 }, overview: 'A synopsis.' } }));
+  await page.route('**/api/dna/**', (r) => r.fulfill({ json: { dna: { score: 86, confidence: 0.2, tasteScore: null, available: false, sampleSize: 0, fit: null } } }));
+  await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+
+  const block = page.getByTestId('why-it-fits').first();
+  await expect(block).toHaveAttribute('data-personalized', 'false');
+  for (const id of ['fit-positive', 'fit-caution']) {
+    const p = block.getByTestId(id);
+    const overflow = await p.evaluate((el) => el.scrollHeight - el.clientHeight);
+    expect(overflow, `${id} fallback is cut`).toBeLessThanOrEqual(1);
+  }
+  // And it does not pretend to be personal.
+  await expect(block.getByTestId('fit-positive')).toContainText(/not on your taste yet/i);
+});
+
+test('the verdict block uses the card’s full width, not the column beside the poster', async ({ page }) => {
+  await open(page);
+  const card = page.getByTestId('qa-grid').locator('> div').first();
+  const cardBox = (await card.boundingBox())!;
+  const art = (await card.locator('.wv-card-art').boundingBox())!;
+  const foot = (await card.locator('.wv-card-foot').boundingBox())!;
+
+  // It starts under the poster, not beside it…
+  expect(foot.y, 'the verdict block is still beside the poster').toBeGreaterThanOrEqual(art.y + art.height - 1);
+  // …and it is wider than the text column ever was.
+  expect(foot.width).toBeGreaterThan(cardBox.width * 0.85);
+});

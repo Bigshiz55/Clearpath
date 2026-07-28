@@ -52,9 +52,24 @@ export interface FitReasons {
 /** Below this the profile is noise, and `matchHighlights` should not be trusted. */
 export const MIN_SAMPLES_FOR_FIT = 3;
 
-/** "edge-of-seat tension", "demands-focus attention" — the axis, read naturally. */
+/**
+ * "edge-of-seat tension", "puzzle-forward mystery complexity" — the axis, read
+ * naturally and kept SHORT.
+ *
+ * Two things bite here. A note can carry a qualifier the sentence does not need
+ * ("puzzle-forward, rewards attention"), and a note can already contain the
+ * label ("heavily supernatural" + "Supernatural Intensity" → "heavily
+ * supernatural supernatural intensity"). Both produced sentences that ran to
+ * three lines and got cut, which is the thing being fixed.
+ */
 function phrase(a: FitAxis): string {
-  return `${a.note.trim()} ${a.label.trim().toLowerCase()}`;
+  // Everything after the first comma is elaboration, not identification.
+  const note = (a.note.split(',')[0] ?? '').trim();
+  const label = a.label.trim().toLowerCase();
+  const words = new Set(note.toLowerCase().split(/\s+/));
+  // Drop label words the note already said.
+  const kept = label.split(/\s+/).filter((w) => !words.has(w));
+  return kept.length > 0 ? `${note} ${kept.join(' ')}` : note;
 }
 
 /** "a, b and c" — an Oxford-free list that reads as a sentence. */
@@ -67,8 +82,8 @@ function list(parts: readonly string[]): string {
 
 const FALLBACK: FitReasons = {
   personalized: false,
-  positive: 'Based on this title’s own themes and how it was received — not on your taste yet.',
-  caution: 'Personalised reasoning improves as your Viewer DNA grows. Rate a few titles.',
+  positive: 'Based on this title’s own themes and reception — not on your taste yet.',
+  caution: 'This gets personal as your Viewer DNA grows. Rate a few titles.',
   positiveLabel: 'What we can say',
   cautionLabel: 'Why it is not personal yet',
 };
@@ -89,19 +104,31 @@ export function buildFitReasons(input: FitInput): FitReasons {
   if (samples < MIN_SAMPLES_FOR_FIT) return FALLBACK;
   if (agree.length === 0 && clash.length === 0) return FALLBACK;
 
-  // Two axes is the budget. Three makes a sentence that wraps to four lines on
-  // a phone, and the third is always the weakest of the three anyway.
-  const good = agree.slice(0, 2).map(phrase);
+  const phrases = agree.slice(0, 2).map(phrase);
   const bad = clash.slice(0, 1);
 
+  // TWO AXES, OR ONE IF TWO WOULD NOT FIT ON TWO LINES.
+  //
+  // Axis names vary hugely — "epic stakes" is 11 characters, "puzzle-forward
+  // mystery complexity" is 33. Rather than guess a cutoff, build the sentence
+  // and measure it: two long axes ran to three lines in a 252px desktop column
+  // and got cut. The second axis is always the weaker of the two, so it goes.
+  //
+  // The heading above already says "Why it fits you", so the sentence does not
+  // repeat the framing — it just names what you rate highly. That is what
+  // bought the room for two axes in the first place.
+  const say = (parts: string[]) => `You rate ${list(parts)} highly.`;
   const positive =
-    good.length > 0
-      ? `You keep rating ${list(good)} highly, and this has it.`
+    phrases.length > 0
+      ? fitsInTwoLines(say(phrases))
+        ? say(phrases)
+        : say(phrases.slice(0, 1))
       : // Everything decisive about this title runs against the profile. Saying
         // "it fits you" here would be a lie, so the positive line becomes an
         // honest statement of the one thing we can still stand behind.
-        'Nothing here matches the taste you have shown so far — worth a look only if you are after something different.';
+        'Nothing here matches the taste you have shown so far.';
 
+  const good = phrases;
   const caution =
     bad.length > 0
       ? `Its ${bad[0]!.label.toLowerCase()} runs the other way — ${bad[0]!.note}.`
@@ -123,7 +150,16 @@ export function buildFitReasons(input: FitInput): FitReasons {
  * rows on a phone gets cut here rather than clipped in CSS, so the words that
  * survive are chosen deliberately.
  */
-export const MAX_FIT_CHARS = 150;
+/**
+ * TWO LINES AT THE NARROWEST COLUMN THE CARD EVER GETS.
+ *
+ * Not the phone — the DESKTOP. On a phone the block spans the card's full width
+ * (~334px). In a `poster-grid` at 1440 the card is a 280px column, so the block
+ * is ~252px, which is ~40 characters a line at 13px. Two lines is therefore ~80,
+ * and the budget has to be set by the tightest case or the sentence is complete
+ * on a phone and cut on a laptop.
+ */
+export const MAX_FIT_CHARS = 84;
 
 export function fitsInTwoLines(sentence: string): boolean {
   return sentence.length <= MAX_FIT_CHARS;

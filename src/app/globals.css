@@ -53,8 +53,10 @@ body {
      hand-rolls its own card — kept the old full-bleed poster and filled the
      whole screen with one title. Two copies of a layout is how that happens, so
      there is now one definition and every grid uses it. */
+  /* The upper half: poster beside the facts on a phone, stacked from `sm`.
+     `pb-0` because `.wv-card-foot` below carries the bottom padding now. */
   .wv-card {
-    @apply flex h-full gap-3 overflow-hidden p-3 sm:block sm:gap-0 sm:p-0;
+    @apply flex gap-3 overflow-hidden p-3 pb-0 sm:block sm:gap-0 sm:p-0;
   }
   /* THE POSTER HOLDS 2:3 EVERYWHERE, AND IS NEVER CROPPED.
      It used to STRETCH to the card's height on a phone, to avoid "a dead gap
@@ -70,6 +72,18 @@ body {
   }
   .wv-card-body {
     @apply flex min-w-0 flex-1 flex-col sm:p-3;
+  }
+  /* THE CARD'S FULL WIDTH, FOR THE THINGS THAT NEED IT.
+     A row card is a 2:3 poster beside a text column, and the poster is almost
+     always the shorter of the two — so everything below the synopsis was being
+     drawn in ~200px of the card's 334 while a 300×320 block under the poster
+     sat empty. The verdict panel was cramped and the two "why" sentences were
+     cut mid-word, in a card with a third of its area unused.
+     This zone starts under BOTH columns, so the verdict, the reasons and the
+     actions get the whole width. From `sm` the card is already a column and
+     this is simply its lower half, sharing the body's padding. */
+  .wv-card-foot {
+    @apply mt-3 px-3 pb-3 sm:mt-0 sm:px-3 sm:pb-3 sm:pt-0;
   }
 
   /* The tray's status word shares one line with Clear and Deliver. Below 360px

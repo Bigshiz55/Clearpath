@@ -111,7 +111,8 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
        near-black fill with a one-pixel ring gives a definite edge at a fraction
        of the visual weight, and lets the poster be the brightest thing on the
        card — which is the only thing that should be. */
-    <div className="card group wv-card !border-transparent bg-ink-950/85 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.9)] ring-1 ring-white/[0.07] transition hover:ring-white/15">
+    <div className="card group flex flex-col !border-transparent bg-ink-950/85 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.9)] ring-1 ring-white/[0.07] transition hover:ring-white/15">
+      <div className="wv-card">
       <div className="wv-card-art">
         {/* HOW FAR YOU HAVE COME. In an endless feed the count is the only
             thing distinguishing a long session from a loop — bottom-left, on
@@ -148,6 +149,14 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           heading
         )}
 
+        {children}
+      </div>
+      </div>
+
+      {/* THE FULL WIDTH OF THE CARD. Everything from here down was being drawn
+          in the narrow column beside the poster while the space under the
+          poster sat empty — which is why the two "why" sentences were cut. */}
+      <div className="wv-card-foot">
         {/* What it is about, straight from TMDB. Renders nothing when there is
             no synopsis rather than showing a placeholder. */}
         {/* THREE lines, not two. "Would like more information about what it's
@@ -181,7 +190,6 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             {resolvedOverlay}
           </div>
         )}
-        {children}
       </div>
     </div>
   );

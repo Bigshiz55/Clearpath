@@ -21,6 +21,29 @@ describe('when there is a real profile', () => {
     expect(r.positive).not.toContain('epic stakes');
   });
 
+  it('drops to ONE axis when two long ones would not fit two lines', () => {
+    // "puzzle-forward mystery complexity" + "heavily supernatural intensity" is
+    // 63 characters of axis alone — three lines in a 252px desktop column.
+    const r = buildFitReasons({
+      agree: [
+        { label: 'Mystery Complexity', note: 'puzzle-forward, rewards attention' },
+        { label: 'Supernatural Intensity', note: 'heavily supernatural' },
+      ],
+      clash: [],
+      samples: 144,
+    });
+    expect(r.positive).toContain('puzzle-forward mystery complexity');
+    expect(r.positive, 'the weaker second axis should have gone').not.toContain('supernatural');
+    expect(r.positive.length).toBeLessThanOrEqual(MAX_FIT_CHARS);
+    expect(fitsInTwoLines(r.positive)).toBe(true);
+  });
+
+  it('keeps both when they are short enough', () => {
+    const r = buildFitReasons({ agree: AGREE.slice(0, 2), clash: [], samples: 144 });
+    expect(r.positive).toContain('edge-of-seat tension');
+    expect(r.positive).toContain('demands focus attention');
+  });
+
   it('gives exactly one caution, from a real clash', () => {
     const r = buildFitReasons({ agree: AGREE, clash: CLASH, samples: 144 });
     expect(r.caution).toContain('humor');
@@ -47,9 +70,7 @@ describe('when there is a real profile', () => {
 
   it('reads as a sentence for one axis and for two', () => {
     const one = buildFitReasons({ agree: [AGREE[0]!], clash: [], samples: 20 });
-    expect(one.positive).toContain('rating edge-of-seat tension highly');
-    // The LIST has no conjunction with one item; the sentence template does.
-    expect(one.positive.split('highly')[0]).not.toContain(' and ');
+    expect(one.positive).toBe('You rate edge-of-seat tension highly.');
     const two = buildFitReasons({ agree: AGREE.slice(0, 2), clash: [], samples: 20 });
     expect(two.positive).toMatch(/tension and .*attention/);
   });
@@ -106,7 +127,9 @@ describe('it has to fit the card', () => {
   });
 
   it('the budget is a real number, not a vibe', () => {
-    expect(MAX_FIT_CHARS).toBeGreaterThan(80);
+    // Set by the narrowest column the card ever gets — a 280px desktop grid
+    // cell, not the 390px phone.
+    expect(MAX_FIT_CHARS).toBeGreaterThan(60);
     expect(fitsInTwoLines('x'.repeat(MAX_FIT_CHARS))).toBe(true);
     expect(fitsInTwoLines('x'.repeat(MAX_FIT_CHARS + 1))).toBe(false);
   });

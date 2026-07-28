@@ -21,16 +21,17 @@ import type { MediaType } from '@/lib/types';
  * A generic sentence dressed as personalisation is worse than an honest one:
  * it teaches people that the personalisation is decoration.
  */
-/** Two clamped lines each, plus the gap: 13px at leading-snug is ~17.9px a
- *  line, so 4 lines + 4px ≈ 76px. Held whether or not a caution exists — a
- *  small gap on the titles with no clash is a cost paid once at layout; a grid
- *  that moves is a cost paid on every tap. */
-/* A FIXED height, not a minimum. `min-h` is a floor: line-height rounding put
-   the rendered block 2px over it and the card grew anyway, which is the whole
-   defect. Both lines are clamped to two, so 80px can hold the maximum the
-   component can produce, and `overflow-hidden` makes that a guarantee rather
-   than an estimate. */
-const RESERVE = 'h-20 overflow-hidden';
+/**
+ * A FIXED height, sized for the block's own worst case at the card's FULL
+ * width (~334px on a 390px phone, ~54 characters a line at 13px).
+ *
+ * Per block: a 15px label line, then a sentence clamped to two lines
+ * (2 × 17.9 = 36). Two blocks plus the gap ≈ 110px. Fixed rather than a
+ * minimum, because `min-h` is only a floor and line-height rounding put the
+ * rendered block 2px over it — which grew the card and moved every card below
+ * it the moment the data landed.
+ */
+const RESERVE = 'h-28 overflow-hidden';
 
 export function CardWhyItFits({
   mediaType,
@@ -77,15 +78,27 @@ export function CardWhyItFits({
       data-testid="why-it-fits"
       data-personalized={reasons.personalized}
     >
-      <p className="line-clamp-2 text-[13px] leading-snug text-slate-300">
-        <span className="font-bold text-emerald-300">{reasons.positiveLabel}</span>{' '}
-        <span data-testid="fit-positive">{reasons.positive}</span>
-      </p>
-      {reasons.caution && (
-        <p className="line-clamp-2 text-[13px] leading-snug text-slate-400">
-          <span className="font-bold text-red-300/90">{reasons.cautionLabel}</span>{' '}
-          <span data-testid="fit-caution">{reasons.caution}</span>
+      {/* THE LABEL GETS ITS OWN LINE. Inline, it ran into the sentence and the
+          two read as one long run of text that then got cut — you could not
+          tell where the heading stopped and the reason started. On its own line
+          it costs 15px and buys a scannable block. */}
+      <div>
+        <div className="text-[10px] font-black uppercase tracking-wide text-emerald-300">
+          {reasons.positiveLabel}
+        </div>
+        <p className="line-clamp-2 text-[13px] leading-snug text-slate-300" data-testid="fit-positive">
+          {reasons.positive}
         </p>
+      </div>
+      {reasons.caution && (
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-wide text-red-300/90">
+            {reasons.cautionLabel}
+          </div>
+          <p className="line-clamp-2 text-[13px] leading-snug text-slate-400" data-testid="fit-caution">
+            {reasons.caution}
+          </p>
+        </div>
       )}
     </div>
   );
