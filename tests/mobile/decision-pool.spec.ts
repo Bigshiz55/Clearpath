@@ -204,6 +204,44 @@ test('selections survive a navigation and a reload', async ({ page }) => {
 
 /* ── layout ────────────────────────────────────────────────────────────── */
 
+/**
+ * THE TRAY DOES NOT SWALLOW THE BOTTOM OF THE PAGE.
+ *
+ * It is `fixed`, and the page's layout pads for the bottom nav but knew nothing
+ * about a tray that only sometimes exists — so the moment the docket had
+ * anything on it, the last line of every screen (the final card's own
+ * FOR/AGAINST/SAVE row included) sat underneath it with no way to scroll clear.
+ * The tray now renders an in-flow spacer of its own height exactly when it
+ * renders itself.
+ */
+for (const w of [320, 390, 1024, 1440] as const) {
+  test(`the last card can always scroll clear of the tray @ ${w}`, async ({ page }) => {
+    await open(page, w, 800);
+    await select(page, 1); // any docket at all summons the tray
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(200);
+
+    const cards = page.getByTestId('qa-grid').locator('> div');
+    const last = (await cards.last().boundingBox())!;
+    const tray = (await page.getByTestId('docket-tray').boundingBox())!;
+    expect(
+      last.y + last.height,
+      `the last card ends ${Math.round(last.y + last.height - tray.y)}px under the tray at ${w}`,
+    ).toBeLessThanOrEqual(tray.y + 1);
+  });
+}
+
+test('and the spacer exists only while the tray does', async ({ page }) => {
+  await open(page);
+  await expect(page.getByTestId('docket-spacer')).toHaveCount(0);
+  await select(page, 1);
+  await expect(page.getByTestId('docket-spacer')).toHaveCount(1);
+  await page.getByTestId('docket-clear').click();
+  await expect(page.getByTestId('docket-spacer')).toHaveCount(0);
+});
+
+
 for (const w of [320, 375, 390, 430, 768, 1024, 1440] as const) {
   test(`the pool and gavel fit, and nothing scrolls sideways @ ${w}`, async ({ page }) => {
     await open(page, w, 900);

@@ -43,10 +43,20 @@ export function DocketTray() {
   if (trayHidden(pathname, docket.length)) return null;
 
   return (
-    <div
-      className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-40 px-2 lg:bottom-4"
-      data-testid="docket-tray"
-    >
+    <>
+      {/* THE TRAY PAYS FOR ITS OWN SPACE. It is `fixed`, so it floats over the
+          page — and the page's layout pads for the bottom nav but knows nothing
+          about a tray that only sometimes exists. Once the docket had anything
+          on it, the last line of every screen (a card's own FOR/AGAINST/SAVE,
+          a page's final button) was under the tray with no way to scroll it
+          clear. This spacer is rendered in normal flow, exactly when the tray
+          is, and is the tray's height — so the page gets that much taller and
+          the bottom of the content can always scroll above the bar. */}
+      <div aria-hidden data-testid="docket-spacer" className="h-20" />
+      <div
+        className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-40 px-2 lg:bottom-4"
+        data-testid="docket-tray"
+      >
       <div className="container-page">
         {/* Opaque, and no backdrop-filter — same iOS fixed-layer repaint trap
             the bottom nav hit. See MobileNav. */}
@@ -136,6 +146,7 @@ export function DocketTray() {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
