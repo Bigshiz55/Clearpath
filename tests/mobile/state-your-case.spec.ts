@@ -110,3 +110,33 @@ test('shift+enter is still a new line, not a ruling', async ({ page }) => {
   expect(posted, 'shift+enter submitted').toBe(0);
   expect(await box(page).inputValue()).toContain('\n');
 });
+
+/**
+ * THE CARD GROWS ON A REAL DESKTOP. At 672px max-width the whole "State Your
+ * Case" hero sat as a small central island on a laptop screen — acres of
+ * black either side, tiny tiles nobody scaled up. `lg:` steps widen the card
+ * and grow the tiles/textarea/button together; nothing below `lg` moves.
+ */
+test.describe('the hero card scales up on a laptop', () => {
+  test('the card is meaningfully wider, and the tiles grow with it', async ({ page }) => {
+    await open(page, 1440);
+    const card = (await page.getByTestId('statecase-card').boundingBox())!;
+    expect(card.width, 'card width at 1440px').toBeGreaterThan(700);
+    const tile = (await chip(page, 'Under 2 hours').boundingBox())!;
+    expect(tile.height, 'tile height grew for the laptop').toBeGreaterThan(70);
+  });
+
+  test('a phone is exactly what it was — the small card, small tiles', async ({ page }) => {
+    await open(page, 390);
+    const card = (await page.getByTestId('statecase-card').boundingBox())!;
+    expect(card.width).toBeLessThan(370);
+    const tile = (await chip(page, 'Under 2 hours').boundingBox())!;
+    expect(tile.height).toBeLessThan(70);
+  });
+
+  test('no sideways scroll at 1440px with the bigger card', async ({ page }) => {
+    await open(page, 1440);
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(over).toBeLessThanOrEqual(1);
+  });
+});

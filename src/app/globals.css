@@ -238,6 +238,20 @@ body {
     animation: wv-cta-breathe 2.4s ease-in-out infinite;
   }
 
+  /* THE ONE WAY IN. The landing hero's whole job is this one button — gold
+     (the courtroom's own accent, not the brand pink or blue) so it reads as
+     ceremonial rather than as just another link, with a slow light sweep
+     (`.wv-cta-sheen`, honoured by the reduced-motion block below) so it
+     catches the eye without competing with the DNA button's breathing pink
+     anywhere else in the product. */
+  .btn-courtroom {
+    @apply btn relative overflow-hidden rounded-2xl border-2 border-gold-300/70
+           font-black uppercase tracking-wide text-ink-950
+           shadow-[0_10px_34px_-8px_rgba(245,198,90,0.65)] transition
+           hover:scale-[1.015] hover:shadow-[0_12px_40px_-6px_rgba(245,198,90,0.8)];
+    background: linear-gradient(135deg, #fff3cf 0%, #f5c65a 45%, #d89a1f 100%);
+  }
+
   .chip {
     @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5
            px-3 py-1 text-xs font-medium text-slate-200;
@@ -833,16 +847,16 @@ body {
   100% { transform: rotateY(0deg); }
 }
 
-/* Promise bar — a slow light band sweeping across the top tagline strip so it
-   catches the eye without shouting. */
-@keyframes wv-promise-sheen {
+/* The courtroom entry button — a slow gold light band sweeping across it so
+   it catches the eye without shouting. */
+@keyframes wv-cta-sheen {
   0% { transform: translateX(-130%) skewX(-12deg); }
   55%, 100% { transform: translateX(560%) skewX(-12deg); }
 }
-.wv-promise-sheen { animation: wv-promise-sheen 6.5s ease-in-out infinite; }
+.wv-cta-sheen { animation: wv-cta-sheen 6.5s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .wv-gavel, .wv-order, .wv-verdict-in, .wv-tile-sheen, .wv-tile-pulse, .wv-promise-sheen { animation: none; }
+  .wv-gavel, .wv-order, .wv-verdict-in, .wv-tile-sheen, .wv-tile-pulse, .wv-cta-sheen { animation: none; }
   /* Static white 1 — no flip — for reduced motion. */
   .wv-logo-1, .wv-logo-1--in, .wv-logo-1--spin { animation: none !important; transform: none !important; }
 }

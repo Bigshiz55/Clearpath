@@ -381,13 +381,17 @@ export function CourtRoom({ code }: { code: string }) {
     stage: (state?.status === 'verdict' ? 'verdict' : state?.status === 'veto' ? 'reacting' : 'open') as 'open' | 'reacting' | 'verdict',
   };
 
-  // ---- Invite ----
+  // ---- Invite (a SUMMONS, not just a link) ----
   async function shareInvite() {
     if (!shareUrl) return;
     const share = (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share;
     if (share) {
       try {
-        await share({ title: 'Join our Court on WatchVerd1ct', text: 'Help us pick what to watch tonight:', url: shareUrl });
+        await share({
+          title: '⚖️ You are summoned to WatchVerd1ct Court',
+          text: 'Official summons — appear before the Court and help decide what we watch tonight:',
+          url: shareUrl,
+        });
         setShared(true); setTimeout(() => setShared(false), 3000);
         return;
       } catch { /* cancelled → fall through to copy */ }
@@ -435,9 +439,12 @@ export function CourtRoom({ code }: { code: string }) {
   if (!participantId && state.status !== 'verdict') {
     return (
       <Shell sync={sync}>
-        <section data-testid="court-join" className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <h1 className="text-lg font-bold text-white">Join the group</h1>
-          <p className="mt-1 text-sm text-slate-400">Add your name and you’re in. No account needed.</p>
+        <section data-testid="court-join" className="rounded-2xl border border-gold-400/30 bg-white/[0.03] p-5">
+          <p className="text-[11px] font-black uppercase tracking-widest text-gold-300">⚖️ Official summons</p>
+          <h1 className="mt-1 text-lg font-bold text-white">You’ve been summoned to Court</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Appear before the Court and help decide what to watch. Add your name to answer the summons — no account needed.
+          </p>
           {mine?.signedIn && mine.name && (
             <button onClick={() => setName(mine.name!)} className="mt-3 w-full rounded-xl border border-brand-400/40 bg-brand-500/15 px-3 py-2.5 text-sm font-semibold text-brand-100">
               Continue as {mine.name} — uses your saved DNA
@@ -658,12 +665,12 @@ export function CourtRoom({ code }: { code: string }) {
         {/* Invite — compact, no raw URL */}
         <div className="mt-4 border-t border-white/10 pt-3">
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={shareInvite} data-testid="share-invite" className="btn-primary text-sm">Share invite</button>
+            <button onClick={shareInvite} data-testid="share-invite" className="btn-primary text-sm">📜 Send summons</button>
             <button onClick={toggleQr} data-testid="show-qr" className="btn-secondary text-sm">{qr ? 'Hide QR code' : 'Show QR code'}</button>
             <button onClick={copyLink} data-testid="copy-link" className="rounded-xl border border-white/12 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5">Copy link</button>
             <span className="ml-auto font-mono text-xs tracking-widest text-slate-400">{code}</span>
           </div>
-          {(copied || shared) && <p role="status" data-testid="invite-feedback" className="mt-2 text-xs text-emerald-300">{copied ? 'Link copied' : 'Invite ready to send'}</p>}
+          {(copied || shared) && <p role="status" data-testid="invite-feedback" className="mt-2 text-xs text-emerald-300">{copied ? 'Link copied' : 'Summons ready to send'}</p>}
           {qr && <div data-testid="qr" className="mx-auto mt-3 h-40 w-40 rounded-lg bg-white p-2" dangerouslySetInnerHTML={{ __html: qr }} />}
         </div>
       </section>

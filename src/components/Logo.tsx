@@ -62,15 +62,28 @@ export function Logo({
 }: {
   href?: string;
   compact?: boolean;
-  size?: 'md' | 'lg';
+  /** `xl` is for a page that gives the logo a line of its own — the landing
+   *  hero, not a shared header bar. It does not shrink for `crowded`. */
+  size?: 'md' | 'lg' | 'xl';
   /** Set on bars that also carry controls — see `CROWDED_WORD`. */
   crowded?: boolean;
 }) {
   // `lg` shrinks on small phones so the header (logo + right controls) never
-  // exceeds a narrow viewport, then grows from `sm` up.
-  const box = size === 'lg' ? 'h-11 w-11 rounded-xl sm:h-14 sm:w-14 sm:rounded-2xl' : 'h-9 w-9 rounded-xl';
-  const inner = size === 'lg' ? 'h-9 w-9 sm:h-11 sm:w-11' : 'h-7 w-7';
-  const word = crowded ? CROWDED_WORD : size === 'lg' ? 'text-xl sm:text-3xl' : 'text-lg';
+  // exceeds a narrow viewport, then grows from `sm` up. `xl` never shares a
+  // bar with controls, so it grows straight through — including a further
+  // step at `lg` (1024px+), because a page that gives the logo a whole line
+  // on a real desktop should use a real desktop's worth of it, not stop
+  // scaling at tablet width.
+  const box =
+    size === 'xl'
+      ? 'h-14 w-14 rounded-2xl sm:h-20 sm:w-20 sm:rounded-3xl lg:h-24 lg:w-24 lg:rounded-[1.75rem]'
+      : size === 'lg'
+        ? 'h-11 w-11 rounded-xl sm:h-14 sm:w-14 sm:rounded-2xl'
+        : 'h-9 w-9 rounded-xl';
+  const inner =
+    size === 'xl' ? 'h-11 w-11 sm:h-16 sm:w-16 lg:h-20 lg:w-20' : size === 'lg' ? 'h-9 w-9 sm:h-11 sm:w-11' : 'h-7 w-7';
+  const word =
+    crowded ? CROWDED_WORD : size === 'xl' ? 'text-3xl sm:text-5xl lg:text-6xl' : size === 'lg' ? 'text-xl sm:text-3xl' : 'text-lg';
 
   return (
     <Link href={href} className="group inline-flex items-center gap-2.5">

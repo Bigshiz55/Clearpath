@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { Tagline } from '@/components/Tagline';
-import { PromiseBar } from '@/components/PromiseBar';
 import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -43,16 +42,17 @@ export default async function LandingPage() {
   const stage = await dnaStage();
   return (
     <div className="min-h-dvh">
-      <PromiseBar />
       {/* flex-wrap so the auth buttons drop below the logo lockup on narrow
-          phones instead of forcing horizontal overflow. */}
-      <header className="container-page flex flex-wrap items-start justify-between gap-y-2 py-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <Logo size="lg" />
-          {/* Tagline tucked under the wordmark — a proper logo lockup. */}
-          <Tagline className="pl-[3.75rem] text-base sm:text-lg" />
+          phones instead of forcing horizontal overflow. `xl` gives the mark
+          and tagline the whole top-left corner — this page gives the logo a
+          full line to itself, unlike the app header which shares one with
+          search, account and overflow controls. */}
+      <header className="container-page flex flex-wrap items-start justify-between gap-y-3 py-6 sm:py-8">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <Logo size="xl" />
+          <Tagline className="pl-[4.5rem] text-lg sm:pl-[5.75rem] sm:text-2xl lg:pl-[7rem] lg:text-3xl" />
         </div>
-        <div className="flex shrink-0 items-center gap-2 pt-1.5">
+        <div className="flex shrink-0 items-center gap-2 pt-2 sm:pt-4 lg:pt-6">
           <Link href="/login" className="btn-ghost">
             Sign in
           </Link>
@@ -63,50 +63,38 @@ export default async function LandingPage() {
       </header>
 
       <main>
-        <section className="container-page py-16 sm:py-24">
-          <div className="mx-auto max-w-3xl text-center">
-            <h1 className="animate-fade-up text-4xl font-extrabold tracking-tight text-white sm:text-6xl">
-              Should you watch it?
-              <span className="block bg-gradient-to-r from-brand-300 to-gold-400 bg-clip-text text-transparent">
-                Get a straight answer.
-              </span>
+        <section className="container-page py-16 sm:py-24 lg:py-28">
+          <div className="mx-auto max-w-3xl text-center lg:max-w-4xl">
+            <h1 className="animate-fade-up text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
+              Enter the courtroom.
             </h1>
-            <p className="mx-auto mt-6 max-w-xl animate-fade-up text-lg text-slate-300">
-              WatchVerdict scores any movie or show two ways — a general recommendation and a match
-              tuned to <em>your</em> taste — then tells you exactly where to watch it.
+            <p className="mx-auto mt-6 max-w-xl animate-fade-up text-lg text-slate-300 sm:mt-8 lg:max-w-2xl lg:text-xl">
+              Every title stands trial — scored two ways, a general recommendation and a match tuned
+              to <em>your</em> taste — until you get a straight Verd1ct and exactly where to watch it.
             </p>
-            {/* Exactly two calls to action, because the product does exactly two
-                things: answer tonight's question, and learn who you are. Every
-                other route in is a text link, not a button. */}
-            <div className="mt-8 flex animate-fade-up flex-wrap items-center justify-center gap-3" data-testid="hero-ctas">
-              <Link href="/app" className="btn-primary px-6 py-3 text-base" data-testid="cta-find">
-                Find something to watch
+            {/* THE ONE WAY IN. The product does two things — answer tonight's
+                question and learn who you are — but the hero now makes ONE
+                ceremonial move, matching "enter the courtroom": ONE gold
+                entry button. The second job (building Watch DNA) and every
+                other route in stay reachable as quiet text links right below
+                it, same as the import link always was — nothing lost, just
+                no longer competing with the entrance for the eye. */}
+            <div className="mt-10 flex animate-fade-up flex-col items-center gap-4 sm:mt-12 lg:mt-14" data-testid="hero-ctas">
+              <Link href="/app" className="btn-courtroom px-10 py-4 text-lg sm:px-14 sm:py-5 sm:text-xl" data-testid="cta-enter">
+                <span aria-hidden>⚖️</span> Enter the Courtroom
+                <span aria-hidden className="wv-cta-sheen pointer-events-none absolute inset-y-0 left-0 w-1/5 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
               </Link>
-              <Link href="/app/taste-quiz" className="btn-pulse px-6 py-3 text-base" data-testid="cta-dna">
-                {DNA_CTA[stage]}
-              </Link>
+              <p className="text-xs text-slate-500 sm:text-sm">
+                No account needed to look ·{' '}
+                <Link href="/app/taste-quiz" className="underline underline-offset-2 hover:text-slate-300" data-testid="cta-dna">
+                  {DNA_CTA[stage]}
+                </Link>
+                {' · '}
+                <Link href="/import-taste" className="underline underline-offset-2 hover:text-slate-300" data-testid="cta-import">
+                  already have a watch history? Import it
+                </Link>
+              </p>
             </div>
-            <p className="mt-4 text-xs text-slate-500">
-              No account needed to look ·{' '}
-              <Link href="/import-taste" className="underline underline-offset-2 hover:text-slate-300" data-testid="cta-import">
-                already have a watch history? Import it
-              </Link>
-            </p>
-          </div>
-        </section>
-
-        <section className="container-page pb-24">
-          <div className="card overflow-hidden bg-cinema-radial p-8 text-center sm:p-12">
-            <h2 className="text-2xl font-bold text-white sm:text-3xl">
-              Stop scrolling. Start watching the right thing.
-            </h2>
-            <p className="mx-auto mt-3 max-w-lg text-slate-300">
-              Build a watchlist that reflects your taste, and share your verdicts with the people you
-              watch with.
-            </p>
-            <Link href="/app" className="btn-primary mt-6 px-6 py-3 text-base">
-              Get started — no signup
-            </Link>
           </div>
         </section>
       </main>

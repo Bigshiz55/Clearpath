@@ -36,27 +36,31 @@ describe('entry points', () => {
     expect(page).toContain("title: 'Taste Quiz");
   });
 
-  it('the landing hero offers exactly two calls to action', () => {
+  it('the landing hero makes ONE ceremonial entrance — everything else is a quiet link', () => {
     const page = read('src/app/page.tsx');
-    const heroBlock = page.slice(page.indexOf('data-testid="hero-ctas"'), page.indexOf('data-testid="cta-import"'));
-    const buttons = heroBlock.match(/btn-primary|btn-secondary|btn-pulse/g) ?? [];
-    expect(buttons).toHaveLength(2);
-    // The DNA button is the pink, breathing one — it was a grey outline
-    // indistinguishable from every dismissable control on the page.
-    expect(heroBlock).toContain('btn-pulse');
-    expect(page).toContain('data-testid="cta-find"');
+    const heroBlock = page.slice(page.indexOf('data-testid="hero-ctas"'), page.indexOf('</section>'));
+    // The single entry button, styled as its own thing (gold, not the brand
+    // pink/blue), not competing with the DNA link for the eye.
+    const buttons = heroBlock.match(/btn-primary|btn-secondary|btn-pulse|btn-courtroom/g) ?? [];
+    expect(buttons).toEqual(['btn-courtroom']);
+    expect(page).toContain('data-testid="cta-enter"');
     expect(page).toContain('data-testid="cta-dna"');
     expect(page).toContain(QUIZ_HREF);
   });
 
-  it('import history is a supporting link, not a third hero button', () => {
+  it('the DNA link and import history are supporting links, not hero buttons', () => {
     const page = read('src/app/page.tsx');
-    const at = page.indexOf('data-testid="cta-import"');
-    const link = page.slice(page.lastIndexOf('<Link', at), page.indexOf('</Link>', at));
-    expect(link).not.toContain('btn-primary');
-    expect(link).not.toContain('btn-secondary');
-    expect(link).not.toContain('btn-pulse');
-    expect(link).toContain('/import-taste');
+    for (const testid of ['cta-dna', 'cta-import']) {
+      const at = page.indexOf(`data-testid="${testid}"`);
+      const link = page.slice(page.lastIndexOf('<Link', at), page.indexOf('</Link>', at));
+      expect(link, testid).not.toContain('btn-primary');
+      expect(link, testid).not.toContain('btn-secondary');
+      expect(link, testid).not.toContain('btn-pulse');
+      expect(link, testid).not.toContain('btn-courtroom');
+    }
+    const importAt = page.indexOf('data-testid="cta-import"');
+    const importLink = page.slice(page.lastIndexOf('<Link', importAt), page.indexOf('</Link>', importAt));
+    expect(importLink).toContain('/import-taste');
   });
 
   it('the Build my Watch DNA call to action adapts to how much DNA there is', () => {

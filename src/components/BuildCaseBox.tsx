@@ -94,13 +94,24 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   }
 
   return (
-    <div data-testid="statecase-card" className="mx-auto max-w-2xl rounded-2xl border border-brand-400/40 bg-gradient-to-br from-brand-500/15 via-fuchsia-500/10 to-transparent p-3.5 shadow-[0_12px_40px_-16px_rgba(236,72,153,0.45)] sm:p-5">
+    <div
+      data-testid="statecase-card"
+      // THE HERO CARD GROWS ON A REAL DESKTOP. At 672px max-width this sat as a
+      // small central island on a laptop screen with acres of black on both
+      // sides — the same "phone box worn on a desktop" problem the finder had.
+      // `lg:`/`xl:` steps widen the card AND scale up everything inside it
+      // (heading, textarea, tiles, button) together, so it reads as one bigger
+      // module rather than a stretched phone layout. Untouched below `lg`.
+      className={`mx-auto max-w-2xl rounded-2xl border border-brand-400/40 bg-gradient-to-br from-brand-500/15 via-fuchsia-500/10 to-transparent p-3.5 shadow-[0_12px_40px_-16px_rgba(236,72,153,0.45)] sm:p-5 ${
+        hero ? 'lg:max-w-3xl lg:p-7 xl:max-w-4xl xl:p-8' : ''
+      }`}
+    >
       {/* Title + one concise supporting line (max two lines). */}
       <div className="flex items-center gap-2.5">
-        <span className={hero ? 'text-2xl' : 'text-xl'} aria-hidden>⚖️</span>
-        <h2 className={hero ? 'text-lg font-black text-white sm:text-2xl' : 'text-base font-extrabold text-white sm:text-lg'}>State Your Case</h2>
+        <span className={hero ? 'text-2xl lg:text-3xl' : 'text-xl'} aria-hidden>⚖️</span>
+        <h2 className={hero ? 'text-lg font-black text-white sm:text-2xl lg:text-3xl' : 'text-base font-extrabold text-white sm:text-lg'}>State Your Case</h2>
       </div>
-      <p className="mt-0.5 text-sm leading-snug text-slate-300">
+      <p className={`mt-0.5 text-sm leading-snug text-slate-300 ${hero ? 'lg:text-base' : ''}`}>
         Describe what you want, or name a few shows you love.
       </p>
 
@@ -123,7 +134,9 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         }}
         aria-label="Describe what you like to watch"
         placeholder="Try: Clever thrillers with a twist, but nothing too slow or gory."
-        className="mt-2.5 h-[84px] w-full resize-none rounded-xl border border-white/25 bg-ink-950/70 px-3.5 py-3 text-base leading-snug text-white placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/40 focus:outline-none"
+        className={`mt-2.5 h-[84px] w-full resize-none rounded-xl border border-white/25 bg-ink-950/70 px-3.5 py-3 text-base leading-snug text-white placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/40 focus:outline-none ${
+          hero ? 'lg:h-[104px] lg:px-4 lg:py-3.5 lg:text-lg' : ''
+        }`}
       />
 
       {/* NINE QUICK ASKS, A PERFECT 3×3. The freeform pill row read as a
@@ -131,7 +144,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
           the edges. A grid of equal tiles reads as a launcher: emoji on top,
           the ask underneath, every tile the same size, every tap target well
           over the 44px floor. Exactly nine, because the grid is the design. */}
-      <div className="mt-3 grid grid-cols-3 gap-1.5" data-testid="quick-asks">
+      <div className={`mt-3 grid grid-cols-3 gap-1.5 ${hero ? 'lg:mt-4 lg:gap-3' : ''}`} data-testid="quick-asks">
         {PRIMARY_EXAMPLES.map((ex) => {
           // THE TILE YOU TAPPED LOOKS CHOSEN. Without the keyboard springing up
           // as confirmation, the only feedback was the browser's own focus
@@ -146,13 +159,15 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
               aria-pressed={chosen}
               onClick={() => fill(ex.text)}
               className={`flex min-h-[58px] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-1.5 transition active:scale-95 ${
+                hero ? 'lg:min-h-[92px] lg:gap-1.5 lg:rounded-2xl lg:px-2 lg:py-3' : ''
+              } ${
                 chosen
                   ? 'border-brand-300 bg-brand-500/25 text-white'
                   : 'border-white/15 bg-white/[0.06] text-slate-200 hover:border-brand-300 hover:bg-brand-500/20 hover:text-white'
               }`}
             >
-              <span aria-hidden className="text-base leading-none">{ex.emoji}</span>
-              <span className="text-center text-[11px] font-semibold leading-tight">{ex.hint}</span>
+              <span aria-hidden className={`text-base leading-none ${hero ? 'lg:text-3xl' : ''}`}>{ex.emoji}</span>
+              <span className={`text-center text-[11px] font-semibold leading-tight ${hero ? 'lg:text-sm' : ''}`}>{ex.hint}</span>
             </button>
           );
         })}
@@ -166,7 +181,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
       <button
         onClick={() => void submit()}
         disabled={busy}
-        className="wv-cta-3d mt-3 w-full py-3 text-base"
+        className={`wv-cta-3d mt-3 w-full py-3 text-base ${hero ? 'lg:mt-4 lg:py-4 lg:text-lg' : ''}`}
       >
         {busy ? 'Ruling…' : 'Hit the Gavel →'}
       </button>
