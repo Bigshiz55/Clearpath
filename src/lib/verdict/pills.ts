@@ -1,23 +1,32 @@
 /**
- * THE PILLS UNDER A RESULT — one of them matters more than the others.
+ * THE PILLS UNDER A RESULT — only what the card has not already said.
  *
- * They shipped as one row of identical bright-green outlines: the personal
- * match, the year, an audience percentage, the runtime, the platform. Five
- * things with one visual weight, so the eye had to read all five to find the
- * one it wanted, and the most important number on the card — YOUR match — was
- * indistinguishable from "2023".
+ * The row began life as the finder's receipts printed verbatim, and by the time
+ * the card grew a facts line and an honest badge it had become a row of
+ * repeats: "Your 81" beside a badge already showing a score, "✓ 1h 42m" under
+ * a facts line already reading "1h 42m · PG", "✓ 2024" under a heading already
+ * reading "MOVIE · 2024". Three inches of card, every number said twice — and
+ * two of the twice-said numbers disagreed.
  *
- * Three ranks now:
- *   match — your score. The reason the result is on the screen at all.
- *   fact  — a checked constraint. Evidence, deliberately quiet.
- *   watch — where to actually watch it, which is a next step, not a fact.
+ * The rules now:
  *
- * Nothing is dropped: the same receipts, re-ranked and de-duplicated.
+ *   ONE NUMBER PER CARD. The Verd1ct badge is the score, labelled honestly by
+ *   its own component ("Your VERD1CT" only when it is actually personalized).
+ *   A match receipt ("Your 81", "Household 88") is therefore DROPPED here —
+ *   not restyled, dropped. Two scores on one card is a contradiction waiting
+ *   to happen, and it happened.
+ *
+ *   NOTHING THE CARD ALREADY SHOWS. The heading owns the year; the facts line
+ *   owns runtime and episode length. Receipts in those shapes are dropped.
+ *
+ *   THE NEXT STEP LEADS. "Watch on Kanopy" is the one pill that is an action
+ *   rather than a fact, so it comes first and the surviving evidence
+ *   ("87% audience", "Stream It", "fast-paced") follows quietly.
  *
  * Pure. No I/O.
  */
 
-export type PillTone = 'match' | 'fact' | 'watch';
+export type PillTone = 'watch' | 'fact';
 
 export interface Pill {
   label: string;
@@ -26,14 +35,31 @@ export interface Pill {
 
 /**
  * "Your 93" / "Household 88" — a word and a 0–100 score, which is how both
- * producers (`finder`, `askJudge`) build the leading receipt.
- *
- * Detected by SHAPE rather than by position, because a receipt list that ever
- * arrives in another order must not promote "2023" to the loudest thing on the
- * card.
+ * producers (`finder`, `askJudge`) build the leading receipt. Detected by
+ * SHAPE, not position, so a reordered receipt list cannot sneak a second
+ * score back onto the card.
  */
 export function isMatchReceipt(receipt: string): boolean {
   return /^[\p{L}][\p{L}’'-]*\s\d{1,3}$/u.test(receipt.trim());
+}
+
+/**
+ * Facts the card states elsewhere, in the shapes the finder emits them:
+ * a bare year (the heading), "1h 42m" / "118m" / "45m episodes" (the facts
+ * line), and "83% audience" / "IMDb 7.8" (the ratings row inside the badge
+ * panel — the audience and IMDb chips are those exact numbers). Nothing is
+ * lost by dropping them: every checked requirement is itemised with its
+ * evidence under "Your requirements" in Why this Verd1ct.
+ */
+export function isAlreadyOnCard(receipt: string): boolean {
+  const r = receipt.trim();
+  if (/^(19|20)\d{2}$/.test(r)) return true;
+  if (/^\d+h(\s\d+m)?$/.test(r)) return true;
+  if (/^\d+m$/.test(r)) return true;
+  if (/^\d+m episodes$/.test(r)) return true;
+  if (/^\d+% audience$/.test(r)) return true;
+  if (/^IMDb \d/.test(r)) return true;
+  return false;
 }
 
 /** "on Netflix" — the receipt that says the same thing as the watch pill. */
@@ -43,35 +69,28 @@ function serviceIn(receipt: string): string | null {
 }
 
 /**
- * Build the row.
- *
- * `where` becomes "Watch on Kanopy" rather than "Kanopy": a bare service name
- * is a label, and the thing a person wants from it is an instruction. When a
- * receipt already says "on Kanopy" it is dropped — the same fact twice, in two
- * shapes, was the row's other problem.
+ * Build the row. `where` becomes "Watch on Kanopy" — an instruction, not a
+ * label — and leads. Everything that survives the dedupe follows as quiet
+ * evidence, in the engine's own order. An empty result is normal and means
+ * the card already said it all.
  */
 export function buildPills(input: { receipts?: readonly string[]; where?: string | null }): Pill[] {
   const receipts = (input.receipts ?? []).map((r) => (r ?? '').trim()).filter((r) => r.length > 0);
   const where = (input.where ?? '').trim();
 
   const pills: Pill[] = [];
-  const seen = new Set<string>();
-  let tookMatch = false;
+  if (where) pills.push({ label: `Watch on ${where}`, tone: 'watch' });
 
+  const seen = new Set<string>();
   for (const r of receipts) {
     const key = r.toLowerCase();
     if (seen.has(key)) continue;
-    // The watch pill says this already, better.
+    if (isMatchReceipt(r)) continue; // the badge is the one number
+    if (isAlreadyOnCard(r)) continue; // the heading/facts line said it
     if (where && serviceIn(r)?.toLowerCase() === where.toLowerCase()) continue;
     seen.add(key);
-    if (!tookMatch && isMatchReceipt(r)) {
-      tookMatch = true;
-      pills.unshift({ label: r, tone: 'match' });
-    } else {
-      pills.push({ label: r, tone: 'fact' });
-    }
+    pills.push({ label: r, tone: 'fact' });
   }
 
-  if (where) pills.push({ label: `Watch on ${where}`, tone: 'watch' });
   return pills;
 }

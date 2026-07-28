@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildPills, isMatchReceipt } from './pills';
+import { buildPills, isAlreadyOnCard, isMatchReceipt } from './pills';
 
-describe('finding the one that matters', () => {
-  it('recognises the match receipt both producers build', () => {
+describe('one number per card', () => {
+  it('still recognises the match receipt both producers build', () => {
     expect(isMatchReceipt('Your 93')).toBe(true);
     expect(isMatchReceipt('Household 88')).toBe(true);
   });
@@ -13,62 +13,78 @@ describe('finding the one that matters', () => {
     }
   });
 
-  it('promotes it even when it is not first', () => {
-    const p = buildPills({ receipts: ['2023', '87% audience', 'Your 93'] });
-    expect(p[0]).toEqual({ label: 'Your 93', tone: 'match' });
+  it('DROPS the match receipt — the badge is the score', () => {
+    // "Your 81" was rendering beside a badge reading 84, both claiming to be
+    // the user's number. The pill goes; the badge (labelled honestly by its
+    // own component) is the one number a card carries.
+    const p = buildPills({ receipts: ['Your 81', 'Stream It'] });
+    expect(p.map((x) => x.label)).toEqual(['Stream It']);
+    expect(p.some((x) => isMatchReceipt(x.label))).toBe(false);
   });
 
-  it('there is only ever ONE loudest pill', () => {
-    const p = buildPills({ receipts: ['Your 93', 'Household 88'] });
-    expect(p.filter((x) => x.tone === 'match')).toHaveLength(1);
-  });
-
-  it('is fine when there is no match receipt at all', () => {
-    const p = buildPills({ receipts: ['2023', '118m'] });
-    expect(p.every((x) => x.tone === 'fact')).toBe(true);
-  });
-});
-
-describe('everything else is quiet evidence', () => {
-  it('keeps every receipt, in order, behind the match', () => {
-    const p = buildPills({ receipts: ['Your 93', '118m', '2023', '87% audience'] });
-    expect(p.map((x) => x.label)).toEqual(['Your 93', '118m', '2023', '87% audience']);
-    expect(p.slice(1).every((x) => x.tone === 'fact')).toBe(true);
-  });
-
-  it('drops an exact duplicate rather than printing it twice', () => {
-    const p = buildPills({ receipts: ['2023', '2023'] });
-    expect(p).toHaveLength(1);
+  it('drops it wherever it appears, and drops all of them', () => {
+    const p = buildPills({ receipts: ['Stream It', 'Your 93', 'Household 88'] });
+    expect(p.map((x) => x.label)).toEqual(['Stream It']);
   });
 });
 
-describe('where to watch is an instruction, not a label', () => {
-  it('says what to do with the service name', () => {
-    const p = buildPills({ receipts: ['Your 93'], where: 'Kanopy' });
-    expect(p.at(-1)).toEqual({ label: 'Watch on Kanopy', tone: 'watch' });
+describe('nothing the card already says', () => {
+  it('knows the shapes the finder emits for year, runtime and ratings', () => {
+    // The ratings receipts too: the panel's audience and IMDb chips ARE those
+    // numbers, so "83% audience" under a panel reading "🍿 83%" is a repeat.
+    for (const r of ['2024', '1995', '1h 42m', '2h', '118m', '45m episodes', '87% audience', 'IMDb 7.8']) {
+      expect(isAlreadyOnCard(r), r).toBe(true);
+    }
   });
 
-  it('does not say the same thing twice in two shapes', () => {
-    // The finder pushes "on Kanopy" as a receipt when you filtered by service,
-    // and `where` is the same service. One row, one statement.
-    const p = buildPills({ receipts: ['Your 93', 'on Kanopy', '2023'], where: 'Kanopy' });
-    expect(p.map((x) => x.label)).toEqual(['Your 93', '2023', 'Watch on Kanopy']);
+  it('does not swallow genuine evidence that merely contains numbers', () => {
+    for (const r of ['Stream It', 'all episodes out', 'fast-paced', 'English audio', 'upcoming', '2 winners']) {
+      expect(isAlreadyOnCard(r), r).toBe(false);
+    }
+  });
+
+  it('drops the repeats and keeps the rest — nothing lost, it is all in Why this Verd1ct', () => {
+    const p = buildPills({ receipts: ['1h 42m', '2024', '87% audience', 'Stream It'] });
+    expect(p.map((x) => x.label)).toEqual(['Stream It']);
+  });
+
+  it('an empty row is normal — it means the card already said it all', () => {
+    expect(buildPills({ receipts: ['Your 81', '1h 42m', '2024'] })).toEqual([]);
+  });
+});
+
+describe('the next step leads', () => {
+  it('says what to do with the service name, first', () => {
+    const p = buildPills({ receipts: ['Stream It'], where: 'Kanopy' });
+    expect(p[0]).toEqual({ label: 'Watch on Kanopy', tone: 'watch' });
+    expect(p[1]).toEqual({ label: 'Stream It', tone: 'fact' });
+  });
+
+  it('does not say the same service twice in two shapes', () => {
+    const p = buildPills({ receipts: ['on Kanopy', 'Stream It'], where: 'Kanopy' });
+    expect(p.map((x) => x.label)).toEqual(['Watch on Kanopy', 'Stream It']);
   });
 
   it('keeps a DIFFERENT service receipt — it is not a duplicate', () => {
     const p = buildPills({ receipts: ['on Netflix'], where: 'Kanopy' });
-    expect(p.map((x) => x.label)).toEqual(['on Netflix', 'Watch on Kanopy']);
+    expect(p.map((x) => x.label)).toEqual(['Watch on Kanopy', 'on Netflix']);
   });
 
   it('shows nothing at all rather than "Watch on "', () => {
-    expect(buildPills({ receipts: ['Your 93'], where: null })).toHaveLength(1);
-    expect(buildPills({ receipts: ['Your 93'], where: '  ' })).toHaveLength(1);
+    expect(buildPills({ receipts: [], where: null })).toEqual([]);
+    expect(buildPills({ receipts: [], where: '  ' })).toEqual([]);
   });
 });
 
-describe('malformed input', () => {
-  it('survives it without throwing', () => {
+describe('the quiet evidence', () => {
+  it('keeps the engine’s own order and drops exact duplicates', () => {
+    const p = buildPills({ receipts: ['English audio', 'Stream It', 'English audio', 'fast-paced'] });
+    expect(p.map((x) => x.label)).toEqual(['English audio', 'Stream It', 'fast-paced']);
+    expect(p.every((x) => x.tone === 'fact')).toBe(true);
+  });
+
+  it('survives malformed input without throwing', () => {
     expect(() => buildPills({})).not.toThrow();
-    expect(buildPills({ receipts: ['', '   '] })).toHaveLength(0);
+    expect(buildPills({ receipts: ['', '   '] })).toEqual([]);
   });
 });

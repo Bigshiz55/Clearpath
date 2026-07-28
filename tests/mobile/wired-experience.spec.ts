@@ -78,6 +78,44 @@ test.describe('TEST A — Why this Verd1ct? on real result cards', () => {
   });
 });
 
+test.describe('ONE NUMBER PER CARD', () => {
+  test('the pill row never restates the score, the year or the runtime', async ({ page }) => {
+    // The fixture's receipts are exactly the three repeats that used to render:
+    // "Your 88" (a second score, beside a badge showing a different number),
+    // "118m" (the facts line says it) and "2023" (the heading says it).
+    await mock(page, (route) => route.fulfill({ json: { items: [itemWith({})], scoredFor: 'Your match', relaxed: null } }));
+    await page.goto(HARNESS);
+    const finder = page.getByTestId('harness-finder');
+    await finder.getByRole('textbox').first().fill('a fast mystery');
+    await finder.getByRole('button', { name: /Find titles/ }).first().click();
+
+    const pills = page.getByTestId('result-pills');
+    await expect(pills).toBeVisible();
+    // What survives is the next step, drawn as an affordance.
+    await expect(pills).toContainText('Watch on Netflix');
+    // And none of the repeats.
+    await expect(pills).not.toContainText('Your 88');
+    await expect(pills).not.toContainText('118m');
+    await expect(pills).not.toContainText('2023');
+    await expect(pills.locator('[data-tone="match"]')).toHaveCount(0);
+  });
+
+  test('a card with nothing new to say renders no pill row at all', async ({ page }) => {
+    await mock(page, (route) =>
+      route.fulfill({
+        json: { items: [itemWith({ where: null, receipts: ['Your 88', '118m', '2023'] })], scoredFor: 'Your match', relaxed: null },
+      }),
+    );
+    await page.goto(HARNESS);
+    const finder = page.getByTestId('harness-finder');
+    await finder.getByRole('textbox').first().fill('a fast mystery');
+    await finder.getByRole('button', { name: /Find titles/ }).first().click();
+
+    await expect(page.getByTestId('why-verdict')).toBeVisible();
+    await expect(page.getByTestId('result-pills')).toHaveCount(0);
+  });
+});
+
 test.describe('TEST B — household selection changes the request, scoring and display', () => {
   test('selecting Amy sends watchers[], renders household block; warning variant renders; deselection flags staleness', async ({ page }) => {
     const bodies: Record<string, unknown>[] = [];

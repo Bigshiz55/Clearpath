@@ -458,29 +458,29 @@ export function FinderUI({
                     posterPath={it.posterPath}
                     evidence={
                       <>
-                        {/* THE PILLS, RANKED. Your match is the reason the
-                            result is on the screen; the year and the audience
-                            score are evidence. They were five identical bright
-                            outlines, so the eye had to read all of them to find
-                            the one it wanted. */}
+                        {/* ONE NUMBER PER CARD. The badge above is the score;
+                            this row no longer restates it, nor the year or
+                            runtime the heading and facts line already carry
+                            (`buildPills` drops all of them). What is left is
+                            the next step — where to watch, drawn as a real
+                            affordance rather than a tag — and any evidence the
+                            card has not said elsewhere, kept quiet beside it. */}
                         {(() => {
                           const pills = buildPills({ receipts: it.receipts, where: it.where });
                           if (pills.length === 0) return null;
                           return (
-                            <div data-testid="result-pills" className="flex flex-wrap gap-1">
+                            <div data-testid="result-pills" className="flex flex-wrap items-center gap-1.5">
                               {pills.map((p) => (
                                 <span
                                   key={p.label}
                                   data-tone={p.tone}
                                   className={
-                                    p.tone === 'match'
-                                      ? 'rounded-md border border-[#ff1493]/60 bg-[#ff1493]/15 px-2 py-0.5 text-[11px] font-black text-pink-100'
-                                      : p.tone === 'watch'
-                                        ? 'rounded-md border border-brand-400/40 bg-brand-500/10 px-2 py-0.5 text-[11px] font-semibold text-brand-100'
-                                        : 'rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-slate-400'
+                                    p.tone === 'watch'
+                                      ? 'inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[13px] font-bold text-white'
+                                      : 'inline-flex min-h-[36px] items-center rounded-lg border border-white/10 bg-white/[0.04] px-2.5 text-[12px] text-slate-400'
                                   }
                                 >
-                                  {p.tone === 'match' ? p.label : p.tone === 'watch' ? `📺 ${p.label}` : `✓ ${p.label}`}
+                                  {p.tone === 'watch' ? <><span aria-hidden>📺</span>{p.label}</> : `✓ ${p.label}`}
                                 </span>
                               ))}
                             </div>
