@@ -6,6 +6,7 @@ import { CardVerdict } from './CardVerdict';
 import { WCheck } from './WCheck';
 import { CardSynopsis } from './CardSynopsis';
 import { CardFacts } from './CardFacts';
+import { CardFit } from './CardFit';
 
 interface PosterCardProps {
   href?: string;
@@ -191,6 +192,12 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             reserved height grows with it, so nothing moves when the text
             lands. */}
         {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1" />}
+
+        {/* Why YOU would like it — one sentence, only when the user's rated
+            history genuinely supports one. Silent otherwise: the boilerplate
+            that used to fill this spot was removed on request, and silence is
+            the honest empty state. */}
+        {saveId != null && <CardFit mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
 
         {/* Supporting evidence: the pills, the household verdict, and the
             "Why this Verd1ct?" panel. */}

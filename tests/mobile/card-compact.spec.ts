@@ -108,6 +108,49 @@ test.describe('an unavailable rating is not drawn as a dash', () => {
   });
 });
 
+/**
+ * WHY YOU'D LIKE IT — the sentence without the boilerplate.
+ *
+ * The old block spoke on every card: a real reason when the profile supported
+ * one, a four-line "not personal yet" disclaimer when it didn't. The
+ * disclaimer was removed on request — and took the real sentences with it.
+ * This is the contract for the restored half: speak only when true.
+ */
+test.describe('why you would like it', () => {
+  test('speaks when the rated history genuinely supports it', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 1000 });
+    await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings: FULL, overview: SYNOPSIS, facts: FACTS } }));
+    await page.route('**/api/dna/**', (r) =>
+      r.fulfill({
+        json: {
+          dna: {
+            score: 88, confidence: 0.8, tasteScore: 84, available: true, sampleSize: 144,
+            fit: { agree: [{ label: 'Tension', note: 'edge-of-seat' }], clash: [] },
+          },
+        },
+      }),
+    );
+    await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+
+    const fit = card(page).getByTestId('card-fit');
+    await expect(fit).toBeVisible();
+    await expect(fit).toContainText('edge-of-seat tension');
+    // Shown in full — a clamped reason reads as a system that would not finish.
+    const overflow = await fit.evaluate((el) => el.scrollHeight - el.clientHeight);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test('and is SILENT — not boilerplate — when there is nothing personal to say', async ({ page }) => {
+    await open(page); // dna mock: sampleSize 0, no fit
+    await expect(card(page).getByTestId('card-fit')).toHaveCount(0);
+    const text = await card(page).innerText();
+    expect(text).not.toMatch(/personalization status/i);
+    expect(text).not.toMatch(/based on the title’s themes/i);
+    expect(text).not.toMatch(/rate a few more titles/i);
+  });
+});
+
 test.describe('the synopsis knows its place', () => {
   test('stops at three lines and offers the rest', async ({ page }) => {
     await open(page);
