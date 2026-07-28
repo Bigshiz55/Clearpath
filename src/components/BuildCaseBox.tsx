@@ -32,9 +32,20 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const lastCase = useRef<{ id: string | null; at: number }>({ id: null, at: 0 });
 
+  /**
+   * A CHIP FILLS THE BOX. IT DOES NOT OPEN THE KEYBOARD.
+   *
+   * It used to focus the textarea, and on iOS a programmatic focus inside a tap
+   * gesture raises the keyboard — which covers the bottom third of the screen,
+   * and "Hit the Gavel" with it. So the one tap that was supposed to be the
+   * shortcut left you unable to reach the button it was a shortcut to.
+   *
+   * Tapping a chip is a complete thought: the words are in the box and the
+   * gavel is right there. The keyboard belongs to the box, and appears when you
+   * tap the box — which is the other thing this now leaves you free to do.
+   */
   function fill(t: string) {
     setText(t);
-    boxRef.current?.focus();
   }
 
   async function submit() {
@@ -94,7 +105,18 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         ref={boxRef}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}
+        /* ENTER RULES; SHIFT+ENTER IS A NEW LINE.
+           When the keyboard IS open — because you tapped the box to type — it
+           still covers the gavel, and no amount of layout fixes that on a
+           phone. The return key is the way out: it is already under your thumb,
+           and `enterKeyHint` labels it "go" so it says what it will do. */
+        enterKeyHint="go"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            void submit();
+          }
+        }}
         aria-label="Describe what you like to watch"
         placeholder="Try: Clever thrillers with a twist, but nothing too slow or gory."
         className="mt-2.5 h-[84px] w-full resize-none rounded-xl border border-white/25 bg-ink-950/70 px-3.5 py-3 text-base leading-snug text-white placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/40 focus:outline-none"
@@ -106,16 +128,29 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
           shorter, so showing the real ones is the only way to make this row
           worth its height. */}
       <div className="mt-2.5 flex flex-wrap gap-1.5">
-        {PRIMARY_EXAMPLES.map((ex) => (
-          <button
-            key={ex.hint}
-            type="button"
-            onClick={() => fill(ex.text)}
-            className="min-h-[44px] rounded-full border border-white/15 bg-white/[0.06] px-2.5 text-[13px] font-semibold text-slate-200 transition hover:border-brand-300 hover:bg-brand-500/20 hover:text-white active:scale-95"
-          >
-            {ex.hint}
-          </button>
-        ))}
+        {PRIMARY_EXAMPLES.map((ex) => {
+          // THE CHIP YOU TAPPED LOOKS CHOSEN. Without the keyboard springing up
+          // as confirmation, the only feedback was the browser's own focus
+          // ring — which looks identical to "you happen to be on this one" and
+          // vanishes the moment you touch anything else. The words landing in
+          // the box are the real feedback; this makes the chip agree with them.
+          const chosen = text === ex.text;
+          return (
+            <button
+              key={ex.hint}
+              type="button"
+              aria-pressed={chosen}
+              onClick={() => fill(ex.text)}
+              className={`min-h-[44px] rounded-full border px-2.5 text-[13px] font-semibold transition active:scale-95 ${
+                chosen
+                  ? 'border-brand-300 bg-brand-500/25 text-white'
+                  : 'border-white/15 bg-white/[0.06] text-slate-200 hover:border-brand-300 hover:bg-brand-500/20 hover:text-white'
+              }`}
+            >
+              {ex.hint}
+            </button>
+          );
+        })}
       </div>
 
       {/* Primary CTA — full width, ≥48px, always looks pressable (only dims while
