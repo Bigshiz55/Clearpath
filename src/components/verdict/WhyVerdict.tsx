@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { explainSections, SECTION, type Reason } from '@/lib/verdict/explainSections';
 
 /**
@@ -15,8 +16,14 @@ import { explainSections, SECTION, type Reason } from '@/lib/verdict/explainSect
  * arithmetic behind "See scoring details". Nothing is removed: every reason and
  * every number is still on the card, one layer down.
  *
- * The section that used to say "What held it back" says so only when something
- * did. See `explainSections`.
+ * SIZED TO BE READ, NOT DECODED. The whole panel rendered at 12px slate-300 —
+ * caption type, for the one block whose entire job is to be read. The reasons
+ * are body type now (15px, near-white, relaxed leading): tap "Why this
+ * Verd1ct?" and the answer is legible instantly, not after leaning in.
+ *
+ * AND IT CLOSES WHERE YOU FINISHED. An open panel is several screens of thumb
+ * away from the summary that opened it; the only way shut was to scroll back
+ * up. A Close row at the bottom folds it from where your eye already is.
  */
 export interface WhyVerdictData {
   rose: string[];
@@ -27,62 +34,63 @@ export interface WhyVerdictData {
 }
 
 function Heading({ children, tone }: { children: React.ReactNode; tone: string }) {
-  return <div className={`text-[10px] font-black uppercase tracking-wide ${tone}`}>{children}</div>;
+  return <div className={`text-[11px] font-black uppercase tracking-wide ${tone}`}>{children}</div>;
 }
 
 /** A reason, with its arithmetic dropped unless the details layer is open. */
 function Line({ r, showMath }: { r: Reason; showMath: boolean }) {
   return (
-    <p className="text-slate-300">
+    <p className="text-[15px] leading-relaxed text-slate-100">
       {r.text}
-      {showMath && r.math && <span className="ml-1 text-[11px] tabular-nums text-slate-500">{r.math}</span>}
+      {showMath && r.math && <span className="ml-1.5 text-[12px] tabular-nums text-slate-400">{r.math}</span>}
     </p>
   );
 }
 
 export function WhyVerdict({ data, className = '' }: { data: WhyVerdictData; className?: string }) {
   const s = explainSections(data);
+  const ref = useRef<HTMLDetailsElement>(null);
 
   return (
-    <details data-testid="why-verdict" className={`group rounded-lg border border-white/10 bg-white/[0.03] text-xs ${className}`}>
-      <summary className="cursor-pointer select-none px-2 py-1.5 font-bold text-brand-200 transition hover:text-white">
+    <details ref={ref} data-testid="why-verdict" className={`group rounded-lg border border-white/10 bg-white/[0.03] ${className}`}>
+      <summary className="cursor-pointer select-none px-3 py-2.5 text-[15px] font-bold text-brand-200 transition hover:text-white">
         Why this Verd1ct?
       </summary>
-      <div className="space-y-2 px-2 pb-2">
+      <div className="space-y-3 px-3 pb-1">
         {s.matched.lead.length > 0 && (
-          <div data-testid="why-matched">
+          <div data-testid="why-matched" className="space-y-0.5">
             <Heading tone="text-emerald-300">{s.matched.heading}</Heading>
             {s.matched.lead.map((r) => <Line key={r.text} r={r} showMath={false} />)}
           </div>
         )}
 
         {s.know.reasons.length > 0 && (
-          <div data-testid="why-know">
+          <div data-testid="why-know" className="space-y-0.5">
             <Heading tone="text-amber-300">{s.know.heading}</Heading>
             {s.know.reasons.map((r) => <Line key={r.text} r={r} showMath={false} />)}
           </div>
         )}
 
         {data.requirements.length > 0 && (
-          <div data-testid="why-requirements">
+          <div data-testid="why-requirements" className="space-y-0.5">
             <Heading tone="text-slate-400">{SECTION.requirements}</Heading>
             {data.requirements.map((r) => (
-              <p key={r.label} className="text-slate-300">
-                {r.satisfied ? '✓' : '✗'} {r.label} <span className="text-slate-500">({r.evidence})</span>
+              <p key={r.label} className="text-[15px] leading-relaxed text-slate-100">
+                {r.satisfied ? '✓' : '✗'} {r.label} <span className="text-[13px] text-slate-400">({r.evidence})</span>
               </p>
             ))}
           </div>
         )}
 
         {data.availability && (
-          <p className="text-slate-300">
+          <p className="text-[15px] leading-relaxed text-slate-100">
             📺 {data.availability.text}
-            <span className="ml-1 text-slate-500">· {data.availability.confidence}</span>
+            <span className="ml-1.5 text-[13px] text-slate-400">· {data.availability.confidence}</span>
           </p>
         )}
 
-        <p className="text-slate-400">
-          Confidence: <b className="uppercase">{data.confidence.level}</b>
+        <p className="text-[14px] leading-relaxed text-slate-300">
+          Confidence: <b className="uppercase text-slate-100">{data.confidence.level}</b>
           {data.confidence.because[0] ? ` — ${data.confidence.because[0]}` : ''}
         </p>
 
@@ -91,11 +99,11 @@ export function WhyVerdict({ data, className = '' }: { data: WhyVerdictData; cla
             the same weight, which made the audit trail the loudest thing in the
             explanation. */}
         {s.hasDetails && (
-          <details data-testid="scoring-details" className="rounded-md bg-black/25 px-2 py-1">
-            <summary className="cursor-pointer select-none text-[11px] font-semibold text-slate-400 transition hover:text-white">
+          <details data-testid="scoring-details" className="rounded-md bg-black/25 px-2.5 py-1.5">
+            <summary className="cursor-pointer select-none text-[13px] font-semibold text-slate-400 transition hover:text-white">
               See scoring details
             </summary>
-            <div className="mt-1 space-y-0.5 text-[11px]">
+            <div className="mt-1 space-y-0.5">
               {[...s.matched.lead, ...s.matched.more, ...s.know.reasons].map((r) => (
                 <Line key={`m-${r.text}`} r={r} showMath />
               ))}
@@ -103,6 +111,17 @@ export function WhyVerdict({ data, className = '' }: { data: WhyVerdictData; cla
           </details>
         )}
       </div>
+
+      {/* Close where you finished reading — the summary that opened this is a
+          whole panel away by now. */}
+      <button
+        type="button"
+        data-testid="why-close"
+        onClick={() => ref.current?.removeAttribute('open')}
+        className="mt-1 flex min-h-[40px] w-full items-center justify-center gap-1.5 border-t border-white/10 text-[13px] font-semibold text-slate-400 transition hover:text-white"
+      >
+        <span aria-hidden>✕</span> Close
+      </button>
     </details>
   );
 }

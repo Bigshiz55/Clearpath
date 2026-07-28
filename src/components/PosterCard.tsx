@@ -5,7 +5,6 @@ import { SaveButton } from './SaveButton';
 import { CardVerdict } from './CardVerdict';
 import { WCheck } from './WCheck';
 import { CardSynopsis } from './CardSynopsis';
-import { CardWhyItFits } from './CardWhyItFits';
 import { CardFacts } from './CardFacts';
 
 interface PosterCardProps {
@@ -192,11 +191,6 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             reserved height grows with it, so nothing moves when the text
             lands. */}
         {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1" />}
-
-        {/* Personalization status — what the recommendation is based on, from
-            the axes this user demonstrably rates highly. Says so honestly when
-            there is not enough profile to speak; never invents a reason. */}
-        {saveId != null && <CardWhyItFits mediaType={mediaType} tmdbId={saveId} className="mt-2" />}
 
         {/* Supporting evidence: the pills, the household verdict, and the
             "Why this Verd1ct?" panel. */}

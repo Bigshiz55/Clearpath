@@ -76,6 +76,53 @@ test.describe('TEST A — Why this Verd1ct? on real result cards', () => {
     await why.locator('summary').first().click();
     await expect(why.getByText('Why it matched')).not.toBeVisible();
   });
+
+  test('the reasons are body type, not caption type', async ({ page }) => {
+    await mock(page, (route) => route.fulfill({ json: { items: [itemWith({})], scoredFor: 'Your match', relaxed: null } }));
+    await page.goto(HARNESS);
+    const finder = page.getByTestId('harness-finder');
+    await finder.getByRole('textbox').first().fill('a fast mystery');
+    await finder.getByRole('button', { name: /Find titles/ }).first().click();
+
+    const why = page.getByTestId('why-verdict');
+    await why.locator('summary').first().click();
+    // The whole panel rendered at 12px slate-300 — caption type, for the one
+    // block whose entire job is to be read at a glance.
+    const line = why.getByTestId('why-matched').locator('p').first();
+    const style = await line.evaluate((el) => {
+      const c = getComputedStyle(el);
+      const rgb = /rgba?\(([^)]+)\)/.exec(c.color)![1]!.split(',').map((n) => Number(n.trim()));
+      return { size: parseFloat(c.fontSize), bright: Math.min(rgb[0]!, rgb[1]!, rgb[2]!) };
+    });
+    expect(style.size, 'reason text is still caption-sized').toBeGreaterThanOrEqual(14);
+    expect(style.bright, `reason text is still dim (${style.bright})`).toBeGreaterThanOrEqual(200);
+  });
+
+  test('a close button at the BOTTOM folds the panel — no scroll back to the summary', async ({ page }) => {
+    await mock(page, (route) => route.fulfill({ json: { items: [itemWith({})], scoredFor: 'Your match', relaxed: null } }));
+    await page.goto(HARNESS);
+    const finder = page.getByTestId('harness-finder');
+    await finder.getByRole('textbox').first().fill('a fast mystery');
+    await finder.getByRole('button', { name: /Find titles/ }).first().click();
+
+    const why = page.getByTestId('why-verdict');
+    await why.locator('summary').first().click();
+    await expect(why).toContainText('Why it matched');
+
+    const close = why.getByTestId('why-close');
+    await expect(close).toBeVisible();
+    // At the bottom of the open panel, below the last content — where the eye
+    // finishes reading.
+    const closeBox = (await close.boundingBox())!;
+    const matched = (await why.getByTestId('why-matched').boundingBox())!;
+    expect(closeBox.y).toBeGreaterThan(matched.y + matched.height);
+
+    await close.click();
+    await expect(why.getByText('Why it matched')).not.toBeVisible();
+    // And it can be reopened — closing did not break the summary toggle.
+    await why.locator('summary').first().click();
+    await expect(why).toContainText('Why it matched');
+  });
 });
 
 test.describe('ONE NUMBER PER CARD', () => {

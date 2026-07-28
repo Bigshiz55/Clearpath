@@ -108,23 +108,6 @@ test.describe('an unavailable rating is not drawn as a dash', () => {
   });
 });
 
-test.describe('personalization status', () => {
-  test('is one section, with the positive framing', async ({ page }) => {
-    await open(page);
-    const block = card(page).getByTestId('why-it-fits');
-    await expect(block).toContainText('Personalization status');
-    await expect(block).not.toContainText('What we can say');
-    await expect(block).not.toContainText('not personal yet');
-    await expect(block.getByTestId('fit-caution')).toHaveCount(0);
-  });
-
-  test('takes less room than the two blocks it replaced', async ({ page }) => {
-    await open(page);
-    const h = (await card(page).getByTestId('why-it-fits').boundingBox())!.height;
-    expect(h, `${Math.round(h)}px`).toBeLessThanOrEqual(90); // was 112
-  });
-});
-
 test.describe('the synopsis knows its place', () => {
   test('stops at three lines and offers the rest', async ({ page }) => {
     await open(page);
@@ -218,15 +201,14 @@ test('the reading order down the card is what a decision needs', async ({ page }
       facts: y('[data-testid="card-facts"]'),
       score: y('.wv-score'),
       synopsis: y('[data-testid="card-synopsis"]'),
-      status: y('[data-testid="why-it-fits"]'),
       actions: y('.wv-act-row'),
     };
   });
   // At a glance: poster, title, what it costs you, how well it fits you.
-  // Then the detail: what it is about, what that judgement rests on, and the
-  // decision itself.
+  // Then what it is about, then the decision itself. (The personalization
+  // status block is gone at the user's request — the honest "not personal
+  // yet" state lives in the badge's own label now.)
   expect(order.facts).toBeLessThan(order.score);
   expect(order.score).toBeLessThan(order.synopsis);
-  expect(order.synopsis).toBeLessThan(order.status);
-  expect(order.status).toBeLessThan(order.actions);
+  expect(order.synopsis).toBeLessThan(order.actions);
 });
