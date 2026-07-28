@@ -5,6 +5,7 @@ import { SaveButton } from './SaveButton';
 import { CardVerdict } from './CardVerdict';
 import { WCheck } from './WCheck';
 import { CardSynopsis } from './CardSynopsis';
+import { CardWhyItFits } from './CardWhyItFits';
 
 interface PosterCardProps {
   href?: string;
@@ -104,7 +105,13 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   // column — a sideways card in a 250px cell would leave a thumbnail and a
   // sliver.
   return (
-    <div className="card group wv-card !border-transparent shadow-[0_6px_24px_-6px_rgba(0,0,0,0.8)] transition hover:shadow-[0_10px_32px_-6px_rgba(0,0,0,0.95)]">
+    /* A PREMIUM NEAR-BLACK SURFACE, framed by a hairline rather than an
+       outline. The card was a translucent panel with a heavy drop shadow doing
+       the separation; on a dark page that reads as smoke, not structure. A
+       near-black fill with a one-pixel ring gives a definite edge at a fraction
+       of the visual weight, and lets the poster be the brightest thing on the
+       card — which is the only thing that should be. */
+    <div className="card group wv-card !border-transparent bg-ink-950/85 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.9)] ring-1 ring-white/[0.07] transition hover:ring-white/15">
       <div className="wv-card-art">
         {/* HOW FAR YOU HAVE COME. In an endless feed the count is the only
             thing distinguishing a long session from a loop — bottom-left, on
@@ -149,6 +156,11 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             reserved height grows with it, so nothing moves when the text
             lands. */}
         {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1" />}
+
+        {/* WHY IT FITS YOU — one line for, one against, both from the axes this
+            user demonstrably rates highly. Says so honestly when there is not
+            enough profile to speak; never invents a reason. */}
+        {saveId != null && <CardWhyItFits mediaType={mediaType} tmdbId={saveId} className="mt-2" />}
 
         {/* One pink box: the algorithm score (your DNA + every rating) + will-you-
             like-it call, with the ratings underneath. */}

@@ -102,8 +102,20 @@ export interface DocketStatus {
   count: number;
   ready: boolean;
   full: boolean;
-  /** What the tray should say right now. */
+  /** What the tray's own line says. Short — see the note in `docketStatus`. */
   message: string;
+  /**
+   * The same state as a full sentence: "2 selected — choose 1 more",
+   * "3 selected — gavel ready".
+   *
+   * Two strings rather than one because the tray is a fixed bar sharing a line
+   * with Clear and Deliver, and the long form wraps at 320px — which doubles
+   * the height of the thing covering the page. So the bar shows `message` and
+   * announces `longMessage`: screen readers and wide screens get the sentence,
+   * a narrow bar gets the words that fit. Neither is ever the only source of
+   * the count, which is rendered in the badge beside them.
+   */
+  longMessage: string;
 }
 
 /**
@@ -134,7 +146,13 @@ export function trayHidden(pathname: string | null | undefined, docketCount: num
 export function docketStatus(docket: readonly DocketEntry[]): DocketStatus {
   const count = docket.length;
   if (count === 0) {
-    return { count, ready: false, full: false, message: 'Nothing on the docket yet.' };
+    return {
+      count,
+      ready: false,
+      full: false,
+      message: 'Nothing on the docket yet.',
+      longMessage: 'Nothing selected yet — tap the W on a poster to start.',
+    };
   }
   // SHORT, because the tray is a fixed bar sharing one line with Clear and
   // Deliver. The original sentence wrapped, which put the controls on a second
@@ -151,10 +169,17 @@ export function docketStatus(docket: readonly DocketEntry[]): DocketStatus {
       ready: false,
       full: false,
       message: `${need} more to rule`,
+      longMessage: `${count} selected — choose ${need} more`,
     };
   }
   // One word once the Deliver button appears beside it: at 320px the button
   // takes the width, and "Ready to rule" next to "Deliver →" says the same
   // thing twice anyway.
-  return { count, ready: true, full: count >= MAX_DOCKET, message: 'Ready' };
+  return {
+    count,
+    ready: true,
+    full: count >= MAX_DOCKET,
+    message: 'Ready',
+    longMessage: `${count} selected — gavel ready`,
+  };
 }

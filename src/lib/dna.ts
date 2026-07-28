@@ -9,7 +9,7 @@ import { buildTasteDna, dnaScore, type TasteDna, type DnaResult } from '@/lib/sc
 import { aiAdjustScore, type AiAdjustment } from '@/lib/aiAdjust';
 import { isPro } from '@/lib/pro';
 import { getUserDimensionProfile, getCachedDimensions, getTitleDimensions } from '@/lib/titleDimensions';
-import { dimensionMatch, matchHighlights } from '@/lib/scoring/dimensions';
+import { dimensionMatch, matchHighlights, type DimensionProfile } from '@/lib/scoring/dimensions';
 import { rerankNudge } from '@/lib/scoring/reranker';
 import { RERANK_MODEL } from '@/lib/scoring/rerankerWeights';
 import { loadPreference } from '@/lib/preference/store';
@@ -98,6 +98,14 @@ export interface UserDnaResult extends DnaResult {
   baseScore?: number; // the deterministic blend before any AI adjustment
   adjustment?: number | null; // the bounded AI nudge applied (null when no AI ran)
   reasoning?: string | null; // one-sentence AI rationale for the nudge
+  /**
+   * The axes of this title's cached content fingerprint that agree with, and
+   * clash against, what the user demonstrably rates highly. Feeds the card's
+   * "why it fits you" line. Absent when there is no profile or no fingerprint —
+   * and the UI must then say so rather than inventing one (see
+   * `verdict/fitReasons`).
+   */
+  fit?: { agree: { label: string; note: string }[]; clash: { label: string; note: string }[] } | null;
 }
 
 /**
@@ -215,6 +223,56 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
   const personalized = scored.some((s) => s.dnaFit != null);
   scored.sort((a, b) => (b.dnaFit ?? -Infinity) - (a.dnaFit ?? -Infinity));
   return { items: scored, personalized };
+}
+
+/**
+ * THE PROFILE, ONCE PER GRID.
+ *
+ * Every card on a page calls the DNA endpoint for its own title, so loading the
+ * user's dimension profile inside that call would mean twelve identical
+ * queries for one screen. It changes only when they rate something, so a short
+ * memo is safe and turns twelve into one.
+ */
+const profileMemo = new Map<string, { at: number; value: Promise<DimensionProfile> }>();
+const PROFILE_TTL_MS = 60_000;
+
+function memoProfile(supabase: SupabaseClient, userId: string, sampleSize: number): Promise<DimensionProfile> {
+  const key = `${userId}:${sampleSize}`;
+  const hit = profileMemo.get(key);
+  const now = Date.now();
+  if (hit && now - hit.at < PROFILE_TTL_MS) return hit.value;
+  const value = getUserDimensionProfile(supabase, userId, sampleSize);
+  profileMemo.set(key, { at: now, value });
+  return value;
+}
+
+/**
+ * The agree/clash axes for one title, for one user — the honest source for the
+ * card's "why it fits you" line.
+ *
+ * CACHE-ONLY on the title side. `getTitleDimensions` will classify an unseen
+ * title with a model call; doing that per card would put an LLM request behind
+ * every placard in a grid. A title we have not fingerprinted yet simply has no
+ * fit line, and the UI says so.
+ */
+export async function dimensionFitFor(
+  supabase: SupabaseClient,
+  userId: string,
+  mediaType: MediaType,
+  id: number,
+  sampleSize: number,
+): Promise<UserDnaResult['fit']> {
+  try {
+    const [cached, profile] = await Promise.all([
+      getCachedDimensions([{ tmdb_id: id, media_type: mediaType }]),
+      memoProfile(supabase, userId, sampleSize),
+    ]);
+    const dims = cached.get(`${mediaType}:${id}`) ?? cached.get(`${id}`);
+    if (!dims || profile.samples === 0) return null;
+    return matchHighlights(dims, profile);
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { Nav } from '@/components/Nav';
 import { PosterCard } from '@/components/PosterCard';
 import { RatingsStrip } from '@/components/RatingsStrip';
+import { DocketTray } from '@/components/DocketTray';
 
 /**
  * VISUAL-QA harness (gated by MOBILE_HARNESS=1) — renders the REAL production
@@ -49,6 +50,10 @@ export default function VisualQaHarness() {
           ))}
         </section>
       </main>
+      {/* The decision-pool tray, which the real app mounts in the /app layout.
+          Without it this harness renders the W but not what the W does, and the
+          workflow could not be driven end to end from a browser test. */}
+      <DocketTray />
       </div>
     </>
   );

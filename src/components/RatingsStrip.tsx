@@ -45,7 +45,11 @@ export function RatingsStrip({
     return (
       <div className={`wv-ratings flex flex-col gap-1.5 ${className}`}>
         <div className="wv-ratings-row flex items-center gap-2.5 text-sm">
-          <span className="h-4 w-24 animate-pulse rounded bg-white/10" />
+          {/* 26px — EXACTLY the height of the chips this becomes. It was a 16px
+              bar inside a 24px row, and the chips render at 26, so every card
+              in the grid grew 2px the moment its ratings landed. Two pixels is
+              still the row below moving under a thumb. */}
+          <span className="h-[26px] w-24 animate-pulse rounded-md bg-white/10" />
         </div>
       </div>
     );
@@ -102,40 +106,89 @@ export function RatingsStrip({
           A three-column grid is one line at every width. `min-w-0` on each cell
           is what stops IMDb escaping the panel — the original reason for the
           wrap — without letting the height vary. */}
-      <div className="wv-ratings-row grid min-w-0 grid-cols-3 items-center gap-1.5 text-sm font-black tabular-nums">
+      {/* CONTENT-SIZED, NOT EQUAL THIRDS. Three equal columns give every chip
+          the same width, and IMDb's wordmark makes it the widest of the three —
+          so at 320px it was the one that got cut while the other two had slack.
+          A no-wrap flex row lets each take what it needs and puts the spare in
+          the gaps. `flex-nowrap` keeps the guarantee the grid was there for:
+          one line, one height, at every width. */}
+      <div className="wv-ratings-row flex min-w-0 flex-nowrap items-center justify-between gap-1 overflow-hidden text-sm font-black tabular-nums">
         <RatingChip
-          label="🍅"
+          mark={<span aria-hidden className="wv-ratings-emoji flex-none text-[11px] leading-none sm:text-sm">🍅</span>}
           value={ratings.tomatometer != null ? `${ratings.tomatometer}%` : null}
           tone={ratings.tomatometer != null ? tomatoColor(ratings.tomatometer) : ''}
           title="Rotten Tomatoes — Tomatometer (critics)"
         />
         <RatingChip
-          label="🍿"
+          mark={<span aria-hidden className="wv-ratings-emoji flex-none text-[11px] leading-none sm:text-sm">🍿</span>}
           value={popcorn != null ? `${popcorn}%` : null}
           tone={popcorn != null ? 'text-amber-200' : ''}
           title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
         />
-        <span
-          className={`inline-flex min-w-0 items-center justify-self-start gap-1 overflow-hidden whitespace-nowrap rounded px-1.5 py-0.5 ${ratings.imdb != null ? 'bg-[#f5c518] text-black' : 'bg-white/5 text-slate-500'}`}
+        {/* IMDb was a SOLID YELLOW PILL — the highest-contrast object on the
+            card, on a row that is reference information. It read as the
+            primary action, next to FOR/AGAINST/SAVE which are the actual
+            actions. The wordmark keeps IMDb recognisable; the chip around it
+            now matches its two neighbours. */}
+        <RatingChip
+          mark={<span className="wv-ratings-tag flex-none rounded-[3px] bg-[#f5c518] px-0.5 text-[8px] font-black leading-[1.5] text-black sm:px-1 sm:text-[9px]">IMDb</span>}
+          value={ratings.imdb != null ? ratings.imdb.toFixed(1) : null}
+          tone="text-amber-100"
           title="IMDb rating"
-        >
-          <span className="wv-ratings-tag text-[10px] font-black opacity-80">IMDb</span> {ratings.imdb != null ? ratings.imdb.toFixed(1) : '–'}
-        </span>
+        />
       </div>
     </div>
   );
 }
 
-/** One source rating — icon + value, dimmed to "–" when unavailable. No pill, so
- *  all three ratings fit one line in a narrow card. */
-function RatingChip({ label, value, tone, title }: { label: string; value: string | null; tone: string; title: string }) {
+/**
+ * ONE SOURCE RATING — and all three look like the same kind of object.
+ *
+ * They used to be three different shapes: two bare icon+number pairs and a
+ * solid yellow IMDb pill. Same row, same rank, three treatments, and the
+ * loudest one was reference information sitting next to the real actions.
+ *
+ * Now: one neutral chip, one height, one type scale. Colour is carried by the
+ * NUMBER (a fresh tomato stays green, a rotten one red) rather than by the
+ * container, so recognition survives without any of them competing with
+ * FOR/AGAINST/SAVE. Missing values render "–" in the same box rather than
+ * leaving a hole.
+ */
+function RatingChip({
+  mark,
+  value,
+  tone,
+  title,
+}: {
+  mark: React.ReactNode;
+  value: string | null;
+  tone: string;
+  title: string;
+}) {
   return (
     <span
-      className={`inline-flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap ${value != null ? tone : 'text-slate-500'}`}
+      /* TIGHT ON PURPOSE. In a row card the body is ~186px wide, so each of
+         the three chips gets ~58px. The first pass used px-1.5, gap-1 and 13px
+         text, which needed ~62 and truncated every value to "5…". Padding is
+         the first thing to give up; the number is the last. */
+      /* THE CHROME IS THE FIRST THING TO GO, THE NUMBER IS THE LAST.
+         In a row card at 320px the body is ~142px, so each of the three chips
+         gets ~45. A padded, ringed chip needs ~52 and clips "6.8" to "6" — a
+         rating that shows the wrong number is worse than one that shows none.
+         So below `sm` the chips lose their fill, ring and padding and keep only
+         what the requirement actually asks for: one height, one type scale, one
+         spacing. The chip treatment returns from `sm`, where it fits. */
+      className={`inline-flex h-[26px] min-w-0 items-center gap-0.5 overflow-hidden whitespace-nowrap rounded-md text-xs sm:gap-1 sm:bg-white/[0.06] sm:px-1.5 sm:text-[13px] sm:ring-1 sm:ring-white/10 ${
+        value != null ? tone : 'text-slate-500'
+      }`}
       title={title}
     >
-      <span aria-hidden className="wv-ratings-emoji text-base leading-none">{label}</span>
-      {value ?? '–'}
+      {mark}
+      {/* NOT truncated. A rating that reads "5…" is worse than one that is
+          absent — it looks like data we have and cannot show. If it genuinely
+          will not fit, the chip clips at its own edge and the test below
+          catches it. */}
+      <span className="font-black">{value ?? '–'}</span>
     </span>
   );
 }

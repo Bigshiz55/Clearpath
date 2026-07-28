@@ -299,3 +299,53 @@ describe('trayHidden', () => {
     expect(trayHidden(null, 3)).toBe(false);
   });
 });
+
+/**
+ * THE DECISION POOL SAYS WHERE YOU ARE, IN WORDS.
+ *
+ * The badge carries the count; these carry the progress toward the gavel. Two
+ * strings on purpose — the tray is a fixed bar sharing one line with Clear and
+ * Deliver, and the full sentence wraps at 320px, which doubles the height of
+ * the thing covering the page. The short one goes in the bar, the long one is
+ * announced and shown where there is room.
+ */
+describe('what the decision pool tells you', () => {
+  const pool = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      key: `movie:${i}`,
+      tmdbId: i,
+      mediaType: 'movie' as const,
+      title: `T${i}`,
+      year: 2020,
+      posterUrl: null,
+      addedAt: 1,
+    }));
+
+  it('counts what is selected and how many more the gavel needs', () => {
+    expect(docketStatus(pool(1)).longMessage).toBe('1 selected — choose 2 more');
+    expect(docketStatus(pool(2)).longMessage).toBe('2 selected — choose 1 more');
+  });
+
+  it('says the gavel is ready at the minimum, and above it', () => {
+    expect(docketStatus(pool(MIN_FOR_VERDICT)).longMessage).toBe('3 selected — gavel ready');
+    expect(docketStatus(pool(5)).longMessage).toBe('5 selected — gavel ready');
+    expect(docketStatus(pool(MIN_FOR_VERDICT)).ready).toBe(true);
+  });
+
+  it('never claims ready below the minimum', () => {
+    for (let n = 1; n < MIN_FOR_VERDICT; n++) {
+      expect(docketStatus(pool(n)).ready, `${n} selected`).toBe(false);
+      expect(docketStatus(pool(n)).longMessage).not.toMatch(/gavel ready/);
+    }
+  });
+
+  it('points an empty pool at the W, which is how you fill it', () => {
+    expect(docketStatus([]).longMessage).toMatch(/tap the W/i);
+  });
+
+  it('keeps the short form short enough for a 320px bar', () => {
+    for (let n = 0; n <= MAX_DOCKET; n++) {
+      expect(docketStatus(pool(n)).message.length, `${n} selected`).toBeLessThanOrEqual(28);
+    }
+  });
+});

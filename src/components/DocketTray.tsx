@@ -50,22 +50,34 @@ export function DocketTray() {
       <div className="container-page">
         {/* Opaque, and no backdrop-filter — same iOS fixed-layer repaint trap
             the bottom nav hit. See MobileNav. */}
-        <div className="rounded-2xl border-2 border-[#ff1493]/50 bg-ink-950 px-2 py-2 shadow-[0_10px_40px_-8px_rgba(0,0,0,0.8)]">
+        {/* A ring, not a two-pixel neon border. The tray has to be findable,
+            not loud — it sits over content the whole time it exists. */}
+        <div className="rounded-2xl bg-ink-950 px-2 py-2 shadow-[0_10px_40px_-8px_rgba(0,0,0,0.85)] ring-1 ring-[#ff1493]/45">
           <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => setOpen((o) => !o)}
               aria-expanded={open}
-              aria-label={`${status.message} — ${status.count} on the docket. Tap to see them.`}
+              aria-label={`${status.longMessage}. Tap to see them.`}
               data-testid="docket-toggle"
               className="inline-flex min-h-[36px] min-w-0 items-center gap-1.5 rounded-lg px-0.5 text-sm font-bold text-white"
             >
               <span data-testid="docket-count" className="wv-tray-count grid h-7 w-7 flex-none place-items-center rounded-full bg-gradient-to-b from-[#ff62b6] to-[#ff1493] text-xs font-black text-white">
                 {status.count}
               </span>
-              <span data-testid="docket-status" className="wv-tray-status truncate">{status.message}</span>
+              {/* Short in the bar, the full sentence where there is room. The
+                  long form wraps at 320px, which doubles the height of a bar
+                  that is already covering the page. */}
+              <span data-testid="docket-status" className="wv-tray-status truncate sm:hidden">{status.message}</span>
+              <span data-testid="docket-status-long" className="hidden truncate sm:inline">{status.longMessage}</span>
               <span aria-hidden className="text-slate-500">{open ? '▾' : '▸'}</span>
             </button>
+
+            {/* "3 selected — gavel ready" is the moment the feature becomes
+                available, and it must be announced, not just coloured in. */}
+            <span className="sr-only" role="status" aria-live="polite" data-testid="docket-announce">
+              {status.longMessage}
+            </span>
 
             <div className="ml-auto flex flex-none items-center gap-1">
               <button
@@ -80,17 +92,26 @@ export function DocketTray() {
                 <Link
                   href="/app/verdict"
                   data-testid="docket-deliver"
-                  className="inline-flex min-h-[40px] flex-none items-center rounded-lg border-2 border-pink-200/60 bg-gradient-to-b from-[#ff62b6] to-[#ff1493] px-3.5 text-sm font-black text-white transition hover:brightness-110"
+                  aria-label={`Let the gavel decide — ${status.count} titles selected`}
+                  className="inline-flex min-h-[44px] flex-none items-center gap-1.5 rounded-xl bg-[#ff1493] px-3.5 text-sm font-black text-white ring-1 ring-pink-200/60 transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-95"
                 >
-                  Deliver →
+                  <span aria-hidden>🔨</span>
+                  <span>Gavel</span>
                 </Link>
               ) : (
-                // Nothing here. The message already says how many more are
-                // needed, and restating it as "3 minimum" cost the row the
-                // width that made it wrap in the first place.
-                <span className="sr-only" data-testid="docket-not-ready">
-                  {MIN_FOR_VERDICT} needed for a verdict
-                </span>
+                // VISIBLE BUT DISABLED, rather than absent. A control that
+                // appears only once you have earned it cannot teach you how to
+                // earn it — and the count alone does not say what it unlocks.
+                <button
+                  type="button"
+                  disabled
+                  data-testid="docket-not-ready"
+                  aria-label={`Gavel unavailable — ${status.longMessage}. ${MIN_FOR_VERDICT} needed for a verdict.`}
+                  className="inline-flex min-h-[44px] flex-none cursor-not-allowed items-center gap-1.5 rounded-xl bg-white/5 px-3.5 text-sm font-black text-slate-500 ring-1 ring-white/10"
+                >
+                  <span aria-hidden className="opacity-50">🔨</span>
+                  <span className="whitespace-nowrap">{MIN_FOR_VERDICT - status.count} more</span>
+                </button>
               )}
             </div>
           </div>

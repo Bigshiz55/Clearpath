@@ -12,6 +12,9 @@ export interface DnaClientResult {
   baseScore?: number; // deterministic blend before the AI adjustment
   adjustment?: number | null; // bounded AI nudge (only present when ai=1 was requested)
   reasoning?: string | null; // one-sentence AI rationale
+  /** Axes of this title that agree/clash with what the user rates highly.
+   *  Null when there is no profile or no cached fingerprint — never faked. */
+  fit?: { agree: { label: string; note: string }[]; clash: { label: string; note: string }[] } | null;
 }
 
 // One in-flight fetch per title, shared across every component on the page (the

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getScoringData } from '@/lib/titleData';
 import { computeGeneralScore } from '@/lib/scoring/general';
-import { getUserDnaForTitle } from '@/lib/dna';
+import { getUserDnaForTitle, dimensionFitFor } from '@/lib/dna';
 import type { MediaType } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -37,7 +37,13 @@ export async function GET(req: Request, { params }: { params: { type: string; id
       year: meta.year,
       genres: meta.genres,
     });
-    return NextResponse.json({ dna });
+    // The agree/clash axes for the card's "why it fits you" line, from the
+    // SAME request the card already makes — a second endpoint would mean a
+    // second fetch per placard. Best-effort and cache-only: a title we have
+    // not fingerprinted yet gets no fit, and the UI says so rather than
+    // inventing one.
+    const fit = await dimensionFitFor(supabase, user.id, mediaType, id, dna.sampleSize).catch(() => null);
+    return NextResponse.json({ dna: { ...dna, fit } });
   } catch {
     return NextResponse.json({ dna: null });
   }

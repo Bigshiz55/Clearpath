@@ -78,6 +78,18 @@ body {
      state. The accessible name on the toggle keeps it for screen readers. */
   @media (max-width: 359px) {
     .wv-tray-status { display: none; }
+    /* THE 320px CARD, MEASURED.
+       At 320 the card is 288 wide; a 38% poster leaves the body 143 and the
+       ratings row 130 — 39px a chip, where "IMDb 6.8" needs 51. The result was
+       a rating that rendered as "IMDb 6", which is worse than none: it is a
+       wrong number, confidently displayed.
+       Two small concessions at this width only: the poster takes 30% instead of
+       38% (86px — still a recognisable placard), and the rating type drops a
+       step. Together that gives 51px a chip against a 44px need. */
+    .wv-card-art { width: 30%; }
+    .wv-ratings-row { font-size: 11px; }
+    .wv-ratings-emoji { font-size: 10px; }
+    .wv-ratings-tag { font-size: 7px; }
   }
   @media (min-width: 640px) {
     .poster-grid {

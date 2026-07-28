@@ -46,7 +46,13 @@ export function AlgorithmScore({
 
   return (
     <div
-      className={`rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 shadow-[0_0_16px_rgba(244,63,94,0.28)] ${compact ? 'px-2 py-1.5' : 'px-2 py-2'} ${className}`}
+      /* LIGHTER, NOT QUIETER. This was a two-pixel pink border over a
+         saturated gradient with a glow — three separate ways of shouting, on a
+         card that also had green, red, magenta, red-tomato, yellow-IMDb and
+         gold all competing. The score and the call are still the loudest thing
+         here; they just no longer have to outshout their own container. A soft
+         tint and a one-pixel ring do the framing. */
+      className={`rounded-xl bg-[#ff1493]/[0.09] ring-1 ring-[#ff1493]/35 ${compact ? 'px-2.5 py-2' : 'px-3 py-2.5'} ${className}`}
       title="Your VERD1CT — your taste blended with every rating into one 0–100 estimate of how much YOU will like it. The blue TV means it’s from WatchVerdict."
     >
       {/* The VERD1CT badge (number + TV) beside the ruling (Stream It / …).
@@ -64,7 +70,7 @@ export function AlgorithmScore({
               {v.call}
             </span>
           )}
-          <div className={`text-[10px] font-black uppercase tracking-wide text-pink-100/90 ${compact ? '' : 'mt-1'}`}>
+          <div className={`text-[10px] font-black uppercase tracking-wide text-pink-200/80 ${compact ? '' : 'mt-1'}`}>
             {personal ? (<>Your VERD<span style={{ color: '#ff1493' }}>1</span>CT</>) : 'WatchVerdict'}
             {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 ? ' · learning' : ''}
           </div>
