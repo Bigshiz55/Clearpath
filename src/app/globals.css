@@ -78,10 +78,18 @@ body {
   }
   @media (min-width: 640px) {
     .poster-grid {
-      /* Content-aware minimum: a card must fit FOR/PASS/SAVE + all three rating
-         chips without crowding, so 250px — fewer, wider columns on laptops
-         instead of a cramped 6-across. */
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      /* Content-aware minimum: a card must fit FOR · AGAINST · SAVE and all
+         three rating chips without crowding — fewer, wider columns on laptops
+         instead of a cramped 6-across.
+
+         280px, NOT 250. The 250 was measured when the action row was 11px
+         everywhere. The row now scales with the screen (`.wv-act`: 13px labels
+         and 18px icons from `lg`, 14px from `xl`), which is the whole point of
+         "too small on iPad" — and at 1280px a 250px track leaves the row 238px
+         to hold 237px of controls. It fitted to the pixel and then stopped
+         fitting: SAVE dropped to a second line. A minimum that cannot hold the
+         controls it was sized for is not a minimum. */
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     }
   }
   /* ── The Top 10 rail ────────────────────────────────────────────────────
@@ -405,13 +413,21 @@ body {
 .wv-det-art { grid-area: art; }
 .wv-det-info { grid-area: info; min-width: 0; }
 .wv-det-verdict { grid-area: verdict; min-width: 0; }
+/* FOUR CONTROLS, FOUR EQUAL CELLS.
+   This row was a wrap-flex with `> * { flex: 1 1 7rem; min-width: 0 }`, and it
+   held REMIND · SAVE · FOR · AGAINST — but only the first two are children of
+   this element. `CardVerdict` wraps its pair in `display: contents`, so the
+   selector never reached the verdict buttons: Remind and Save each claimed a
+   7rem basis and grew, and FOR and AGAINST divided the ~40px left over and
+   printed their labels straight over each other. A two-by-two grid gives all
+   four the same cell whether or not their parent is a box. */
 .wv-det-act {
   grid-area: act;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
+  align-content: start;
 }
-.wv-det-act > * { flex: 1 1 7rem; min-width: 0; }
 @media (min-width: 640px) {
   .wv-det-row { grid-template-columns: 7rem minmax(0, 1fr); gap: 1rem; }
 }
@@ -421,8 +437,7 @@ body {
     grid-template-columns: 8rem minmax(0, 1fr) 15rem 10rem;
     align-items: center;
   }
-  .wv-det-act { flex-direction: column; flex-wrap: nowrap; }
-  .wv-det-act > * { flex: 0 0 auto; width: 100%; }
+  .wv-det-act { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ── Quick Taste Quiz ────────────────────────────────────────────────────

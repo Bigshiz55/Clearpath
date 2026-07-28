@@ -20,6 +20,36 @@ import { signalFor, signalForVerdict, type UserVerdict } from '@/lib/import/sign
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
+/* Line art rather than emoji for the three marks that carry meaning here: an
+   emoji shield renders as a different object on every platform, and this one is
+   making a promise about where the file goes. */
+function ShieldIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m5 13 4 4L19 7" />
+    </svg>
+  );
+}
+
+function UploadIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 9l5-5 5 5" />
+      <path d="M12 4v12" />
+    </svg>
+  );
+}
+
 type Stage = 'choose' | 'processing' | 'review' | 'applied';
 
 interface ReviewItem {
@@ -119,36 +149,72 @@ export function ImportTasteFlow() {
   // ---- CHOOSE ------------------------------------------------------------
   if (stage === 'choose') {
     return (
-      <div className="space-y-6" data-testid="import-taste">
-        <header>
-          <h1 className="text-2xl font-bold text-white sm:text-3xl">Bring Your Taste With You</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Import what you have watched, saved, liked, or skipped so WatchVerd1ct can understand you
-            faster — without rating hundreds of titles by hand.
+      <div className="space-y-6 sm:space-y-8" data-testid="import-taste">
+        <header className="max-w-2xl">
+          <h1 className="text-[1.75rem] font-black leading-[1.1] tracking-tight text-white sm:text-4xl">
+            Bring your taste with you
+          </h1>
+          <p className="mt-3 text-base leading-relaxed text-slate-300 sm:text-lg">
+            Import what you have watched, saved, liked or skipped, and WatchVerd1ct understands you in
+            one go — instead of you rating hundreds of titles by hand.
           </p>
         </header>
 
-        <section className="rounded-xl border border-emerald-400/30 bg-emerald-500/[0.07] p-4" data-testid="privacy-note">
-          <h2 className="text-sm font-bold text-emerald-100">Your file stays on your device</h2>
-          <ul className="mt-2 space-y-1 text-sm text-emerald-100/80">
-            <li>· We never ask for your Netflix password, and we never sign in to your account.</li>
-            <li>· Your file is read in this browser. It is not uploaded to our servers.</li>
-            <li>· You review every title before anything is added to your Viewer DNA.</li>
-            <li>· Nothing is saved until you confirm it, and any import can be undone.</li>
+        {/* THE PROMISE COMES FIRST, and it is structural rather than a policy
+            sentence: the parsing runs in this browser, so there is no raw
+            upload to delete because there was no raw upload. It used to be four
+            lines of 14px text behind a "·" — the same weight as a footnote for
+            the thing most people want answered before they pick a file. */}
+        <section
+          className="rounded-2xl border border-emerald-400/30 bg-emerald-500/[0.07] p-5 sm:p-6"
+          data-testid="privacy-note"
+        >
+          <h2 className="flex items-center gap-2.5 text-lg font-bold text-emerald-50 sm:text-xl">
+            <ShieldIcon className="h-6 w-6 flex-none text-emerald-300" />
+            Your file stays on your device
+          </h2>
+          <ul className="mt-4 space-y-3">
+            {[
+              'We never ask for your Netflix password, and we never sign in to your account.',
+              'Your file is read in this browser. It is not uploaded to our servers.',
+              'You review every title before anything is added to your Viewer DNA.',
+              'Nothing is saved until you confirm it, and any import can be undone.',
+            ].map((line) => (
+              <li key={line} className="flex gap-3 text-[15px] leading-relaxed text-emerald-50/90">
+                <CheckIcon className="mt-0.5 h-5 w-5 flex-none text-emerald-300" />
+                <span>{line}</span>
+              </li>
+            ))}
           </ul>
         </section>
 
-        <section className="card p-5">
-          <h2 className="text-lg font-semibold text-white">Import your Netflix history</h2>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-300">
-            <li>Open Netflix on a computer and go to Account → Profile → Viewing activity.</li>
-            <li>Scroll to the bottom and choose <strong className="text-white">Download all</strong>.</li>
-            <li>Upload the <code className="text-brand-200">NetflixViewingHistory.csv</code> file here.</li>
+        <section className="card p-5 sm:p-6">
+          <h2 className="text-xl font-bold text-white sm:text-2xl">Import your Netflix history</h2>
+          {/* Numbered discs rather than a `list-decimal` margin — on a phone the
+              browser's own numerals sat outside the card's padding and the
+              steps read as an afterthought. */}
+          <ol className="mt-4 space-y-3.5">
+            {[
+              <>Open Netflix on a computer and go to <strong className="font-semibold text-white">Account → Profile → Viewing activity</strong>.</>,
+              <>Scroll to the bottom and choose <strong className="font-semibold text-white">Download all</strong>.</>,
+              <>Upload the <code className="rounded bg-white/10 px-1.5 py-0.5 text-[13px] text-brand-200">NetflixViewingHistory.csv</code> file here.</>,
+            ].map((step, i) => (
+              <li key={i} className="flex gap-3.5">
+                <span
+                  aria-hidden
+                  className="grid h-7 w-7 flex-none place-items-center rounded-full bg-brand-500/25 text-sm font-black text-brand-100"
+                >
+                  {i + 1}
+                </span>
+                <span className="pt-0.5 text-[15px] leading-relaxed text-slate-300">{step}</span>
+              </li>
+            ))}
           </ol>
-          <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/20 bg-white/5 p-8 text-center transition hover:border-brand-400/60 hover:bg-white/10">
-            <span className="text-3xl" aria-hidden>📄</span>
-            <span className="mt-2 text-sm font-semibold text-white">Choose your CSV file</span>
-            <span className="mt-1 text-xs text-slate-400">or drag it here · up to 20 MB</span>
+
+          <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-brand-400/40 bg-brand-500/[0.07] px-5 py-9 text-center transition hover:border-brand-400/80 hover:bg-brand-500/15 sm:py-12">
+            <UploadIcon className="h-11 w-11 text-brand-200" />
+            <span className="mt-3 text-lg font-bold text-white sm:text-xl">Choose your CSV file</span>
+            <span className="mt-1.5 text-sm text-slate-400">or drag it here · up to 20 MB</span>
             <input
               type="file"
               accept=".csv,text/csv,text/plain"
@@ -158,29 +224,42 @@ export function ImportTasteFlow() {
             />
           </label>
           {error && (
-            <p className="mt-3 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-100" role="alert" data-testid="import-error">
+            <p className="mt-4 rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-[15px] text-red-100" role="alert" data-testid="import-error">
               {error}
             </p>
           )}
         </section>
 
-        <section className="card p-5">
-          <h2 className="text-lg font-semibold text-white">Other ways to start</h2>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="text-sm font-semibold text-white">Screenshot Taste Scan</div>
-              <div className="mt-0.5 text-xs text-slate-400">
+        <section className="card p-5 sm:p-6">
+          <h2 className="text-xl font-bold text-white sm:text-2xl">Other ways to start</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {/* Not a link, and it must not look like one: this does not exist
+                yet, and a tappable card that goes nowhere is worse than a
+                labelled placeholder. */}
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 opacity-70">
+              <div className="text-2xl" aria-hidden>🖼️</div>
+              <div className="mt-2 text-base font-bold text-white">Screenshot Taste Scan</div>
+              <div className="mt-1 text-sm leading-relaxed text-slate-400">
                 Coming next — upload screenshots from any service.
               </div>
             </div>
-            <a href="/app/dna" className="rounded-lg border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
-              <div className="text-sm font-semibold text-white">Take the Viewer DNA quiz</div>
-              <div className="mt-0.5 text-xs text-slate-400">A few questions, no file needed.</div>
-            </a>
-            <a href="/app" className="rounded-lg border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
-              <div className="text-sm font-semibold text-white">Start fresh</div>
-              <div className="mt-0.5 text-xs text-slate-400">Rate titles as you go.</div>
-            </a>
+            {([
+              ['/app/dna', '🧬', 'Take the Viewer DNA quiz', 'A few questions, no file needed.'],
+              ['/app', '⭐', 'Start fresh', 'Rate titles as you go.'],
+            ] as const).map(([href, emoji, title, sub]) => (
+              <a
+                key={href}
+                href={href}
+                className="group flex min-h-[44px] flex-col rounded-xl border border-white/12 bg-white/5 p-4 transition hover:border-brand-400/50 hover:bg-white/10"
+              >
+                <span className="text-2xl" aria-hidden>{emoji}</span>
+                <span className="mt-2 flex items-center gap-1.5 text-base font-bold text-white">
+                  {title}
+                  <span aria-hidden className="text-brand-300 transition group-hover:translate-x-0.5">→</span>
+                </span>
+                <span className="mt-1 text-sm leading-relaxed text-slate-400">{sub}</span>
+              </a>
+            ))}
           </div>
         </section>
       </div>

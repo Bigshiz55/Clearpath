@@ -253,17 +253,25 @@ export async function discoverByGenres(
   mediaType: MediaType,
   genreIds: number[],
   region = 'US',
+  /**
+   * 1-based page. Discovery used to be pinned to page 1, which capped the whole
+   * profile-shaped pool at twenty titles per media type — fine for a cold-start
+   * hint, hopeless for a feed somebody is meant to keep ruling. TMDB discover is
+   * thousands deep; paging is what makes it deep here too.
+   */
+  page = 1,
 ): Promise<DiscoverItem[]> {
-  if (genreIds.length === 0) return [];
+  // An EMPTY genre list is now meaningful: "no genre constraint", the broadest
+  // tier of the ruling deck. It used to be the early-return.
   const data = await tmdbFetch<TmdbMultiResult>(`/discover/${mediaType}`, {
     language: 'en-US',
     include_adult: 'false',
     sort_by: 'popularity.desc',
     watch_region: region,
-    with_genres: genreIds.join('|'),
+    ...(genreIds.length > 0 ? { with_genres: genreIds.join('|') } : {}),
     'vote_count.gte': '200',
     'vote_average.gte': '6.4',
-    page: '1',
+    page: String(Math.max(1, Math.floor(page))),
   }).catch(() => ({ page: 1, results: [] as TmdbMultiResult['results'] }));
 
   return data.results.slice(0, 20).map((r) => {

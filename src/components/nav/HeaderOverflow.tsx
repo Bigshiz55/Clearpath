@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { ViewModeToggle } from '../ViewModeToggle';
 import { SignOutButton } from '../SignOutButton';
 
@@ -71,6 +72,15 @@ export function HeaderOverflow({
             <div className="px-2 pb-2 pt-1 text-xs text-slate-400">{personalLabel}</div>
           )}
           <div className="flex flex-col gap-1">
+            {/* Pro is inline in the header from `sm`; on a phone this is where
+                it lives, because the header there has room for search instead. */}
+            <Link
+              href="/app/pro"
+              className="w-full rounded-lg border border-gold-400/50 bg-gold-500/10 px-2.5 py-1.5 text-left text-sm font-semibold text-gold-100 transition hover:bg-gold-500/20 sm:hidden"
+              role="menuitem"
+            >
+              ⭐ WatchVerdict Pro
+            </Link>
             <ViewModeToggle className="w-full justify-start" />
             {!isGuest && (
               <SignOutButton className="w-full rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-left text-sm font-semibold text-slate-200 transition hover:bg-white/10" />

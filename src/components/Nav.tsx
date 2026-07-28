@@ -5,6 +5,7 @@ import { MoreMenu, type NavLink } from './nav/MoreMenu';
 import { MobileNav } from './nav/MobileNav';
 import { HeaderOverflow } from './nav/HeaderOverflow';
 import { Avatar } from './Avatar';
+import { QuickSearchTrigger } from './QuickSearch';
 
 // Primary destinations stay inline; secondary ones live under "More" so neither
 // the desktop bar nor the mobile tab bar gets overcrowded.
@@ -77,19 +78,29 @@ export function Nav({
               overflow at every width — inline they cost ~220px, which is what
               pushed the primary nav past this column and under them. */}
           <div className="flex shrink-0 items-center gap-2">
+            {/* Search belongs in the header at every width — "a search button
+                that's always there no matter what screen you're on". Once this
+                one scrolls off on a phone, QuickSearch floats a replacement. */}
+            <QuickSearchTrigger />
+            {/* PRO STEPS ASIDE ON A PHONE. The header holds a logo and three
+                controls at 390px and no more — adding a fifth put the search
+                button under the wordmark. Search is worth more from every
+                screen than an upsell is; Pro keeps its place from `sm` and is
+                in the overflow menu below at every width. */}
             <Link
               href="/app/pro"
               title="WatchVerdict Pro — AI-tuned verdicts, household profiles & more"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gold-400/50 bg-gold-500/10 px-2.5 py-1.5 text-sm font-semibold text-gold-100 transition hover:bg-gold-500/20"
+              className="hidden items-center gap-1.5 rounded-lg border border-gold-400/50 bg-gold-500/10 px-2.5 py-1.5 text-sm font-semibold text-gold-100 transition hover:bg-gold-500/20 sm:inline-flex"
             >
               <span aria-hidden className="text-base leading-none">⭐</span>
               <span className="hidden sm:inline">Pro</span>
             </Link>
-            {personalLabel && !isGuest && (
-              <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 lg:inline">
-                {personalLabel}
-              </span>
-            )}
+            {/* THE IDENTITY CHIP IS NOT INLINE ANY MORE. `container-page` caps
+                at 1152px, so the header has exactly as much room at 1600 as at
+                1280 — and measured there, the primary nav ends at 958 while
+                this cluster starts at 952. The chip was the ~115px in the
+                middle. It is in the overflow menu at every width, which is
+                where a label you read once belongs. */}
             {isGuest ? (
               <GuestSaveButton className="btn-primary hidden sm:inline-flex" />
             ) : (

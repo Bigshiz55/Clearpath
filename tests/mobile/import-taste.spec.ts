@@ -257,3 +257,80 @@ test.describe('responsive and accessible', () => {
     await expect(page.locator('h1')).toHaveCount(1);
   });
 });
+
+/**
+ * "Looks dated and small."
+ *
+ * The first screen of this flow was 14px body copy, a bulleted privacy note
+ * whose markers were literal "·" characters, browser-default `list-decimal`
+ * numerals hanging outside the card, and a grey dashed box with a 📄 in it.
+ * Everything was legible and nothing was inviting, on the one screen that has
+ * to answer "where does my file go" before anybody picks one.
+ *
+ * These pin the floor rather than the styling: type large enough to read on a
+ * phone, a drop target you can actually hit, and headings that outrank the body
+ * text beneath them.
+ */
+const MIN_BODY_PX = 15;
+
+async function px(page: Page, selector: string): Promise<number> {
+  return page.locator(selector).first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+}
+
+test.describe('the first screen reads like a 2026 product', () => {
+  test('body copy is never phone-squint small', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(R, { waitUntil: 'networkidle' });
+
+    // The privacy promise and the steps are the two things people actually read.
+    const promise = await page.getByTestId('privacy-note').locator('li').first()
+      .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(promise, 'privacy line font size').toBeGreaterThanOrEqual(MIN_BODY_PX);
+
+    const step = await page.locator('ol li span').last()
+      .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(step, 'step font size').toBeGreaterThanOrEqual(MIN_BODY_PX);
+  });
+
+  test('the headline outranks the paragraph under it', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(R, { waitUntil: 'networkidle' });
+    const h1 = await px(page, 'h1');
+    const lede = await page.locator('h1 + p').evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(h1, 'headline').toBeGreaterThanOrEqual(26);
+    expect(h1).toBeGreaterThan(lede * 1.5);
+    expect(lede, 'lede').toBeGreaterThanOrEqual(MIN_BODY_PX);
+  });
+
+  test('the drop target is big enough to be the obvious next move', async ({ page }) => {
+    for (const [, w, h] of VIEWPORTS) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto(R, { waitUntil: 'networkidle' });
+      const label = page.locator('label:has([data-testid="csv-input"])');
+      const box = (await label.boundingBox())!;
+      expect(box.height, `drop zone height at ${w}px`).toBeGreaterThanOrEqual(120);
+      const words = await label.locator('span').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      expect(words, `drop zone label at ${w}px`).toBeGreaterThanOrEqual(17);
+    }
+  });
+
+  test('nothing overflows the screen sideways at any width', async ({ page }) => {
+    for (const [, w, h] of VIEWPORTS) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto(R, { waitUntil: 'networkidle' });
+      const over = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(over, `horizontal overflow at ${w}px`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test('the one thing that does not exist yet is not dressed up as a link', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(R, { waitUntil: 'networkidle' });
+    const scan = page.getByText('Screenshot Taste Scan');
+    await expect(scan).toBeVisible();
+    // A tappable card that goes nowhere is worse than a labelled placeholder.
+    expect(await scan.locator('xpath=ancestor::a').count(), 'the placeholder is a link').toBe(0);
+  });
+});

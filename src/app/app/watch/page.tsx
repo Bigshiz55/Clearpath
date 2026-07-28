@@ -11,6 +11,8 @@ import { WatchTabs } from '@/components/WatchTabs';
 import { BrowseCatalog } from '@/components/BrowseCatalog';
 import { PosterCard } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
+import { RulingFeed } from '@/components/RulingFeed';
+import { BATCH, minScoreFor } from '@/lib/reco/deck';
 import { tmdbImage } from '@/lib/tmdb/image';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +37,17 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
     // Taste-seeded picks ("because you liked …"), built from what the user has
     // rated — including the Taste Quiz. This is what actually changes after the
     // quiz, so it's the primary "for you" row (popular is the cold-start fallback).
-    uid ? getRecommendations(supabase, uid) : Promise.resolve([] as Recommendation[]),
+    // The deck's first deal, with the same knobs `dealRulingBatch` uses, so
+    // deal two continues deal one instead of being a differently-seeded list
+    // that happens to overlap it.
+    uid
+      ? getRecommendations(supabase, uid, {
+          limit: BATCH,
+          candidatePool: BATCH + 36,
+          seedLimit: 10,
+          minScore: minScoreFor(1),
+        })
+      : Promise.resolve([] as Recommendation[]),
   ]);
 
   // Titles the user has flagged (dropped / seen) never resurface in picks.
@@ -70,19 +82,13 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
             Seeded from the titles you rated highest — the more you rate in the{' '}
             <Link href="/app/quiz" className="text-brand-300 hover:underline">Taste Quiz</Link>, the sharper this gets. Tap any for where to watch.
           </p>
-          <div className="poster-grid">
-            {recs.map((r) => (
-              <PosterCard
-                key={`${r.mediaType}-${r.id}`}
-                href={`/app/title/${r.mediaType}/${r.id}`}
-                title={r.title}
-                year={r.year}
-                mediaType={r.mediaType}
-                posterUrl={tmdbImage(r.posterPath, 'w342')}
-                overlay={<SaveButton wide tmdbId={r.id} mediaType={r.mediaType} title={r.title} year={r.year} posterPath={r.posterPath} />}
-              />
-            ))}
-          </div>
+          {/* A DECK, NOT A PAGE. This used to be a fixed slice of twelve that
+              re-sorted itself every time the user's own taps changed their
+              profile, and that could re-deal a title it had already shown.
+              The feed appends, never reorders, and keeps going. */}
+          <RulingFeed
+            initial={recs.map((r) => ({ id: r.id, mediaType: r.mediaType, title: r.title, year: r.year, posterPath: r.posterPath }))}
+          />
         </section>
       ) : (
         rankedMore && rankedMore.items.length > 0 && (

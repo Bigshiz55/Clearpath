@@ -8,6 +8,7 @@ import { recordImpressions, recordOutcome } from '@/lib/reco/store';
 import { ALGO_VERSION, type OutcomeKind } from '@/lib/reco/accuracy';
 import { confidenceOf, cohortOf } from '@/lib/reco/experiments';
 import { loadDnaConfidence } from '@/lib/preference/dnaSignals';
+import { BATCH } from '@/lib/reco/deck';
 
 /**
  * REFRESH RECOMMENDATIONS (PART 7) + recommendation VALIDATION (PART 9).
@@ -94,6 +95,92 @@ export async function buildRecommendationSlate(
   ).catch(() => 0);
 
   return { ok: true, items, algoVersion: ALGO_VERSION, dnaConfidence: confidencePct };
+}
+
+/* ---------------------------------------------------------------------------
+   DEAL THE NEXT BATCH OF THE RULING DECK.
+
+   "It will stop usually at 12, then a couple kind of automatically randomly
+   update, then a few may show up again."
+
+   Three symptoms of one wrong idea — that recommendations are a PAGE, rebuilt
+   and re-sorted on every request. Rebuilding is what reshuffled them (every
+   FOR/AGAINST rewrites the profile, which moves the sort key), and it is what
+   let handled titles climb back above the cut.
+
+   This deals instead. The client carries every key it has ever been dealt and
+   sends them back; the server excludes them and returns only what is new. Order
+   is therefore frozen at deal time — nothing on screen can move again — and a
+   title cannot be dealt twice.
+
+   `tier`/`page` walk the supply outwards when the titles nearest the user's
+   favourites are used up, so the feed keeps going until they stop rather than
+   until the seed pool empties. `reco/deck` owns that walk; this just fetches
+   where it is told to.
+--------------------------------------------------------------------------- */
+
+/** What the ruling feed needs to draw a card, and nothing more. */
+export interface DealtPick {
+  id: number;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+}
+
+export interface Deal {
+  items: DealtPick[];
+  /** Echoed back so the client can tell a stale deal from the current one. */
+  tier: 1 | 2 | 3;
+  page: number;
+}
+
+const dealSchema = z.object({
+  /** Keys ("movie-603") already on screen. Capped; the deck's own ceiling is far lower. */
+  dealtKeys: z.array(z.string().max(40)).max(600).default([]),
+  tier: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(1),
+  page: z.number().int().min(1).max(20).default(1),
+  /** The personal-fit floor for this tier — the caller's, since it lowers with depth. */
+  minScore: z.number().int().min(0).max(100).default(55),
+});
+
+export async function dealRulingBatch(input: z.input<typeof dealSchema>): Promise<Deal> {
+  const parsed = dealSchema.safeParse(input);
+  if (!parsed.success) return { items: [], tier: 1, page: 1 };
+  const { dealtKeys, tier, page, minScore } = parsed.data;
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { items: [], tier, page };
+
+  try {
+    const picks = await getRecommendations(supabase, user.id, {
+      limit: BATCH,
+      // THE POOL HAS TO GROW WITH THE ASK. The default scores eighteen
+      // candidates, so once the exclusion set is a few batches long there is
+      // nothing left to fill a batch with and the feed looks finished when it
+      // is only starved.
+      candidatePool: BATCH + dealtKeys.length + 36,
+      seedLimit: 10,
+      perSeedCap: Math.max(3, Math.ceil(BATCH / 3)), // variety within a batch
+      minScore,
+      excludeKeys: dealtKeys,
+      tier,
+      page,
+    });
+    return {
+      items: picks.map((r) => ({ id: r.id, mediaType: r.mediaType, title: r.title, year: r.year, posterPath: r.posterPath })),
+      tier,
+      page,
+    };
+  } catch {
+    // A failed deal leaves the feed exactly as it was. The caller retries; it
+    // must not be mistaken for "there is nothing more", which is a claim about
+    // real inventory.
+    return { items: [], tier, page };
+  }
 }
 
 const outcomeSchema = z.object({

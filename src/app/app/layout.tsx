@@ -5,6 +5,7 @@ import { isPro } from '@/lib/pro';
 import { Nav } from '@/components/Nav';
 import { NavArrows } from '@/components/NavArrows';
 import { DocketTray } from '@/components/DocketTray';
+import { QuickSearch } from '@/components/QuickSearch';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </main>
       {/* The docket, wherever you are. Renders nothing when it is empty. */}
       <DocketTray />
+      {/* Search, wherever you are — the sheet plus the phone's floating
+          trigger. The header carries the same control at the top of the page. */}
+      <QuickSearch />
     </div>
   );
 }
