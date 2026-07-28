@@ -26,6 +26,8 @@ import type { Briefing } from '@/lib/briefing';
 import { originSummary } from '@/lib/origin';
 import { buildEvidence } from '@/lib/verdict/evidence';
 import { FactorBar, SourceConfidenceCard } from './ScoreEvidence';
+import { ReportTabs } from './ReportTabs';
+import { splitContentSignals, unknownSummary } from '@/lib/verdict/reportTabs';
 
 const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   none: 'bg-white/10 text-slate-400',
@@ -183,6 +185,12 @@ export function VerdictReportView({
       {/* Will you finish it? — honest, from your own history */}
       {finishCheck && <FinishCheck assessment={finishCheck} />}
 
+      {/* FOUR TABS, ONE DECISION ABOVE THEM. See lib/verdict/reportTabs for
+          what goes where — the split is by the QUESTION somebody arrives with,
+          not by which system the data came from. */}
+      <ReportTabs
+        verdict={
+          <>
       {/* Actions */}
       <VerdictActions
         tmdbId={t.id}
@@ -207,41 +215,29 @@ export function VerdictReportView({
         />
       )}
 
-      {/* Theater Mode — dim the lights, hush notifications, tell the group */}
-      <TheaterMode
-        tmdbId={t.id}
-        mediaType={t.mediaType}
-        title={t.title}
-        year={t.year}
-        posterPath={t.posterPath}
-        runtimeMinutes={t.runtimeMinutes ?? t.episodeRuntimeMinutes}
-      />
-
-      {/* The Critics' Table — grounded multi-perspective panel */}
-      <CriticsTable
-        panel={panel}
-        facts={{ title: t.title, year: t.year, watchVerdictScore: report.general.score, tier: report.tier }}
-      />
-
-      {/* Ratings (icons) + language & episodes */}
-      <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">Ratings</h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Critic scores from IMDb / Rotten Tomatoes (when available); audience from TMDB.
-        </p>
-        <div className="mt-4">
-          <RatingIcons sources={report.general.sources} />
+      {/* Why it may / may not work */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <div className="card p-5">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-emerald-200">Why it may work</h3>
+          <ul className="mt-3 space-y-2 text-sm text-slate-300">
+            {report.reasonsFor.map((r, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-emerald-400">+</span>
+                {r}
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="mt-5 border-t border-white/10 pt-5">
-          <LanguageEpisodes meta={t} />
-        </div>
-      </section>
-
-      {/* Recommendation consensus */}
-      <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">Recommendation consensus</h2>
-        <div className="mt-4">
-          <RecommendationConsensus primaryCall={report.primaryCall} sources={report.general.sources} />
+        <div className="card p-5">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-red-200">Why it may not</h3>
+          <ul className="mt-3 space-y-2 text-sm text-slate-300">
+            {report.reasonsAgainst.map((r, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-red-400">–</span>
+                {r}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
@@ -292,31 +288,23 @@ export function VerdictReportView({
         )}
       </section>
 
-      {/* Why it may / may not work */}
-      <section className="grid gap-4 sm:grid-cols-2">
-        <div className="card p-5">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-emerald-200">Why it may work</h3>
-          <ul className="mt-3 space-y-2 text-sm text-slate-300">
-            {report.reasonsFor.map((r, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="text-emerald-400">+</span>
-                {r}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="card p-5">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-red-200">Why it may not</h3>
-          <ul className="mt-3 space-y-2 text-sm text-slate-300">
-            {report.reasonsAgainst.map((r, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="text-red-400">–</span>
-                {r}
-              </li>
-            ))}
-          </ul>
+      {/* Recommendation consensus */}
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-lg font-semibold text-white">Recommendation consensus</h2>
+        <div className="mt-4">
+          <RecommendationConsensus primaryCall={report.primaryCall} sources={report.general.sources} />
         </div>
       </section>
+
+      {/* Content DNA — aggregated from real viewer check-ins */}
+      {tasteMatch && <TasteMatchView tm={tasteMatch} />}
+      {contentDna && <ContentDnaView dna={contentDna} />}
+
+      {/* The Critics' Table — grounded multi-perspective panel */}
+      <CriticsTable
+        panel={panel}
+        facts={{ title: t.title, year: t.year, watchVerdictScore: report.general.score, tier: report.tier }}
+      />
 
       {/* Not a fit? Send it to the Judge for better-for-you alternatives. */}
       {report.primaryCall !== 'WATCH IT' && (
@@ -334,29 +322,75 @@ export function VerdictReportView({
         </section>
       )}
 
-      {/* Content DNA — aggregated from real viewer check-ins */}
-      {tasteMatch && <TasteMatchView tm={tasteMatch} />}
-      {contentDna && <ContentDnaView dna={contentDna} />}
-
-      {/* Content & tone */}
+      {/* Final verdict */}
+      <section className="card bg-cinema-radial p-6 text-center">
+        <div className="text-xs uppercase tracking-wider text-slate-400">Final verdict</div>
+        <div className="mt-2 flex flex-col items-center gap-2">
+          <VerdictBadge tier={report.tier} size="lg" />
+          <div className="text-sm text-slate-300">
+            Watchlist call: <DispositionChip disposition={report.watchlistDisposition} />
+          </div>
+        </div>
+      </section>
+          </>
+        }
+        details={
+          <>
+      {/* Ratings (icons) + language & episodes */}
       <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">Content &amp; tone</h2>
+        <h2 className="text-lg font-semibold text-white">Ratings</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Signals inferred from genre, keywords, and rating. Where we can’t responsibly determine a
-          level, it’s marked unknown rather than guessed.
+          Critic scores from IMDb / Rotten Tomatoes (when available); audience from TMDB.
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {report.contentSignals.map((s) => (
-            <div key={s.label} className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="text-sm font-medium text-white">{s.label}</div>
-              <span className={`mt-1 inline-block rounded px-2 py-0.5 text-xs capitalize ${LEVEL_COLOR[s.level]}`}>
-                {s.note ?? s.level}
-              </span>
-            </div>
-          ))}
+        <div className="mt-4">
+          <RatingIcons sources={report.general.sources} />
+        </div>
+        <div className="mt-5 border-t border-white/10 pt-5">
+          <LanguageEpisodes meta={t} />
         </div>
       </section>
 
+      {/* CONTENT & TONE, WITHOUT SIX IDENTICAL GREY TILES.
+          Every signal we could not determine used to get a full card of its
+          own, so a typical title spent half a screen on "Gore: Unknown",
+          "Language: Unknown", "Drug Use: Unknown"… Saying unknown is the
+          honest thing and it stays — as one line, named, not as six cards. */}
+      {(() => {
+        const { known, unknown } = splitContentSignals(report.contentSignals);
+        const note = unknownSummary(unknown);
+        return (
+          <section className="card p-5 sm:p-6" data-testid="content-tone">
+            <h2 className="text-lg font-semibold text-white">Content &amp; tone</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Signals inferred from genre, keywords, and rating.
+            </p>
+            {known.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {known.map((s) => (
+                  <div key={s.label} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <div className="text-sm font-medium text-white">{s.label}</div>
+                    <span className={`mt-1 inline-block rounded px-2 py-0.5 text-xs capitalize ${LEVEL_COLOR[s.level]}`}>
+                      {s.note ?? s.level}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {note && (
+              <p className="mt-3 text-xs text-slate-500" data-testid="content-unknown">
+                {note}
+              </p>
+            )}
+          </section>
+        );
+      })()}
+      {/* The Dossier — real credits, themes, franchise */}
+      {briefing && <TitleBriefing briefing={briefing} keywords={t.keywords} />}
+
+          </>
+        }
+        watch={
+          <>
       {/* Where to watch */}
       <section className="card p-5 sm:p-6">
         <h2 className="text-lg font-semibold text-white">Where to watch</h2>
@@ -369,9 +403,20 @@ export function VerdictReportView({
       {/* Episode-level: which service carries each season (only if split) */}
       <SeasonWhereToWatch mediaType={t.mediaType} tmdbId={t.id} />
 
-      {/* The Dossier — real credits, themes, franchise */}
-      {briefing && <TitleBriefing briefing={briefing} keywords={t.keywords} />}
+      {/* Theater Mode — dim the lights, hush notifications, tell the group */}
+      <TheaterMode
+        tmdbId={t.id}
+        mediaType={t.mediaType}
+        title={t.title}
+        year={t.year}
+        posterPath={t.posterPath}
+        runtimeMinutes={t.runtimeMinutes ?? t.episodeRuntimeMinutes}
+      />
 
+          </>
+        }
+        similar={
+          <>
       {/* More like this */}
       {report.similar.length > 0 && (
         <section className="card p-5 sm:p-6">
@@ -399,16 +444,9 @@ export function VerdictReportView({
         </section>
       )}
 
-      {/* Final verdict */}
-      <section className="card bg-cinema-radial p-6 text-center">
-        <div className="text-xs uppercase tracking-wider text-slate-400">Final verdict</div>
-        <div className="mt-2 flex flex-col items-center gap-2">
-          <VerdictBadge tier={report.tier} size="lg" />
-          <div className="text-sm text-slate-300">
-            Watchlist call: <DispositionChip disposition={report.watchlistDisposition} />
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
     </article>
   );
 }

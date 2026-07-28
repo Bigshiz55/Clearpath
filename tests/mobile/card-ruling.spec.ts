@@ -186,7 +186,17 @@ for (const [w, h] of [[320, 800], [390, 900], [1024, 1200], [1366, 900]] as cons
 
     expect(settled.length).toBe(atPaint.length);
     for (let i = 0; i < atPaint.length; i++) {
-      expect(settled[i], `card ${i} moved once its data landed`).toEqual(atPaint[i]);
+      const [a, b] = [atPaint[i]!, settled[i]!];
+      // ONE PIXEL OF TOLERANCE, AND ONLY ONE. The poster holds a 2:3 ratio of a
+      // percentage width, so its height is fractional at most viewport widths;
+      // rounding those fractions can move a card in the fifth row by a pixel
+      // when the text above it changes. The defect this test exists for was
+      // FIFTY-FOUR pixels — every card in the grid growing two lines a few
+      // hundred milliseconds after paint, so the row below dropped out from
+      // under a thumb already reaching for a button. A pixel is not that.
+      expect(Math.abs(b.y - a.y), `card ${i} moved ${b.y - a.y}px once its data landed`).toBeLessThanOrEqual(1);
+      expect(b.x, `card ${i} moved sideways`).toBe(a.x);
+      expect(Math.abs(b.h - a.h), `card ${i} changed height by ${b.h - a.h}px`).toBeLessThanOrEqual(1);
     }
   });
 }

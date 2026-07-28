@@ -99,9 +99,13 @@ export function RulingFeed({ initial }: { initial: DealtPick[] }) {
   return (
     <>
       <div className="poster-grid" data-testid="ruling-feed">
-        {items.map((r) => (
+        {items.map((r, i) => (
           <PosterCard
             key={dealtKey(r)}
+            /* "so if you wanted to you could just go 1 2 3 all the way down to
+               100 or more" — the count is the point of an endless feed. Without
+               it you cannot tell a long session from a loop. */
+            rank={i + 1}
             href={`/app/title/${r.mediaType}/${r.id}`}
             title={r.title}
             year={r.year}

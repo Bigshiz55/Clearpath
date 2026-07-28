@@ -24,6 +24,8 @@ interface PosterCardProps {
   /** If provided, the poster/title open this (e.g. a QuickLook modal) instead of
    *  navigating via `href`. Requires `tmdbId` so the card can still score itself. */
   onOpen?: () => void;
+  /** 1-based position in an endless feed. Drawn on the artwork; omitted elsewhere. */
+  rank?: number;
 }
 
 export function Poster({ posterUrl, title, className = '' }: { posterUrl?: string | null; title: string; className?: string }) {
@@ -48,7 +50,7 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
   );
 }
 
-export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen }: PosterCardProps) {
+export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen, rank }: PosterCardProps) {
   const poster = (
     <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04]" />
   );
@@ -104,6 +106,17 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   return (
     <div className="card group wv-card !border-transparent shadow-[0_6px_24px_-6px_rgba(0,0,0,0.8)] transition hover:shadow-[0_10px_32px_-6px_rgba(0,0,0,0.95)]">
       <div className="wv-card-art">
+        {/* HOW FAR YOU HAVE COME. In an endless feed the count is the only
+            thing distinguishing a long session from a loop — bottom-left, on
+            the artwork, clear of the W in the opposite corner. */}
+        {rank != null && (
+          <span
+            data-testid="card-rank"
+            className="absolute bottom-1 left-1 z-10 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-white/90 backdrop-blur-sm"
+          >
+            {rank}
+          </span>
+        )}
         {/* The W sits ON the artwork, not in the action row: the row is already
             three buttons wide and a fourth breaks at 320px, and the stamp has
             to be in the same place on every surface to read as one gesture. */}
@@ -130,7 +143,12 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
 
         {/* What it is about, straight from TMDB. Renders nothing when there is
             no synopsis rather than showing a placeholder. */}
-        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={2} className="mt-1" />}
+        {/* THREE lines, not two. "Would like more information about what it's
+            about" — two lines of a TMDB synopsis ends mid-clause on almost
+            every title ("…until Andy's…"), which tells you less than none. The
+            reserved height grows with it, so nothing moves when the text
+            lands. */}
+        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1" />}
 
         {/* One pink box: the algorithm score (your DNA + every rating) + will-you-
             like-it call, with the ratings underneath. */}

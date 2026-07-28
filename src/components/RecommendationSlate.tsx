@@ -30,6 +30,8 @@ export function RecommendationSlate({
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const shown = useRef<Set<string>>(new Set((initial ?? []).map((i) => `${i.mediaType}:${i.id}`)));
+  /** Where a refresh puts you: the top of the new slate, not the bottom of the old one. */
+  const top = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(
     (isFirst = false) => {
@@ -44,6 +46,13 @@ export function RecommendationSlate({
         if (!r.ok) { setMsg(r.error ?? 'Could not refresh.'); return; }
         r.items.forEach((it) => shown.current.add(`${it.mediaType}:${it.id}`));
         setItems(r.items);
+        // A REFRESH REPLACES THE SLATE, SO IT HAS TO REPLACE YOUR POSITION TOO.
+        // Pressing Refresh from the bottom of the old set left the viewport
+        // where it was — which is now the bottom of a completely different set,
+        // with twelve titles you have never seen scrolled off above you and a
+        // long scroll back up to reach them. Not on the first, server-seeded
+        // load: nobody asked for that one, so nobody should be moved by it.
+        if (!isFirst) top.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
         setAlgo(r.algoVersion);
         setReacted({});
         if (r.items.length === 0) setMsg('No fresh picks right now — rate a few more titles to widen your slate.');
@@ -73,6 +82,9 @@ export function RecommendationSlate({
 
   return (
     <section data-testid="reco-slate">
+      {/* The anchor a refresh scrolls you back to. `scroll-mt` clears the
+          sticky header so the heading is not tucked underneath it. */}
+      <div ref={top} className="scroll-mt-20" aria-hidden />
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-white">🧬 Recommended for you</h2>
