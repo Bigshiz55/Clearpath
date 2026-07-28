@@ -3,7 +3,9 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
 import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle } from '@/lib/onTv';
+import { getFullGuideAirings } from '@/lib/tvGrid';
 import { OnTvGuide } from '@/components/OnTvGuide';
+import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
 import { hasFullGridProvider } from '@/lib/viewing/liveTv';
 import { TvDetective } from '@/components/TvDetective';
@@ -47,7 +49,7 @@ function friendlyDate(d: Date): string {
 export default async function OnTvPage({
   searchParams,
 }: {
-  searchParams?: { within?: string | string[]; genre?: string | string[]; network?: string | string[]; type?: string | string[] };
+  searchParams?: { within?: string | string[]; genre?: string | string[]; network?: string | string[]; type?: string | string[]; view?: string | string[] };
 }) {
   const supabase = createClient();
   const {
@@ -62,6 +64,8 @@ export default async function OnTvPage({
   const genre = one(searchParams?.genre)?.slice(0, 24) ?? null;
   const network = one(searchParams?.network)?.slice(0, 24) ?? null;
   const movieOnly = one(searchParams?.type) === 'movie';
+  // ?view=guide — the full by-channel guide, from the whole ingested lineup.
+  const guideView = one(searchParams?.view) === 'guide' && region === 'US';
   const hasFilter = !!(genre || network || movieOnly);
   const titleCase = (s: string) => s.replace(/\b\w/g, (m) => m.toUpperCase());
   // A human label for the filters: "Lifetime comedy movies".
@@ -71,9 +75,14 @@ export default async function OnTvPage({
   // and the empty-state wording, so the two can never disagree.
   const gridConnected = hasFullGridProvider();
 
-  const airingsRaw = await getOnTvToday(region, date);
+  const airingsRaw = guideView ? [] : await getOnTvToday(region, date);
   // Add IMDb / Rotten Tomatoes / Metacritic to the placards (cached, bounded).
   const airings = await enrichAiringsWithCritics(airingsRaw).then((a) => enrichAiringsWithTmdb(a));
+
+  // THE FULL GUIDE — the whole ingested cable lineup for the next 6 hours,
+  // every channel, by channel. This is the grid the "Lifetime movies" answers
+  // were already drawing from; the guide view finally lets you BROWSE it.
+  const guideAirings = guideView ? await getFullGuideAirings(now.getTime(), 6 * HOUR_MS) : [];
 
   // When asked for a specific window ("Lifetime movies coming on tonight"), build
   // the real time/genre/network/type-filtered set and enrich it the same way.
@@ -115,14 +124,21 @@ export default async function OnTvPage({
     <div className="space-y-6">
       <section>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">
-          {withinHours != null
-            ? genreEmpty
-              ? `📺 ${filterLabel ? `${titleCase(filterLabel)} ` : ''}on live TV`
-              : `📺 ${filterLabel ? `${filterLabel} ` : ''}coming on in the next ${withinHours} hours`
-            : '📺 On TV today'}
+          {guideView
+            ? '📺 Full channel guide'
+            : withinHours != null
+              ? genreEmpty
+                ? `📺 ${filterLabel ? `${titleCase(filterLabel)} ` : ''}on live TV`
+                : `📺 ${filterLabel ? `${filterLabel} ` : ''}coming on in the next ${withinHours} hours`
+              : '📺 On TV today'}
         </h1>
         <p className="mt-2 text-sm text-slate-300">
-          {withinHours != null ? (
+          {guideView ? (
+            <>
+              Every channel in the national lineup for the next 6 hours — what’s on now, what’s next,
+              Hallmark and Lifetime movies included. Search by channel or by what’s playing.
+            </>
+          ) : withinHours != null ? (
             <>
               Real listings for {region} between now and {withinHours} hours from now — channel, time, and rating.
               Hit <span className="font-semibold text-white">Remind me</span> to get pinged{' '}
@@ -161,11 +177,41 @@ export default async function OnTvPage({
         </section>
       )}
 
-      <TvDetective />
+      {/* THREE WAYS INTO THE SAME SCHEDULE. Highlights is the curated view;
+          the full guide is the cable box (every channel, by channel); movies
+          is the whole lineup filtered to films — the "there must be Hallmark
+          movies on somewhere" question, answered as a tab instead of a typed
+          query. US-only because the ingested grid is the US national lineup. */}
+      {region === 'US' && (
+        <nav className="flex flex-wrap gap-1.5" aria-label="Guide views" data-testid="tv-views">
+          {[
+            { href: '/app/tv', label: '✨ Highlights', active: !guideView && withinHours == null },
+            { href: '/app/tv?view=guide', label: '📡 Full guide', active: guideView },
+            { href: '/app/tv?within=12&type=movie', label: '🎬 Movies on now', active: !guideView && movieOnly },
+          ].map((t) => (
+            <Link
+              key={t.href}
+              href={t.href}
+              aria-current={t.active ? 'page' : undefined}
+              className={`inline-flex min-h-[40px] items-center rounded-full border px-3.5 text-[13px] font-semibold transition ${
+                t.active
+                  ? 'border-brand-300 bg-brand-500/25 text-white'
+                  : 'border-white/15 bg-white/[0.06] text-slate-300 hover:border-brand-300 hover:text-white'
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+      )}
+
+      {!guideView && <TvDetective />}
 
       {upcoming.length > 0 && <MyReminders initial={upcoming} />}
 
-      {withinHours != null && windowed ? (
+      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} />}
+
+      {guideView ? null : withinHours != null && windowed ? (
         <>
           {genreEmpty ? (
             <>

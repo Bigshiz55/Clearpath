@@ -112,7 +112,7 @@ export async function refreshTvGrid(): Promise<{ ok: boolean; rows: number; erro
 export async function getStoredGridAirings(
   nowMs: number,
   horizonMs: number,
-  opts: { network?: string | null; movieOnly?: boolean } = {},
+  opts: { network?: string | null; movieOnly?: boolean; limit?: number } = {},
 ): Promise<Airing[]> {
   let admin: ReturnType<typeof createAdminClient>;
   try {
@@ -124,6 +124,9 @@ export async function getStoredGridAirings(
   // then keep only those still running or upcoming.
   const from = new Date(nowMs - 3 * 60 * 60 * 1000).toISOString();
   const to = new Date(nowMs + horizonMs).toISOString();
+  // 60 is right for a filtered answer ("Lifetime movies tonight"); the
+  // channel-guide view needs the WHOLE lineup for its window.
+  const limit = Math.max(1, Math.min(opts.limit ?? 60, 1200));
   try {
     let q = admin
       .from('tv_grid')
@@ -131,7 +134,7 @@ export async function getStoredGridAirings(
       .gte('airstamp', from)
       .lte('airstamp', to)
       .order('airstamp', { ascending: true })
-      .limit(600);
+      .limit(Math.max(600, limit));
     const wantNet = opts.network ? opts.network.toLowerCase() : null;
     if (wantNet) q = q.in('network_key', wantNet === 'lifetime' ? ['lifetime', 'lmn'] : [wantNet]);
     if (opts.movieOnly) q = q.eq('is_movie', true);
@@ -148,10 +151,23 @@ export async function getStoredGridAirings(
         return end > nowMs && start <= nowMs + horizonMs; // still on, or upcoming in window
       })
       .map(toAiring)
-      .slice(0, 60);
+      .slice(0, limit);
   } catch {
     return [];
   }
+}
+
+/**
+ * THE FULL GUIDE — every channel in the lineup for the window, unfiltered.
+ * DB-first (the hourly-refreshed grid), live Gracenote only when the table is
+ * empty. Returns [] when neither can see anything; the page says so honestly
+ * rather than drawing an empty guide.
+ */
+export async function getFullGuideAirings(nowMs: number, horizonMs: number): Promise<Airing[]> {
+  const stored = await getStoredGridAirings(nowMs, horizonMs, { limit: 1200 }).catch(() => []);
+  if (stored.length > 0) return stored;
+  const { getGracenoteAirings } = await import('@/lib/gracenote');
+  return getGracenoteAirings(nowMs, horizonMs).catch(() => []);
 }
 
 /** Fire a background refresh if the newest stored row is stale. Best-effort. */
