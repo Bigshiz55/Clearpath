@@ -50,15 +50,26 @@ for (const width of WIDTHS) {
     const clipped = await headline.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
     expect(clipped, `headline not clipped @ ${width}px`).toBe(false);
 
-    // 3) State Your Case card, with every quick ask visible up front. They used
-    //    to be three behind a "More ideas" toggle — a control that spent a whole
-    //    chip slot on revealing more chips. Six real asks fit in the same space.
+    // 3) State Your Case card: NINE quick asks in a perfect 3×3 — three rows
+    //    of three equal tiles, no ragged edge, and no "More ideas" toggle.
     await expect(page.getByRole('heading', { name: 'State Your Case' })).toBeVisible();
-    const chips = page.locator('[data-testid="statecase-card"] .rounded-full');
-    expect(await chips.count(), `quick asks @ ${width}px`).toBe(6);
-    for (const label of ['On TV tonight', 'Family night', 'New this week']) {
+    const chips = page.locator('[data-testid="quick-asks"] > button');
+    expect(await chips.count(), `quick asks @ ${width}px`).toBe(9);
+    for (const label of ['On TV tonight', 'Family night', 'Date night', 'True crime', 'Feel-good']) {
       await expect(page.getByRole('button', { name: new RegExp(label) })).toBeVisible();
     }
+    // A REAL 3×3: exactly three distinct columns, three distinct rows, and
+    // every tile the same size (±1px of rounding).
+    const boxes = await chips.evaluateAll((els) =>
+      els.map((e) => {
+        const b = e.getBoundingClientRect();
+        return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
+      }),
+    );
+    expect(new Set(boxes.map((b) => b.x)).size, `columns @ ${width}px`).toBe(3);
+    expect(new Set(boxes.map((b) => b.y)).size, `rows @ ${width}px`).toBe(3);
+    const widths = boxes.map((b) => b.w);
+    expect(Math.max(...widths) - Math.min(...widths), `unequal tiles @ ${width}px`).toBeLessThanOrEqual(1);
     // The toggle is gone, not hidden.
     await expect(page.getByRole('button', { name: /More ideas/ })).toHaveCount(0);
 
@@ -73,6 +84,14 @@ for (const width of WIDTHS) {
     // Full-width WITHIN its card: card inner width = card box minus its 16px padding.
     const cardBox = (await page.locator('[data-testid="statecase-card"]').boundingBox())!;
     expect(cb.width, `CTA fills its card @ ${width}px`).toBeGreaterThanOrEqual(cardBox.width - 2 * 16 - 4);
+    // AND IT IS THE LAST THING IN THE CARD. The "or name a few titles" line
+    // that used to hang under it made the card end on a footnote instead of on
+    // the action.
+    expect(
+      Math.round(cardBox.y + cardBox.height - (cb.y + cb.height)),
+      `something is below the gavel @ ${width}px`,
+    ).toBeLessThanOrEqual(24); // just the card's own padding
+    await expect(page.getByTestId('statecase-card')).not.toContainText('name a few titles you love');
     // The DOM disabled attribute must be false on load (only set while "Ruling…").
     expect(await cta.isDisabled(), 'CTA not DOM-disabled on load').toBe(false);
     const opacity = await cta.evaluate((el) => Number(getComputedStyle(el).opacity));

@@ -2,7 +2,6 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useToast } from '@/components/Toast';
 
 /**
@@ -12,16 +11,21 @@ import { useToast } from '@/components/Toast';
  * watch a title, something on a service, what's coming on) to the right screen.
  * (The title-by-title Mentalist is still one tap away.)
  */
-// Chips: the first three are shown up front (mobile-clean); the rest reveal on
-// "More ideas". Each `text` is the full query dropped into the box; `hint` is the
-// short chip label. Kept broad and mainstream — not tuned to one person's taste.
-const PRIMARY_EXAMPLES: { hint: string; text: string }[] = [
-  { hint: '📺 On TV tonight', text: 'What’s on TV tonight?' },
-  { hint: '🍿 Under 2 hours', text: 'A great movie under two hours' },
-  { hint: '👨‍👩‍👧 Family night', text: 'A great family movie for tonight' },
-  { hint: '😂 Something funny', text: 'Something genuinely funny' },
-  { hint: '😱 Actually scary', text: 'A really good scary movie' },
-  { hint: '🔥 New this week', text: 'The best things released this week' },
+// THE NINE MOST COMMON ASKS, IN A 3×3 GRID. Each `text` is the full query
+// dropped into the box; `emoji` + `hint` are the tile. Nine because that is a
+// perfect grid on every width — six left a ragged bottom row, and more than
+// nine buries the gavel. Kept broad and mainstream — not tuned to one person's
+// taste. Exactly nine: the grid IS the design, so adding one means cutting one.
+const PRIMARY_EXAMPLES: { emoji: string; hint: string; text: string }[] = [
+  { emoji: '📺', hint: 'On TV tonight', text: 'What’s on TV tonight?' },
+  { emoji: '🍿', hint: 'Under 2 hours', text: 'A great movie under two hours' },
+  { emoji: '👨‍👩‍👧', hint: 'Family night', text: 'A great family movie for tonight' },
+  { emoji: '😂', hint: 'Something funny', text: 'Something genuinely funny' },
+  { emoji: '😱', hint: 'Actually scary', text: 'A really good scary movie' },
+  { emoji: '🔥', hint: 'New this week', text: 'The best things released this week' },
+  { emoji: '❤️', hint: 'Date night', text: 'A great date night movie' },
+  { emoji: '🕵️', hint: 'True crime', text: 'A gripping true crime series' },
+  { emoji: '🌈', hint: 'Feel-good', text: 'Something feel-good and uplifting' },
 ];
 
 export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
@@ -122,18 +126,18 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         className="mt-2.5 h-[84px] w-full resize-none rounded-xl border border-white/25 bg-ink-950/70 px-3.5 py-3 text-base leading-snug text-white placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/40 focus:outline-none"
       />
 
-      {/* Six quick asks, all visible. They used to be three behind a "More
-          ideas" toggle, which spent a whole chip slot on a control that only
-          revealed more chips. The 44px tap floor means a chip cannot be made
-          shorter, so showing the real ones is the only way to make this row
-          worth its height. */}
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
+      {/* NINE QUICK ASKS, A PERFECT 3×3. The freeform pill row read as a
+          ragged tag cloud — two columns of uneven widths with dead space at
+          the edges. A grid of equal tiles reads as a launcher: emoji on top,
+          the ask underneath, every tile the same size, every tap target well
+          over the 44px floor. Exactly nine, because the grid is the design. */}
+      <div className="mt-3 grid grid-cols-3 gap-1.5" data-testid="quick-asks">
         {PRIMARY_EXAMPLES.map((ex) => {
-          // THE CHIP YOU TAPPED LOOKS CHOSEN. Without the keyboard springing up
+          // THE TILE YOU TAPPED LOOKS CHOSEN. Without the keyboard springing up
           // as confirmation, the only feedback was the browser's own focus
           // ring — which looks identical to "you happen to be on this one" and
           // vanishes the moment you touch anything else. The words landing in
-          // the box are the real feedback; this makes the chip agree with them.
+          // the box are the real feedback; this makes the tile agree with them.
           const chosen = text === ex.text;
           return (
             <button
@@ -141,20 +145,24 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
               type="button"
               aria-pressed={chosen}
               onClick={() => fill(ex.text)}
-              className={`min-h-[44px] rounded-full border px-2.5 text-[13px] font-semibold transition active:scale-95 ${
+              className={`flex min-h-[58px] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-1.5 transition active:scale-95 ${
                 chosen
                   ? 'border-brand-300 bg-brand-500/25 text-white'
                   : 'border-white/15 bg-white/[0.06] text-slate-200 hover:border-brand-300 hover:bg-brand-500/20 hover:text-white'
               }`}
             >
-              {ex.hint}
+              <span aria-hidden className="text-base leading-none">{ex.emoji}</span>
+              <span className="text-center text-[11px] font-semibold leading-tight">{ex.hint}</span>
             </button>
           );
         })}
       </div>
 
       {/* Primary CTA — full width, ≥48px, always looks pressable (only dims while
-          ruling). An empty tap focuses the box rather than sitting dead-grey. */}
+          ruling). An empty tap focuses the box rather than sitting dead-grey.
+          NOTHING BELOW IT: it is the last thing in the card, so the eye lands on
+          it and stops. The "or name a few titles" line that used to hang under
+          it made the card end on a footnote instead of on the action. */}
       <button
         onClick={() => void submit()}
         disabled={busy}
@@ -162,13 +170,6 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
       >
         {busy ? 'Ruling…' : 'Hit the Gavel →'}
       </button>
-
-      <Link
-        href="/app/mentalist"
-        className="mt-1 flex min-h-[44px] items-center justify-center px-2 text-center text-xs font-semibold text-brand-200 underline-offset-2 hover:text-white hover:underline"
-      >
-        Or name a few titles you love — we’ll figure out your taste →
-      </Link>
     </div>
   );
 }
