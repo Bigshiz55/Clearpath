@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
-import { getProfile, regionFor } from '@/lib/profile';
+import { getProfile, getPreferenceRules, regionFor } from '@/lib/profile';
 import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle } from '@/lib/onTv';
 import { getFullGuideAirings, getStoredGridAirings } from '@/lib/tvGrid';
 import { OnTvGuide } from '@/components/OnTvGuide';
@@ -83,6 +83,12 @@ export default async function OnTvPage({
   // every channel, by channel. This is the grid the "Lifetime movies" answers
   // were already drawing from; the guide view finally lets you BROWSE it.
   const guideAirings = guideView ? await getFullGuideAirings(now.getTime(), 6 * HOUR_MS) : [];
+  // The user's own preference rules, serialized down to what the guide needs —
+  // the channel ordering runs on the SAME weights that score every title.
+  const tasteRules =
+    guideView && user
+      ? (await getPreferenceRules(supabase, user.id).catch(() => [])).map((r) => ({ trait: r.trait as string, weight: r.weight }))
+      : [];
 
   // COVERAGE HONESTY, FROM THE DATA — NOT FROM A CONFIG FLAG. The banner used
   // to read `hasFullGridProvider()` (a licensed-provider check) and say "no
@@ -220,7 +226,7 @@ export default async function OnTvPage({
 
       {upcoming.length > 0 && <MyReminders initial={upcoming} />}
 
-      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} remindedIds={remindedIds} />}
+      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} remindedIds={remindedIds} taste={tasteRules} />}
 
       {guideView ? null : withinHours != null && windowed ? (
         <>

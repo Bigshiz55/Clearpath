@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { buildChannelGuide, filterGuide, guideSummary } from '@/lib/tv/channelGuide';
+import { rankGuideForTaste, type TasteRule } from '@/lib/tv/channelAffinity';
 import { displayClock } from '@/lib/viewing/clock';
 import { setTvReminder } from '@/lib/actions/tvReminders';
 import type { Airing } from '@/lib/onTv';
@@ -24,17 +25,25 @@ export function ChannelGuide({
   airings,
   nowMs,
   remindedIds = [],
+  taste = [],
 }: {
   airings: Airing[];
   nowMs: number;
   /** Airings this user already has a reminder for. */
   remindedIds?: number[];
+  /** The user's own preference rules — the guide orders channels by them.
+   *  Empty = the plain alphabetical guide, unchanged. */
+  taste?: TasteRule[];
 }) {
   const [query, setQuery] = useState('');
   const [reminded, setReminded] = useState<Set<number>>(() => new Set(remindedIds));
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const rows = useMemo(() => buildChannelGuide(airings, nowMs), [airings, nowMs]);
+  // TASTE ORDERS THE DIAL. Same live-first guarantee, but inside each group
+  // the user's own rule weights decide who leads — Investigation Discovery
+  // before ESPN for a true-crime lover, Syfy sunk for a sci-fi avoider —
+  // and zero-affinity channels keep their alphabetical place.
+  const rows = useMemo(() => rankGuideForTaste(buildChannelGuide(airings, nowMs), taste), [airings, nowMs, taste]);
   const shown = useMemo(() => filterGuide(rows, query), [rows, query]);
   const stats = guideSummary(rows);
 
@@ -109,7 +118,18 @@ export function ChannelGuide({
           {shown.map((r) => (
             <li key={r.network} className="card wv-tile p-3" data-testid="guide-channel">
               <div className="flex items-baseline justify-between gap-2">
-                <h3 className="truncate text-sm font-black uppercase tracking-wide text-white">{r.network}</h3>
+                <h3 className="flex min-w-0 items-baseline gap-1.5 truncate text-sm font-black uppercase tracking-wide text-white">
+                  {r.network}
+                  {'forYou' in r && (r as { forYou: boolean }).forYou && (
+                    <span
+                      data-testid="guide-for-you"
+                      title="This channel’s programming matches your taste rules"
+                      className="rounded bg-[#ff1493]/20 px-1 py-0.5 text-[9px] font-black tracking-wide text-pink-200"
+                    >
+                      🧬 FOR YOU
+                    </span>
+                  )}
+                </h3>
                 {r.onNow && (
                   <span className="flex-none rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
                     On now

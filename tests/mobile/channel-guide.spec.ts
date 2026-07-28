@@ -106,6 +106,44 @@ test('tapping remind reports its real outcome — no faked success', async ({ pa
   await expect(bell).toContainText('⏰'); // still unset — nothing was saved
 });
 
+/**
+ * THE DNA ORDERS THE DIAL. `?taste=1` gives the harness a viewer whose rules
+ * love classic noir (+15) and Lifetime-style thrillers (+6). The guide must
+ * put TCM at the top of the live group, badge only the genuinely favoured
+ * channels, and leave everyone else exactly where the alphabet had them.
+ */
+test.describe('ranked by your DNA', () => {
+  test('a loved channel leads the live group; neutrals keep their order', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto('/dev/channel-guide?taste=1', { waitUntil: 'networkidle' });
+    const names = (await channels(page).locator('h3').allInnerTexts()).map((n) =>
+      n.replace(/🧬 FOR YOU/i, '').trim().toLowerCase(),
+    );
+    // TCM (+15) jumps to first; the zero-affinity live channels follow in the
+    // old alphabetical order; Lifetime (+6) is still last — live channels lead
+    // whatever the taste says.
+    expect(names[0]).toBe('tcm');
+    expect(names.slice(1)).toEqual(['espn', 'food network', 'hallmark', 'history', 'lifetime']);
+  });
+
+  test('the badge marks only genuinely favoured channels', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto('/dev/channel-guide?taste=1', { waitUntil: 'networkidle' });
+    const badges = page.getByTestId('guide-for-you');
+    await expect(badges).toHaveCount(2); // TCM and Lifetime
+    const badged = channels(page).filter({ has: page.getByTestId('guide-for-you') });
+    await expect(badged.first()).toContainText(/tcm/i);
+    await expect(badged.nth(1)).toContainText(/lifetime/i);
+  });
+
+  test('without taste rules the guide is EXACTLY the old alphabetical order', async ({ page }) => {
+    await open(page);
+    await expect(page.getByTestId('guide-for-you')).toHaveCount(0);
+    const names = (await channels(page).locator('h3').allInnerTexts()).map((n) => n.trim().toLowerCase());
+    expect(names[0]).toBe('espn');
+  });
+});
+
 for (const w of [320, 390, 768, 1440]) {
   test(`no sideways scroll at ${w}px`, async ({ page }) => {
     await open(page, w);

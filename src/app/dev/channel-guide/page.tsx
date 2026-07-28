@@ -50,12 +50,20 @@ const GRID: Airing[] = [
   a({ network: 'Dead Channel', showName: 'Already Over', airstamp: '2026-07-28T17:00:00Z', runtime: 30 }),
 ];
 
-export default function ChannelGuideHarness() {
+// `?taste=1` — the DNA-ordered variant: a viewer whose rules love classic noir
+// and Lifetime thrillers. TCM should lead the live group; ESPN stays neutral.
+const TASTE = [
+  { trait: 'noir', weight: 15 },
+  { trait: 'domestic_thriller', weight: 6 },
+];
+
+export default function ChannelGuideHarness({ searchParams }: { searchParams?: { taste?: string } }) {
   if (process.env.MOBILE_HARNESS !== '1') notFound();
+  const taste = searchParams?.taste === '1' ? TASTE : [];
   return (
     <main className="container-page space-y-4 py-6" data-testid="guide-harness">
       <h1 className="text-xl font-black text-white">Harness — full channel guide</h1>
-      <ChannelGuide airings={GRID} nowMs={NOW} />
+      <ChannelGuide airings={GRID} nowMs={NOW} taste={taste} />
     </main>
   );
 }
