@@ -346,14 +346,16 @@ export function FinderUI({
   return (
     <div className="space-y-5">
       {(q.providerIds?.length ?? 0) > 0 && (
-        <div className="flex items-center justify-between gap-2 rounded-xl border border-brand-400/40 bg-brand-500/10 px-3.5 py-2.5 text-sm text-brand-100">
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 rounded-xl border border-brand-400/40 bg-brand-500/10 px-3.5 py-2.5 text-sm text-brand-100">
           <span>📺 Filtered to <b className="text-white">{providerFilterNames.join(', ') || 'your pick'}</b> — real availability from TMDB.</span>
           <button onClick={() => set('providerIds', [])} className="flex-none text-xs font-semibold text-brand-200 underline underline-offset-2 hover:text-white">Clear</button>
         </div>
       )}
       {/* On the home screen, both ways to search live inside ONE outlined box —
           "say what you want" OR "build it by hand" — so it reads as two options
-          in a single section. Elsewhere the wrapper is transparent (`contents`). */}
+          in a single section. Elsewhere the wrapper is transparent (`contents`)
+          — it encloses the RESULTS too, so any width put on it would cap the
+          grid; the question column is capped on the form div below instead. */}
       <div className={embedded ? 'space-y-5 rounded-3xl border-2 border-brand-400/40 bg-brand-500/[0.05] p-4 sm:p-6' : 'contents'}>
         {embedded && (
           <div className="flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
@@ -363,8 +365,11 @@ export function FinderUI({
 
         {/* One column. This was `lg:grid-cols-2` from when a second panel sat
             beside the ask; that panel is long gone, so on a laptop it left the
-            box stranded in the left half with an empty column beside it. */}
-        <div className="grid gap-4">
+            box stranded in the left half with an empty column beside it.
+            Standalone, the question keeps a readable centered column — a
+            1500px textarea is a worse textarea — while the results grid below
+            takes the whole container. That split IS the desktop layout. */}
+        <div className={`grid gap-4 ${embedded ? '' : 'mx-auto w-full max-w-2xl'}`}>
 
         <div className={embedded ? 'flex flex-col gap-3' : 'card flex flex-col gap-3 p-4'}>
           {!embedded && <div className="eyebrow-lg">Refine your search</div>}
@@ -395,12 +400,12 @@ export function FinderUI({
       </div>
 
       {loading && (
-        <div className="card p-6 text-center">
+        <div className="card mx-auto w-full max-w-2xl p-6 text-center">
           <div className="text-sm font-semibold text-white">Searching…</div>
           <div className="mt-1 text-xs text-slate-400">Checking every candidate against your requirements.</div>
         </div>
       )}
-      {error && <p className="text-sm text-amber-300">{error}</p>}
+      {error && <p className="mx-auto w-full max-w-2xl text-sm text-amber-300">{error}</p>}
 
       {items && !loading && (
         <div id="finder-results" className="scroll-mt-4">
@@ -531,14 +536,15 @@ export function FinderUI({
       )}
 
       {/* OR — type an opening statement above, or build the case with the controls. */}
-      <div className="flex items-center gap-4" aria-hidden>
+      <div className={`flex items-center gap-4 ${embedded ? '' : 'mx-auto w-full max-w-2xl'}`} aria-hidden>
         <span className="h-0.5 flex-1 rounded-full bg-white/15" />
         <span className="text-3xl font-black uppercase tracking-[0.15em] text-slate-300 sm:text-4xl">OR</span>
         <span className="h-0.5 flex-1 rounded-full bg-white/15" />
       </div>
 
-      {/* Submit your evidence — transparent, editable, no black box. */}
-      <div id="evidence" className={embedded ? 'space-y-4 scroll-mt-20' : 'card space-y-4 p-4 scroll-mt-20'}>
+      {/* Submit your evidence — transparent, editable, no black box. The
+          builder is a form, and forms keep the readable column standalone. */}
+      <div id="evidence" className={embedded ? 'space-y-4 scroll-mt-20' : 'card mx-auto w-full max-w-2xl space-y-4 p-4 scroll-mt-20'}>
         <div className="flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
           Refine your search
         </div>

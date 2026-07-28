@@ -25,7 +25,11 @@ body {
 
 @layer components {
   .container-page {
-    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+    /* One shell for every screen. Phones and tablets are untouched; from `xl`
+       the cap steps up so a MacBook isn't drawing a phone column between two
+       fields of black — the grids inside are auto-fill, so extra width becomes
+       MORE columns at the same card size, never wider cards. */
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 xl:max-w-7xl 2xl:max-w-[1520px];
   }
 
   /* The one poster-grid used across the app.

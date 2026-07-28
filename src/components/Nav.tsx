@@ -55,9 +55,11 @@ export function Nav({
           From `sm` there is no bottom nav, so it sticks as before. */}
       <header className="relative z-40 border-b border-white/10 bg-ink-950/80 pt-[calc(env(safe-area-inset-top)+1.5rem)] backdrop-blur sm:sticky sm:top-0">
         <div className="container-page flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-4">
-          {/* Spacing does NOT relax at wider viewports: `container-page` caps at
-              1152px, so the header has exactly as much room at 1600 as at 1280.
-              Restoring the roomier gaps above `xl` reintroduced the collision. */}
+          {/* Spacing does NOT relax at wider viewports. The tightest fit is a
+              1280px window (container ≈ 1232), and roomier gaps above `xl`
+              reintroduced the collision there. The container now widens on big
+              desktops, but a layout that only fits when the window is huge is
+              still broken at 1280 — so the compact spacing stays. */}
           <div className="flex min-w-0 items-center gap-3">
             <Logo href="/app" size="lg" crowded />
             <nav className="hidden items-center gap-0.5 lg:flex">
@@ -95,12 +97,12 @@ export function Nav({
               <span aria-hidden className="text-base leading-none">⭐</span>
               <span className="hidden sm:inline">Pro</span>
             </Link>
-            {/* THE IDENTITY CHIP IS NOT INLINE ANY MORE. `container-page` caps
-                at 1152px, so the header has exactly as much room at 1600 as at
-                1280 — and measured there, the primary nav ends at 958 while
-                this cluster starts at 952. The chip was the ~115px in the
-                middle. It is in the overflow menu at every width, which is
-                where a label you read once belongs. */}
+            {/* THE IDENTITY CHIP IS NOT INLINE ANY MORE. Measured at the
+                tightest real width (a 1280px window), the primary nav ends at
+                958 while this cluster starts at 952 — the chip was the ~115px
+                in the middle. Wider desktops now get a wider container, but
+                the chip must fit at 1280 too, so it lives in the overflow menu
+                at every width — where a label you read once belongs. */}
             {isGuest ? (
               <GuestSaveButton className="btn-primary hidden sm:inline-flex" />
             ) : (

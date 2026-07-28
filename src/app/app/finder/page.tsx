@@ -33,13 +33,19 @@ export default async function FinderPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="text-2xl font-bold text-white sm:text-3xl">🕵️ Forensic Search</h1>
-      <p className="mt-2 text-sm text-slate-400">
-        Say what you want in plain English — length, genre, how recent, a minimum match, English audio, on your
-        services. You get a <span className="font-semibold text-slate-200">ranked set</span> of real titles, each
-        scored for you and showing exactly which of your rules it met. No black box, no “one guess,” no credits.
-      </p>
+    <div>
+      {/* The QUESTION reads best as a column; the RESULTS deserve the screen.
+          The old wrapper capped both at 672px, which on a MacBook drew two
+          giant posters between two fields of black. FinderUI now caps its own
+          form and lets the grid take the container. */}
+      <div className="mx-auto w-full max-w-2xl">
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">🕵️ Forensic Search</h1>
+        <p className="mt-2 text-sm text-slate-400">
+          Say what you want in plain English — length, genre, how recent, a minimum match, English audio, on your
+          services. You get a <span className="font-semibold text-slate-200">ranked set</span> of real titles, each
+          scored for you and showing exactly which of your rules it met. No black box, no “one guess,” no credits.
+        </p>
+      </div>
       <div className="mt-6">
         <FinderUI hasServices={services.length > 0} watchers={watchers} />
       </div>
