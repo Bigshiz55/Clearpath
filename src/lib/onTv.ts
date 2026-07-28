@@ -4,6 +4,7 @@ import { getCriticRatings } from '@/lib/omdb';
 import { findTmdbByImdb, searchTitles, type SearchResultItem } from '@/lib/tmdb/client';
 import { getGracenoteAirings } from '@/lib/gracenote';
 import { getStoredGridAirings } from '@/lib/tvGrid';
+import { stillJoinable } from '@/lib/viewing/clock';
 import type { MediaType } from '@/lib/types';
 
 /**
@@ -422,6 +423,12 @@ export async function getUpcomingTv(
     const byKey = new Set<string>();
     return merged
       .filter((a) => {
+        // The grid window reaches back for in-progress airings on purpose, but
+        // this surface RECOMMENDS. A movie three hours in is still "on" by the
+        // schedule and useless to tune into — keep an in-progress listing only
+        // while joining it is genuinely worth it (the full guide still shows
+        // everything that's on).
+        if (!stillJoinable(a.airstamp, a.runtime, nowMs)) return false;
         if (wantGenre && !a.genres.some((g) => g.toLowerCase() === wantGenre)) return false;
         const k = `${a.showName.toLowerCase()}|${a.airstamp}`;
         return byKey.has(k) ? false : (byKey.add(k), true);

@@ -105,3 +105,30 @@ export function liveLabel(startedMinutesAgo: number): string {
   const m = startedMinutesAgo % 60;
   return m === 0 ? `On now · ${h}h in` : `On now · ${h}h ${m}m in`;
 }
+
+/** How late a join is still worth suggesting when the runtime is unknown. */
+export const JOIN_LATE_GRACE_MIN = 30;
+
+/**
+ * Whether an airing still belongs on a "what should I watch" list.
+ *
+ * Upcoming: always. Ended: never. In progress: only while joining is genuinely
+ * worth it — within the first third of the runtime (a long movie forgives more
+ * lateness than a sitcom), with a 30-minute floor, and only the 30-minute grace
+ * when the runtime is unknown. A movie that started three hours ago is still
+ * "on" by the schedule, but recommending it is recommending its last scene —
+ * the full channel guide may say what's on; a recommendation list must not
+ * lead with it.
+ */
+export function stillJoinable(
+  airstamp: string | null | undefined,
+  runtimeMinutes: number | null | undefined,
+  nowMs: number,
+): boolean {
+  const s = airingStatus(airstamp, runtimeMinutes, nowMs);
+  if (s.state === 'upcoming') return true;
+  if (s.state === 'ended') return false;
+  const runtime = typeof runtimeMinutes === 'number' && runtimeMinutes > 0 ? runtimeMinutes : null;
+  const limit = runtime != null ? Math.max(JOIN_LATE_GRACE_MIN, runtime / 3) : JOIN_LATE_GRACE_MIN;
+  return s.startedMinutesAgo <= limit;
+}

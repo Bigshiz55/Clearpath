@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { airingStatus, displayClock, liveLabel } from '@/lib/viewing/clock';
+import { airingStatus, displayClock, liveLabel, stillJoinable } from '@/lib/viewing/clock';
 import { tmdbImage, type TmdbImageSize } from '@/lib/tmdb/image';
 
 /** Poster art comes from the canonical TMS CDN; if it fails to load, swap to the
@@ -193,12 +193,16 @@ export function OnTvGuide({
     // 6, so a healthy schedule could never show more than six cards up top no
     // matter how much real inventory arrived. The window set is already the
     // curated result; show it all and let the list below carry the rest.
-    if (windowed) return airings.filter((a) => !NOISE_TYPES.has(a.showType));
+    // `stillJoinable` re-checks against the ticking clock: the server filtered
+    // the set at request time, but a tab left open (or a cached render) can
+    // outlive that — a card whose show is now mostly over quietly leaves the
+    // strip instead of advertising a start time hours in the past.
+    if (windowed) return airings.filter((a) => !NOISE_TYPES.has(a.showType) && stillJoinable(a.airstamp, a.runtime, nowMs));
     return airings
       .filter((a) => !NOISE_TYPES.has(a.showType) && a.rating != null && (streaming || (a.minutes >= 18 * 60 && a.minutes <= 23 * 60)))
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
       .slice(0, 10);
-  }, [airings, streaming, windowed]);
+  }, [airings, streaming, windowed, nowMs]);
   // ONE CARD PER SHOW. A back-to-back double bill — "World War II with Tom
   // Hanks" at 8:00 and again at 9:00 — took two of six highlight slots to name
   // one programme. The extra showings are kept, not dropped, so a card can say
@@ -291,7 +295,22 @@ export function OnTvGuide({
                     <div className="wv-card-body">
                       <div className="line-clamp-2 text-sm font-semibold leading-snug text-white">{a.showName}</div>
                       <div className="mt-1 flex items-center justify-between gap-1">
-                        <span suppressHydrationWarning className="truncate text-base font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.airstamp, a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
+                        {(() => {
+                          // A start time in the past under "coming on" reads as
+                          // stale data. If it's running, the card says so — the
+                          // same label the list rows use.
+                          const st = streaming ? null : airingStatus(a.airstamp, a.runtime, nowMs);
+                          if (st?.state === 'live') {
+                            return (
+                              <span suppressHydrationWarning data-testid="airing-live" className="truncate rounded-md bg-emerald-500/20 px-1.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-emerald-200">
+                                {liveLabel(st.startedMinutesAgo)}
+                              </span>
+                            );
+                          }
+                          return (
+                            <span suppressHydrationWarning className="truncate text-base font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.airstamp, a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
+                          );
+                        })()}
                         {a.rating != null && <span className={`flex-none text-sm font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
                       </div>
                       {/* The showings this card stands in for. Deduping the strip

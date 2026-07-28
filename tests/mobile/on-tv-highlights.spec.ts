@@ -86,6 +86,35 @@ test('the strip never scrolls the page sideways', async ({ page }) => {
   }
 });
 
+/**
+ * TIME HONESTY IN THE STRIP. The grid window reaches back for in-progress
+ * airings on purpose — but the cards printed their raw start time, so at
+ * 3:33 PM the "Movies on now" tab led with "11:45 AM", which reads as stale
+ * data. A running show must say it's running, and one that's mostly over must
+ * not be offered at all.
+ */
+test('a card already running says ON NOW instead of a past start time', async ({ page }) => {
+  await open(page, 390);
+  const strip = page.getByTestId('tv-highlights');
+  const card = strip.locator('> div').filter({ hasText: 'Started Twenty Minutes Ago' });
+  await expect(card).toHaveCount(1);
+  const chip = card.getByTestId('airing-live');
+  await expect(chip).toBeVisible();
+  await expect(chip).toContainText(/on now/i);
+  await expect(chip).toContainText(/\d+m in/i);
+  // And no clock time on that card's time line — the chip replaced it.
+  await expect(card.locator('text=/\\d{1,2}:\\d{2}\\s?(AM|PM)/').first()).not.toBeVisible();
+});
+
+test('a movie in its final scene is not offered as a highlight', async ({ page }) => {
+  await open(page, 390);
+  const strip = page.getByTestId('tv-highlights');
+  // The fixture is still "on" by its four-hour slot — and 3h48m in.
+  await expect(strip).not.toContainText('Nearly Over Movie');
+  // The upcoming fixtures are untouched: real future listings keep their times.
+  await expect(strip).toContainText('Cinderella Man');
+});
+
 test('an unmatched listing keeps the same card shape as a matched one', async ({ page }) => {
   await open(page, 390);
   const unmatched = page.getByTestId('airing-unmatched').first();

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { airingClock, airingStatus, clockFromProviderTime, displayClock, liveLabel } from './clock';
+import { airingClock, airingStatus, clockFromProviderTime, displayClock, liveLabel, stillJoinable } from './clock';
 
 // 2026-07-28T03:42:00Z. In Eastern (UTC-4 in July) that is 11:42 PM the night
 // before; on the West Coast it is 8:42 PM. The provider hands us the Eastern
@@ -93,6 +93,50 @@ describe('liveLabel', () => {
     expect(liveLabel(18)).toBe('On now · 18m in');
     expect(liveLabel(60)).toBe('On now · 1h in');
     expect(liveLabel(95)).toBe('On now · 1h 35m in');
+  });
+});
+
+/**
+ * STILL WORTH TUNING INTO? The 3h look-back that catches in-progress airings
+ * also caught movies in their final scene — a "Movies on now" tab led with a
+ * western that started at 11:45 AM at half past three. The schedule says it's
+ * on; a recommendation list must not lead with its ending.
+ */
+describe('stillJoinable', () => {
+  const start = Date.parse(STAMP);
+  const min = (n: number) => start + n * 60_000;
+
+  it('anything not yet started is always listable', () => {
+    expect(stillJoinable(STAMP, 120, min(-5))).toBe(true);
+    expect(stillJoinable(null, 120, min(50))).toBe(true); // unusable stamp → upcoming
+  });
+
+  it('anything ended never is', () => {
+    expect(stillJoinable(STAMP, 120, min(121))).toBe(false);
+  });
+
+  it('a show a few minutes in is worth joining', () => {
+    expect(stillJoinable(STAMP, 60, min(18))).toBe(true);
+  });
+
+  it('a long movie forgives more lateness — a third of the runtime', () => {
+    expect(stillJoinable(STAMP, 180, min(55))).toBe(true); // 55 ≤ 180/3
+    expect(stillJoinable(STAMP, 180, min(75))).toBe(false); // past the first third
+  });
+
+  it('THE SCREENSHOT BUG: a movie hours into its slot is not a recommendation', () => {
+    // "The Big Country", started 3h48m ago in a four-hour slot: still "on",
+    // useless to tune into.
+    expect(stillJoinable(STAMP, 240, min(228))).toBe(false);
+  });
+
+  it('a short show keeps the 30-minute grace even when a third is less', () => {
+    expect(stillJoinable(STAMP, 30, min(25))).toBe(true); // 25 ≤ max(30, 10)
+  });
+
+  it('unknown runtime gets only the 30-minute grace', () => {
+    expect(stillJoinable(STAMP, null, min(20))).toBe(true);
+    expect(stillJoinable(STAMP, null, min(40))).toBe(false);
   });
 });
 

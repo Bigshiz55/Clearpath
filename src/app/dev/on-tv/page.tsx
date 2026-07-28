@@ -21,11 +21,15 @@ import type { Airing } from '@/lib/onTv';
  */
 export const dynamic = 'force-dynamic';
 
-/** Fixed instants so the clock labels never shift under a measurement. */
-const BASE = Date.parse('2026-07-27T23:00:00Z');
-
-function airing(i: number, over: Partial<Airing>): Airing {
-  const start = BASE + i * 1_800_000;
+/**
+ * Anchored to the REAL clock, per request: the strip now drops anything no
+ * longer worth tuning into, so a frozen past instant would empty it — and a
+ * module-level `Date.now()` would age out under a long-lived test server. The
+ * OFFSETS from now (upcoming / just started / nearly over) are what the
+ * assertions care about, and those are fixed per render.
+ */
+function airing(base: number, i: number, over: Partial<Airing>): Airing {
+  const start = base + 30 * 60_000 + i * 1_800_000;
   return {
     id: 900 + i,
     time: '20:00',
@@ -54,40 +58,59 @@ function airing(i: number, over: Partial<Airing>): Airing {
   };
 }
 
-const AIRINGS: Airing[] = [
-  airing(0, { showName: 'Cinderella Man', network: 'AMC' }),
-  // The worst case the screenshot showed: a long name over a long channel name.
-  airing(1, {
-    showName: 'The Lord of the Rings: The Fellowship of the Ring',
-    network: 'Paramount Network HD',
-    rating: 8.8,
-    criticRt: 91,
-  }),
-  // Same show twice, thirty minutes apart — one card, with "also at". Same
-  // TMDB id on both, as the resolver would give them: that is the key the
-  // strip groups on.
-  airing(2, { showName: 'World War II with Tom Hanks', showId: 777, tmdbId: 4242, network: 'History' }),
-  airing(3, { showName: 'World War II with Tom Hanks', showId: 777, tmdbId: 4242, network: 'History' }),
-  // Not matched to TMDB: no verdict pair, no W, no DNA — but the same height.
-  airing(4, {
-    showName: 'Some Local Broadcast',
-    network: 'WGN',
-    tmdbId: null,
-    mediaType: null,
-    criticRt: null,
-    criticImdb: null,
-  }),
-  airing(5, { showName: 'Gone', network: 'FX', rating: 6.2, criticRt: 38, criticImdb: null }),
-  airing(6, { showName: 'Heat', network: 'TNT', rating: 8.3 }),
-  airing(7, { showName: 'Se7en', network: 'IFC', rating: 8.6, criticImdb: 8.6 }),
-];
+function buildAirings(base: number): Airing[] {
+  const a = (i: number, over: Partial<Airing>) => airing(base, i, over);
+  return [
+    a(0, { showName: 'Cinderella Man', network: 'AMC' }),
+    // The worst case the screenshot showed: a long name over a long channel name.
+    a(1, {
+      showName: 'The Lord of the Rings: The Fellowship of the Ring',
+      network: 'Paramount Network HD',
+      rating: 8.8,
+      criticRt: 91,
+    }),
+    // Same show twice, thirty minutes apart — one card, with "also at". Same
+    // TMDB id on both, as the resolver would give them: that is the key the
+    // strip groups on.
+    a(2, { showName: 'World War II with Tom Hanks', showId: 777, tmdbId: 4242, network: 'History' }),
+    a(3, { showName: 'World War II with Tom Hanks', showId: 777, tmdbId: 4242, network: 'History' }),
+    // Not matched to TMDB: no verdict pair, no W, no DNA — but the same height.
+    a(4, {
+      showName: 'Some Local Broadcast',
+      network: 'WGN',
+      tmdbId: null,
+      mediaType: null,
+      criticRt: null,
+      criticImdb: null,
+    }),
+    a(5, { showName: 'Gone', network: 'FX', rating: 6.2, criticRt: 38, criticImdb: null }),
+    a(6, { showName: 'Heat', network: 'TNT', rating: 8.3 }),
+    a(7, { showName: 'Se7en', network: 'IFC', rating: 8.6, criticImdb: 8.6 }),
+    // Already running, twenty minutes in — the card must say "On now", not
+    // print a start time that has passed.
+    a(8, {
+      showName: 'Started Twenty Minutes Ago',
+      network: 'Hallmark',
+      airstamp: new Date(base - 20 * 60_000).toISOString(),
+      runtime: 120,
+    }),
+    // The screenshot bug: started nearly four hours ago in a four-hour slot.
+    // Still "on" by the schedule — and must NOT be offered as a highlight.
+    a(9, {
+      showName: 'Nearly Over Movie',
+      network: 'HDNet Movies',
+      airstamp: new Date(base - 228 * 60_000).toISOString(),
+      runtime: 240,
+    }),
+  ];
+}
 
 export default function OnTvHarness() {
   if (process.env.MOBILE_HARNESS !== '1') notFound();
   return (
     <main className="container-page py-6" data-testid="on-tv-harness">
       <h1 className="mb-4 text-xl font-black text-white">On TV — highlight strip</h1>
-      <OnTvGuide airings={AIRINGS} dateLabel="Monday, 27 July" country="US" windowHours={6} />
+      <OnTvGuide airings={buildAirings(Date.now())} dateLabel="Monday, 27 July" country="US" windowHours={6} />
     </main>
   );
 }
