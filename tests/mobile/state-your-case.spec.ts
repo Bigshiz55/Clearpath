@@ -140,3 +140,18 @@ test.describe('the hero card scales up on a laptop', () => {
     expect(over).toBeLessThanOrEqual(1);
   });
 });
+
+/**
+ * MODERN ICONS, NOT EMOJI. The nine quick-ask tiles used bare emoji, which
+ * render differently per platform and read as a lower tier of finish than
+ * the rest of the product. They now use the same glossy gradient-square
+ * `TileIcon` language as every home tile.
+ */
+test('every quick-ask tile renders a modern icon mark, not a bare emoji glyph', async ({ page }) => {
+  await open(page, 1024);
+  const tiles = page.getByTestId('quick-asks').locator('button[aria-pressed]');
+  await expect(tiles).toHaveCount(9);
+  for (let i = 0; i < 9; i++) {
+    await expect(tiles.nth(i).locator('svg')).toBeVisible();
+  }
+});

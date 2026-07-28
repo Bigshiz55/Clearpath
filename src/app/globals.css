@@ -64,7 +64,7 @@ body {
   .wv-card {
     @apply flex gap-3 overflow-hidden p-3 pb-0 sm:block sm:gap-0 sm:p-0;
   }
-  /* THE POSTER HOLDS 2:3 EVERYWHERE, AND IS NEVER CROPPED.
+  /* THE POSTER IS NEVER CROPPED — ON A PHONE ROW, TRUE 2:3.
      It used to STRETCH to the card's height on a phone, to avoid "a dead gap
      beneath it". With `object-cover` that meant the taller the card's text got,
      the more of the artwork's sides were cut off — "Toy Story" rendered as
@@ -72,9 +72,18 @@ body {
      before they read anything. A little unused column is a much smaller cost
      than an unrecognisable placard, so the ratio is fixed and the art is
      top-aligned. Slightly wider too (38%), because at 34% of a 358px card the
-     poster was 122px and titles on the artwork were unreadable. */
+     poster was 122px and titles on the artwork were unreadable.
+
+     FROM `sm`, THE TILE IS SHORTER AND SQUARER. A full 2:3 poster at a 280px
+     grid column is ~420px tall — before the title, the score, the ratings or
+     the FOR/AGAINST/SAVE row appeared, a 5-across desktop grid showed nothing
+     but a wall of posters, cut off mid-artwork by the viewport. A fixed,
+     shorter box (see PosterCard's blurred-backdrop layer, which lets the true
+     poster sit uncropped inside it via `object-contain`) keeps every card the
+     SAME height regardless of which title's key art is unusually tall, and
+     puts the rest of the card back in view. */
   .wv-card-art {
-    @apply relative aspect-[2/3] w-[38%] max-w-[160px] flex-none self-start overflow-hidden rounded-lg sm:w-full sm:max-w-none sm:self-auto sm:rounded-none;
+    @apply relative aspect-[2/3] w-[38%] max-w-[160px] flex-none self-start overflow-hidden rounded-lg sm:aspect-auto sm:h-[236px] sm:w-full sm:max-w-none sm:self-auto sm:rounded-none lg:h-[264px];
   }
   .wv-card-body {
     @apply flex min-w-0 flex-1 flex-col sm:p-3;

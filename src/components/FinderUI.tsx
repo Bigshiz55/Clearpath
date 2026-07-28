@@ -470,27 +470,38 @@ export function FinderUI({
                             the next step — where to watch, drawn as a real
                             affordance rather than a tag — and any evidence the
                             card has not said elsewhere, kept quiet beside it. */}
-                        {(() => {
-                          const pills = buildPills({ receipts: it.receipts, where: it.where });
-                          if (pills.length === 0) return null;
-                          return (
-                            <div data-testid="result-pills" className="flex flex-wrap items-center gap-1.5">
-                              {pills.map((p) => (
-                                <span
-                                  key={p.label}
-                                  data-tone={p.tone}
-                                  className={
-                                    p.tone === 'watch'
-                                      ? 'inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[13px] font-bold text-white'
-                                      : 'inline-flex min-h-[36px] items-center rounded-lg border border-white/10 bg-white/[0.04] px-2.5 text-[12px] text-slate-400'
-                                  }
-                                >
-                                  {p.tone === 'watch' ? <><span aria-hidden>📺</span>{p.label}</> : `✓ ${p.label}`}
-                                </span>
-                              ))}
-                            </div>
-                          );
-                        })()}
+                        {/* RESERVED, EVEN WHEN EMPTY. A card without a
+                            streaming match (no `where`) rendered nothing here
+                            at all, so the row below it — Why this Verd1ct,
+                            then FOR · AGAINST · SAVE — sat 36px higher than on
+                            a neighbouring card that DID have a pill, and a row
+                            of five cards read as five different heights. The
+                            zone is now always present; the pills inside it are
+                            not (`result-pills` still renders zero elements
+                            when there is nothing to show). */}
+                        <div className="min-h-[36px]">
+                          {(() => {
+                            const pills = buildPills({ receipts: it.receipts, where: it.where });
+                            if (pills.length === 0) return null;
+                            return (
+                              <div data-testid="result-pills" className="flex flex-wrap items-center gap-1.5">
+                                {pills.map((p) => (
+                                  <span
+                                    key={p.label}
+                                    data-tone={p.tone}
+                                    className={
+                                      p.tone === 'watch'
+                                        ? 'inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[13px] font-bold text-white'
+                                        : 'inline-flex min-h-[36px] items-center rounded-lg border border-white/10 bg-white/[0.04] px-2.5 text-[12px] text-slate-400'
+                                    }
+                                  >
+                                    {p.tone === 'watch' ? <><span aria-hidden>📺</span>{p.label}</> : `✓ ${p.label}`}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
                         {(() => {
                           const info = it.mediaType === 'tv' && it.airing ? airingInfo(it.airing) : null;
                           if (!info) return null;

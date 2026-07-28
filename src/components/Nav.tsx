@@ -5,7 +5,7 @@ import { MoreMenu, type NavLink } from './nav/MoreMenu';
 import { MobileNav } from './nav/MobileNav';
 import { HeaderOverflow } from './nav/HeaderOverflow';
 import { Avatar } from './Avatar';
-import { QuickSearchTrigger } from './QuickSearch';
+import { HeaderSearchBar, QuickSearchTrigger } from './QuickSearch';
 
 // Primary destinations stay inline; secondary ones live under "More" so neither
 // the desktop bar nor the mobile tab bar gets overcrowded.
@@ -74,6 +74,14 @@ export function Nav({
               ))}
               <MoreMenu links={SECONDARY} />
             </nav>
+          </div>
+          {/* THE VISIBLE SEARCH BOX. Once the header has a real free middle —
+              from `xl`, where the app's own container starts widening too —
+              it gets an actual typeable box instead of asking you to open one.
+              `min-w-0` lets this shrink before it ever forces the two
+              clusters apart; below `xl` the icon + sheet above is unchanged. */}
+          <div className="hidden min-w-0 flex-1 justify-center px-6 xl:flex">
+            <HeaderSearchBar />
           </div>
           {/* The right cluster carries only what belongs in a header: upgrade,
               identity, account. The desktop-view switch and Sign out live in the

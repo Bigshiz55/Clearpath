@@ -51,6 +51,54 @@ export function SearchIcon({ className = '' }: { className?: string }) {
   );
 }
 
+/**
+ * A REAL SEARCH BOX, VISIBLE, AT THE TOP OF EVERY SCREEN — not an icon that
+ * opens one. "There needs to be a search box at the top of every screen no
+ * matter where you go, you can just put in a show or movie."
+ *
+ * Header real estate is the constraint the icon+sheet design above exists to
+ * respect (a phone header is ~148px and full at three controls), so this is
+ * NOT a phone-width thing — it only appears once the header genuinely has a
+ * free middle to put it in (`xl`, 1280px+; the app's own container starts
+ * widening at the same breakpoint). Below that, the icon + QuickSearch sheet
+ * above is still the always-there control, unchanged.
+ *
+ * A real form, not a trigger for the sheet: it types and submits inline,
+ * routing through the exact same `quickSearchHref` the sheet uses, so typing
+ * "Oppenheimer" and hitting enter goes straight there — no second box.
+ */
+export function HeaderSearchBar({ className = '' }: { className?: string }) {
+  const [q, setQ] = useState('');
+  const router = useRouter();
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const href = quickSearchHref(q);
+    if (!href) return;
+    setQ('');
+    router.push(href);
+  }
+
+  return (
+    <form onSubmit={submit} className={`w-full max-w-md ${className}`} role="search">
+      <div className="flex h-10 items-center gap-2 rounded-lg border border-white/12 bg-white/5 px-3 transition focus-within:border-brand-400/60 focus-within:bg-white/[0.07]">
+        <SearchIcon className="h-4 w-4 flex-none text-slate-400" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          type="search"
+          enterKeyHint="search"
+          autoComplete="off"
+          placeholder="A title, a person, or what you feel like…"
+          aria-label="Search titles, people and questions"
+          data-testid="header-search-bar"
+          className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+        />
+      </div>
+    </form>
+  );
+}
+
 /** The header's search control. Same destination, same sheet. */
 export function QuickSearchTrigger({ className = '' }: { className?: string }) {
   return (

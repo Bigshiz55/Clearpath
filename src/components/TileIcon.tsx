@@ -14,7 +14,12 @@ export type TileIconName =
   | 'together'
   | 'watchlist'
   | 'money'
-  | 'easy';
+  | 'easy'
+  | 'clock'
+  | 'funny'
+  | 'scary'
+  | 'heart'
+  | 'sunny';
 
 function G({ id, from, to, v }: { id: string; from: string; to: string; v?: boolean }) {
   return (
@@ -162,6 +167,80 @@ export function TileIcon({ name, className = 'h-11 w-11' }: { name: TileIconName
             <circle cx="16.4" cy="13.4" r="3.1" fill="#fff" fillOpacity="0.25" />
             <path d="M10.7 12.9c.9-.8 2.7-.8 2.6 0" />
             <path d="M4.5 12.2 3 10.6M19.5 12.2 21 10.6" />
+          </g>
+        </>,
+      );
+    case 'clock': // a short runtime, at a glance
+      return svg(
+        <>
+          <defs><G id="ti-clock" from="#67e8f9" to="#0e7490" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-clock)" />
+          <Gloss />
+          <circle cx="12" cy="13.1" r="6.3" fill="#fff" opacity="0.94" />
+          <path d="M9.4 4.6h5.2M12 4.6v2.3" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M12 9.3v3.9l2.9 1.9" stroke="#0e7490" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </>,
+      );
+    case 'funny': // a big open laugh
+      return svg(
+        <>
+          <defs><G id="ti-funny" from="#fde047" to="#d97706" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-funny)" />
+          <Gloss />
+          <circle cx="12" cy="12.6" r="7.1" fill="#fff" opacity="0.94" />
+          <g fill="#b45309">
+            <ellipse cx="9.1" cy="11" rx="1" ry="1.35" />
+            <ellipse cx="14.9" cy="11" rx="1" ry="1.35" />
+          </g>
+          <path d="M7.7 14.5c1 2.7 7.6 2.7 8.6 0" stroke="#b45309" strokeWidth="1.9" strokeLinecap="round" fill="none" />
+        </>,
+      );
+    case 'scary': // a friendly-menacing ghost
+      return svg(
+        <>
+          <defs><G id="ti-scary" from="#a78bfa" to="#4c1d95" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-scary)" />
+          <Gloss />
+          <path
+            d="M12 5.3c-3.4 0-5.7 2.5-5.7 6v7.3c.6-.9 1.3-.9 1.9 0 .6.9 1.3.9 1.9 0 .6-.9 1.2-.9 1.8 0 .6.9 1.3.9 1.9 0 .6-.9 1.3-.9 1.9 0 .6-.9 1.2-.9 1.8 0v-7.3c0-3.5-2.3-6-5.7-6z"
+            fill="#fff"
+            opacity="0.95"
+          />
+          <g fill="#4c1d95">
+            <circle cx="9.6" cy="11.3" r="1" />
+            <circle cx="14.4" cy="11.3" r="1" />
+          </g>
+          <ellipse cx="12" cy="14.2" rx="1.1" ry="1.4" fill="#4c1d95" />
+        </>,
+      );
+    case 'heart': // date night
+      return svg(
+        <>
+          <defs><G id="ti-heart" from="#f9a8d4" to="#be185d" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-heart)" />
+          <Gloss />
+          <path
+            d="M12 18.1s-6.3-3.8-6.3-8.2a3.55 3.55 0 0 1 6.3-2.3 3.55 3.55 0 0 1 6.3 2.3c0 4.4-6.3 8.2-6.3 8.2z"
+            fill="#fff"
+          />
+        </>,
+      );
+    case 'sunny': // feel-good, uplifting
+      return svg(
+        <>
+          <defs><G id="ti-sunny" from="#fef08a" to="#ca8a04" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-sunny)" />
+          <Gloss />
+          <circle cx="12" cy="12.5" r="4" fill="#fff" />
+          <g stroke="#fff" strokeWidth="1.8" strokeLinecap="round">
+            <line x1="12" y1="4.5" x2="12" y2="6.5" />
+            <line x1="12" y1="18.5" x2="12" y2="20.5" />
+            <line x1="4.5" y1="12.5" x2="6.5" y2="12.5" />
+            <line x1="17.5" y1="12.5" x2="19.5" y2="12.5" />
+            <line x1="6.9" y1="7.4" x2="8.3" y2="8.8" />
+            <line x1="15.7" y1="16.2" x2="17.1" y2="17.6" />
+            <line x1="17.1" y1="7.4" x2="15.7" y2="8.8" />
+            <line x1="8.3" y1="16.2" x2="6.9" y2="17.6" />
           </g>
         </>,
       );

@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
+import { TileIcon, type TileIconName } from '@/components/TileIcon';
 
 /**
  * "State Your Case" — the low-friction way to start a Taste DNA: just type what
@@ -12,20 +13,26 @@ import { useToast } from '@/components/Toast';
  * (The title-by-title Mentalist is still one tap away.)
  */
 // THE NINE MOST COMMON ASKS, IN A 3×3 GRID. Each `text` is the full query
-// dropped into the box; `emoji` + `hint` are the tile. Nine because that is a
+// dropped into the box; `icon` + `hint` are the tile. Nine because that is a
 // perfect grid on every width — six left a ragged bottom row, and more than
 // nine buries the gavel. Kept broad and mainstream — not tuned to one person's
 // taste. Exactly nine: the grid IS the design, so adding one means cutting one.
-const PRIMARY_EXAMPLES: { emoji: string; hint: string; text: string }[] = [
-  { emoji: '📺', hint: 'On TV tonight', text: 'What’s on TV tonight?' },
-  { emoji: '🍿', hint: 'Under 2 hours', text: 'A great movie under two hours' },
-  { emoji: '👨‍👩‍👧', hint: 'Family night', text: 'A great family movie for tonight' },
-  { emoji: '😂', hint: 'Something funny', text: 'Something genuinely funny' },
-  { emoji: '😱', hint: 'Actually scary', text: 'A really good scary movie' },
-  { emoji: '🔥', hint: 'New this week', text: 'The best things released this week' },
-  { emoji: '❤️', hint: 'Date night', text: 'A great date night movie' },
-  { emoji: '🕵️', hint: 'True crime', text: 'A gripping true crime series' },
-  { emoji: '🌈', hint: 'Feel-good', text: 'Something feel-good and uplifting' },
+//
+// GLOSSY APP-ICON MARKS, NOT EMOJI. The bare emoji rendered differently (and
+// looked dated) across platforms, and read as a lower tier of finish than the
+// rest of the product — every home tile already uses `TileIcon`'s bold
+// gradient-square language, so the quick asks now speak the same visual
+// dialect instead of a second, inconsistent one.
+const PRIMARY_EXAMPLES: { icon: TileIconName; hint: string; text: string }[] = [
+  { icon: 'tv', hint: 'On TV tonight', text: 'What’s on TV tonight?' },
+  { icon: 'clock', hint: 'Under 2 hours', text: 'A great movie under two hours' },
+  { icon: 'together', hint: 'Family night', text: 'A great family movie for tonight' },
+  { icon: 'funny', hint: 'Something funny', text: 'Something genuinely funny' },
+  { icon: 'scary', hint: 'Actually scary', text: 'A really good scary movie' },
+  { icon: 'new', hint: 'New this week', text: 'The best things released this week' },
+  { icon: 'heart', hint: 'Date night', text: 'A great date night movie' },
+  { icon: 'search', hint: 'True crime', text: 'A gripping true crime series' },
+  { icon: 'sunny', hint: 'Feel-good', text: 'Something feel-good and uplifting' },
 ];
 
 export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
@@ -166,7 +173,7 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
                   : 'border-white/15 bg-white/[0.06] text-slate-200 hover:border-brand-300 hover:bg-brand-500/20 hover:text-white'
               }`}
             >
-              <span aria-hidden className={`text-base leading-none ${hero ? 'lg:text-3xl' : ''}`}>{ex.emoji}</span>
+              <TileIcon name={ex.icon} className={`h-6 w-6 flex-none ${hero ? 'lg:h-9 lg:w-9' : ''}`} />
               <span className={`text-center text-[11px] font-semibold leading-tight ${hero ? 'lg:text-sm' : ''}`}>{ex.hint}</span>
             </button>
           );

@@ -59,8 +59,13 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
 }
 
 export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen, rank, evidence }: PosterCardProps) {
+  // FROM `sm`, THE POSTER IS LETTERBOXED, NOT CROPPED. The tile itself is now a
+  // fixed, shorter box (see `.wv-card-art`) — `object-contain` keeps the whole
+  // poster visible inside it, centered, at its true proportions. `object-cover`
+  // on a phone row is untouched: that box IS exactly 2:3, so cover there never
+  // crops anything.
   const poster = (
-    <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04]" />
+    <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04] sm:object-contain" />
   );
 
   // Every placard gets a "＋ save" affordance. If the caller didn't supply its
@@ -122,6 +127,22 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
     <div className="card wv-tile group flex flex-col bg-ink-950/85">
       <div className="wv-card">
       <div className="wv-card-art">
+        {/* THE MATTE, FROM `sm` ONLY. A blurred, scaled-up copy of the SAME
+            image (no extra request — the browser already has it cached) fills
+            the shorter box behind the true, uncropped poster, so the empty
+            band `object-contain` leaves top/bottom or side-to-side reads as a
+            deliberate frame instead of dead black bars. `aria-hidden`: purely
+            decorative, the real `<img>` below still carries the alt text. */}
+        {posterUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={posterUrl}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="absolute inset-0 hidden h-full w-full scale-110 object-cover object-center opacity-40 blur-2xl sm:block"
+          />
+        )}
         {/* HOW FAR YOU HAVE COME. In an endless feed the count is the only
             thing distinguishing a long session from a loop — bottom-left, on
             the artwork, clear of the W in the opposite corner. */}
@@ -139,12 +160,14 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         {overlay !== null && saveId != null && (
           <WCheck tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterUrl={posterUrl ?? null} />
         )}
+        {/* `relative` so the real poster paints ABOVE the absolutely-positioned
+            matte behind it, regardless of DOM stacking specifics. */}
         {onOpen ? (
-          <button type="button" onClick={onOpen} className="block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
+          <button type="button" onClick={onOpen} className="relative block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
         ) : href ? (
-          <Link href={href} className="block h-full">{poster}</Link>
+          <Link href={href} className="relative block h-full">{poster}</Link>
         ) : (
-          poster
+          <div className="relative h-full">{poster}</div>
         )}
       </div>
 
