@@ -24,6 +24,7 @@
  * Pure. No I/O.
  */
 import type { ChannelRow } from '@/lib/tv/channelGuide';
+import { guideRankScore } from '@/lib/tv/guideScoring';
 
 /** The slice of a preference rule this module needs — serializable. */
 export interface TasteRule {
@@ -73,23 +74,28 @@ export type RankedChannel = ChannelRow & {
   affinity: number;
   /** True when the user's rules actively favour this channel's programming. */
   forYou: boolean;
+  /** The one rank number: the programme's own engine match when one exists,
+   *  else the neutral baseline nudged by channel affinity. */
+  rankScore: number;
 };
 
 /**
  * Order the guide by taste WITHOUT breaking its promises: live channels still
- * lead, and inside each group affinity sorts first (descending), alphabetical
- * breaking ties — so zero-affinity channels read exactly as before.
+ * lead; inside each group the rank score sorts (a scored PROGRAMME outranks a
+ * channel identity — "this movie suits you 84" beats "this channel usually
+ * suits you"), alphabetical breaking ties — so with no signal at all the
+ * guide reads exactly as before.
  */
 export function rankGuideForTaste(rows: readonly ChannelRow[], rules: readonly TasteRule[]): RankedChannel[] {
   const ranked = rows.map((r) => {
     const affinity = channelAffinity(r.network, rules);
-    return { ...r, affinity, forYou: affinity > 0 };
+    return { ...r, affinity, forYou: affinity > 0, rankScore: guideRankScore({ ...r, affinity }) };
   });
   return ranked.sort((a, b) => {
     const liveA = a.onNow ? 0 : 1;
     const liveB = b.onNow ? 0 : 1;
     if (liveA !== liveB) return liveA - liveB;
-    if (a.affinity !== b.affinity) return b.affinity - a.affinity;
+    if (a.rankScore !== b.rankScore) return b.rankScore - a.rankScore;
     return a.network.localeCompare(b.network);
   });
 }

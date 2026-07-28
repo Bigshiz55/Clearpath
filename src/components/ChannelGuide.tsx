@@ -145,6 +145,19 @@ export function ChannelGuide({
                       {r.onNow.showName}
                     </span>
                     {r.onNow.year != null && <span className="flex-none text-xs text-slate-500">{r.onNow.year}</span>}
+                    {/* The programme's own engine match — the number the whole
+                        app means by "Your NN", computed by the same
+                        deterministic verdict, shown only when the listing was
+                        confidently resolved to a real title. */}
+                    {r.onNow.match != null && (
+                      <span
+                        data-testid="guide-match"
+                        title={`Your match: ${r.onNow.match} — scored by your VERD1CT engine`}
+                        className="flex-none rounded-md border border-[#ff1493]/50 bg-[#ff1493]/15 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-pink-100"
+                      >
+                        Your {r.onNow.match}
+                      </span>
+                    )}
                   </div>
                   {/* How far in — so "join late?" is answerable at a glance. */}
                   {r.progress != null && (
@@ -167,6 +180,11 @@ export function ChannelGuide({
                         <span className="min-w-0 flex-1 truncate text-slate-400">
                           {a.showType === 'Movie' && <span aria-hidden className="mr-1">🎬</span>}
                           {a.showName}
+                          {a.match != null && (
+                            <span className="ml-1.5 rounded border border-[#ff1493]/40 bg-[#ff1493]/10 px-1 text-[10px] font-black tabular-nums text-pink-200">
+                              {a.match}
+                            </span>
+                          )}
                         </span>
                         <button
                           type="button"

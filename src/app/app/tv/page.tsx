@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfile, getPreferenceRules, regionFor } from '@/lib/profile';
 import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle } from '@/lib/onTv';
 import { getFullGuideAirings, getStoredGridAirings } from '@/lib/tvGrid';
+import { scoreGuideAirings } from '@/lib/tv/scoreGuide';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
@@ -82,7 +83,15 @@ export default async function OnTvPage({
   // THE FULL GUIDE — the whole ingested cable lineup for the next 6 hours,
   // every channel, by channel. This is the grid the "Lifetime movies" answers
   // were already drawing from; the guide view finally lets you BROWSE it.
-  const guideAirings = guideView ? await getFullGuideAirings(now.getTime(), 6 * HOUR_MS) : [];
+  let guideAirings = guideView ? await getFullGuideAirings(now.getTime(), 6 * HOUR_MS) : [];
+  // PER-PROGRAMME SCORES. A bounded set of the window's programmes (on-now
+  // first) is resolved to real titles and run through the SAME deterministic
+  // engine as every card, with this user's rules — so "this movie suits you
+  // 84" outranks the channel it happens to be on. Cached across users
+  // (resolution 7d, hydration 12h); fail-open, never a broken guide.
+  if (guideView && user && guideAirings.length > 0) {
+    guideAirings = await scoreGuideAirings(supabase, user.id, guideAirings, now.getTime(), region);
+  }
   // The user's own preference rules, serialized down to what the guide needs —
   // the channel ordering runs on the SAME weights that score every title.
   const tasteRules =

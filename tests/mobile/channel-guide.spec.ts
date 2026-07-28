@@ -144,6 +144,43 @@ test.describe('ranked by your DNA', () => {
   });
 });
 
+/**
+ * PER-PROGRAMME SCORES. `?scored=1` attaches engine matches exactly as
+ * `scoreGuideAirings` would: Casablanca 88, Chopped 34. The programme's own
+ * number must outrank any channel identity, sink what the engine dislikes,
+ * and print on the row so the reorder explains itself.
+ */
+test.describe('ranked by the programme itself', () => {
+  test('a scored programme outranks channel identity, and a disliked one sinks', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto('/dev/channel-guide?scored=1', { waitUntil: 'networkidle' });
+    const names = (await channels(page).locator('h3').allInnerTexts()).map((n) =>
+      n.replace(/🧬 FOR YOU/i, '').trim().toLowerCase(),
+    );
+    // TCM leads on Casablanca's 88; the neutral live channels follow
+    // alphabetically at 55; Food Network sinks on Chopped's 34; Lifetime is
+    // last only because it has nothing on now.
+    expect(names[0]).toBe('tcm');
+    expect(names[names.length - 2]).toBe('food network');
+    expect(names[names.length - 1]).toBe('lifetime');
+  });
+
+  test('the score prints on the row — the reorder explains itself', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto('/dev/channel-guide?scored=1', { waitUntil: 'networkidle' });
+    const tcm = channels(page).filter({ hasText: /casablanca/i });
+    await expect(tcm.getByTestId('guide-match')).toBeVisible();
+    await expect(tcm.getByTestId('guide-match')).toContainText('Your 88');
+  });
+
+  test('unscored rows carry no number — no invented scores', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto('/dev/channel-guide?scored=1', { waitUntil: 'networkidle' });
+    const espn = channels(page).filter({ hasText: /sportscenter|football/i });
+    await expect(espn.getByTestId('guide-match')).toHaveCount(0);
+  });
+});
+
 for (const w of [320, 390, 768, 1440]) {
   test(`no sideways scroll at ${w}px`, async ({ page }) => {
     await open(page, w);

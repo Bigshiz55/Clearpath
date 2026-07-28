@@ -57,13 +57,26 @@ const TASTE = [
   { trait: 'domestic_thriller', weight: 6 },
 ];
 
-export default function ChannelGuideHarness({ searchParams }: { searchParams?: { taste?: string } }) {
+// `?scored=1` — the per-programme variant: the engine has scored Casablanca 88
+// for this viewer and Chopped 34, exactly as `scoreGuideAirings` would attach
+// them. Casablanca's programme score must beat TCM's mere channel identity,
+// and Food Network must sink below the neutral channels.
+function withScores(grid: Airing[]): Airing[] {
+  return grid.map((x) => {
+    if (x.showName === 'Casablanca') return { ...x, tmdbId: 289, mediaType: 'movie' as const, match: 88 };
+    if (x.showName === 'Chopped') return { ...x, tmdbId: 55, mediaType: 'tv' as const, match: 34 };
+    return x;
+  });
+}
+
+export default function ChannelGuideHarness({ searchParams }: { searchParams?: { taste?: string; scored?: string } }) {
   if (process.env.MOBILE_HARNESS !== '1') notFound();
   const taste = searchParams?.taste === '1' ? TASTE : [];
+  const grid = searchParams?.scored === '1' ? withScores(GRID) : GRID;
   return (
     <main className="container-page space-y-4 py-6" data-testid="guide-harness">
       <h1 className="text-xl font-black text-white">Harness — full channel guide</h1>
-      <ChannelGuide airings={GRID} nowMs={NOW} taste={taste} />
+      <ChannelGuide airings={grid} nowMs={NOW} taste={taste} />
     </main>
   );
 }

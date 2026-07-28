@@ -40,6 +40,9 @@ export interface Airing {
   tmdbId?: number | null;
   mediaType?: MediaType | null;
   posterPath?: string | null; // TMDB poster path once resolved (for saved thumbnails)
+  /** The user's personal match (0–100) from the deterministic engine, when the
+   *  programme was confidently resolved to a title. Absent = not scored. */
+  match?: number | null;
   year?: number | null; // release year (Gracenote) — disambiguates the TMDB match
 }
 
