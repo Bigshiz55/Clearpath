@@ -39,6 +39,8 @@ const GRID: Airing[] = [
   a({ network: 'Hallmark', showName: 'Autumn in the City', airstamp: '2026-07-28T20:00:00Z', runtime: 120, showType: 'Movie', year: 2022 }),
   a({ network: 'Hallmark', showName: 'A Second Chance Christmas', airstamp: '2026-07-28T22:00:00Z', showType: 'Movie' }),
   a({ network: 'Lifetime', showName: 'A Dangerous Affair', airstamp: '2026-07-28T21:00:00Z', showType: 'Movie' }),
+  // East/west feed duplicate — same broadcast, second satellite. Must collapse.
+  a({ network: 'Lifetime', showName: 'A Dangerous Affair', airstamp: '2026-07-28T21:00:00Z', showType: 'Movie' }),
   a({ network: 'Lifetime', showName: 'The Perfect Stranger', airstamp: '2026-07-28T23:00:00Z', showType: 'Movie' }),
   a({ network: 'TCM', showName: 'Casablanca', airstamp: '2026-07-28T19:45:00Z', runtime: 90, showType: 'Movie', year: 1942 }),
   a({ network: 'ESPN', showName: 'Monday Night Football', airstamp: '2026-07-28T20:00:00Z', runtime: 180 }),

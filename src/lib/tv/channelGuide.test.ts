@@ -87,6 +87,22 @@ describe('building the guide', () => {
   it('an empty grid builds an empty guide without throwing', () => {
     expect(buildChannelGuide([], NOW)).toEqual([]);
   });
+
+  it('east and west feeds of the same broadcast are ONE row entry, not two', () => {
+    // A&E and A&E-West both display as "A&E" — the same episode arrived twice
+    // at the same minute and the guide printed it twice in up-next.
+    const rows = buildChannelGuide(
+      [
+        airing({ network: 'A&E', airstamp: '2026-07-28T21:00:00Z', showName: 'Neighborhood Wars' }),
+        airing({ network: 'A&E', airstamp: '2026-07-28T21:00:00Z', showName: 'Neighborhood Wars' }),
+        airing({ network: 'A&E', airstamp: '2026-07-28T21:30:00Z', showName: 'Neighborhood Wars' }),
+      ],
+      NOW,
+    );
+    const ae = rows.find((r) => r.network === 'A&E')!;
+    // The 21:00 dupe collapses; the genuinely different 21:30 showing stays.
+    expect(ae.upNext.map((a) => a.airstamp)).toEqual(['2026-07-28T21:00:00Z', '2026-07-28T21:30:00Z']);
+  });
 });
 
 describe('the header sentence', () => {

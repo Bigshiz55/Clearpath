@@ -74,7 +74,16 @@ export function buildChannelGuide(airings: readonly Airing[], nowMs: number): Ch
 
   const rows: ChannelRow[] = [];
   for (const [network, list] of byChannel) {
-    const sorted = [...list].sort((a, b) => startOf(a) - startOf(b));
+    // EAST AND WEST FEEDS ARE ONE CHANNEL. A&E and A&E-West both map to
+    // "A&E", so the same episode arrived twice at the same minute and the
+    // guide printed "2:30 PM Neighborhood Wars" twice in a row. Same start +
+    // same title is one broadcast, whatever satellite it rode in on.
+    const seen = new Set<string>();
+    const deduped = list.filter((a) => {
+      const k = `${a.airstamp}|${a.showName.toLowerCase()}`;
+      return seen.has(k) ? false : (seen.add(k), true);
+    });
+    const sorted = deduped.sort((a, b) => startOf(a) - startOf(b));
     const onNow = onNowOf(sorted, nowMs);
     const upNext = sorted.filter((a) => startOf(a) > nowMs && a !== onNow).slice(0, UP_NEXT);
     if (!onNow && upNext.length === 0) continue;

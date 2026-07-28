@@ -78,6 +78,34 @@ test('a search that matches nothing says so instead of drawing an empty guide', 
   await expect(channels(page)).toHaveCount(6);
 });
 
+test('the same broadcast on two feeds is ONE line, not two', async ({ page }) => {
+  await open(page);
+  // The fixture carries "A Dangerous Affair" twice at the same minute (east +
+  // west feed). The guide must print it once — the A&E "2:30 PM twice" bug.
+  const lifetime = channels(page).filter({ hasText: 'Lifetime' });
+  await expect(lifetime.getByTestId('guide-up-next').locator('> div')).toHaveCount(2);
+  expect(await lifetime.getByText('A Dangerous Affair').count()).toBe(1);
+});
+
+test('every upcoming listing carries a quick-reminder button', async ({ page }) => {
+  await open(page);
+  const upNextRows = page.locator('[data-testid="guide-up-next"] > div');
+  const bells = page.locator('button[data-testid^="guide-remind-"]');
+  expect(await bells.count()).toBe(await upNextRows.count());
+  await expect(bells.first()).toHaveAccessibleName(/remind me before/i);
+});
+
+test('tapping remind reports its real outcome — no faked success', async ({ page }) => {
+  await open(page);
+  // The harness has no signed-in user, so the server action refuses — and the
+  // guide must SAY that rather than flipping the bell to a lying checkmark.
+  const bell = page.locator('button[data-testid^="guide-remind-"]').first();
+  await bell.click();
+  await expect(page.getByTestId('guide-note')).toBeVisible();
+  await expect(page.getByTestId('guide-note')).toContainText(/sign in|could not|wrong/i);
+  await expect(bell).toContainText('⏰'); // still unset — nothing was saved
+});
+
 for (const w of [320, 390, 768, 1440]) {
   test(`no sideways scroll at ${w}px`, async ({ page }) => {
     await open(page, w);

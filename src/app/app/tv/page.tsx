@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
 import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle } from '@/lib/onTv';
-import { getFullGuideAirings } from '@/lib/tvGrid';
+import { getFullGuideAirings, getStoredGridAirings } from '@/lib/tvGrid';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
@@ -84,6 +84,17 @@ export default async function OnTvPage({
   // were already drawing from; the guide view finally lets you BROWSE it.
   const guideAirings = guideView ? await getFullGuideAirings(now.getTime(), 6 * HOUR_MS) : [];
 
+  // COVERAGE HONESTY, FROM THE DATA — NOT FROM A CONFIG FLAG. The banner used
+  // to read `hasFullGridProvider()` (a licensed-provider check) and say "no
+  // full TV guide is connected" — directly above a Full Guide tab showing 188
+  // channels from the ingested grid. If the grid HAS rows, the guide exists,
+  // whatever the contract status. One-row probe; the guide view reuses its
+  // own fetch.
+  const gridProbe = guideView
+    ? guideAirings
+    : await getStoredGridAirings(now.getTime(), 6 * HOUR_MS, { limit: 1 }).catch(() => []);
+  const gridLive = gridConnected || gridProbe.length > 0;
+
   // When asked for a specific window ("Lifetime movies coming on tonight"), build
   // the real time/genre/network/type-filtered set and enrich it the same way.
   // Broadcast airings resolve TMDB via their imdb id; the Gracenote cable movies
@@ -93,14 +104,14 @@ export default async function OnTvPage({
     enrichAiringsWithCritics(a).then(enrichAiringsWithTmdb).then(enrichAiringsWithTmdbByTitle);
   let windowed =
     withinHours != null
-      ? await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, genre, network, movieOnly))
+      ? await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, genre, network, movieOnly, true))
       : null;
   // Filters named but nothing matched in-window — fall back to everything on,
   // labeled honestly, rather than an empty screen.
   let genreEmpty = false;
   if (withinHours != null && hasFilter && windowed && windowed.length === 0) {
     genreEmpty = true;
-    windowed = await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, null, null, false));
+    windowed = await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, null, null, false, true));
   }
 
   // Which airings this user already has a reminder for (guarded pre-migration),
@@ -160,7 +171,7 @@ export default async function OnTvPage({
           local affiliates. A six-hour window can legitimately contain a single
           row. Saying so is the difference between a thin list and a thin list
           that pretends to be the national schedule. */}
-      {!gridConnected && (
+      {!gridLive && (
         <section
           className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-4"
           data-testid="schedule-coverage-notice"
@@ -209,7 +220,7 @@ export default async function OnTvPage({
 
       {upcoming.length > 0 && <MyReminders initial={upcoming} />}
 
-      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} />}
+      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} remindedIds={remindedIds} />}
 
       {guideView ? null : withinHours != null && windowed ? (
         <>
@@ -225,12 +236,12 @@ export default async function OnTvPage({
               <div className="rounded-2xl border border-amber-400/30 bg-amber-500/[0.07] p-4 text-center sm:p-5">
                 <div className="text-2xl" aria-hidden>📭</div>
                 <h2 className="mt-1 text-lg font-bold text-white">
-                  {gridConnected
+                  {gridLive
                     ? `No ${filterLabel || 'matches'} on live TV in the next ${withinHours}h`
                     : `We can’t see ${network ? titleCase(network) : 'that channel'}’s listings yet`}
                 </h2>
                 <p className="mx-auto mt-1.5 max-w-md text-sm text-slate-300">
-                  {gridConnected ? (
+                  {gridLive ? (
                     <>
                       We checked every channel in your lineup for the next {withinHours} hours and
                       found nothing matching. That’s a real result, not a gap in our data.

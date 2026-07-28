@@ -372,6 +372,11 @@ export async function getUpcomingTv(
   genre: string | null = null,
   network: string | null = null,
   movieOnly = false,
+  /** Merge the FULL ingested cable grid even without a network/movie filter —
+   *  "what's coming on" should consider all ~190 channels, not just the
+   *  first-run premiere feed. Opt-in, because the curated surfaces (home
+   *  strip, Easy TV) want the best-reviewed short list, not the whole dial. */
+  fullLineup = false,
 ): Promise<Airing[]> {
   const clampedHorizon = Math.max(HOUR_MS, Math.min(horizonMs, UPCOMING_TV_HORIZON_MS));
   const horizon = nowMs + clampedHorizon;
@@ -403,7 +408,7 @@ export async function getUpcomingTv(
   // ask comes back thin or empty. For those, pull the real listing from Gracenote's
   // full US grid (cable + movie typing) and prefer a time-ordered union — this is
   // what makes "Lifetime movies tonight" actually return Lifetime movies. US only.
-  const wantGracenote = country === 'US' && !!(network || movieOnly);
+  const wantGracenote = country === 'US' && !!(network || movieOnly || fullLineup);
   if (wantGracenote) {
     // DB-first: read the hourly-refreshed grid from our own table (fast, no
     // upstream call). Only if it's empty (before the first refresh, or the table

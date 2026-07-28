@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { buildChannelGuide, filterGuide, guideSummary } from '@/lib/tv/channelGuide';
 import { displayClock } from '@/lib/viewing/clock';
+import { setTvReminder } from '@/lib/actions/tvReminders';
 import type { Airing } from '@/lib/onTv';
 
 /**
@@ -19,11 +20,49 @@ import type { Airing } from '@/lib/onTv';
  * corrects, which is intended for a wall clock), and a channel we cannot see
  * simply is not a row.
  */
-export function ChannelGuide({ airings, nowMs }: { airings: Airing[]; nowMs: number }) {
+export function ChannelGuide({
+  airings,
+  nowMs,
+  remindedIds = [],
+}: {
+  airings: Airing[];
+  nowMs: number;
+  /** Airings this user already has a reminder for. */
+  remindedIds?: number[];
+}) {
   const [query, setQuery] = useState('');
+  const [reminded, setReminded] = useState<Set<number>>(() => new Set(remindedIds));
+  const [busy, setBusy] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const rows = useMemo(() => buildChannelGuide(airings, nowMs), [airings, nowMs]);
   const shown = useMemo(() => filterGuide(rows, query), [rows, query]);
   const stats = guideSummary(rows);
+
+  // A QUICK REMINDER, RIGHT ON THE ROW. The guide is where you notice that a
+  // Hallmark movie starts at 10 — making you leave for another screen to be
+  // reminded of it is how the thought gets lost. Same server action, same
+  // 1h+5m pings as everywhere else; failures are said out loud, never faked.
+  async function remind(a: Airing) {
+    if (busy != null) return;
+    setBusy(a.id);
+    try {
+      const res = await setTvReminder({ airingId: a.id, showName: a.showName, network: a.network, airstamp: a.airstamp, url: '/app/tv?view=guide' });
+      if (!res.ok) {
+        setNotice(res.error ?? 'Could not set the reminder.');
+        return;
+      }
+      setReminded((s) => new Set(s).add(a.id));
+      setNotice(
+        res.needsNotifications
+          ? `Reminder set for ${a.showName}! Turn on notifications in Settings so we can ping you.`
+          : `Reminder set — we’ll ping you before ${a.showName} starts. ⏰`,
+      );
+    } catch {
+      setNotice('Something went wrong. Please try again.');
+    } finally {
+      setBusy(null);
+    }
+  }
 
   if (rows.length === 0) {
     return (
@@ -54,6 +93,12 @@ export function ChannelGuide({ airings, nowMs }: { airings: Airing[]; nowMs: num
           {stats.movies > 0 && <> · <b className="text-slate-200">{stats.movies}</b> movies</>}
         </p>
       </div>
+
+      {notice && (
+        <p role="status" className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-100" data-testid="guide-note">
+          {notice}
+        </p>
+      )}
 
       {shown.length === 0 ? (
         <p className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400" data-testid="guide-no-match">
@@ -92,17 +137,34 @@ export function ChannelGuide({ airings, nowMs }: { airings: Airing[]; nowMs: num
 
               {r.upNext.length > 0 && (
                 <div className="mt-2 space-y-0.5" data-testid="guide-up-next">
-                  {r.upNext.map((a) => (
-                    <div key={a.id} className="flex items-baseline gap-2 text-[13px]">
-                      <span suppressHydrationWarning className="flex-none font-bold tabular-nums text-slate-300">
-                        {displayClock(a.airstamp, a.time) ?? '—'}
-                      </span>
-                      <span className="min-w-0 truncate text-slate-400">
-                        {a.showType === 'Movie' && <span aria-hidden className="mr-1">🎬</span>}
-                        {a.showName}
-                      </span>
-                    </div>
-                  ))}
+                  {r.upNext.map((a) => {
+                    const isSet = reminded.has(a.id);
+                    return (
+                      <div key={a.id} className="flex items-center gap-2 text-[13px]">
+                        <span suppressHydrationWarning className="flex-none font-bold tabular-nums text-slate-300">
+                          {displayClock(a.airstamp, a.time) ?? '—'}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-slate-400">
+                          {a.showType === 'Movie' && <span aria-hidden className="mr-1">🎬</span>}
+                          {a.showName}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => void remind(a)}
+                          disabled={isSet || busy === a.id}
+                          aria-label={isSet ? `Reminder set for ${a.showName}` : `Remind me before ${a.showName} starts`}
+                          data-testid={`guide-remind-${a.id}`}
+                          className={`grid h-8 w-8 flex-none place-items-center rounded-lg border text-sm transition active:scale-95 ${
+                            isSet
+                              ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
+                              : 'border-white/15 bg-white/[0.05] text-slate-300 hover:border-brand-300 hover:text-white'
+                          }`}
+                        >
+                          <span aria-hidden>{isSet ? '✓' : '⏰'}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </li>
