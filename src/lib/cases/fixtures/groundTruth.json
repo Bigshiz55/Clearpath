@@ -8,6 +8,26 @@
     "caseId": "singleton-94850"
   },
   {
+    "tvmazeEpisodeId": 94914,
+    "caseId": "melanie-mcguire"
+  },
+  {
+    "tvmazeEpisodeId": 94941,
+    "caseId": "singleton-94941"
+  },
+  {
+    "tvmazeEpisodeId": 95034,
+    "caseId": "singleton-95034"
+  },
+  {
+    "tvmazeEpisodeId": 95055,
+    "caseId": "singleton-95055"
+  },
+  {
+    "tvmazeEpisodeId": 95062,
+    "caseId": "singleton-95062"
+  },
+  {
     "tvmazeEpisodeId": 95073,
     "caseId": "jodi-arias"
   },
@@ -32,8 +52,16 @@
     "caseId": "singleton-254012"
   },
   {
+    "tvmazeEpisodeId": 254037,
+    "caseId": "michele-macneill"
+  },
+  {
     "tvmazeEpisodeId": 254069,
     "caseId": "amanda-knox"
+  },
+  {
+    "tvmazeEpisodeId": 254070,
+    "caseId": "singleton-254070"
   },
   {
     "tvmazeEpisodeId": 254135,
@@ -64,8 +92,24 @@
     "caseId": "robert-durst"
   },
   {
+    "tvmazeEpisodeId": 579824,
+    "caseId": "singleton-579824"
+  },
+  {
+    "tvmazeEpisodeId": 648963,
+    "caseId": "michele-macneill"
+  },
+  {
     "tvmazeEpisodeId": 830823,
     "caseId": "jonbenet-ramsey"
+  },
+  {
+    "tvmazeEpisodeId": 984719,
+    "caseId": "singleton-984719"
+  },
+  {
+    "tvmazeEpisodeId": 995746,
+    "caseId": "singleton-995746"
   },
   {
     "tvmazeEpisodeId": 1017282,
@@ -96,12 +140,20 @@
     "caseId": "drew-peterson"
   },
   {
+    "tvmazeEpisodeId": 1278329,
+    "caseId": "singleton-1278329"
+  },
+  {
     "tvmazeEpisodeId": 1290367,
     "caseId": "scott-peterson"
   },
   {
     "tvmazeEpisodeId": 1464302,
     "caseId": "lorenzen-wright"
+  },
+  {
+    "tvmazeEpisodeId": 1514212,
+    "caseId": "singleton-1514212"
   },
   {
     "tvmazeEpisodeId": 1575906,
@@ -136,6 +188,10 @@
     "caseId": "lorenzen-wright"
   },
   {
+    "tvmazeEpisodeId": 1938629,
+    "caseId": "melanie-mcguire"
+  },
+  {
     "tvmazeEpisodeId": 1969655,
     "caseId": "susan-powell"
   },
@@ -158,6 +214,14 @@
   {
     "tvmazeEpisodeId": 2091698,
     "caseId": "scott-peterson"
+  },
+  {
+    "tvmazeEpisodeId": 2175073,
+    "caseId": "singleton-2175073"
+  },
+  {
+    "tvmazeEpisodeId": 2192922,
+    "caseId": "singleton-2192922"
   },
   {
     "tvmazeEpisodeId": 2205613,
@@ -190,6 +254,10 @@
   {
     "tvmazeEpisodeId": 2576147,
     "caseId": "kristin-smart"
+  },
+  {
+    "tvmazeEpisodeId": 3053478,
+    "caseId": "singleton-3053478"
   },
   {
     "tvmazeEpisodeId": 3081714,

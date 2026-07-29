@@ -68,24 +68,103 @@ const MAJOR_CITIES = [
 
 const LOCATIONS = [...new Set([...US_STATES, ...MAJOR_CITIES])].sort((a, b) => b.length - a.length);
 
+/**
+ * Strip diacritics for matching purposes only (e.g. "JonBenét" -> "JonBenet")
+ * — extraction always keeps the original spelling in `subjectNames`; this is
+ * used solely where two names need to be COMPARED (see matching.ts's
+ * `normalizeName`), so "JonBenét" and "JonBenet" resolve to the same entity
+ * without either extracted record losing its real, original form.
+ */
+export function normalizeDiacritics(text: string): string {
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 const NAME_STOPWORDS = new Set([
   'The', 'A', 'An', 'In', 'On', 'At', 'Is', 'It', 'His', 'Her', 'They', 'She', 'He', 'Who', 'What',
   'When', 'Where', 'Why', 'How', 'This', 'That', 'New', 'North', 'South', 'East', 'West', 'Dateline',
   'CBS', 'ABC', 'NBC',
+  // Common sentence-initial verbs/gerunds in headline-style synopses ("Did
+  // Michele MacNeill...", "Remembering Michele MacNeill") — without these,
+  // a leading gerund/auxiliary swallows the real name into a 3-word phrase
+  // that fails to match the same name extracted without that lead-in.
+  'Did', 'Does', 'Do', 'Was', 'Were', 'Could', 'Would', 'Should', 'Will', 'Has', 'Have', 'Had',
+  'Remembering', 'Investigating', 'Following', 'Watching', 'Looking', 'Inside', 'Meet',
 ]);
 
-/** 2-3 consecutive capitalized words, filtered against common non-name openers and the location gazetteer. */
+// Name-token shapes, widest-to-narrowest so alternation prefers the longer
+// compound match over a short prefix (e.g. "McDonald" over just "Mc"):
+//  - COMPOUND: an internally-capitalized token with no separator — a short
+//    capital+lowercase* prefix (Mc/Mac/De/Jon, up to 3 lowercase letters)
+//    immediately followed by another capital+lowercase+ segment. Covers
+//    McDonald, MacArthur, DeAngelo, JonBenet, and (via the accented-letter
+//    range) JonBenét.
+//  - APOSTROPHE: a single capital initial + apostrophe + capitalized word
+//    (O'Neill, D'Angelo) — the only real-world case where a bare single
+//    capital letter is a legitimate name segment.
+//  - HYPHENATED: two capitalized words joined by a hyphen (Smith-Jones).
+//  - PLAIN: an ordinary single capitalized word (John, Ramsey).
+const LOWER = 'a-zà-öø-ÿ';
+const UPPER = 'A-ZÀ-ÖØ-Þ';
+const COMPOUND = `[${UPPER}][${LOWER}]{0,3}[${UPPER}][${LOWER}]+`;
+const APOSTROPHE = `[${UPPER}]['’][${UPPER}][${LOWER}]+`;
+const HYPHENATED = `[${UPPER}][${LOWER}]+-[${UPPER}][${LOWER}]+`;
+const PLAIN = `[${UPPER}][${LOWER}]+`;
+
+// Standalone-eligible: distinctive enough on their own (an internal capital,
+// apostrophe, or hyphen is a strong name signal) to count as a subject even
+// with no capitalized neighbor. PLAIN alone never qualifies standalone —
+// ordinary capitalized words are too common — it only counts inside a 2-3
+// word run (handled by ANY_WORD below).
+const DISTINCTIVE = `(?:${COMPOUND}|${APOSTROPHE}|${HYPHENATED})`;
+const ANY_WORD = `(?:${COMPOUND}|${APOSTROPHE}|${HYPHENATED}|${PLAIN})`;
+
+const MULTI_WORD_NAME_RE = new RegExp(`\\b(${ANY_WORD}(?:\\s+${ANY_WORD}){1,2})\\b`, 'g');
+const STANDALONE_DISTINCTIVE_NAME_RE = new RegExp(`\\b(${DISTINCTIVE})\\b`, 'g');
+
+/**
+ * 2-3 consecutive capitalized-token runs, plus standalone compound/
+ * apostrophe/hyphenated surnames that don't need a capitalized neighbor to
+ * be a real name (McDonald, O'Neill, Smith-Jones). Filtered against common
+ * non-name openers and the location gazetteer.
+ */
 function extractSubjectNames(text: string): string[] {
   const found = new Set<string>();
-  const re = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/g;
+  const spans: [number, number][] = [];
+
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    const candidate = m[1]!;
-    const firstWord = candidate.split(' ')[0]!;
+  MULTI_WORD_NAME_RE.lastIndex = 0;
+  while ((m = MULTI_WORD_NAME_RE.exec(text))) {
+    let candidate = m[1]!;
+    let start = m.index;
+    // A leading stopword ("The JonBenet Ramsey") shouldn't sink the whole
+    // phrase — drop it and re-validate the shorter remainder ("JonBenet
+    // Ramsey") instead of discarding a real name because of what preceded it.
+    let firstWord = candidate.split(' ')[0]!;
+    if (NAME_STOPWORDS.has(firstWord) && candidate.includes(' ')) {
+      const dropped = firstWord.length + 1;
+      candidate = candidate.slice(dropped);
+      start += dropped;
+      firstWord = candidate.split(' ')[0]!;
+    }
+    spans.push([start, start + candidate.length]);
     if (NAME_STOPWORDS.has(firstWord)) continue;
     if (LOCATIONS.includes(candidate)) continue;
     found.add(candidate);
   }
+
+  STANDALONE_DISTINCTIVE_NAME_RE.lastIndex = 0;
+  while ((m = STANDALONE_DISTINCTIVE_NAME_RE.exec(text))) {
+    const candidate = m[1]!;
+    const start = m.index;
+    const end = start + m[0].length;
+    // Skip if already covered by a multi-word match (avoid double-counting
+    // "Ramsey" inside "JonBenét Ramsey" as a separate standalone entry).
+    if (spans.some(([a, b]) => start < b && end > a)) continue;
+    if (NAME_STOPWORDS.has(candidate)) continue;
+    if (LOCATIONS.includes(candidate)) continue;
+    found.add(candidate);
+  }
+
   return [...found];
 }
 

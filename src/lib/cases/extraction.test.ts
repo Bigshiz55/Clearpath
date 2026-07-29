@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { extractCaseIdentifiers, runExtractionBatch, type EpisodeInput } from './extraction';
+import { extractCaseIdentifiers, normalizeDiacritics, runExtractionBatch, type EpisodeInput } from './extraction';
 import fixtures from './fixtures/trueCrimeEpisodes.json';
 
 const episodes = fixtures as EpisodeInput[];
+
+function subjectNamesIn(synopsis: string): string[] {
+  return extractCaseIdentifiers({
+    tvmazeEpisodeId: 0,
+    series: 'test',
+    network: 'test',
+    title: '',
+    airdate: '2020-01-01',
+    synopsis,
+  }).subjectNames;
+}
 
 describe('extractCaseIdentifiers', () => {
   it('extracts a subject name, location, year, and crime type from a real synopsis', () => {
@@ -45,6 +56,67 @@ describe('extractCaseIdentifiers', () => {
     expect(id.subjectNames).toEqual([]);
     expect(id.location).toBeNull();
     expect(id.crimeType).toBeNull();
+  });
+});
+
+describe('compound and internally-capitalized proper noun forms', () => {
+  it('extracts JonBenét (accented, internal capital)', () => {
+    const names = subjectNamesIn('The murder of JonBenét Ramsey remains unsolved.');
+    expect(names).toContain('JonBenét Ramsey');
+  });
+
+  it('extracts JonBenet (unaccented, internal capital)', () => {
+    const names = subjectNamesIn('The murder of JonBenet Ramsey remains unsolved.');
+    expect(names).toContain('JonBenet Ramsey');
+  });
+
+  it('extracts DeAngelo (internal capital, standalone)', () => {
+    const names = subjectNamesIn('DeAngelo was arrested decades after the crimes.');
+    expect(names).toContain('DeAngelo');
+  });
+
+  it('extracts McDonald (internal capital, standalone)', () => {
+    const names = subjectNamesIn('McDonald was convicted of murder in 2001.');
+    expect(names).toContain('McDonald');
+  });
+
+  it('extracts MacArthur (internal capital, standalone)', () => {
+    const names = subjectNamesIn('MacArthur testified about the night of the crime.');
+    expect(names).toContain('MacArthur');
+  });
+
+  it("extracts O'Neill (apostrophe, single-letter initial)", () => {
+    const names = subjectNamesIn("O'Neill was the lead detective on the case.");
+    expect(names).toContain("O'Neill");
+  });
+
+  it("extracts D'Angelo (apostrophe, single-letter initial)", () => {
+    const names = subjectNamesIn("D'Angelo confessed to investigators years later.");
+    expect(names).toContain("D'Angelo");
+  });
+
+  it('extracts Smith-Jones (hyphenated surname)', () => {
+    const names = subjectNamesIn('The victim was later identified as Smith-Jones.');
+    expect(names).toContain('Smith-Jones');
+  });
+
+  it('does not extract plain network acronyms as compound names', () => {
+    const names = subjectNamesIn('NBC and CBS both covered the trial.');
+    expect(names).toEqual([]);
+  });
+});
+
+describe('normalizeDiacritics', () => {
+  it('strips combining diacritics so accented and unaccented spellings match', () => {
+    expect(normalizeDiacritics('JonBenét')).toBe(normalizeDiacritics('JonBenet'));
+    expect(normalizeDiacritics('JonBenét').toLowerCase()).toBe('jonbenet');
+  });
+
+  it('the two JonBenét spellings resolve to the same entity for matching purposes', () => {
+    const accented = subjectNamesIn('The case of JonBenét Ramsey.');
+    const plain = subjectNamesIn('The case of JonBenet Ramsey.');
+    const normalize = (n: string) => normalizeDiacritics(n.toLowerCase().trim());
+    expect(accented.map(normalize)).toEqual(plain.map(normalize));
   });
 });
 

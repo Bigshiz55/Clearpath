@@ -20,6 +20,15 @@ describe('scoreMatch', () => {
     expect(confidence).toBeGreaterThanOrEqual(PROPOSAL_THRESHOLD);
   });
 
+  it('matches "JonBenét Ramsey" against "JonBenet Ramsey" (diacritics normalized for comparison only)', () => {
+    const a = { subjectNames: ['JonBenét Ramsey'], location: null, year: null, crimeType: null };
+    const b = { subjectNames: ['JonBenet Ramsey'], location: null, year: null, crimeType: null };
+    const { confidence, reasons } = scoreMatch(a, b);
+    expect(confidence).toBeGreaterThanOrEqual(PROPOSAL_THRESHOLD);
+    // Original spellings are preserved in the reason, not silently rewritten.
+    expect(reasons.join(' ')).toContain('JonBenét Ramsey');
+  });
+
   it('does not score two unrelated episodes sharing only a crime type above the threshold', () => {
     const a = { subjectNames: ['Alice Anders'], location: null, year: null, crimeType: 'murder' };
     const b = { subjectNames: ['Bob Baker'], location: null, year: null, crimeType: 'murder' };
@@ -52,9 +61,9 @@ describe('proposeMatches — real fixture set', () => {
   });
 });
 
-describe('precision and recall against the 50 hand-labeled fixture programmes', () => {
-  it('has exactly 50 ground-truth labels, all pointing at real fixture episodes', () => {
-    expect(labels).toHaveLength(50);
+describe('precision and recall against the hand-labeled fixture programmes', () => {
+  it('has at least 50 ground-truth labels, all pointing at real fixture episodes', () => {
+    expect(labels.length).toBeGreaterThanOrEqual(50);
     const fixtureIds = new Set(episodes.map((e) => e.tvmazeEpisodeId));
     for (const row of labels) {
       expect(fixtureIds.has(row.tvmazeEpisodeId)).toBe(true);
@@ -72,7 +81,7 @@ describe('precision and recall against the 50 hand-labeled fixture programmes', 
     expect(report.precision).toBeLessThanOrEqual(1);
     expect(report.recall).toBeGreaterThanOrEqual(0);
     expect(report.recall).toBeLessThanOrEqual(1);
-    // Ground truth has 13 real multi-episode Case groups — there must be true pairs to measure against.
+    // Ground truth has real multi-episode Case groups — there must be true pairs to measure against.
     expect(report.groundTruthPairCount).toBeGreaterThan(0);
   });
 });

@@ -1,5 +1,5 @@
 import 'server-only';
-import type { EpisodeInput, CaseIdentifiers } from './extraction';
+import { normalizeDiacritics, type EpisodeInput, type CaseIdentifiers } from './extraction';
 
 /**
  * Candidate Case matching — pure, deterministic scoring over extracted
@@ -15,8 +15,14 @@ export interface MatchCandidate {
   reasons: string[];
 }
 
+/**
+ * Comparison-only normalization: case-fold, trim, and strip diacritics so
+ * "JonBenét" and "JonBenet" resolve to the same entity. Extracted records
+ * keep the original spelling — only this comparison ever sees the
+ * normalized form.
+ */
 function normalizeName(name: string): string {
-  return name.toLowerCase().trim();
+  return normalizeDiacritics(name.toLowerCase().trim());
 }
 
 /** True if any subject name is shared (exact, case-insensitive) between the two episodes. */
