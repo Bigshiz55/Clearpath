@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractCaseIdentifiers, type EpisodeInput } from './extraction';
+import { runExtractionBatch, type EpisodeInput } from './extraction';
 import { scoreMatch, proposeMatches, PROPOSAL_THRESHOLD, type EpisodeExtraction } from './matching';
 import { computePrecisionRecall, type GroundTruthRow } from './evaluate';
 import fixtures from './fixtures/trueCrimeEpisodes.json';
@@ -8,8 +8,17 @@ import groundTruth from './fixtures/groundTruth.json';
 const episodes = fixtures as EpisodeInput[];
 const labels = groundTruth as GroundTruthRow[];
 
+/**
+ * Goes through the real batch entry point (not `extractCaseIdentifiers`
+ * directly) so evaluation reflects BOTH suppression layers: the per-episode
+ * manual correspondent stoplist and the batch-level, per-series frequency
+ * safeguard — the latter only runs at the batch level, since it needs stats
+ * across a whole series.
+ */
 function extractAll(eps: EpisodeInput[]): EpisodeExtraction[] {
-  return eps.map((episode) => ({ episode, identifiers: extractCaseIdentifiers(episode) }));
+  const report = runExtractionBatch(eps);
+  const byId = new Map(eps.map((e) => [e.tvmazeEpisodeId, e]));
+  return report.results.map((r) => ({ episode: byId.get(r.tvmazeEpisodeId)!, identifiers: r.identifiers }));
 }
 
 describe('scoreMatch', () => {

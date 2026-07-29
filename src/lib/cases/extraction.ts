@@ -1,4 +1,5 @@
 import 'server-only';
+import { isStoplistedCorrespondent } from './correspondentStoplist';
 
 /**
  * Case-identifier extraction — a pure, deterministic (rule-based) extractor,
@@ -20,7 +21,23 @@ export interface EpisodeInput {
 }
 
 export interface CaseIdentifiers {
+  /**
+   * Matching-safe subject names: everything in `rawSubjectNames` MINUS
+   * known correspondents/narrators (the stoplist, applied here — episode
+   * scoped, no batch needed) and, after a batch run, minus per-series
+   * high-frequency names (see `runExtractionBatch`). This is the field
+   * matching.ts reads — it never sees suppressed names, so no changes were
+   * needed there.
+   */
   subjectNames: string[];
+  /**
+   * Every name extraction found, before any correspondent suppression — a
+   * stoplisted or frequency-suppressed name still appears here. Optional so
+   * that `matching.ts` (which only ever reads `subjectNames` and doesn't
+   * need this field) and its tests can keep constructing minimal identifier
+   * literals unchanged; every real extraction always populates it.
+   */
+  rawSubjectNames?: string[];
   location: string | null;
   year: number | null;
   crimeType: string | null;
@@ -122,12 +139,28 @@ const MULTI_WORD_NAME_RE = new RegExp(`\\b(${ANY_WORD}(?:\\s+${ANY_WORD}){1,2})\
 const STANDALONE_DISTINCTIVE_NAME_RE = new RegExp(`\\b(${DISTINCTIVE})\\b`, 'g');
 
 /**
+ * "Correspondent" immediately before a name ("Correspondent Peter Van Sant
+ * reports...", a recurring construction in this fixture set's 48 Hours
+ * episodes) pushes the real 3-word name past this extractor's 3-word
+ * window, truncating it to "Correspondent Peter Van" — which then can't
+ * match the correspondent stoplist's clean "Peter Van Sant" entry. Stripped
+ * before name-window matching only; every other extractor still sees the
+ * full original text. Deliberately narrow (just this one word, not a wider
+ * "Host/Anchor/Reporter/Narrator" list) — only "Correspondent" has evidence
+ * in this fixture set of causing a truncation; a broader list risks
+ * stripping those words out of real names/phrases without a concrete case
+ * showing it's needed.
+ */
+const ROLE_PREFIX_RE = /\bCorrespondent\s+/g;
+
+/**
  * 2-3 consecutive capitalized-token runs, plus standalone compound/
  * apostrophe/hyphenated surnames that don't need a capitalized neighbor to
  * be a real name (McDonald, O'Neill, Smith-Jones). Filtered against common
  * non-name openers and the location gazetteer.
  */
-function extractSubjectNames(text: string): string[] {
+function extractSubjectNames(rawText: string): string[] {
+  const text = rawText.replace(ROLE_PREFIX_RE, '');
   const found = new Set<string>();
   const spans: [number, number][] = [];
 
@@ -191,15 +224,93 @@ function extractCrimeType(text: string): string | null {
   return null;
 }
 
-/** Pure — extracts structured Case identifiers from one episode's title + synopsis. */
+/**
+ * Pure — extracts structured Case identifiers from one episode's title +
+ * synopsis. Applies the manual correspondent stoplist (episode-scoped, no
+ * batch context needed); frequency-based suppression is a second pass that
+ * only `runExtractionBatch` can do, since it needs stats across the series.
+ */
 export function extractCaseIdentifiers(episode: EpisodeInput): CaseIdentifiers {
   const text = `${episode.title}. ${episode.synopsis}`;
+  const rawSubjectNames = extractSubjectNames(text);
+  const subjectNames = rawSubjectNames.filter((name) => !isStoplistedCorrespondent(episode.series, name));
   return {
-    subjectNames: extractSubjectNames(text),
+    subjectNames,
+    rawSubjectNames,
     location: extractLocation(text),
     year: extractYear(text, episode.airdate),
     crimeType: extractCrimeType(text),
   };
+}
+
+/**
+ * A name appearing in this fraction (or more) of one series' episodes is
+ * treated as recurring production talent, not a Case subject, and is
+ * suppressed from that series' `subjectNames` — a general safeguard beyond
+ * the manual stoplist. Chosen deliberately at 25%, not the 80% used in the
+ * accept-criteria example, because:
+ *  - It comfortably triggers on the 80% example (well below it).
+ *  - The most-recurring REAL Case subject actually observed in this fixture
+ *    set — Jodi Arias, genuinely covered across 5 Snapped/20/20 episodes —
+ *    sits at 5.0-8.3% of her series. No real individual is legitimately the
+ *    subject of a quarter or more of an anthology true-crime series; a name
+ *    at that rate is structurally a host/narrator, not a story.
+ *  - 25% gives roughly 3x headroom over the highest observed legitimate
+ *    repeat-subject rate, so it won't falsely suppress a real recurring case
+ *    even as the fixture set grows, while still catching correspondents
+ *    this file's manual stoplist doesn't yet know about.
+ */
+export const CORRESPONDENT_FREQUENCY_THRESHOLD = 0.25;
+
+/**
+ * Frequency suppression needs enough episodes to make a percentage mean
+ * anything — a single-episode series would put any name it mentions at
+ * 100% "frequency" without that being evidence of anything recurring.
+ * Below this many episodes for a series, only the manual stoplist applies.
+ */
+const MIN_EPISODES_FOR_FREQUENCY_SUPPRESSION = 5;
+
+/**
+ * Batch-level, per-series correspondent suppression. Mutates each result's
+ * `subjectNames` in place (removing any name at/above the frequency
+ * threshold for that episode's series) — `rawSubjectNames` is left
+ * untouched, so a suppressed name is still visible there. Per-series only:
+ * a name frequent on one series never affects another series' episodes.
+ */
+function suppressFrequentNames(results: ExtractionResult[], episodes: EpisodeInput[]): void {
+  const seriesById = new Map(episodes.map((e) => [e.tvmazeEpisodeId, e.series]));
+
+  const seriesEpisodeCount = new Map<string, number>();
+  const seriesNameCount = new Map<string, Map<string, number>>();
+  for (const r of results) {
+    const series = seriesById.get(r.tvmazeEpisodeId)!;
+    seriesEpisodeCount.set(series, (seriesEpisodeCount.get(series) ?? 0) + 1);
+    const nameCounts = seriesNameCount.get(series) ?? new Map<string, number>();
+    for (const name of new Set(r.identifiers.subjectNames)) {
+      nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+    }
+    seriesNameCount.set(series, nameCounts);
+  }
+
+  const suppressedBySeries = new Map<string, Set<string>>();
+  for (const [series, nameCounts] of seriesNameCount) {
+    const total = seriesEpisodeCount.get(series)!;
+    const suppressed = new Set<string>();
+    if (total >= MIN_EPISODES_FOR_FREQUENCY_SUPPRESSION) {
+      for (const [name, count] of nameCounts) {
+        if (count / total >= CORRESPONDENT_FREQUENCY_THRESHOLD) suppressed.add(name);
+      }
+    }
+    suppressedBySeries.set(series, suppressed);
+  }
+
+  for (const r of results) {
+    const series = seriesById.get(r.tvmazeEpisodeId)!;
+    const suppressed = suppressedBySeries.get(series);
+    if (suppressed && suppressed.size > 0) {
+      r.identifiers.subjectNames = r.identifiers.subjectNames.filter((name) => !suppressed.has(name));
+    }
+  }
 }
 
 export interface ExtractionBatchReport {
@@ -215,6 +326,9 @@ export interface ExtractionBatchReport {
  * Batch extraction over a full fixture/programme set. Never called from a
  * request handler — this is the job entry point. Rule-based, so the API
  * cost is genuinely $0; wall-clock cost is reported for capacity planning.
+ * Applies per-series frequency-based correspondent suppression as a second
+ * pass after per-episode extraction (the manual stoplist is already applied
+ * per-episode in `extractCaseIdentifiers`).
  */
 export function runExtractionBatch(episodes: EpisodeInput[]): ExtractionBatchReport {
   const start = performance.now();
@@ -222,6 +336,7 @@ export function runExtractionBatch(episodes: EpisodeInput[]): ExtractionBatchRep
     tvmazeEpisodeId: episode.tvmazeEpisodeId,
     identifiers: extractCaseIdentifiers(episode),
   }));
+  suppressFrequentNames(results, episodes);
   const durationMs = performance.now() - start;
   return {
     results,

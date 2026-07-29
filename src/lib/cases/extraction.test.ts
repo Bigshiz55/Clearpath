@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { extractCaseIdentifiers, normalizeDiacritics, runExtractionBatch, type EpisodeInput } from './extraction';
+import {
+  extractCaseIdentifiers,
+  normalizeDiacritics,
+  runExtractionBatch,
+  CORRESPONDENT_FREQUENCY_THRESHOLD,
+  type EpisodeInput,
+} from './extraction';
 import fixtures from './fixtures/trueCrimeEpisodes.json';
 
 const episodes = fixtures as EpisodeInput[];
@@ -146,5 +152,112 @@ describe('runExtractionBatch', () => {
       (r) => r.identifiers.subjectNames.length > 0 || r.identifiers.location || r.identifiers.crimeType,
     );
     expect(withSomething.length / report.results.length).toBeGreaterThan(0.5);
+  });
+});
+
+function ep(overrides: Partial<EpisodeInput>): EpisodeInput {
+  return {
+    tvmazeEpisodeId: 0,
+    series: 'test',
+    network: 'test',
+    title: '',
+    airdate: '2020-01-01',
+    synopsis: '',
+    ...overrides,
+  };
+}
+
+describe('correspondent and narrator suppression', () => {
+  it('extracts "Keith Morrison" but excludes it from subjectNames on Dateline NBC (manual stoplist)', () => {
+    const episode = ep({
+      series: 'Dateline NBC',
+      title: 'The Vanishing',
+      synopsis: 'A family struggles to understand what happened to their daughter. Keith Morrison reports.',
+    });
+    const id = extractCaseIdentifiers(episode);
+    expect(id.rawSubjectNames).toContain('Keith Morrison');
+    expect(id.subjectNames).not.toContain('Keith Morrison');
+  });
+
+  it('does not suppress a name that only coincidentally shares a stoplisted correspondent\'s name on a different series', () => {
+    // The manual stoplist is keyed by series — "Keith Morrison" is only ever
+    // suppressed for the shows it's actually listed against.
+    const episode = ep({
+      series: 'A Show Not In The Stoplist',
+      synopsis: 'Keith Morrison was the prime suspect in the 1994 disappearance.',
+    });
+    const id = extractCaseIdentifiers(episode);
+    expect(id.subjectNames).toContain('Keith Morrison');
+  });
+
+  it('auto-suppresses a name appearing in 80% of one series\' episodes, without it being in the manual stoplist', () => {
+    const series = 'Synthetic Anthology Show';
+    const subjects = [
+      'Alice Adams', 'Bob Baker', 'Carla Cruz', 'Derek Diaz', 'Ellen Ellis',
+      'Frank Foster', 'Gina Grant', 'Harry Hayes', 'Ivy Irwin', 'Jack Jones',
+    ];
+    const episodes10: EpisodeInput[] = Array.from({ length: 10 }, (_, i) =>
+      ep({
+        tvmazeEpisodeId: 9000 + i,
+        series,
+        title: `Episode ${i}`,
+        // 8 of 10 (80%) mention the same recurring on-air name; each also
+        // has a distinct real case subject so the two never get confused.
+        synopsis:
+          i < 8
+            ? `Randall Voss reports on the disappearance of ${subjects[i]}.`
+            : `A cold case reopens for ${subjects[i]}.`,
+      }),
+    );
+    const report = runExtractionBatch(episodes10);
+    for (const r of report.results) {
+      expect(r.identifiers.subjectNames).not.toContain('Randall Voss');
+    }
+    // The frequency safeguard doesn't touch the distinct per-episode case names.
+    expect(report.results[0]!.identifiers.subjectNames).toContain('Alice Adams');
+  });
+
+  it('does not suppress a name below the frequency threshold', () => {
+    const series = 'Synthetic Anthology Show 2';
+    // 2 of 10 (20%) — below CORRESPONDENT_FREQUENCY_THRESHOLD (25%).
+    expect(CORRESPONDENT_FREQUENCY_THRESHOLD).toBeGreaterThan(0.2);
+    const episodes10: EpisodeInput[] = Array.from({ length: 10 }, (_, i) =>
+      ep({
+        tvmazeEpisodeId: 9100 + i,
+        series,
+        synopsis: i < 2 ? 'Rare Guest Anchor covers a 2015 murder case.' : `A story about Person${i} unfolds.`,
+      }),
+    );
+    const report = runExtractionBatch(episodes10);
+    const withGuestAnchor = report.results.filter((r) => r.identifiers.subjectNames.includes('Rare Guest Anchor'));
+    expect(withGuestAnchor.length).toBe(2);
+  });
+
+  it('suppression is per-series — a name suppressed on one series is a legitimate subject on another', () => {
+    const suppressedOn = 'Series With Recurring Talent';
+    const legitOn = 'Series Where They Are A Real Subject';
+    const talkingHead = 'Frequent Anchor Person';
+
+    const episodesA: EpisodeInput[] = Array.from({ length: 5 }, (_, i) =>
+      ep({
+        tvmazeEpisodeId: 9200 + i,
+        series: suppressedOn,
+        synopsis: `${talkingHead} reports on the case of Victim${i}.`,
+      }),
+    );
+    const episodeB = ep({
+      tvmazeEpisodeId: 9300,
+      series: legitOn,
+      synopsis: `${talkingHead} was accused of embezzlement in 2019.`,
+    });
+
+    const report = runExtractionBatch([...episodesA, episodeB]);
+    const resultsA = report.results.filter((r) => episodesA.some((e) => e.tvmazeEpisodeId === r.tvmazeEpisodeId));
+    const resultB = report.results.find((r) => r.tvmazeEpisodeId === episodeB.tvmazeEpisodeId)!;
+
+    for (const r of resultsA) {
+      expect(r.identifiers.subjectNames).not.toContain(talkingHead);
+    }
+    expect(resultB.identifiers.subjectNames).toContain(talkingHead);
   });
 });
