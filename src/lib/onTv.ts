@@ -2,9 +2,6 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getCriticRatings } from '@/lib/omdb';
 import { findTmdbByImdb, searchTitles, type SearchResultItem } from '@/lib/tmdb/client';
-import { getGracenoteAirings } from '@/lib/gracenote';
-import { getStoredGridAirings } from '@/lib/tvGrid';
-import { stillJoinable } from '@/lib/viewing/clock';
 import type { MediaType } from '@/lib/types';
 
 /**
@@ -46,7 +43,7 @@ export interface Airing {
   match?: number | null;
   /** One plain-language line of what drove `match` — the badge's "why". */
   matchWhy?: string | null;
-  year?: number | null; // release year (Gracenote) — disambiguates the TMDB match
+  year?: number | null; // release year, when the source reports one — disambiguates the TMDB match
 }
 
 interface TvmazeShow {
@@ -219,10 +216,10 @@ function resolveTmdbByTitle(title: string, year: number | null): Promise<{ id: n
 }
 
 /**
- * Resolve TMDB ids for MOVIE airings that have no imdb id (i.e. the Gracenote
- * cable listings), by an exact title+year search — so cable movies get a Save
- * button and a DNA score like the broadcast cards. Bounded and best-effort; a
- * title we can't match cleanly is left as-is. No-op without a TMDB key.
+ * Resolve TMDB ids for MOVIE airings that have no imdb id, by an exact
+ * title+year search — so a movie missing that id still gets a Save button and
+ * a DNA score like the rest of the cards. Bounded and best-effort; a title we
+ * can't match cleanly is left as-is. No-op without a TMDB key.
  */
 export async function enrichAiringsWithTmdbByTitle(airings: Airing[], cap = 14): Promise<Airing[]> {
   const targets = airings
@@ -378,11 +375,6 @@ export async function getUpcomingTv(
   genre: string | null = null,
   network: string | null = null,
   movieOnly = false,
-  /** Merge the FULL ingested cable grid even without a network/movie filter —
-   *  "what's coming on" should consider all ~190 channels, not just the
-   *  first-run premiere feed. Opt-in, because the curated surfaces (home
-   *  strip, Easy TV) want the best-reviewed short list, not the whole dial. */
-  fullLineup = false,
 ): Promise<Airing[]> {
   const clampedHorizon = Math.max(HOUR_MS, Math.min(horizonMs, UPCOMING_TV_HORIZON_MS));
   const horizon = nowMs + clampedHorizon;
@@ -409,35 +401,6 @@ export async function getUpcomingTv(
       if (movieOnly && a.showType !== 'Movie') return false;
       return true;
     });
-
-  // TVmaze is broadcast-only, so a cable network ("on Lifetime") or a movies-only
-  // ask comes back thin or empty. For those, pull the real listing from Gracenote's
-  // full US grid (cable + movie typing) and prefer a time-ordered union — this is
-  // what makes "Lifetime movies tonight" actually return Lifetime movies. US only.
-  const wantGracenote = country === 'US' && !!(network || movieOnly || fullLineup);
-  if (wantGracenote) {
-    // DB-first: read the hourly-refreshed grid from our own table (fast, no
-    // upstream call). Only if it's empty (before the first refresh, or the table
-    // isn't there yet) do we fetch Gracenote live.
-    let grid = await getStoredGridAirings(nowMs, clampedHorizon, { network, movieOnly }).catch(() => []);
-    if (grid.length === 0) grid = await getGracenoteAirings(nowMs, clampedHorizon, { network, movieOnly }).catch(() => []);
-    const merged = [...upcoming, ...grid];
-    const byKey = new Set<string>();
-    return merged
-      .filter((a) => {
-        // The grid window reaches back for in-progress airings on purpose, but
-        // this surface RECOMMENDS. A movie three hours in is still "on" by the
-        // schedule and useless to tune into — keep an in-progress listing only
-        // while joining it is genuinely worth it (the full guide still shows
-        // everything that's on).
-        if (!stillJoinable(a.airstamp, a.runtime, nowMs)) return false;
-        if (wantGenre && !a.genres.some((g) => g.toLowerCase() === wantGenre)) return false;
-        const k = `${a.showName.toLowerCase()}|${a.airstamp}`;
-        return byKey.has(k) ? false : (byKey.add(k), true);
-      })
-      .sort((a, b) => Date.parse(a.airstamp) - Date.parse(b.airstamp))
-      .slice(0, 60);
-  }
 
   // Rank by rating (unrated last), keep a healthy set, then show in time order.
   const ranked = [...upcoming].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 30);

@@ -2,8 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, getPreferenceRules, regionFor } from '@/lib/profile';
-import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle } from '@/lib/onTv';
-import { getFullGuideAirings, getStoredGridAirings } from '@/lib/tvGrid';
+import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle, type Airing } from '@/lib/onTv';
 import { scoreGuideAirings } from '@/lib/tv/scoreGuide';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
@@ -91,10 +90,14 @@ export default async function OnTvPage({
   // Add IMDb / Rotten Tomatoes / Metacritic to the placards (cached, bounded).
   const airings = await enrichAiringsWithCritics(airingsRaw).then((a) => enrichAiringsWithTmdb(a));
 
-  // THE FULL GUIDE — the whole ingested cable lineup for the next 6 hours,
-  // every channel, by channel. This is the grid the "Lifetime movies" answers
-  // were already drawing from; the guide view finally lets you BROWSE it.
-  let guideAirings = guideView ? await getFullGuideAirings(now.getTime(), 6 * HOUR_MS) : [];
+  // THE FULL GUIDE — every channel, by channel, for the next 6 hours. The
+  // ingested cable lineup that used to back this (Gracenote's public grid) is
+  // retired: that endpoint is now WAF-blocked and not worked around (see
+  // docs/SCHEDULE_PROVIDERS.md). Until a licensed full-grid provider or the
+  // new TVmaze-ingested tables (see src/lib/viewing/ingest/) are wired into
+  // this view, it is honestly empty rather than showing stale or fabricated
+  // rows — the coverage banner below reflects that from real data, not a flag.
+  let guideAirings: Airing[] = [];
   // PER-PROGRAMME SCORES. A bounded set of the window's programmes (on-now
   // first) is resolved to real titles and run through the SAME deterministic
   // engine as every card, with this user's rules — so "this movie suits you
@@ -123,34 +126,30 @@ export default async function OnTvPage({
     guidePersonalized = (count ?? 0) >= DNA_PERSONAL_MIN;
   }
 
-  // COVERAGE HONESTY, FROM THE DATA — NOT FROM A CONFIG FLAG. The banner used
-  // to read `hasFullGridProvider()` (a licensed-provider check) and say "no
-  // full TV guide is connected" — directly above a Full Guide tab showing 188
-  // channels from the ingested grid. If the grid HAS rows, the guide exists,
-  // whatever the contract status. One-row probe; the guide view reuses its
-  // own fetch.
-  const gridProbe = guideView
-    ? guideAirings
-    : await getStoredGridAirings(now.getTime(), 6 * HOUR_MS, { limit: 1 }).catch(() => []);
+  // COVERAGE HONESTY, FROM THE DATA — NOT FROM A CONFIG FLAG. `guideAirings`
+  // is always empty for now (see above), so this reduces to `gridConnected` —
+  // kept as its own value rather than inlined so the banner's condition still
+  // reads as "is there real grid data", not "is a specific provider's flag set".
+  const gridProbe = guideAirings;
   const gridLive = gridConnected || gridProbe.length > 0;
 
   // When asked for a specific window ("Lifetime movies coming on tonight"), build
   // the real time/genre/network/type-filtered set and enrich it the same way.
-  // Broadcast airings resolve TMDB via their imdb id; the Gracenote cable movies
-  // have no imdb id, so also resolve those by an exact title+year search — that's
-  // what gives the cable placards a Save button and a DNA score.
+  // Most airings resolve TMDB via their imdb id; any movie missing one also
+  // gets resolved by an exact title+year search — that's what gives every
+  // movie card a Save button and a DNA score, imdb id or not.
   const enrich = (a: Awaited<ReturnType<typeof getUpcomingTv>>) =>
     enrichAiringsWithCritics(a).then(enrichAiringsWithTmdb).then(enrichAiringsWithTmdbByTitle);
   let windowed =
     withinHours != null
-      ? await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, genre, network, movieOnly, true))
+      ? await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, genre, network, movieOnly))
       : null;
   // Filters named but nothing matched in-window — fall back to everything on,
   // labeled honestly, rather than an empty screen.
   let genreEmpty = false;
   if (withinHours != null && hasFilter && windowed && windowed.length === 0) {
     genreEmpty = true;
-    windowed = await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, null, null, false, true));
+    windowed = await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, null, null, false));
   }
 
   // Which airings this user already has a reminder for (guarded pre-migration),
@@ -312,9 +311,17 @@ export default async function OnTvPage({
           the deep-scan tool waits under them. */}
       {!guideView && <TvDetective />}
 
+      {/* TVmaze API attribution — a clickable link to tvmaze.com, per their
+          terms. Every surface on this page that shows TVmaze-sourced listings
+          shares this one credit; do not add a second, differently-worded one
+          elsewhere without checking here first. */}
       <p className="text-[11px] text-slate-500">
-        Listings from TVmaze’s community broadcast guide — real schedules, refreshed hourly. Coverage is best for
-        major {region} networks; we never invent a listing, so a channel with no data simply won’t appear.
+        Listings from{' '}
+        <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">
+          TVmaze
+        </a>
+        ’s community broadcast guide — real schedules, refreshed hourly. Coverage is best for major {region}{' '}
+        networks; we never invent a listing, so a channel with no data simply won’t appear.
       </p>
     </div>
   );

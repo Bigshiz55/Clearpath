@@ -1,12 +1,13 @@
 /**
- * THE CHANNEL GUIDE — the cable-box view of the grid we already ingest.
+ * THE CHANNEL GUIDE — the cable-box view of an ingested lineup.
  *
- * The app has held the full national lineup all along: an hourly job pulls
- * Gracenote's grid (every cable channel, movies typed, Hallmark and Lifetime
- * and TCM included) into `tv_grid`. But the only way to see any of it was to
- * ask a filtered question — "Lifetime movies tonight" — one channel at a time.
- * A person with 300 channels does not browse by interrogation; they open the
- * guide and scan.
+ * The Gracenote-fed `tv_grid` table this was originally built against is
+ * retired (that public endpoint is now WAF-blocked and not worked around —
+ * see docs/SCHEDULE_PROVIDERS.md). This module itself is provider-agnostic:
+ * it turns whatever flat list of airings it's given into a browsable guide,
+ * one row per channel — rather than the old one-channel-at-a-time "Lifetime
+ * movies tonight" style question. A person with 300 channels does not browse
+ * by interrogation; they open the guide and scan.
  *
  * This module turns a flat list of airings into that guide: one row per
  * channel, what is ON RIGHT NOW first, then what is up next. Channels showing
