@@ -15,6 +15,7 @@ import { TitleBriefing } from './TitleBriefing';
 import { CriticsTable } from './CriticsTable';
 import { TheaterMode } from '@/components/TheaterMode';
 import { PostWatchInterview } from './PostWatchInterview';
+import { DidWeGetItRight } from './DidWeGetItRight';
 import { FinishCheck } from './FinishCheck';
 import { ContentDnaView } from './ContentDnaView';
 import { TasteMatchView, type TasteMatch } from './TasteMatchView';
@@ -204,6 +205,24 @@ export function VerdictReportView({
         initialRating={watchState?.rating ?? null}
         initialNotes={watchState?.notes ?? null}
       />
+
+      {/* DID WE GET IT RIGHT? — the accuracy loop. Only after it's marked
+          watched, and only while we don't already hold a rating (the component
+          dedupes on exactly that). It grades us against `personal.score`,
+          because that is the number `tierFromScore` turned into the headline
+          call this user actually saw. */}
+      {watchState?.status === 'watched' && (
+        <DidWeGetItRight
+          tmdbId={t.id}
+          mediaType={t.mediaType}
+          title={t.title}
+          year={t.year}
+          posterPath={t.posterPath}
+          predicted={report.personal.score}
+          existingRating={watchState?.rating ?? null}
+          genres={t.genres ?? []}
+        />
+      )}
 
       {/* Post-watch interview — appears once you've marked it watched/dropped */}
       {interview && interview.questions.length > 0 && (
