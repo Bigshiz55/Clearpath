@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { TitleGridCalibration } from '@/components/TitleGridCalibration';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Taste Quiz · WatchVerdict' };
+export const metadata: Metadata = { title: 'Taste Quiz · WatchVerd1ct' };
 
 /**
  * THE TASTE QUIZ — real titles.

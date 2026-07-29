@@ -139,7 +139,7 @@ export function isPublicProduction(env: EnvKind): boolean {
 
 /** The compact one-line badge text per the environment rules. */
 export function badgeText(env: EnvKind, info: BuildInfo): string {
-  if (isPublicProduction(env)) return `WatchVerdict v${info.appVersion}`;
+  if (isPublicProduction(env)) return `WatchVerd1ct v${info.appVersion}`;
   // Preview / Development / Founder: full identification.
   const parts = [env, info.gitBranch || '—', info.gitShaShort || '—', `v${info.appVersion}`];
   return parts.join(' • ');

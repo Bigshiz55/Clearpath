@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { WatchVerdictWordmark } from './WatchVerdictWordmark';
 
-/** The WatchVerdict app mark alone — a retro TV with scales of justice on the
+/** The WatchVerd1ct app mark alone — a retro TV with scales of justice on the
  *  screen. `box`/`inner` size it; `overlay` renders on top (e.g. a score), and
  *  when set the mark itself dims so the overlay reads as "inside" the icon. */
 export function LogoMark({

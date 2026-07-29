@@ -71,7 +71,7 @@ export default async function SharePage({ params }: { params: { token: string } 
           </div>
 
           <div className="card flex flex-col items-center gap-6 p-6 sm:flex-row sm:justify-around">
-            <ScoreRing score={snap.generalScore} label="WatchVerdict Score" accent="brand" />
+            <ScoreRing score={snap.generalScore} label="WatchVerd1ct Score" accent="brand" />
             {snap.personal && (
               <>
                 <div className="hidden h-24 w-px bg-white/10 sm:block" />

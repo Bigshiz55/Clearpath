@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { VerdictDelivery } from '@/components/VerdictDelivery';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'The Verd1ct · WatchVerdict' };
+export const metadata: Metadata = { title: 'The Verd1ct · WatchVerd1ct' };
 
 /**
  * The single-watcher decision. Everything it needs is on the client — the

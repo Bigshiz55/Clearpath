@@ -55,7 +55,7 @@ export function AlgorithmScore({
          exists to say. Pink survives as the edge and the label, which is
          enough for it to read as the brand's own verdict. */
       className={`wv-score rounded-xl bg-ink-950/70 ring-1 ring-[#ff1493]/40 shadow-[0_0_14px_-6px_rgba(255,20,147,0.55)] ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'} ${className}`}
-      title="Your VERD1CT — your taste blended with every rating into one 0–100 estimate of how much YOU will like it. The blue TV means it’s from WatchVerdict."
+      title="Your VERD1CT — your taste blended with every rating into one 0–100 estimate of how much YOU will like it. The blue TV means it’s from WatchVerd1ct."
     >
       {/* ONE ROW WHEN THE PANEL CAN HOLD ONE.
           Score, call and the ratings that produced it belong on a single line;
@@ -88,7 +88,7 @@ export function AlgorithmScore({
           {/* The source label is provenance, not a heading — it sits under the
               call at the smallest size on the card and carries the pink. */}
           <div className="text-[10px] font-black uppercase leading-tight tracking-wide text-pink-200/80">
-            {personal ? (<>Your VERD<span style={{ color: '#ff1493' }}>1</span>CT</>) : 'WatchVerdict'}
+            {personal ? (<>Your VERD<span style={{ color: '#ff1493' }}>1</span>CT</>) : 'WatchVerd1ct'}
             {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 ? ' · learning' : ''}
           </div>
         </div>

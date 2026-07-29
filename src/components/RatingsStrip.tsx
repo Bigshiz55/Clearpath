@@ -72,7 +72,7 @@ export function RatingsStrip({
               ? 'bg-red-500/20 text-red-200'
               : 'bg-white/10 text-slate-300'
         }`}
-        title="WatchVerdict's Watchability score (0–100) and the Stream It / Skip It call it produces"
+        title="WatchVerd1ct's Watchability score (0–100) and the Stream It / Skip It call it produces"
       >
         {ratings.standardScore != null
           ? `${verdict === 'stream' ? '✅' : '⛔'} ${ratings.standardScore} · ${verdict === 'stream' ? 'STREAM IT' : 'SKIP IT'}`
@@ -88,7 +88,7 @@ export function RatingsStrip({
         <div className="flex items-center gap-2">
           {call}
           {standard && !(mediaType && tmdbId) && ratings.standardScore != null && (
-            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-gold-400" title="WatchVerdict Standard Score — blended across every rating source we have">
+            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-gold-400" title="WatchVerd1ct Standard Score — blended across every rating source we have">
               ⚖️ {ratings.standardScore}
             </span>
           )}
@@ -144,7 +144,10 @@ export function RatingsStrip({
           mark={<span aria-hidden className="wv-ratings-emoji flex-none text-[11px] leading-none sm:text-sm">🍿</span>}
           value={popcorn != null ? `${popcorn}%` : null}
           tone={popcorn != null ? 'text-amber-200' : ''}
-          title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score (Popcorn)' : 'Audience / Popcorn score (from TMDB when Rotten Tomatoes’ own audience score isn’t available)'}
+          /* HONEST SOURCING: only the real RT number may carry RT's name. The
+             TMDB-derived stand-in is an "Audience score" that says exactly
+             where it came from — never Popcornmeter branding. */
+          title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score' : 'Audience score — from TMDB user votes (Rotten Tomatoes’ own audience score isn’t in our data feed for this title)'}
         />
         {/* IMDb was a SOLID YELLOW PILL — the highest-contrast object on the
             card, on a row that is reference information. It read as the

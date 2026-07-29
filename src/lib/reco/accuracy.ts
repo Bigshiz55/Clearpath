@@ -1,5 +1,5 @@
 /**
- * Recommendation VALIDATION engine (pure). This is how WatchVerdict answers the
+ * Recommendation VALIDATION engine (pure). This is how WatchVerd1ct answers the
  * only question that matters long-term: "are we actually getting better at
  * predicting what people will enjoy?"
  *

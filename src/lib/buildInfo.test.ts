@@ -41,7 +41,7 @@ describe('buildInfo (pure)', () => {
 
   it('production shows ONLY the minimal public badge', () => {
     expect(isPublicProduction('Production')).toBe(true);
-    expect(badgeText('Production', info)).toBe('WatchVerdict v0.9.18');
+    expect(badgeText('Production', info)).toBe('WatchVerd1ct v0.9.18');
     // no branch / commit / deploy details leak to normal users
     expect(badgeText('Production', info)).not.toMatch(/7e0e3ba|feature|preview/i);
   });

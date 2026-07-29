@@ -48,7 +48,7 @@ export const INTERACTION_MANIFEST: ControlEntry[] = [
       { file: REFINE_UNIT, needle: 'maxRuntime', kind: 'unit' },
       { file: CONTROLS_E2E, needle: 'maxRuntime', kind: 'e2e' },
     ] },
-  { controlId: 'finder.slider.audience', route: FINDER, label: 'Popcorn meter (audience)', controlType: 'slider',
+  { controlId: 'finder.slider.audience', route: FINDER, label: 'Audience score', controlType: 'slider',
     expectedEffect: 'Sets minAudience; 0 = Any (null in the canonical key)',
     coveredBy: [{ file: REFINE_UNIT, needle: 'minAudience', kind: 'unit' }] },
   { controlId: 'finder.slider.imdb', route: FINDER, label: 'IMDb rating', controlType: 'slider',

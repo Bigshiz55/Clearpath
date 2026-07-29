@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: { key: string } }): Promise<Metadata> {
   const pack = packByKey(params.key);
-  return { title: pack ? `${pack.name} booster · WatchVerdict` : 'DNA booster' };
+  return { title: pack ? `${pack.name} booster · WatchVerd1ct` : 'DNA booster' };
 }
 
 /**

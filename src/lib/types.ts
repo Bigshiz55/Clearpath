@@ -1,4 +1,4 @@
-// Shared domain types for WatchVerdict.
+// Shared domain types for WatchVerd1ct.
 
 export type MediaType = 'movie' | 'tv';
 
@@ -155,7 +155,7 @@ export interface ScoreBreakdown {
   dataReliability: Confidence;
 }
 
-export interface WatchVerdictScore {
+export interface WatchVerd1ctScore {
   /** 0..100 general recommendation score. */
   score: number;
   breakdown: ScoreBreakdown;
@@ -191,7 +191,7 @@ export interface PersonalMatch {
 
 export interface VerdictReport {
   title: TitleMetadata;
-  general: WatchVerdictScore;
+  general: WatchVerd1ctScore;
   personal: PersonalMatch;
   primaryCall: PrimaryCall;
   tier: VerdictTier;

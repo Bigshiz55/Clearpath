@@ -5,7 +5,7 @@ import { PACKS, packSource } from '@/lib/preference/packs';
 import { countAnswersBySource, loadDnaConfidence } from '@/lib/preference/dnaSignals';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'DNA boosters · WatchVerdict' };
+export const metadata: Metadata = { title: 'DNA boosters · WatchVerd1ct' };
 
 /**
  * Optional calibration packs. Each booster sharpens DNA Confidence for a

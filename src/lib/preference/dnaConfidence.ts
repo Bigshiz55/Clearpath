@@ -1,5 +1,5 @@
 /**
- * Watch DNA CONFIDENCE (pure) — a metric that answers "how well does WatchVerdict
+ * Watch DNA CONFIDENCE (pure) — a metric that answers "how well does WatchVerd1ct
  * understand this user?" It is DELIBERATELY SEPARATE from onboarding Quiz Progress
  * (answered/20). The two must never mirror each other:
  *

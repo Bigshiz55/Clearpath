@@ -16,7 +16,7 @@ import { BATCH, minScoreFor } from '@/lib/reco/deck';
 import { tmdbImage } from '@/lib/tmdb/image';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Watch now · WatchVerdict' };
+export const metadata: Metadata = { title: 'Watch now · WatchVerd1ct' };
 
 export default async function WatchNowPage({ searchParams }: { searchParams?: { type?: string } }) {
   // Deep link from the simple version: /app/watch?type=tv opens straight into the

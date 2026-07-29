@@ -60,7 +60,7 @@ export function LiveCourt({ code }: { code: string }) {
     if (!shareUrl) return;
     const share = (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share;
     if (share) {
-      try { await share({ title: 'Join my WatchVerdict Court', text: 'Help us pick what to watch — tap to join:', url: shareUrl }); return; } catch { /* cancelled */ }
+      try { await share({ title: 'Join my WatchVerd1ct Court', text: 'Help us pick what to watch — tap to join:', url: shareUrl }); return; } catch { /* cancelled */ }
     }
     try { await navigator.clipboard?.writeText(shareUrl); setErr(null); } catch { /* ignore */ }
   }
@@ -171,7 +171,7 @@ export function LiveCourt({ code }: { code: string }) {
   }
 
   if (notFound) {
-    return <Shell><div className="card p-8 text-center"><div className="text-3xl">🔗</div><p className="mt-3 text-sm text-slate-400">This Court room doesn’t exist or has ended.</p><Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVerdict →</Link></div></Shell>;
+    return <Shell><div className="card p-8 text-center"><div className="text-3xl">🔗</div><p className="mt-3 text-sm text-slate-400">This Court room doesn’t exist or has ended.</p><Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVerd1ct →</Link></div></Shell>;
   }
   if (!state) return <Shell><div className="text-sm text-slate-400">Connecting to the room…</div></Shell>;
 

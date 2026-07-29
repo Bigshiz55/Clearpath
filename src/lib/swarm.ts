@@ -110,7 +110,7 @@ function indieSnob(report: VerdictReport): Panelist {
       line = `Critics at ${critic}, crowd at ${audience}. The masses just don't get it — I do.`;
     } else if (gap <= -10) {
       stance = 'pass';
-      line = `Audience ${audience}, critics only ${critic}. Popcorn consensus. Hard pass.`;
+      line = `Audience ${audience}, critics only ${critic}. Crowd-pleaser consensus. Hard pass.`;
     } else {
       stance = prestige ? 'mixed' : 'pass';
       line = `Critics ${critic}, audience ${audience} — safe, agreeable, forgettable.`;

@@ -6,7 +6,7 @@ import { CourtIntro } from '@/components/court/CourtIntro';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'Tonight, Together · WatchVerdict',
+  title: 'Tonight, Together · WatchVerd1ct',
 };
 
 export default async function TogetherPage() {

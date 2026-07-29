@@ -11,7 +11,7 @@ import { getBuildInfo, resolveEnvironment, badgeText, isPublicProduction, type E
  * lib/buildInfo) — never hardcoded.
  *
  * Rules:
- *   • Production (and not a founder route): only `WatchVerdict v0.9.18`.
+ *   • Production (and not a founder route): only `WatchVerd1ct v0.9.18`.
  *   • Preview / Development / TestScott|Heather|Amy: `Env • branch • sha • vX`.
  * Tapping or long-pressing the badge (or "Developer Info" in Settings, which
  * dispatches `wv:open-build-info`) opens the Build Information sheet for QA.

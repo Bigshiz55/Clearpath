@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { airingStatus, displayClock, liveLabel, stillJoinable } from '@/lib/viewing/clock';
+import { dayLabel, longDayLabel } from '@/lib/viewing/localDay';
 import { tmdbImage, type TmdbImageSize } from '@/lib/tmdb/image';
 
 /** Poster art comes from the canonical TMS CDN; if it fails to load, swap to the
@@ -53,14 +54,10 @@ function fmtTime(airstamp: string | null | undefined, providerTime: string): str
   return displayClock(airstamp, providerTime);
 }
 
-/** "Today" / "Tomorrow" / weekday for an airing, from its real UTC timestamp. */
-function dayLabel(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return 'Today';
-  if (new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString()) return 'Tomorrow';
-  return d.toLocaleDateString([], { weekday: 'short' });
-}
+/* "Today" / "Tomorrow" / weekday now comes from the shared `localDay` module —
+   see the import above. It compares CALENDAR days rather than adding 24h, so a
+   daylight-saving day (23 or 25 hours long) cannot move the answer, and every
+   surface in the app derives the words from the same function. */
 
 /** A Google Calendar "add event" link so the reminder is real — the user can
  *  actually set their DVR or tune in. Built from the true airstamp + runtime. */
@@ -70,7 +67,7 @@ function calendarUrl(a: Airing): string {
   const z = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const text = encodeURIComponent(`${a.showName} on ${a.network}`);
   const details = encodeURIComponent(
-    `${a.episodeName ? `"${a.episodeName}" · ` : ''}${a.showType}${a.genres.length ? ` · ${a.genres.join(', ')}` : ''}\nOn ${a.network}. Added from WatchVerdict.`,
+    `${a.episodeName ? `"${a.episodeName}" · ` : ''}${a.showType}${a.genres.length ? ` · ${a.genres.join(', ')}` : ''}\nOn ${a.network}. Added from WatchVerd1ct.`,
   );
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${z(start)}/${z(end)}&details=${details}`;
 }
@@ -104,13 +101,21 @@ function ratingRow(a: Airing) {
 export function OnTvGuide({
   airings,
   dateLabel,
+  dateIso = null,
   country,
   mode = 'broadcast',
   remindedIds = [],
   windowHours = null,
 }: {
   airings: Airing[];
+  /** Fallback label for surfaces that already have a non-date caption
+   *  ("Next 6 hours"). When `dateIso` is set, THAT wins — see below. */
   dateLabel: string;
+  /** The instant the caption is about. Formatted HERE, in the browser, so the
+   *  header cannot say "Tuesday, Jul 29" over rows that say "Today": a server
+   *  render freezes the date in the server's zone (UTC on Vercel), which at
+   *  6pm in California is already the next day. */
+  dateIso?: string | null;
   country: string;
   mode?: GuideMode;
   remindedIds?: number[];
@@ -379,9 +384,9 @@ export function OnTvGuide({
             ))}
           </div>
         </div>
-        <div className="text-[11px] text-slate-400">
-          {dateLabel} · {filtered.length} {streaming ? 'premiere' : 'airing'}{filtered.length === 1 ? '' : 's'}
-          {!streaming && ' · times are each channel’s local broadcast time'}.
+        <div suppressHydrationWarning className="text-[11px] text-slate-400">
+          {(dateIso ? longDayLabel(dateIso, nowMs) : '') || dateLabel} · {filtered.length} {streaming ? 'premiere' : 'airing'}{filtered.length === 1 ? '' : 's'}
+          {!streaming && ' · times shown in your local time'}.
         </div>
       </div>
 
@@ -404,7 +409,7 @@ export function OnTvGuide({
               >
                 <div className="wv-tv-when text-center">
                   {(() => {
-                    const dl = dayLabel(a.airstamp);
+                    const dl = dayLabel(a.airstamp, nowMs);
                     // Already running. The window includes these on purpose —
                     // joining twenty minutes late is a real option — but a start
                     // time in the past under a "coming on" heading reads as a

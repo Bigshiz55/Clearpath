@@ -1,5 +1,6 @@
 'use client';
 
+import { dayLabel } from '@/lib/viewing/localDay';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
@@ -70,15 +71,12 @@ function airingInfo(a: { network: string; time: string; airstamp: string }): { t
   // Beyond the 48h window (or more than a few hours past) it isn't watch-now.
   if (airMs - now > AIRING_WINDOW_MS || airMs - now < -3 * 60 * 60 * 1000) return null;
 
-  const dayMs = 86_400_000;
   const d = new Date(airMs);
-  const isToday = d.toDateString() === new Date(now).toDateString();
-  const isTomorrow = new Date(now + dayMs).toDateString() === d.toDateString();
-  const day = isToday
-    ? 'Tonight'
-    : isTomorrow
-      ? 'Tomorrow'
-      : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  // The day word comes from the shared, DST-safe `localDay` module (calendar
+  // comparison, never `now + 24h`). "Today" reads as "Tonight" here because
+  // this row is specifically about tonight's viewing.
+  const label = dayLabel(airMs, now, 'short');
+  const day = label === 'Today' ? 'Tonight' : label;
 
   let clock = '';
   const m = a.time.match(/^(\d{1,2}):(\d{2})/);
@@ -656,7 +654,7 @@ export function FinderUI({
           <Slider label="How far back" hint="How old a title can be" readout={releasedReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0)} min={0} max={75} step={1}
             minLabel="Any year" maxLabel="Classics"
             value={q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0} onChange={(years) => set('sinceMonths', years === 0 ? null : years * 12)} />
-          <Slider label="🍿 Popcorn meter (audience)" hint="Minimum crowd score" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
+          <Slider label="🍿 Audience score" hint="Minimum crowd score" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
             minLabel="Any" maxLabel="Crowd-loved"
             value={q.minAudience ?? 0} onChange={(v) => set('minAudience', v === 0 ? null : v)} />
           <Slider label="IMDb rating" hint="Minimum IMDb score" readout={q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'} min={0} max={9} step={0.5}
@@ -667,8 +665,8 @@ export function FinderUI({
             value={q.minMatch ?? 0} onChange={(v) => set('minMatch', v === 0 ? null : v)} accent />
         </div>
         <p className="-mt-1 text-[11px] leading-relaxed text-slate-400">
-          Each slider stays at “Any” until you drag it right. “Audience score” is the crowd rating from TMDB — the open
-          stand-in for Rotten Tomatoes’ audience/Popcorn score.
+          Each slider stays at “Any” until you drag it right. “Audience score” is the crowd rating from TMDB user
+          votes — a real audience signal, but not Rotten Tomatoes’ own audience score.
         </p>
 
         <div className="flex flex-wrap gap-2">

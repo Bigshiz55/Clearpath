@@ -4,7 +4,7 @@ import type {
   ScoreBreakdown,
   TitleMetadata,
   WatchProviders,
-  WatchVerdictScore,
+  WatchVerd1ctScore,
 } from '@/lib/types';
 import { computeStandardScore, type SourceReading } from './standardScore';
 import { STANDARD_WEIGHTS } from './standardWeights';
@@ -76,7 +76,7 @@ function watchabilityScore(
 export function computeGeneralScore(
   meta: TitleMetadata,
   providers: WatchProviders | null,
-): WatchVerdictScore {
+): WatchVerd1ctScore {
   const hasVote = meta.voteAverage != null && meta.voteCount > 0;
   const audience = hasVote ? clamp(meta.voteAverage! * 10) : NEUTRAL;
   // The Standard Score — one confidence-weighted number across every rating

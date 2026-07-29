@@ -12,7 +12,7 @@ import { hasFullGridProvider } from '@/lib/viewing/liveTv';
 import { TvDetective } from '@/components/TvDetective';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'On TV today · WatchVerdict' };
+export const metadata: Metadata = { title: 'On TV today · WatchVerd1ct' };
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -43,6 +43,14 @@ function officialScheduleFor(net: string | null): { name: string; url: string } 
 function isoDate(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
+/**
+ * SERVER-SIDE FALLBACK ONLY. This renders in the SERVER's zone (UTC on
+ * Vercel), which at 6pm in California is already the next calendar day — the
+ * header used to print "Tuesday, Jul 29" directly above rows labelled "Today".
+ * The real label is computed in the browser from `dateIso` (see
+ * `longDayLabel` in OnTvGuide); this string only ever shows in the instant
+ * before hydration, and for non-JS crawlers.
+ */
 function friendlyDate(d: Date): string {
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
@@ -305,7 +313,7 @@ export default async function OnTvPage({
           </p>
         </>
       ) : (
-        <OnTvGuide airings={airings} dateLabel={friendlyDate(now)} country={region} mode="broadcast" remindedIds={remindedIds} />
+        <OnTvGuide airings={airings} dateLabel={friendlyDate(now)} dateIso={now.toISOString()} country={region} mode="broadcast" remindedIds={remindedIds} />
       )}
 
       <p className="text-[11px] text-slate-500">

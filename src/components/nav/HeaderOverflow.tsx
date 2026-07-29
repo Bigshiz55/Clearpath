@@ -79,7 +79,7 @@ export function HeaderOverflow({
               className="w-full rounded-lg border border-gold-400/50 bg-gold-500/10 px-2.5 py-1.5 text-left text-sm font-semibold text-gold-100 transition hover:bg-gold-500/20 sm:hidden"
               role="menuitem"
             >
-              ⭐ WatchVerdict Pro
+              ⭐ WatchVerd1ct Pro
             </Link>
             <ViewModeToggle className="w-full justify-start" />
             {!isGuest && (

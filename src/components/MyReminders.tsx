@@ -1,5 +1,6 @@
 'use client';
 
+import { dayLabel } from '@/lib/viewing/localDay';
 import { useState } from 'react';
 import { removeTvReminder } from '@/lib/actions/tvReminders';
 
@@ -10,15 +11,12 @@ export interface ReminderRow {
   airstamp: string;
 }
 
+/** Day + clock, in the viewer's zone; the day word from the shared, DST-safe
+ *  `localDay` module. */
 function whenLabel(iso: string): string {
   const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  const tomorrow = new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString();
   const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  if (sameDay) return `Today ${time}`;
-  if (tomorrow) return `Tomorrow ${time}`;
-  return `${d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} · ${time}`;
+  return `${dayLabel(iso, Date.now())} ${time}`;
 }
 
 export function MyReminders({ initial }: { initial: ReminderRow[] }) {

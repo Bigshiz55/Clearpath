@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { RapidFireDemo } from '@/components/RapidFireDemo';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Rapid Fire · WatchVerdict' };
+export const metadata: Metadata = { title: 'Rapid Fire · WatchVerd1ct' };
 
 export default function RapidFirePage() {
   return (

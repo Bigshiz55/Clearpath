@@ -5,7 +5,7 @@ import { listCrews } from '@/lib/actions/crews';
 import { FinderUI, type WatcherOption } from '@/components/FinderUI';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Forensic Search · WatchVerdict' };
+export const metadata: Metadata = { title: 'Forensic Search · WatchVerd1ct' };
 
 export default async function FinderPage() {
   const supabase = createClient();

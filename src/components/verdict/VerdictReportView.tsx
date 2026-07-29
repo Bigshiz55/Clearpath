@@ -168,7 +168,7 @@ export function VerdictReportView({
       </header>
 
       {/* Ratings — right under the placard: the call + every score in one strip,
-          with the WatchVerdict score carried inside the site's own mark. */}
+          with the WatchVerd1ct score carried inside the site's own mark. */}
       <AtAGlance
         primaryCall={report.primaryCall}
         tier={report.tier}

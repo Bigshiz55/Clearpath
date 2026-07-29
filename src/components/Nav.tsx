@@ -99,7 +99,7 @@ export function Nav({
                 in the overflow menu below at every width. */}
             <Link
               href="/app/pro"
-              title="WatchVerdict Pro — AI-tuned verdicts, household profiles & more"
+              title="WatchVerd1ct Pro — AI-tuned verdicts, household profiles & more"
               className="hidden items-center gap-1.5 rounded-lg border border-gold-400/50 bg-gold-500/10 px-2.5 py-1.5 text-sm font-semibold text-gold-100 transition hover:bg-gold-500/20 sm:inline-flex"
             >
               <span aria-hidden className="text-base leading-none">⭐</span>

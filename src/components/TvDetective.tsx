@@ -1,5 +1,6 @@
 'use client';
 
+import { dayLabel } from '@/lib/viewing/localDay';
 import { useState } from 'react';
 import Link from 'next/link';
 import { RemindButton } from '@/components/RemindButton';
@@ -29,14 +30,13 @@ interface Pick {
   mediaType: MediaType | null;
 }
 
+/** Day + clock, in the viewer's zone; the day word from the shared, DST-safe
+ *  `localDay` module. */
 function whenLabel(iso: string): string {
   const d = new Date(iso);
-  const now = new Date();
   // Force 12-hour AM/PM regardless of the device/server locale.
   const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  if (d.toDateString() === now.toDateString()) return `Today · ${time}`;
-  if (new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString()) return `Tomorrow · ${time}`;
-  return `${d.toLocaleDateString('en-US', { weekday: 'long' })} · ${time}`;
+  return `${dayLabel(iso, Date.now(), 'long')} · ${time}`;
 }
 
 function Ratings({ p }: { p: Pick }) {

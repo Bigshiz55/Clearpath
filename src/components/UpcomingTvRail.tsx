@@ -19,6 +19,7 @@
  * Shape-wise it uses the shared `.wv-rail` so it snaps and hides its scrollbar
  * like the Top 10 does, instead of being a third hand-rolled horizontal scroll.
  */
+import { dayLabel } from '@/lib/viewing/localDay';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { airingStatus, displayClock, liveLabel } from '@/lib/viewing/clock';
@@ -35,16 +36,8 @@ export interface RailAiring {
   runtime: number | null;
 }
 
-/** "Today" / "Tomorrow" / weekday, from the real instant in the viewer's zone. */
-function dayLabel(iso: string): string {
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return '';
-  const d = new Date(ms);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return 'Today';
-  if (new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString()) return 'Tomorrow';
-  return d.toLocaleDateString([], { weekday: 'short' });
-}
+/* "Today" / "Tomorrow" / weekday comes from the shared `localDay` module —
+   see the import above. Calendar-day comparison, so DST cannot move it. */
 
 export function UpcomingTvRail({ airings }: { airings: RailAiring[] }) {
   // Ticks so a row flips to "On now" while the page is open, rather than
@@ -74,8 +67,8 @@ export function UpcomingTvRail({ airings }: { airings: RailAiring[] }) {
             status.state === 'live'
               ? liveLabel(status.startedMinutesAgo)
               : clock
-                ? `${dayLabel(a.airstamp)} ${clock}`.trim()
-                : dayLabel(a.airstamp);
+                ? `${dayLabel(a.airstamp, nowMs)} ${clock}`.trim()
+                : dayLabel(a.airstamp, nowMs);
           return (
             <li key={a.id} className="wv-rail-item" data-state={status.state}>
               <div className="aspect-[2/3] overflow-hidden rounded-xl bg-ink-800 shadow-lg shadow-black/50">

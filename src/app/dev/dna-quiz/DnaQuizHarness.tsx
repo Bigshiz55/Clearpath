@@ -46,7 +46,7 @@ export function DnaQuizHarness() {
     <div className="min-h-dvh pb-20 sm:pb-0">
       {/* Mock global header — same height/treatment as the real <Nav> */}
       <header className="sticky top-0 z-40 flex h-16 items-center border-b border-white/10 bg-ink-950/80 backdrop-blur">
-        <div className="container-page font-bold tracking-tight text-white">WatchVerdict</div>
+        <div className="container-page font-bold tracking-tight text-white">WatchVerd1ct</div>
       </header>
 
       <main className="container-page py-6">

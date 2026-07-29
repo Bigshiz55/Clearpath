@@ -1,7 +1,7 @@
 import type { DnaConfidenceResult } from '@/lib/preference/dnaConfidence';
 
 /**
- * "What WatchVerdict learned" — the DNA Confidence number WITH its evidence, so
+ * "What WatchVerd1ct learned" — the DNA Confidence number WITH its evidence, so
  * there are no unexplained numbers. Shows the overall confidence, its tier, and
  * a per-signal breakdown (each source, how many, and how many points it added).
  */

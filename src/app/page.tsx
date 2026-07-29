@@ -107,7 +107,7 @@ export default async function LandingPage() {
             <a href="https://www.themoviedb.org" className="text-brand-300 underline" rel="noopener noreferrer" target="_blank">
               TMDB
             </a>{' '}
-            and JustWatch. WatchVerdict is not endorsed by TMDB.
+            and JustWatch. WatchVerd1ct is not endorsed by TMDB.
           </p>
         </div>
       </footer>

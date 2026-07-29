@@ -1,5 +1,5 @@
 /**
- * Pure, dependency-free intent detectors for WatchVerdict natural-language
+ * Pure, dependency-free intent detectors for WatchVerd1ct natural-language
  * requests.
  *
  * These functions were previously module-local inside
