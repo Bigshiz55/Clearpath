@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfile, ensureGuestProfile, personalLabelFor, getAvatar } from '@/lib/profile';
 import { isPro } from '@/lib/pro';
 import { Nav } from '@/components/Nav';
-import { NavArrows } from '@/components/NavArrows';
 import { DocketTray } from '@/components/DocketTray';
 import { QuickSearch } from '@/components/QuickSearch';
 
@@ -43,10 +42,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-dvh pb-24 lg:pb-0">
       <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} pro={pro} avatarLabel={avatarLabel} />
-      <main className="container-page py-6">
-        <NavArrows />
-        {children}
-      </main>
+      {/* The on-screen Back/Home/Forward row is gone: browser chrome (and the
+          bottom nav on phones) already provides navigation, and the row spent
+          ~48px of every screen duplicating it. */}
+      <main className="container-page py-6">{children}</main>
       {/* The docket, wherever you are. Renders nothing when it is empty. */}
       <DocketTray />
       {/* Search, wherever you are — the sheet plus the phone's floating

@@ -126,6 +126,47 @@ test.describe('TEST 1+2 — join and invite', () => {
     await expect(page.getByTestId('room-status')).toContainText('1 of 2 minimum joined');
   });
 
+  test('the summons names the inviter and shows who is already in the room', async ({ page }) => {
+    // A second person opening the link must see who summoned them and who is
+    // already inside — everything from the room state the screen already
+    // polls, no new API surface.
+    await mockRoom(page, {
+      ...EMPTY_LOBBY,
+      hostName: 'Scott',
+      participants: [
+        { id: 'p-1', name: 'Scott', host: true },
+        { id: 'p-2', name: 'Amy' },
+      ],
+    });
+    await page.goto(HARNESS);
+    const join = page.getByTestId('court-join');
+    await expect(join).toBeVisible();
+    await expect(join).toContainText('Scott summoned you');
+    const roster = page.getByTestId('join-roster');
+    await expect(roster).toContainText('2 already in the room');
+    // One initial-chip per joined member, host and guest alike.
+    await expect(roster.locator('span[title="Scott"]')).toBeVisible();
+    await expect(roster.locator('span[title="Amy"]')).toBeVisible();
+  });
+
+  test('the Join button is plainly disabled without a name, and plainly enabled with one', async ({ page }) => {
+    await mockRoom(page, EMPTY_LOBBY);
+    await page.goto(HARNESS);
+    const btn = page.getByTestId('join-court');
+    await expect(btn).toBeDisabled();
+    const disabledBg = await btn.evaluate((el) => getComputedStyle(el).backgroundColor);
+    await page.getByPlaceholder('Your name').fill('Scott');
+    await expect(btn).toBeEnabled();
+    // The fill animates (`transition`), so poll until it settles rather than
+    // reading an interpolated frame. The two states must be visually distinct
+    // fills, not the same blue at half opacity — and the enabled fill is the
+    // high-contrast brand-600.
+    await expect
+      .poll(() => btn.evaluate((el) => getComputedStyle(el).backgroundColor))
+      .toBe('rgb(31, 82, 230)');
+    expect(disabledBg).not.toBe('rgb(31, 82, 230)');
+  });
+
   test('invite area: no raw URL, copy gives feedback, QR toggles', async ({ page }) => {
     await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
     await page.goto(HARNESS);

@@ -441,10 +441,38 @@ export function CourtRoom({ code }: { code: string }) {
       <Shell sync={sync}>
         <section data-testid="court-join" className="rounded-2xl border border-gold-400/30 bg-white/[0.03] p-5">
           <p className="text-[11px] font-black uppercase tracking-widest text-gold-300">⚖️ Official summons</p>
-          <h1 className="mt-1 text-lg font-bold text-white">You’ve been summoned to Court</h1>
+          <h1 className="mt-1 text-lg font-bold text-white">
+            {hostName ? `${hostName} summoned you` : 'You’ve been summoned to Court'}
+          </h1>
           <p className="mt-1 text-sm text-slate-400">
             Appear before the Court and help decide what to watch. Add your name to answer the summons — no account needed.
           </p>
+          {/* WHO'S ALREADY IN THE ROOM — the social proof that makes a bare
+              name field feel like a party instead of a form. Everything here
+              is the room state we already poll: the host's name above, and
+              each joined member as an initial-chip. Nothing new is fetched. */}
+          {participants.length > 0 && (
+            <div className="mt-3 flex items-center gap-2" data-testid="join-roster">
+              <div className="flex -space-x-2" aria-hidden>
+                {participants.slice(0, 6).map((p) => (
+                  <span
+                    key={p.id}
+                    title={p.name}
+                    className={`grid h-8 w-8 place-items-center rounded-full border-2 border-ink-950 text-xs font-black uppercase ${
+                      p.host ? 'bg-gold-500/80 text-ink-950' : 'bg-brand-500/70 text-white'
+                    }`}
+                  >
+                    {p.name.trim().charAt(0) || '?'}
+                  </span>
+                ))}
+              </div>
+              <span className="text-xs text-slate-300">
+                {participants.length === 1
+                  ? `${participants[0]!.name} is already in the room`
+                  : `${participants.length} already in the room`}
+              </span>
+            </div>
+          )}
           {mine?.signedIn && mine.name && (
             <button onClick={() => setName(mine.name!)} className="mt-3 w-full rounded-xl border border-brand-400/40 bg-brand-500/15 px-3 py-2.5 text-sm font-semibold text-brand-100">
               Continue as {mine.name} — uses your saved DNA
@@ -455,7 +483,18 @@ export function CourtRoom({ code }: { code: string }) {
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="input" maxLength={40} autoFocus />
           </label>
           {err && <p role="alert" className="mt-3 text-xs text-red-300">{err}</p>}
-          <button onClick={join} disabled={joining || !name.trim()} data-testid="join-court" className="btn-primary mt-4 w-full py-3">
+          {/* CONTRAST, AND AN HONEST DISABLED STATE. `btn-primary`'s white on
+              brand-500 sits at ~4.5:1 — borderline — and its disabled state
+              was the same blue at reduced opacity, so the button looked
+              broken-grey-on-blue while waiting for a name. Enabled is white
+              on brand-600 (≈6.4:1); disabled is a plainly different control:
+              flat dark fill, muted text, no glow. */}
+          <button
+            onClick={join}
+            disabled={joining || !name.trim()}
+            data-testid="join-court"
+            className="mt-4 w-full rounded-xl bg-brand-600 py-3 text-base font-bold text-white shadow-glow transition hover:bg-brand-500 disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none"
+          >
             {joining ? 'Joining…' : 'Join Court'}
           </button>
         </section>

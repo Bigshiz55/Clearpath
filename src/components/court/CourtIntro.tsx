@@ -1,7 +1,10 @@
+import { StartLiveCourt } from '@/components/StartLiveCourt';
+
 /**
- * The Court intro panel. Replaces the former mascot ("Judge Verity") entirely:
- * no character, no owl, no gavel — WatchVerd1ct itself is the intelligence.
- * Modern, premium and explanatory, using light Verd1ct terminology only.
+ * THE ONE LIVE COURT BLOCK. The landing page used to describe Live Court
+ * twice — this intro panel AND a second card below it with near-identical
+ * copy ("everyone joins from their own phone" appeared in both), each with
+ * its own way in. One block, two sentences, one button.
  */
 export function CourtIntro({ big = false }: { big?: boolean }) {
   return (
@@ -14,15 +17,12 @@ export function CourtIntro({ big = false }: { big?: boolean }) {
         Decide together, in one round
       </h2>
       <p className={`mt-2 text-slate-300 ${big ? 'text-sm sm:text-base' : 'text-xs'}`}>
-        Everyone joins from their own phone and reacts to the same shortlist. WatchVerd1ct scores
-        each title for every person, protects a real objection, and returns one Verd1ct with its
-        reasoning shown.
+        Everyone joins from their own phone and reacts to the same blind shortlist. WatchVerd1ct
+        scores each title for the whole room and returns one Verd1ct, with vetoes protected.
       </p>
-      <ul className={`mt-3 flex flex-wrap gap-x-4 gap-y-1 text-slate-400 ${big ? 'text-sm' : 'text-xs'}`}>
-        <li>Scored for everyone, not averaged</li>
-        <li>Two vetoes each</li>
-        <li>Hidden votes until you choose</li>
-      </ul>
+      <div className="mt-4">
+        <StartLiveCourt />
+      </div>
     </section>
   );
 }
