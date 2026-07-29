@@ -17,6 +17,9 @@ import {
   groupRank, winnerOf, appeal as appealNext, nextActionLabel, participantStatus, partialNote,
   roomReady, shortlistReady, type Reaction, type CandidateInput, type RankedCandidate,
 } from '@/lib/courtRoom';
+import { formatNames } from '@/lib/court/shareCard';
+import { useVerdictReveal } from '@/components/court/useVerdictReveal';
+import { ShareVerdictCard } from '@/components/court/ShareVerdictCard';
 
 /**
  * THE COURT — a modern group decision room. Five stages: JOIN → SET TONIGHT →
@@ -376,6 +379,16 @@ export function CourtRoom({ code }: { code: string }) {
   }, [state?.finalists, participants, participantId, myReactions]);
 
   const ranked = useMemo(() => groupRank(candidates), [candidates]);
+  // HOISTED ABOVE THE STAGE BRANCHES — winner/vetoedList feed the reveal
+  // sequence's hook, and hooks cannot be called conditionally inside a
+  // stage's early return. Cheap and pure before Stage 5 (ranked is simply
+  // empty), so computing it unconditionally costs nothing.
+  const winner = useMemo(
+    () => (appealed.length > 0 ? appealNext(candidates, appealed) : winnerOf(ranked)),
+    [ranked, candidates, appealed],
+  );
+  const vetoedList = useMemo(() => ranked.filter((r) => r.vetoed), [ranked]);
+  const reveal = useVerdictReveal(winner?.perMember.length ?? 0, vetoedList.length);
   const reactedCount = participants.filter((p) => (p.reactionCount ?? 0) > 0 || (p.id === participantId && Object.keys(myReactions).length > 0)).length;
   const snapshot = {
     participantCount: participants.length,
@@ -506,8 +519,16 @@ export function CourtRoom({ code }: { code: string }) {
   }
 
   // ===================== STAGE 5 — FINAL VERD1CT ============================
+  // §4 REVEAL SEQUENCE. `winner`/`vetoedList`/`reveal` are computed above the
+  // branches (hooks can't be conditional). Nothing about the DATA changes
+  // here — scoring, veto rules and room state are all untouched — only WHEN
+  // the client shows what it already fully holds: jurors' scores flip in one
+  // at a time, then the vetoed titles cross out with who struck them, then
+  // the winning title itself resolves last. `reveal.winnerRevealed` starts
+  // true under prefers-reduced-motion (see useVerdictReveal), so that path
+  // renders the final state on the very first frame — sequence honoured,
+  // wait removed.
   if (state.status === 'verdict' && ranked.length > 0) {
-    const winner = appealed.length > 0 ? appealNext(candidates, appealed) : winnerOf(ranked);
     const backup = winnerOf(groupRank(candidates.filter((c) => c.key !== winner?.key && !appealed.includes(c.key))));
     const note = partialNote(snapshot);
     if (!winner) {
@@ -526,65 +547,141 @@ export function CourtRoom({ code }: { code: string }) {
       <Shell onChat={() => setChatOpen(true)} unread={unread} sync={sync}>
         <section data-testid="court-verdict">
           <p className="text-xs font-semibold uppercase tracking-widest text-brand-300">Your group’s Verd1ct</p>
-          <h1 className="mt-1 text-2xl font-black leading-tight text-white sm:text-3xl">
-            {winner.title}{f?.year ? <span className="font-bold text-slate-400"> ({f.year})</span> : null}
-          </h1>
-          {note && <p data-testid="partial-note" className="mt-1 text-xs text-amber-200">{note}</p>}
-
-          <div className="mt-4 flex flex-col gap-4 sm:flex-row">
-            {f?.posterUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={f.posterUrl} alt={`Poster for ${winner.title}`} className="h-48 w-32 flex-none rounded-xl border border-white/10 object-cover" />
+          <h1 className="mt-1 text-2xl font-black leading-tight text-white sm:text-3xl" data-testid="verdict-headline">
+            {reveal.winnerRevealed ? (
+              <>{winner.title}{f?.year ? <span className="font-bold text-slate-400"> ({f.year})</span> : null}</>
+            ) : (
+              <span className="text-slate-400">Tallying the votes…</span>
             )}
-            <div className="min-w-0 flex-1 space-y-3">
-              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Group match</div>
-                  <div data-testid="group-match" className="text-4xl font-black tabular-nums text-white">{winner.groupScore}</div>
-                </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm tabular-nums text-slate-300">
-                  {winner.perMember.map((m) => (
-                    <span key={m.name}>{m.name} <b className="text-white">{m.score}</b></span>
-                  ))}
-                </div>
-              </div>
-              {winner.reasons.length > 0 && (
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Why it won</div>
-                  <ul className="mt-1 space-y-0.5 text-sm text-slate-300">
-                    {winner.reasons.map((r) => <li key={r}>· {r}</li>)}
-                  </ul>
-                </div>
-              )}
-              {f && f.streaming.length > 0 ? (
-                <p className="text-sm text-slate-300">
-                  <span className="text-slate-400">Available on</span> {f.streaming.join(', ')}
-                  <span className="ml-1 text-xs text-slate-500">· availability likely (listings source)</span>
-                </p>
-              ) : (
-                <p className="text-sm text-amber-200">Availability unconfirmed for your group’s services.</p>
-              )}
+          </h1>
+
+          {/* JURORS' SCORES FLIP IN FIRST — for the title the room is about to
+              name, before it's named. Named again on the reveal (the title
+              text above), so nothing here spoils it early or leaves it
+              unexplained. */}
+          <div className="mt-4" data-testid="verdict-jury-reveal">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Everyone’s score for tonight’s winner</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {winner.perMember.map((m, i) => {
+                const shown = i < reveal.revealedJurors;
+                return (
+                  <span
+                    key={m.name}
+                    data-testid="verdict-juror"
+                    data-revealed={shown ? 'true' : 'false'}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-slate-300"
+                  >
+                    {m.name}{' '}
+                    {shown ? (
+                      <b className="wv-flip-in tabular-nums text-white">{m.score}</b>
+                    ) : (
+                      <b aria-hidden className="tabular-nums text-slate-600">···</b>
+                    )}
+                  </span>
+                );
+              })}
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Link href={`/app/title/${f?.mediaType ?? 'movie'}/${f?.id ?? 0}`} className="btn-primary">Watch now</Link>
-            <button onClick={() => void react(winner.key, 'maybe', 'save for later')} className="btn-secondary">Save for later</button>
-            <button
-              data-testid="appeal"
-              onClick={() => setAppealed((prev) => [...prev, winner.key])}
-              className="rounded-xl border border-white/12 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/5"
-            >
-              Appeal
-            </button>
-          </div>
-
-          {backup && (
-            <div data-testid="backup" className="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Backup option</div>
-              <div className="mt-0.5 text-sm text-white">{backup.title} <span className="tabular-nums text-slate-400">· {backup.groupScore}</span></div>
+          {/* THEN THE VETOED TITLES — struck through, naming who struck them. */}
+          {vetoedList.length > 0 && (
+            <div className="mt-4 space-y-1.5" data-testid="verdict-veto-reveal">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Titles the room vetoed</p>
+              {vetoedList.slice(0, reveal.revealedVetoes).map((v) => (
+                <p key={v.key} data-testid="verdict-veto-row" className="wv-reveal-in text-sm">
+                  <span className="text-slate-500 line-through">{v.title}</span>{' '}
+                  <span className="text-red-300">— vetoed by {formatNames(v.vetoedBy)}</span>
+                </p>
+              ))}
             </div>
           )}
+
+          {/* THE WINNER RESOLVES LAST — poster, group match, why it won,
+              availability and the action row all arrive together, once the
+              evidence above has finished making its case. A fixed-height
+              skeleton holds the space so nothing jumps when it does. */}
+          <div className={`mt-5 ${reveal.winnerRevealed ? 'wv-verdict-in' : ''}`} data-testid="verdict-winner">
+            {!reveal.winnerRevealed ? (
+              <div aria-hidden className="animate-pulse space-y-3" data-testid="verdict-winner-pending">
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  <div className="h-48 w-32 flex-none rounded-xl bg-white/5" />
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="h-10 w-24 rounded bg-white/5" />
+                    <div className="h-4 w-48 rounded bg-white/5" />
+                    <div className="h-4 w-64 rounded bg-white/5" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                {note && <p data-testid="partial-note" className="mb-3 text-xs text-amber-200">{note}</p>}
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  {f?.posterUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={f.posterUrl} alt={`Poster for ${winner.title}`} className="h-48 w-32 flex-none rounded-xl border border-white/10 object-cover" />
+                  )}
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Group match</div>
+                      <div data-testid="group-match" className="text-4xl font-black tabular-nums text-white">{winner.groupScore}</div>
+                    </div>
+                    {winner.reasons.length > 0 && (
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Why it won</div>
+                        <ul className="mt-1 space-y-0.5 text-sm text-slate-300">
+                          {winner.reasons.map((r) => <li key={r}>· {r}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                    {f && f.streaming.length > 0 ? (
+                      <p className="text-sm text-slate-300">
+                        <span className="text-slate-400">Available on</span> {f.streaming.join(', ')}
+                        <span className="ml-1 text-xs text-slate-500">· availability likely (listings source)</span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-amber-200">Availability unconfirmed for your group’s services.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Link href={`/app/title/${f?.mediaType ?? 'movie'}/${f?.id ?? 0}`} className="btn-primary">Watch now</Link>
+                  <button onClick={() => void react(winner.key, 'maybe', 'save for later')} className="btn-secondary">Save for later</button>
+                  <button
+                    data-testid="appeal"
+                    onClick={() => setAppealed((prev) => [...prev, winner.key])}
+                    className="rounded-xl border border-white/12 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/5"
+                  >
+                    Appeal
+                  </button>
+                </div>
+
+                {backup && (
+                  <div data-testid="backup" className="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Backup option</div>
+                    <div className="mt-0.5 text-sm text-white">{backup.title} <span className="tabular-nums text-slate-400">· {backup.groupScore}</span></div>
+                  </div>
+                )}
+
+                {/* §1–§3 THE SHAREABLE VERD1CT CARD. Only once the winner has
+                    actually resolved — sharing an image before the room's own
+                    reveal has finished would spoil it for the room itself. */}
+                <div className="mt-5">
+                  <ShareVerdictCard
+                    data={{
+                      title: winner.title,
+                      year: f?.year ?? null,
+                      posterUrl: f?.posterUrl ?? null,
+                      groupScore: winner.groupScore,
+                      joinUrl: shareUrl,
+                      jurors: winner.perMember,
+                      vetoed: vetoedList.map((v) => ({ title: v.title, byNames: v.vetoedBy })),
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </section>
         {chatOpen && <ChatPanel messages={messages} me={myName} draft={draft} setDraft={setDraft} onSend={sendChat} onClose={() => setChatOpen(false)} failed={sendFailed} onRetry={() => sendFailed && sendChat(sendFailed)} />}
       </Shell>
@@ -888,7 +985,7 @@ export function CourtRoom({ code }: { code: string }) {
             </button>
             {!roomReady(snapshot) && (
               <p className="mt-2 text-[11px] text-slate-500" data-testid="solo-note">
-                You can build and preview the court solo — the final Verd1ct unlocks when one more juror joins.
+                You can build and preview the court solo — the final Verd1ct unlocks when one more person joins.
               </p>
             )}
           </>
@@ -956,7 +1053,7 @@ function ActivityFeed({
       </ul>
       <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto border-t border-white/10 pt-3">
         {messages.length === 0 ? (
-          <p className="text-xs text-slate-500">No messages yet — say hi while the jury assembles.</p>
+          <p className="text-xs text-slate-500">No messages yet — say hi while everyone assembles.</p>
         ) : (
           messages.map((m) => (
             <p key={m.id} className="text-sm leading-snug">

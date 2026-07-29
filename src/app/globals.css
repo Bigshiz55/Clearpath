@@ -363,6 +363,26 @@ body {
 .wv-order { animation: wv-order-flash 1.7s ease-out both; }
 .wv-verdict-in { animation: wv-verdict-in 0.5s ease-out both; }
 
+/* THE VERD1CT REVEAL SEQUENCE (Stage 3, §4). A juror's score "flips" from
+   hidden to visible; a vetoed row fades/slides in as it takes its turn. Both
+   are driven by React state from `useVerdictReveal`'s timeline — these
+   classes only animate the moment an element mounts or its content changes,
+   they never control WHEN that happens. The global prefers-reduced-motion
+   rule above already collapses their duration to ~0; the JS-side stagger is
+   skipped separately (see useVerdictReveal), so reduced motion gets an
+   instant reveal on both axes. */
+@keyframes wv-flip-in {
+  0%   { transform: scaleX(0.15); opacity: 0.2; }
+  60%  { transform: scaleX(1.08); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 1; }
+}
+.wv-flip-in { display: inline-block; animation: wv-flip-in 0.3s ease-out both; transform-origin: center; }
+@keyframes wv-reveal-in {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.wv-reveal-in { animation: wv-reveal-in 0.32s ease-out both; }
+
 /* Twisting DNA helix + pulsing halo for the "VERD1CT DNA updating" burst. */
 @keyframes wv-dna-twist {
   0%   { transform: rotateY(0deg) scale(1); }

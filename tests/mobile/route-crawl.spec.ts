@@ -63,6 +63,7 @@ const HARNESS_ROUTES = [
   '/dev/onboarding',
   '/dev/post-watch',
   '/dev/together',
+  '/dev/share-card',
   '/dev/logo',
   '/dev/search-qa',
   '/dev/reco-lab',
