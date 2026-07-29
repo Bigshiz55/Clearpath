@@ -80,9 +80,20 @@ const ALLOWED_CONSOLE = [
   /Failed to load resource/i,
   /net::ERR_/i,
   /401|403|404 \(/,
-  // React dev-mode hydration notes for intentionally client-corrected clocks
-  // (see `suppressHydrationWarning` in the guide/rail components).
-  /hydrat/i,
+  // THE HARNESS POINTS SUPABASE AT A HOST THAT CANNOT RESOLVE, on purpose:
+  // `harness.invalid` is in the reserved `.invalid` TLD, so no request can ever
+  // leave and no real project is ever contacted. Two failures follow by
+  // construction, and both name their own cause in the text we match on — the
+  // anonymous sign-in every public page kicks off, and the realtime socket the
+  // Court opens. Neither is reachable from the product's code paths in
+  // production, where the host resolves.
+  //
+  // These are matched on the specific call and the specific host rather than on
+  // a bare "Failed to fetch", because a blanket match would swallow a genuine
+  // request failure in app code. See the `pageerror` note below for what a
+  // sloppy suppression cost last time.
+  /signInAnonymously/,
+  /harness\.invalid/,
   // Next.js image/font preload advisories — performance hints, not errors.
   /preload/i,
 ];
@@ -102,17 +113,20 @@ async function visit(page: Page, route: string): Promise<{ status: number | null
     if (ALLOWED_CONSOLE.some((re) => re.test(text))) return;
     findings.consoleErrors.push(text);
   });
-  // An uncaught exception that reaches the page is a defect — with ONE
-  // documented exception. React #423 is "hydration failed, falling back to
-  // client rendering", and the Court harness provokes it by design: it mounts
-  // the real room with NO Supabase behind it, so the server renders the
-  // connecting state and the client immediately renders the failed one. In
-  // production that path has a real backend, and `court.spec.ts` drives the
-  // whole room with the RPCs intercepted. Any OTHER exception still fails.
-  page.on('pageerror', (e: Error) => {
-    if (/Minified React error #(418|423|425)/.test(e.message)) return;
-    findings.pageErrors.push(e.message);
-  });
+  // AN UNCAUGHT EXCEPTION THAT REACHES THE PAGE IS A DEFECT. NO EXCEPTIONS —
+  // and that word is load-bearing.
+  //
+  // This listener briefly allowlisted React #418/#423/#425 as "hydration
+  // fallback noise the harness provokes by design". That was wrong, and the
+  // allowlist hid a real crash: the Court room was white-screening with
+  // "Application error: a client-side exception has occurred". The crawler
+  // reported /dev/court as clean for as long as the allowlist stood, and only
+  // `court.spec.ts` — which asserts on actual content — caught it.
+  //
+  // The lesson is the rule: a suppression written to explain a symptom you have
+  // not diagnosed will eventually suppress a defect. If a route throws, either
+  // fix the route or fix the harness, and never quiet the messenger.
+  page.on('pageerror', (e: Error) => findings.pageErrors.push(e.message));
   page.on('requestfailed', (r: Request) => {
     if (r.resourceType() === 'image') findings.brokenImages.push(r.url());
   });
@@ -148,6 +162,15 @@ test.describe('every route loads without an error', () => {
       // hides.
       const text = (await page.locator('body').innerText()).trim();
       expect(text.length, `${route} rendered an empty page`).toBeGreaterThan(0);
+
+      // AND IT RENDERED THE PAGE, NOT NEXT'S APOLOGY FOR IT. A crashed client
+      // component still returns 200 with a non-empty body, so every check above
+      // passes while the user stares at a white screen. This is the assertion
+      // that would have caught the Court crash on its own, without depending on
+      // an exception being reported at all.
+      expect(text, `${route} rendered the client-side error fallback`).not.toContain(
+        'Application error',
+      );
     });
   }
 });

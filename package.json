@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:harness": "MOBILE_HARNESS=1 NEXT_PUBLIC_SUPABASE_URL=https://harness.invalid NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=harness-anon-key next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
