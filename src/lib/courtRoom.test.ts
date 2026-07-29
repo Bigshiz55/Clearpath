@@ -89,7 +89,11 @@ describe('staged readiness — no rigid gate on every action', () => {
   });
 
   it('the primary label always explains the next action — never a mystery', () => {
-    expect(nextActionLabel({ participantCount: 1, candidateCount: 0, reactedCount: 0, stage: 'open' })).toBe('Invite at least one more person');
+    // STAGE 2: a solo host builds and previews freely — the open stage never
+    // demands an invite. Only the final Verd1ct waits for a second juror, and
+    // the reacting-stage label says exactly what unlocks it.
+    expect(nextActionLabel({ participantCount: 1, candidateCount: 0, reactedCount: 0, stage: 'open' })).toBe('Add titles or build our shortlist');
+    expect(nextActionLabel({ participantCount: 1, candidateCount: 4, reactedCount: 1, stage: 'reacting' })).toBe('Invite one more juror to unlock the Verd1ct');
     expect(nextActionLabel({ participantCount: 2, candidateCount: 1, reactedCount: 0, stage: 'open' })).toBe('Add titles or build our shortlist');
     expect(nextActionLabel({ participantCount: 2, candidateCount: 4, reactedCount: 0, stage: 'open' })).toBe('4 titles ready — start choosing');
     expect(nextActionLabel({ participantCount: 3, candidateCount: 4, reactedCount: 1, stage: 'reacting' })).toBe('1 of 3 have reacted');

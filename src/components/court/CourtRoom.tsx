@@ -89,6 +89,9 @@ export function CourtRoom({ code }: { code: string }) {
   // two devices can never end up believing different sizes.
   const [pendingSize, setPendingSize] = useState<CourtSize | null>(null);
   const [sizeBusy, setSizeBusy] = useState(false);
+  // The Advanced disclosure (type / runtime / court size) — collapsed by
+  // default; the defaults are what almost every room wants.
+  const [advOpen, setAdvOpen] = useState(false);
 
   // Stage 3 — shortlist
   const [picks, setPicks] = useState<Pick[]>([]);
@@ -659,7 +662,15 @@ export function CourtRoom({ code }: { code: string }) {
             })}
           </div>
           {isHost && (
-            <button onClick={revealVerdict} disabled={busy} data-testid="reveal" className="btn-primary mt-4 w-full py-3">
+            // THE ONE GATE THAT REMAINS. Everything before this point works
+            // solo; a Verd1ct for a jury of one is not a group decision, so
+            // the reveal — and only the reveal — waits for a second juror.
+            <button
+              onClick={revealVerdict}
+              disabled={busy || !roomReady(snapshot)}
+              data-testid="reveal"
+              className="btn-primary mt-4 w-full py-3 disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none"
+            >
               {nextActionLabel(snapshot)}
             </button>
           )}
@@ -670,8 +681,12 @@ export function CourtRoom({ code }: { code: string }) {
   }
 
   // ============ STAGES 2 + 3 — SET TONIGHT · BUILD THE SHORTLIST ============
+  // THREE COLUMNS FROM `xl` (1280): jury roster + room controls on the left,
+  // the court itself in the middle, the live activity feed on the right.
+  // A single column below 1280 — the phone flow is untouched.
   return (
-    <Shell onChat={() => setChatOpen(true)} unread={unread} sync={sync}>
+    <Shell wide onChat={() => setChatOpen(true)} unread={unread} sync={sync}>
+      <div className="xl:grid xl:grid-cols-3 xl:items-start xl:gap-5" data-testid="lobby-grid">
       {/* Your group */}
       <section data-testid="court-group" className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -714,31 +729,21 @@ export function CourtRoom({ code }: { code: string }) {
         </div>
       </section>
 
-      {/* Stage 2 — Set tonight */}
-      <section data-testid="court-tonight" className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      {/* CENTER COLUMN — the court itself. */}
+      <div>
+      {/* Stage 2 — Set tonight. TWO QUESTIONS BY DEFAULT: what sounds good and
+          what to avoid. Content type and runtime are real controls but their
+          DEFAULTS ("Either", "No limit") are what almost every room wants, so
+          they live behind Advanced with the room-size setting instead of
+          costing every juror two more decisions. The whole default form fits a
+          900px viewport without scrolling. */}
+      <section data-testid="court-tonight" className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 xl:mt-0">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-bold text-white">Tonight’s preferences</h2>
           {tonightDone
             ? <button onClick={() => setTonightDone(false)} className="text-xs font-semibold text-brand-300">Edit</button>
             : <span className="text-xs text-slate-500">Takes ~20 seconds · tonight only</span>}
         </div>
-
-        {/* ROOM SETTING — the host controls it, everyone sees it. Shown above
-            the personal questions so a member knows how many titles the room
-            will weigh before deciding how much to fill in. */}
-        <div className="mt-3">
-          <CourtSizePicker
-            value={courtSize}
-            onChange={changeCourtSize}
-            isHost={isHost}
-            hostName={hostName}
-            locked={sizeLocked}
-            busy={sizeBusy}
-          />
-        </div>
-        <p className="mt-3 border-t border-white/10 pt-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-          Your own preferences
-        </p>
         {tonightDone ? (
           <p className="mt-2 text-sm text-slate-300">
             {KINDS.find((k) => k.k === tonight.kind)?.label}
@@ -748,26 +753,76 @@ export function CourtRoom({ code }: { code: string }) {
           </p>
         ) : (
           <div className="mt-3 space-y-3">
-            <Field label="What are we watching?">
-              {KINDS.map((k) => (
-                <Chip key={k.k} on={tonight.kind === k.k} onClick={() => setTonight({ ...tonight, kind: k.k })}>{k.label}</Chip>
-              ))}
-            </Field>
             <Field label="What sounds good? (up to 3)">
               {MOODS.map((m) => (
-                <Chip key={m} context="Sounds good" on={tonight.moods.includes(m)} onClick={() => setTonight({ ...tonight, moods: toggleIn(tonight.moods, m, 3) })}>{m}</Chip>
+                <Chip
+                  key={m}
+                  context="Sounds good"
+                  on={tonight.moods.includes(m)}
+                  // A GENRE CANNOT BE WANTED AND AVOIDED AT ONCE. Horror sits in
+                  // both lists; picking it in one disables it in the other, and
+                  // toggling it on scrubs it from the other side defensively.
+                  disabled={tonight.avoid.includes(m)}
+                  disabledReason="in your avoid list"
+                  onClick={() => setTonight({ ...tonight, moods: toggleIn(tonight.moods, m, 3), avoid: tonight.avoid.filter((x) => x !== m) })}
+                >
+                  {m}
+                </Chip>
               ))}
             </Field>
             <Field label="Anything to avoid?">
               {AVOIDS.map((a) => (
-                <Chip key={a} context="Avoid" on={tonight.avoid.includes(a)} onClick={() => setTonight({ ...tonight, avoid: toggleIn(tonight.avoid, a) })}>{a}</Chip>
+                <Chip
+                  key={a}
+                  context="Avoid"
+                  on={tonight.avoid.includes(a)}
+                  disabled={tonight.moods.includes(a)}
+                  disabledReason="in your sounds-good list"
+                  onClick={() => setTonight({ ...tonight, avoid: toggleIn(tonight.avoid, a), moods: tonight.moods.filter((x) => x !== a) })}
+                >
+                  {a}
+                </Chip>
               ))}
             </Field>
-            <Field label="How much time do we have?">
-              {TIMES.map((t) => (
-                <Chip key={t.k} on={tonight.time === t.k} onClick={() => setTonight({ ...tonight, time: t.k })}>{t.label}</Chip>
-              ))}
-            </Field>
+
+            {/* ADVANCED — everything with a good default. Content type
+                ("Either") and runtime ("No limit") for everyone; the room-size
+                setting rides along here too (the host's selector, a member's
+                read-only note), collapsed until asked for. */}
+            <div className="border-t border-white/10 pt-3">
+              <button
+                type="button"
+                data-testid="advanced-toggle"
+                aria-expanded={advOpen}
+                onClick={() => setAdvOpen((o) => !o)}
+                className="text-xs font-semibold text-slate-400 underline decoration-dotted underline-offset-2 hover:text-white"
+              >
+                {advOpen ? 'Hide advanced' : 'Advanced — type, runtime & court size'}
+              </button>
+              {advOpen && (
+                <div className="mt-3 space-y-3" data-testid="advanced-panel">
+                  <Field label="What are we watching?">
+                    {KINDS.map((k) => (
+                      <Chip key={k.k} on={tonight.kind === k.k} onClick={() => setTonight({ ...tonight, kind: k.k })}>{k.label}</Chip>
+                    ))}
+                  </Field>
+                  <Field label="How much time do we have?">
+                    {TIMES.map((t) => (
+                      <Chip key={t.k} on={tonight.time === t.k} onClick={() => setTonight({ ...tonight, time: t.k })}>{t.label}</Chip>
+                    ))}
+                  </Field>
+                  <CourtSizePicker
+                    value={courtSize}
+                    onChange={changeCourtSize}
+                    isHost={isHost}
+                    hostName={hostName}
+                    locked={sizeLocked}
+                    busy={sizeBusy}
+                  />
+                </div>
+              )}
+            </div>
+
             <p className="text-[11px] text-slate-500">These apply to tonight only — your saved DNA is untouched.</p>
             <div className="flex flex-wrap gap-2">
               <button data-testid="tonight-ready" onClick={() => { setTonightDone(true); void saveTonight(tonight, true); }} className="btn-primary text-sm">I’m ready</button>
@@ -818,14 +873,25 @@ export function CourtRoom({ code }: { code: string }) {
         {err && <p role="alert" className="mt-3 text-xs text-red-300">{err}</p>}
 
         {isHost ? (
-          <button
-            data-testid="build-shortlist"
-            onClick={buildShortlist}
-            disabled={building || !roomReady(snapshot)}
-            className="btn-primary mt-4 w-full py-3"
-          >
-            {building ? 'Building our shortlist…' : roomReady(snapshot) ? 'Build our shortlist' : 'Invite at least one more person'}
-          </button>
+          <>
+            {/* SOLO IS A REAL STATE, NOT A LOCKED DOOR. The host can build and
+                preview the whole court alone — the only thing a second juror
+                unlocks is the final Verd1ct, and THAT gate lives on the reveal
+                button, where it belongs. */}
+            <button
+              data-testid="build-shortlist"
+              onClick={buildShortlist}
+              disabled={building}
+              className="btn-primary mt-4 w-full py-3"
+            >
+              {building ? 'Building our shortlist…' : 'Build our shortlist'}
+            </button>
+            {!roomReady(snapshot) && (
+              <p className="mt-2 text-[11px] text-slate-500" data-testid="solo-note">
+                You can build and preview the court solo — the final Verd1ct unlocks when one more juror joins.
+              </p>
+            )}
+          </>
         ) : (
           <p className="mt-4 text-sm text-slate-400" data-testid="guest-wait">{nextActionLabel(snapshot)}</p>
         )}
@@ -836,9 +902,87 @@ export function CourtRoom({ code }: { code: string }) {
           <p className="mt-1 text-[11px] text-slate-500">Fewer than 3 possibilities so far. Building the shortlist will fill in verified options.</p>
         )}
       </section>
+      </div>
+
+      {/* RIGHT COLUMN — the live activity feed, desktop only. Below `xl` the
+          floating Group chat panel carries the same conversation. */}
+      <ActivityFeed
+        participants={participants}
+        messages={messages}
+        me={myName}
+        draft={draft}
+        setDraft={setDraft}
+        onSend={sendChat}
+      />
+      </div>
 
       {chatOpen && <ChatPanel messages={messages} me={myName} draft={draft} setDraft={setDraft} onSend={sendChat} onClose={() => setChatOpen(false)} failed={sendFailed} onRetry={() => sendFailed && sendChat(sendFailed)} />}
     </Shell>
+  );
+}
+
+/**
+ * THE LIVE ACTIVITY FEED — the lobby's right column from `xl`. Joins and
+ * ready-states from the roster the room already polls, then the group chat
+ * inline (same messages, same send RPC as the floating panel — one
+ * conversation, two viewports). Nothing here is a new data source.
+ */
+function ActivityFeed({
+  participants,
+  messages,
+  me,
+  draft,
+  setDraft,
+  onSend,
+}: {
+  participants: Participant[];
+  messages: ChatMessage[];
+  me: string;
+  draft: string;
+  setDraft: (v: string) => void;
+  onSend: (body: string) => void;
+}) {
+  return (
+    <aside className="hidden xl:flex xl:max-h-[80vh] xl:flex-col xl:rounded-2xl xl:border xl:border-white/10 xl:bg-white/[0.03] xl:p-4" data-testid="activity-feed">
+      <h2 className="text-base font-bold text-white">Live activity</h2>
+      <ul className="mt-2 space-y-1 text-xs text-slate-400">
+        {participants.map((p) => (
+          <li key={p.id} data-testid="activity-event">
+            <span className="font-semibold text-slate-300">{p.name}</span>
+            {p.host ? ' opened the court' : ' joined'}
+            {p.ready ? ' · ready' : ''}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto border-t border-white/10 pt-3">
+        {messages.length === 0 ? (
+          <p className="text-xs text-slate-500">No messages yet — say hi while the jury assembles.</p>
+        ) : (
+          messages.map((m) => (
+            <p key={m.id} className="text-sm leading-snug">
+              <span className={`font-bold ${m.sender === me ? 'text-brand-200' : 'text-white'}`}>{m.sender}</span>{' '}
+              <span className="text-slate-300">{m.body}</span>
+            </p>
+          ))
+        )}
+      </div>
+      <form
+        className="mt-3 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (draft.trim()) onSend(draft.trim());
+        }}
+      >
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Message the room…"
+          aria-label="Message the room"
+          className="input min-w-0 flex-1"
+        />
+        <button type="submit" className="btn-secondary flex-none text-sm">Send</button>
+      </form>
+    </aside>
   );
 }
 
@@ -851,7 +995,22 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Chip({ on, onClick, children, context }: { on: boolean; onClick: () => void; children: React.ReactNode; context?: string }) {
+function Chip({
+  on,
+  onClick,
+  children,
+  context,
+  disabled = false,
+  disabledReason,
+}: {
+  on: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  context?: string;
+  /** A chip selected in the OPPOSITE list — you can't want and avoid it. */
+  disabled?: boolean;
+  disabledReason?: string;
+}) {
   return (
     <button
       type="button"
@@ -860,9 +1019,16 @@ function Chip({ on, onClick, children, context }: { on: boolean; onClick: () => 
       // two buttons are indistinguishable to a screen reader.
       aria-label={context ? `${context}: ${String(children)}` : undefined}
       aria-pressed={on}
+      aria-disabled={disabled || undefined}
+      disabled={disabled}
+      title={disabled && disabledReason ? `Already ${disabledReason}` : undefined}
       onClick={onClick}
       className={`min-h-[36px] rounded-full border px-3 text-xs font-semibold transition ${
-        on ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/[0.04] text-slate-300 hover:bg-white/10'
+        disabled
+          ? 'cursor-not-allowed border-white/5 bg-transparent text-slate-600 line-through'
+          : on
+            ? 'border-brand-400/60 bg-brand-500/20 text-brand-100'
+            : 'border-white/12 bg-white/[0.04] text-slate-300 hover:bg-white/10'
       }`}
     >
       {on ? '✓ ' : ''}{children}
@@ -925,7 +1091,22 @@ function ChatPanel({
   );
 }
 
-function Shell({ children, onChat, unread = 0, sync }: { children: React.ReactNode; onChat?: () => void; unread?: number; sync?: SyncStatus }) {
+function Shell({
+  children,
+  onChat,
+  unread = 0,
+  sync,
+  wide = false,
+}: {
+  children: React.ReactNode;
+  onChat?: () => void;
+  unread?: number;
+  sync?: SyncStatus;
+  /** The lobby's three-column desktop mode: the shell widens to 1720px from
+   *  `xl` so a 1920 screen carries three ≤640px columns with ≤120px gutters,
+   *  and the floating chat button stands down where the feed is inline. */
+  wide?: boolean;
+}) {
   return (
     <div className="min-h-dvh pb-24 sm:pb-8">
       {/* The global build badge floats across the top of every screen, so the
@@ -953,7 +1134,11 @@ function Shell({ children, onChat, unread = 0, sync }: { children: React.ReactNo
             </span>
           )}
         {onChat && (
-          <button onClick={onChat} data-testid="open-chat" className="relative min-h-[44px] rounded-xl border border-white/12 px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/5">
+          <button
+            onClick={onChat}
+            data-testid="open-chat"
+            className={`relative min-h-[44px] rounded-xl border border-white/12 px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/5 ${wide ? 'xl:hidden' : ''}`}
+          >
             Group chat
             {unread > 0 && (
               <span data-testid="chat-unread" className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-black text-white">{unread}</span>
@@ -962,7 +1147,7 @@ function Shell({ children, onChat, unread = 0, sync }: { children: React.ReactNo
         )}
         </span>
       </header>
-      <main className="container-page mx-auto max-w-2xl py-3">{children}</main>
+      <main className={`mx-auto w-full py-3 ${wide ? 'max-w-2xl px-4 sm:px-6 xl:max-w-[1760px]' : 'container-page max-w-2xl'}`}>{children}</main>
     </div>
   );
 }

@@ -119,7 +119,8 @@ test.describe('TEST 1+2 — join and invite', () => {
     await page.getByTestId('join-court').click();
 
     await expect(page.getByTestId('court-group')).toBeVisible();
-    await expect(page.getByText('Scott')).toBeVisible();
+    // Scoped: "Scott" also appears in the xl activity feed's roster events.
+    await expect(page.getByTestId('court-group').getByText('Scott')).toBeVisible();
     // Explicit status, never a bare mystery number.
     await expect(page.getByTestId('participant-status').first()).toHaveText('Still choosing');
     // Room status is actionable language, not "NEED 2+ TO START".
@@ -194,6 +195,9 @@ test.describe('TEST 3 — tonight setup is temporary', () => {
 
     const tonight = page.getByTestId('court-tonight');
     await expect(tonight).toContainText('tonight only');
+    // Content type and runtime moved behind the Advanced disclosure (defaults
+    // "Either" / "No limit"); open it to set non-default values.
+    await tonight.getByTestId('advanced-toggle').click();
     await tonight.getByRole('button', { name: 'Movie', exact: true }).click();
     await tonight.getByRole('button', { name: 'Mystery' }).click();
     await tonight.getByRole('button', { name: 'Thriller' }).click();
@@ -534,6 +538,9 @@ test.describe('TEST 11 — live sync', () => {
   });
 
   test('a broadcast delivers a message far faster than the heartbeat poll', async ({ page }) => {
+    // The floating chat panel is the sub-xl path (the xl lobby carries the
+    // conversation inline in the activity feed) — test it at laptop width.
+    await page.setViewportSize({ width: 1024, height: 800 });
     const socket = await mockRealtime(page);
     const { room } = await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
     await joinAs(page, 'Scott');
@@ -546,12 +553,13 @@ test.describe('TEST 11 — live sync', () => {
     room.messages.push({ id: 'm-remote', sender: 'Heather', body: 'I am in for the mystery', at: new Date(0).toISOString() });
     const started = Date.now();
     await socket.broadcast('chat');
-    await expect(page.getByText('I am in for the mystery')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByTestId('group-chat').getByText('I am in for the mystery')).toBeVisible({ timeout: 3_000 });
     // The live poll interval is 15s, so arriving inside 3s can only be the push.
     expect(Date.now() - started, 'message must arrive by push, not by poll').toBeLessThan(3_000);
   });
 
   test('the socket carries no room data — chat bodies only travel through the RPC', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 800 });
     const socket = await mockRealtime(page);
     await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
     await joinAs(page, 'Scott');
@@ -560,7 +568,7 @@ test.describe('TEST 11 — live sync', () => {
     await page.getByTestId('open-chat').click();
     await page.getByTestId('chat-input').fill('my private plan for tonight');
     await page.getByTestId('chat-send').click();
-    await expect(page.getByText('my private plan for tonight')).toBeVisible();
+    await expect(page.getByTestId('group-chat').getByText('my private plan for tonight')).toBeVisible();
 
     // An announcement went out...
     const broadcasts = socket.sent.filter((f) => f.includes('"broadcast"'));
@@ -573,6 +581,7 @@ test.describe('TEST 11 — live sync', () => {
   });
 
   test('with the socket down the room says so and keeps working by polling', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 800 });
     // No mockRealtime: wss://harness.invalid is unreachable, exactly like a
     // member on a flaky connection.
     const { room } = await mockRoom(page, { ...EMPTY_LOBBY, participants: [{ id: 'p-1', name: 'Scott' }] });
@@ -582,7 +591,7 @@ test.describe('TEST 11 — live sync', () => {
 
     // Degraded must still mean working: the 2s fallback poll picks this up.
     room.participants.push({ id: 'p-2', name: 'Heather' });
-    await expect(page.getByText('Heather')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByTestId('court-group').getByText('Heather')).toBeVisible({ timeout: 8_000 });
     await page.screenshot({ path: path.join(SHOTS, '11-degraded.png') });
   });
 });
@@ -604,6 +613,9 @@ test.describe('TEST 12 — host controls the title count', () => {
     await asHost(page);
     await joinAs(page, 'Heather');
 
+    // The selector lives behind the Advanced disclosure, collapsed by default.
+    await expect(page.getByTestId('court-size-picker')).toHaveCount(0);
+    await page.getByTestId('advanced-toggle').click();
     await expect(page.getByTestId('court-size-picker')).toBeVisible();
     await expect(page.getByTestId('court-size-standard')).toHaveAttribute('aria-checked', 'true');
     await page.screenshot({ path: path.join(SHOTS, '12-host.png'), fullPage: true });
@@ -626,6 +638,9 @@ test.describe('TEST 12 — host controls the title count', () => {
     // No host token: this member arrived by invite link.
     await joinAs(page, 'Amy');
 
+    // A member NEVER sees the selector — before or after opening Advanced.
+    await expect(page.getByTestId('court-size-picker')).toHaveCount(0);
+    await page.getByTestId('advanced-toggle').click();
     await expect(page.getByTestId('court-size-picker')).toHaveCount(0);
     const card = page.getByTestId('court-size-readonly');
     await expect(card).toBeVisible();
@@ -643,10 +658,12 @@ test.describe('TEST 12 — host controls the title count', () => {
     await joinAs(page, 'Amy');
 
     const tonight = page.getByTestId('court-tonight');
-    // Content type, genres, exclusions and runtime are all still theirs to set.
-    await tonight.getByRole('button', { name: 'Show', exact: true }).click();
+    // Content type, genres, exclusions and runtime are all still theirs to set
+    // — type and runtime behind Advanced, the two questions in front.
     await tonight.getByRole('button', { name: 'Sounds good: Comedy' }).click();
     await tonight.getByRole('button', { name: 'Avoid: Horror' }).click();
+    await tonight.getByTestId('advanced-toggle').click();
+    await tonight.getByRole('button', { name: 'Show', exact: true }).click();
     await tonight.getByRole('button', { name: 'Under 90 min' }).click();
     await page.getByTestId('tonight-ready').click();
 
@@ -667,6 +684,7 @@ test.describe('TEST 12 — host controls the title count', () => {
       courtSize: 'standard',
     });
     await joinAs(page, 'Amy');
+    await page.getByTestId('advanced-toggle').click();
     await expect(page.getByTestId('court-size-headline')).toHaveText('Standard Court selected by Heather');
 
     // The host (another device) changes it; the room broadcasts.
@@ -684,9 +702,11 @@ test.describe('TEST 12 — host controls the title count', () => {
       courtSize: 'deep',
     });
     await joinAs(page, 'Amy');
+    await page.getByTestId('advanced-toggle').click();
     await expect(page.getByTestId('court-size-headline')).toHaveText('Deep Court selected by Heather');
     await page.reload();
     // Read back from the room, not from this device's storage.
+    await page.getByTestId('advanced-toggle').click();
     await expect(page.getByTestId('court-size-headline')).toHaveText('Deep Court selected by Heather');
   });
 
@@ -716,5 +736,130 @@ test.describe('TEST 12 — host controls the title count', () => {
     const badges = page.getByTestId('host-badge');
     await expect(badges).toHaveCount(1);
     await expect(badges.first()).toHaveText('Host');
+  });
+});
+
+test.describe('STAGE 2 — two questions, solo preview, three columns', () => {
+  test('a genre cannot be wanted and avoided at once', async ({ page }) => {
+    await mockRoom(page, EMPTY_LOBBY);
+    await joinAs(page, 'Scott');
+    const tonight = page.getByTestId('court-tonight');
+
+    // Pick Horror as "sounds good" → the avoid Horror chip is disabled.
+    await tonight.getByRole('button', { name: 'Sounds good: Horror' }).click();
+    await expect(tonight.getByRole('button', { name: 'Avoid: Horror' })).toBeDisabled();
+
+    // Un-pick it, avoid it instead → the sounds-good chip is disabled.
+    await tonight.getByRole('button', { name: 'Sounds good: Horror' }).click();
+    await tonight.getByRole('button', { name: 'Avoid: Horror' }).click();
+    await expect(tonight.getByRole('button', { name: 'Sounds good: Horror' })).toBeDisabled();
+  });
+
+  test('the default form is two chip groups plus Ready, and fits 900px', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockRoom(page, EMPTY_LOBBY);
+    await joinAs(page, 'Scott');
+    const tonight = page.getByTestId('court-tonight');
+
+    // Two questions by default; type/runtime/size wait behind Advanced.
+    await expect(tonight.locator('fieldset')).toHaveCount(2);
+    await expect(tonight.getByTestId('advanced-panel')).toHaveCount(0);
+    await expect(page.getByTestId('tonight-ready')).toBeVisible();
+
+    // The whole form is on screen in a 900px viewport with no scrolling.
+    const box = await tonight.boundingBox();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height, `form bottom ${box!.y + box!.height}`).toBeLessThanOrEqual(900);
+
+    // Advanced opens to type (default Either), runtime (default No limit)
+    // and — for a host — the court-size selector.
+    await tonight.getByTestId('advanced-toggle').click();
+    await expect(tonight.getByRole('button', { name: '✓ Either' })).toBeVisible();
+    await expect(tonight.getByRole('button', { name: '✓ No limit' })).toBeVisible();
+  });
+
+  test('a solo host builds and previews; only the Verd1ct is gated', async ({ page }) => {
+    const { room } = await mockRoom(page, EMPTY_LOBBY);
+    await asHost(page);
+    // The build endpoint succeeds solo and moves the room to the voting floor.
+    await page.route('**/api/court/start', async (route) => {
+      room.status = 'veto';
+      room.finalists = [
+        finalist(1, 11, 'The Quiet Room', [['Scott', 82]]),
+        finalist(2, 12, 'Second Choice', [['Scott', 74]]),
+      ];
+      await route.fulfill({ json: { ok: true } });
+    });
+    await joinAs(page, 'Scott');
+
+    // Solo: the build button is live, and the note says what the wait is for.
+    const build = page.getByTestId('build-shortlist');
+    await expect(build).toBeEnabled();
+    await expect(build).toHaveText('Build our shortlist');
+    await expect(page.getByTestId('solo-note')).toContainText('final Verd1ct unlocks');
+
+    await build.click();
+
+    // The generated shortlist is visible in the waiting state…
+    await expect(page.getByText('The Quiet Room')).toBeVisible();
+    // …and the ONLY disabled action is the Verd1ct reveal, which says why.
+    const reveal = page.getByTestId('reveal');
+    await expect(reveal).toBeDisabled();
+    await expect(reveal).toHaveText('Invite one more juror to unlock the Verd1ct');
+  });
+
+  test('the Verd1ct unlocks when a second juror joins', async ({ page }) => {
+    await mockRoom(page, {
+      status: 'veto',
+      participants: [
+        { id: 'p-1', name: 'Scott', host: true, reactionCount: 1 },
+        { id: 'p-2', name: 'Amy', reactionCount: 0 },
+      ],
+      finalists: [finalist(1, 11, 'The Quiet Room', [['Scott', 82], ['Amy', 77]])],
+      messages: [],
+    });
+    await asHost(page);
+    await page.goto(HARNESS);
+    await page.evaluate(() => localStorage.setItem('court_part_HARNESS1', 'p-1'));
+    await page.reload();
+
+    await expect(page.getByTestId('reveal')).toBeEnabled();
+  });
+
+  test('three columns at 1920: roster · court · activity, honest widths', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await mockRoom(page, { ...EMPTY_LOBBY, messages: [{ id: 'm-1', sender: 'Amy', body: 'evening all', at: new Date(0).toISOString() }] });
+    await joinAs(page, 'Scott');
+
+    const cols = [
+      await page.getByTestId('court-group').boundingBox(),
+      await page.getByTestId('court-tonight').boundingBox(),
+      await page.getByTestId('activity-feed').boundingBox(),
+    ];
+    for (const [i, box] of cols.entries()) {
+      expect(box, `column ${i} missing`).not.toBeNull();
+      expect(box!.width, `column ${i} width ${box!.width}`).toBeLessThanOrEqual(640);
+    }
+    // Side by side, not stacked.
+    expect(cols[1]!.x).toBeGreaterThan(cols[0]!.x + cols[0]!.width - 1);
+    expect(cols[2]!.x).toBeGreaterThan(cols[1]!.x + cols[1]!.width - 1);
+    // No dead gutter over 120px per side.
+    expect(cols[0]!.x, `left gutter ${cols[0]!.x}`).toBeLessThanOrEqual(120);
+    expect(1920 - (cols[2]!.x + cols[2]!.width), 'right gutter').toBeLessThanOrEqual(120);
+
+    // The feed carries the conversation inline; the floating chat button
+    // stands down at this width.
+    await expect(page.getByTestId('activity-feed')).toContainText('evening all');
+    await expect(page.getByTestId('open-chat')).toBeHidden();
+  });
+
+  test('single column below 1280', async ({ page }) => {
+    await page.setViewportSize({ width: 1279, height: 900 });
+    await mockRoom(page, EMPTY_LOBBY);
+    await joinAs(page, 'Scott');
+    await expect(page.getByTestId('activity-feed')).toBeHidden();
+    const group = await page.getByTestId('court-group').boundingBox();
+    const tonight = await page.getByTestId('court-tonight').boundingBox();
+    expect(tonight!.y).toBeGreaterThan(group!.y + group!.height - 1);
   });
 });

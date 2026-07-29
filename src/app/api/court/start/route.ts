@@ -104,7 +104,10 @@ export async function POST(request: Request) {
       picks: toPicks(p.picks),
       tonight: toTonight(p.tonight),
     }));
-    if (members.length < 2) return NextResponse.json({ error: 'Invite at least one more person.' }, { status: 400 });
+    // A SOLO HOST MAY BUILD AND PREVIEW. The two-juror minimum guards the
+    // final Verd1ct (the reveal), not the shortlist — a host waiting for
+    // friends should be looking at candidate titles, not a locked door.
+    if (members.length < 1) return NextResponse.json({ error: 'Join the room first.' }, { status: 400 });
     // NOBODY has to nominate. With no picks at all, WatchVerd1ct builds the
     // whole shortlist from the group's DNA + tonight's preferences, so a room
     // can never get stuck because nobody wants to search.

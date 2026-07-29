@@ -123,11 +123,14 @@ export const verdictReady = (s: RoomSnapshot) => s.participantCount > 0 && s.rea
 export function nextActionLabel(s: RoomSnapshot): string {
   if (s.stage === 'verdict') return 'See your group’s Verd1ct';
   if (s.stage === 'reacting') {
+    // A SOLO HOST PREVIEWS, NEVER RULES. The whole court can be built and
+    // browsed alone; only the final Verd1ct needs a second juror, and the
+    // label says exactly that instead of a disabled mystery.
+    if (!roomReady(s)) return 'Invite one more juror to unlock the Verd1ct';
     return verdictReady(s)
       ? 'Everyone has reacted — reveal the Verd1ct'
       : `${s.reactedCount} of ${s.participantCount} have reacted`;
   }
-  if (!roomReady(s)) return 'Invite at least one more person';
   if (!shortlistReady(s)) return 'Add titles or build our shortlist';
   return `${s.candidateCount} titles ready — start choosing`;
 }
