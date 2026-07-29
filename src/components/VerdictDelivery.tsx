@@ -183,14 +183,30 @@ export function VerdictDelivery() {
           >
             {showRest ? 'Hide' : `Show the other ${alsoRan.length}`}
           </button>
+          {/* WHY EACH ONE LOST, not just what it scored. A bare number beside
+              a title is a result, not a reason — and "why did the others lose"
+              is exactly what makes the gavel trustworthy rather than
+              arbitrary. Every line is engine data: the title's own strengths,
+              and the real gap to the winner. */}
           {showRest && (
-            <ul className="mt-2 space-y-1.5" data-testid="verdict-also-ran">
-              {alsoRan.map((r) => (
-                <li key={r.candidate.key} className="flex items-center justify-between gap-3 text-sm text-slate-300">
-                  <span>{r.candidate.title}</span>
-                  <span className="tabular-nums text-slate-500">{Math.round(r.score)}</span>
-                </li>
-              ))}
+            <ul className="mt-2 space-y-2" data-testid="verdict-also-ran">
+              {alsoRan.map((r) => {
+                const behind = winner ? Math.round(winner.score - r.score) : 0;
+                return (
+                  <li key={r.candidate.key} className="text-sm text-slate-300">
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="font-semibold text-white">{r.candidate.title}</span>
+                      <span className="flex-none tabular-nums text-slate-500">{Math.round(r.score)}</span>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-400">
+                      {r.strengths.length > 0 ? `${r.strengths.join(' · ')} — ` : ''}
+                      {behind > 0
+                        ? `${behind} behind ${winner!.candidate.title} on tonight's blend.`
+                        : 'Level on the blend, but ranked lower on how well we know your taste for it.'}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

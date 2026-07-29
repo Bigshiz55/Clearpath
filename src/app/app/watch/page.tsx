@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getReadyToWatch, getFreeToWatch } from '@/lib/watchNow';
 import { getBrowseProviders } from '@/lib/browse';
 import { getRecommendations, type Recommendation } from '@/lib/recommend';
-import { rankByDna } from '@/lib/dna';
+import { recommendationHeading } from '@/lib/verdict/confidence';
+import { getUserTasteDna, rankByDna } from '@/lib/dna';
 import { getMyServices, getProfile, regionFor } from '@/lib/profile';
 import { WatchNowGrid } from '@/components/WatchNowGrid';
 import { WatchTabs } from '@/components/WatchTabs';
@@ -63,6 +64,12 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
   // list genuinely reflects the quiz instead of the same top-of-the-charts titles.
   const rankedReady = await rankByDna(supabase, uid, ready);
   const rankedMore = recs.length > 0 ? null : await rankByDna(supabase, uid, morePool);
+  // HOW MUCH OF THIS USER WE ACTUALLY KNOW. Drives the honest heading below —
+  // the row says "Popular picks while we learn your taste" until there is
+  // genuinely enough signal to call it personal. Fail-open to 0 (the most
+  // conservative claim) rather than letting a DNA read break the page.
+  const ratedCount = uid ? await getUserTasteDna(supabase, uid).then((d) => d.sampleSize).catch(() => 0) : 0;
+  const recsHeading = recommendationHeading(ratedCount, recs.length > 0);
 
   const readyContent = (
     <div className="space-y-8">
@@ -77,10 +84,19 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
       )}
       {recs.length > 0 ? (
         <section>
-          <h2 className="mb-1 text-lg font-semibold text-white">🧬 Recommended for you</h2>
+          {/* HONEST HEADING. "Recommended for you" over a list built from four
+              ratings is the single most common lie a recommender tells. The
+              heading and the note come from `recommendationHeading`, which
+              reads the user's REAL rated count and says what the row actually
+              is — plus exactly how many more ratings unlock the personal
+              match. It upgrades itself the moment the threshold is crossed. */}
+          <h2 className="mb-1 text-lg font-semibold text-white" data-testid="recs-heading">
+            🧬 {recsHeading.heading}
+          </h2>
           <p className="mb-3 text-xs text-slate-400">
-            Seeded from the titles you rated highest — the more you rate in the{' '}
-            <Link href="/app/quiz" className="text-brand-300 hover:underline">Taste Quiz</Link>, the sharper this gets. Tap any for where to watch.
+            {recsHeading.note}{' '}
+            <Link href="/app/quiz" className="text-brand-300 hover:underline">Rate a few in the Taste Quiz</Link>{' '}
+            to sharpen it. Tap any for where to watch.
           </p>
           {/* A DECK, NOT A PAGE. This used to be a fixed slice of twelve that
               re-sorted itself every time the user's own taps changed their
@@ -93,13 +109,14 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
       ) : (
         rankedMore && rankedMore.items.length > 0 && (
           <section>
-            <h2 className="mb-1 text-lg font-semibold text-white">
-              {rankedMore.personalized ? '🧬 Recommended for you' : '🍿 Popular right now'}
+            {/* Same honest gate on the fallback row: a popularity ranking never
+                claims to be personal, and a thin model says how thin it is. */}
+            <h2 className="mb-1 text-lg font-semibold text-white" data-testid="recs-heading">
+              {rankedMore.personalized ? '🧬' : '🍿'}{' '}
+              {recommendationHeading(ratedCount, rankedMore.personalized).heading}
             </h2>
             <p className="mb-3 text-xs text-slate-400">
-              {rankedMore.personalized
-                ? 'Ranked by your VERD1CT DNA — tap any to see where to watch.'
-                : 'Trending titles you can stream right now — tap any for where to watch.'}
+              {recommendationHeading(ratedCount, rankedMore.personalized).note} Tap any to see where to watch.
             </p>
             <div className="poster-grid">
               {rankedMore.items.map((t) => (

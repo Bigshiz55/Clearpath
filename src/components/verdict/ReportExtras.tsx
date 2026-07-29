@@ -3,6 +3,7 @@ import { episodeSummary } from '@/lib/tmdb/meta-helpers';
 import { originSummary } from '@/lib/origin';
 import { DnaScore } from '@/components/DnaScore';
 import { formatRating } from '@/lib/ratings/format';
+import { VerdictConfidence } from './VerdictConfidence';
 
 // Niche community aggregators we don't surface — they read as "random stars".
 // Metacritic is dropped too: it's usually sparse and adds a fourth number that
@@ -59,6 +60,18 @@ export function AtAGlance({
           <div className="text-sm font-bold text-white">{tier}</div>
           <p className="line-clamp-2 text-xs text-slate-300 sm:text-sm">{oneLiner}</p>
         </div>
+        {/* HOW SURE, BESIDE HOW GOOD. The call says what we think; this says
+            how much evidence that rests on — and taps open the reasons in
+            plain language. Built from the engine's OWN available sources plus
+            how many titles this user has rated, so it can never claim more
+            than we hold. */}
+        <VerdictConfidence
+          className="flex-none"
+          mediaType={mediaType}
+          tmdbId={tmdbId}
+          ratingSourceCount={available.length}
+          availabilityVerified={streamNames.length > 0}
+        />
       </div>
 
       <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
