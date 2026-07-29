@@ -82,8 +82,20 @@ export function Logo({
         : 'h-9 w-9 rounded-xl';
   const inner =
     size === 'xl' ? 'h-11 w-11 sm:h-16 sm:w-16 lg:h-20 lg:w-20' : size === 'lg' ? 'h-9 w-9 sm:h-11 sm:w-11' : 'h-7 w-7';
+  // `xl` STEPS DOWN AT 320. A line of its own is not the same as unlimited
+  // room: at `text-3xl` the wordmark measures 252px, and beside a 56px mark
+  // inside a 16px-padded page that needs 334 — it ran 2px off the right edge
+  // of the narrowest phone the product supports, which the route crawler
+  // caught as horizontal overflow on the LANDING PAGE. One step smaller below
+  // 360px costs nothing and fits with room to spare.
   const word =
-    crowded ? CROWDED_WORD : size === 'xl' ? 'text-3xl sm:text-5xl lg:text-6xl' : size === 'lg' ? 'text-xl sm:text-3xl' : 'text-lg';
+    crowded
+      ? CROWDED_WORD
+      : size === 'xl'
+        ? 'text-2xl min-[360px]:text-3xl sm:text-5xl lg:text-6xl'
+        : size === 'lg'
+          ? 'text-xl sm:text-3xl'
+          : 'text-lg';
 
   return (
     <Link href={href} className="group inline-flex items-center gap-2.5">
