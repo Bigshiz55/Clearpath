@@ -85,7 +85,17 @@ export function buildChannelGuide(airings: readonly Airing[], nowMs: number): Ch
     });
     const sorted = deduped.sort((a, b) => startOf(a) - startOf(b));
     const onNow = onNowOf(sorted, nowMs);
-    const upNext = sorted.filter((a) => startOf(a) > nowMs && a !== onNow).slice(0, UP_NEXT);
+    // WHAT IS ON NOW IS NEVER ALSO "UP NEXT". Reference identity (`a !==
+    // onNow`) missed the feed's near-duplicates — the same broadcast arriving
+    // again with a different episode id and an airstamp seconds apart — so the
+    // channel header said "Chicago Fire, on now" and the first schedule row
+    // said "5:00 AM Chicago Fire" right under it. Same show, same start minute
+    // = the same broadcast, whatever id it rode in on.
+    const repeatsOnNow = (a: Airing) =>
+      onNow != null &&
+      a.showName.toLowerCase() === onNow.showName.toLowerCase() &&
+      Math.abs(startOf(a) - startOf(onNow)) < 60_000;
+    const upNext = sorted.filter((a) => startOf(a) > nowMs && a !== onNow && !repeatsOnNow(a)).slice(0, UP_NEXT);
     if (!onNow && upNext.length === 0) continue;
     let progress: number | null = null;
     if (onNow) {
@@ -168,28 +178,28 @@ export interface GuideCategory {
 export const GUIDE_CATEGORIES: GuideCategory[] = [
   {
     key: 'movies',
-    label: '🎬 Movie channels',
+    label: 'Movie channels',
     re: /hbo|cinemax|showtime|starz|encore|epix|mgm|^tcm\b|turner classic|^amc\b|hdnet movie|sony movie|movieplex|flix|hallmark movie|lifetime movie|lmn|cine/i,
   },
-  { key: 'feelgood', label: '💜 Hallmark & Lifetime', re: /hallmark|lifetime|lmn|uptv|gac/i },
+  { key: 'feelgood', label: 'Hallmark & Lifetime', re: /hallmark|lifetime|lmn|uptv|gac/i },
   {
     key: 'crime',
-    label: '🔎 Crime & mystery',
+    label: 'Crime & mystery',
     re: /investigation discovery|^id\b|oxygen|a&e|court tv|usa network|^ion\b|^tnt\b/i,
   },
   {
     key: 'sports',
-    label: '🏈 Sports',
+    label: 'Sports',
     re: /espn|fox sports|fs[12]\b|nfl|nba|mlb|nhl|golf|tennis|cbs sports|accn|sec network|big ten|btn\b|olympic/i,
   },
   {
     key: 'kids',
-    label: '🧒 Kids & family',
+    label: 'Kids & family',
     re: /disney|nick|cartoon network|boomerang|pbs kids|universal kids|discovery family/i,
   },
   {
     key: 'news',
-    label: '📰 News',
+    label: 'News',
     re: /cnn|fox news|msnbc|cnbc|newsnation|newsmax|bbc (world )?news|c-?span|weather/i,
   },
 ];
@@ -199,4 +209,58 @@ export function filterGuideByCategory<T extends ChannelRow>(rows: readonly T[], 
   const cat = key ? GUIDE_CATEGORIES.find((c) => c.key === key) : null;
   if (!cat) return [...rows];
   return rows.filter((r) => cat.re.test(r.network.trim()));
+}
+
+/**
+ * PAID PROGRAMMING IS NOT PROGRAMMING. Broadcast affiliates fill overnight
+ * slots with infomercials — "Inogen Portable Oxygen - No More Tanks!" is a
+ * sales pitch, not a show, and treating it like one (a title row, a score
+ * lookup, a reminder bell) lends it the guide's credibility. Classified by the
+ * signals the feed actually carries: the giveaway phrases and the product-pitch
+ * title shapes. Classified rows stay in the guide (the slot IS what that
+ * channel is airing — hiding it would fake the schedule) but render muted,
+ * scoreless and un-remindable.
+ */
+const PAID_RE =
+  /\bpaid programming\b|\binfomercial\b|\bprogramming paid\b|(?:^|\s)(?:my ?pillow|copperfit|copper fit|inogen|lifelock|omega ?xl|nutrisystem|proactiv|hurrycane|medicare (?:help|hotline|benefits))\b/i;
+/** Product-pitch title shapes: "X - No More Y!", "Amazing Z™!", phone-number CTAs. */
+const PITCH_RE = /(?:no more \w+!|call now|act now|risk[- ]free|free trial|as seen on tv|™|®)/i;
+
+export function isPaidProgramming(a: Pick<Airing, 'showName' | 'showType'>): boolean {
+  const name = a.showName ?? '';
+  if (PAID_RE.test(name)) return true;
+  // The pitch shapes only count on the show types infomercials ship under —
+  // a scripted drama with "Call Now" in an episode title is not a sales block.
+  const t = (a.showType ?? '').toLowerCase();
+  const pitchable = t === '' || t === 'variety' || t === 'reality' || t === 'news' || t === 'talk show';
+  return pitchable && PITCH_RE.test(name);
+}
+
+export interface ScheduleGap {
+  /** ms timestamps of the unexplained hole between two listed rows. */
+  fromMs: number;
+  toMs: number;
+}
+
+/**
+ * A GUIDE THAT JUMPS THREE HOURS IS LYING BY OMISSION. When one row ends at
+ * 6:00 and the next listed row starts at 9:00, silence between them reads as
+ * "nothing until 9" — but it's "we have no data until 9", a different claim.
+ * Detectable only when the earlier row's runtime is known; a hole shorter than
+ * `MIN_GAP_MIN` is scheduling slop, not missing data.
+ */
+export const MIN_GAP_MIN = 25;
+
+export function scheduleGaps(rows: readonly Airing[]): ScheduleGap[] {
+  const gaps: ScheduleGap[] = [];
+  const sorted = [...rows].sort((a, b) => startOf(a) - startOf(b));
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const cur = sorted[i]!;
+    const next = sorted[i + 1]!;
+    const end = endOf(cur);
+    if (end == null) continue; // no runtime → cannot claim a gap honestly
+    const nextStart = startOf(next);
+    if (nextStart - end >= MIN_GAP_MIN * 60_000) gaps.push({ fromMs: end, toMs: nextStart });
+  }
+  return gaps;
 }

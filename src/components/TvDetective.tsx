@@ -1,5 +1,6 @@
 'use client';
 
+import { SearchCheck } from 'lucide-react';
 import { dayLabel } from '@/lib/viewing/localDay';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -117,7 +118,7 @@ export function TvDetective() {
   return (
     <section className="overflow-hidden rounded-2xl border border-brand-400/30 bg-gradient-to-br from-brand-500/12 to-ink-850 p-5">
       <div className="flex items-start gap-4">
-        <span className="text-4xl" aria-hidden>🕵️</span>
+        <span className="grid h-11 w-11 flex-none place-items-center rounded-xl border border-brand-400/40 bg-brand-500/15 text-brand-200" aria-hidden><SearchCheck size={22} /></span>
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-white sm:text-xl">TV Guide Detective</h2>
           <p className="mt-1 text-sm text-slate-300">
@@ -130,7 +131,7 @@ export function TvDetective() {
           </div>
           {state !== 'done' && (
             <button onClick={() => scan()} disabled={state === 'scanning'} className="btn-primary mt-4 px-5 py-2.5 disabled:opacity-70">
-              {state === 'scanning' ? '🔎 On the case… scanning listings' : `🔎 Scan the ${horizonLabel(hours)}`}
+              {state === 'scanning' ? 'Scanning…' : 'Scan'}
             </button>
           )}
         </div>
@@ -252,7 +253,7 @@ export function TvDetective() {
                   );
                 })}
               </div>
-              <button onClick={() => scan()} className="mt-4 text-sm font-bold text-brand-300 hover:text-brand-200">🔄 Scan again</button>
+              <button onClick={() => scan()} className="mt-4 text-sm font-bold text-brand-300 hover:text-brand-200">Scan again</button>
             </>
           )}
         </div>

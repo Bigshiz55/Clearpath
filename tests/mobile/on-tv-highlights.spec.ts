@@ -115,12 +115,19 @@ test('a movie in its final scene is not offered as a highlight', async ({ page }
   await expect(strip).toContainText('Cinderella Man');
 });
 
-test('an unmatched listing keeps the same card shape as a matched one', async ({ page }) => {
+test('an unmatched listing shows NO action slot and NO placeholder text', async ({ page }) => {
+  // The old design reserved the action row's height on every card with a
+  // "Not matched to a title yet" box — an internal pipeline state printed on
+  // most broadcast cards. Now the action row lives BELOW the title and only
+  // exists on cards that resolved to a real title; an unmatched card simply
+  // has nothing to rule on, and says nothing.
   await open(page, 390);
-  const unmatched = page.getByTestId('airing-unmatched').first();
-  await expect(unmatched).toBeVisible();
-  // The point of the always-present row: the artwork below it must start at the
-  // same offset within the card as its neighbours', or the strip reads broken.
+  const strip = page.getByTestId('tv-highlights');
+  await expect(strip).not.toContainText('Not matched');
+  await expect(page.getByTestId('airing-unmatched')).toHaveCount(0);
+
+  // And artwork alignment no longer depends on a placeholder: with the action
+  // row below the content, EVERY card's art starts at the same offset.
   const n = await cards(page).count();
   const offsets: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -131,4 +138,17 @@ test('an unmatched listing keeps the same card shape as a matched one', async ({
     offsets.push(Math.round(a!.y - c!.y));
   }
   expect(new Set(offsets).size, `artwork starts at ${[...new Set(offsets)].join('/')} across cards`).toBe(1);
+});
+
+test('all card artwork shares one 16:9 aspect, letterboxing mismatched art', async ({ page }) => {
+  await open(page, 390);
+  const n = await cards(page).count();
+  expect(n).toBeGreaterThan(0);
+  for (let i = 0; i < n; i++) {
+    const art = cards(page).nth(i).locator('.wv-card-art').first();
+    if ((await art.count()) === 0) continue;
+    const box = await art.boundingBox();
+    const ratio = box!.width / box!.height;
+    expect(Math.abs(ratio - 16 / 9), `card ${i} art ratio ${ratio.toFixed(2)}`).toBeLessThan(0.05);
+  }
 });

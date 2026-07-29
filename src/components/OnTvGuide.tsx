@@ -30,6 +30,7 @@ import { SignalIcon } from '@/components/RemindButton';
 import { WCheck } from '@/components/WCheck';
 import { groupByShow, repeatNote } from '@/lib/tvHighlights';
 import { CardDna } from '@/components/CardDna';
+import { Radio, Popcorn, Sparkles } from 'lucide-react';
 import type { Airing } from '@/lib/onTv';
 
 type TimeFilter = 'all' | 'primetime' | 'nownext';
@@ -149,7 +150,7 @@ export function OnTvGuide({
         setNotice(
           res.needsNotifications
             ? 'Reminder set! Turn on notifications in Settings so we can ping you 1 hour and 5 minutes before.'
-            : 'Reminder set — we’ll ping you 1 hour and 5 minutes before it starts. ⏰',
+            : 'Reminder set — we’ll ping you 1 hour and 5 minutes before it starts.',
         );
       }
     } catch {
@@ -225,7 +226,7 @@ export function OnTvGuide({
   if (airings.length === 0) {
     return (
       <div className="card p-6 text-center">
-        <div className="text-3xl">{streaming ? '🍿' : '📡'}</div>
+        <div className="grid place-items-center text-slate-400">{streaming ? <Popcorn size={28} aria-hidden /> : <Radio size={28} aria-hidden />}</div>
         <h2 className="mt-3 text-lg font-semibold text-white">
           {streaming ? 'No major streaming premieres today' : 'No listings right now'}
         </h2>
@@ -249,20 +250,25 @@ export function OnTvGuide({
           </span>
         </div>
       )}
-      {/* Highlights */}
+      {/* Highlights. In windowed mode the PAGE's H1 already says "Coming on in
+          the next N hours" — repeating it here as an H2 with its own explainer
+          printed the same sentence twice and pushed the first card row below
+          the fold. The strip starts straight at the cards; the other modes
+          keep their (non-duplicated) headings. */}
       {highlights.length > 0 && (
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-white">
-            {windowed ? `⏰ Coming on in the next ${windowHours} hours` : streaming ? '✨ Best of today’s drops' : '✨ Tonight’s highlights'}
-          </h2>
-          <p className="mb-3 text-xs text-slate-400">
-            {windowed
-              ? 'Real listings between now and then, soonest first — times are your local time, and anything already running says so'
-              : streaming
-                ? 'Highest-rated premieres on the major services'
-                : 'Best-reviewed shows in prime time'}{' '}
-            — rating is TVmaze’s community score.
-          </p>
+          {!windowed && (
+            <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold text-white">
+              <Sparkles size={16} className="text-slate-400" aria-hidden />
+              {streaming ? 'Best of today’s drops' : 'Tonight’s highlights'}
+            </h2>
+          )}
+          {!windowed && (
+            <p className="mb-3 text-xs text-slate-400">
+              {streaming ? 'Highest-rated premieres on the major services' : 'Best-reviewed shows in prime time'} — rating
+              is TVmaze’s community score.
+            </p>
+          )}
           {/* THE SHARED CARD SHAPE, not a third copy of one.
               This strip drew TWO columns on a phone with a hand-rolled card. At
               390px that made each cell ~173px, and an action row inside it had
@@ -283,27 +289,11 @@ export function OnTvGuide({
               const resolved = a.tmdbId != null && a.mediaType != null;
               return (
                 <div key={a.id} className="card wv-tile flex flex-col overflow-hidden">
-                  {/* THE DECISION ROW LEADS THE CARD — same order as PosterCard:
-                      rule at the top, then drop to the W on the artwork. The
-                      unmatched note keeps the row's height so every card's
-                      artwork starts at the same offset. */}
-                  {resolved ? (
-                    <div className="wv-act-row border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
-                      <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
-                      <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
-                    </div>
-                  ) : (
-                    <div className="border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
-                      <div className="flex min-h-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 px-2 text-center text-[11px] font-semibold text-slate-500" data-testid="airing-unmatched">
-                        Not matched to a title yet
-                      </div>
-                    </div>
-                  )}
                   <div className="wv-card flex-1">
                     {/* The W, on the artwork, exactly where it is on every other
                         card — so putting an airing on the docket is the same
                         gesture as putting a poster on it. */}
-                    <div className="wv-card-art bg-ink-800">
+                    <div className="wv-card-art wv-art-video bg-ink-800">
                       {resolved && (
                         <WCheck tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterUrl={a.image ?? null} />
                       )}
@@ -352,10 +342,20 @@ export function OnTvGuide({
                       )}
                       <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
                       {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
+                      {/* THE DECISION ROW, BELOW THE TITLE — and only on a card
+                          that resolved to a real title. An unresolved listing
+                          used to reserve this slot with a "Not matched to a
+                          title yet" box, which put an internal pipeline state
+                          on nearly every broadcast card; there is nothing to
+                          rule on there, so nothing renders. */}
+                      {resolved && (
+                        <div className="wv-act-row mt-2 border-t border-white/10 pt-2">
+                          <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                          <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {/* For · Against · Save moved to the TOP of the card — see
-                      the block above `.wv-card`. */}
                 </div>
               );
             })}

@@ -10,6 +10,9 @@ import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
 import { hasFullGridProvider } from '@/lib/viewing/liveTv';
 import { TvDetective } from '@/components/TvDetective';
+import { CoverageNote } from '@/components/tv/CoverageNote';
+import { Antenna, Film, Sparkles } from 'lucide-react';
+import { DNA_PERSONAL_MIN } from '@/lib/verdict/confidence';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'On TV today · WatchVerd1ct' };
@@ -106,6 +109,19 @@ export default async function OnTvPage({
     guideView && user
       ? (await getPreferenceRules(supabase, user.id).catch(() => [])).map((r) => ({ trait: r.trait as string, weight: r.weight }))
       : [];
+  // "YOUR 93" IS ONLY TRUE ONCE THE ENGINE HAS LEARNED YOU. Under the same
+  // floor every personal claim uses (DNA_PERSONAL_MIN rated titles), guide
+  // badges render as neutral baseline scores instead — never a personalized
+  // label on a non-personalized number. Count query is cheap and fail-open.
+  let guidePersonalized = false;
+  if (guideView && user) {
+    const { count } = await supabase
+      .from('watchlist_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .not('rating', 'is', null);
+    guidePersonalized = (count ?? 0) >= DNA_PERSONAL_MIN;
+  }
 
   // COVERAGE HONESTY, FROM THE DATA — NOT FROM A CONFIG FLAG. The banner used
   // to read `hasFullGridProvider()` (a licensed-provider check) and say "no
@@ -155,61 +171,37 @@ export default async function OnTvPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* ONE H1, ONE LINE UNDER IT, AND THE COVERAGE CAVEAT AT CAPTION WEIGHT.
+          This heading block used to spend ~340px before the first listing: a
+          three-line intro, a full amber banner restating coverage, and then
+          the SAME "coming on" heading again inside the guide with its own
+          explainer. The page's purpose is the listings; everything above them
+          now fits in two short rows, and the first card row is on screen at
+          1440×900 without scrolling. */}
       <section>
-        <h1 className="text-2xl font-bold text-white sm:text-3xl">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <h1 className="text-2xl font-bold text-white sm:text-3xl">
+            {guideView
+              ? 'Full channel guide'
+              : withinHours != null
+                ? genreEmpty
+                  ? `${filterLabel ? `${titleCase(filterLabel)} ` : ''}on live TV`
+                  : `${filterLabel ? `${titleCase(filterLabel)} ` : ''}Coming on in the next ${withinHours} hours`
+                : 'On TV today'}
+          </h1>
+          {!gridLive && <CoverageNote />}
+        </div>
+        {/* Max one line, ≤90 characters — the details live on the controls
+            themselves (the reminder bell explains the reminder). */}
+        <p className="mt-1 text-sm text-slate-400">
           {guideView
-            ? '📺 Full channel guide'
+            ? 'Every channel, next 6 hours — search by channel or by what’s playing.'
             : withinHours != null
-              ? genreEmpty
-                ? `📺 ${filterLabel ? `${titleCase(filterLabel)} ` : ''}on live TV`
-                : `📺 ${filterLabel ? `${filterLabel} ` : ''}coming on in the next ${withinHours} hours`
-              : '📺 On TV today'}
-        </h1>
-        <p className="mt-2 text-sm text-slate-300">
-          {guideView ? (
-            <>
-              Every channel in the national lineup for the next 6 hours — what’s on now, what’s next,
-              Hallmark and Lifetime movies included. Search by channel or by what’s playing.
-            </>
-          ) : withinHours != null ? (
-            <>
-              Real listings for {region} between now and {withinHours} hours from now — channel, time, and rating.
-              Hit <span className="font-semibold text-white">Remind me</span> to get pinged{' '}
-              <span className="font-semibold text-white">1 hour and 5 minutes before</span> a show starts.
-            </>
-          ) : (
-            <>
-              What’s on live in {region} — channel, time, and rating. Filter to prime time, sort by rating, and hit{' '}
-              <span className="font-semibold text-white">Remind me</span> to get a phone/PC notification{' '}
-              <span className="font-semibold text-white">1 hour and 5 minutes before</span> it airs.
-            </>
-          )}
+              ? 'What’s on now and next — local times, ratings, and one-tap reminders.'
+              : `What’s on live in ${region} — filter, sort by rating, set reminders.`}
         </p>
       </section>
-
-      {/* COVERAGE HONESTY.
-          Without a full-grid provider the guide is reading a premiere feed —
-          roughly 42 rows for an entire US day, no reruns, movies, daytime or
-          local affiliates. A six-hour window can legitimately contain a single
-          row. Saying so is the difference between a thin list and a thin list
-          that pretends to be the national schedule. */}
-      {!gridLive && (
-        <section
-          className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-4"
-          data-testid="schedule-coverage-notice"
-        >
-          <h2 className="text-sm font-bold text-amber-100">
-            Partial listings — no full TV guide is connected
-          </h2>
-          <p className="mt-1 text-sm leading-snug text-amber-100/80">
-            This deployment has no full-schedule provider configured, so we can only show
-            first-run episodes on a small number of national networks. Reruns, movies,
-            daytime, sports and local channels are missing — this is <em>not</em> the
-            complete TV schedule.
-          </p>
-        </section>
-      )}
 
       {/* THREE WAYS INTO THE SAME SCHEDULE. Highlights is the curated view;
           the full guide is the cable box (every channel, by channel); movies
@@ -219,31 +211,30 @@ export default async function OnTvPage({
       {region === 'US' && (
         <nav className="flex flex-wrap gap-1.5" aria-label="Guide views" data-testid="tv-views">
           {[
-            { href: '/app/tv', label: '✨ Highlights', active: !guideView && withinHours == null },
-            { href: '/app/tv?view=guide', label: '📡 Full guide', active: guideView },
-            { href: '/app/tv?within=12&type=movie', label: '🎬 Movies on now', active: !guideView && movieOnly },
+            { href: '/app/tv', label: 'Highlights', Icon: Sparkles, active: !guideView && withinHours == null },
+            { href: '/app/tv?view=guide', label: 'Full guide', Icon: Antenna, active: guideView },
+            { href: '/app/tv?within=12&type=movie', label: 'Movies on now', Icon: Film, active: !guideView && movieOnly },
           ].map((t) => (
             <Link
               key={t.href}
               href={t.href}
               aria-current={t.active ? 'page' : undefined}
-              className={`inline-flex min-h-[40px] items-center rounded-full border px-3.5 text-[13px] font-semibold transition ${
+              className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition ${
                 t.active
                   ? 'border-brand-300 bg-brand-500/25 text-white'
                   : 'border-white/15 bg-white/[0.06] text-slate-300 hover:border-brand-300 hover:text-white'
               }`}
             >
+              <t.Icon size={16} aria-hidden />
               {t.label}
             </Link>
           ))}
         </nav>
       )}
 
-      {!guideView && <TvDetective />}
-
       {upcoming.length > 0 && <MyReminders initial={upcoming} />}
 
-      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} remindedIds={remindedIds} taste={tasteRules} />}
+      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} remindedIds={remindedIds} taste={tasteRules} personalized={guidePersonalized} />}
 
       {guideView ? null : withinHours != null && windowed ? (
         <>
@@ -257,8 +248,7 @@ export default async function OnTvPage({
                   been on screen after a full provider was connected. It now
                   names the real cause and changes on its own once one is. */}
               <div className="rounded-2xl border border-amber-400/30 bg-amber-500/[0.07] p-4 text-center sm:p-5">
-                <div className="text-2xl" aria-hidden>📭</div>
-                <h2 className="mt-1 text-lg font-bold text-white">
+                                <h2 className="mt-1 text-lg font-bold text-white">
                   {gridLive
                     ? `No ${filterLabel || 'matches'} on live TV in the next ${withinHours}h`
                     : `We can’t see ${network ? titleCase(network) : 'that channel'}’s listings yet`}
@@ -289,11 +279,11 @@ export default async function OnTvPage({
                       rel="noopener noreferrer"
                       className="rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-400"
                     >
-                      📺 See {official.name}’s live schedule →
+                      See {official.name}’s live schedule →
                     </a>
                   )}
                   <Link href="/app/finder" className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition ${official ? 'border border-white/15 text-slate-200 hover:bg-white/10' : 'bg-brand-500 text-white hover:bg-brand-400'}`}>
-                    🔎 Find {movieOnly ? 'movies' : 'titles'} by streaming service
+                    Find {movieOnly ? 'movies' : 'titles'} by streaming service
                   </Link>
                   <Link href="/app/watch" className="rounded-lg border border-white/15 px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
                     State a new case
@@ -315,6 +305,12 @@ export default async function OnTvPage({
       ) : (
         <OnTvGuide airings={airings} dateLabel={friendlyDate(now)} dateIso={now.toISOString()} country={region} mode="broadcast" remindedIds={remindedIds} />
       )}
+
+      {/* THE DETECTIVE IS A TOOL, NOT THE PAGE. It sat between the heading and
+          the listings, which pushed the actual schedule below the fold to
+          promote a secondary feature. The listings are why anyone is here;
+          the deep-scan tool waits under them. */}
+      {!guideView && <TvDetective />}
 
       <p className="text-[11px] text-slate-500">
         Listings from TVmaze’s community broadcast guide — real schedules, refreshed hourly. Coverage is best for

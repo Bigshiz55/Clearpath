@@ -53,7 +53,10 @@ export function Nav({
           already carries navigation, so a second persistent bar earns nothing.
           It scrolls away with the content and comes straight back at the top.
           From `sm` there is no bottom nav, so it sticks as before. */}
-      <header className="relative z-40 border-b border-white/10 bg-ink-950/80 pt-[calc(env(safe-area-inset-top)+1.5rem)] backdrop-blur sm:sticky sm:top-0">
+      {/* NEAR-OPAQUE WHEN STICKY. At /80 the scrolled page's own H1 ghosted
+          through the bar — a heading apparently printed across the search box.
+          The blur stays for the frosted edge; the fill now actually covers. */}
+      <header className="relative z-40 border-b border-white/10 bg-ink-950/95 pt-[calc(env(safe-area-inset-top)+1.5rem)] backdrop-blur sm:sticky sm:top-0">
         <div className="container-page flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-4">
           {/* Spacing does NOT relax at wider viewports. The tightest fit is a
               1280px window (container ≈ 1232), and roomier gaps above `xl`
@@ -90,8 +93,14 @@ export function Nav({
           <div className="flex shrink-0 items-center gap-2">
             {/* Search belongs in the header at every width — "a search button
                 that's always there no matter what screen you're on". Once this
-                one scrolls off on a phone, QuickSearch floats a replacement. */}
-            <QuickSearchTrigger />
+                one scrolls off on a phone, QuickSearch floats a replacement.
+                From `xl` the header carries a real typeable search BOX (above),
+                and a second magnifier beside it was a duplicate control — the
+                input is sufficient, so the icon stands down where the box
+                exists and remains the only way in below it. */}
+            <span className="xl:hidden">
+              <QuickSearchTrigger />
+            </span>
             {/* PRO STEPS ASIDE ON A PHONE. The header holds a logo and three
                 controls at 390px and no more — adding a fifth put the search
                 button under the wordmark. Search is worth more from every

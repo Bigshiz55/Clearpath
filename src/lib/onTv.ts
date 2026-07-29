@@ -44,6 +44,8 @@ export interface Airing {
   /** The user's personal match (0–100) from the deterministic engine, when the
    *  programme was confidently resolved to a title. Absent = not scored. */
   match?: number | null;
+  /** One plain-language line of what drove `match` — the badge's "why". */
+  matchWhy?: string | null;
   year?: number | null; // release year (Gracenote) — disambiguates the TMDB match
 }
 

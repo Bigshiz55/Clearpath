@@ -47,6 +47,15 @@ export function BuildVersionBadge() {
     pressTimer.current = null;
   }, []);
 
+  // THE VERSION PILL IS A DEBUG INSTRUMENT, NOT PRODUCT CHROME. In public
+  // production it renders nothing at the top of every screen — real users
+  // don't need a floating build string, and it sat above the logo on every
+  // page. The string is still reachable where debugging happens: preview /
+  // development / founder-test environments keep the pill, and Settings'
+  // "Developer Info" opens the full sheet in any environment via the
+  // `wv:open-build-info` event this component keeps listening for.
+  if (isPublicProduction(env)) return open ? <BuildInfoSheet env={env} onClose={() => setOpen(false)} /> : null;
+
   return (
     <>
       {/* FIXED thin bar in its own top band (height ≈ --wv-badge-h). Fixed, so it

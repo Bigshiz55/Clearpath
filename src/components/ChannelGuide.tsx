@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { AlarmClock, Bookmark, Check, Dna, Film, Tv } from 'lucide-react';
 import {
   GUIDE_CATEGORIES,
   buildChannelGuide,
@@ -8,11 +9,16 @@ import {
   filterGuideByCategory,
   filterGuideByMedia,
   guideSummary,
+  isPaidProgramming,
+  scheduleGaps,
   type GuideMediaFilter,
 } from '@/lib/tv/channelGuide';
+import { channelIdentity, channelHue } from '@/lib/tv/channelNames';
 import { rankGuideForTaste, type TasteRule } from '@/lib/tv/channelAffinity';
 import { displayClock } from '@/lib/viewing/clock';
 import { setTvReminder } from '@/lib/actions/tvReminders';
+import { addToWatchlist } from '@/lib/actions/watchlist';
+import { ScoreBadge } from '@/components/tv/ScoreBadge';
 import type { Airing } from '@/lib/onTv';
 
 /**
@@ -26,14 +32,16 @@ import type { Airing } from '@/lib/onTv';
  * Data honesty carries through from the module: "on now" is only claimed when
  * the runtime proves it, times render in the viewer's own zone
  * (`suppressHydrationWarning` — the server renders UTC and the browser
- * corrects, which is intended for a wall clock), and a channel we cannot see
- * simply is not a row.
+ * corrects, which is intended for a wall clock), a channel we cannot see
+ * simply is not a row, and a HOLE in a channel's data renders as "no listing
+ * data" instead of silently jumping three hours.
  */
 export function ChannelGuide({
   airings,
   nowMs,
   remindedIds = [],
   taste = [],
+  personalized = false,
 }: {
   airings: Airing[];
   nowMs: number;
@@ -42,11 +50,15 @@ export function ChannelGuide({
   /** The user's own preference rules — the guide orders channels by them.
    *  Empty = the plain alphabetical guide, unchanged. */
   taste?: TasteRule[];
+  /** True only when this user has rated enough titles that a score is
+   *  genuinely THEIRS — gates the "Your NN" label (see ScoreBadge). */
+  personalized?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [media, setMedia] = useState<GuideMediaFilter>('all');
   const [cat, setCat] = useState<string | null>(null);
   const [reminded, setReminded] = useState<Set<number>>(() => new Set(remindedIds));
+  const [saved, setSaved] = useState<Set<number>>(() => new Set());
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // TASTE ORDERS THE DIAL. Same live-first guarantee, but inside each group
@@ -58,7 +70,9 @@ export function ChannelGuide({
   // channel group. Order is preserved — filters never re-rank.
   const narrowed = useMemo(() => filterGuideByCategory(filterGuideByMedia(rows, media), cat), [rows, media, cat]);
   const shown = useMemo(() => filterGuide(narrowed, query), [narrowed, query]);
-  // The header sentence counts what the toggles have left in view.
+  // The header sentence counts what the toggles have left in view. "On now" is
+  // deliberately not one of the numbers: guide channels almost always have
+  // something on, so it tracked the channel count and said nothing.
   const stats = guideSummary(narrowed);
   const filtersOn = media !== 'all' || cat != null;
 
@@ -79,8 +93,36 @@ export function ChannelGuide({
       setNotice(
         res.needsNotifications
           ? `Reminder set for ${a.showName}! Turn on notifications in Settings so we can ping you.`
-          : `Reminder set — we’ll ping you before ${a.showName} starts. ⏰`,
+          : `Reminder set — we’ll ping you before ${a.showName} starts.`,
       );
+    } catch {
+      setNotice('Something went wrong. Please try again.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // SAVE, RIGHT ON THE ROW TOO — a reminder is "tonight", the watchlist is
+  // "someday", and noticing a title in the guide raises both. Only offered
+  // when the listing resolved to a real TMDB title; a save needs an identity.
+  async function save(a: Airing) {
+    if (busy != null || a.tmdbId == null || a.mediaType == null) return;
+    setBusy(a.id);
+    try {
+      const res = await addToWatchlist({
+        tmdbId: a.tmdbId,
+        mediaType: a.mediaType,
+        title: a.showName,
+        year: a.year ?? null,
+        posterPath: a.posterPath ?? null,
+        status: 'possible',
+      });
+      if (!res.ok) {
+        setNotice(res.error ?? 'Could not save that.');
+        return;
+      }
+      setSaved((s) => new Set(s).add(a.id));
+      setNotice(`Saved ${a.showName} to your watchlist.`);
     } catch {
       setNotice('Something went wrong. Please try again.');
     } finally {
@@ -99,6 +141,9 @@ export function ChannelGuide({
     );
   }
 
+  const clockOf = (ms: number) =>
+    new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
   return (
     <div className="space-y-3" data-testid="channel-guide">
       <div className="flex flex-wrap items-center gap-2">
@@ -113,7 +158,7 @@ export function ChannelGuide({
         />
         {/* The header sentence is computed from the SAME rows it describes. */}
         <p className="text-xs text-slate-400" data-testid="guide-stats">
-          <b className="text-slate-200">{stats.channels}</b> channels · <b className="text-slate-200">{stats.onNow}</b> on now
+          <b className="text-slate-200">{stats.channels}</b> channels
           {stats.movies > 0 && <> · <b className="text-slate-200">{stats.movies}</b> movies</>}
         </p>
       </div>
@@ -125,17 +170,24 @@ export function ChannelGuide({
           stays under All. */}
       <div className="flex flex-wrap items-center gap-2" data-testid="guide-filters">
         <div className="inline-flex flex-none rounded-lg border border-white/12 bg-white/5 p-0.5">
-          {([['all', 'All'], ['movie', '🎬 Movies'], ['tv', '📺 Shows']] as const).map(([v, label]) => (
+          {(
+            [
+              ['all', 'All', null],
+              ['movie', 'Movies', Film],
+              ['tv', 'Shows', Tv],
+            ] as const
+          ).map(([v, label, Icon]) => (
             <button
               key={v}
               type="button"
               onClick={() => setMedia(v)}
               aria-pressed={media === v}
               data-testid={`guide-media-${v}`}
-              className={`min-h-[36px] rounded-md px-3 text-sm font-semibold transition ${
+              className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition ${
                 media === v ? 'bg-brand-500 text-white shadow-glow' : 'text-slate-300 hover:text-white'
               }`}
             >
+              {Icon && <Icon size={16} aria-hidden />}
               {label}
             </button>
           ))}
@@ -192,100 +244,159 @@ export function ChannelGuide({
         </div>
       ) : (
         <ul className="space-y-2">
-          {shown.map((r) => (
-            <li key={r.network} className="card wv-tile p-3" data-testid="guide-channel">
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="flex min-w-0 items-baseline gap-1.5 truncate text-sm font-black uppercase tracking-wide text-white">
-                  {r.network}
-                  {'forYou' in r && (r as { forYou: boolean }).forYou && (
+          {shown.map((r) => {
+            // CHANNEL IDENTITY, not FCC paperwork. "KWPXDT" means nothing to a
+            // viewer whose cable box says ION; the mapping names what it can
+            // prove and falls back to the call sign — never a guess. The chip
+            // is a stable monogram, not a hotlinked logo.
+            const id = channelIdentity(r.network);
+            // Paid programming gets the guide's floor, not its shine: the slot
+            // is real (hiding it would fake the schedule) but it renders muted
+            // and scoreless — an infomercial does not earn a match number.
+            const onNowPaid = r.onNow != null && isPaidProgramming(r.onNow);
+            // The holes between the rows we SHOW — an unexplained jump from
+            // 6:00 to 9:00 is a claim about the schedule we can't back.
+            const visible = [...(r.onNow ? [r.onNow] : []), ...r.upNext];
+            const gaps = scheduleGaps(visible);
+            const gapAfter = (a: Airing) =>
+              gaps.find((g) => {
+                const end = Date.parse(a.airstamp) + (a.runtime ?? 0) * 60_000;
+                return Math.abs(g.fromMs - end) < 60_000;
+              });
+            return (
+              <li key={r.network} className="card wv-tile p-3" data-testid="guide-channel">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h3 className="flex min-w-0 items-center gap-2 truncate text-sm font-black uppercase tracking-wide text-white">
                     <span
-                      data-testid="guide-for-you"
-                      title="This channel’s programming matches your taste rules"
-                      className="rounded bg-[#ff1493]/20 px-1 py-0.5 text-[9px] font-black tracking-wide text-pink-200"
+                      aria-hidden
+                      className="grid h-6 w-9 flex-none place-items-center rounded-md text-[9px] font-black tracking-wide"
+                      style={{ backgroundColor: `hsl(${channelHue(id.name)} 45% 22%)`, color: `hsl(${channelHue(id.name)} 80% 82%)` }}
                     >
-                      🧬 FOR YOU
+                      {id.monogram}
                     </span>
-                  )}
-                </h3>
-                {r.onNow && (
-                  <span className="flex-none rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
-                    On now
-                  </span>
-                )}
-              </div>
-
-              {r.onNow && (
-                <div className="mt-1.5" data-testid="guide-on-now">
-                  <div className="flex items-baseline gap-2">
-                    <span className="min-w-0 truncate text-[15px] font-semibold text-white">
-                      {r.onNow.showType === 'Movie' && <span aria-hidden className="mr-1">🎬</span>}
-                      {r.onNow.showName}
+                    <span className="truncate" title={id.mapped ? `${id.name} (${r.network})` : id.name} data-testid="guide-channel-name">
+                      {id.name}
                     </span>
-                    {r.onNow.year != null && <span className="flex-none text-xs text-slate-500">{r.onNow.year}</span>}
-                    {/* The programme's own engine match — the number the whole
-                        app means by "Your NN", computed by the same
-                        deterministic verdict, shown only when the listing was
-                        confidently resolved to a real title. */}
-                    {r.onNow.match != null && (
+                    {'forYou' in r && (r as { forYou: boolean }).forYou && (
                       <span
-                        data-testid="guide-match"
-                        title={`Your match: ${r.onNow.match} — scored by your VERD1CT engine`}
-                        className="flex-none rounded-md border border-[#ff1493]/50 bg-[#ff1493]/15 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-pink-100"
+                        data-testid="guide-for-you"
+                        title="This channel’s programming matches your taste rules"
+                        className="inline-flex items-center gap-0.5 rounded bg-[#ff1493]/20 px-1 py-0.5 text-[9px] font-black tracking-wide text-pink-200"
                       >
-                        Your {r.onNow.match}
+                        <Dna size={10} aria-hidden /> FOR YOU
                       </span>
                     )}
-                  </div>
-                  {/* How far in — so "join late?" is answerable at a glance. */}
-                  {r.progress != null && (
-                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10" aria-hidden>
-                      <div className="h-full rounded-full bg-emerald-400/80" style={{ width: `${Math.round(r.progress * 100)}%` }} />
-                    </div>
+                  </h3>
+                  {r.onNow && (
+                    <span className="flex-none rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
+                      On now
+                    </span>
                   )}
                 </div>
-              )}
 
-              {r.upNext.length > 0 && (
-                <div className="mt-2 space-y-0.5" data-testid="guide-up-next">
-                  {r.upNext.map((a) => {
-                    const isSet = reminded.has(a.id);
-                    return (
-                      <div key={a.id} className="flex items-center gap-2 text-[13px]">
-                        <span suppressHydrationWarning className="flex-none font-bold tabular-nums text-slate-300">
-                          {displayClock(a.airstamp, a.time) ?? '—'}
+                {r.onNow && (
+                  <div className={`mt-1.5 ${onNowPaid ? 'opacity-60' : ''}`} data-testid="guide-on-now">
+                    <div className="flex items-baseline gap-2">
+                      <span className="flex min-w-0 items-baseline gap-1.5 truncate text-[15px] font-semibold text-white">
+                        {r.onNow.showType === 'Movie' && <Film size={14} className="flex-none self-center text-slate-400" aria-hidden />}
+                        <span className="truncate">{r.onNow.showName}</span>
+                      </span>
+                      {r.onNow.year != null && <span className="flex-none text-xs text-slate-500">{r.onNow.year}</span>}
+                      {onNowPaid ? (
+                        <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400" data-testid="guide-paid">
+                          Paid programming
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-slate-400">
-                          {a.showType === 'Movie' && <span aria-hidden className="mr-1">🎬</span>}
-                          {a.showName}
-                          {a.match != null && (
-                            <span className="ml-1.5 rounded border border-[#ff1493]/40 bg-[#ff1493]/10 px-1 text-[10px] font-black tabular-nums text-pink-200">
-                              {a.match}
-                            </span>
-                          )}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => void remind(a)}
-                          disabled={isSet || busy === a.id}
-                          aria-label={isSet ? `Reminder set for ${a.showName}` : `Remind me before ${a.showName} starts`}
-                          data-testid={`guide-remind-${a.id}`}
-                          className={`grid h-8 w-8 flex-none place-items-center rounded-lg border text-sm transition active:scale-95 ${
-                            isSet
-                              ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
-                              : 'border-white/15 bg-white/[0.05] text-slate-300 hover:border-brand-300 hover:text-white'
-                          }`}
-                        >
-                          <span aria-hidden>{isSet ? '✓' : '⏰'}</span>
-                        </button>
+                      ) : (
+                        r.onNow.match != null && (
+                          <ScoreBadge score={r.onNow.match} personalized={personalized} why={r.onNow.matchWhy ?? null} />
+                        )
+                      )}
+                    </div>
+                    {/* How far in — so "join late?" is answerable at a glance. */}
+                    {r.progress != null && (
+                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10" aria-hidden>
+                        <div className="h-full rounded-full bg-emerald-400/80" style={{ width: `${Math.round(r.progress * 100)}%` }} />
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </li>
-          ))}
+                    )}
+                    {gapAfter(r.onNow) && <GapRow gap={gapAfter(r.onNow)!} clockOf={clockOf} />}
+                  </div>
+                )}
+
+                {r.upNext.length > 0 && (
+                  <div className="mt-2 space-y-0.5" data-testid="guide-up-next">
+                    {r.upNext.map((a) => {
+                      const isSet = reminded.has(a.id);
+                      const isSaved = saved.has(a.id);
+                      const paid = isPaidProgramming(a);
+                      const gap = gapAfter(a);
+                      return (
+                        <div key={a.id}>
+                          <div className={`flex items-center gap-2 text-[13px] ${paid ? 'opacity-60' : ''}`}>
+                            <span suppressHydrationWarning className="flex-none font-bold tabular-nums text-slate-300">
+                              {displayClock(a.airstamp, a.time) ?? '—'}
+                            </span>
+                            <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-slate-400">
+                              {a.showType === 'Movie' && <Film size={13} className="flex-none" aria-hidden />}
+                              <span className="truncate">{a.showName}</span>
+                              {!paid && a.match != null && (
+                                <ScoreBadge score={a.match} personalized={personalized} why={a.matchWhy ?? null} size="sm" />
+                              )}
+                            </span>
+                            {a.tmdbId != null && a.mediaType != null && (
+                              <button
+                                type="button"
+                                onClick={() => void save(a)}
+                                disabled={isSaved || busy === a.id}
+                                aria-label={isSaved ? `${a.showName} saved` : `Save ${a.showName} to your watchlist`}
+                                data-testid={`guide-save-${a.id}`}
+                                className={`grid h-8 w-8 flex-none place-items-center rounded-lg border transition active:scale-95 ${
+                                  isSaved
+                                    ? 'border-[#ff1493]/40 bg-[#ff1493]/15 text-pink-200'
+                                    : 'border-white/15 bg-white/[0.05] text-slate-300 hover:border-brand-300 hover:text-white'
+                                }`}
+                              >
+                                {isSaved ? <Check size={16} aria-hidden /> : <Bookmark size={16} aria-hidden />}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => void remind(a)}
+                              disabled={isSet || busy === a.id}
+                              aria-label={isSet ? `Reminder set for ${a.showName}` : `Remind me before ${a.showName} starts`}
+                              data-testid={`guide-remind-${a.id}`}
+                              className={`grid h-8 w-8 flex-none place-items-center rounded-lg border transition active:scale-95 ${
+                                isSet
+                                  ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
+                                  : 'border-white/15 bg-white/[0.05] text-slate-300 hover:border-brand-300 hover:text-white'
+                              }`}
+                            >
+                              {isSet ? <Check size={16} aria-hidden /> : <AlarmClock size={16} aria-hidden />}
+                            </button>
+                          </div>
+                          {gap && <GapRow gap={gap} clockOf={clockOf} />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** "We can't see this stretch" — a hole in the data, named instead of skipped. */
+function GapRow({ gap, clockOf }: { gap: { fromMs: number; toMs: number }; clockOf: (ms: number) => string }) {
+  return (
+    <div
+      suppressHydrationWarning
+      data-testid="guide-gap"
+      className="mt-0.5 rounded-md border border-dashed border-white/10 px-2 py-1 text-[11px] text-slate-500"
+    >
+      No listing data {clockOf(gap.fromMs)}–{clockOf(gap.toMs)}
     </div>
   );
 }

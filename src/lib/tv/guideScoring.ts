@@ -75,12 +75,42 @@ export function pickScoringCandidates(airings: readonly Airing[], nowMs: number,
  */
 export function applyScores(
   airings: readonly Airing[],
-  scores: ReadonlyMap<string, { tmdbId: number; mediaType: 'movie' | 'tv'; match: number }>,
+  scores: ReadonlyMap<string, { tmdbId: number; mediaType: 'movie' | 'tv'; match: number; why?: string | null }>,
 ): Airing[] {
   return airings.map((a) => {
     const s = scores.get(titleKey(a));
-    return s ? { ...a, tmdbId: s.tmdbId, mediaType: s.mediaType, match: s.match } : a;
+    return s ? { ...a, tmdbId: s.tmdbId, mediaType: s.mediaType, match: s.match, matchWhy: s.why ?? null } : a;
   });
+}
+
+export interface ScoreDistribution {
+  n: number;
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
+  /** True when the middle half of the guide sits above 65 — the badge scale is
+   *  compressed and "Your 71" vs "Your 68" is telling the user nothing. */
+  compressed: boolean;
+}
+
+/**
+ * THE SCALE AUDIT. A score only informs when it discriminates: if the median
+ * guide match is above 65, most of the dial is printing roughly the same
+ * number and the badge has stopped carrying information. This measures the
+ * spread of one guide fetch so the server can log it on every scored request
+ * — the recalibration decision needs the LIVE distribution (real users, real
+ * schedules), which no fixture can stand in for, so the honest sandbox
+ * deliverable is the instrument plus the trigger condition, not a blind
+ * rescale of the deterministic engine's output.
+ */
+export function scoreDistribution(scores: readonly number[]): ScoreDistribution | null {
+  if (scores.length === 0) return null;
+  const s = [...scores].sort((a, b) => a - b);
+  const at = (p: number) => s[Math.min(s.length - 1, Math.max(0, Math.round(p * (s.length - 1))))]!;
+  const median = at(0.5);
+  return { n: s.length, min: s[0]!, q1: at(0.25), median, q3: at(0.75), max: s[s.length - 1]!, compressed: median > 65 };
 }
 
 /** The map key `applyScores` expects — exported so the server half agrees. */

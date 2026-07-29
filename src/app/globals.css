@@ -85,6 +85,21 @@ body {
   .wv-card-art {
     @apply relative aspect-[2/3] w-[38%] max-w-[160px] flex-none self-start overflow-hidden rounded-lg sm:aspect-auto sm:h-[196px] sm:w-full sm:max-w-none sm:self-auto sm:rounded-none lg:h-[216px];
   }
+  /* ONE ASPECT FOR TV-LISTING ARTWORK: 16:9 at every width, letterboxed.
+     Broadcast art arrives as posters, banners and stills in every shape;
+     letting the shape drive the box made every card a different height. The
+     box is fixed and the IMAGE adapts (object-contain centers it on the ink
+     background), so a mismatched source letterboxes instead of resizing the
+     card. Height overrides use !important because the base class pins fixed
+     heights from `sm`. */
+  .wv-art-video {
+    aspect-ratio: 16 / 9;
+    height: auto !important;
+  }
+  .wv-art-video > img,
+  .wv-art-video > a > img {
+    object-fit: contain !important;
+  }
   .wv-card-body {
     @apply flex min-w-0 flex-1 flex-col sm:p-3;
   }
