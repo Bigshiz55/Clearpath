@@ -87,17 +87,17 @@ export default function PacksHarness() {
       <PublicHeader />
       <main className="container-page space-y-10 py-8">
         <section>
-          <h1 className="text-2xl font-bold text-white sm:text-3xl">Hallmark &amp; Lifetime</h1>
+          <h1 className="text-2xl font-bold text-white sm:text-3xl">Hallmark Universe</h1>
           <p className="mt-1 text-sm text-slate-400">Premiere calendar and cast tracking (fixture data).</p>
           <h2 className="mb-2 mt-4 text-lg font-bold text-white">Premiere calendar</h2>
-          <PremiereListOrCalendar entries={PREMIERE_ENTRIES} packSlug="hallmark-lifetime" signedIn />
+          <PremiereListOrCalendar entries={PREMIERE_ENTRIES} packSlug="hallmark-universe" signedIn />
         </section>
 
         <section>
-          <h1 className="text-2xl font-bold text-white sm:text-3xl">True Crime</h1>
+          <h1 className="text-2xl font-bold text-white sm:text-3xl">Crime Case Files</h1>
           <p className="mt-1 text-sm text-slate-400">Case tracking and completion stats (fixture data).</p>
           <h2 className="mb-2 mt-4 text-lg font-bold text-white">Cases</h2>
-          <CaseList cases={CASES} unmatched={UNMATCHED} packSlug="true-crime" signedIn />
+          <CaseList cases={CASES} unmatched={UNMATCHED} packSlug="crime-case-files" signedIn />
         </section>
 
         <section>

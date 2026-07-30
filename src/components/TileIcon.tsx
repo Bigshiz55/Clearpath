@@ -19,7 +19,8 @@ export type TileIconName =
   | 'funny'
   | 'scary'
   | 'heart'
-  | 'sunny';
+  | 'sunny'
+  | 'packs';
 
 function G({ id, from, to, v }: { id: string; from: string; to: string; v?: boolean }) {
   return (
@@ -242,6 +243,17 @@ export function TileIcon({ name, className = 'h-11 w-11' }: { name: TileIconName
             <line x1="17.1" y1="7.4" x2="15.7" y2="8.8" />
             <line x1="8.3" y1="16.2" x2="6.9" y2="17.6" />
           </g>
+        </>,
+      );
+    case 'packs': // stacked specialized collections
+      return svg(
+        <>
+          <defs><G id="ti-packs" from="#c4b5fd" to="#7c3aed" /></defs>
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-packs)" />
+          <Gloss />
+          <rect x="6" y="13.5" width="12" height="3.4" rx="1.4" fill="#fff" opacity="0.55" />
+          <rect x="6" y="9.6" width="12" height="3.4" rx="1.4" fill="#fff" opacity="0.78" />
+          <rect x="6" y="5.7" width="12" height="3.4" rx="1.4" fill="#fff" />
         </>,
       );
   }
