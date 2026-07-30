@@ -6,6 +6,9 @@ import { getPackBySlug } from '@/lib/packs/packs';
 import { ensurePackIngested } from '@/lib/packs/lazyIngest';
 import { PremiereCalendarView } from '@/components/packs/PremiereCalendarView';
 import { CaseBrowserView } from '@/components/packs/CaseBrowserView';
+import { ChecklistSection } from '@/components/packs/ChecklistSection';
+import { FranchiseOrderView } from '@/components/packs/FranchiseOrderView';
+import { CaseSearchBox } from '@/components/packs/CaseSearchBox';
 import { PackEmptyState } from '@/components/packs/PackEmptyState';
 import { PublicHeader, PublicFooter } from '@/components/discovery/DiscoveryLayout';
 
@@ -106,9 +109,26 @@ export default async function PackPage({ params }: { params: { slug: string } })
         )}
 
         {pack.caseTracking && (
+          <>
+            <CaseSearchBox packSlug={pack.slug} />
+            <section>
+              <h2 className="mb-2 text-lg font-bold text-white">Cases</h2>
+              <CaseBrowserView pack={pack} userId={user?.id ?? null} />
+            </section>
+          </>
+        )}
+
+        {pack.completionStats && !pack.caseTracking && (
           <section>
-            <h2 className="mb-2 text-lg font-bold text-white">Cases</h2>
-            <CaseBrowserView pack={pack} userId={user?.id ?? null} />
+            <h2 className="mb-2 text-lg font-bold text-white">My Checklist</h2>
+            <ChecklistSection pack={pack} userId={user?.id ?? null} />
+          </section>
+        )}
+
+        {pack.franchiseContinuity && (
+          <section>
+            <h2 className="mb-2 text-lg font-bold text-white">Franchise Order</h2>
+            <FranchiseOrderView />
           </section>
         )}
 

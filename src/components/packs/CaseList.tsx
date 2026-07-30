@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Poster } from '@/components/PosterCard';
 import { SeenToggle } from './SeenToggle';
 
@@ -48,7 +49,9 @@ function CaseCard({ caseSummary, packSlug, signedIn }: { caseSummary: CaseSummar
     <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-lg font-bold text-white">{caseSummary.title}</h3>
+          <Link href={`/packs/${packSlug}/cases/${caseSummary.slug}`} className="text-lg font-bold text-white hover:underline">
+            {caseSummary.title} →
+          </Link>
           {caseSummary.description && <p className="mt-0.5 text-sm text-slate-400">{caseSummary.description}</p>}
           <p className="mt-1 text-[12px] text-slate-500">
             Covered across {networks.length} network{networks.length === 1 ? '' : 's'}: {networks.join(', ')}

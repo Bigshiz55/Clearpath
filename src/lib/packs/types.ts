@@ -66,8 +66,81 @@ export interface CaseRecord {
   slug: string;
   title: string;
   description: string | null;
+  location: string | null;
+  incidentDate: string | null;
+  /** A short, honest one-line status ("Not yet documented" when nothing is curated). */
+  statusSummary: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** How firmly a curated fact is backed by its source. */
+export type FactConfidence = 'verified' | 'reported' | 'unconfirmed';
+
+export type CaseSubjectRole =
+  | 'victim' | 'person_of_interest' | 'suspect' | 'charged'
+  | 'defendant' | 'convicted' | 'acquitted' | 'exonerated' | 'witness' | 'other';
+
+/** A sourced person connected to a Case. `role` is the role AT THE TIME —
+ *  `outcome` is the eventual, separately-sourced result. Never collapse the two. */
+export interface CaseSubject {
+  id: string;
+  caseId: string;
+  fullName: string;
+  role: CaseSubjectRole;
+  outcome: string | null;
+  sourceUrl: string | null;
+  confidence: FactConfidence;
+  sortOrder: number;
+}
+
+export type CaseTimelineEventType =
+  | 'incident' | 'investigation' | 'arrest' | 'charges' | 'trial'
+  | 'verdict' | 'sentencing' | 'appeal' | 'development';
+
+export interface CaseTimelineEvent {
+  id: string;
+  caseId: string;
+  eventType: CaseTimelineEventType;
+  eventDate: string | null;
+  headline: string;
+  detail: string | null;
+  sourceUrl: string | null;
+  confidence: FactConfidence;
+  disputed: boolean;
+  sortOrder: number;
+}
+
+export type FranchiseConnection = 'direct_sequel' | 'shared_universe' | 'standalone_same_franchise' | 'unknown';
+
+/** A verified franchise membership + viewing-order position. Never inferred
+ *  from title-string similarity — every row is individually sourced. */
+export interface FranchiseEntry {
+  id: string;
+  franchise: string;
+  programmeId: string | null;
+  tmdbId: number | null;
+  tmdbMediaType: 'movie' | 'tv' | null;
+  title: string;
+  sequenceNumber: number | null;
+  connection: FranchiseConnection;
+  sourceUrl: string | null;
+  confidence: FactConfidence;
+}
+
+/** One row in a Pack's "My Checklist" — every programme on the Pack's
+ *  stations, real genre tags from the provider, and the signed-in user's
+ *  watched status. No fabricated thematic buckets (e.g. "Christmas in July")
+ *  — only what the data actually supports. */
+export interface ChecklistItem {
+  programmeId: string;
+  title: string;
+  posterUrl: string | null;
+  genres: string[];
+  releaseYear: number | null;
+  seen: boolean;
+  /** Most recent or soonest known airing, for sorting/display. */
+  latestAiringUtc: string | null;
 }
 
 /** An alternate title the same tv_programmes row has aired under. */

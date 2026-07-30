@@ -1,6 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Pack, PackPremiereEntry, PackPreview } from './types';
+import type { Pack, PackPremiereEntry, PackPreview, ChecklistItem } from './types';
 import { listStationsForPack } from './stations';
 
 interface PackRow {
@@ -151,4 +151,65 @@ export async function getPackPreview(
   }
 
   return preview;
+}
+
+const CHECKLIST_LIMIT = 300;
+
+/**
+ * "My Checklist" — every distinct programme on a Pack's stations (not just
+ * upcoming premieres), with real genre tags from the provider and the
+ * signed-in user's watched status. No fabricated thematic buckets (e.g. a
+ * "Christmas in July" filter) — filtering is built only from what the data
+ * actually carries (genre, watched/unwatched).
+ */
+export async function listPackChecklist(
+  supabase: SupabaseClient,
+  pack: Pack,
+  userId: string | null,
+): Promise<ChecklistItem[]> {
+  const stationIds = await listStationsForPack(supabase, pack.id);
+  if (stationIds.length === 0) return [];
+
+  const { data: airings, error: airingsError } = await supabase
+    .from('tv_airings')
+    .select('programme_id, start_at_utc')
+    .in('station_id', stationIds)
+    .order('start_at_utc', { ascending: false })
+    .limit(2000);
+  if (airingsError) throw airingsError;
+
+  const latestByProgramme = new Map<string, string>();
+  for (const row of (airings ?? []) as { programme_id: string; start_at_utc: string }[]) {
+    if (!latestByProgramme.has(row.programme_id)) latestByProgramme.set(row.programme_id, row.start_at_utc);
+  }
+  const programmeIds = [...latestByProgramme.keys()].slice(0, CHECKLIST_LIMIT);
+  if (programmeIds.length === 0) return [];
+
+  const { data: programmes, error: programmesError } = await supabase
+    .from('tv_programmes')
+    .select('id, title, artwork_url, genres, release_year')
+    .in('id', programmeIds);
+  if (programmesError) throw programmesError;
+
+  const anonymousUserId = '00000000-0000-0000-0000-000000000000';
+  const { data: seenRows } = await supabase
+    .from('user_seen_programmes')
+    .select('programme_id')
+    .in('programme_id', programmeIds)
+    .eq('user_id', userId ?? anonymousUserId);
+  const seenIds = new Set(((seenRows ?? []) as { programme_id: string }[]).map((r) => r.programme_id));
+
+  return (
+    (programmes ?? []) as { id: string; title: string; artwork_url: string | null; genres: string[] | null; release_year: number | null }[]
+  )
+    .map((p) => ({
+      programmeId: p.id,
+      title: p.title,
+      posterUrl: p.artwork_url,
+      genres: p.genres ?? [],
+      releaseYear: p.release_year,
+      seen: seenIds.has(p.id),
+      latestAiringUtc: latestByProgramme.get(p.id) ?? null,
+    }))
+    .sort((a, b) => (a.latestAiringUtc && b.latestAiringUtc ? (a.latestAiringUtc < b.latestAiringUtc ? 1 : -1) : 0));
 }
