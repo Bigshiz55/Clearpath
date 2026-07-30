@@ -24,6 +24,11 @@ const schema = z.object({
   intent: z.enum(['looks_good', 'watchlist', 'not_interested', 'seen']),
   rating: z.enum(['loved', 'liked', 'okay', 'disliked']).optional(),
   dwellMs: z.number().int().min(0).max(600000).optional(),
+  /** Tags the event by originating surface (e.g. 'calibration' for the
+   *  cold-start title grid). Defaults to 'quiz' — the card flow's own answers. */
+  source: z.string().max(40).optional(),
+  /** Founder test-session scoping, when answered from within a test session. */
+  sessionId: z.string().max(64).optional(),
 });
 
 export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{ ok: boolean; error?: string }> {
@@ -57,11 +62,11 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
     rating: a.rating,
     dims,
     dwellMs: a.dwellMs,
-    source: 'quiz',
+    source: a.source ?? 'quiz',
   };
 
   // 1) The real engine (idempotent on eventId → duplicate taps write once).
-  await recordEvents(supabase, user.id, [quizAnswerToEvent(answer)]);
+  await recordEvents(supabase, user.id, [quizAnswerToEvent(answer)], { sessionId: a.sessionId });
 
   // 2) "Watchlist" saves the title (status: possible = wants to watch). Only the
   //    Watchlist intent writes here — "Looks good" is a taste signal only.

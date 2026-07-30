@@ -213,8 +213,8 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
         return [
           recordQuizAnswer(
             pick.kind === 'like'
-              ? { ...base, recognition: 'unseen' as const, attraction: 'interested' as const }
-              : { ...base, recognition: 'seen' as const, rating: pick.rating },
+              ? { ...base, intent: 'looks_good' as const }
+              : { ...base, intent: 'seen' as const, rating: pick.rating },
           ).catch(() => ({ ok: false })),
         ];
       }),
