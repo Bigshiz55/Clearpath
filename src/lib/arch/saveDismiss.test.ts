@@ -187,7 +187,7 @@ describe('no grid pulls a card out from under you', () => {
     'src/components/WatchNowGrid.tsx',
     'src/components/OnTvGuide.tsx',
     'src/components/Mentalist.tsx',
-    'src/components/RecommendedForYou.tsx',
+    'src/components/HomeRecommendations.tsx',
     'src/app/app/watch/page.tsx',
   ];
 

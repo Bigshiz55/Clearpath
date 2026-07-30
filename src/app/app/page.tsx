@@ -8,11 +8,10 @@ import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictBadge } from '@/components/VerdictBadge';
-import { RecommendedForYou } from '@/components/RecommendedForYou';
+import { HomeRecommendations } from '@/components/HomeRecommendations';
 import { BuildCaseBox } from '@/components/BuildCaseBox';
 import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
-import { Top10Slate } from '@/components/Top10Slate';
 import { UpcomingTvRail } from '@/components/UpcomingTvRail';
 import { InstallHint } from '@/components/InstallHint';
 import { getTonight } from '@/lib/tonight';
@@ -147,11 +146,10 @@ export default async function DiscoverPage() {
       </section>
 
       {/* The ranked shape, on the surface people actually browse — with the
-          arithmetic behind every number one tap away. It renders nothing until
-          there is a slate to rank, so a brand-new account sees no empty rail. */}
-      <Top10Slate surface="home" />
-
-      <RecommendedForYou label={label} />
+          arithmetic behind every number one tap away, and "Recommended for
+          you" continuing from #11 rather than repeating the same 10 titles
+          twice on one screen. One fetch, no empty rail on a brand-new account. */}
+      <HomeRecommendations label={label} />
 
       {/* Times are computed in the browser, in the viewer's own zone — see
           UpcomingTvRail. Rendering them here would print the server's clock. */}
