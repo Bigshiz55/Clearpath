@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `2d8dd7d` · Branch: `claude/watch-verdict-app-wwbtbg`
+- Commit: `ac4c14d` · Branch: `claude/watch-verdict-app-wwbtbg`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 

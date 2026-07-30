@@ -76,7 +76,7 @@ export default async function DiscoverPage() {
       <TonightHome tonight={tonight} />
 
       <section className="space-y-6">
-        {/* Featured — Decide Together (Live Court): the group "wow", given top
+        {/* Featured — The Verdict Room (Live Court): the group "wow", given top
             billing as a wide, prominent card above the rest of the tiles. */}
         <Link
           href="/app/together"
@@ -93,8 +93,8 @@ export default async function DiscoverPage() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-100">⚖️ Live Court</span>
-            <span className="mt-1.5 block text-2xl font-black tracking-tight text-white sm:text-3xl">Decide Together</span>
-            <span className="mt-0.5 block text-sm text-slate-200 sm:text-base">One verdict for the whole room — everyone votes from their own phone, the judge settles it.</span>
+            <span className="mt-1.5 block text-2xl font-black tracking-tight text-white sm:text-3xl">The Verdict Room</span>
+            <span className="mt-0.5 block text-sm text-slate-200 sm:text-base">Everyone weighs in. One title wins.</span>
           </span>
           <span aria-hidden className="pointer-events-none flex-none text-2xl font-black text-brand-300 transition-transform duration-300 group-hover:translate-x-0.5 sm:text-3xl">→</span>
         </Link>
