@@ -34,9 +34,12 @@ export function ApplyMigrationsButton() {
     setBusy(true);
     setResult(null);
     try {
+      // A copy-pasted secret very commonly carries a trailing newline or
+      // space from wherever it was copied — the route does an exact string
+      // match, so an untrimmed value that LOOKS right still fails silently.
       const res = await fetch('/api/admin/migrate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.trim()}` },
         body: '{}',
       });
       const body = (await res.json().catch(() => ({ error: `HTTP ${res.status}` }))) as MigrateResult;
@@ -64,6 +67,9 @@ export function ApplyMigrationsButton() {
           id="migrate-secret"
           type="password"
           autoComplete="off"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
           value={token}
           onChange={(e) => setToken(e.target.value)}
           className="input"
