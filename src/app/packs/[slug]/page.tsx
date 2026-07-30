@@ -146,9 +146,20 @@ export default async function PackPage({ params }: { params: { slug: string } })
   }
 }
 
-/** A Postgres/DB error message is safe, human-legible text (e.g. "relation
- *  \"packs\" does not exist") — never a secret — so it's fine to surface
- *  directly rather than only a digest. */
+/**
+ * A Postgres/DB error message is safe, human-legible text (e.g. "relation
+ * \"packs\" does not exist") — never a secret — so it's fine to surface
+ * directly rather than only a digest.
+ *
+ * Supabase's PostgrestError (thrown by `if (error) throw error` in the
+ * packs data layer) is a plain object shaped like an Error, not always an
+ * actual `instanceof Error` — so this checks for a usable `.message` string
+ * on any thrown value, not only real Error instances.
+ */
 function causeMessage(e: unknown): string {
-  return e instanceof Error && e.message ? e.message : 'An unexpected error occurred.';
+  if (typeof e === 'object' && e !== null && 'message' in e && typeof (e as { message: unknown }).message === 'string') {
+    const msg = (e as { message: string }).message;
+    if (msg) return msg;
+  }
+  return 'An unexpected error occurred.';
 }
