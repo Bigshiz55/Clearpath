@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Growth OS · WatchVerdict', robots: { index: false, follow: false } };
+export const metadata = { title: 'Growth OS · WatchVerd1ct', robots: { index: false, follow: false } };
 
 const NAV = [
   { href: '/growth-os', label: 'Today' },

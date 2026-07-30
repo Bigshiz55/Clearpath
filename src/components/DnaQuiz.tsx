@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { recordQuizAnswer, undoQuizAnswer } from '@/lib/actions/dnaQuiz';
+import { SeeRecommendations } from '@/components/SeeRecommendations';
 import type { QuizIntent, QuizRating } from '@/lib/preference/quizMap';
 
 export interface QuizItem {
@@ -25,10 +26,14 @@ export interface SubmitPayload {
   intent: QuizIntent;
   rating?: QuizRating;
   dwellMs?: number;
+  sessionId?: string;
 }
 
 interface Props {
   totalRated?: number;
+  /** Founder test-session scoping — when set, every answer is tagged so it
+   *  lands in that isolated session instead of the founder's real profile. */
+  sessionId?: string;
   /** Test/harness override — skip the /api/quiz fetch and use these. */
   items?: QuizItem[];
   /** Override the write path (harness). Defaults to the real server action. */
@@ -74,7 +79,7 @@ const uid = () =>
  * place (fixed-height rows ⇒ zero shift). Every answer writes to the real engine;
  * Undo is lossless (and reverses a Watchlist save); no follow-up interrupts.
  */
-export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
+export function DnaQuiz({ totalRated = 0, sessionId, items, onSubmit, onUndo }: Props) {
   const submit = onSubmit ?? recordQuizAnswer;
   const undo = onUndo ?? undoQuizAnswer;
 
@@ -138,6 +143,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
         intent,
         rating,
         dwellMs: Date.now() - shownAt.current,
+        sessionId,
       };
       try {
         const res = await submit(full);
@@ -152,7 +158,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
         busy.current = false;
       }
     },
-    [queue, idx, submit, advance],
+    [queue, idx, submit, advance, sessionId],
   );
 
   const retry = () => setStatus('idle');
@@ -187,7 +193,7 @@ export function DnaQuiz({ totalRated = 0, items, onSubmit, onUndo }: Props) {
         <div>
           <p className="text-xl font-black text-white">That’s a wrap for now 🎬</p>
           <p className="mt-1 text-sm text-slate-400">{rated} rated · {stageLabel(rated)}</p>
-          <Link href="/app/watch" className="btn-primary mt-5 inline-flex">See my picks</Link>
+          <SeeRecommendations taught={rated} className="mt-5" />
         </div>
       </div>
     );

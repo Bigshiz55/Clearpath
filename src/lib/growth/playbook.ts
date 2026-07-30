@@ -34,16 +34,16 @@ export interface PlanContext {
 }
 
 const FRIENDS_DM =
-  "Hey [name] — I built a small app, WatchVerdict, that ends the “what should we watch?” argument: it learns your taste and gives ONE clear verdict for tonight's mood. Could you try it for 2 min and tell me what's confusing or missing? Brutally honest feedback is exactly what I need 🙏 [link]";
+  "Hey [name] — I built a small app, WatchVerd1ct, that ends the “what should we watch?” argument: it learns your taste and gives ONE clear verdict for tonight's mood. Could you try it for 2 min and tell me what's confusing or missing? Brutally honest feedback is exactly what I need 🙏 [link]";
 
 const COMMUNITY_POST =
   "Title: I got tired of 40-minute “what should we watch” fights, so I built a taste-matcher\n\nBody: It learns why you say no (too slow, too dark, not tonight) and gives one verdict for your mood — and a group verdict when you and a partner/friends can't agree. It's free and early; I'd genuinely love feedback from people who watch a lot. Not trying to spam — happy to answer anything. [link]";
 
 const FOUNDER_STORY =
-  "I'm a solo founder. I built WatchVerdict because my partner and I wasted more time choosing than watching. It learns your taste across three signals — what pulls you in, what you actually enjoy, and what you're curious about — and gives one honest verdict. Building in public; first 100 users get founding-member status. Try it: [link]";
+  "I'm a solo founder. I built WatchVerd1ct because my partner and I wasted more time choosing than watching. It learns your taste across three signals — what pulls you in, what you actually enjoy, and what you're curious about — and gives one honest verdict. Building in public; first 100 users get founding-member status. Try it: [link]";
 
 const GROUP_INVITE =
-  "Want to settle movie night for good? I'll add you to a WatchVerdict group room — we each build a 60-second taste profile and it finds the pick we'll BOTH be happy with. Takes 2 min: [link]";
+  "Want to settle movie night for good? I'll add you to a WatchVerd1ct group room — we each build a 60-second taste profile and it finds the pick we'll BOTH be happy with. Takes 2 min: [link]";
 
 /** Build up to five prioritized actions from the real situation. */
 export function todaysPlan(ctx: PlanContext): PlanAction[] {
@@ -138,7 +138,7 @@ export function todaysPlan(ctx: PlanContext): PlanAction[] {
     {
       id: 'group-invite',
       task: 'Invite 3 friends to a group verdict room',
-      why: 'The collaborative "we can\'t agree" moment is WatchVerdict\'s natural viral loop.',
+      why: 'The collaborative "we can\'t agree" moment is WatchVerd1ct\'s natural viral loop.',
       impact: 'Activates the invite→group-result loop',
       minutes: 10,
       copy: GROUP_INVITE,

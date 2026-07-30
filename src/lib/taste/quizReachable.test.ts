@@ -79,12 +79,15 @@ describe('entry points', () => {
     expect(hub).toContain(QUIZ_HREF);
   });
 
-  it('the old title-quiz URL forwards instead of holding a second copy', () => {
-    const legacy = read('src/app/app/quiz/page.tsx');
-    expect(legacy).toContain('redirect(');
-    expect(legacy).toContain(QUIZ_HREF);
+  it('the card-flow quiz at /app/quiz is a second real instrument, not a stub', () => {
+    // /app/quiz (DnaQuiz — swipe-style card flow) and /app/taste-quiz
+    // (TitleGridCalibration — a grid of titles) are two distinct, real quiz
+    // instruments that coexist deliberately (see DnaQuiz.tsx's doc comment).
+    // Both need their own working entry point.
+    const cardQuiz = read('src/app/app/quiz/page.tsx');
+    expect(cardQuiz).toContain('DnaQuiz');
     // A founder session must survive the hop, or isolated calibration breaks.
-    expect(legacy).toContain('session');
+    expect(cardQuiz).toContain('session');
   });
 
   it('the nav carries the quiz', () => {

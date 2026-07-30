@@ -4,10 +4,15 @@ import { DnaQuiz } from '@/components/DnaQuiz';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'Build your Watch DNA · WatchVerdict',
+  title: 'Build your Watch DNA · WatchVerd1ct',
 };
 
-export default async function QuizPage() {
+export default async function QuizPage({
+  searchParams,
+}: {
+  searchParams?: { session?: string };
+}) {
+  const sessionId = searchParams?.session || undefined;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   let totalRated = 0;
@@ -29,7 +34,7 @@ export default async function QuizPage() {
         <p className="mt-0.5 text-xs text-slate-400">Rate what you’ve seen — “haven’t seen it” never counts against you.</p>
       </div>
       <div className="mt-2 min-h-0 flex-1">
-        <DnaQuiz totalRated={totalRated} />
+        <DnaQuiz totalRated={totalRated} sessionId={sessionId} />
       </div>
     </div>
   );
