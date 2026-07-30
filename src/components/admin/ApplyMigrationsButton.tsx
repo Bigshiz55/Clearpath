@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
 
 interface MigrateResult {
@@ -13,37 +12,42 @@ interface MigrateResult {
 }
 
 /**
- * Fires the existing POST /api/admin/migrate route using the browser's own
- * signed-in-admin session cookie — no token entry, no copy-paste. The route's
- * authorization and migration logic are untouched; this only calls it and
- * renders whatever it returns, in full, so a failure is readable on screen
- * rather than a bare digest.
+ * Fires the existing POST /api/admin/migrate route with a manually-entered
+ * MIGRATE_SECRET as a bearer token — the same alternative authorization that
+ * route already accepted for curl, just reachable from a phone browser now
+ * that this page has no admin session to gate on. The route's authorization
+ * and migration logic are untouched; this only calls it and renders whatever
+ * it returns, in full, so a failure (wrong secret or a migration error) is
+ * readable on screen rather than a bare digest.
+ *
+ * The token lives only in this component's state — never localStorage, a
+ * cookie, or the URL — so it's gone the moment the page reloads.
  */
 export function ApplyMigrationsButton() {
-  const router = useRouter();
   const toast = useToast();
+  const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MigrateResult | null>(null);
 
-  async function apply() {
+  async function apply(e: React.FormEvent) {
+    e.preventDefault();
     setBusy(true);
     setResult(null);
     try {
       const res = await fetch('/api/admin/migrate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: '{}',
       });
       const body = (await res.json().catch(() => ({ error: `HTTP ${res.status}` }))) as MigrateResult;
       setResult(body);
       if (res.ok && body.ok) {
         toast.show(`Applied ${body.applied ?? 0} of ${body.total ?? 0} migrations.`, 'success');
-        router.refresh();
       } else {
         toast.show(body.error ?? 'Migration run failed.', 'error');
       }
-    } catch (e) {
-      setResult({ error: e instanceof Error ? e.message : 'Network error.' });
+    } catch (e2) {
+      setResult({ error: e2 instanceof Error ? e2.message : 'Network error.' });
       toast.show('Could not reach the migrate endpoint.', 'error');
     } finally {
       setBusy(false);
@@ -51,8 +55,23 @@ export function ApplyMigrationsButton() {
   }
 
   return (
-    <div className="space-y-3">
-      <button onClick={() => void apply()} disabled={busy} className="btn-primary disabled:opacity-50">
+    <form onSubmit={(e) => void apply(e)} className="space-y-3">
+      <div>
+        <label htmlFor="migrate-secret" className="label">
+          Migrate secret
+        </label>
+        <input
+          id="migrate-secret"
+          type="password"
+          autoComplete="off"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          className="input"
+          placeholder="MIGRATE_SECRET"
+        />
+      </div>
+
+      <button type="submit" disabled={busy || !token} className="btn-primary disabled:opacity-50">
         {busy ? 'Applying…' : 'Apply pending migrations'}
       </button>
 
@@ -79,6 +98,6 @@ export function ApplyMigrationsButton() {
           )}
         </div>
       )}
-    </div>
+    </form>
   );
 }
