@@ -39,7 +39,8 @@ set slug = 'hallmark-universe',
     display_name = 'Hallmark Universe',
     description = 'Your personal Hallmark command center — tonight''s lineup, your checklist, and franchise order, all in one place.',
     person_tracking = true,
-    completion_stats = true
+    completion_stats = true,
+    franchise_continuity = true
 where slug = 'hallmark-lifetime';
 
 insert into public.packs
