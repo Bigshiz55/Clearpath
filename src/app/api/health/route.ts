@@ -277,6 +277,8 @@ export async function GET(request: Request) {
         watchmode_key: cfg.watchmodeKey,
         cron_secret: cfg.cronSecret,
         resend_key: cfg.resendKey,
+        migrate_secret: cfg.migrateSecret,
+        migrations_db_url: cfg.migrationsDbUrl,
       },
       features: {
         auth: cfg.supabaseUrl && cfg.supabasePublishableKey,
@@ -286,6 +288,7 @@ export async function GET(request: Request) {
         critic_ratings: cfg.omdbKey,
         daily_digest: cfg.cronSecret && cfg.serviceRoleKey && cfg.tmdbKey,
         digest_email: cfg.resendKey,
+        admin_migrations: cfg.migrateSecret && cfg.migrationsDbUrl,
       },
     },
     { status: ready ? 200 : 503, headers: { 'Cache-Control': 'no-store' } },
