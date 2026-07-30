@@ -243,16 +243,28 @@ export function SettingsView(props: {
       <h1 className="text-2xl font-bold text-white sm:text-3xl">Settings</h1>
 
       {props.isAdmin && (
-        <a
-          href="/app/admin/sponsors"
-          className="flex items-center justify-between rounded-xl border border-gold-400/40 bg-gold-500/10 p-4 transition hover:bg-gold-500/20"
-        >
-          <span>
-            <span className="block font-semibold text-gold-400">⚖️ Sponsored Judges — Admin</span>
-            <span className="block text-sm text-slate-400">Add and manage sponsors, and see coupon-claim conversions.</span>
-          </span>
-          <span className="text-gold-400">→</span>
-        </a>
+        <>
+          <a
+            href="/app/admin/sponsors"
+            className="flex items-center justify-between rounded-xl border border-gold-400/40 bg-gold-500/10 p-4 transition hover:bg-gold-500/20"
+          >
+            <span>
+              <span className="block font-semibold text-gold-400">⚖️ Sponsored Judges — Admin</span>
+              <span className="block text-sm text-slate-400">Add and manage sponsors, and see coupon-claim conversions.</span>
+            </span>
+            <span className="text-gold-400">→</span>
+          </a>
+          <a
+            href="/admin/migrations"
+            className="flex items-center justify-between rounded-xl border border-gold-400/40 bg-gold-500/10 p-4 transition hover:bg-gold-500/20"
+          >
+            <span>
+              <span className="block font-semibold text-gold-400">🗄️ Migrations — Admin</span>
+              <span className="block text-sm text-slate-400">See which database migrations are pending and apply them.</span>
+            </span>
+            <span className="text-gold-400">→</span>
+          </a>
+        </>
       )}
 
       {/* Profile */}
