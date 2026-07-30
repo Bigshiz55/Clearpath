@@ -12,6 +12,7 @@ import { RecommendationSlate } from '@/components/RecommendationSlate';
 import { Top10Slate } from '@/components/Top10Slate';
 import { loadDnaConfidence } from '@/lib/preference/dnaSignals';
 import { RetiredInterviewNotice } from '@/components/RetiredInterviewNotice';
+import { getPackActivitySummary } from '@/lib/packs/profileSummary';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Your Watch DNA' };
@@ -27,6 +28,10 @@ export default async function WatchDnaPage() {
 
   const stats = await getWatchStats(supabase, uid);
   const { confidence: dnaConfidence } = await loadDnaConfidence(supabase, uid);
+  // Fail-open: Pack tables may not exist yet on an environment that hasn't
+  // applied the Packs migrations, and this summary should never block the
+  // rest of the DNA page over that.
+  const packActivity = await getPackActivitySummary(supabase, uid).catch(() => ({ seenCount: 0, followingCount: 0 }));
   const profile = await getUserDimensionProfile(supabase, uid, stats.rated);
   const dials = tasteDials(profile, 8);
   const persona = describePersonality(profile);
@@ -132,6 +137,21 @@ export default async function WatchDnaPage() {
         <Stat label="⭐ Favorites" value={String(stats.favorites)} />
         <Stat label="Avg. days to watch" value={stats.avgDaysToWatch == null ? '—' : stats.avgDaysToWatch < 1 ? 'same day' : String(Math.round(stats.avgDaysToWatch))} />
       </section>
+
+      {/* Pack activity — a separate, honest count (not merged into the stats
+          above): Pack content has no reliable id bridge to the main TMDB-keyed
+          watchlist, so this stays its own number rather than a forced join. */}
+      <Link href="/packs" className="card flex items-center justify-between p-4 transition hover:bg-white/10" data-testid="pack-activity-link">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Packs</div>
+          <div className="mt-1 text-sm text-slate-300">
+            {packActivity.seenCount > 0 || packActivity.followingCount > 0
+              ? `${packActivity.seenCount} marked seen · following ${packActivity.followingCount}`
+              : 'Hallmark Universe, Lifetime Movie Vault, Crime Case Files'}
+          </div>
+        </div>
+        <span aria-hidden className="text-slate-500">→</span>
+      </Link>
 
       {/* Taste dials */}
       <section className="card p-5 sm:p-6">
