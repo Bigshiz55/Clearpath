@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `6b30ffb` · Branch: `main`
+- Commit: `eaafb58` · Branch: `main`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 
