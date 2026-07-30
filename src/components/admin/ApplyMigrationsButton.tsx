@@ -42,7 +42,16 @@ export function ApplyMigrationsButton() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.trim()}` },
         body: '{}',
       });
-      const body = (await res.json().catch(() => ({ error: `HTTP ${res.status}` }))) as MigrateResult;
+      // Read the raw text first — a crash that never reaches our JSON
+      // handlers (a platform-level 500, an HTML error page) still has a body
+      // worth showing, and `res.json()` alone throws that text away.
+      const text = await res.text();
+      let body: MigrateResult;
+      try {
+        body = text ? (JSON.parse(text) as MigrateResult) : { error: `HTTP ${res.status} (empty response)` };
+      } catch {
+        body = { error: text ? `HTTP ${res.status}: ${text}` : `HTTP ${res.status}` };
+      }
       setResult(body);
       if (res.ok && body.ok) {
         toast.show(`Applied ${body.applied ?? 0} of ${body.total ?? 0} migrations.`, 'success');
