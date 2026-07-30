@@ -925,6 +925,11 @@ body {
 .wv-tv-info { grid-area: info; min-width: 0; }
 .wv-tv-verdict { grid-area: verdict; display: none; }
 .wv-tv-actions { grid-area: actions; display: flex; gap: 0.5rem; }
+/* The FOR/AGAINST/SAVE row, on a resolved list row — full width, below
+   everything else, same as the Highlights card's decision row (`.wv-act-row`
+   below the title). Explicit `grid-column` because this div isn't one of the
+   row's named `grid-template-areas` cells; it's an extra row appended after. */
+.wv-tv-decision { grid-column: 1 / -1; }
 
 @media (min-width: 640px) {
   .wv-tv-row {
