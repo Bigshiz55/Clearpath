@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, getPreferenceRules, regionFor } from '@/lib/profile';
-import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle, type Airing } from '@/lib/onTv';
+import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle, usBroadcastDate, type Airing } from '@/lib/onTv';
 import { scoreGuideAirings } from '@/lib/tv/scoreGuide';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
@@ -42,9 +42,6 @@ function officialScheduleFor(net: string | null): { name: string; url: string } 
   return NETWORK_SCHEDULES.find((s) => s.test.test(n)) ?? null;
 }
 
-function isoDate(d: Date): string {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-}
 /**
  * SERVER-SIDE FALLBACK ONLY. This renders in the SERVER's zone (UTC on
  * Vercel), which at 6pm in California is already the next calendar day — the
@@ -69,7 +66,7 @@ export default async function OnTvPage({
   const region = regionFor(user ? await getProfile(supabase, user.id) : null);
 
   const now = new Date();
-  const date = isoDate(now);
+  const date = usBroadcastDate(now.getTime());
   const withinHours = parseWithin(searchParams?.within);
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
   const genre = one(searchParams?.genre)?.slice(0, 24) ?? null;

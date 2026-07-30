@@ -96,19 +96,80 @@ policies for every table those touch; `src/components/import/ImportTasteFlow.tsx
 (likely an incomplete feature, not an isolation bug — flagged for area 4/6,
 not area 1).
 
-## 2. TV guide date, time zone, schedule freshness — spot-checked, looks OK
+## 2. TV guide date, time zone, schedule freshness — AUDITED, one root-cause fixed
 
-- `src/lib/viewing/schedule.ts`, `clock.ts`, `localDay.ts`, `scheduleState.ts`
-  form a real IANA-timezone layer (`Intl.DateTimeFormat`/`toLocaleTimeString`
-  with an explicit `timeZone`), with `formatRefreshedAt` for staleness
-  messaging and a test (`clock.test.ts`) that specifically asserts raw
-  `toLocaleTimeString` (no timezone arg) is NOT used — suggests a past bug
-  was fixed here and guarded.
-- Not yet verified: actual behavior in the running app across DST
-  boundaries / non-US timezones, and whether "schedule freshness" (last
-  ingest time) is surfaced anywhere a user can see it outside Packs (Pack
-  pages show ingest staleness via `pack_ingest_runs`; the main On TV guide's
-  own staleness signal wasn't checked this pass).
+**CONFIRMED and FIXED**: `/app/tv` (`src/app/app/tv/page.tsx`) fetched TVmaze's
+US broadcast schedule for the wrong calendar day for a large chunk of every
+US evening. The page computed `date = isoDate(now)` using the SERVER's raw
+UTC calendar day (`getUTCFullYear/getUTCMonth/getUTCDate`) to pick which
+day's schedule to request — but the page's own "Today" header (`dateIso`,
+via `localDay.ts`'s `longDayLabel`) is correctly computed from the VIEWER's
+real local clock. Those two were different values computed two different
+ways, and disagreed for hours every day:
+- Reproduced concretely: at 8:00 PM Pacific (primetime start) on a July
+  evening, UTC has already rolled to the next calendar day (3:00 AM UTC) —
+  so the page requested TOMORROW's schedule while its own header, correctly,
+  still said "Today." The mismatch window starts even earlier (~4-5pm
+  Pacific) and covers Central/Mountain too, narrower.
+- Root cause: TVmaze's `date=` param indexes a single NATIONAL calendar day.
+  `clock.ts` already documents (for per-listing times) that this network
+  reference is US Eastern, not UTC — the date computation just never applied
+  that same fact.
+- Fix: replaced BOTH duplicate UTC-based date-key functions (one in
+  `page.tsx`, a second, independent copy inside `src/lib/onTv.ts`'s
+  `getUpcomingTv`) with one shared, exported `usBroadcastDate()` in
+  `onTv.ts`, anchored to `America/New_York` via `Intl.DateTimeFormat`
+  (DST-safe by construction, not a fixed offset). This is exactly correct
+  for Eastern/Central/Mountain viewers all evening, and narrows the same
+  class of mismatch for Pacific viewers from a ~7-8 hour daily window to a
+  ~3 hour tail (9pm-midnight PT) — the best a single nationwide schedule
+  date can do without per-viewer timezone data the server doesn't have.
+- Verified: new `src/lib/onTv.test.ts` (5 tests) reproduces the exact 8pm-
+  Pacific failure case and 4 other boundary cases (a DST fall-back
+  transition, the exact Eastern-midnight rollover instant, a neutral
+  sanity check); confirmed the reproduction case returns the WRONG day
+  under the literal pre-fix code (`2026-07-16` instead of `2026-07-15`) by
+  running the old formula directly. Full gates clean (typecheck, lint, 1651
+  unit tests, production build). Confirmed NOT a regression: the 12
+  pre-existing Playwright failures in `channel-guide.spec.ts` /
+  `on-tv-highlights.spec.ts` (fixture-driven harnesses that never call the
+  changed code) reproduce identically against the unmodified code — a
+  direct stash/rebuild/rerun A-B comparison, not an assumption.
+- Honest limitation: could not click through the real `/app/tv` page in an
+  actual browser with live TVmaze data at multiple real clock times — no
+  live credentials in this sandbox (same limitation as prior areas).
+  Verification is at the exact function the page calls, with the exact
+  real-world failure instant reproduced, plus a build/typecheck/test/lint
+  pass and a fixture-harness screenshot regression check
+  (`/dev/on-tv`, `/dev/channel-guide` — confirmed still rendering correctly,
+  though neither harness exercises the fetch-date logic itself).
+
+**CONFIRMED, NOT fixed this pass** (flagged, not silently dropped — adding
+either would be adding a new user-visible feature, which the "stop adding
+features" instruction for this whole phase argues against doing
+unilaterally):
+- `src/lib/viewing/scheduleState.ts` — a real, tested, well-designed
+  freshness/staleness module (`freshness()`, `formatRefreshedAt()`,
+  `formatCoverageThrough()`, `programState`/`bucketByState`) — is imported
+  by NOTHING outside its own test file. "Schedule freshness" has zero live
+  surface anywhere in the TV guide; the only freshness-adjacent text on the
+  page is a static, hardcoded claim ("refreshed hourly") in a footer
+  paragraph, not derived from any real ingestion timestamp.
+- `OnTvGuide.tsx`'s empty state for the broadcast tab says "We couldn't
+  load today's {country} broadcast schedule" whenever TVmaze returns zero
+  results — accurate for a real fetch failure (the actual, and by far most
+  likely, cause, since `fetchJson` fails open to `[]` on any network error
+  or non-OK response), but technically imprecise for the near-impossible
+  edge case of a successful fetch that happened to return nothing.
+
+**Checked and OK**: midnight/day-boundary logic itself (`localDay.ts`'s
+`dayOffset`/`dayLabel`/`longDayLabel`) compares calendar fields, not
+millisecond arithmetic, so it's already DST-safe; `clock.ts`'s per-listing
+time display already renders in the viewer's own zone from the real
+instant, with the network-local string only as a documented last-resort
+fallback; `airingStatus`/`stillJoinable` (live/ended/joinable classification)
+correctly treat a start with no known runtime as "cannot prove it's over"
+rather than guessing.
 
 ## 3. New Releases loading and empty states — POSSIBLE
 
