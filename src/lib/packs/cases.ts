@@ -1,6 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CaseRecord, CaseAlias, CaseSubject, CaseSubjectRole, CaseTimelineEvent, CaseTimelineEventType, FactConfidence } from './types';
+import { CURATED_CASE_FACTS, type CuratedCaseFact } from './curatedCaseFacts';
 
 interface CaseRow {
   id: string;
@@ -220,6 +221,115 @@ export async function searchCases(supabase: SupabaseClient, query: string, limit
   }
 
   return [...directResults, ...extraResults].slice(0, limit);
+}
+
+export interface CuratedFactResult {
+  titleMatches: string[];
+  matchedCaseId: string | null;
+  matchedCaseTitle: string | null;
+  subjectsWritten: number;
+  timelineWritten: number;
+}
+
+/**
+ * Attaches one hand-curated fact bundle to whichever EXISTING `cases` row (if
+ * any) matches its title candidates — never creates a new case. This is the
+ * only safe way to apply curated content without a live view into which real
+ * cases the extraction pipeline has actually produced: a bundle that matches
+ * nothing simply writes nothing, rather than inventing a case for a title
+ * that was never really ingested from a real programme.
+ *
+ * Idempotent: skips subjects/timeline that already exist for the matched
+ * case (by full_name/headline), so re-running is safe.
+ */
+async function applyCuratedFact(supabase: SupabaseClient, fact: CuratedCaseFact): Promise<CuratedFactResult> {
+  const result: CuratedFactResult = {
+    titleMatches: fact.titleMatches,
+    matchedCaseId: null,
+    matchedCaseTitle: null,
+    subjectsWritten: 0,
+    timelineWritten: 0,
+  };
+
+  let matched: CaseRow | null = null;
+  for (const candidate of fact.titleMatches) {
+    const { data, error } = await supabase.from('cases').select('*').ilike('title', `%${candidate}%`).limit(1).maybeSingle();
+    if (error) throw error;
+    if (data) {
+      matched = data as CaseRow;
+      break;
+    }
+  }
+  if (!matched) return result;
+
+  result.matchedCaseId = matched.id;
+  result.matchedCaseTitle = matched.title;
+
+  // Only fill in location/incident date/status summary when the pipeline
+  // hasn't already set them — curated facts supplement real ingested data,
+  // never overwrite it.
+  const patch: Record<string, string> = {};
+  if (!matched.location && fact.location) patch.location = fact.location;
+  if (!matched.incident_date && fact.incidentDate) patch.incident_date = fact.incidentDate;
+  if (!matched.status_summary && fact.statusSummary) patch.status_summary = fact.statusSummary;
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase.from('cases').update(patch).eq('id', matched.id);
+    if (error) throw error;
+  }
+
+  const [existingSubjects, existingTimeline] = await Promise.all([
+    supabase.from('case_subjects').select('full_name').eq('case_id', matched.id),
+    supabase.from('case_timeline_events').select('headline').eq('case_id', matched.id),
+  ]);
+  const haveSubject = new Set(((existingSubjects.data ?? []) as { full_name: string }[]).map((r) => r.full_name));
+  const haveEvent = new Set(((existingTimeline.data ?? []) as { headline: string }[]).map((r) => r.headline));
+
+  const newSubjects = fact.subjects.filter((s) => !haveSubject.has(s.fullName));
+  if (newSubjects.length > 0) {
+    const { error } = await supabase.from('case_subjects').insert(
+      newSubjects.map((s, i) => ({
+        case_id: matched!.id,
+        full_name: s.fullName,
+        role: s.role,
+        outcome: s.outcome,
+        source_url: s.sourceUrl,
+        confidence: s.confidence,
+        sort_order: i,
+      })),
+    );
+    if (error) throw error;
+    result.subjectsWritten = newSubjects.length;
+  }
+
+  const newEvents = fact.timeline.filter((e) => !haveEvent.has(e.headline));
+  if (newEvents.length > 0) {
+    const { error } = await supabase.from('case_timeline_events').insert(
+      newEvents.map((e, i) => ({
+        case_id: matched!.id,
+        event_type: e.eventType,
+        event_date: e.eventDate,
+        headline: e.headline,
+        detail: e.detail,
+        source_url: e.sourceUrl,
+        confidence: e.confidence,
+        disputed: e.disputed,
+        sort_order: i,
+      })),
+    );
+    if (error) throw error;
+    result.timelineWritten = newEvents.length;
+  }
+
+  return result;
+}
+
+/** Applies every bundle in the curated dataset. See `applyCuratedFact`. */
+export async function applyCuratedCaseFacts(supabase: SupabaseClient): Promise<CuratedFactResult[]> {
+  const results: CuratedFactResult[] = [];
+  for (const fact of CURATED_CASE_FACTS) {
+    results.push(await applyCuratedFact(supabase, fact));
+  }
+  return results;
 }
 
 export interface BeforeYouWatchResult {

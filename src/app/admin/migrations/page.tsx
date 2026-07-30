@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { ApplyMigrationsButton } from '@/components/admin/ApplyMigrationsButton';
+import { ApplyCuratedCaseFactsButton } from '@/components/admin/ApplyCuratedCaseFactsButton';
 
 export const metadata: Metadata = {
   title: 'Migrations · WatchVerd1ct admin',
@@ -28,6 +29,16 @@ export default function AdminMigrationsPage() {
         </div>
 
         <ApplyMigrationsButton />
+
+        <div>
+          <h2 className="text-lg font-bold text-white">Crime Case Files: curated facts</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Attaches a small, hand-sourced set of well-known cases to whatever real Case rows the ingest pipeline has
+            already produced. Never creates a Case — a bundle with no match just shows &ldquo;no matching Case
+            ingested yet.&rdquo; Requires migration 0039.
+          </p>
+        </div>
+        <ApplyCuratedCaseFactsButton />
       </main>
     </div>
   );
