@@ -105,6 +105,17 @@ export async function POST(request: Request) {
           results.push({ name: m.name, ok: false, error, code });
         }
       }
+      // Supabase's hosted PostgREST normally auto-reloads on DDL via its own
+      // event trigger, but that trigger can be missing or lag on some
+      // projects — the exact "Could not find the table ... in the schema
+      // cache" failure mode this migrate flow exists to fix. An explicit
+      // NOTIFY is a no-op if the auto-trigger already handled it, and cheap
+      // insurance if it didn't. Never fails the whole run — a table that was
+      // actually created should still read as applied even if the cache
+      // nudge itself has a problem.
+      try {
+        await client.query("NOTIFY pgrst, 'reload schema'");
+      } catch { /* best-effort */ }
     } finally {
       await client.end().catch(() => {});
     }
