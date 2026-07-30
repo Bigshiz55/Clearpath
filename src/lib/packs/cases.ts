@@ -73,3 +73,29 @@ export async function listAliasesForProgramme(supabase: SupabaseClient, programm
     createdAt: row.created_at,
   }));
 }
+
+/** Create a Case if `slug` doesn't already exist, otherwise return the existing one. */
+export async function upsertCase(
+  supabase: SupabaseClient,
+  slug: string,
+  title: string,
+  description: string | null = null,
+): Promise<CaseRecord> {
+  const existing = await getCaseBySlug(supabase, slug);
+  if (existing) return existing;
+  const { data, error } = await supabase
+    .from('cases')
+    .insert({ slug, title, description })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return toCase(data as CaseRow);
+}
+
+/** Link a programme to a Case (idempotent — a retitled airing is still one programme row, see migration 0036). */
+export async function linkProgrammeToCase(supabase: SupabaseClient, caseId: string, programmeId: string): Promise<void> {
+  const { error } = await supabase
+    .from('case_programmes')
+    .upsert({ case_id: caseId, programme_id: programmeId }, { onConflict: 'case_id,programme_id' });
+  if (error) throw error;
+}
