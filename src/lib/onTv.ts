@@ -345,9 +345,32 @@ export function getOnTvToday(country: string, date: string): Promise<Airing[]> {
 const NOISE_TYPES = new Set(['News', 'Talk Show', 'Variety']);
 const DAY_MS = 86_400_000;
 
-function isoDate(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+/**
+ * The calendar-day key TVmaze's `date=` param expects for the US broadcast
+ * schedule — anchored to US Eastern, the network's own reference zone (the
+ * same fact `clock.ts` already documents: provider airtimes are Eastern too),
+ * NOT the server's UTC clock.
+ *
+ * Getting this wrong meant every US viewer west of Eastern got TOMORROW's
+ * schedule for a multi-hour window every evening: at 6pm Pacific it is
+ * already past midnight UTC, so a naive `date.getUTCDate()` had already
+ * rolled over while it was still Tuesday evening in Los Angeles — right
+ * through primetime, the hours this feature matters most for. The page's own
+ * "Today" header is computed separately from the viewer's real local clock
+ * (see localDay.ts) and stayed correct throughout, so the two silently
+ * disagreed: a header reading "Today" over a Wednesday's listings.
+ *
+ * Anchoring to Eastern instead of UTC is exactly correct for Eastern/
+ * Central/Mountain viewers (Eastern's calendar day extends into their whole
+ * evening) and narrows the same class of mismatch for Pacific viewers to a
+ * ~3-hour tail (9pm–midnight PT) instead of the ~7-8 hour window UTC caused —
+ * the best a single nationwide schedule date can do without per-viewer
+ * timezone data the server doesn't have.
+ */
+export function usBroadcastDate(ms: number): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+    new Date(ms),
+  );
 }
 
 /** We never surface a TV airing further out than this — "what's on" means the
@@ -382,7 +405,7 @@ export async function getUpcomingTv(
   // the time of day) — cache keys stay stable regardless of the chosen horizon —
   // then filter strictly to [now, now+horizon].
   const spanDays = Math.ceil(UPCOMING_TV_HORIZON_MS / DAY_MS) + 1;
-  const dates = Array.from({ length: spanDays }, (_, i) => isoDate(nowMs + i * DAY_MS));
+  const dates = Array.from({ length: spanDays }, (_, i) => usBroadcastDate(nowMs + i * DAY_MS));
   const perDay = await Promise.all(dates.map((d) => getOnTvToday(country, d)));
 
   const wantGenre = genre ? genre.toLowerCase() : null;

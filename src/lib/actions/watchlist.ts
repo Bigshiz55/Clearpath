@@ -103,7 +103,7 @@ export async function updateWatchlistItem(input: z.infer<typeof updateSchema>): 
 
   try {
     const supabase = createClient();
-    await requireUser(supabase);
+    const user = await requireUser(supabase);
     const patch: Record<string, unknown> = {};
     if (v.status !== undefined) {
       patch.status = v.status;
@@ -113,7 +113,10 @@ export async function updateWatchlistItem(input: z.infer<typeof updateSchema>): 
     if (v.notes !== undefined) patch.notes = v.notes;
     if (v.priority !== undefined) patch.priority = v.priority;
 
-    const { error } = await supabase.from('watchlist_items').update(patch).eq('id', v.itemId);
+    // Explicit ownership filter, not just RLS: this is the only thing standing
+    // between "update my own watchlist item" and "update anyone's" if a future
+    // migration or policy change ever weakens the watchlist_items RLS policy.
+    const { error } = await supabase.from('watchlist_items').update(patch).eq('id', v.itemId).eq('user_id', user.id);
     if (error) return { ok: false, error: error.message };
     revalidatePath('/app/watchlist');
     return { ok: true };
@@ -126,8 +129,9 @@ export async function removeWatchlistItem(itemId: string): Promise<ActionResult>
   if (!z.string().uuid().safeParse(itemId).success) return { ok: false, error: 'Invalid item.' };
   try {
     const supabase = createClient();
-    await requireUser(supabase);
-    const { error } = await supabase.from('watchlist_items').delete().eq('id', itemId);
+    const user = await requireUser(supabase);
+    // Same explicit ownership filter as updateWatchlistItem above.
+    const { error } = await supabase.from('watchlist_items').delete().eq('id', itemId).eq('user_id', user.id);
     if (error) return { ok: false, error: error.message };
     revalidatePath('/app/watchlist');
     return { ok: true };

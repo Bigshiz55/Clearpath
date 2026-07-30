@@ -55,6 +55,21 @@ function optional(name: string): string | undefined {
   return value ? value : undefined;
 }
 
+/**
+ * Catches the setup mistake of pasting the Supabase project URL — the
+ * adjacent field in DEPLOYMENT.md's env table — into NEXT_PUBLIC_SITE_URL
+ * instead of the deployed app's own URL. Every canonical/og:url in the app
+ * is built from `siteUrl()` below, so a Supabase URL there would make every
+ * shared link preview point at the database instead of the site.
+ */
+function isSupabaseHost(url: string): boolean {
+  try {
+    return /(^|\.)supabase\.co$/i.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 export const publicEnv = {
   // IMPORTANT: these must reference `process.env.NEXT_PUBLIC_*` as *static*
   // literals (not `process.env[name]`). Next.js only inlines public env vars
@@ -78,7 +93,9 @@ export const publicEnv = {
   siteUrl(): string {
     // Falls back to localhost in dev; safe non-secret default.
     const value = process.env.NEXT_PUBLIC_SITE_URL;
-    return value && value.trim() !== '' ? value : 'http://localhost:3000';
+    const trimmed = value && value.trim() !== '' ? value.trim() : null;
+    if (trimmed && isSupabaseHost(trimmed)) return 'http://localhost:3000';
+    return trimmed ?? 'http://localhost:3000';
   },
   vapidPublicKey(): string | undefined {
     const v = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;

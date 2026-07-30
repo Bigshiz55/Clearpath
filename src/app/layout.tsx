@@ -17,6 +17,13 @@ export const metadata: Metadata = {
     'Thousands of titles. One verd1ct. Personalized movie & TV recommendations — a clear verdict, a match score tuned to your taste, and where to watch it legally.',
   applicationName: 'WatchVerd1ct',
   manifest: '/manifest.webmanifest',
+  // The homepage's own canonical/og:url. Pages below the root set their own
+  // `alternates.canonical` / `openGraph.url` (see e.g. src/app/movie/[slug]
+  // or src/app/app/title/[type]/[id]) — Next.js deep-merges the `openGraph`
+  // object per key, so a page that supplies its own `url` fully replaces
+  // this one rather than appending to it. Only a route with no metadata of
+  // its own falls back to this homepage value.
+  alternates: { canonical: siteUrl },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

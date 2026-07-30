@@ -6,7 +6,9 @@ import { buildReportForCurrentUser } from '@/lib/report';
 import { VerdictReportView, type WatchState } from '@/components/verdict/VerdictReportView';
 import { createClient } from '@/lib/supabase/server';
 import { TmdbError } from '@/lib/tmdb/client';
-import { ConfigError } from '@/lib/env';
+import { ConfigError, publicEnv } from '@/lib/env';
+import { getSharedTitleData } from '@/lib/titleData';
+import { tmdbImage } from '@/lib/tmdb/image';
 import { getMyServices } from '@/lib/profile';
 import { buildInterview, type Disposition } from '@/lib/interview';
 import { getFinishProfile, assessTitleRisk } from '@/lib/finish';
@@ -65,7 +67,26 @@ function parseParams(params: { type: string; id: string }): { mediaType: MediaTy
 export async function generateMetadata({ params }: { params: { type: string; id: string } }): Promise<Metadata> {
   const parsed = parseParams(params);
   if (!parsed) return { title: 'Not found' };
-  return { title: 'Verdict' };
+  const url = `${publicEnv.siteUrl()}/app/title/${parsed.mediaType}/${parsed.id}`;
+  // Public/generic per-page metadata only — never the personalized report
+  // (buildReportForCurrentUser below), since crawlers and link-unfurlers see
+  // this, not a signed-in user. getSharedTitleData is the same cached call
+  // the report itself makes, so this doesn't add a second live TMDB fetch.
+  try {
+    const { meta } = await getSharedTitleData(parsed.mediaType, parsed.id, 'US');
+    const title = meta.year ? `${meta.title} (${meta.year})` : meta.title;
+    const description = meta.overview || undefined;
+    const image = tmdbImage(meta.posterPath, 'w500') ?? undefined;
+    return {
+      title,
+      description,
+      alternates: { canonical: url },
+      openGraph: { type: 'video.other', title, description, url, images: image ? [image] : undefined },
+      twitter: { card: 'summary_large_image', title, description, images: image ? [image] : undefined },
+    };
+  } catch {
+    return { title: 'Verdict', alternates: { canonical: url }, openGraph: { url } };
+  }
 }
 
 async function getWatchState(tmdbId: number, mediaType: MediaType): Promise<WatchState | undefined> {
