@@ -15,7 +15,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import { GENRE_IDS } from '@/lib/finderGenres';
 
 /**
- * WatchVerdict Mentalist — "name a few you love, we read your viewing mind."
+ * WatchVerd1ct Mentalist — "name a few you love, we read your viewing mind."
  *
  * Turns 3–7 loved titles into a multi-signal Viewing DNA (the 15-axis content
  * fingerprint + an embedding vibe centroid + genre & story-motif frequencies),

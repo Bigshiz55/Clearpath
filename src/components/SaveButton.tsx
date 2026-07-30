@@ -19,8 +19,6 @@ interface Props {
   wide?: boolean;
   /** Fires after a successful add — lets a list make room / advance. */
   onSaved?: () => void;
-  /** In recommendation feeds: once saved (handled), fade the card out of view. */
-  removeOnSave?: boolean;
 }
 
 export function SaveButton({
@@ -34,7 +32,6 @@ export function SaveButton({
   variant = 'overlay',
   wide = false,
   onSaved,
-  removeOnSave = false,
 }: Props) {
   const toast = useToast();
   const [saved, setSaved] = useState(initialSaved);
@@ -42,18 +39,15 @@ export function SaveButton({
   const [busy, setBusy] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
 
-  // Saved in a recommendation feed = handled → fade the card out (brief beat so
-  // the bookmark-fill registers first). It won't be re-recommended on reload.
-  function hideCard() {
-    const card = btnRef.current?.closest('.card');
-    if (!(card instanceof HTMLElement)) return;
-    window.setTimeout(() => {
-      card.style.transition = 'opacity .3s ease, transform .3s ease';
-      card.style.opacity = '0';
-      card.style.transform = 'scale(0.96)';
-      window.setTimeout(() => { card.style.display = 'none'; }, 300);
-    }, 450);
-  }
+  // THE CARD STAYS. Saving used to fade the placard out and `display: none` it,
+  // which collapsed its cell and pushed every card after it up a slot — the
+  // grid rearranged itself while you were still reading it.
+  //
+  // Nothing was gained by removing it, either: the button already shows a
+  // filled bookmark and the word "Saved", and tapping it again takes the title
+  // back off the list. That is the undo, and it only exists while the card is
+  // still on screen. Handled titles are filtered out of the picks server-side,
+  // so it is gone on the next load without the grid jumping on this one.
 
   async function toggle(e: React.MouseEvent) {
     // These buttons usually sit inside a card <Link>; don't navigate on click.
@@ -79,7 +73,6 @@ export function SaveButton({
           setSaved(true);
           toast.show('Added to your list.', 'success');
           onSaved?.();
-          if (removeOnSave) hideCard();
         } else {
           toast.show(res.error ?? 'Sign in to save to your list.', 'error');
         }
@@ -90,11 +83,11 @@ export function SaveButton({
   }
 
   const icon = saved ? (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 flex-none" fill="currentColor" aria-hidden>
+    <svg viewBox="0 0 24 24" className="wv-act-icon h-3.5 w-3.5 flex-none" fill="currentColor" aria-hidden>
       <path d="M6.5 3h11A1.5 1.5 0 0 1 19 4.5V21l-7-4-7 4V4.5A1.5 1.5 0 0 1 6.5 3Z" />
     </svg>
   ) : (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+    <svg viewBox="0 0 24 24" className="wv-act-icon h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <path d="M12 5v14M5 12h14" strokeLinecap="round" />
     </svg>
   );
@@ -129,14 +122,14 @@ export function SaveButton({
       disabled={busy}
       aria-label={saved ? 'Saved — remove from your list' : 'Save'}
       title={saved ? 'Saved — tap to remove' : 'Save'}
-      className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-md border text-white transition ${wide ? 'w-full flex-1' : 'w-9'} ${
+      className={`wv-act flex items-center justify-center gap-0.5 rounded-lg border font-semibold text-white transition ${wide ? 'w-full flex-1' : 'w-11'} ${
         saved
-          ? 'border-brand-300 bg-brand-500'
-          : 'border-brand-400/60 bg-brand-500/35 hover:bg-brand-500/60'
+          ? 'border-pink-200/70 bg-gradient-to-b from-[#ff62b6] to-[#ff1493]'
+          : 'border-2 border-[#ff1493]/70 bg-[#ff1493]/30 text-pink-50 hover:bg-[#ff1493]/45 hover:text-white'
       }`}
     >
       {icon}
-      {wide && <span className="text-[10px] font-black uppercase tracking-wide">{saved ? 'Saved' : 'Save'}</span>}
+      {wide && <span className="wv-act-label whitespace-nowrap font-black uppercase tracking-wide">{saved ? 'Saved' : 'Save'}</span>}
     </button>
   );
 }

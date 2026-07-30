@@ -107,8 +107,14 @@ export async function recordEvents(
   supabase: SupabaseClient,
   userId: string,
   events: Array<Partial<PreferenceEvent> & { id: string; titleId: string; action: PreferenceEvent['action'] }>,
+  opts: { sessionId?: string; isTest?: boolean } = {},
 ): Promise<number> {
   if (!userId || events.length === 0) return 0;
+  // `session_id` / `is_test` are added by migration 0025. Only include them when
+  // provided (founder test sessions) so normal inserts still succeed on a DB that
+  // hasn't applied 0025 yet — fail-open by construction.
+  const sessionCols =
+    opts.sessionId != null ? { session_id: opts.sessionId, is_test: opts.isTest ?? true } : {};
   const rows = events.map((e) => ({
     id: e.id,
     user_id: userId,
@@ -129,6 +135,7 @@ export async function recordEvents(
     source: e.source ?? null,
     round_id: e.roundId ?? null,
     event_at: new Date(e.at ?? Date.now()).toISOString(),
+    ...sessionCols,
   }));
   const { error, count } = await supabase
     .from('preference_events')

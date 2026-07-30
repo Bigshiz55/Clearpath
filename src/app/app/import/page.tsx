@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { ImportForm } from '@/components/ImportForm';
 
 export const metadata: Metadata = {
-  title: 'Import your history · WatchVerdict',
+  title: 'Import your history · WatchVerd1ct',
 };
 
 export default function ImportPage() {

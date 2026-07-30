@@ -7,6 +7,11 @@ import { tasteDials, dnaStrength } from '@/lib/scoring/dimensions';
 import { describePersonality } from '@/lib/scoring/personality';
 import { ShareCard, WatchDnaCardArt } from '@/components/ShareCards';
 import { TasteDials } from '@/components/TasteDials';
+import { DnaConfidencePanel } from '@/components/DnaConfidencePanel';
+import { RecommendationSlate } from '@/components/RecommendationSlate';
+import { Top10Slate } from '@/components/Top10Slate';
+import { loadDnaConfidence } from '@/lib/preference/dnaSignals';
+import { RetiredInterviewNotice } from '@/components/RetiredInterviewNotice';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Your Watch DNA' };
@@ -21,6 +26,7 @@ export default async function WatchDnaPage() {
   const uid = user?.id ?? '';
 
   const stats = await getWatchStats(supabase, uid);
+  const { confidence: dnaConfidence } = await loadDnaConfidence(supabase, uid);
   const profile = await getUserDimensionProfile(supabase, uid, stats.rated);
   const dials = tasteDials(profile, 8);
   const persona = describePersonality(profile);
@@ -34,6 +40,66 @@ export default async function WatchDnaPage() {
         <h1 className="flex items-center gap-2 text-2xl font-bold text-white sm:text-3xl">🧬 Your Watch DNA</h1>
         <p className="mt-1 text-sm text-slate-400">Your taste, learned from what you rate — the axes you lean on and how you watch.</p>
       </div>
+
+      <RetiredInterviewNotice />
+
+      {/* Three ways in, in the order of what they cost you. Your DNA also keeps
+          growing on its own from what you do across the app — rating, saving,
+          passing — so none of these is a gate you have to pass before
+          WatchVerd1ct is useful. */}
+      <section data-testid="dna-build">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Build your Watch DNA</h2>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Link href="/app/taste-quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-taste-quiz">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>⚡</span> Quick Taste Quiz
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              A dozen short statements about what you actually like. Two minutes, and
+              &ldquo;depends&rdquo; is a real answer.
+            </p>
+          </Link>
+          <Link href="/app/taste-quiz?mode=titles" className="card p-4 transition hover:bg-white/10" data-testid="link-title-quiz">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>🎬</span> React to real titles
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              React to a selection of films and shows so Verd1ct can begin learning your taste.
+            </p>
+          </Link>
+          <Link href="/app/rapid-fire" className="card p-4 transition hover:bg-white/10" data-testid="link-rapid-fire">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>⚡️</span> Rapid Fire
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              Import your history, then rate it at a tap a title. Turns &ldquo;you pressed play&rdquo; into
+              something worth ranking on. Try it on sample data first.
+            </p>
+          </Link>
+          <Link href="/import-taste" className="card p-4 transition hover:bg-white/10" data-testid="link-import-taste">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>📄</span> Import your history
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              Bring in titles you have watched, rated, saved or abandoned. You review everything
+              first — watched is never read as liked.
+            </p>
+          </Link>
+        </div>
+        <p className="mt-2 text-xs text-slate-500" data-testid="dna-grows">
+          Your DNA also keeps learning from what you do — ratings, saves, passes and the titles you
+          finish or give up on.
+        </p>
+        {/* Kept visibly apart: a permanent profile and tonight's request are not
+            the same function, and merging them is how both get worse. */}
+        <p className="mt-3 text-xs text-slate-500" data-testid="tonight-separate">
+          Looking for something to watch <em>right now</em> instead?{' '}
+          <Link href="/app" className="font-semibold text-brand-300 underline underline-offset-2" data-testid="link-tonight">
+            Describe exactly what you want tonight
+          </Link>{' '}
+          — that is a one-off brief, and it does not change your DNA.
+        </p>
+      </section>
 
       {/* Personality */}
       <section className="card overflow-hidden p-0">
@@ -56,6 +122,9 @@ export default async function WatchDnaPage() {
         </div>
       </section>
 
+      {/* DNA Confidence — separate from onboarding progress, with its evidence */}
+      <DnaConfidencePanel result={dnaConfidence} />
+
       {/* Behavioral stats */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Rated" value={String(stats.rated)} />
@@ -68,7 +137,10 @@ export default async function WatchDnaPage() {
       <section className="card p-5 sm:p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Your taste dials</h2>
-          <Link href="/app/quiz" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
+          <div className="flex items-center gap-3">
+            <Link href="/app/dna/packs" className="text-sm font-semibold text-emerald-300 hover:text-emerald-200">🎯 Boosters</Link>
+            <Link href="/app/taste-quiz?mode=titles" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
+          </div>
         </div>
         {ready && dials.length > 0 ? (
           <TasteDials
@@ -90,7 +162,15 @@ export default async function WatchDnaPage() {
           <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-5 text-center">
             <div className="text-3xl">🍿</div>
             <p className="mt-2 text-sm text-slate-300">Rate a few titles and your dials will appear here.</p>
-            <Link href="/app/quiz" className="btn-primary mt-3 inline-flex">Play the Taste Quiz →</Link>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <Link href="/app/taste-quiz" className="btn-primary inline-flex">Take the Quick Taste Quiz →</Link>
+              <Link
+                href="/import-taste"
+                className="inline-flex items-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+              >
+                Or import your history →
+              </Link>
+            </div>
           </div>
         )}
         {ready && (
@@ -101,6 +181,20 @@ export default async function WatchDnaPage() {
           </p>
         )}
       </section>
+
+      {/* The Top 10, with the arithmetic behind every number one tap away. */}
+      {ready && (
+        <section>
+          <Top10Slate />
+        </section>
+      )}
+
+      {/* Fresh, refreshable, validated recommendations — refresh preserves DNA */}
+      {ready && (
+        <section className="card p-5 sm:p-6">
+          <RecommendationSlate surface="dna" />
+        </section>
+      )}
 
       {/* Shareable card */}
       {ready && (

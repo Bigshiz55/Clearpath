@@ -1,6 +1,6 @@
 /**
  * DNA STRENGTH — an explainable, anti-gaming measure of how confidently AND
- * comprehensively WatchVerdict understands a user's taste. It is NOT "titles
+ * comprehensively WatchVerd1ct understands a user's taste. It is NOT "titles
  * rated": rating 100 near-identical action movies leaves comedy, animation,
  * romance, pacing tolerance, etc. unknown, so it must NOT reach 100%.
  *

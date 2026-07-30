@@ -1,6 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { airingStatus, displayClock, liveLabel, stillJoinable } from '@/lib/viewing/clock';
+import { dayLabel, longDayLabel } from '@/lib/viewing/localDay';
 import { tmdbImage, type TmdbImageSize } from '@/lib/tmdb/image';
 
 /** Poster art comes from the canonical TMS CDN; if it fails to load, swap to the
@@ -23,33 +25,40 @@ function posterSrcFor(a: { image: string | null; posterPath?: string | null }, s
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
 import { SaveButton } from '@/components/SaveButton';
-import { TasteFeedback } from '@/components/TasteFeedback';
-import { LikeButton } from '@/components/LikeButton';
+import { CardVerdict } from '@/components/CardVerdict';
+import { SignalIcon } from '@/components/RemindButton';
+import { WCheck } from '@/components/WCheck';
+import { groupByShow, repeatNote } from '@/lib/tvHighlights';
 import { CardDna } from '@/components/CardDna';
+import { Radio, Popcorn, Sparkles } from 'lucide-react';
 import type { Airing } from '@/lib/onTv';
 
 type TimeFilter = 'all' | 'primetime' | 'nownext';
 type SortFilter = 'time' | 'rating';
 export type GuideMode = 'broadcast' | 'streaming';
 
-function fmtTime(t: string): string | null {
-  const m = t.match(/^(\d{1,2}):(\d{2})/);
-  if (!m) return null;
-  let h = Number(m[1]);
-  const min = m[2];
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${h}:${min} ${ampm}`;
+/**
+ * The clock label for an airing, IN THE VIEWER'S OWN ZONE.
+ *
+ * `a.time` is a pre-formatted string from the provider, in the NETWORK's
+ * timezone (Eastern, for both Gracenote and TVmaze's US grid). Printing it to
+ * everybody meant a Pacific viewer saw "3:42 AM" for something starting in
+ * forty minutes — a time that reads as already past, and that contradicted the
+ * "next 2 hours" heading above it. The window was always computed on the real
+ * instant; only the label was wrong.
+ *
+ * `suppressHydrationWarning` on the elements below: the server renders in its
+ * own zone (UTC) and the browser corrects on hydration. That is the intended
+ * behaviour for a wall-clock time, not a mismatch to fix.
+ */
+function fmtTime(airstamp: string | null | undefined, providerTime: string): string | null {
+  return displayClock(airstamp, providerTime);
 }
 
-/** "Today" / "Tomorrow" / weekday for an airing, from its real UTC timestamp. */
-function dayLabel(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return 'Today';
-  if (new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString()) return 'Tomorrow';
-  return d.toLocaleDateString([], { weekday: 'short' });
-}
+/* "Today" / "Tomorrow" / weekday now comes from the shared `localDay` module —
+   see the import above. It compares CALENDAR days rather than adding 24h, so a
+   daylight-saving day (23 or 25 hours long) cannot move the answer, and every
+   surface in the app derives the words from the same function. */
 
 /** A Google Calendar "add event" link so the reminder is real — the user can
  *  actually set their DVR or tune in. Built from the true airstamp + runtime. */
@@ -59,7 +68,7 @@ function calendarUrl(a: Airing): string {
   const z = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const text = encodeURIComponent(`${a.showName} on ${a.network}`);
   const details = encodeURIComponent(
-    `${a.episodeName ? `"${a.episodeName}" · ` : ''}${a.showType}${a.genres.length ? ` · ${a.genres.join(', ')}` : ''}\nOn ${a.network}. Added from WatchVerdict.`,
+    `${a.episodeName ? `"${a.episodeName}" · ` : ''}${a.showType}${a.genres.length ? ` · ${a.genres.join(', ')}` : ''}\nOn ${a.network}. Added from WatchVerd1ct.`,
   );
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${z(start)}/${z(end)}&details=${details}`;
 }
@@ -72,16 +81,42 @@ function ratingTone(r: number): string {
 
 const NOISE_TYPES = new Set(['News', 'Talk Show', 'Variety']);
 
+/** The ratings we hold, labelled by source. Renders nothing when we hold none. */
+function ratingRow(a: Airing) {
+  if (a.rating == null && a.criticRt == null && a.criticImdb == null) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold tabular-nums" data-testid="airing-ratings">
+      {a.rating != null && (
+        <span className={ratingTone(a.rating)} title="TVmaze community score">★ {a.rating.toFixed(1)}</span>
+      )}
+      {a.criticRt != null && (
+        <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {a.criticRt}%</span>
+      )}
+      {a.criticImdb != null && (
+        <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>
+      )}
+    </div>
+  );
+}
+
 export function OnTvGuide({
   airings,
   dateLabel,
+  dateIso = null,
   country,
   mode = 'broadcast',
   remindedIds = [],
   windowHours = null,
 }: {
   airings: Airing[];
+  /** Fallback label for surfaces that already have a non-date caption
+   *  ("Next 6 hours"). When `dateIso` is set, THAT wins — see below. */
   dateLabel: string;
+  /** The instant the caption is about. Formatted HERE, in the browser, so the
+   *  header cannot say "Tuesday, Jul 29" over rows that say "Today": a server
+   *  render freezes the date in the server's zone (UTC on Vercel), which at
+   *  6pm in California is already the next day. */
+  dateIso?: string | null;
   country: string;
   mode?: GuideMode;
   remindedIds?: number[];
@@ -94,8 +129,6 @@ export function OnTvGuide({
   const [reminded, setReminded] = useState<Set<number>>(new Set(remindedIds));
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [hidden, setHidden] = useState<Set<number>>(new Set());
-  const remove = (id: number) => setHidden((s) => new Set(s).add(id));
 
   async function toggleReminder(a: Airing) {
     setBusy(a.id);
@@ -117,7 +150,7 @@ export function OnTvGuide({
         setNotice(
           res.needsNotifications
             ? 'Reminder set! Turn on notifications in Settings so we can ping you 1 hour and 5 minutes before.'
-            : 'Reminder set — we’ll ping you 1 hour and 5 minutes before it starts. ⏰',
+            : 'Reminder set — we’ll ping you 1 hour and 5 minutes before it starts.',
         );
       }
     } catch {
@@ -127,6 +160,15 @@ export function OnTvGuide({
     }
   }
   const [time, setTime] = useState<TimeFilter>(streaming || windowed ? 'all' : 'primetime');
+  // "Now" for the live/upcoming split. Set on mount and ticked every minute, so
+  // a card that starts while you are looking at it flips to "On now" instead of
+  // sitting there with a time that has quietly passed. Rendering it on the
+  // SERVER would freeze it at request time, which is how a stale label survives.
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
   const [sort, setSort] = useState<SortFilter>(streaming ? 'rating' : 'time');
   const [media, setMedia] = useState<'all' | 'movie' | 'tv'>('all');
 
@@ -153,18 +195,38 @@ export function OnTvGuide({
   // In windowed mode the airings are already the curated next-N-hours set, so we
   // keep them soonest-first (their given order) rather than re-filtering to prime time.
   const highlightPool = useMemo(() => {
-    if (windowed) return airings.filter((a) => !NOISE_TYPES.has(a.showType)).slice(0, 10);
+    // Windowed mode used to cap at 10 here AND the highlight strip cut that to
+    // 6, so a healthy schedule could never show more than six cards up top no
+    // matter how much real inventory arrived. The window set is already the
+    // curated result; show it all and let the list below carry the rest.
+    // `stillJoinable` re-checks against the ticking clock: the server filtered
+    // the set at request time, but a tab left open (or a cached render) can
+    // outlive that — a card whose show is now mostly over quietly leaves the
+    // strip instead of advertising a start time hours in the past.
+    if (windowed) return airings.filter((a) => !NOISE_TYPES.has(a.showType) && stillJoinable(a.airstamp, a.runtime, nowMs));
     return airings
       .filter((a) => !NOISE_TYPES.has(a.showType) && a.rating != null && (streaming || (a.minutes >= 18 * 60 && a.minutes <= 23 * 60)))
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
       .slice(0, 10);
-  }, [airings, streaming, windowed]);
-  const highlights = highlightPool.filter((a) => !hidden.has(a.id)).slice(0, 6);
+  }, [airings, streaming, windowed, nowMs]);
+  // ONE CARD PER SHOW. A back-to-back double bill — "World War II with Tom
+  // Hanks" at 8:00 and again at 9:00 — took two of six highlight slots to name
+  // one programme. The extra showings are kept, not dropped, so a card can say
+  // "also at 9:00" rather than quietly losing a time somebody was planning
+  // around. The full list below still carries every airing; that IS the
+  // schedule, and this only governs the shortlist.
+  const highlightGroups = useMemo(() => groupByShow(highlightPool), [highlightPool]);
+  const alsoAiring = useMemo(
+    () => new Map(highlightGroups.map((g) => [g.pick.id, g.others])),
+    [highlightGroups],
+  );
+  const highlightVisible = useMemo(() => highlightGroups.map((g) => g.pick), [highlightGroups]);
+  const highlights = windowed ? highlightVisible : highlightVisible.slice(0, 6);
 
   if (airings.length === 0) {
     return (
       <div className="card p-6 text-center">
-        <div className="text-3xl">{streaming ? '🍿' : '📡'}</div>
+        <div className="grid place-items-center text-slate-400">{streaming ? <Popcorn size={28} aria-hidden /> : <Radio size={28} aria-hidden />}</div>
         <h2 className="mt-3 text-lg font-semibold text-white">
           {streaming ? 'No major streaming premieres today' : 'No listings right now'}
         </h2>
@@ -188,21 +250,34 @@ export function OnTvGuide({
           </span>
         </div>
       )}
-      {/* Highlights */}
+      {/* Highlights. In windowed mode the PAGE's H1 already says "Coming on in
+          the next N hours" — repeating it here as an H2 with its own explainer
+          printed the same sentence twice and pushed the first card row below
+          the fold. The strip starts straight at the cards; the other modes
+          keep their (non-duplicated) headings. */}
       {highlights.length > 0 && (
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-white">
-            {windowed ? `⏰ Coming on in the next ${windowHours} hours` : streaming ? '✨ Best of today’s drops' : '✨ Tonight’s highlights'}
-          </h2>
-          <p className="mb-3 text-xs text-slate-400">
-            {windowed
-              ? 'Real listings between now and then, soonest first'
-              : streaming
-                ? 'Highest-rated premieres on the major services'
-                : 'Best-reviewed shows in prime time'}{' '}
-            — rating is TVmaze’s community score.
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {!windowed && (
+            <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold text-white">
+              <Sparkles size={16} className="text-slate-400" aria-hidden />
+              {streaming ? 'Best of today’s drops' : 'Tonight’s highlights'}
+            </h2>
+          )}
+          {!windowed && (
+            <p className="mb-3 text-xs text-slate-400">
+              {streaming ? 'Highest-rated premieres on the major services' : 'Best-reviewed shows in prime time'} — rating
+              is TVmaze’s community score.
+            </p>
+          )}
+          {/* THE SHARED CARD SHAPE, not a third copy of one.
+              This strip drew TWO columns on a phone with a hand-rolled card. At
+              390px that made each cell ~173px, and an action row inside it had
+              ~157px for FOR · AGAINST · SAVE — about 48px a button for a word
+              that measures 57. The row is now the full width of the card and
+              the card is `.poster-grid` + `.wv-card`: a row on a phone (poster
+              at a third of the width, the facts beside it), a column from `sm`,
+              exactly like every other grid in the app. */}
+          <div className="poster-grid" data-testid="tv-highlights">
             {highlights.map((a) => {
               const posterSrc = posterSrcFor(a);
               const poster = posterSrc ? (
@@ -213,35 +288,73 @@ export function OnTvGuide({
               );
               const resolved = a.tmdbId != null && a.mediaType != null;
               return (
-                <div key={a.id} className="card flex flex-col overflow-hidden">
-                  {/* Action row on top of the placard — For · Pass · Save — the
-                      same groove as every other card in the app. */}
-                  {resolved && (
-                    <div className="flex items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
-                      <LikeButton tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onFlagged={() => remove(a.id)} />
-                      <TasteFeedback compact wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onFlagged={() => remove(a.id)} />
-                      <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} onSaved={() => remove(a.id)} />
+                <div key={a.id} className="card wv-tile flex flex-col overflow-hidden">
+                  <div className="wv-card flex-1">
+                    {/* The W, on the artwork, exactly where it is on every other
+                        card — so putting an airing on the docket is the same
+                        gesture as putting a poster on it. */}
+                    <div className="wv-card-art wv-art-video bg-ink-800">
+                      {resolved && (
+                        <WCheck tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterUrl={a.image ?? null} />
+                      )}
+                      {resolved ? (
+                        <Link href={`/app/title/${a.mediaType}/${a.tmdbId}`} className="block h-full">{poster}</Link>
+                      ) : (
+                        poster
+                      )}
                     </div>
-                  )}
-                  {resolved ? (
-                    <Link href={`/app/title/${a.mediaType}/${a.tmdbId}`} className="block aspect-[2/3] overflow-hidden bg-ink-800">{poster}</Link>
-                  ) : (
-                    <div className="aspect-[2/3] overflow-hidden bg-ink-800">{poster}</div>
-                  )}
-                  <div className="flex flex-1 flex-col p-2">
-                    <div className="line-clamp-2 text-xs font-semibold text-white">{a.showName}</div>
-                    <div className="mt-1 flex items-center justify-between gap-1">
-                      <span className="truncate text-sm font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
-                      {a.rating != null && <span className={`flex-none text-xs font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
-                    </div>
-                    {(a.criticRt != null || a.criticImdb != null) && (
-                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-bold tabular-nums">
-                        {a.criticRt != null && <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes">🍅 {a.criticRt}%</span>}
-                        {a.criticImdb != null && <span className="rounded bg-[#f5c518] px-1 text-[10px] font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>}
+                    <div className="wv-card-body">
+                      <div className="line-clamp-2 text-sm font-semibold leading-snug text-white">{a.showName}</div>
+                      <div className="mt-1 flex items-center justify-between gap-1">
+                        {(() => {
+                          // A start time in the past under "coming on" reads as
+                          // stale data. If it's running, the card says so — the
+                          // same label the list rows use.
+                          const st = streaming ? null : airingStatus(a.airstamp, a.runtime, nowMs);
+                          if (st?.state === 'live') {
+                            return (
+                              <span suppressHydrationWarning data-testid="airing-live" className="truncate rounded-md bg-emerald-500/20 px-1.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-emerald-200">
+                                {liveLabel(st.startedMinutesAgo)}
+                              </span>
+                            );
+                          }
+                          return (
+                            <span suppressHydrationWarning className="truncate text-base font-black tabular-nums text-white">{a.minutes > 0 ? fmtTime(a.airstamp, a.time) ?? 'Today' : streaming ? 'Today' : 'New'}</span>
+                          );
+                        })()}
+                        {a.rating != null && <span className={`flex-none text-sm font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
                       </div>
-                    )}
-                    <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
-                    {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
+                      {/* The showings this card stands in for. Deduping the strip
+                          must not lose a time somebody could have watched. */}
+                      {(() => {
+                        const note = repeatNote((alsoAiring.get(a.id) ?? []).map((o) => fmtTime(o.airstamp, o.time)));
+                        return note ? (
+                          <div suppressHydrationWarning className="mt-0.5 truncate text-[11px] font-semibold text-slate-400" data-testid="also-airing">
+                            {note}
+                          </div>
+                        ) : null;
+                      })()}
+                      {(a.criticRt != null || a.criticImdb != null) && (
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-bold tabular-nums">
+                          {a.criticRt != null && <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes">🍅 {a.criticRt}%</span>}
+                          {a.criticImdb != null && <span className="rounded bg-[#f5c518] px-1 text-[10px] font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>}
+                        </div>
+                      )}
+                      <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
+                      {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
+                      {/* THE DECISION ROW, BELOW THE TITLE — and only on a card
+                          that resolved to a real title. An unresolved listing
+                          used to reserve this slot with a "Not matched to a
+                          title yet" box, which put an internal pipeline state
+                          on nearly every broadcast card; there is nothing to
+                          rule on there, so nothing renders. */}
+                      {resolved && (
+                        <div className="wv-act-row mt-2 border-t border-white/10 pt-2">
+                          <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                          <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -271,9 +384,9 @@ export function OnTvGuide({
             ))}
           </div>
         </div>
-        <div className="text-[11px] text-slate-400">
-          {dateLabel} · {filtered.length} {streaming ? 'premiere' : 'airing'}{filtered.length === 1 ? '' : 's'}
-          {!streaming && ' · times are each channel’s local broadcast time'}.
+        <div suppressHydrationWarning className="text-[11px] text-slate-400">
+          {(dateIso ? longDayLabel(dateIso, nowMs) : '') || dateLabel} · {filtered.length} {streaming ? 'premiere' : 'airing'}{filtered.length === 1 ? '' : 's'}
+          {!streaming && ' · times shown in your local time'}.
         </div>
       </div>
 
@@ -285,64 +398,107 @@ export function OnTvGuide({
       ) : (
         <div className="space-y-2">
           {filtered.map((a) => {
-            const t = fmtTime(a.time);
+            const t = fmtTime(a.airstamp, a.time);
+            const status = airingStatus(a.airstamp, a.runtime, nowMs);
             return (
-              <div key={a.id} className="card flex items-center gap-3 p-3.5">
-                <div className="w-[5rem] flex-none text-center sm:w-28">
+              <div
+                key={a.id}
+                className="card wv-tile wv-tv-row p-3"
+                data-testid="airing-row"
+                data-state={status.state}
+              >
+                <div className="wv-tv-when text-center">
                   {(() => {
-                    const dl = dayLabel(a.airstamp);
+                    const dl = dayLabel(a.airstamp, nowMs);
+                    // Already running. The window includes these on purpose —
+                    // joining twenty minutes late is a real option — but a start
+                    // time in the past under a "coming on" heading reads as a
+                    // broken clock, so say what it actually is.
+                    if (status.state === 'live') {
+                      return (
+                        <div
+                          suppressHydrationWarning
+                          data-testid="airing-live"
+                          className="rounded-md bg-emerald-500/20 px-1 py-1 text-[11px] font-black uppercase leading-tight tracking-wide text-emerald-200"
+                        >
+                          {liveLabel(status.startedMinutesAgo)}
+                        </div>
+                      );
+                    }
                     if (t && a.minutes > 0) {
                       return (
                         <>
-                          <div className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white sm:text-2xl">{t}</div>
-                          {dl !== 'Today' && <div className="mt-1 text-xs font-bold uppercase tracking-wide text-amber-300">{dl}</div>}
+                          <div suppressHydrationWarning className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white">{t}</div>
+                          {dl !== 'Today' && <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">{dl}</div>}
                         </>
                       );
                     }
-                    return <div className="rounded-md bg-emerald-500/20 px-1.5 py-1.5 text-base font-black uppercase tracking-wide text-emerald-200">{streaming ? dl : 'New'}</div>;
+                    return <div className="rounded-md bg-emerald-500/20 px-1 py-1 text-xs font-black uppercase tracking-wide text-emerald-200">{streaming ? dl : 'New'}</div>;
                   })()}
-                  <div className="mt-2 line-clamp-2 rounded-lg border border-brand-400/30 bg-brand-500/15 px-2 py-1.5 text-sm font-bold leading-tight text-brand-100 sm:text-base">{a.network}</div>
+                  <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-tight text-brand-200" data-testid="airing-channel">{a.network}</div>
                 </div>
-                <div className="h-20 w-14 flex-none overflow-hidden rounded-md border border-white/10 bg-ink-800">
-                  {posterSrcFor(a, 'w185') ? (
+
+                <div className="wv-tv-poster">
+                  {posterSrcFor(a, 'w342') ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={posterSrcFor(a, 'w185')!} alt="" loading="lazy" onError={posterFallback} className="h-full w-full object-cover" />
+                    <img src={posterSrcFor(a, 'w342')!} alt="" loading="lazy" onError={posterFallback} className="wv-tv-art" data-testid="airing-poster" />
                   ) : (
-                    <div className="grid h-full w-full place-items-center text-[9px] text-slate-500">TV</div>
+                    <div className="wv-tv-art grid place-items-center text-[10px] text-slate-500">TV</div>
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="line-clamp-2 text-lg font-bold leading-snug text-white sm:text-xl">{a.showName}</div>
+
+                <div className="wv-tv-info">
+                  <div className="line-clamp-2 text-base font-bold leading-snug text-white sm:text-lg">{a.showName}</div>
                   <div className="truncate text-xs text-slate-400">
                     {a.showType}
                     {a.episodeName ? ` · ${a.episodeName}` : ''}
                     {a.season && a.number ? ` (S${a.season}E${a.number})` : ''}
                     {a.genres.length ? ` · ${a.genres.slice(0, 2).join(', ')}` : ''}
                   </div>
-                  {(a.rating != null || a.criticRt != null || a.criticImdb != null) && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm font-bold tabular-nums">
-                      {a.rating != null && (
-                        <span className={ratingTone(a.rating)} title="TVmaze community score">★ {a.rating.toFixed(1)}</span>
-                      )}
-                      {a.criticRt != null && (
-                        <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {a.criticRt}%</span>
-                      )}
-                      {a.criticImdb != null && (
-                        <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>
-                      )}
-                    </div>
-                  )}
+                  {/* Ratings stay in the info column below `lg`, where the panel
+                      is hidden — they must never disappear with the zone. */}
+                  <div className="mt-1 lg:hidden">{ratingRow(a)}</div>
                 </div>
-                <div className="flex flex-none items-center gap-1.5">
+
+                {/* What we actually know. When we hold nothing it says so —
+                    an empty coloured block claiming a verdict is worse than
+                    an honest blank. */}
+                <div className="wv-tv-verdict" data-testid="airing-verdict">
+                  <div className="wv-tv-panel">
+                    {(a.rating != null || a.criticRt != null || a.criticImdb != null) ? (
+                      <>
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">What we know</div>
+                        <div className="mt-1">{ratingRow(a)}</div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-slate-500" data-testid="no-ratings">
+                        No ratings for this one yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="wv-tv-actions">
                   <button
                     onClick={() => toggleReminder(a)}
                     disabled={busy === a.id}
-                    className={`whitespace-nowrap rounded-lg border px-2.5 py-2 text-sm font-semibold transition disabled:opacity-50 sm:px-3 ${reminded.has(a.id) ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10'}`}
-                    title="Get a phone/PC notification 1 hour and 5 minutes before it airs"
+                    className={`wv-tv-act ${reminded.has(a.id) ? 'wv-tv-act--on' : ''}`}
+                    title="Get a notification 1 hour and 5 minutes before it airs"
+                    data-testid="airing-remind"
                   >
-                    🔔<span className="ml-1 hidden sm:inline">{reminded.has(a.id) ? 'On' : 'Remind'}</span>
+                    {/* Not a bell — the same broadcast mark the Detective uses,
+                        and it only pulses once the reminder is actually set. */}
+                    <SignalIcon on={reminded.has(a.id)} className="h-4 w-4" />
+                    <span className="hidden sm:inline">{reminded.has(a.id) ? 'On' : 'Remind'}</span>
                   </button>
-                  <a href={calendarUrl(a)} target="_blank" rel="noopener noreferrer" className="hidden rounded-lg border border-white/12 bg-white/5 px-2 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 sm:inline-flex" title="Or add it to your calendar">
+                  <a
+                    href={calendarUrl(a)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="wv-tv-act"
+                    title="Add it to your calendar"
+                    data-testid="airing-calendar"
+                  >
                     📅
                   </a>
                 </div>

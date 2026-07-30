@@ -5,7 +5,7 @@ import { getEasyPicks, DEFAULT_PREFS } from '@/lib/easyPicks';
 import { EasyMode } from '@/components/EasyMode';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Easy Mode · WatchVerdict' };
+export const metadata: Metadata = { title: 'Easy Mode · WatchVerd1ct' };
 
 export default async function EasyModePage() {
   const supabase = createClient();

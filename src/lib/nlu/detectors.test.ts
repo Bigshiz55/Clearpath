@@ -7,8 +7,11 @@ import {
   detectGenre,
   detectNetwork,
   detectPlatform,
+  detectExcludedMediaType,
+  detectOrigin,
   extractCount,
   parseRequestedCount,
+  DEFAULT_COUNT,
 } from './detectors';
 
 // Characterization tests: these freeze the *current* production behaviour of
@@ -48,7 +51,23 @@ describe('count parsing', () => {
     expect(extractCount('give me five movies')).toBe(5);
     expect(extractCount('show me 3 shows')).toBe(3);
     expect(extractCount('a good movie')).toBeNull();
-    expect(parseRequestedCount('a good movie')).toBe(8); // default
+    // The default is a full page, not a shortlist, and lives in one place —
+    // see count.ts. It was written 8 here and 8 again in askParse while
+    // finder.ts documented 24, so the product returned eight of everything.
+    expect(parseRequestedCount('a good movie')).toBe(DEFAULT_COUNT);
+    expect(DEFAULT_COUNT).toBeGreaterThanOrEqual(20);
+  });
+
+  it('a number that is not counting results is not a count', () => {
+    // The bug the user hit: "a great movie under two hours" returned two.
+    expect(extractCount('a great movie under two hours')).toBeNull();
+    expect(extractCount('from the last 3 years')).toBeNull();
+    expect(parseRequestedCount('a great movie under two hours')).toBe(DEFAULT_COUNT);
+  });
+
+  it('reads a count separated from its noun by qualifiers', () => {
+    expect(extractCount('Pull up five Lifetime movies coming on in the next 24 hours')).toBe(5);
+    expect(extractCount('three really good crime thrillers')).toBe(3);
   });
   it('reads fuzzy spoken counts "a couple"/"a few"', () => {
     expect(extractCount('a couple of movies on Netflix')).toBe(2);
@@ -151,5 +170,59 @@ describe('detectPlatform', () => {
     expect(detectPlatform('on Netflix, no wait, Hulu')).toEqual({ id: 15, name: 'Hulu' });
     // No correction cue → first platform still wins.
     expect(detectPlatform('best movies on Netflix')).toEqual({ id: 8, name: 'Netflix' });
+  });
+  it('resolves curated Netflix misspellings (offline typo tolerance)', () => {
+    expect(detectPlatform('on Netflx')).toEqual({ id: 8, name: 'Netflix' });
+    expect(detectPlatform('a thriller on netlix')).toEqual({ id: 8, name: 'Netflix' });
+    expect(detectPlatform('netfix crime series')).toEqual({ id: 8, name: 'Netflix' });
+    // A non-misspelling word must NOT false-match Netflix.
+    expect(detectPlatform('a nice film')).toBeNull();
+  });
+  it('recognizes BritBox as a platform (named in the difficult-search set)', () => {
+    expect(detectPlatform('a detective series on BritBox')).toEqual({ id: 151, name: 'BritBox' });
+  });
+  it('recognizes the full forensic streaming set', () => {
+    expect(detectPlatform('on Acorn TV')).toEqual({ id: 87, name: 'Acorn TV' });
+    expect(detectPlatform('a mystery on Acorn')).toEqual({ id: 87, name: 'Acorn TV' });
+    expect(detectPlatform('on Apple TV+')).toEqual({ id: 350, name: 'Apple TV+' });
+    expect(detectPlatform('on Peacock')).toEqual({ id: 386, name: 'Peacock' });
+    expect(detectPlatform('on Paramount+')).toEqual({ id: 531, name: 'Paramount+' });
+  });
+});
+
+describe('detectOrigin — curated misspellings (offline fallback)', () => {
+  it('resolves common origin misspellings', () => {
+    expect(detectOrigin('a koreen thriller').countries).toContain('KR');
+    expect(detectOrigin('a spanihs film').countries).toContain('ES');
+    expect(detectOrigin('a japanes movie').countries).toContain('JP');
+    expect(detectOrigin('a britsh detective series').countries).toContain('GB');
+    expect(detectOrigin('an italion drama').countries).toContain('IT');
+  });
+  it('still never reads "english" (audio) as British origin', () => {
+    expect(detectOrigin('an english movie').countries).not.toContain('GB');
+    expect(detectOrigin('a spanish film with english audio').countries).not.toContain('GB');
+  });
+});
+
+describe('detectGenre — curated misspellings', () => {
+  it('resolves common genre misspellings', () => {
+    expect(detectGenre('a horrer movie')).toBe('Horror');
+    expect(detectGenre('a documentry about whales')).toBe('Documentary');
+    expect(detectGenre('a comdey series')).toBe('Comedy');
+    expect(detectGenre('a thriler')).toBe('Thriller');
+  });
+});
+
+describe('detectExcludedMediaType', () => {
+  it('detects the media type the user ruled out', () => {
+    expect(detectExcludedMediaType('Fargo the movie, not the series')).toBe('tv');
+    expect(detectExcludedMediaType('the show, not a movie')).toBe('movie');
+    expect(detectExcludedMediaType('not a TV show')).toBe('tv');
+    expect(detectExcludedMediaType('not a film')).toBe('movie');
+  });
+  it('does not fire without a clear media-type negation', () => {
+    expect(detectExcludedMediaType('a good crime movie')).toBeNull();
+    expect(detectExcludedMediaType('not that one, something newer')).toBeNull();
+    expect(detectExcludedMediaType('Fargo')).toBeNull();
   });
 });

@@ -60,7 +60,10 @@ export async function getEasyPicks(supabase: SupabaseClient, userId: string, pre
     castIds: prefs.actorIds.length > 0 ? prefs.actorIds : undefined,
   };
 
-  const res = await runFinder(supabase, userId, query);
+  // Three cards, with headroom for the exclusions below. Explicit, because the
+  // shared default is a browse-sized page now and hydrating one of those for a
+  // three-card rail is a lot of upstream traffic nobody sees.
+  const res = await runFinder(supabase, userId, query, null, 12);
   const exclude = new Set(prefs.excludeKeys);
 
   return res.items

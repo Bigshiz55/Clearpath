@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const person = await getPerson(Number(params.id)).catch(() => null);
-  return { title: person ? `${person.name} · WatchVerdict` : 'Person · WatchVerdict' };
+  return { title: person ? `${person.name} · WatchVerd1ct` : 'Person · WatchVerd1ct' };
 }
 
 export default async function PersonPage({ params }: { params: { id: string } }) {

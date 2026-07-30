@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { releasesEmptyState } from '@/lib/releasesDiagnostics';
 import { SaveButton } from './SaveButton';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { AlgorithmScore } from './AlgorithmScore';
-import { TasteFeedback } from './TasteFeedback';
+import { WCheck } from './WCheck';
+import { CardVerdict } from './CardVerdict';
 import type { MediaType } from '@/lib/types';
 
 export interface WallService {
@@ -83,10 +85,15 @@ export function ReleaseWall({
   const [items, setItems] = useState<WallItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<QuickLookTarget | null>(null);
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [errored, setErrored] = useState(false);
+  // Monotonic request id: a slower earlier fetch must never overwrite a newer
+  // filter combination's results (latest state wins).
+  const seqRef = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setErrored(false);
+    const mySeq = ++seqRef.current;
     try {
       const res = await fetch('/api/releases', {
         method: 'POST',
@@ -94,11 +101,13 @@ export function ReleaseWall({
         body: JSON.stringify({ mediaType, window: win, sort, providerIds }),
       });
       const data = await res.json();
-      setItems(data.items ?? []);
+      if (mySeq !== seqRef.current) return; // superseded by a newer request
+      if (!res.ok) { setErrored(true); setItems([]); }
+      else setItems(data.items ?? []);
     } catch {
-      setItems([]);
+      if (mySeq === seqRef.current) { setErrored(true); setItems([]); }
     } finally {
-      setLoading(false);
+      if (mySeq === seqRef.current) setLoading(false);
     }
   }, [mediaType, win, sort, providerIds]);
 
@@ -162,39 +171,24 @@ export function ReleaseWall({
       {loading && items == null ? (
         <div className="poster-grid">
           {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] animate-pulse rounded-2xl bg-white/5" />
+            <div key={i} className="h-[13rem] animate-pulse rounded-2xl bg-white/5 sm:aspect-[2/3] sm:h-auto" />
           ))}
         </div>
       ) : items && items.length > 0 ? (
         <div className={`poster-grid ${loading ? 'opacity-60' : ''}`}>
-          {items.filter((t) => !hidden.has(`${t.mediaType}-${t.id}`)).map((t) => {
+          {items.map((t) => {
             const label = dateLabel(t.releaseDate);
             const d = daysUntil(t.releaseDate);
             const soon = win === 'upcoming' && d != null && d <= 14;
             return (
-              <div key={`${t.mediaType}-${t.id}`} className="card group h-full overflow-hidden text-left transition hover:border-white/20 hover:shadow-glow">
-                {/* Top bar — Movie/TV · ＋ · O. Score lives in the pink box below. */}
-                <div className="flex items-center gap-1.5 border-b border-white/10 bg-ink-900/85 px-2 py-1.5">
-                  <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
-                    {t.mediaType === 'movie' ? 'Movie' : 'TV'}
-                  </span>
-                  <div className="flex flex-1 items-center gap-1.5">
-                    <SaveButton wide tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterPath={t.posterPath} />
-                    <TasteFeedback
-                      compact
-                      wide
-                      tmdbId={t.id}
-                      mediaType={t.mediaType}
-                      title={t.title}
-                      year={t.year}
-                      posterPath={t.posterPath}
-                      onFlagged={() => setHidden((h) => new Set(h).add(`${t.mediaType}-${t.id}`))}
-                    />
-                  </div>
-                </div>
+              <div key={`${t.mediaType}-${t.id}`} className="card wv-tile group wv-card text-left">
+                {/* The W lives on the artwork on every surface — a new release
+                    goes on the docket with the same gesture as anything else. */}
+                <div className="wv-card-art">
+                  <WCheck tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterUrl={t.posterUrl} />
                 <button
                   onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
-                  className="relative block aspect-[2/3] w-full overflow-hidden"
+                  className="block h-full w-full"
                   aria-label={`Quick look at ${t.title}`}
                 >
                   {t.posterUrl ? (
@@ -212,7 +206,8 @@ export function ReleaseWall({
                     <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
                   </span>
                 </button>
-                <div className="p-3">
+                </div>
+                <div className="wv-card-body">
                   <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block text-left">
                     <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>
                     <div className="mt-0.5 text-xs text-slate-400">{t.year ?? '—'}</div>
@@ -223,18 +218,74 @@ export function ReleaseWall({
                       </div>
                     )}
                   </button>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    <span className="rounded bg-white/10 px-1.5 py-0.5">{t.mediaType === 'movie' ? 'Movie' : 'TV'}</span>
+                    {label && <span data-testid="release-date">{label}</span>}
+                  </div>
                   <AlgorithmScore mediaType={t.mediaType} tmdbId={t.id} title={t.title} year={t.year} className="mt-2" />
+                  {/* Actions sit with the information they act on, rather than in
+                      a toolbar above the artwork. Save is the ordinary watchlist
+                      save; FOR / AGAINST teach the DNA and say so.
+                      NONE of them take the card out of the wall. Removing a tile
+                      reflowed every tile after it, and it took the undo with it —
+                      each control now shows its own state in place and can be
+                      tapped again to reverse it. */}
+                  <div className="wv-act-row mt-2" data-testid="release-actions">
+                    {/* FOR · AGAINST · SAVE, in that order, on every surface.
+                        Save came first here, so the verdict pair was split and
+                        the same three controls sat in a different sequence from
+                        every other card — muscle memory from one grid tapped
+                        the wrong thing on the next. */}
+                    <CardVerdict
+                      tmdbId={t.id}
+                      mediaType={t.mediaType}
+                      title={t.title}
+                      year={t.year}
+                      posterPath={t.posterPath}
+                    />
+                    <SaveButton
+                      wide
+                      tmdbId={t.id}
+                      mediaType={t.mediaType}
+                      title={t.title}
+                      year={t.year}
+                      posterPath={t.posterPath}
+                    />
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       ) : (
-        <p className="text-sm text-slate-400">
-          {win === 'upcoming'
-            ? 'No upcoming titles match these filters yet. Try “All platforms”, or switch back to Out now.'
-            : 'Nothing matched these filters. Try “All platforms” or a different sort.'}
-        </p>
+        (() => {
+          // Diagnostic empty state: distinguish an UNSUPPORTED combination
+          // (upcoming + a provider filter, which TMDB can't verify) from genuine
+          // no-data and from an API error — each with truthful recovery actions.
+          const es = releasesEmptyState({ window: win, providerIds, itemCount: 0, errored });
+          return (
+            <div className="text-sm text-slate-400" role="status" data-testid="releases-empty" data-reason={es.reason}>
+              <p>{es.message}</p>
+              {es.actions.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {es.actions.map((a) => (
+                    <button
+                      key={a.label}
+                      type="button"
+                      onClick={() => {
+                        if (a.patch.providerIds !== undefined) setProviderIds(a.patch.providerIds);
+                        if (a.patch.window !== undefined) setWin(a.patch.window);
+                      }}
+                      className="rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 py-1.5 text-xs font-semibold text-brand-100 hover:bg-brand-500/25"
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()
       )}
 
       {open && <QuickLook target={open} onClose={() => setOpen(null)} />}

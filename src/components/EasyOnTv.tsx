@@ -1,5 +1,6 @@
 'use client';
 
+import { dayLabel } from '@/lib/viewing/localDay';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
@@ -15,13 +16,13 @@ interface Airing {
   episodeName: string | null;
 }
 
+/** Day + clock, in the viewer's zone. The day word comes from the shared
+ *  `localDay` module — comparing calendar days rather than adding 24h, so a
+ *  daylight-saving day cannot make "Tomorrow" unreachable. */
 function whenLabel(iso: string): string {
   const d = new Date(iso);
-  const now = new Date();
   const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  if (d.toDateString() === now.toDateString()) return `Today ${time}`;
-  if (new Date(now.getTime() + 86_400_000).toDateString() === d.toDateString()) return `Tomorrow ${time}`;
-  return `${d.toLocaleDateString([], { weekday: 'long' })} ${time}`;
+  return `${dayLabel(iso, Date.now(), 'long')} ${time}`;
 }
 
 export function EasyOnTv() {

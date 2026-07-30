@@ -55,6 +55,21 @@ function optional(name: string): string | undefined {
   return value ? value : undefined;
 }
 
+/**
+ * Catches the setup mistake of pasting the Supabase project URL — the
+ * adjacent field in DEPLOYMENT.md's env table — into NEXT_PUBLIC_SITE_URL
+ * instead of the deployed app's own URL. Every canonical/og:url in the app
+ * is built from `siteUrl()` below, so a Supabase URL there would make every
+ * shared link preview point at the database instead of the site.
+ */
+function isSupabaseHost(url: string): boolean {
+  try {
+    return /(^|\.)supabase\.co$/i.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 export const publicEnv = {
   // IMPORTANT: these must reference `process.env.NEXT_PUBLIC_*` as *static*
   // literals (not `process.env[name]`). Next.js only inlines public env vars
@@ -78,7 +93,9 @@ export const publicEnv = {
   siteUrl(): string {
     // Falls back to localhost in dev; safe non-secret default.
     const value = process.env.NEXT_PUBLIC_SITE_URL;
-    return value && value.trim() !== '' ? value : 'http://localhost:3000';
+    const trimmed = value && value.trim() !== '' ? value.trim() : null;
+    if (trimmed && isSupabaseHost(trimmed)) return 'http://localhost:3000';
+    return trimmed ?? 'http://localhost:3000';
   },
   vapidPublicKey(): string | undefined {
     const v = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -137,12 +154,50 @@ export const serverEnv = {
   migrateSecret(): string | undefined {
     return optional('MIGRATE_SECRET');
   },
-  /** Comma/space-separated allowlist of admin emails (ADMIN_EMAILS). */
+  /**
+   * TEMPORARY founder access code. Server-only, never NEXT_PUBLIC, never
+   * logged, never returned by any API. Its presence alone enables the
+   * /founder/access flow; its absence disables that flow entirely (the route
+   * then behaves as if it does not exist).
+   *
+   * Must NOT be shared with any service credential — it is its own secret.
+   */
+  founderAccessCode(): string | undefined {
+    const v = optional('FOUNDER_ACCESS_CODE');
+    // A short code is not defensible behind any rate limiter; refuse to treat
+    // one as configured rather than offering false assurance.
+    return v && v.length >= 16 ? v : undefined;
+  },
+  /**
+   * Allowlist of admin emails (ADMIN_EMAILS), separated by commas OR whitespace
+   * — including newlines, because Vercel's env editor is a textarea and people
+   * paste one address per line.
+   *
+   * This deliberately splits the RAW value BEFORE `clean()` touches it.
+   * `clean()` strips non-printable characters by DELETING them, so cleaning
+   * first turns "a@x.com\nb@y.com" into the single fused entry
+   * "a@x.comb@y.com" — the list still looks populated (count 1) while matching
+   * nobody, which is a 404 with no diagnosis attached.
+   */
   adminEmails(): string[] {
-    return (optional('ADMIN_EMAILS') ?? '')
-      .split(/[,\s]+/)
-      .map((s) => s.trim().toLowerCase())
+    return (process.env.ADMIN_EMAILS ?? '')
+      .split(/[,;\s]+/)
+      .map((s) => clean(s).toLowerCase())
       .filter(Boolean);
+  },
+  /**
+   * Approved founder accounts for the /TestScott · /TestHeather · /TestAmy
+   * environments. Server-only; these are EMAILS of real sign-in accounts, never
+   * credentials. A founder route is accessible only to its mapped email (or an
+   * admin). Set FOUNDER_SCOTT_EMAIL / FOUNDER_HEATHER_EMAIL / FOUNDER_AMY_EMAIL.
+   */
+  founderEmails(): Record<'scott' | 'heather' | 'amy', string | undefined> {
+    const norm = (v?: string) => (v ? v.trim().toLowerCase() || undefined : undefined);
+    return {
+      scott: norm(optional('FOUNDER_SCOTT_EMAIL')),
+      heather: norm(optional('FOUNDER_HEATHER_EMAIL')),
+      amy: norm(optional('FOUNDER_AMY_EMAIL')),
+    };
   },
   /**
    * Affiliate program tags — appended to provider deep links at redirect time.

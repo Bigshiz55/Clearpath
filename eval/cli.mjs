@@ -35,6 +35,8 @@ switch (cmd) {
     break;
   case 'optimize': spec = 'eval/runner/optimize.eval.ts'; break;
   case 'analyze': spec = 'eval/runner/analyze.eval.ts'; break;
+  case 'critical': spec = 'eval/critical/run.critical.test.ts'; break;
+  case 'campaign': spec = 'eval/critical/campaign.test.ts'; break;
   default:
     console.error(`Unknown command: ${cmd}`);
     process.exit(2);

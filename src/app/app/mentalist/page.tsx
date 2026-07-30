@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Mentalist } from '@/components/Mentalist';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Build Your Case · WatchVerdict' };
+export const metadata: Metadata = { title: 'Build Your Case · WatchVerd1ct' };
 
 export default function MentalistPage() {
   return (
@@ -13,7 +13,7 @@ export default function MentalistPage() {
         kind of lead you gravitate to — to start building your VERD1CT DNA, then predict the next handful you’ll
         actually pick. Save the whole list in one tap.
       </p>
-      <p className="mt-1 text-[11px] text-slate-500">Powered by the WatchVerdict Mentalist</p>
+      <p className="mt-1 text-[11px] text-slate-500">Powered by the WatchVerd1ct Mentalist</p>
       <div className="mt-6">
         <Mentalist />
       </div>

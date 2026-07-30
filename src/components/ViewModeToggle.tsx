@@ -17,6 +17,11 @@ function applyViewport(desktop: boolean) {
  * width, so the browser renders the PC version scaled to fit (pinch to zoom).
  * The preference persists in localStorage and is applied before paint by a small
  * script in the root layout, so there's no flash on reload.
+ *
+ * The label is always rendered. It used to be `hidden sm:inline` because the
+ * button sat inline in a header that had no room for it; it now lives in the
+ * header overflow menu, where an icon-only control would simply be an
+ * unlabelled button.
  */
 export function ViewModeToggle({ className = '' }: { className?: string }) {
   const [desktop, setDesktop] = useState(false);
@@ -55,7 +60,7 @@ export function ViewModeToggle({ className = '' }: { className?: string }) {
             <rect x="7" y="3" width="10" height="18" rx="2.5" />
             <line x1="11" y1="18" x2="13" y2="18" />
           </svg>
-          <span className="hidden sm:inline">Phone view</span>
+          <span>Phone view</span>
         </>
       ) : (
         <>
@@ -65,7 +70,7 @@ export function ViewModeToggle({ className = '' }: { className?: string }) {
             <line x1="9" y1="20" x2="15" y2="20" />
             <line x1="12" y1="16" x2="12" y2="20" />
           </svg>
-          <span className="hidden sm:inline">Desktop view</span>
+          <span>Desktop view</span>
         </>
       )}
     </button>

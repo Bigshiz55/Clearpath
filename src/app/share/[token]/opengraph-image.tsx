@@ -4,11 +4,11 @@ import { getPublicShare } from '@/lib/share';
 export const dynamic = 'force-dynamic';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const alt = 'WatchVerdict';
+export const alt = 'WatchVerd1ct';
 
 export default async function Image({ params }: { params: { token: string } }) {
   const snap = await getPublicShare(params.token);
-  const title = snap?.title ?? 'WatchVerdict';
+  const title = snap?.title ?? 'WatchVerd1ct';
   const year = snap?.year ? ` (${snap.year})` : '';
   const tier = snap?.tier ?? 'Should you watch it?';
   const score = snap?.generalScore ?? null;

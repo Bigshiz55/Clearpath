@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { WatchVerdictWordmark } from './WatchVerdictWordmark';
 import { qrForUrl } from '@/lib/actions/qr';
 import { getMyTaste, type MyTaste } from '@/lib/actions/profile';
 
@@ -47,7 +48,7 @@ export function LiveCourt({ code }: { code: string }) {
   const [starting, setStarting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
-  const [gaveled, setGaveled] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/court/${code}` : '';
@@ -59,7 +60,7 @@ export function LiveCourt({ code }: { code: string }) {
     if (!shareUrl) return;
     const share = (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share;
     if (share) {
-      try { await share({ title: 'Join my WatchVerdict Court', text: 'Help us pick what to watch — tap to join:', url: shareUrl }); return; } catch { /* cancelled */ }
+      try { await share({ title: 'Join my WatchVerd1ct Court', text: 'Help us pick what to watch — tap to join:', url: shareUrl }); return; } catch { /* cancelled */ }
     }
     try { await navigator.clipboard?.writeText(shareUrl); setErr(null); } catch { /* ignore */ }
   }
@@ -87,13 +88,13 @@ export function LiveCourt({ code }: { code: string }) {
     return () => { if (poll.current) clearInterval(poll.current); };
   }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Play the gavel-strike once when the ruling first lands.
+  // Brief reveal beat once the Verd1ct first lands.
   useEffect(() => {
-    if (state?.status === 'verdict' && !gaveled) {
-      const t = setTimeout(() => setGaveled(true), 1500);
+    if (state?.status === 'verdict' && !revealed) {
+      const t = setTimeout(() => setRevealed(true), 1500);
       return () => clearTimeout(t);
     }
-  }, [state?.status, gaveled]);
+  }, [state?.status, revealed]);
 
   async function join() {
     if (!name.trim()) return;
@@ -170,7 +171,7 @@ export function LiveCourt({ code }: { code: string }) {
   }
 
   if (notFound) {
-    return <Shell><div className="card p-8 text-center"><div className="text-3xl">🔗</div><p className="mt-3 text-sm text-slate-400">This Court room doesn’t exist or has ended.</p><Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVerdict →</Link></div></Shell>;
+    return <Shell><div className="card p-8 text-center"><div className="text-3xl">🔗</div><p className="mt-3 text-sm text-slate-400">This Court room doesn’t exist or has ended.</p><Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVerd1ct →</Link></div></Shell>;
   }
   if (!state) return <Shell><div className="text-sm text-slate-400">Connecting to the room…</div></Shell>;
 
@@ -183,7 +184,7 @@ export function LiveCourt({ code }: { code: string }) {
       <Shell>
         <div className="card p-5">
           <div className="text-sm font-semibold text-white">Join the Court</div>
-          <p className="mt-1 text-xs text-slate-400">Add your name, then search for what <span className="font-semibold text-slate-200">you</span> want to watch. The judge weighs everyone’s picks together.</p>
+          <p className="mt-1 text-xs text-slate-400">Add your name, then search for what <span className="font-semibold text-slate-200">you</span> want to watch. WatchVerd1ct scores every title for each of you.</p>
           {mine?.signedIn && mine.name && (
             <button onClick={() => setName(mine.name!)} className="mt-3 w-full rounded-xl border border-brand-400/40 bg-brand-500/15 px-3 py-2 text-sm font-semibold text-brand-100">✨ I’m {mine.name}</button>
           )}
@@ -209,7 +210,7 @@ export function LiveCourt({ code }: { code: string }) {
             <div className="text-sm font-semibold text-white">What do you want to watch?</div>
             <span className="text-xs text-slate-400">{picks.length}/8</span>
           </div>
-          <p className="mt-1 text-xs text-slate-400">Search real movies & shows and add the ones you’re into. The judge blends them with everyone else’s.</p>
+          <p className="mt-1 text-xs text-slate-400">Search real movies & shows and add the ones you’re into. They are scored alongside everyone else’s.</p>
 
           <div className="relative mt-3">
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔎 Search a movie or show…" className="input" />
@@ -274,7 +275,7 @@ export function LiveCourt({ code }: { code: string }) {
 
           {isHost ? (
             <button onClick={startCourt} disabled={starting || state.participants.length < 2 || !anyPicks} className="btn-primary mt-5 w-full py-3">
-              {starting ? 'Deliberating…' : state.participants.length < 2 ? 'Need 2+ to start' : !anyPicks ? 'Add some titles first' : '⚖️ Deliver the ruling'}
+              {starting ? 'Scoring…' : state.participants.length < 2 ? 'Need 2+ to start' : !anyPicks ? 'Add some titles first' : 'Reveal the Verd1ct'}
             </button>
           ) : (
             <div className="mt-5 text-sm text-slate-400">Waiting for the host to start…</div>
@@ -287,14 +288,14 @@ export function LiveCourt({ code }: { code: string }) {
   // ---- RULING (ranked 3 + controls) ----
   if ((state.status === 'verdict' || state.status === 'veto') && state.finalists) {
     const finalists = [...state.finalists].sort((a, b) => a.rank - b.rank);
-    if (!gaveled) {
+    if (!revealed) {
       return (
         <Shell>
           <div className="grid min-h-[60vh] place-items-center text-center">
             <div>
-              <div className="wv-gavel text-7xl" aria-hidden>⚖️</div>
-              <div className="wv-order mt-4 text-2xl font-black uppercase tracking-[0.2em] text-gold-300">Order in the court</div>
-              <div className="mt-2 text-sm text-slate-400">Ranking everyone’s picks…</div>
+              <div className="wv-dna-twist text-5xl" aria-hidden>🎬</div>
+              <div className="wv-order mt-4 text-2xl font-black tracking-tight text-white">Counting the room</div>
+              <div className="mt-2 text-sm text-slate-400">Scoring every title for everyone…</div>
             </div>
           </div>
         </Shell>
@@ -305,9 +306,9 @@ export function LiveCourt({ code }: { code: string }) {
         <div className="wv-verdict-in">
           <div className="text-center">
             <div className="inline-flex items-center gap-1.5 rounded-full border border-gold-400/40 bg-gold-500/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.15em] text-gold-200">
-              <span aria-hidden>🔨</span> The ruling
+              The Verd1ct
             </div>
-            <p className="mt-2 text-sm text-slate-300">Ranked by best fit for all {finalists[0]?.perMember.length ?? state.participants.length} of you. Veto any pick and the judge swaps in the next best.</p>
+            <p className="mt-2 text-sm text-slate-300">Ranked by best fit for all {finalists[0]?.perMember.length ?? state.participants.length} of you. Veto any pick and the next best title takes its place.</p>
           </div>
 
           <div className="mt-4 space-y-3">
@@ -376,7 +377,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       <header className="container-page flex h-16 items-center">
-        <span className="whitespace-nowrap text-lg font-bold tracking-tight text-white">Watch<span className="text-[#ff1493]">VERDICT</span> · ⚖️ Court</span>
+        <span className="inline-flex items-center gap-1.5 text-lg"><WatchVerdictWordmark /> <span className="whitespace-nowrap font-bold text-white">· Court</span></span>
       </header>
       <main className="container-page mx-auto max-w-md py-4">{children}</main>
     </div>

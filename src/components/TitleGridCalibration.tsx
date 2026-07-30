@@ -1,0 +1,460 @@
+'use client';
+
+/**
+ * THE TWELVE-CARD GRID.
+ *
+ * The old title lane showed one card at a time and asked you to judge each one,
+ * which is fine until it serves something you have never heard of. There is no
+ * "no idea what that is" button, so the answer becomes Skip — and Skip is
+ * recorded as `not_interested`. That turns ignorance into a stated dislike.
+ *
+ * A grid fixes it at the root, and it is what every service that does cold
+ * start well already does: show twelve at once, and let people TAP THE ONES
+ * THEY RECOGNISE. Recognition is fast, and it is self-selecting for signal.
+ *
+ * The load-bearing rule, said out loud in the UI:
+ *
+ *   NOT TAPPING A TITLE RECORDS NOTHING.
+ *
+ * Nothing here manufactures a negative. Dislikes come from "Not for me" on real
+ * cards elsewhere, where the person is actually looking at something they
+ * understand. Everything sent from this grid is a positive the user chose, or a
+ * rating they gave a title they have seen.
+ */
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { SeeRecommendations } from '@/components/SeeRecommendations';
+import { recordQuizAnswer } from '@/lib/actions/dnaQuiz';
+import { DnaBurst } from '@/components/DnaBurst';
+import { RecommendationSlate } from '@/components/RecommendationSlate';
+import { analysePicks, type AnalysedPick, type PickAnalysis } from '@/lib/preference/pickAnalysis';
+
+const GRID_SIZE = 12;
+
+/** Client-side event id — the engine is idempotent on it, so a double tap
+ *  writes once rather than twice. */
+const uid = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `g_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e9).toString(36)}`;
+
+interface Item {
+  id: number;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+  posterUrl: string | null;
+  genre: string | null;
+}
+
+type Rating = 'loved' | 'liked' | 'okay' | 'disliked';
+
+/** What the user said about a tile. Absence means "said nothing" — never a no. */
+type Pick =
+  | { kind: 'like' }
+  | { kind: 'seen'; rating: Rating };
+
+const RATINGS: Array<{ key: Rating; label: string; emoji: string }> = [
+  { key: 'loved', label: 'Loved', emoji: '❤️' },
+  { key: 'liked', label: 'Liked', emoji: '👍' },
+  { key: 'okay', label: 'Okay', emoji: '😐' },
+  { key: 'disliked', label: 'Didn’t', emoji: '👎' },
+];
+
+export function TitleGridCalibration({ sessionId }: { sessionId?: string | undefined }) {
+  const [items, setItems] = useState<Item[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [picks, setPicks] = useState<Record<string, Pick>>({});
+  const [openRating, setOpenRating] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savedCount, setSavedCount] = useState<number | null>(null);
+  // The read-back is built from the picks AS SUBMITTED — snapshotted here so a
+  // later round cannot rewrite what a finished run said about you.
+  const [analysis, setAnalysis] = useState<PickAnalysis | null>(null);
+  const [round, setRound] = useState(0);
+  const [exhausted, setExhausted] = useState(false);
+  // The DNA pop, in the centre of the tile you just chose. Same moment the
+  // rest of the app gives you for a For/Pass — this is the only feedback that
+  // a tap did anything, so it belongs here more than anywhere.
+  const [burst, setBurst] = useState<{ cx: number; cy: number } | null>(null);
+  // Every title picked across EVERY round, not just the one on screen. A round
+  // is a dealer, not a session: dealing twelve more used to wipe the six you
+  // had already chosen, which threw the work away without ever saving it.
+  const chosenItems = useRef<Map<string, Item>>(new Map());
+  // Every key this session has already put on screen. Sent to the server so a
+  // fresh round genuinely deals fresh cards: the plan is deterministic, so
+  // without it "show me 12 more" re-deals the same twelve — which it did.
+  const seen = useRef<Set<string>>(new Set());
+
+  const keyOf = (i: Item) => `${i.mediaType}:${i.id}`;
+
+  const load = useCallback(async () => {
+    setItems(null);
+    setError(null);
+    setOpenRating(null);
+    // NOT `setPicks({})`. A new round adds twelve more cards; it does not
+    // discard what you already chose.
+    try {
+      // NO REPEATS, GUARANTEED HERE.
+      //
+      // The server excludes what it knows about, but this component is the one
+      // making the promise on screen, so it enforces it itself: anything this
+      // session has already shown is filtered out again on arrival, and if a
+      // page comes back thin we walk deeper until we have a full twelve or run
+      // out of catalog. A stale deployment, a cached response or a server that
+      // ignores `exclude` can no longer produce the same twelve twice.
+      const fresh: Item[] = [];
+      let lastError: string | null = null;
+
+      for (let attempt = 0; attempt < 5 && fresh.length < GRID_SIZE; attempt++) {
+        const qs = new URLSearchParams({ size: String(GRID_SIZE * 2) });
+        // Walk TMDB deeper so the pool itself refreshes rather than being
+        // re-planned from the same forty titles.
+        qs.set('page', String(((round + attempt) % 5) + 1));
+        if (sessionId) qs.set('session', sessionId);
+        const already = Array.from(seen.current).slice(-200);
+        if (already.length > 0) qs.set('exclude', already.join(','));
+
+        const res = await fetch(`/api/calibration?${qs.toString()}`, { cache: 'no-store' });
+        const data = (await res.json()) as { items?: Item[]; error?: string };
+        if (!res.ok) {
+          lastError = data.error ?? 'Could not load titles right now.';
+          break;
+        }
+        let added = 0;
+        for (const i of data.items ?? []) {
+          const k = `${i.mediaType}:${i.id}`;
+          if (seen.current.has(k) || fresh.some((f) => keyOf(f) === k)) continue;
+          fresh.push(i);
+          added += 1;
+          if (fresh.length >= GRID_SIZE) break;
+        }
+        // A page that produced nothing new means deeper pages are unlikely to
+        // either — stop rather than hammering TMDB.
+        if (added === 0 && attempt > 0) break;
+      }
+
+      if (fresh.length === 0 && lastError) {
+        setError(lastError);
+        setItems([]);
+        return;
+      }
+      for (const i of fresh) seen.current.add(keyOf(i));
+      setExhausted(fresh.length === 0 && seen.current.size > 0);
+      setItems(fresh);
+    } catch {
+      setError('Could not load titles right now.');
+      setItems([]);
+    }
+  }, [sessionId, round]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const chosen = Object.keys(picks).length;
+
+  /** After a save, the next twelve start a fresh run — the picks just written
+   *  must not be counted (or re-written) a second time. */
+  function startNewRun() {
+    setPicks({});
+    chosenItems.current.clear();
+    setSavedCount(null);
+    setAnalysis(null);
+    setRound((r) => r + 1);
+  }
+
+  function toggleLike(i: Item, el: HTMLElement | null) {
+    const k = keyOf(i);
+    setOpenRating(null);
+    setPicks((p) => {
+      const next = { ...p };
+      if (next[k]?.kind === 'like') {
+        delete next[k];
+        chosenItems.current.delete(k);
+      } else {
+        next[k] = { kind: 'like' };
+        chosenItems.current.set(k, i);
+        const r = el?.getBoundingClientRect();
+        if (r) setBurst({ cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+      }
+      return next;
+    });
+  }
+
+  function setRating(i: Item, rating: Rating, el: HTMLElement | null) {
+    const k = keyOf(i);
+    setPicks((p) => ({ ...p, [k]: { kind: 'seen', rating } }));
+    chosenItems.current.set(k, i);
+    setOpenRating(null);
+    const r = el?.closest('li')?.getBoundingClientRect();
+    if (r) setBurst({ cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+  }
+
+  async function submit() {
+    if (chosen === 0) return;
+    setSaving(true);
+    // Everything picked across every round — a title chosen three rounds ago is
+    // still a title you chose.
+    const results = await Promise.all(
+      Array.from(chosenItems.current.values()).flatMap((i) => {
+        const pick = picks[keyOf(i)];
+        if (!pick) return []; // untouched → nothing is sent. This is the point.
+        const base = {
+          eventId: uid(),
+          tmdbId: i.id,
+          mediaType: i.mediaType,
+          title: i.title,
+          year: i.year,
+          posterPath: i.posterPath,
+          source: 'calibration',
+          ...(sessionId ? { sessionId } : {}),
+        };
+        return [
+          recordQuizAnswer(
+            pick.kind === 'like'
+              ? { ...base, recognition: 'unseen' as const, attraction: 'interested' as const }
+              : { ...base, recognition: 'seen' as const, rating: pick.rating },
+          ).catch(() => ({ ok: false })),
+        ];
+      }),
+    );
+    setSaving(false);
+    setAnalysis(
+      analysePicks(
+        Array.from(chosenItems.current.values()).flatMap((i): AnalysedPick[] => {
+          const p = picks[keyOf(i)];
+          if (!p) return [];
+          return [
+            {
+              title: i.title,
+              year: i.year,
+              mediaType: i.mediaType,
+              genre: i.genre,
+              kind: p.kind,
+              ...(p.kind === 'seen' ? { rating: p.rating } : {}),
+            },
+          ];
+        }),
+        new Date().getFullYear(),
+      ),
+    );
+    setSavedCount(results.filter((r) => r.ok).length);
+  }
+
+  if (items === null) {
+    return (
+      <div className="card p-6 text-sm text-slate-400" data-testid="title-grid-loading">
+        Pulling together a spread of films and shows…
+      </div>
+    );
+  }
+
+  if (savedCount !== null) {
+    // The payoff. Finishing used to say "Got it." and stop — the one moment
+    // someone has just done the work, and it handed back nothing. Read the
+    // picks straight back to them, then show what those picks actually buy.
+    return (
+      <div className="space-y-5" data-testid="title-grid-done">
+        <section className="card p-5 sm:p-6">
+          <div className="text-xs font-bold uppercase tracking-wide text-[#ff1493]">What your picks say</div>
+          <h2 className="mt-1 text-2xl font-black text-white sm:text-3xl" data-testid="analysis-headline">
+            {analysis?.headline ?? 'Saved.'}
+          </h2>
+          <p className="mt-1 text-sm text-slate-300">
+            {savedCount === 0
+              ? 'Nothing was recorded — the ones you did not tap are not held against you.'
+              : `${savedCount} ${savedCount === 1 ? 'title' : 'titles'} went into your Watch DNA.`}
+          </p>
+
+          {analysis && analysis.facts.length > 0 && (
+            <dl className="mt-4 grid gap-3 sm:grid-cols-2" data-testid="analysis-facts">
+              {analysis.facts.map((f) => (
+                <div key={f.key} className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                  <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{f.label}</dt>
+                  <dd className="mt-0.5 text-sm font-semibold text-white">{f.detail}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          {analysis && (
+            <p className="mt-3 text-xs text-slate-500" data-testid="analysis-caveat">
+              {analysis.caveat}
+              {!analysis.enough && ' Another round or two and this gets a lot sharper.'}
+            </p>
+          )}
+
+          {/* The picks just moved the DNA, so the default action is to go see
+              what that bought. "Keep going" was primary here and there was no
+              route to recommendations at all — the reward for finishing was
+              the offer to do it again. */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <SeeRecommendations taught={savedCount} />
+            <button
+              type="button"
+              onClick={startNewRun}
+              className="inline-flex min-h-[48px] items-center rounded-lg border border-white/15 px-5 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+              data-testid="title-grid-more"
+            >
+              Keep going — 12 more
+            </button>
+            <a
+              href="/app/dna"
+              className="inline-flex min-h-[48px] items-center rounded-lg border-2 border-[#ff1493]/45 bg-[#ff1493]/10 px-5 text-sm font-bold text-pink-100 transition hover:bg-[#ff1493]/20"
+            >
+              See my full Watch DNA →
+            </a>
+          </div>
+        </section>
+
+        {/* What it bought. The slate ranks from the DNA that just changed, so
+            this is the first real evidence the picks did anything. */}
+        <section className="card p-5 sm:p-6" data-testid="analysis-recommendations">
+          <h3 className="text-lg font-bold text-white">Because of those picks</h3>
+          <p className="mt-0.5 text-sm text-slate-400">
+            Ranked against your Watch DNA as it stands right now — react to any of them and it keeps learning.
+          </p>
+          <div className="mt-4">
+            <RecommendationSlate surface="grid-calibration" {...(sessionId ? { sessionId } : {})} />
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="title-grid">
+      <header>
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">Tap anything you like the look of</h1>
+        <p className="mt-1 text-sm text-slate-400">
+          Twelve at a time. Tap the ones you would happily watch — and if you have already seen one, say what you
+          thought.{' '}
+          <span className="font-semibold text-slate-300" data-testid="grid-no-penalty">
+            Leaving a title alone records nothing: not recognising something is not a dislike.
+          </span>
+        </p>
+      </header>
+
+      {error && (
+        <p className="mt-3 text-sm text-amber-200" data-testid="title-grid-error">
+          {error}
+        </p>
+      )}
+
+      {items.length === 0 && !error ? (
+        <p className="mt-4 text-sm text-slate-400" data-testid="title-grid-empty">
+          {exhausted
+            ? 'That is everything I can find that you have not already seen here. Come back later and there will be more.'
+            : 'Nothing to show right now.'}
+        </p>
+      ) : (
+        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          {items.map((i) => {
+            const k = keyOf(i);
+            const pick = picks[k];
+            const liked = pick?.kind === 'like';
+            const seen = pick?.kind === 'seen' ? pick.rating : null;
+            return (
+              <li key={k} className="min-w-0" data-testid={`grid-tile-${i.mediaType}-${i.id}`}>
+                <button
+                  type="button"
+                  onClick={(e) => toggleLike(i, e.currentTarget)}
+                  aria-pressed={liked}
+                  data-testid={`grid-like-${i.id}`}
+                  className={[
+                    'relative block w-full overflow-hidden rounded-xl border-2 transition',
+                    liked || seen
+                      ? 'border-brand-400 shadow-[0_0_0_3px_rgba(168,85,247,0.25)]'
+                      : 'border-white/10 hover:border-white/30',
+                  ].join(' ')}
+                >
+                  <span className="block aspect-[2/3] w-full bg-ink-800">
+                    {i.posterUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={i.posterUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="grid h-full w-full place-items-center p-2 text-center text-[11px] text-slate-400">
+                        {i.title}
+                      </span>
+                    )}
+                  </span>
+                  {(liked || seen) && (
+                    <span className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-brand-500 text-sm font-black text-white">
+                      {liked ? '✓' : (RATINGS.find((r) => r.key === seen)?.emoji ?? '✓')}
+                    </span>
+                  )}
+                </button>
+
+                <div className="mt-1 line-clamp-2 text-xs font-semibold text-white">{i.title}</div>
+                <div className="text-[11px] text-slate-500">
+                  {i.year ?? '—'} · {i.mediaType === 'movie' ? 'Movie' : 'TV'}
+                </div>
+
+                {openRating === k ? (
+                  <div className="mt-1 flex flex-wrap gap-1" data-testid={`grid-ratings-${i.id}`}>
+                    {RATINGS.map((r) => (
+                      <button
+                        key={r.key}
+                        type="button"
+                        onClick={(e) => setRating(i, r.key, e.currentTarget)}
+                        data-testid={`grid-rate-${i.id}-${r.key}`}
+                        className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg border border-white/12 bg-white/5 px-1 text-base text-slate-200 hover:bg-white/10"
+                        title={r.label}
+                      >
+                        {r.emoji}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setOpenRating(k)}
+                    data-testid={`grid-seen-${i.id}`}
+                    className="mt-1 inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-[#ff1493]/45 bg-[#ff1493]/10 px-2 text-xs font-bold text-pink-200 transition hover:bg-[#ff1493]/20"
+                  >
+                    {seen ? `Seen it · ${RATINGS.find((r) => r.key === seen)?.label}` : 'Seen it?'}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Keep going for as long as you like. The end button is the ONLY thing
+          that writes — dealing another twelve never discards what you picked,
+          and the running total says so. More rounds is the fastest way to a
+          real profile, so nothing here rushes you off the screen. */}
+      <div className="sticky bottom-0 mt-5 flex flex-wrap items-center gap-2 bg-gradient-to-t from-ink-950 via-ink-950/95 to-transparent pb-2 pt-4">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={chosen === 0 || saving}
+          data-testid="title-grid-submit"
+          className="btn-primary inline-flex min-h-[48px] items-center px-6 text-base disabled:opacity-40"
+        >
+          {saving ? 'Saving…' : chosen === 0 ? 'Pick a few first' : `Done — add ${chosen} to my DNA →`}
+        </button>
+        {items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setRound((r) => r + 1)}
+            disabled={saving}
+            data-testid="title-grid-shuffle"
+            className="inline-flex min-h-[48px] items-center rounded-lg border-2 border-[#ff1493]/45 bg-[#ff1493]/10 px-5 text-sm font-bold text-pink-100 transition hover:bg-[#ff1493]/20 disabled:opacity-40"
+          >
+            Show me 12 more
+          </button>
+        )}
+        {chosen > 0 && (
+          <span className="text-sm font-semibold text-slate-300" data-testid="grid-running-total">
+            {chosen} picked so far · keep going, nothing is saved until you finish
+          </span>
+        )}
+      </div>
+
+      {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind="up" onDone={() => setBurst(null)} />}
+    </div>
+  );
+}

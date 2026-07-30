@@ -1,0 +1,93 @@
+import { createClient } from '@/lib/supabase/server';
+import { getPackPremiereCalendar } from '@/lib/packs/packs';
+import { listStationsForPack } from '@/lib/packs/stations';
+import { listPersonsForProgramme } from '@/lib/packs/persons';
+import { listSubscriptions } from '@/lib/packs/userTracking';
+import type { Pack } from '@/lib/packs/types';
+import { PremiereListOrCalendar, type PremiereEntry, type CreditedPerson } from './PremiereListOrCalendar';
+import { PackEmptyState } from './PackEmptyState';
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * The premiere-calendar + person-tracking feature. Driven entirely by
+ * `pack.premiereCalendar`/`pack.personTracking` — never by `pack.slug`.
+ */
+export async function PremiereCalendarView({ pack, userId }: { pack: Pack; userId: string | null }) {
+  const supabase = createClient();
+
+  // A 6-week window (today through the end of the following month) — enough
+  // to fill a month-grid view without an unbounded query.
+  const today = new Date();
+  const start = isoDate(today);
+  const end = isoDate(new Date(today.getTime() + 42 * 86_400_000));
+
+  const [premieres, stationIds] = await Promise.all([
+    getPackPremiereCalendar(supabase, pack.id, start, end),
+    listStationsForPack(supabase, pack.id),
+  ]);
+
+  if (stationIds.length === 0) {
+    return (
+      <PackEmptyState
+        title="No channels wired to this Pack yet"
+        detail="This Pack hasn't been connected to any TV listings. Run the admin ingest to populate its channel lineup."
+      />
+    );
+  }
+
+  if (premieres.length === 0) {
+    return (
+      <PackEmptyState
+        title="No premieres in the next 6 weeks"
+        detail="Listings refresh daily. Either nothing new is scheduled on this Pack's channels right now, or the ingest hasn't run yet — check back after the next refresh."
+      />
+    );
+  }
+
+  const programmeIds = [...new Set(premieres.map((p) => p.programmeId))];
+  const stationIdsUsed = [...new Set(premieres.map((p) => p.stationId))];
+  const anonymousUserId = '00000000-0000-0000-0000-000000000000';
+
+  const [programmeRes, stationRes, seenRes, subs, creditsPerProgramme] = await Promise.all([
+    supabase.from('tv_programmes').select('id, title, artwork_url').in('id', programmeIds),
+    supabase.from('tv_stations').select('id, name').in('id', stationIdsUsed),
+    supabase.from('user_seen_programmes').select('programme_id').in('programme_id', programmeIds).eq('user_id', userId ?? anonymousUserId),
+    userId ? listSubscriptions(supabase, userId) : Promise.resolve([]),
+    Promise.all(programmeIds.map((id) => listPersonsForProgramme(supabase, id).then((credits) => [id, credits] as const))),
+  ]);
+
+  const programmeById = new Map(
+    (programmeRes.data ?? []).map((r) => [r.id as string, r as { id: string; title: string; artwork_url: string | null }]),
+  );
+  const stationById = new Map((stationRes.data ?? []).map((r) => [r.id as string, r as { id: string; name: string }]));
+  const seenIds = new Set<string>((seenRes.data ?? []).map((r) => r.programme_id as string));
+  const followedPersonIds = new Set(
+    subs.filter((s) => s.subscriptionType === 'person' && s.subjectUuid).map((s) => s.subjectUuid as string),
+  );
+  const creditsByProgramme = new Map(creditsPerProgramme);
+
+  const entries: PremiereEntry[] = premieres.map((p) => {
+    const credits = creditsByProgramme.get(p.programmeId) ?? [];
+    const people: CreditedPerson[] = credits.map((c) => ({
+      id: c.person.id,
+      name: c.person.fullName,
+      role: c.role,
+      following: followedPersonIds.has(c.person.id),
+    }));
+    return {
+      programmeId: p.programmeId,
+      title: programmeById.get(p.programmeId)?.title ?? p.title,
+      posterUrl: programmeById.get(p.programmeId)?.artwork_url ?? null,
+      channel: stationById.get(p.stationId)?.name ?? 'Unknown channel',
+      premiereDate: p.premiereDate,
+      startAtUtc: p.startAtUtc,
+      seen: seenIds.has(p.programmeId),
+      people,
+    };
+  });
+
+  return <PremiereListOrCalendar entries={entries} packSlug={pack.slug} signedIn={userId != null} />;
+}

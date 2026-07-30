@@ -27,17 +27,20 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
 
   return (
     <>
+      {/* No blur on the scrim either — a full-screen fixed layer with a
+          backdrop filter is the same iOS compositing trap. A plain scrim does
+          the job. */}
       {open && (
-        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm sm:hidden" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-40 bg-black/70 lg:hidden" onClick={() => setOpen(false)}>
           <div
-            className="absolute inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] mx-2 overflow-hidden rounded-2xl border border-white/10 bg-ink-850 p-2 shadow-card"
+            className="absolute inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] mx-2 overflow-hidden rounded-2xl border border-white/10 bg-ink-850 p-2 shadow-card"
             onClick={(e) => e.stopPropagation()}
           >
             {secondary.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${isActive(l.href) ? 'bg-brand-500/20 text-brand-100' : 'text-slate-200 hover:bg-white/10'}`}
+                className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${isActive(l.href) ? 'bg-[#ff1493]/20 text-pink-100' : 'text-slate-200 hover:bg-white/10'}`}
               >
                 {l.label}
               </Link>
@@ -46,26 +49,52 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-ink-950/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
-        {primary.map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            aria-current={isActive(l.href) ? 'page' : undefined}
-            className={`flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1 text-[11px] leading-none ${isActive(l.href) ? 'font-semibold text-brand-200' : 'text-slate-300'}`}
+      {/* WELDED TO THE BOTTOM EDGE, AND OPAQUE.
+          It shipped briefly as a floating translucent pill inset from the edges.
+          Two problems, and the second is the serious one:
+            • Content showed through and around it, so it read as something
+              stuck on top of the page rather than part of the app.
+            • `backdrop-filter` on a `position: fixed` element is the classic
+              iOS Safari repaint trap. Combined with `background-attachment:
+              fixed` on the body (now also gone), Safari can leave the fixed
+              layer painted at a stale offset during a scroll — which is how a
+              bottom bar ends up sitting in the middle of the screen over a
+              poster. It measures correctly in Chromium, so the layout was never
+              wrong; the compositing was.
+          So: no blur, no translucency, no inset. An opaque bar on the edge
+          cannot be composited to the wrong place, and nothing shows through. */}
+      <div
+        data-app-bottomnav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-ink-950 pb-[env(safe-area-inset-bottom)] lg:hidden"
+      >
+        <nav className="mx-auto flex max-w-md items-center justify-around gap-0.5 px-2 py-1">
+          {primary.map((l) => {
+            const on = isActive(l.href);
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                aria-current={on ? 'page' : undefined}
+                className={`flex min-h-[44px] flex-1 items-center justify-center rounded-xl px-1 text-[11px] font-semibold leading-none transition ${
+                  on ? 'bg-[#ff1493]/20 text-pink-100' : 'text-slate-400'
+                }`}
+              >
+                <span className="whitespace-nowrap">{SHORT[l.href] ?? l.label}</span>
+              </Link>
+            );
+          })}
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className={`flex min-h-[44px] flex-1 items-center justify-center rounded-xl px-1 text-[11px] font-semibold leading-none transition ${
+              open || secondaryActive ? 'bg-[#ff1493]/20 text-pink-100' : 'text-slate-400'
+            }`}
+            aria-haspopup="menu"
+            aria-expanded={open}
           >
-            <span className="whitespace-nowrap">{SHORT[l.href] ?? l.label}</span>
-          </Link>
-        ))}
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className={`flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1 text-[11px] leading-none ${open || secondaryActive ? 'font-semibold text-brand-200' : 'text-slate-300'}`}
-          aria-haspopup="menu"
-          aria-expanded={open}
-        >
-          <span className="whitespace-nowrap">More</span>
-        </button>
-      </nav>
+            <span className="whitespace-nowrap">More</span>
+          </button>
+        </nav>
+      </div>
     </>
   );
 }

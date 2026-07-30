@@ -1,53 +1,33 @@
 import type { Metadata } from 'next';
-import { CloudCrews } from '@/components/CloudCrews';
-import { TogetherPlanner } from '@/components/TogetherPlanner';
-import { StartLiveCourt } from '@/components/StartLiveCourt';
-import { JudgeBench } from '@/components/JudgeBench';
+import { CourtIntro } from '@/components/court/CourtIntro';
+import { TogetherSecondary } from '@/components/TogetherSecondary';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'Tonight, Together · WatchVerdict',
+  title: 'Tonight, Together · WatchVerd1ct',
 };
 
+/**
+ * TONIGHT, TOGETHER — one page, one action. It used to describe Live Court
+ * twice (intro panel + a second card with near-identical copy) and offer
+ * three competing entry cards. Now: heading, ONE Live Court block with the
+ * page's single filled button, and the other two modes as text links that
+ * disclose their existing panels (TogetherSecondary).
+ */
 export default async function TogetherPage() {
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="text-2xl font-bold text-white sm:text-3xl">👪 Tonight, Together</h1>
+      <h1 className="text-2xl font-bold text-white sm:text-3xl">Tonight, Together</h1>
       <p className="mt-2 text-sm text-slate-400">
-        One pick the whole room will actually agree on — scored for <em>everyone</em>, never
-        suggesting something on someone’s hard-no list.
+        One pick the whole room will actually agree on — never suggesting something on someone’s
+        hard-no list.
       </p>
 
       <div className="mt-5">
-        <JudgeBench big />
+        <CourtIntro big />
       </div>
 
-      <section className="mt-6 rounded-2xl border border-brand-400/30 bg-brand-500/10 p-4">
-        <h2 className="text-sm font-bold text-white">⚖️ Live Taste Court</h2>
-        <p className="mt-1 text-xs text-slate-300">
-          Everyone joins from their own phone — even from different places. Private moods, blind
-          finalists, one private veto each, and a judged verdict. Share the QR and go.
-        </p>
-        <div className="mt-3">
-          <StartLiveCourt />
-        </div>
-      </section>
-
-      <section className="mt-6">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-brand-300">Synced juries · share with a QR code</h2>
-        <p className="mt-1 text-xs text-slate-400">
-          Cloud juries sync across devices. Friends scan a QR, do a 30-second calibration, and join — their taste counts too.
-        </p>
-        <div className="mt-3">
-          <CloudCrews />
-        </div>
-      </section>
-
-      <section className="mt-8 border-t border-white/10 pt-6">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">On this device</h2>
-        <p className="mt-1 text-xs text-slate-500">Quick, private juries stored just on this phone — no accounts, no sharing.</p>
-        <TogetherPlanner />
-      </section>
+      <TogetherSecondary />
     </div>
   );
 }

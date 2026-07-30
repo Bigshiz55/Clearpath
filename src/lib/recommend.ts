@@ -48,6 +48,30 @@ export interface RecommendOptions {
   perSeedCap?: number;
   /** User feedback filters ("no westerns", "newer only") applied on recalculate. */
   filters?: RecFilters;
+  /**
+   * Titles the caller has ALREADY put on screen ("movie-603"), excluded on top
+   * of the user's own watchlist and verdicts.
+   *
+   * This is what stops a ruling feed re-dealing a card. The recommender has no
+   * cursor — it rebuilds a ranked list every time — so without an exclusion set
+   * carried by the caller, a title that was below the cut on one request comes
+   * back above it on the next. "A few may show up again" was exactly this.
+   */
+  excludeKeys?: readonly string[];
+  /**
+   * WHERE to look, when the titles nearest the user's favourites are used up.
+   *
+   *   1 — similar to what you rated highest (best, and genuinely finite)
+   *   2 — discover across the genres the profile leans on (paged, deep)
+   *   3 — broadly popular, still scored against the profile (paged, deeper)
+   *
+   * The bar drops as the tier rises (see `reco/deck.minScoreFor`), which is a
+   * real trade — so the UI says so at the seam rather than quietly serving
+   * weaker matches under the same heading.
+   */
+  tier?: 1 | 2 | 3;
+  /** 1-based page within a discover tier. Ignored by tier 1. */
+  page?: number;
 }
 
 /** Does this title fall foul of the user's feedback filters? (real metadata only) */
@@ -153,6 +177,18 @@ export async function getRecommendations(
   const exclude = new Set<string>();
   for (const r of wlAll.data ?? []) exclude.add(`${r.media_type}-${r.tmdb_id}`);
   for (const r of verdicts.data ?? []) exclude.add(`${r.media_type}-${r.tmdb_id}`);
+  // …nor anything the caller has already dealt. Without this a ruling feed
+  // re-deals cards, because this function has no cursor: it rebuilds the whole
+  // ranked list every call, so a title below the cut on one request can come
+  // back above it on the next.
+  for (const k of opts.excludeKeys ?? []) exclude.add(k);
+
+  // Past the first tier we stop asking "what is like your favourites" and start
+  // asking "what fits your profile" — a deeper, paged pool that does not run
+  // out after one pass over the seeds.
+  if ((opts.tier ?? 1) > 1) {
+    return discoverForProfile(personal, region, exclude, minScore, limit, filters, opts.page ?? 1, opts.tier === 3);
+  }
 
   // Seeds: prefer titles rated 7+ (a genuine "like"); fall back to any watched.
   const watched = (watchedFavs.data ?? []) as SeedRow[];
@@ -322,10 +358,38 @@ async function coldStartFromProfile(
   limit: number,
   filters: RecFilters = NO_FILTERS,
 ): Promise<Recommendation[]> {
+  return discoverForProfile(personal, region, exclude, minScore, limit, filters, 1, false);
+}
+
+/**
+ * THE DEEP POOL — profile-shaped discovery, paged.
+ *
+ * Tier 1 ("similar to what you rated highest") is genuinely finite: six seeds
+ * times twenty neighbours, minus everything already handled. A feed you are
+ * meant to keep ruling until you decide to stop cannot live on it. This is what
+ * comes next, and it is paged, so it is thousands of titles deep rather than
+ * one page of twenty.
+ *
+ * `broad` drops the genre constraint entirely — the last resort, for a session
+ * long enough to exhaust the profile's own genres. It is still scored by the
+ * deterministic engine against the real profile; only the SUPPLY widens, never
+ * the scoring, and the caller lowers `minScore` in step so the widening is a
+ * deliberate, stated trade rather than a silent drop in quality.
+ */
+async function discoverForProfile(
+  personal: PersonalContext,
+  region: string,
+  exclude: Set<string>,
+  minScore: number,
+  limit: number,
+  filters: RecFilters,
+  page: number,
+  broad: boolean,
+): Promise<Recommendation[]> {
   const genres = genresFromRules(personal);
   const [movies, shows] = await Promise.all([
-    discoverByGenres('movie', genres.movie, region).catch(() => []),
-    discoverByGenres('tv', genres.tv, region).catch(() => []),
+    discoverByGenres('movie', broad ? [] : genres.movie, region, page).catch(() => []),
+    discoverByGenres('tv', broad ? [] : genres.tv, region, page).catch(() => []),
   ]);
 
   const seen = new Set<string>();

@@ -2,8 +2,11 @@ import Link from 'next/link';
 import type { MediaType } from '@/lib/types';
 import { AlgorithmScore } from './AlgorithmScore';
 import { SaveButton } from './SaveButton';
-import { TasteFeedback } from './TasteFeedback';
-import { LikeButton } from './LikeButton';
+import { CardVerdict } from './CardVerdict';
+import { WCheck } from './WCheck';
+import { CardSynopsis } from './CardSynopsis';
+import { CardFacts } from './CardFacts';
+import { CardFit } from './CardFit';
 
 interface PosterCardProps {
   href?: string;
@@ -23,6 +26,14 @@ interface PosterCardProps {
   /** If provided, the poster/title open this (e.g. a QuickLook modal) instead of
    *  navigating via `href`. Requires `tmdbId` so the card can still score itself. */
   onOpen?: () => void;
+  /** 1-based position in an endless feed. Drawn on the artwork; omitted elsewhere. */
+  rank?: number;
+  /** Supporting evidence for the decision — pills, the household verdict, the
+   *  "Why this Verd1ct?" panel. Rendered at the card's FULL width, after the
+   *  score and before the buttons, which is the order a decision is made in:
+   *  what it is → how well it fits you → why → what you want to do about it.
+   *  `children` stays beside the poster, for the one line that belongs there. */
+  evidence?: React.ReactNode;
 }
 
 export function Poster({ posterUrl, title, className = '' }: { posterUrl?: string | null; title: string; className?: string }) {
@@ -47,9 +58,14 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
   );
 }
 
-export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen }: PosterCardProps) {
+export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen, rank, evidence }: PosterCardProps) {
+  // FROM `sm`, THE POSTER IS LETTERBOXED, NOT CROPPED. The tile itself is now a
+  // fixed, shorter box (see `.wv-card-art`) — `object-contain` keeps the whole
+  // poster visible inside it, centered, at its true proportions. `object-cover`
+  // on a phone row is untouched: that box IS exactly 2:3, so cover there never
+  // crops anything.
   const poster = (
-    <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04]" />
+    <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04] sm:object-contain" />
   );
 
   // Every placard gets a "＋ save" affordance. If the caller didn't supply its
@@ -63,16 +79,12 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
       : saveId != null
         ? <SaveButton wide tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
         : null;
-  // Every placard everywhere also gets the "not for me" flag (feeds your DNA),
-  // unless the caller explicitly opts out of overlays with `overlay={null}`.
-  const feedback =
-    overlay !== null && saveId != null ? (
-      <TasteFeedback compact wide tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
-    ) : null;
   const heading = (
     <>
-      <div className="line-clamp-2 text-sm font-semibold text-white">{title}</div>
-      <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+      {/* Full-width cards on a phone mean the title has room to be read rather
+          than scanned, so it is sized for reading. */}
+      <div className="line-clamp-2 text-base font-semibold leading-snug text-white sm:text-sm">{title}</div>
+      <div className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-400 sm:text-xs">
         <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
           {mediaType === 'movie' ? 'Movie' : 'TV'}
         </span>
@@ -84,30 +96,93 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
     </>
   );
 
-  // The poster and title link out; the top bar and `children` are siblings of
+  // The poster and title link out; the actions and `children` are siblings of
   // the link (never nested inside it) so they may hold interactive controls.
+  //
+  // The wrapper keeps its `card` class — five components find their placard
+  // with `closest('.card')` to fade it out, and dropping it would silently
+  // break every one of them. The BORDER is what goes: the poster's own edge is
+  // the boundary, depth comes from a shadow, and a page of results stops being
+  // a grid of boxes.
+  // A ROW ON A PHONE, A COLUMN FROM `sm` UP.
+  //
+  // Full-width column cards meant one poster filled a 956px screen on its own —
+  // 2:3 at 406px wide is 609px of artwork before the title even appears. You
+  // could see exactly one title at a time, and nothing telling you what it was
+  // about. Turning the card on its side fixes both at once: the poster drops to
+  // roughly a third of the width, three or four cards fit on a screen, and the
+  // space beside the artwork is exactly where a synopsis belongs.
+  //
+  // From `sm` the grid has real columns again, so the card goes back to being a
+  // column — a sideways card in a 250px cell would leave a thumbnail and a
+  // sliver.
   return (
-    <div className="card group flex h-full flex-col overflow-hidden transition hover:border-white/20 hover:shadow-glow">
-      {/* One tidy action row — a clean groove, all the same size and OFF the art:
-          👍 more like this · 👎 not for me · ＋ Save. The Movie/TV tag moved down to
-          the title line; the score lives in the pink box below. */}
-      <div className="flex items-center gap-1 border-b border-white/10 bg-ink-900/85 px-1.5 py-1.5">
+    /* A PREMIUM NEAR-BLACK SURFACE WITH A VISIBLE EDGE.
+       The hairline that replaced the old border went too far: a 7%-white ring
+       on a near-black fill is invisible, so a column of tall cards read as one
+       continuous scroll and you could not tell whose buttons you were looking
+       at. `.wv-tile` puts the boundary back in the app's accent blue — see
+       globals.css. The fill stays near-black so the poster is still the
+       brightest thing on the card. */
+    <div className="card wv-tile group flex flex-col bg-ink-950/85">
+      {/* THE DECISION ROW LEADS THE CARD. FOR · AGAINST · SAVE used to sit at
+          the very bottom, which on the new shorter tiles meant scrolling past
+          poster, facts, score and synopsis before you could act. On request
+          the row is now the FIRST thing on every card — rule at the top, then
+          drop down to the W on the artwork if it belongs on the docket. */}
+      {overlay !== null && saveId != null && (
+        <div className="wv-act-row border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
+          <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+          {resolvedOverlay}
+        </div>
+      )}
+      <div className="wv-card">
+      <div className="wv-card-art">
+        {/* THE MATTE, FROM `sm` ONLY. A blurred, scaled-up copy of the SAME
+            image (no extra request — the browser already has it cached) fills
+            the shorter box behind the true, uncropped poster, so the empty
+            band `object-contain` leaves top/bottom or side-to-side reads as a
+            deliberate frame instead of dead black bars. `aria-hidden`: purely
+            decorative, the real `<img>` below still carries the alt text. */}
+        {posterUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={posterUrl}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="absolute inset-0 hidden h-full w-full scale-110 object-cover object-center opacity-40 blur-2xl sm:block"
+          />
+        )}
+        {/* HOW FAR YOU HAVE COME. In an endless feed the count is the only
+            thing distinguishing a long session from a loop — bottom-left, on
+            the artwork, clear of the W in the opposite corner. */}
+        {rank != null && (
+          <span
+            data-testid="card-rank"
+            className="absolute bottom-1 left-1 z-10 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] font-black tabular-nums text-white/90 backdrop-blur-sm"
+          >
+            {rank}
+          </span>
+        )}
+        {/* The W sits ON the artwork, not in the action row: the row is already
+            three buttons wide and a fourth breaks at 320px, and the stamp has
+            to be in the same place on every surface to read as one gesture. */}
         {overlay !== null && saveId != null && (
-          <LikeButton tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+          <WCheck tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterUrl={posterUrl ?? null} />
         )}
-        {feedback}
-        {resolvedOverlay}
-      </div>
-      <div className="relative aspect-[2/3] overflow-hidden">
+        {/* `relative` so the real poster paints ABOVE the absolutely-positioned
+            matte behind it, regardless of DOM stacking specifics. */}
         {onOpen ? (
-          <button type="button" onClick={onOpen} className="block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
+          <button type="button" onClick={onOpen} className="relative block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
         ) : href ? (
-          <Link href={href} className="block h-full">{poster}</Link>
+          <Link href={href} className="relative block h-full">{poster}</Link>
         ) : (
-          poster
+          <div className="relative h-full">{poster}</div>
         )}
       </div>
-      <div className="flex flex-1 flex-col p-3">
+
+      <div className="wv-card-body">
         {onOpen ? (
           <button type="button" onClick={onOpen} className="block w-full text-left">{heading}</button>
         ) : href ? (
@@ -115,12 +190,55 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         ) : (
           heading
         )}
-        {/* One pink box: the algorithm score (your DNA + every rating) + will-you-
-            like-it call, with the ratings underneath. */}
-        {saveId != null && (
-          <AlgorithmScore mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-2" />
-        )}
+
+        {/* THE COLUMN BESIDE THE POSTER WAS EMPTY, AND THE FACTS WERE MISSING.
+            A 2:3 poster is ~210px tall and a title is two lines, so every card
+            carried ~150px of black beside its artwork — while runtime,
+            certificate, genre and season count, all of which we already hydrate
+            to compute the score, appeared nowhere. Same fetch, no new request. */}
+        {saveId != null && <CardFacts mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+
         {children}
+
+        {/* THE NUMBER GOES NEXT TO THE ARTWORK, where the eye already is.
+            It was drawn full-width below the poster, which pushed the whole
+            card ~75px taller to say something that fits in the space that was
+            already sitting empty. Poster, title, facts and verdict now read as
+            one at-a-glance block; the detail follows underneath.
+            `mt-auto` pins it to the bottom of the column, so the block ends
+            level with the poster instead of leaving the gap it was put there
+            to fill. */}
+        {saveId != null && (
+          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-auto pt-2" />
+        )}
+      </div>
+      </div>
+
+      {/* THE FULL WIDTH OF THE CARD. Everything from here down was being drawn
+          in the narrow column beside the poster while the space under the
+          poster sat empty — which is why the two "why" sentences were cut. */}
+      <div className="wv-card-foot">
+        {/* What it is about, straight from TMDB. Renders nothing when there is
+            no synopsis rather than showing a placeholder. */}
+        {/* THREE lines, not two. "Would like more information about what it's
+            about" — two lines of a TMDB synopsis ends mid-clause on almost
+            every title ("…until Andy's…"), which tells you less than none. The
+            reserved height grows with it, so nothing moves when the text
+            lands. */}
+        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1" />}
+
+        {/* Why YOU would like it — one sentence, only when the user's rated
+            history genuinely supports one. Silent otherwise: the boilerplate
+            that used to fill this spot was removed on request, and silence is
+            the honest empty state. */}
+        {saveId != null && <CardFit mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+
+        {/* Supporting evidence: the pills, the household verdict, and the
+            "Why this Verd1ct?" panel. */}
+        {evidence && <div className="space-y-2">{evidence}</div>}
+
+        {/* The FOR/AGAINST/SAVE row lives at the TOP of the card now — see the
+            block above `.wv-card`. The foot ends on the evidence. */}
       </div>
     </div>
   );

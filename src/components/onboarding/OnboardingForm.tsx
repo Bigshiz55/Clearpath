@@ -24,12 +24,17 @@ const REGIONS = [
   ['MX', 'Mexico'],
 ] as const;
 
+/** A display name into a legal username: lowercase, safe characters, 24 max. */
+function slugify(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
+}
+
 export function OnboardingForm({ defaultName }: { defaultName: string }) {
   const router = useRouter();
   const toast = useToast();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [displayName, setDisplayName] = useState(defaultName);
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => slugify(defaultName));
   const [region, setRegion] = useState('US');
   const [avoid, setAvoid] = useState<Set<PreferenceTrait>>(new Set());
   const [love, setLove] = useState<Set<PreferenceTrait>>(new Set());
@@ -81,11 +86,59 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
 
   return (
     <div className="card w-full max-w-lg p-7">
-      <div className="mb-5 flex items-center gap-2">
-        {[1, 2, 3].map((s) => (
-          <div key={s} className={`h-1.5 flex-1 rounded-full ${step >= s ? 'bg-brand-500' : 'bg-white/10'}`} />
-        ))}
-      </div>
+      {step > 0 && (
+        <div data-testid="onboarding-progress" className="mb-5 flex items-center gap-2">
+          {[1, 2, 3].map((s) => (
+            <div key={s} className={`h-1.5 flex-1 rounded-full ${step >= s ? 'bg-brand-500' : 'bg-white/10'}`} />
+          ))}
+        </div>
+      )}
+
+      {/* STEP 0 — WHAT THIS IS.
+          A new person's first screen used to be "pick a username", which asks
+          them to do admin for a product they have not seen do anything yet.
+          This says what it does, in their terms, and costs one tap. No progress
+          bar here on purpose: a bar implies a form, and this is not one. */}
+      {step === 0 && (
+        <div className="space-y-5" data-testid="onboarding-welcome">
+          <div>
+            <h1 className="text-2xl font-black leading-tight text-white sm:text-3xl">
+              Stop scrolling. Start watching.
+            </h1>
+            <p className="mt-2 text-base leading-relaxed text-slate-300">
+              Most apps hand you another endless list. This one gives you{' '}
+              <strong className="font-bold text-white">one answer</strong> — and shows you the maths behind it.
+            </p>
+          </div>
+
+          <ul className="space-y-2.5">
+            {[
+              { icon: '⚖️', title: 'Say it in plain words', body: '“Clever thriller, nothing too gory, under two hours.” We take it literally.' },
+              { icon: '🧬', title: 'It learns what you like', body: 'A two-minute quiz, or react to titles you know. Nothing is guessed from thin air.' },
+              { icon: '🔨', title: 'Shortlist, then one Verd1ct', body: 'Mark a few with the W, hit the gavel, get a decision and the reason the runner-up lost.' },
+            ].map((f) => (
+              <li key={f.title} className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                <span aria-hidden className="text-xl leading-none">{f.icon}</span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-white">{f.title}</span>
+                  <span className="mt-0.5 block text-sm leading-snug text-slate-400">{f.body}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <button
+            onClick={() => setStep(1)}
+            data-testid="onboarding-start"
+            className="btn-primary w-full py-3.5 text-base"
+          >
+            Set me up — takes a minute →
+          </button>
+          <p className="text-center text-xs text-slate-500">
+            Three short steps. You can change any of it later.
+          </p>
+        </div>
+      )}
 
       {step === 1 && (
         <div className="space-y-4">
@@ -95,7 +148,19 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
           </div>
           <div>
             <label className="label" htmlFor="name">Display name</label>
-            <input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="input" placeholder="Scott" />
+            <input
+              id="name"
+              value={displayName}
+              onChange={(e) => {
+                const v = e.target.value;
+                // Keep the username in step with the name until the user edits
+                // it themselves — one fewer thing to invent on a first run.
+                setUsername((u) => (u === '' || u === slugify(displayName) ? slugify(v) : u));
+                setDisplayName(v);
+              }}
+              className="input"
+              placeholder="Scott"
+            />
           </div>
           <div>
             <label className="label" htmlFor="username">Username</label>
@@ -106,7 +171,9 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
               className="input"
               placeholder="scott"
             />
-            <p className="mt-1 text-xs text-slate-500">3–24 lowercase letters, numbers, or underscores.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Filled in from your name — change it if you like. 3–24 lowercase letters, numbers or underscores.
+            </p>
           </div>
           <div>
             <label className="label" htmlFor="region">Viewing country</label>

@@ -8,7 +8,7 @@ import type {
   VerdictTier,
   WatchlistDisposition,
   WatchProviders,
-  WatchVerdictScore,
+  WatchVerd1ctScore,
 } from '@/lib/types';
 import { computeGeneralScore } from './general';
 import { computePersonalMatch, type PersonalContext } from './personal';
@@ -161,7 +161,7 @@ function buildContentSignals(meta: TitleMetadata): ContentSignal[] {
 
 function buildReasonsFor(
   meta: TitleMetadata,
-  general: WatchVerdictScore,
+  general: WatchVerd1ctScore,
   personal: PersonalMatch,
   providers: WatchProviders | null,
 ): string[] {
@@ -189,7 +189,7 @@ function buildReasonsFor(
 
 function buildReasonsAgainst(
   meta: TitleMetadata,
-  general: WatchVerdictScore,
+  general: WatchVerd1ctScore,
   personal: PersonalMatch,
   providers: WatchProviders | null,
 ): string[] {

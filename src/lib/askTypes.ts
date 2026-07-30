@@ -30,6 +30,14 @@ export interface TitleVerdict {
   where: string | null;
   ratings: TileRatings;
   deciderUrl: string;
+  // ── Title-identity guard (exact vs substitution) ──────────────────────────
+  /** Strict match status; the UI must render each distinctly. */
+  matchStatus?: 'EXACT_MATCH' | 'POSSIBLE_MATCH' | 'NOT_VERIFIED' | 'NOT_AVAILABLE_ON_SERVICE' | 'NO_MATCH';
+  matchMessage?: string;
+  /** True when this must NOT be presented as the requested title. */
+  isSubstitute?: boolean;
+  requestedTitle?: string | null;
+  requiredProvider?: string | null;
 }
 
 export interface AltItem {

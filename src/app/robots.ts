@@ -9,8 +9,10 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/share/'],
-        disallow: ['/app', '/api/', '/auth/', '/onboarding'],
+        // Public discovery platform is crawlable; the product, admin CMS,
+        // internal harnesses and private routes are not.
+        allow: ['/', '/share/', '/compare/', '/for/', '/guides/', '/discover/', '/explore'],
+        disallow: ['/app', '/api/', '/auth/', '/onboarding', '/admin', '/dev/', '/migrate', '/growth-os', '/os', '/founder'],
       },
     ],
     sitemap: `${base}/sitemap.xml`,

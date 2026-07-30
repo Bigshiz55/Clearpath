@@ -2,7 +2,7 @@
 // surface numbers we actually have — TMDB audience, Rotten Tomatoes critics,
 // IMDb, Metacritic — plus our own Standard Score. Decider has no public data
 // feed, so it can only ever be an outbound link, never a fabricated score.
-import type { WatchVerdictScore } from '@/lib/types';
+import type { WatchVerd1ctScore } from '@/lib/types';
 
 export interface TileRatings {
   standardScore: number | null; // our blended 0..100
@@ -23,7 +23,7 @@ export const EMPTY_TILE_RATINGS: TileRatings = {
 };
 
 /** Pull the tile-facing ratings out of a computed general score. */
-export function tileRatingsFromScore(general: WatchVerdictScore): TileRatings {
+export function tileRatingsFromScore(general: WatchVerd1ctScore): TileRatings {
   const find = (name: string) => general.sources.find((s) => s.name === name && s.available);
   const imdb = find('IMDb');
   return {

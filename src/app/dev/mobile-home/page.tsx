@@ -32,15 +32,15 @@ export default function MobileHomeHarness() {
     <div className="min-h-dvh pb-20">
       <header
         data-testid="site-header"
-        className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[env(safe-area-inset-top)] backdrop-blur"
+        className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/80 pt-[calc(env(safe-area-inset-top)+1.5rem)] backdrop-blur"
       >
         <div className="container-page flex h-16 items-center">
           <Logo href="/app" size="lg" />
         </div>
       </header>
 
-      <main className="container-page space-y-8 py-6">
-        <section className="space-y-4">
+      <main className="container-page space-y-6 py-6">
+        <section className="space-y-3">
           <div className="text-center">
             <h1
               data-testid="hero-headline"
@@ -48,15 +48,11 @@ export default function MobileHomeHarness() {
             >
               What should we watch?
             </h1>
-            <p className="mt-1 text-base text-slate-300 sm:text-xl">Tell us what you’re in the mood for.</p>
           </div>
 
           <BuildCaseBox hero />
 
           <div className="mx-auto max-w-xl">
-            <label className="mb-1.5 block text-center text-sm font-semibold text-slate-400">
-              Search by title, actor, or service
-            </label>
             <SearchBar />
           </div>
         </section>

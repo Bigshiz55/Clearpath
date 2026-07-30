@@ -6,7 +6,7 @@ import { SeasonWhereToWatch } from '@/components/SeasonWhereToWatch';
 import { Poster } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
 import { CardRatings } from '@/components/CardRatings';
-import { TasteFeedback } from '@/components/TasteFeedback';
+import { CardVerdict } from '@/components/CardVerdict';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
 import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
@@ -15,6 +15,7 @@ import { TitleBriefing } from './TitleBriefing';
 import { CriticsTable } from './CriticsTable';
 import { TheaterMode } from '@/components/TheaterMode';
 import { PostWatchInterview } from './PostWatchInterview';
+import { DidWeGetItRight } from './DidWeGetItRight';
 import { FinishCheck } from './FinishCheck';
 import { ContentDnaView } from './ContentDnaView';
 import { TasteMatchView, type TasteMatch } from './TasteMatchView';
@@ -24,6 +25,10 @@ import type { RiskAssessment } from '@/lib/finish';
 import type { ContentDna } from '@/lib/contentDna';
 import type { Briefing } from '@/lib/briefing';
 import { originSummary } from '@/lib/origin';
+import { buildEvidence } from '@/lib/verdict/evidence';
+import { FactorBar, SourceConfidenceCard } from './ScoreEvidence';
+import { ReportTabs } from './ReportTabs';
+import { splitContentSignals, unknownSummary } from '@/lib/verdict/reportTabs';
 
 const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   none: 'bg-white/10 text-slate-400',
@@ -32,20 +37,6 @@ const LEVEL_COLOR: Record<ContentSignal['level'], string> = {
   high: 'bg-red-500/15 text-red-200',
   unknown: 'bg-white/5 text-slate-500',
 };
-
-function Bar({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="text-slate-400">{label}</span>
-        <span className="tabular-nums text-slate-300">{value}</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/5">
-        <div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-300" style={{ width: `${value}%` }} />
-      </div>
-    </div>
-  );
-}
 
 export interface WatchState {
   itemId: string | null;
@@ -76,6 +67,17 @@ export function VerdictReportView({
   const t = report.title;
   const origin = originSummary(t);
   const panel = buildPanel(report);
+  // What the score screen is allowed to claim, derived from what the engine
+  // actually had. Pure — it reads the engine's output and never alters it.
+  const evidence = buildEvidence({
+    sources: report.general.sources,
+    breakdown: report.general.breakdown,
+    voteCount: t.voteCount,
+    hasAudienceRating: t.voteAverage != null && t.voteCount > 0,
+    hasPopularity: t.popularity != null && t.popularity > 0,
+    hasProviders: report.providers != null,
+    mediaType: t.mediaType,
+  });
   const backdrop = tmdbImage(t.backdropPath, 'w780');
   const poster = tmdbImage(t.posterPath, 'w342');
   const runtime =
@@ -152,8 +154,9 @@ export function VerdictReportView({
                 initialItemId={watchState?.itemId ?? null}
                 variant="inline"
               />
-              {/* Not for you? Flag it here too — feeds your DNA, same as the cards. */}
-              <TasteFeedback
+              {/* Rule on it here too — feeds your DNA, same as the cards, and
+                  reversible in the same way. */}
+              <CardVerdict
                 tmdbId={t.id}
                 mediaType={t.mediaType}
                 title={t.title}
@@ -166,7 +169,7 @@ export function VerdictReportView({
       </header>
 
       {/* Ratings — right under the placard: the call + every score in one strip,
-          with the WatchVerdict score carried inside the site's own mark. */}
+          with the WatchVerd1ct score carried inside the site's own mark. */}
       <AtAGlance
         primaryCall={report.primaryCall}
         tier={report.tier}
@@ -183,6 +186,12 @@ export function VerdictReportView({
       {/* Will you finish it? — honest, from your own history */}
       {finishCheck && <FinishCheck assessment={finishCheck} />}
 
+      {/* FOUR TABS, ONE DECISION ABOVE THEM. See lib/verdict/reportTabs for
+          what goes where — the split is by the QUESTION somebody arrives with,
+          not by which system the data came from. */}
+      <ReportTabs
+        verdict={
+          <>
       {/* Actions */}
       <VerdictActions
         tmdbId={t.id}
@@ -197,6 +206,24 @@ export function VerdictReportView({
         initialNotes={watchState?.notes ?? null}
       />
 
+      {/* DID WE GET IT RIGHT? — the accuracy loop. Only after it's marked
+          watched, and only while we don't already hold a rating (the component
+          dedupes on exactly that). It grades us against `personal.score`,
+          because that is the number `tierFromScore` turned into the headline
+          call this user actually saw. */}
+      {watchState?.status === 'watched' && (
+        <DidWeGetItRight
+          tmdbId={t.id}
+          mediaType={t.mediaType}
+          title={t.title}
+          year={t.year}
+          posterPath={t.posterPath}
+          predicted={report.personal.score}
+          existingRating={watchState?.rating ?? null}
+          genres={t.genres ?? []}
+        />
+      )}
+
       {/* Post-watch interview — appears once you've marked it watched/dropped */}
       {interview && interview.questions.length > 0 && (
         <PostWatchInterview
@@ -206,105 +233,6 @@ export function VerdictReportView({
           questions={interview.questions}
         />
       )}
-
-      {/* Theater Mode — dim the lights, hush notifications, tell the group */}
-      <TheaterMode
-        tmdbId={t.id}
-        mediaType={t.mediaType}
-        title={t.title}
-        year={t.year}
-        posterPath={t.posterPath}
-        runtimeMinutes={t.runtimeMinutes ?? t.episodeRuntimeMinutes}
-      />
-
-      {/* The Critics' Table — grounded multi-perspective panel */}
-      <CriticsTable
-        panel={panel}
-        facts={{ title: t.title, year: t.year, watchVerdictScore: report.general.score, tier: report.tier }}
-      />
-
-      {/* Ratings (icons) + language & episodes */}
-      <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">Ratings</h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Critic scores from IMDb / Rotten Tomatoes (when available); audience from TMDB.
-        </p>
-        <div className="mt-4">
-          <RatingIcons sources={report.general.sources} />
-        </div>
-        <div className="mt-5 border-t border-white/10 pt-5">
-          <LanguageEpisodes meta={t} />
-        </div>
-      </section>
-
-      {/* Recommendation consensus */}
-      <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">Recommendation consensus</h2>
-        <div className="mt-4">
-          <RecommendationConsensus primaryCall={report.primaryCall} sources={report.general.sources} />
-        </div>
-      </section>
-
-      {/* Score explanation */}
-      <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">How this score was built</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-3">
-            <Bar label="General quality" value={report.general.breakdown.quality} />
-            <Bar label="Audience reception" value={report.general.breakdown.audience} />
-            <Bar label="Watchability" value={report.general.breakdown.watchability} />
-            <Bar label="Engagement" value={report.general.breakdown.engagement} />
-          </div>
-          <div className="space-y-3">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="text-sm font-semibold text-white">Ratings used</div>
-              <div className="mt-2 space-y-1 text-sm">
-                {report.general.sources.map((s) => (
-                  <div key={s.name} className="flex items-center justify-between">
-                    <span className="text-slate-400">{s.name}</span>
-                    <span className={s.available ? 'text-slate-200' : 'text-slate-500'}>
-                      {s.available ? s.raw : 'Not available'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-slate-500">
-                Audience & critic scores shown as reported. When critic aggregators are
-                unavailable, quality is estimated from audience data (shrunk toward neutral when
-                few votes exist) and labeled as such — never presented as an official critic score.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {report.personal.adjustments.length > 0 && (
-          <div className="mt-5">
-            <div className="text-sm font-semibold text-white">
-              {report.personal.label} adjustments
-            </div>
-            <ul className="mt-2 space-y-2">
-              {report.personal.adjustments.map((a, i) => (
-                <li key={i} className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
-                  <span
-                    className={`mt-0.5 rounded-md px-2 py-0.5 text-xs font-bold tabular-nums ${
-                      a.points < 0 ? 'bg-red-500/20 text-red-200' : 'bg-emerald-500/20 text-emerald-200'
-                    }`}
-                  >
-                    {a.points > 0 ? `+${a.points}` : a.points}
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-medium text-white">
-                      {a.label}
-                      {a.defining && <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">hard rule</span>}
-                    </div>
-                    <div className="text-xs text-slate-400">{a.reason}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
 
       {/* Why it may / may not work */}
       <section className="grid gap-4 sm:grid-cols-2">
@@ -332,6 +260,71 @@ export function VerdictReportView({
         </div>
       </section>
 
+      {/* Score explanation */}
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-lg font-semibold text-white">How this score was built</h2>
+        <div className="mt-4 grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:gap-6">
+          <div className="space-y-3.5" data-testid="score-factors">
+            {evidence.factors.map((f) => (
+              <FactorBar key={f.key} factor={f} />
+            ))}
+          </div>
+          <SourceConfidenceCard evidence={evidence} retrievedAt={report.generatedAt} />
+        </div>
+
+        {/* Kept inside this section, under a divider — the personal adjustments
+            are the last step of the same score-building story, not a separate
+            topic that happens to sit nearby. */}
+        {report.personal.adjustments.length > 0 && (
+          <div className="mt-5 border-t border-white/10 pt-5" data-testid="match-adjustments">
+            <div className="text-sm font-semibold text-white">
+              {report.personal.label} adjustments
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Applied to the score above, after the evidence was blended.
+            </p>
+            <ul className="mt-2 space-y-2">
+              {report.personal.adjustments.map((a, i) => (
+                <li key={i} className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
+                  <span
+                    className={`mt-0.5 rounded-md px-2 py-0.5 text-xs font-bold tabular-nums ${
+                      a.points < 0 ? 'bg-red-500/20 text-red-200' : 'bg-emerald-500/20 text-emerald-200'
+                    }`}
+                  >
+                    {a.points > 0 ? `+${a.points}` : a.points}
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-medium text-white">
+                      {a.label}
+                      {a.defining && <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">hard rule</span>}
+                    </div>
+                    <div className="text-xs text-slate-400">{a.reason}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      {/* Recommendation consensus */}
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-lg font-semibold text-white">Recommendation consensus</h2>
+        <div className="mt-4">
+          <RecommendationConsensus primaryCall={report.primaryCall} sources={report.general.sources} />
+        </div>
+      </section>
+
+      {/* Content DNA — aggregated from real viewer check-ins */}
+      {tasteMatch && <TasteMatchView tm={tasteMatch} />}
+      {contentDna && <ContentDnaView dna={contentDna} />}
+
+      {/* The Critics' Table — grounded multi-perspective panel */}
+      <CriticsTable
+        panel={panel}
+        facts={{ title: t.title, year: t.year, watchVerdictScore: report.general.score, tier: report.tier }}
+      />
+
       {/* Not a fit? Send it to the Judge for better-for-you alternatives. */}
       {report.primaryCall !== 'WATCH IT' && (
         <section>
@@ -348,29 +341,75 @@ export function VerdictReportView({
         </section>
       )}
 
-      {/* Content DNA — aggregated from real viewer check-ins */}
-      {tasteMatch && <TasteMatchView tm={tasteMatch} />}
-      {contentDna && <ContentDnaView dna={contentDna} />}
-
-      {/* Content & tone */}
+      {/* Final verdict */}
+      <section className="card bg-cinema-radial p-6 text-center">
+        <div className="text-xs uppercase tracking-wider text-slate-400">Final verdict</div>
+        <div className="mt-2 flex flex-col items-center gap-2">
+          <VerdictBadge tier={report.tier} size="lg" />
+          <div className="text-sm text-slate-300">
+            Watchlist call: <DispositionChip disposition={report.watchlistDisposition} />
+          </div>
+        </div>
+      </section>
+          </>
+        }
+        details={
+          <>
+      {/* Ratings (icons) + language & episodes */}
       <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-white">Content &amp; tone</h2>
+        <h2 className="text-lg font-semibold text-white">Ratings</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Signals inferred from genre, keywords, and rating. Where we can’t responsibly determine a
-          level, it’s marked unknown rather than guessed.
+          Critic scores from IMDb / Rotten Tomatoes (when available); audience from TMDB.
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {report.contentSignals.map((s) => (
-            <div key={s.label} className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="text-sm font-medium text-white">{s.label}</div>
-              <span className={`mt-1 inline-block rounded px-2 py-0.5 text-xs capitalize ${LEVEL_COLOR[s.level]}`}>
-                {s.note ?? s.level}
-              </span>
-            </div>
-          ))}
+        <div className="mt-4">
+          <RatingIcons sources={report.general.sources} />
+        </div>
+        <div className="mt-5 border-t border-white/10 pt-5">
+          <LanguageEpisodes meta={t} />
         </div>
       </section>
 
+      {/* CONTENT & TONE, WITHOUT SIX IDENTICAL GREY TILES.
+          Every signal we could not determine used to get a full card of its
+          own, so a typical title spent half a screen on "Gore: Unknown",
+          "Language: Unknown", "Drug Use: Unknown"… Saying unknown is the
+          honest thing and it stays — as one line, named, not as six cards. */}
+      {(() => {
+        const { known, unknown } = splitContentSignals(report.contentSignals);
+        const note = unknownSummary(unknown);
+        return (
+          <section className="card p-5 sm:p-6" data-testid="content-tone">
+            <h2 className="text-lg font-semibold text-white">Content &amp; tone</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Signals inferred from genre, keywords, and rating.
+            </p>
+            {known.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {known.map((s) => (
+                  <div key={s.label} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <div className="text-sm font-medium text-white">{s.label}</div>
+                    <span className={`mt-1 inline-block rounded px-2 py-0.5 text-xs capitalize ${LEVEL_COLOR[s.level]}`}>
+                      {s.note ?? s.level}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {note && (
+              <p className="mt-3 text-xs text-slate-500" data-testid="content-unknown">
+                {note}
+              </p>
+            )}
+          </section>
+        );
+      })()}
+      {/* The Dossier — real credits, themes, franchise */}
+      {briefing && <TitleBriefing briefing={briefing} keywords={t.keywords} />}
+
+          </>
+        }
+        watch={
+          <>
       {/* Where to watch */}
       <section className="card p-5 sm:p-6">
         <h2 className="text-lg font-semibold text-white">Where to watch</h2>
@@ -383,9 +422,20 @@ export function VerdictReportView({
       {/* Episode-level: which service carries each season (only if split) */}
       <SeasonWhereToWatch mediaType={t.mediaType} tmdbId={t.id} />
 
-      {/* The Dossier — real credits, themes, franchise */}
-      {briefing && <TitleBriefing briefing={briefing} keywords={t.keywords} />}
+      {/* Theater Mode — dim the lights, hush notifications, tell the group */}
+      <TheaterMode
+        tmdbId={t.id}
+        mediaType={t.mediaType}
+        title={t.title}
+        year={t.year}
+        posterPath={t.posterPath}
+        runtimeMinutes={t.runtimeMinutes ?? t.episodeRuntimeMinutes}
+      />
 
+          </>
+        }
+        similar={
+          <>
       {/* More like this */}
       {report.similar.length > 0 && (
         <section className="card p-5 sm:p-6">
@@ -413,16 +463,9 @@ export function VerdictReportView({
         </section>
       )}
 
-      {/* Final verdict */}
-      <section className="card bg-cinema-radial p-6 text-center">
-        <div className="text-xs uppercase tracking-wider text-slate-400">Final verdict</div>
-        <div className="mt-2 flex flex-col items-center gap-2">
-          <VerdictBadge tier={report.tier} size="lg" />
-          <div className="text-sm text-slate-300">
-            Watchlist call: <DispositionChip disposition={report.watchlistDisposition} />
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
     </article>
   );
 }

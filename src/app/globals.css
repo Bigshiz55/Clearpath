@@ -15,30 +15,223 @@ body {
   background-image:
     radial-gradient(1100px 560px at 82% -12%, rgba(47, 107, 255, 0.16), transparent),
     radial-gradient(820px 460px at -8% 4%, rgba(230, 173, 51, 0.07), transparent);
-  background-attachment: fixed;
+  /* NOT `background-attachment: fixed`. On iOS Safari it forces the whole page
+     into a compositing path where `position: fixed` layers are repainted
+     lazily, so the bottom nav and the docket tray could be left stranded
+     mid-screen after a scroll. The gradients are decorative and look identical
+     scrolling with the page. */
   min-height: 100dvh;
 }
 
 @layer components {
   .container-page {
-    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+    /* One shell for every screen. Phones and tablets are untouched; from `xl`
+       the cap steps up so a MacBook isn't drawing a phone column between two
+       fields of black — the grids inside are auto-fill, so extra width becomes
+       MORE columns at the same card size, never wider cards. */
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 xl:max-w-7xl 2xl:max-w-[1520px];
   }
 
-  /* The one poster-grid used across the app. Two-up on phones; from `sm` up it
-     auto-fills columns but never lets a card shrink below a readable width, so
-     cards stay big enough on every screen instead of squeezing to 6-across. */
+  /* The one poster-grid used across the app.
+     ONE COLUMN OF ROWS ON A PHONE. Two narrow columns is the wrong way to fit
+     more titles on a phone screen — at 390px each cell is ~170px, which is
+     where "NOT FOR ME" wraps onto three lines and titles truncate mid-word, and
+     there is nowhere at all to say what the thing is about. So the CARD turns
+     sideways instead (see PosterCard): poster on the left at about a third of
+     the width, facts and synopsis beside it. Three or four fit on a screen
+     where one used to, and each one tells you what it is.
+     From `sm` there is room for real columns, the card goes back to being a
+     column, and the grid auto-fills. */
   .poster-grid {
+    /* 16px between tiles, not 12. An edge draws the boundary; the gap is what
+       makes two boundaries read as two objects rather than a seam. */
     @apply grid gap-4;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
   @media (min-width: 640px) {
     .poster-grid {
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      @apply gap-4;
     }
+  }
+  /* ── The card shape, in ONE place ────────────────────────────────────────
+     A row on a phone, a column from `sm`. These live here rather than inline
+     because the shape was fixed on PosterCard and the New Releases wall — which
+     hand-rolls its own card — kept the old full-bleed poster and filled the
+     whole screen with one title. Two copies of a layout is how that happens, so
+     there is now one definition and every grid uses it. */
+  /* The upper half: poster beside the facts on a phone, stacked from `sm`.
+     `pb-0` because `.wv-card-foot` below carries the bottom padding now. */
+  .wv-card {
+    @apply flex gap-3 overflow-hidden p-3 pb-0 sm:block sm:gap-0 sm:p-0;
+  }
+  /* THE POSTER IS NEVER CROPPED — ON A PHONE ROW, TRUE 2:3.
+     It used to STRETCH to the card's height on a phone, to avoid "a dead gap
+     beneath it". With `object-cover` that meant the taller the card's text got,
+     the more of the artwork's sides were cut off — "Toy Story" rendered as
+     "OY / ORY", and the poster is the one thing on a card people recognise
+     before they read anything. A little unused column is a much smaller cost
+     than an unrecognisable placard, so the ratio is fixed and the art is
+     top-aligned. Slightly wider too (38%), because at 34% of a 358px card the
+     poster was 122px and titles on the artwork were unreadable.
+
+     FROM `sm`, THE TILE IS SHORTER AND SQUARER. A full 2:3 poster at a 280px
+     grid column is ~420px tall — before the title, the score, the ratings or
+     the FOR/AGAINST/SAVE row appeared, a 5-across desktop grid showed nothing
+     but a wall of posters, cut off mid-artwork by the viewport. A fixed,
+     shorter box (see PosterCard's blurred-backdrop layer, which lets the true
+     poster sit uncropped inside it via `object-contain`) keeps every card the
+     SAME height regardless of which title's key art is unusually tall, and
+     puts the rest of the card back in view. */
+  .wv-card-art {
+    @apply relative aspect-[2/3] w-[38%] max-w-[160px] flex-none self-start overflow-hidden rounded-lg sm:aspect-auto sm:h-[196px] sm:w-full sm:max-w-none sm:self-auto sm:rounded-none lg:h-[216px];
+  }
+  /* ONE ASPECT FOR TV-LISTING ARTWORK: 16:9 at every width, letterboxed.
+     Broadcast art arrives as posters, banners and stills in every shape;
+     letting the shape drive the box made every card a different height. The
+     box is fixed and the IMAGE adapts (object-contain centers it on the ink
+     background), so a mismatched source letterboxes instead of resizing the
+     card. Height overrides use !important because the base class pins fixed
+     heights from `sm`. */
+  .wv-art-video {
+    aspect-ratio: 16 / 9;
+    height: auto !important;
+  }
+  .wv-art-video > img,
+  .wv-art-video > a > img {
+    object-fit: contain !important;
+  }
+  .wv-card-body {
+    @apply flex min-w-0 flex-1 flex-col sm:p-3;
+  }
+  /* THE CARD'S FULL WIDTH, FOR THE THINGS THAT NEED IT.
+     A row card is a 2:3 poster beside a text column, and the poster is almost
+     always the shorter of the two — so everything below the synopsis was being
+     drawn in ~200px of the card's 334 while a 300×320 block under the poster
+     sat empty. The verdict panel was cramped and the two "why" sentences were
+     cut mid-word, in a card with a third of its area unused.
+     This zone starts under BOTH columns, so the verdict, the reasons and the
+     actions get the whole width. From `sm` the card is already a column and
+     this is simply its lower half, sharing the body's padding. */
+  .wv-card-foot {
+    @apply mt-3 px-3 pb-3 sm:mt-0 sm:px-3 sm:pb-3 sm:pt-0;
+  }
+
+  /* The tray's status word shares one line with Clear and Deliver. Below 360px
+     those two take the width and the word truncates to "Read…", which is worse
+     than absent — the count badge and the Deliver button already carry the
+     state. The accessible name on the toggle keeps it for screen readers. */
+  @media (max-width: 359px) {
+    .wv-tray-status { display: none; }
+    /* THE 320px CARD, MEASURED.
+       At 320 the card is 288 wide; a 38% poster leaves the body 143 and the
+       ratings row 130 — 39px a chip, where "IMDb 6.8" needs 51. The result was
+       a rating that rendered as "IMDb 6", which is worse than none: it is a
+       wrong number, confidently displayed.
+       Two small concessions at this width only: the poster takes 30% instead of
+       38% (86px — still a recognisable placard), and the rating type drops a
+       step. Together that gives 51px a chip against a 44px need. */
+    .wv-card-art { width: 30%; }
+    .wv-ratings-row { font-size: 11px; }
+    .wv-ratings-emoji { font-size: 10px; }
+    .wv-ratings-tag { font-size: 7px; }
+  }
+  @media (min-width: 640px) {
+    .poster-grid {
+      /* Content-aware minimum: a card must fit FOR · AGAINST · SAVE and all
+         three rating chips without crowding — fewer, wider columns on laptops
+         instead of a cramped 6-across.
+
+         280px, NOT 250. The 250 was measured when the action row was 11px
+         everywhere. The row now scales with the screen (`.wv-act`: 13px labels
+         and 18px icons from `lg`, 14px from `xl`), which is the whole point of
+         "too small on iPad" — and at 1280px a 250px track leaves the row 238px
+         to hold 237px of controls. It fitted to the pixel and then stopped
+         fitting: SAVE dropped to a second line. A minimum that cannot hold the
+         controls it was sized for is not a minimum. */
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+  }
+  /* ── The Top 10 rail ────────────────────────────────────────────────────
+     A horizontal run of posters that scrolls ITSELF rather than widening the
+     document — a rail that stretches the page is how a phone ends up scrolling
+     sideways. Snap points so a flick lands on a poster instead of between two.
+     The scrollbar is hidden because the rank numerals already say there is
+     more to the right. */
+  .wv-rail {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.25rem;
+  }
+  .wv-rail::-webkit-scrollbar { display: none; }
+  .wv-rail-item {
+    flex: 0 0 auto;
+    width: 8.5rem;
+    scroll-snap-align: start;
+  }
+  @media (min-width: 640px) {
+    .wv-rail-item { width: 10rem; }
+  }
+  @media (min-width: 1024px) {
+    .wv-rail-item { width: 11rem; }
+  }
+
+  /* Safari/WebKit min-content guard: a grid child's implicit min-width is
+     auto, which lets long unbreakable content (ratings row, badges) stretch
+     the track and escape the card. Force it to 0 so cards clip/wrap instead. */
+  .poster-grid > * {
+    min-width: 0;
   }
 
   .card {
     @apply rounded-2xl border border-white/10 bg-ink-850/70 shadow-card backdrop-blur;
+  }
+
+  /* ── ONE TILE, ONE EDGE ───────────────────────────────────────────────────
+     A RESULT TILE HAS TO LOOK LIKE AN OBJECT, NOT A STRETCH OF PAGE.
+
+     The premium-surface pass replaced the card's border with a hairline ring
+     at 7% white. On a near-black fill that is invisible on a phone, so a column
+     of tall cards read as one continuous scroll — you could not see where one
+     title's poster, reasons, verdict and buttons ended and the next one's
+     began, and the buttons in particular could belong to either.
+
+     The fix is the app's own accent, not more white: brand blue is already the
+     colour of "this is a thing you act on" (primary buttons, focus rings), it
+     separates cleanly from the pink of the decision pool and the green/red of
+     a verdict, and it is the only hue on the page that a near-black surface
+     cannot swallow. A solid one-pixel border draws the boundary; a wider, much
+     fainter halo outside it keeps the boundary readable on the darkest
+     backgrounds without turning the grid into a set of glowing boxes.
+
+     `.card` still comes first, so tiles keep the radius, blur and fill; this
+     only replaces the edge. It is defined AFTER `.card` on purpose — same
+     specificity, source order decides. */
+  .wv-tile {
+    @apply transition;
+    border-color: rgb(79 134 255 / 0.55);
+    box-shadow:
+      0 0 0 1px rgb(79 134 255 / 0.16),
+      0 6px 18px -10px rgb(0 0 0 / 0.95);
+  }
+  .wv-tile:hover {
+    border-color: rgb(79 134 255 / 0.9);
+    box-shadow:
+      0 0 0 1px rgb(79 134 255 / 0.3),
+      0 10px 24px -12px rgb(0 0 0 / 0.95);
+  }
+  /* NO `:focus-within` BRIGHTENING. It was the obvious thing to add and it is
+     wrong: tapping the W focuses a button inside the tile, so the whole edge
+     would light up and stay lit — a second, competing signal for "this one is
+     selected", which is the pink W's job alone. The edge says WHERE THE TILE
+     IS and nothing else. Focus is drawn on the control that has it. */
+  @media (prefers-contrast: more) {
+    .wv-tile {
+      border-color: rgb(122 168 255 / 0.95);
+    }
   }
 
   .btn {
@@ -54,6 +247,33 @@ body {
   }
   .btn-ghost {
     @apply btn text-slate-300 hover:bg-white/5 hover:text-white;
+  }
+
+  /* THE ONE CTA THAT HAS TO BE NOTICED.
+     "Build my Watch DNA" is the whole product's second job, and it sat in the
+     same grey outline as every dismissable control on the page. Pink, and a
+     slow breath so the eye lands on it — a BREATH, not a blink: it repeats
+     every 2.4s and never fully fades, so it reads as alive rather than as an
+     error state. Honoured by the reduced-motion block below, which stops the
+     animation and leaves the pink. */
+  .btn-pulse {
+    @apply btn border-2 border-[#ff62b6]/70 text-white
+           bg-gradient-to-b from-[#ff62b6] to-[#ff1493] hover:brightness-110;
+    animation: wv-cta-breathe 2.4s ease-in-out infinite;
+  }
+
+  /* THE ONE WAY IN. The landing hero's whole job is this one button — gold
+     (the courtroom's own accent, not the brand pink or blue) so it reads as
+     ceremonial rather than as just another link, with a slow light sweep
+     (`.wv-cta-sheen`, honoured by the reduced-motion block below) so it
+     catches the eye without competing with the DNA button's breathing pink
+     anywhere else in the product. */
+  .btn-courtroom {
+    @apply btn relative overflow-hidden rounded-2xl border-2 border-gold-300/70
+           font-black uppercase tracking-wide text-ink-950
+           shadow-[0_10px_34px_-8px_rgba(245,198,90,0.65)] transition
+           hover:scale-[1.015] hover:shadow-[0_12px_40px_-6px_rgba(245,198,90,0.8)];
+    background: linear-gradient(135deg, #fff3cf 0%, #f5c65a 45%, #d89a1f 100%);
   }
 
   .chip {
@@ -74,14 +294,18 @@ body {
     @apply mb-1.5 block text-sm font-medium text-slate-200;
   }
 
-  /* Section "eyebrow" label — modern, bright, legible. Replaces the old small
-     gold serif treatment. Bright brand-blue, larger, and set in the UI sans. */
+  /* Section headings.
+     These were small gold uppercase eyebrows, which is a quiet treatment doing
+     a loud job: on a dense screen the heading is the thing that lets you skip
+     a whole block, and it was smaller than the body text under it. Now white,
+     larger, sentence-case weight — hierarchy from size and colour rather than
+     from letter-spacing. Gold is freed up for the things that actually mean
+     something (ratings, warnings). */
   .eyebrow {
-    @apply inline-flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-[0.12em] text-gold-300;
+    @apply inline-flex items-center gap-1.5 text-lg font-extrabold tracking-tight text-white;
   }
-  /* A slightly larger hero variant for the top of a page/card. */
   .eyebrow-lg {
-    @apply inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.1em] text-gold-300;
+    @apply inline-flex items-center gap-1.5 text-xl font-black tracking-tight text-white sm:text-2xl;
   }
   /* Small helper/caption text with enough contrast to actually read on dark. */
   .helper {
@@ -110,54 +334,12 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Simple (Senior) view — one tap, everything bigger and calmer.
-   Scales the rem base so all Tailwind text/spacing grows together, enlarges
-   tap targets, raises contrast, and quiets low-priority chrome.
+   SIMPLE VIEW REMOVED. This block scaled the rem base, enlarged controls and
+   — critically — hid content via [data-simple-hide]. Simple View is no longer
+   a mode: the full result experience is the only view, and accessibility is
+   served by responsive type, 44px targets and progressive disclosure instead
+   of a reduced parallel interface. Do not reintroduce a `data-simple` mode.
 --------------------------------------------------------------------------- */
-:root[data-simple='1'] {
-  font-size: 20px; /* base is 16px; ~1.25x everything sized in rem */
-}
-:root[data-simple='1'] body {
-  line-height: 1.65;
-  letter-spacing: 0.01em;
-}
-/* Bigger, easier-to-hit controls. */
-:root[data-simple='1'] .btn,
-:root[data-simple='1'] button,
-:root[data-simple='1'] .input,
-:root[data-simple='1'] select,
-:root[data-simple='1'] a.btn-primary,
-:root[data-simple='1'] a.btn-secondary {
-  min-height: 56px;
-}
-:root[data-simple='1'] .btn-primary,
-:root[data-simple='1'] .btn-secondary,
-:root[data-simple='1'] .btn-ghost {
-  padding-top: 0.9rem;
-  padding-bottom: 0.9rem;
-  font-size: 1.05rem;
-}
-/* Larger, higher-contrast body text. */
-:root[data-simple='1'] .text-slate-400,
-:root[data-simple='1'] .text-slate-500 {
-  color: #cdd5e6 !important;
-}
-:root[data-simple='1'] .text-xs {
-  font-size: 0.85rem;
-}
-:root[data-simple='1'] .text-\[11px\],
-:root[data-simple='1'] .text-\[10px\],
-:root[data-simple='1'] .text-\[9px\] {
-  font-size: 0.8rem;
-}
-/* More breathing room between cards/sections. */
-:root[data-simple='1'] .card {
-  border-radius: 1.25rem;
-}
-/* Opt-out hook: hide flourish-only elements in simple view. */
-:root[data-simple='1'] [data-simple-hide] {
-  display: none !important;
-}
 
 /* Live Court — the gavel-strike reveal that hands down the verdict. */
 @keyframes wv-gavel-strike {
@@ -180,6 +362,26 @@ body {
 .wv-gavel { animation: wv-gavel-strike 1.5s cubic-bezier(0.3, 0.7, 0.2, 1) both; transform-origin: 80% 80%; }
 .wv-order { animation: wv-order-flash 1.7s ease-out both; }
 .wv-verdict-in { animation: wv-verdict-in 0.5s ease-out both; }
+
+/* THE VERD1CT REVEAL SEQUENCE (Stage 3, §4). A juror's score "flips" from
+   hidden to visible; a vetoed row fades/slides in as it takes its turn. Both
+   are driven by React state from `useVerdictReveal`'s timeline — these
+   classes only animate the moment an element mounts or its content changes,
+   they never control WHEN that happens. The global prefers-reduced-motion
+   rule above already collapses their duration to ~0; the JS-side stagger is
+   skipped separately (see useVerdictReveal), so reduced motion gets an
+   instant reveal on both axes. */
+@keyframes wv-flip-in {
+  0%   { transform: scaleX(0.15); opacity: 0.2; }
+  60%  { transform: scaleX(1.08); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 1; }
+}
+.wv-flip-in { display: inline-block; animation: wv-flip-in 0.3s ease-out both; transform-origin: center; }
+@keyframes wv-reveal-in {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.wv-reveal-in { animation: wv-reveal-in 0.32s ease-out both; }
 
 /* Twisting DNA helix + pulsing halo for the "VERD1CT DNA updating" burst. */
 @keyframes wv-dna-twist {
@@ -229,6 +431,415 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 7px 0 #b30d6b;
 }
 
+/* ── DNA quiz: ONE-TILE mobile layout ──────────────────────────────────────
+   The active rating card fills exactly the space left after the app header,
+   the compact utility row, and the fixed bottom nav (plus iOS safe areas),
+   using the *dynamic* viewport unit so Safari's collapsing chrome can never
+   push the answer buttons under the fold. Inside the tile it's a flex column
+   where ONLY the poster may shrink — the title and the four buttons are never
+   pushed off screen. On very short viewports the poster shrinks first (and can
+   scroll internally as a last resort); the buttons always stay put.
+   `--wv-quiz-reserve` is the total chrome above+below the tile; tune it there. */
+:root {
+  --wv-quiz-reserve: 15.5rem;
+}
+.wv-quiz-fit {
+  /* First-paint fallback — dynamic viewport minus the app chrome. JS then
+     measures the exact free space per device (see DnaQuiz useAvailableFit) and
+     overrides this, so the tile is never sized to a single "target" phone. */
+  height: calc(100dvh - var(--wv-quiz-reserve) - env(safe-area-inset-top));
+  min-height: 12rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+@media (min-width: 640px) and (min-height: 640px) {
+  /* True desktop (wide AND tall): no bottom nav to clear, so size to the
+     viewport with a sensible cap. A real height (not auto) lets the poster fill
+     via flex-1 instead of collapsing. JS leaves this alone. Short landscape
+     phones (wide but < 640 tall) deliberately fall through to the mobile calc
+     + the measured JS fit below, so their buttons never drop below the fold. */
+  .wv-quiz-fit {
+    height: calc(100dvh - 10rem);
+    max-height: 760px;
+    min-height: 18rem;
+  }
+}
+
+/* Four equal answer buttons. Every modifier below changes ONLY colour accents —
+   never geometry — so all four render at identical width, height, weight, font,
+   padding and radius. */
+.wv-quiz-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: clamp(48px, 7.4dvh, 60px);
+  padding: 0.25rem 0.5rem;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(0.8rem, 3.3vw, 1rem);
+  line-height: 1.05;
+  text-align: center;
+  /* Wrap long labels ("Add to Watchlist") instead of clipping — button size is
+     held equal by the grid + min-height, so wrapping never breaks the layout. */
+  white-space: normal;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.wv-quiz-btn:active:not(:disabled) { transform: scale(0.97); }
+.wv-quiz-btn:disabled { opacity: 0.55; }
+.wv-quiz-btn .wv-quiz-emoji { font-size: 1.1rem; line-height: 1; }
+.wv-quiz-ico { display: inline-flex; align-items: center; line-height: 0; color: #fff; }
+.wv-quiz-legend .wv-quiz-ico { color: #fff; }
+/* 2×2 on phones. In short landscape the four equal buttons collapse to a single
+   equal row so the whole card still fits without scrolling — never uneven. */
+/* THREE primary actions. A 2×2 grid with one cell removed left a visible hole
+   where Save used to be; three equal columns keep the row balanced and every
+   target the same weight — no action should look more "default" than another. */
+.wv-quiz-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+/* FOUR ratings — a separate grid on purpose.
+   These two rows have different arities, and sharing one class meant narrowing
+   the primary row to three columns also narrowed this one, orphaning "Didn't
+   Like It" onto its own line and wrapping its label. Four items want 2×2 on a
+   phone and a single row of four once there is width for it. */
+.wv-rate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+/* Voice DNA review: four decisions per row (Right / Backwards / Just now /
+   Drop it). Two columns on a phone so the labels never truncate, four across
+   once there is room — same reasoning as the rating grid above. */
+.wv-vd-decisions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+@media (min-width: 480px) {
+  .wv-vd-decisions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+/* ── Retired: the Taste Interview's styles lived here ────────────────────
+   The interview was removed from the product. Its layout classes went with it;
+   the On TV row and quiz styles below are unrelated and stay. */
+
+/* ── TV Guide Detective row ──────────────────────────────────────────────
+   The old two-column layout put the poster and three stacked buttons in a
+   9rem rail and gave everything else one wide track, so on a laptop the
+   verdict panel stretched to 900px of mostly empty gradient while the actions
+   sat squashed in a column. Same fix as the On TV row: name the zones, and let
+   the verdict and the actions have their own columns instead of inheriting the
+   text column's width. */
+.wv-det-row {
+  display: grid;
+  grid-template-areas:
+    'art info'
+    'verdict verdict'
+    'act act';
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+.wv-det-art { grid-area: art; }
+.wv-det-info { grid-area: info; min-width: 0; }
+.wv-det-verdict { grid-area: verdict; min-width: 0; }
+/* FOUR CONTROLS, FOUR EQUAL CELLS.
+   This row was a wrap-flex with `> * { flex: 1 1 7rem; min-width: 0 }`, and it
+   held REMIND · SAVE · FOR · AGAINST — but only the first two are children of
+   this element. `CardVerdict` wraps its pair in `display: contents`, so the
+   selector never reached the verdict buttons: Remind and Save each claimed a
+   7rem basis and grew, and FOR and AGAINST divided the ~40px left over and
+   printed their labels straight over each other. A two-by-two grid gives all
+   four the same cell whether or not their parent is a box. */
+.wv-det-act {
+  grid-area: act;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  align-content: start;
+}
+@media (min-width: 640px) {
+  .wv-det-row { grid-template-columns: 7rem minmax(0, 1fr); gap: 1rem; }
+}
+@media (min-width: 1024px) {
+  .wv-det-row {
+    grid-template-areas: 'art info verdict act';
+    grid-template-columns: 8rem minmax(0, 1fr) 15rem 10rem;
+    align-items: center;
+  }
+  .wv-det-act { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Quick Taste Quiz ────────────────────────────────────────────────────
+   Two different shapes from one markup. On a phone the statement sits above a
+   full-width row of answers, because a 360px screen cannot hold both side by
+   side without the answers becoming unhittable. From `sm` up the row goes
+   horizontal and compact — that is what puts six to ten statements on a laptop
+   screen at once, which is the whole point of a quiz over an interview. */
+.wv-qtq-row {
+  display: grid;
+  grid-template-areas:
+    'text'
+    'answers'
+    'chips';
+  gap: 0.5rem;
+}
+.wv-qtq-text { grid-area: text; }
+/* Two by two on a phone. Four answers in one 320px row would either overflow or
+   shrink below a hittable target, and both are worse than a second line. */
+.wv-qtq-answers {
+  grid-area: answers;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+.wv-qtq-answers > button { flex: 1 1 calc(50% - 0.1875rem); min-width: 0; }
+.wv-qtq-chips {
+  grid-area: chips;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding-top: 0.125rem;
+}
+@media (min-width: 640px) {
+  .wv-qtq-row {
+    grid-template-areas:
+      'text answers'
+      'chips chips';
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 1rem;
+    row-gap: 0.375rem;
+  }
+  .wv-qtq-answers { flex-wrap: nowrap; }
+  .wv-qtq-answers > button { flex: 0 0 auto; }
+}
+
+/* The hero poster must always be substantial — never the collapsed thumbnail iOS
+   produced when the measured tile came out short. Give it a guaranteed portrait
+   min-height (the tile grows to fit via min-height, so nothing else is clipped);
+   it still grows past this via flex-1 whenever there's room. */
+/* overflow:hidden is the structural guarantee: the absolutely-positioned hero
+   poster is CLIPPED to this box and can never spill over the title or the
+   action buttons — even if a mobile browser miscomputes the flex/dvh height
+   (the iOS Safari case where the poster escaped onto the buttons). The floor is
+   gentle so the poster always yields space to the controls first. */
+.wv-quiz-poster { min-height: clamp(64px, 18dvh, 240px); overflow: hidden; }
+/* Narrow screens: the title wraps to two lines and the metadata line ended up
+   UNDERNEATH the action buttons. The poster is NOT the lever to fix that — an
+   existing guard keeps it substantial, because collapsing it to a thumbnail was
+   a previous regression. So the height comes out of the title block instead:
+   a smaller title and tighter gaps, and below 360px a single clamped line. */
+@media (max-width: 480px) {
+  .wv-quiz-title { font-size: 1rem; line-height: 1.15; }
+  .wv-quiz-meta { font-size: 0.6875rem; margin-top: 0; }
+  .wv-title-in { gap: 0.25rem; }
+  /* Small phones only: a 14dvh floor instead of 18dvh. The poster keeps its
+     aspect ratio (this is a min-height, not a fixed size) and stays clearly
+     recognisable — it is the last ~30px needed to keep the metadata line off
+     the action row once the title wraps. Larger phones, tablets and desktop
+     are untouched. */
+  .wv-quiz-poster { min-height: clamp(64px, 14dvh, 240px); }
+}
+@media (max-width: 360px) {
+  .wv-quiz-title { -webkit-line-clamp: 1; }
+}
+@media (max-height: 520px) {
+  .wv-quiz-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .wv-rate-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* Short/landscape viewports: a smaller guaranteed minimum so the whole tile
+     still fits a wide, short screen without needing to scroll. */
+  .wv-quiz-poster { min-height: 4.5rem; }
+  /* Narrow 4-up columns: let labels wrap to two lines and cap the font so no
+     text is ever clipped. Buttons stay equal size. */
+  .wv-quiz-btn {
+    white-space: normal;
+    overflow: visible;
+    font-size: 0.8rem;
+    gap: 0.3rem;
+    line-height: 1.05;
+    padding: 0.25rem 0.4rem;
+  }
+  .wv-quiz-btn .wv-quiz-emoji { font-size: 1rem; }
+}
+.wv-quiz-btn--loved    { border-color: rgba(244, 63, 94, 0.55);  background: rgba(244, 63, 94, 0.12); }
+.wv-quiz-btn--liked    { border-color: rgba(16, 185, 129, 0.55); background: rgba(16, 185, 129, 0.12); }
+.wv-quiz-btn--disliked { border-color: rgba(245, 158, 11, 0.55); background: rgba(245, 158, 11, 0.12); }
+.wv-quiz-btn--unseen   { border-color: rgba(148, 163, 184, 0.5); background: rgba(148, 163, 184, 0.12); }
+/* Intent-valence accents for the primary actions: gold = save it, red = no. */
+.wv-quiz-btn--gold     { border-color: rgba(234, 179, 8, 0.65);  background: rgba(234, 179, 8, 0.15); }
+.wv-quiz-btn--nope     { border-color: rgba(239, 68, 68, 0.6);   background: rgba(239, 68, 68, 0.14); }
+
+/* Colored legend pill used in the intro sheet — mirrors the real button accents
+   so the explanation visually matches the buttons the user will tap. */
+.wv-quiz-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  min-width: 8.5rem;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.5rem 0.6rem;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+/* ── DNA quiz: CINEMATIC redesign ──────────────────────────────────────────
+   A blurred, dimmed, grainy full-viewport backdrop generated from the current
+   poster so portrait art never sits in black bars — the screen always feels
+   cinematic on any aspect ratio (phone → ultrawide). The real poster stays
+   crisp and centered on top. */
+.wv-cine-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(42px) saturate(1.4) brightness(0.98);
+  transform: scale(1.22);
+  will-change: transform;
+  animation: wv-cine-drift 30s ease-in-out infinite alternate;
+}
+@keyframes wv-cine-drift {
+  from { transform: scale(1.2) translate3d(0, 0, 0); }
+  to   { transform: scale(1.26) translate3d(0, -1.6%, 0); }
+}
+.wv-cine-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(130% 100% at 50% 12%, rgba(6, 9, 17, 0.14), rgba(3, 5, 11, 0.66) 80%),
+    linear-gradient(180deg, rgba(3, 5, 11, 0.46) 0%, rgba(3, 5, 11, 0.58) 55%, rgba(3, 5, 11, 0.74) 100%);
+}
+.wv-cine-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+}
+
+/* Hero poster — the crisp artwork, floated over the backdrop with depth.
+   Absolutely positioned to fill its (flex-sized) parent: `height:100%` on a
+   flex-grow child does NOT resolve in Safari, which collapsed the poster to a
+   thumbnail — `position:absolute; inset:0` sizes reliably everywhere. The
+   drop-shadow hugs the poster's real silhouette (object-contain letterboxes). */
+.wv-poster-hero {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  object-position: center;
+  filter: drop-shadow(0 22px 42px rgba(0, 0, 0, 0.68)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6));
+}
+.wv-poster-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  text-align: center;
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(47, 107, 255, 0.28), rgba(17, 22, 38, 0.7));
+  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.8);
+  outline: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Watch-DNA progress panel */
+/* Compact metric number for the two side-by-side quiz cards — smaller than the
+   standalone confidence readout so the pair leaves more room for the poster. */
+.wv-quiz-metric-pct {
+  font-weight: 900;
+  font-size: clamp(1.3rem, 5vw, 1.6rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.wv-dna-pct {
+  font-weight: 900;
+  font-size: clamp(1.6rem, 6vw, 2.1rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.wv-dna-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.wv-dna-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #34d399, #2f6bff 70%, #a855f7);
+  box-shadow: 0 0 12px rgba(47, 107, 255, 0.6);
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Quiz Progress uses the brand pink so it reads distinct from the emerald
+   DNA-confidence bar right beside it — the two metrics must never look alike. */
+.wv-dna-bar--brand > span {
+  background: linear-gradient(90deg, #ff1493, #a855f7);
+  box-shadow: 0 0 12px rgba(255, 20, 147, 0.5);
+}
+.wv-dna-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.wv-dna-chip--expert { background: rgba(52, 211, 153, 0.16); color: #a7f3d0; border: 1px solid rgba(52, 211, 153, 0.3); }
+.wv-dna-chip--learning { background: rgba(255, 255, 255, 0.06); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.12); }
+/* The Expert/Still-learning detail only appears when there's real vertical room
+   (tablet/desktop), so the mobile one-tile never gets crowded. */
+.wv-dna-detail { display: none; }
+/* Only show the Expert / Still-learning detail where there's real room — tablet
+   and desktop. On phones we keep the panel compact so the poster stays the hero. */
+@media (min-width: 768px) {
+  .wv-dna-detail { display: grid; }
+}
+
+/* Micro-interactions — all well under 350ms, all inline (no popups). */
+@keyframes wv-title-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.wv-title-in { animation: wv-title-in 0.26s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes wv-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+.wv-pop { animation: wv-pop 0.22s ease-out; }
+.wv-quiz-btn--seen { border-color: rgba(129, 140, 248, 0.55); background: rgba(129, 140, 248, 0.14); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wv-cine-bg, .wv-title-in, .wv-pop { animation: none !important; }
+  .wv-dna-bar > span { transition: none; }
+}
+
 /* Home-tile ambient sheen — a slow light band that drifts across each tile so
    the hub feels alive on touch devices (where hover never fires). */
 @keyframes wv-tile-sheen {
@@ -246,46 +857,286 @@ body {
 }
 .wv-tile-pulse { animation: wv-tile-pulse 5.5s ease-in-out infinite; }
 
-/* Brand wordmark: the "I" in VERDICT slowly rolls over in place and becomes a
-   "1", holds a beat, then rolls back to an "I". A 3D flip on two stacked faces —
-   front is the "I" (inherits pink), back is a white "1". Width comes from the
-   in-flow front face, so nothing shifts as it turns. */
-/* Fixed-width slot so the wider "1" never pushes the "CT" — the mark's width
-   never changes. The glyph flips on the horizontal axis like a baseball
-   scoreboard / split-flap: front is the "I", back is a white "1". */
-.wv-iflip {
+/* Brand wordmark: the "I" in VERD1CT is a white numeral 1. It flips in ONCE on
+   first render (premium, not a loading spinner) and flips again on hover/tap of
+   the logo. Crucially the 1 is a REAL inline glyph, so its width is intrinsic
+   and it can never collapse to an empty gap the way the old two-face 3D slot did
+   on iOS Safari. Reduced-motion shows a static white 1. */
+.wv-logo-1 {
   display: inline-block;
-  width: 0.64em;
-  text-align: center;
-  perspective: 420px;
-  color: #ffffff; /* accent stays white on both the I and the 1 */
-  /* A slab/serif face so the capital "I" carries top + bottom bars and can't be
-     mistaken for a lowercase l or a 1 — modern slab first, serif fallback. */
-  font-family: 'Roboto Slab', 'Rockwell', 'Zilla Slab', Georgia, 'Times New Roman', serif;
+  color: #fff;
+  font-weight: 900;
+  transform-origin: 50% 50%;
+  /* NO backface-visibility: hidden. It was left over from an older two-face
+     flip and, combined with the 540deg spin, made the glyph invisible at every
+     odd half-turn — the brand rendered as "WatchVERD_CT". The 1 must always be
+     legible. */
 }
-.wv-iflip-inner { position: relative; display: block; transform-style: preserve-3d; animation: wv-iflip 12s ease-in-out infinite; }
-.wv-iflip-face { display: block; backface-visibility: hidden; }
-.wv-iflip-back { position: absolute; top: 0; left: 0; right: 0; transform: rotateX(180deg); }
-/* Even alternation I → 1 → I → 1: ~2s held on each, ~1s slow flip between.
-   Ends at 720deg (an I) so the loop repeats seamlessly. */
-@keyframes wv-iflip {
-  0%, 17%    { transform: rotateX(0deg); }   /* I */
-  25%, 42%   { transform: rotateX(180deg); } /* 1 */
-  50%, 67%   { transform: rotateX(360deg); } /* I */
-  75%, 92%   { transform: rotateX(540deg); } /* 1 */
-  100%       { transform: rotateX(720deg); } /* back to I, seamless */
+.wv-logo-1--in { animation: wv-logo-1-in 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.wv-logo-1--spin { animation: wv-logo-1-spin 720ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+.wv-logo-1--idle { transform: none; }
+/* The numeral 1 must ALWAYS be legible — it is part of the brand. A full
+   rotateY spin squeezed the glyph to ~0px edge-on (and the old keyframe also
+   started at opacity 0), so first paint could render "WatchVERD_CT" with the 1
+   missing. Motion is now BOUNDED to ±58deg — the glyph keeps real width and
+   full opacity at every frame. */
+@keyframes wv-logo-1-in {
+  0%   { transform: rotateY(-58deg) translateY(-0.06em); }
+  70%  { transform: rotateY(10deg) translateY(0); }
+  100% { transform: rotateY(0deg) translateY(0); }
+}
+@keyframes wv-logo-1-spin {
+  0%   { transform: rotateY(0deg); }
+  50%  { transform: rotateY(58deg); }
+  100% { transform: rotateY(0deg); }
 }
 
-/* Promise bar — a slow light band sweeping across the top tagline strip so it
-   catches the eye without shouting. */
-@keyframes wv-promise-sheen {
+/* The courtroom entry button — a slow gold light band sweeping across it so
+   it catches the eye without shouting. */
+@keyframes wv-cta-sheen {
   0% { transform: translateX(-130%) skewX(-12deg); }
   55%, 100% { transform: translateX(560%) skewX(-12deg); }
 }
-.wv-promise-sheen { animation: wv-promise-sheen 6.5s ease-in-out infinite; }
+.wv-cta-sheen { animation: wv-cta-sheen 6.5s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .wv-gavel, .wv-order, .wv-verdict-in, .wv-tile-sheen, .wv-tile-pulse, .wv-promise-sheen { animation: none; }
-  /* Rest on the "I" so the mark reads VERDICT with no motion. */
-  .wv-iflip-inner { animation: none; }
+  .wv-gavel, .wv-order, .wv-verdict-in, .wv-tile-sheen, .wv-tile-pulse, .wv-cta-sheen { animation: none; }
+  /* Static white 1 — no flip — for reduced motion. */
+  .wv-logo-1, .wv-logo-1--in, .wv-logo-1--spin { animation: none !important; transform: none !important; }
+}
+
+/* ── On TV: four-zone desktop row ─────────────────────────────────────────
+   The old card put a narrow time block, a thumbnail and a short title on the
+   left of a flex-1 that had nothing to fill it, so half a 1440px screen went
+   to whitespace while the content crowded. This lays the row out as explicit
+   zones — when/poster · programme · what we know · actions — so the width is
+   spent on information and more programmes fit in one viewport. */
+.wv-tv-row {
+  display: grid;
+  grid-template-areas:
+    'when poster info'
+    'actions actions actions';
+  grid-template-columns: 4.5rem 3.5rem minmax(0, 1fr);
+  gap: 0.625rem;
+  align-items: start;
+}
+.wv-tv-when { grid-area: when; }
+.wv-tv-poster { grid-area: poster; }
+.wv-tv-info { grid-area: info; min-width: 0; }
+.wv-tv-verdict { grid-area: verdict; display: none; }
+.wv-tv-actions { grid-area: actions; display: flex; gap: 0.5rem; }
+
+@media (min-width: 640px) {
+  .wv-tv-row {
+    grid-template-areas: 'when poster info verdict actions';
+    grid-template-columns: 5rem 4.5rem minmax(0, 1fr) auto auto;
+    align-items: center;
+  }
+  .wv-tv-actions { justify-content: flex-end; }
+}
+@media (min-width: 1024px) {
+  /* The zone the brief asked for: a real poster, and a panel for what we
+     actually know, rather than an empty coloured rectangle. */
+  .wv-tv-row {
+    grid-template-columns: 5.5rem 8.25rem minmax(0, 1fr) 15rem auto;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+  }
+  .wv-tv-verdict { display: block; }
+}
+.wv-tv-art {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 0.5rem;
+  object-fit: cover;
+  background: rgb(255 255 255 / 0.06);
+}
+.wv-tv-panel {
+  border-radius: 0.625rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.04);
+  padding: 0.5rem 0.625rem;
+}
+.wv-tv-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 40px;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background: rgb(255 255 255 / 0.05);
+  padding: 0 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgb(226 232 240);
+  white-space: nowrap;
+}
+.wv-tv-act:hover:not(:disabled) { background: rgb(255 255 255 / 0.1); }
+.wv-tv-act--on { border-color: rgb(52 211 153 / 0.5); background: rgb(16 185 129 / 0.15); color: rgb(209 250 229); }
+
+
+/* ---------------------------------------------------------------------------
+   THE PINK CTA'S BREATH. Glow and scale only — no colour cycling, which reads
+   as a warning, and no opacity dip below 1, which reads as disabled.
+--------------------------------------------------------------------------- */
+@keyframes wv-cta-breathe {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 20, 147, 0.55), 0 8px 24px -8px rgba(255, 20, 147, 0.5);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(255, 20, 147, 0), 0 12px 30px -8px rgba(255, 20, 147, 0.75);
+    transform: scale(1.025);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   BIG SCREENS GET BIG CONTROLS.
+   On an iPad the cards are ~470px wide and the action row underneath was still
+   drawn at phone scale: 11px labels in 44px boxes, which is what "too small on
+   iPad" means. The row scales with the screen from `lg` up. The 44px minimum
+   is a floor for touch, never a target — there is no reason to sit on it when
+   there is a thousand points of width available.
+--------------------------------------------------------------------------- */
+/* ── THE ACTION ROW, IN ONE PLACE ────────────────────────────────────────
+   FOR · AGAINST · SAVE. Every grid in the app hand-rolled this row, and they
+   were all wrong the same way: the buttons were `flex-1 min-w-0`, and a flex
+   item with `min-width: 0` is allowed to shrink BELOW ITS OWN CONTENT. In a
+   two-up strip on a 390px phone each button got 48px to hold an 11px
+   "AGAINST" that measures 57 — so the word rendered outside its own border,
+   which is what the iPhone screenshot showed. `fit-content` is the floor: a
+   button is never narrower than what is written on it, and when three of them
+   genuinely do not fit, the row wraps instead of lying about it.
+
+   The row is its own CONTAINER so the icons can go when THE ROW is tight
+   rather than when the SCREEN is. On one phone the same row is 334px wide in
+   a single-column grid and 157px in a two-up strip, so a viewport media query
+   would be answering the wrong question. The gavels are decoration; the words
+   are the control, and the words are what survive. */
+.wv-act-row {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+@container (max-width: 230px) {
+  .wv-act-icon {
+    display: none;
+  }
+}
+/* SCORE · CALL · RATINGS ON ONE LINE, WHEN THE PANEL CAN HOLD ONE.
+   The badge and the call need ~150px and the three rating chips ~140px, so
+   below ~310px of panel the ratings take their own row instead of being
+   crushed. A container query, because the panel's width is set by the CARD
+   (a 252px grid cell at 1440, a 310px card foot on a phone), not by the
+   viewport — the `sm:` breakpoint gets this exactly backwards. */
+.wv-score {
+  container-type: inline-size;
+}
+.wv-score-ratings {
+  flex-basis: 100%;
+}
+@container (min-width: 310px) {
+  .wv-score-ratings {
+    flex-basis: auto;
+    margin-left: auto;
+  }
+}
+/* …but the chips are deliberately BIGGER from `lg` (they are the evidence
+   under the score), so the same panel that holds them on one line at 390px
+   cannot at 1366. Left to the 310px threshold the row fitted while the
+   skeleton was 96px wide and wrapped once the real numbers arrived — the card
+   grew 32px a few hundred milliseconds after paint, which is the exact defect
+   `card-ruling.spec` exists to catch. The threshold moves with the type. */
+@media (min-width: 1024px) {
+  @container (max-width: 420px) {
+    .wv-score-ratings {
+      flex-basis: 100%;
+      margin-left: 0;
+    }
+  }
+}
+
+/* 44px is the tap-target floor and stays the floor at every width. What went is
+   the extra height ABOVE it on wide screens: a 56px button is not more tappable
+   than a 50px one, it is just a bigger block of colour under the thing you are
+   deciding about. */
+.wv-act {
+  min-height: 44px;
+  min-width: fit-content;
+}
+.wv-act-label {
+  font-size: 11px;
+}
+@media (min-width: 1024px) {
+  .wv-act {
+    min-height: 48px;
+  }
+  .wv-act-label {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+  .wv-act-icon {
+    height: 1.125rem;
+    width: 1.125rem;
+  }
+}
+@media (min-width: 1280px) {
+  .wv-act {
+    min-height: 50px;
+  }
+  .wv-act-label {
+    font-size: 14px;
+  }
+}
+
+/* The docket tray is the app's running state; on a 1024px screen it was a
+   thin strip of 11px text. */
+@media (min-width: 1024px) {
+  .wv-tray-status {
+    font-size: 1rem;
+  }
+  .wv-tray-count {
+    height: 2.25rem;
+    width: 2.25rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* THE REMINDER'S BROADCAST PULSE. Two arcs leaving a dot — "we will ping you
+   when it is on". It only animates while the reminder is ON, so the motion
+   means something rather than decorating a button nobody set. */
+@keyframes wv-signal-out {
+  0% { opacity: 0; transform: scale(0.55); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.15); }
+}
+.wv-signal-arc-1 { animation: wv-signal-out 1.8s ease-out infinite; transform-origin: 20% 80%; }
+.wv-signal-arc-2 { animation: wv-signal-out 1.8s ease-out infinite 0.45s; transform-origin: 20% 80%; }
+
+
+/* ---------------------------------------------------------------------------
+   THE RATINGS ROW, ON A BIG SCREEN.
+   "Use the extra real estate to increase ratings." An iPad card is ~470px wide
+   and the evidence under it — Rotten Tomatoes, the audience score, IMDb — was
+   drawn at 14px with 10px labels, the size it needs to be on a 390px phone.
+   The scores are the reason to trust the number above them, so on a screen
+   with room they get read at a glance rather than squinted at.
+
+   Scoped to `.wv-ratings` so it lifts the row wherever it appears — card,
+   release wall, recommendation slate — from one definition.
+--------------------------------------------------------------------------- */
+/* The row claims its height before the numbers arrive — see RatingsStrip. */
+.wv-ratings-row { min-height: 1.5rem; }
+@media (min-width: 1024px) {
+  .wv-ratings-row { min-height: 1.75rem; }
+  .wv-ratings { font-size: 1rem; gap: 0.5rem; }
+  .wv-ratings .wv-ratings-row { font-size: 1.0625rem; gap: 0.875rem; }
+  .wv-ratings .wv-ratings-tag { font-size: 0.75rem; }
+  .wv-ratings .wv-ratings-emoji { font-size: 1.25rem; }
+}
+@media (min-width: 1280px) {
+  .wv-ratings .wv-ratings-row { font-size: 1.125rem; }
 }

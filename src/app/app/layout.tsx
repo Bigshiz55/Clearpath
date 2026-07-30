@@ -3,7 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfile, ensureGuestProfile, personalLabelFor, getAvatar } from '@/lib/profile';
 import { isPro } from '@/lib/pro';
 import { Nav } from '@/components/Nav';
-import { NavArrows } from '@/components/NavArrows';
+import { DocketTray } from '@/components/DocketTray';
+import { QuickSearch } from '@/components/QuickSearch';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,22 +39,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const avatar = isGuest ? null : await getAvatar(supabase, user.id);
   const avatarLabel = avatar ?? (user.email?.[0] ?? '🍿').toUpperCase();
 
-  // Build marker — read at request time (force-dynamic), so it always shows the
-  // commit/branch of the deployment actually serving this page. If your phone
-  // shows an old hash, the deploy hasn't been promoted to production.
-  const sha = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7) || 'dev';
-  const ref = process.env.VERCEL_GIT_COMMIT_REF ?? '';
-
   return (
-    <div className="min-h-dvh pb-20 sm:pb-0">
+    <div className="min-h-dvh pb-24 lg:pb-0">
       <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} pro={pro} avatarLabel={avatarLabel} />
-      <main className="container-page py-6">
-        <NavArrows />
-        {children}
-        <div className="mt-10 text-center text-[10px] tracking-wide text-slate-600">
-          build {sha}{ref ? ` · ${ref.replace(/^.*\//, '')}` : ''}
-        </div>
-      </main>
+      {/* The on-screen Back/Home/Forward row is gone: browser chrome (and the
+          bottom nav on phones) already provides navigation, and the row spent
+          ~48px of every screen duplicating it. */}
+      <main className="container-page py-6">{children}</main>
+      {/* The docket, wherever you are. Renders nothing when it is empty. */}
+      <DocketTray />
+      {/* Search, wherever you are — the sheet plus the phone's floating
+          trigger. The header carries the same control at the top of the page. */}
+      <QuickSearch />
     </div>
   );
 }

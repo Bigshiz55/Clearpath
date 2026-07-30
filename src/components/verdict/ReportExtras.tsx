@@ -2,6 +2,8 @@ import type { RatingSource, TitleMetadata, PrimaryCall, VerdictTier, WatchProvid
 import { episodeSummary } from '@/lib/tmdb/meta-helpers';
 import { originSummary } from '@/lib/origin';
 import { DnaScore } from '@/components/DnaScore';
+import { formatRating } from '@/lib/ratings/format';
+import { VerdictConfidence } from './VerdictConfidence';
 
 // Niche community aggregators we don't surface — they read as "random stars".
 // Metacritic is dropped too: it's usually sparse and adds a fourth number that
@@ -18,7 +20,7 @@ function callStyleFor(call: PrimaryCall): string {
 
 /**
  * Top-of-page summary: the headline call plus every score in one glanceable
- * strip — WatchVerdict score, personal match, and all *available* external
+ * strip — WatchVerd1ct score, personal match, and all *available* external
  * ratings (IMDb, Rotten Tomatoes, Metacritic, TMDB). Missing sources are simply
  * omitted; nothing is fabricated.
  */
@@ -58,6 +60,18 @@ export function AtAGlance({
           <div className="text-sm font-bold text-white">{tier}</div>
           <p className="line-clamp-2 text-xs text-slate-300 sm:text-sm">{oneLiner}</p>
         </div>
+        {/* HOW SURE, BESIDE HOW GOOD. The call says what we think; this says
+            how much evidence that rests on — and taps open the reasons in
+            plain language. Built from the engine's OWN available sources plus
+            how many titles this user has rated, so it can never claim more
+            than we hold. */}
+        <VerdictConfidence
+          className="flex-none"
+          mediaType={mediaType}
+          tmdbId={tmdbId}
+          ratingSourceCount={available.length}
+          availabilityVerified={streamNames.length > 0}
+        />
       </div>
 
       <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
@@ -66,13 +80,21 @@ export function AtAGlance({
             duplicate Stream/Skip box here — it only collided with the DNA call. */}
         <DnaScore mediaType={mediaType} tmdbId={tmdbId} />
         {available.map((s) => {
-          const { node, label } = iconFor(s.name);
+          // ONE FORMATTER FOR EVERY RATING. The old per-surface assembly put a
+          // "/ 10" label under a raw that already said "/10" — "7.9/10 / 10".
+          // `formatRating` splits value from scale exactly once, and names the
+          // source honestly (a TMDB-derived number is "Audience score", never
+          // Popcornmeter branding — the tooltip says where it really came from).
+          const f = formatRating(s);
           return (
-            <div key={s.name} className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-              {node}
+            <div key={s.name} title={f.detail} className="flex flex-shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+              {iconFor(s.name).node}
               <span className="flex flex-col leading-tight">
-                <span className="text-sm font-extrabold tabular-nums text-white">{s.raw}</span>
-                <span className="text-[9px] uppercase tracking-wide text-slate-500">{label}</span>
+                <span className="text-sm font-extrabold tabular-nums text-white">
+                  {f.value}
+                  {f.scale && <span className="ml-0.5 text-[10px] font-bold text-slate-400">{f.scale}</span>}
+                </span>
+                <span className="text-[9px] uppercase tracking-wide text-slate-500">{f.source}</span>
               </span>
             </div>
           );
@@ -95,26 +117,26 @@ export function AtAGlance({
   );
 }
 
-/** Icon + style per known rating source. */
-function iconFor(name: string): { node: React.ReactNode; label: string } {
+/** Icon per known rating source. Labels come from `formatRating` — the one
+ *  shared formatter — never from here, which is how "/ 10" ended up printed
+ *  under a value that already said "/10". */
+function iconFor(name: string): { node: React.ReactNode } {
   switch (name) {
     case 'IMDb':
       return {
-        label: '/ 10',
         node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#f5c518] text-[9px] font-black tracking-tight text-black">IMDb</span>,
       };
     case 'Rotten Tomatoes':
-      return { label: 'Tomatometer', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#fa320a] text-base">🍅</span> };
+      return { node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#fa320a] text-base">🍅</span> };
     case 'RT Audience':
-      return { label: 'Popcorn', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#faa71a] text-base">🍿</span> };
-    case 'Metacritic':
-      return { label: 'Metacritic', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#00ce7a] text-[11px] font-black text-emerald-950">M</span> };
     case 'TMDB Audience':
-      return { label: 'audience', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#faa71a] text-base">🍿</span> };
+      return { node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#faa71a] text-base">🍿</span> };
+    case 'Metacritic':
+      return { node: <span className="grid h-7 w-7 place-items-center rounded-md bg-[#00ce7a] text-[11px] font-black text-emerald-950">M</span> };
     case 'Metacritic Users':
-      return { label: 'MC users', node: <span className="grid h-7 w-7 place-items-center rounded-md border border-[#00ce7a]/60 text-[11px] font-black text-[#00ce7a]">M</span> };
+      return { node: <span className="grid h-7 w-7 place-items-center rounded-md border border-[#00ce7a]/60 text-[11px] font-black text-[#00ce7a]">M</span> };
     default:
-      return { label: '', node: <span className="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-xs">★</span> };
+      return { node: <span className="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-xs">★</span> };
   }
 }
 
@@ -126,13 +148,16 @@ export function RatingIcons({ sources }: { sources: RatingSource[] }) {
   return (
     <div className="flex flex-wrap gap-2">
       {available.map((s) => {
-        const { node, label } = iconFor(s.name);
+        const f = formatRating(s);
         return (
-          <div key={s.name} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-            {node}
+          <div key={s.name} title={f.detail} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+            {iconFor(s.name).node}
             <span className="flex flex-col leading-tight">
-              <span className="text-sm font-extrabold tabular-nums text-white">{s.raw}</span>
-              <span className="text-[9px] uppercase tracking-wide text-slate-500">{label}</span>
+              <span className="text-sm font-extrabold tabular-nums text-white">
+                {f.value}
+                {f.scale && <span className="ml-0.5 text-[10px] font-bold text-slate-400">{f.scale}</span>}
+              </span>
+              <span className="text-[9px] uppercase tracking-wide text-slate-500">{f.source}</span>
             </span>
           </div>
         );
@@ -236,7 +261,7 @@ export function RecommendationConsensus({
     <div className="space-y-2.5">
       <Row
         icon="🎬"
-        name="WatchVerdict"
+        name="WatchVerd1ct"
         value="Our personalized call"
         right={<span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${callStyle}`}>{primaryCall}</span>}
       />

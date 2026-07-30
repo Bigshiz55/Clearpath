@@ -2,8 +2,6 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getCriticRatings } from '@/lib/omdb';
 import { findTmdbByImdb, searchTitles, type SearchResultItem } from '@/lib/tmdb/client';
-import { getGracenoteAirings } from '@/lib/gracenote';
-import { getStoredGridAirings } from '@/lib/tvGrid';
 import type { MediaType } from '@/lib/types';
 
 /**
@@ -40,7 +38,12 @@ export interface Airing {
   tmdbId?: number | null;
   mediaType?: MediaType | null;
   posterPath?: string | null; // TMDB poster path once resolved (for saved thumbnails)
-  year?: number | null; // release year (Gracenote) — disambiguates the TMDB match
+  /** The user's personal match (0–100) from the deterministic engine, when the
+   *  programme was confidently resolved to a title. Absent = not scored. */
+  match?: number | null;
+  /** One plain-language line of what drove `match` — the badge's "why". */
+  matchWhy?: string | null;
+  year?: number | null; // release year, when the source reports one — disambiguates the TMDB match
 }
 
 interface TvmazeShow {
@@ -213,10 +216,10 @@ function resolveTmdbByTitle(title: string, year: number | null): Promise<{ id: n
 }
 
 /**
- * Resolve TMDB ids for MOVIE airings that have no imdb id (i.e. the Gracenote
- * cable listings), by an exact title+year search — so cable movies get a Save
- * button and a DNA score like the broadcast cards. Bounded and best-effort; a
- * title we can't match cleanly is left as-is. No-op without a TMDB key.
+ * Resolve TMDB ids for MOVIE airings that have no imdb id, by an exact
+ * title+year search — so a movie missing that id still gets a Save button and
+ * a DNA score like the rest of the cards. Bounded and best-effort; a title we
+ * can't match cleanly is left as-is. No-op without a TMDB key.
  */
 export async function enrichAiringsWithTmdbByTitle(airings: Airing[], cap = 14): Promise<Airing[]> {
   const targets = airings
@@ -342,9 +345,32 @@ export function getOnTvToday(country: string, date: string): Promise<Airing[]> {
 const NOISE_TYPES = new Set(['News', 'Talk Show', 'Variety']);
 const DAY_MS = 86_400_000;
 
-function isoDate(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+/**
+ * The calendar-day key TVmaze's `date=` param expects for the US broadcast
+ * schedule — anchored to US Eastern, the network's own reference zone (the
+ * same fact `clock.ts` already documents: provider airtimes are Eastern too),
+ * NOT the server's UTC clock.
+ *
+ * Getting this wrong meant every US viewer west of Eastern got TOMORROW's
+ * schedule for a multi-hour window every evening: at 6pm Pacific it is
+ * already past midnight UTC, so a naive `date.getUTCDate()` had already
+ * rolled over while it was still Tuesday evening in Los Angeles — right
+ * through primetime, the hours this feature matters most for. The page's own
+ * "Today" header is computed separately from the viewer's real local clock
+ * (see localDay.ts) and stayed correct throughout, so the two silently
+ * disagreed: a header reading "Today" over a Wednesday's listings.
+ *
+ * Anchoring to Eastern instead of UTC is exactly correct for Eastern/
+ * Central/Mountain viewers (Eastern's calendar day extends into their whole
+ * evening) and narrows the same class of mismatch for Pacific viewers to a
+ * ~3-hour tail (9pm–midnight PT) instead of the ~7-8 hour window UTC caused —
+ * the best a single nationwide schedule date can do without per-viewer
+ * timezone data the server doesn't have.
+ */
+export function usBroadcastDate(ms: number): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+    new Date(ms),
+  );
 }
 
 /** We never surface a TV airing further out than this — "what's on" means the
@@ -379,7 +405,7 @@ export async function getUpcomingTv(
   // the time of day) — cache keys stay stable regardless of the chosen horizon —
   // then filter strictly to [now, now+horizon].
   const spanDays = Math.ceil(UPCOMING_TV_HORIZON_MS / DAY_MS) + 1;
-  const dates = Array.from({ length: spanDays }, (_, i) => isoDate(nowMs + i * DAY_MS));
+  const dates = Array.from({ length: spanDays }, (_, i) => usBroadcastDate(nowMs + i * DAY_MS));
   const perDay = await Promise.all(dates.map((d) => getOnTvToday(country, d)));
 
   const wantGenre = genre ? genre.toLowerCase() : null;
@@ -398,29 +424,6 @@ export async function getUpcomingTv(
       if (movieOnly && a.showType !== 'Movie') return false;
       return true;
     });
-
-  // TVmaze is broadcast-only, so a cable network ("on Lifetime") or a movies-only
-  // ask comes back thin or empty. For those, pull the real listing from Gracenote's
-  // full US grid (cable + movie typing) and prefer a time-ordered union — this is
-  // what makes "Lifetime movies tonight" actually return Lifetime movies. US only.
-  const wantGracenote = country === 'US' && !!(network || movieOnly);
-  if (wantGracenote) {
-    // DB-first: read the hourly-refreshed grid from our own table (fast, no
-    // upstream call). Only if it's empty (before the first refresh, or the table
-    // isn't there yet) do we fetch Gracenote live.
-    let grid = await getStoredGridAirings(nowMs, clampedHorizon, { network, movieOnly }).catch(() => []);
-    if (grid.length === 0) grid = await getGracenoteAirings(nowMs, clampedHorizon, { network, movieOnly }).catch(() => []);
-    const merged = [...upcoming, ...grid];
-    const byKey = new Set<string>();
-    return merged
-      .filter((a) => {
-        if (wantGenre && !a.genres.some((g) => g.toLowerCase() === wantGenre)) return false;
-        const k = `${a.showName.toLowerCase()}|${a.airstamp}`;
-        return byKey.has(k) ? false : (byKey.add(k), true);
-      })
-      .sort((a, b) => Date.parse(a.airstamp) - Date.parse(b.airstamp))
-      .slice(0, 60);
-  }
 
   // Rank by rating (unrated last), keep a healthy set, then show in time order.
   const ranked = [...upcoming].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 30);

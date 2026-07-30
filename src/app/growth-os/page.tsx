@@ -61,7 +61,7 @@ export default async function GrowthHome() {
 
       {!pros.tablesReady && (
         <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-xs text-amber-200">
-          One-time setup: the Growth OS tables aren’t in the database yet. Apply migration <code>0024_growth_os</code> at{' '}
+          One-time setup: the Growth OS tables aren’t in the database yet. Apply migration <code>0039_growth_os</code> at{' '}
           <Link href="/migrate" className="underline">/migrate</Link> to enable prospects, campaigns, links, and feedback.
           Your user count and funnel below are live regardless.
         </div>

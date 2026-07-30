@@ -8,6 +8,7 @@ import type {
   WatchProviders,
 } from '@/lib/types';
 import { computeEnglishAvailability } from './meta-helpers';
+import { rankAndLimit } from '@/lib/nlu/titleNormalize';
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 export { TMDB_IMAGE_BASE, tmdbImage } from './image';
@@ -108,6 +109,8 @@ export interface SearchResultItem {
   posterPath: string | null;
   voteAverage: number | null;
   popularity: number | null;
+  /** TMDB genre ids, when the search payload carried them. Additive/optional. */
+  genreIds?: number[];
 }
 
 interface TmdbMultiResult {
@@ -123,6 +126,7 @@ interface TmdbMultiResult {
     poster_path?: string | null;
     vote_average?: number;
     popularity?: number;
+    genre_ids?: number[];
   }>;
 }
 
@@ -146,6 +150,7 @@ function toResult(r: MultiRow, forced?: MediaType): SearchResultItem | null {
     posterPath: r.poster_path ?? null,
     voteAverage: typeof r.vote_average === 'number' ? r.vote_average : null,
     popularity: typeof r.popularity === 'number' ? r.popularity : null,
+    ...(Array.isArray(r.genre_ids) ? { genreIds: r.genre_ids.filter((n) => typeof n === 'number') } : {}),
   };
 }
 
@@ -177,7 +182,11 @@ export async function searchTitles(query: string): Promise<SearchResultItem[]> {
     });
   }
 
-  return results.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0)).slice(0, 20);
+  // Identity first, popularity only within a tier — and CUT AFTERWARDS. A
+  // straight popularity sort put Gone Girl, Gone in 60 Seconds and Gone with
+  // the Wind in the top 20 for "gone" and dropped the film actually called
+  // Gone before anything downstream could rank it back up. See rankAndLimit.
+  return rankAndLimit(trimmed, results, (r) => r.title, (r) => r.popularity ?? 0, 20);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,17 +253,25 @@ export async function discoverByGenres(
   mediaType: MediaType,
   genreIds: number[],
   region = 'US',
+  /**
+   * 1-based page. Discovery used to be pinned to page 1, which capped the whole
+   * profile-shaped pool at twenty titles per media type — fine for a cold-start
+   * hint, hopeless for a feed somebody is meant to keep ruling. TMDB discover is
+   * thousands deep; paging is what makes it deep here too.
+   */
+  page = 1,
 ): Promise<DiscoverItem[]> {
-  if (genreIds.length === 0) return [];
+  // An EMPTY genre list is now meaningful: "no genre constraint", the broadest
+  // tier of the ruling deck. It used to be the early-return.
   const data = await tmdbFetch<TmdbMultiResult>(`/discover/${mediaType}`, {
     language: 'en-US',
     include_adult: 'false',
     sort_by: 'popularity.desc',
     watch_region: region,
-    with_genres: genreIds.join('|'),
+    ...(genreIds.length > 0 ? { with_genres: genreIds.join('|') } : {}),
     'vote_count.gte': '200',
     'vote_average.gte': '6.4',
-    page: '1',
+    page: String(Math.max(1, Math.floor(page))),
   }).catch(() => ({ page: 1, results: [] as TmdbMultiResult['results'] }));
 
   return data.results.slice(0, 20).map((r) => {
@@ -296,6 +313,10 @@ export interface DiscoverOptions {
   excludeGenreIds?: number[];
   /** TMDB keyword ids (with_keywords) — trope/subject/vibe filtering (OR). */
   keywordIds?: number[];
+  /** ISO-639-1 original language (with_original_language), e.g. 'ja' for anime. */
+  originalLanguage?: string;
+  /** ISO-3166-1 origin country (with_origin_country), e.g. 'KR' for K-drama. */
+  originCountry?: string;
   page?: number;
 }
 
@@ -319,6 +340,8 @@ export async function discoverTitles(
   if (opts.genreIds && opts.genreIds.length > 0) params.with_genres = opts.genreIds.join('|');
   if (opts.excludeGenreIds && opts.excludeGenreIds.length > 0) params.without_genres = opts.excludeGenreIds.join(',');
   if (opts.keywordIds && opts.keywordIds.length > 0) params.with_keywords = opts.keywordIds.join('|'); // OR — any matching trope
+  if (opts.originalLanguage) params.with_original_language = opts.originalLanguage;
+  if (opts.originCountry) params.with_origin_country = opts.originCountry;
   // Monetization: an explicit filter wins; otherwise, when filtering by provider,
   // default to the "included" tiers so results are things you can actually stream.
   const monetization = opts.monetization ?? (opts.providerIds && opts.providerIds.length > 0 ? 'flatrate|free|ads' : undefined);

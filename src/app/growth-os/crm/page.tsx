@@ -67,7 +67,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement> & { className?
 export function SetupNote() {
   return (
     <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-xs text-amber-200">
-      Apply migration <code>0024_growth_os</code> at <a href="/migrate" className="underline">/migrate</a> to enable saving. Forms below won’t persist until then.
+      Apply migration <code>0039_growth_os</code> at <a href="/migrate" className="underline">/migrate</a> to enable saving. Forms below won’t persist until then.
     </div>
   );
 }

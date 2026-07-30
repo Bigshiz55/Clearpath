@@ -1,0 +1,107 @@
+import { describe, it, expect } from 'vitest';
+import {
+  candidateTarget,
+  discoverPages,
+  enoughSurvivors,
+  mapPool,
+  waves,
+  MAX_CANDIDATES,
+  MIN_CANDIDATES,
+  OVERSHOOT,
+  PAGE_SIZE,
+} from './finderPool';
+import { DEFAULT_RESULT_COUNT } from './nlu/count';
+
+/**
+ * THE OTHER CEILING.
+ *
+ * `runFinder` pulled two discover pages, deduped, and took the first SIXTEEN —
+ * a constant unrelated to how many results the caller asked for. Sixteen was
+ * therefore the maximum the whole product could return, and once the hard
+ * filters had run it returned about eight. Raising the result limit did
+ * nothing; the pool was the wall.
+ */
+describe('the candidate pool is sized by the ask, not by a constant', () => {
+  it('a full page of results needs a pool several times larger', () => {
+    // The old cap. A 24-result request cannot be served from 16 candidates
+    // even if every single one survives every filter.
+    expect(candidateTarget(DEFAULT_RESULT_COUNT)).toBeGreaterThan(16);
+    expect(candidateTarget(DEFAULT_RESULT_COUNT)).toBeGreaterThanOrEqual(DEFAULT_RESULT_COUNT * OVERSHOOT);
+  });
+
+  it('grows with the request', () => {
+    expect(candidateTarget(48)).toBeGreaterThan(candidateTarget(24));
+  });
+
+  it('is bounded at both ends — a tiny ask still gets ranking choice, a huge one cannot flood upstream', () => {
+    expect(candidateTarget(1)).toBe(MIN_CANDIDATES);
+    expect(candidateTarget(1000)).toBe(MAX_CANDIDATES);
+    for (const n of [1, 3, 8, 24, 60, 500]) {
+      expect(candidateTarget(n)).toBeGreaterThanOrEqual(MIN_CANDIDATES);
+      expect(candidateTarget(n)).toBeLessThanOrEqual(MAX_CANDIDATES);
+    }
+  });
+
+  it('pulls enough discover pages to actually contain that pool', () => {
+    for (const [limit, types] of [[24, 1], [24, 2], [60, 1], [60, 2]] as const) {
+      const pages = discoverPages(limit, types);
+      const rows = pages.length * PAGE_SIZE * types;
+      expect(rows, `limit=${limit} types=${types}`).toBeGreaterThanOrEqual(candidateTarget(limit));
+    }
+  });
+
+  it('never asks for fewer pages than the two it used to', () => {
+    expect(discoverPages(1, 2).length).toBeGreaterThanOrEqual(2);
+    expect(discoverPages(24, 1)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('goes deeper for a single media type than for two — same total fan-out', () => {
+    expect(discoverPages(24, 1).length).toBeGreaterThan(discoverPages(24, 2).length);
+  });
+
+  it('stops hydrating with ranking headroom, not at exactly the number shown', () => {
+    // Stopping at exactly `limit` would mean the last result shown was also the
+    // last one looked at — there would be nothing for the sort to choose from.
+    expect(enoughSurvivors(24)).toBeGreaterThan(24);
+    expect(enoughSurvivors(8)).toBeGreaterThan(8);
+  });
+});
+
+describe('mapPool — bounded concurrency, order preserved', () => {
+  it('returns results in input order', async () => {
+    const out = await mapPool([5, 1, 4, 2, 3], 2, async (n) => {
+      await new Promise((r) => setTimeout(r, n));
+      return n * 10;
+    });
+    expect(out).toEqual([50, 10, 40, 20, 30]);
+  });
+
+  it('never exceeds the concurrency limit', async () => {
+    let live = 0;
+    let peak = 0;
+    await mapPool(Array.from({ length: 40 }, (_, i) => i), 4, async (n) => {
+      live++;
+      peak = Math.max(peak, live);
+      await new Promise((r) => setTimeout(r, 1));
+      live--;
+      return n;
+    });
+    expect(peak).toBeLessThanOrEqual(4);
+  });
+
+  it('handles an empty pool without hanging', async () => {
+    expect(await mapPool([], 8, async (x) => x)).toEqual([]);
+  });
+});
+
+describe('waves', () => {
+  it('splits into fixed-size chunks with a short tail', () => {
+    expect(waves([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+    expect(waves([], 3)).toEqual([]);
+  });
+
+  it('covers every item exactly once', () => {
+    const items = Array.from({ length: 97 }, (_, i) => i);
+    expect(waves(items, 24).flat()).toEqual(items);
+  });
+});

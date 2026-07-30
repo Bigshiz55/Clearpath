@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import { WatchVerdictWordmark } from './WatchVerdictWordmark';
 
-/** The WatchVerdict app mark alone — a retro TV with scales of justice on the
+/** The WatchVerd1ct app mark alone — a retro TV with scales of justice on the
  *  screen. `box`/`inner` size it; `overlay` renders on top (e.g. a score), and
  *  when set the mark itself dims so the overlay reads as "inside" the icon. */
 export function LogoMark({
@@ -37,30 +38,73 @@ export function LogoMark({
   );
 }
 
+/**
+ * THE WORDMARK YIELDS WHEN THE BAR CANNOT HOLD IT.
+ *
+ * The app header is a logo plus search, account and overflow. That was sized at
+ * 390px, where it fits with four pixels to spare — and never checked narrower.
+ * At 360 the wordmark ran 26px under the search button and at 320 it ran 66px
+ * under it, with "VERD1CT" printed through a control.
+ *
+ * There is no type size that fixes 320: the three controls plus padding leave
+ * ~100px, and the shortest legible wordmark is half again that. So it steps
+ * down at 390, and below 360 the mark carries the brand alone — which it is
+ * designed to do. Only the crowded header opts in; a page that gives the logo
+ * a line of its own keeps the full wordmark at every width.
+ */
+const CROWDED_WORD = 'hidden min-[360px]:inline text-base min-[390px]:text-xl sm:text-3xl';
+
 export function Logo({
   href = '/',
   compact = false,
   size = 'md',
+  crowded = false,
 }: {
   href?: string;
   compact?: boolean;
-  size?: 'md' | 'lg';
+  /** `xl` is for a page that gives the logo a line of its own — the landing
+   *  hero, not a shared header bar. It does not shrink for `crowded`. */
+  size?: 'md' | 'lg' | 'xl';
+  /** Set on bars that also carry controls — see `CROWDED_WORD`. */
+  crowded?: boolean;
 }) {
-  const box = size === 'lg' ? 'h-14 w-14 rounded-2xl' : 'h-9 w-9 rounded-xl';
-  const inner = size === 'lg' ? 'h-11 w-11' : 'h-7 w-7';
-  const word = size === 'lg' ? 'text-2xl sm:text-3xl' : 'text-lg';
+  // `lg` shrinks on small phones so the header (logo + right controls) never
+  // exceeds a narrow viewport, then grows from `sm` up. `xl` never shares a
+  // bar with controls, so it grows straight through — including a further
+  // step at `lg` (1024px+), because a page that gives the logo a whole line
+  // on a real desktop should use a real desktop's worth of it, not stop
+  // scaling at tablet width.
+  const box =
+    size === 'xl'
+      ? 'h-14 w-14 rounded-2xl sm:h-20 sm:w-20 sm:rounded-3xl lg:h-24 lg:w-24 lg:rounded-[1.75rem]'
+      : size === 'lg'
+        ? 'h-11 w-11 rounded-xl sm:h-14 sm:w-14 sm:rounded-2xl'
+        : 'h-9 w-9 rounded-xl';
+  const inner =
+    size === 'xl' ? 'h-11 w-11 sm:h-16 sm:w-16 lg:h-20 lg:w-20' : size === 'lg' ? 'h-9 w-9 sm:h-11 sm:w-11' : 'h-7 w-7';
+  // `xl` STEPS DOWN AT 320. A line of its own is not the same as unlimited
+  // room: at `text-3xl` the wordmark measures 252px, and beside a 56px mark
+  // inside a 16px-padded page that needs 334 — it ran 2px off the right edge
+  // of the narrowest phone the product supports, which the route crawler
+  // caught as horizontal overflow on the LANDING PAGE. One step smaller below
+  // 360px costs nothing and fits with room to spare.
+  const word =
+    crowded
+      ? CROWDED_WORD
+      : size === 'xl'
+        ? 'text-2xl min-[360px]:text-3xl sm:text-5xl lg:text-6xl'
+        : size === 'lg'
+          ? 'text-xl sm:text-3xl'
+          : 'text-lg';
 
   return (
     <Link href={href} className="group inline-flex items-center gap-2.5">
       <LogoMark box={box} inner={inner} />
-      {!compact && (
-        // Solid, single-run wordmark. No per-letter animation or fixed-width
-        // slot — the previous 3D "I→1" flip collapsed to an empty gap on iOS
-        // Safari and read as "WatchVERD_CT". It must ALWAYS render "WatchVERDICT".
-        <span className={`whitespace-nowrap font-bold tracking-tight text-white ${word}`}>
-          Watch<span className="text-[#ff1493]">VERDICT</span>
-        </span>
-      )}
+      {!compact && <WatchVerdictWordmark className={word} />}
     </Link>
   );
 }
+
+/** Canonical shared brand logo (app mark + WatchVERD1CT wordmark). Alias of Logo
+ *  so callers can import a clearly-named component. */
+export const WatchVerdictLogo = Logo;

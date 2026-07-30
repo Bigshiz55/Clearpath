@@ -1,5 +1,5 @@
 /**
- * Pure, dependency-free intent detectors for WatchVerdict natural-language
+ * Pure, dependency-free intent detectors for WatchVerd1ct natural-language
  * requests.
  *
  * These functions were previously module-local inside
@@ -18,37 +18,30 @@
  * where-to-watch title).
  */
 
-const NUM_WORDS: Record<string, number> = {
-  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-};
+import { extractResultCount, DEFAULT_RESULT_COUNT } from '@/lib/nlu/count';
 
-/** The default result count when none is stated. Mirrors askParse. */
-export const DEFAULT_COUNT = 8;
+/**
+ * The default result count when none is stated — one definition, shared with
+ * `finder.ts` (`DEFAULT_RESULT_LIMIT`) and `askParse`. It used to be an 8
+ * written out separately in three files, two of which were the live path, so
+ * every browse-shaped ask was answered with eight titles.
+ */
+export const DEFAULT_COUNT = DEFAULT_RESULT_COUNT;
 
-/** Fuzzy spoken counts people actually say. Checked before the numeric parse so
- *  "a couple of movies" → 2 rather than falling through to the default. */
-function fuzzyCount(text: string): number | null {
-  const t = ` ${text.toLowerCase()} `;
-  if (/\b(a\s+)?couple\b/.test(t)) return 2;
-  if (/\b(a\s+)?few\b/.test(t)) return 3;
-  return null;
-}
-
-/** Like parseRequestedCount but returns null when no count word/number is
- *  present (so the evaluator can distinguish "user said nothing" from a
- *  defaulted 8). Reads "a couple"/"a few" too; otherwise first-number semantics
- *  (which still reproduces the known "last 5 years" → 5 misread). */
+/**
+ * An explicitly requested count, or null when the ask names none (so the
+ * evaluator can distinguish "the user said nothing" from a defaulted number).
+ *
+ * The old implementation took the first number in the sentence, which meant
+ * "a great movie under two hours" asked for TWO MOVIES and "from the last 3
+ * years" asked for three. See `count.ts` for what now qualifies.
+ */
 export function extractCount(text: string): number | null {
-  const fuzzy = fuzzyCount(text);
-  if (fuzzy != null) return fuzzy;
-  const m = text.toLowerCase().match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})\b/);
-  if (!m || !m[1]) return null;
-  const n = NUM_WORDS[m[1]] ?? Number.parseInt(m[1], 10);
-  return Number.isFinite(n) && n >= 1 && n <= 20 ? n : null;
+  return extractResultCount(text, { fuzzy: true, max: 20 });
 }
 
 /** A requested result count from the ask ("five …" → 5, "a couple" → 2).
- *  Default 8. Shared by build-case/ask/finder. */
+ *  Defaults to a full page. Shared by build-case/ask/finder. */
 export function parseRequestedCount(text: string): number {
   return extractCount(text) ?? DEFAULT_COUNT;
 }
@@ -165,18 +158,18 @@ export function extractWatchTitle(text: string): string | null {
 export function detectGenre(text: string): string | null {
   const t = ` ${text.toLowerCase()} `;
   const table: [RegExp, string][] = [
-    [/\b(comed(y|ies)|sitcoms?|funny)\b/, 'Comedy'],
+    [/\b(comed(y|ies)|sitcoms?|funny|comdey|comdy)\b/, 'Comedy'],
     [/\b(dramas?)\b/, 'Drama'],
     [/\b(crime)\b/, 'Crime'],
-    [/\b(thrillers?)\b/, 'Thriller'],
-    [/\b(horror|scary)\b/, 'Horror'],
+    [/\b(thrillers?|thriler|thrillr)\b/, 'Thriller'],
+    [/\b(horror|scary|horrer|horor|horrror)\b/, 'Horror'],
     [/\b(sci-?fi|science fiction)\b/, 'Science-Fiction'],
-    [/\b(rom-?coms?|romance|romantic)\b/, 'Romance'],
-    [/\b(myster(y|ies))\b/, 'Mystery'],
+    [/\b(rom-?coms?|romance|romantic|romence)\b/, 'Romance'],
+    [/\b(myster(y|ies)|mistery)\b/, 'Mystery'],
     [/\b(action)\b/, 'Action'],
     [/\b(reality)\b/, 'Reality'],
     [/\b(sports?)\b/, 'Sports'],
-    [/\b(documentar(y|ies)|docs?)\b/, 'Documentary'],
+    [/\b(documentar(y|ies)|docs?|documentry|documentery|documantary)\b/, 'Documentary'],
     [/\b(fantasy)\b/, 'Fantasy'],
     [/\b(family|kids?|children'?s?)\b/, 'Family'],
     [/\b(western)\b/, 'Western'],
@@ -301,7 +294,11 @@ export function detectNetwork(text: string): { key: string; name: string } | nul
 export function detectPlatform(text: string): { id: number; name: string } | null {
   const t = ` ${text.toLowerCase()} `;
   const table: { id: number; name: string; strong: RegExp; bare?: RegExp }[] = [
-    { id: 8, name: 'Netflix', strong: /\bnetflix\b/ },
+    // Netflix carries a curated set of high-frequency misspellings so the
+    // offline detector (the fallback when the LLM parser has no key) still
+    // resolves the platform a typo would otherwise silently drop. Each variant
+    // is unambiguous — none collides with an ordinary English word.
+    { id: 8, name: 'Netflix', strong: /\b(netflix|netflx|netlix|netfix|netflex|netfllix|neflix)\b/ },
     { id: 9, name: 'Prime Video', strong: /\b(amazon prime|prime video|amazon video)\b/, bare: /\b(amazon|prime)\b/ },
     { id: 337, name: 'Disney+', strong: /\b(disney\s*\+|disney plus)\b/, bare: /\bdisney\b/ },
     { id: 1899, name: 'Max', strong: /\b(hbo max|hbo)\b/, bare: /\bmax\b/ },
@@ -312,6 +309,8 @@ export function detectPlatform(text: string): { id: number; name: string } | nul
     { id: 43, name: 'Starz', strong: /\bstarz\b/ },
     { id: 37, name: 'Showtime', strong: /\bshowtime\b/ },
     { id: 526, name: 'AMC+', strong: /\bamc\s*\+/ },
+    { id: 151, name: 'BritBox', strong: /\bbritbox\b/ },
+    { id: 87, name: 'Acorn TV', strong: /\b(acorn tv|acorn)\b/ },
     { id: 73, name: 'Tubi', strong: /\btubi\b/ },
     { id: 300, name: 'Pluto TV', strong: /\bpluto\b/ },
     { id: 207, name: 'The Roku Channel', strong: /\broku\b/ },
@@ -328,5 +327,123 @@ export function detectPlatform(text: string): { id: number; name: string } | nul
   }
   for (const p of table) if (p.strong.test(t)) return { id: p.id, name: p.name };
   for (const p of table) if (p.bare && new RegExp(`\\bon\\s+(?:the\\s+)?${p.bare.source}`).test(t)) return { id: p.id, name: p.name };
+  return null;
+}
+
+// ── International origin / language / audio / runtime ────────────────────────
+// Pure detectors that give the search pipeline first-class foreign-origin,
+// original-language, English-audio and runtime-cap constraints — the dimensions
+// the ask parser previously dropped (so "a Spanish film with English audio" kept
+// only "movie"). Nationality adjective / country name → ISO-3166 country + the
+// ISO-639-1 original language. Conservative: only fires on an explicit cue.
+
+interface OriginRule { re: RegExp; country: string; lang: string }
+const ORIGIN_RULES: OriginRule[] = [
+  // Each rule carries a few curated, unambiguous MISSPELLINGS so the offline
+  // fallback (used when the LLM parser has no key) still resolves origin on a
+  // typo. Exhaustive typo handling is the live LLM's job; these are the common
+  // ones seen in real voice/keyboard input.
+  { re: /\b(spanish|spain|castilian|from spain|spanihs|spansh|spainish|espanol)\b/, country: 'ES', lang: 'es' },
+  { re: /\b(mexican|mexico)\b/, country: 'MX', lang: 'es' },
+  { re: /\b(argentin(e|ian)|argentina)\b/, country: 'AR', lang: 'es' },
+  { re: /\b(french|france|frenchh|frnch)\b/, country: 'FR', lang: 'fr' },
+  { re: /\b(italian|italy|italion|itallian)\b/, country: 'IT', lang: 'it' },
+  { re: /\b(german|germany|germen|jerman)\b/, country: 'DE', lang: 'de' },
+  { re: /\b(korean|korea|k-?drama|koreen|korien|korain)\b/, country: 'KR', lang: 'ko' },
+  { re: /\b(japanese|japan|japanes|japenese|japenes)\b/, country: 'JP', lang: 'ja' },
+  { re: /\b(indian|india|bollywood|hindi)\b/, country: 'IN', lang: 'hi' },
+  { re: /\b(brazil(ian)?|portuguese)\b/, country: 'BR', lang: 'pt' },
+  { re: /\b(british|england|english|uk|u\.k\.|britsh|brittish|britsish)\b/, country: 'GB', lang: 'en' },
+  { re: /\b(irish|ireland)\b/, country: 'IE', lang: 'en' },
+  { re: /\b(australian|australia)\b/, country: 'AU', lang: 'en' },
+  { re: /\b(scandinavian|swedish|sweden|norwegian|norway|danish|denmark|nordic)\b/, country: 'SE', lang: 'sv' },
+];
+
+export interface OriginDetection {
+  countries: string[];
+  languages: string[];
+  /** True when a NON-domestic (non-US) origin was requested, incl. "foreign". */
+  foreign: boolean;
+}
+
+/** Detect requested production origin + original language. Empty when none. */
+export function detectOrigin(text: string): OriginDetection {
+  const t = ` ${text.toLowerCase()} `;
+  const countries = new Set<string>();
+  const languages = new Set<string>();
+  for (const r of ORIGIN_RULES) {
+    if (r.re.test(t)) {
+      // "english" alone (audio) must not be read as British origin — require a
+      // stronger UK cue for GB, but always allow the language signal elsewhere.
+      if (r.country === 'GB' && !/\b(british|england|uk|u\.k\.|britsh|brittish|britsish)\b/.test(t)) continue;
+      countries.add(r.country);
+      if (r.lang !== 'en') languages.add(r.lang);
+    }
+  }
+  // Generic "foreign / international / non-english" without a named country.
+  const genericForeign = /\b(foreign|international|non-?english|world cinema)\b/.test(t);
+  const foreign = genericForeign || [...countries].some((c) => c !== 'US' && c !== 'GB');
+  return { countries: [...countries], languages: [...languages], foreign };
+}
+
+export interface AudioDetection {
+  englishAudioRequired: boolean;
+  englishDubRequired: boolean;
+  dubNotAcceptable: boolean;
+  subtitlesNotAcceptable: boolean;
+  originalAudioPreferred: boolean;
+}
+
+/** Detect English-audio / dub / subtitle preferences. Conservative. */
+export function detectAudio(text: string): AudioDetection {
+  const t = ` ${text.toLowerCase()} `;
+  const englishDubRequired = /\b(english dub|dubbed in english|english dubbed|english-language dub)\b/.test(t);
+  const englishAudioRequired =
+    englishDubRequired ||
+    /\b(english audio|in english|english language|english-language|english spoken|spoken english)\b/.test(t) ||
+    /\bneeds? (?:to be )?(?:in )?english\b/.test(t);
+  const subtitlesNotAcceptable = /\b(no subtitles?|without subtitles?|don'?t want to read|hate subtitles?|not subtitled|no subs)\b/.test(t);
+  const dubNotAcceptable = /\b(no dub|not dubbed|original audio only|subtitles? (?:are )?fine|prefer subtitles?)\b/.test(t);
+  const originalAudioPreferred = /\b(original (?:language|audio)|subtitles? (?:are )?(?:fine|ok|okay|acceptable|preferred))\b/.test(t);
+  return { englishAudioRequired, englishDubRequired, dubNotAcceptable, subtitlesNotAcceptable, originalAudioPreferred };
+}
+
+const WORD_NUM: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+
+/** The runtime CEILING in minutes if the text names one ("under two hours" → 120,
+ *  "under 110 minutes" → 110, "under 90" → 90). Null when unconstrained. */
+export function detectRuntimeMaxMinutes(text: string): number | null {
+  const t = ` ${text.toLowerCase()} `;
+  // "under two hours" / "less than 2 hrs"
+  const hr = t.match(/\b(?:under|less than|below|no more than|at most|within|shorter than)\s+(\d+(?:\.\d+)?|one|two|three)\s*(?:hours?|hrs?)\b/);
+  if (hr && hr[1]) {
+    const n = WORD_NUM[hr[1]] ?? Number(hr[1]);
+    if (Number.isFinite(n) && n > 0) return Math.round(n * 60);
+  }
+  // "under 110 minutes" / "less than 90 min"
+  const mn = t.match(/\b(?:under|less than|below|no more than|at most|within|shorter than)\s+(\d{2,3})\s*(?:minutes?|mins?)\b/);
+  if (mn && mn[1]) {
+    const n = Number(mn[1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  // "two hours or less"
+  const hr2 = t.match(/\b(\d+(?:\.\d+)?|one|two|three)\s*(?:hours?|hrs?)\s+or\s+(?:less|under|shorter)\b/);
+  if (hr2 && hr2[1]) {
+    const n = WORD_NUM[hr2[1]] ?? Number(hr2[1]);
+    if (Number.isFinite(n) && n > 0) return Math.round(n * 60);
+  }
+  return null;
+}
+
+/**
+ * The media type the user explicitly RULED OUT — "the movie, not the series",
+ * "not a TV show", "not a film". Returns the excluded type so a caller can
+ * narrow an otherwise-uncommitted ('any') query to the other type. Conservative:
+ * only a clear negation cue fires it, so "not that one" or a bare title never do.
+ */
+export function detectExcludedMediaType(text: string): 'movie' | 'tv' | null {
+  const t = ` ${text.toLowerCase()} `;
+  if (/\bnot\s+(?:a|an|the)?\s*(?:tv\s+)?(?:series|show|sitcom)\b/.test(t)) return 'tv';
+  if (/\bnot\s+(?:a|an|the)?\s*(?:movie|film|flick|feature)\b/.test(t)) return 'movie';
   return null;
 }

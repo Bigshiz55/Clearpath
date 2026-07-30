@@ -31,8 +31,15 @@ export function StartLiveCourt() {
 
   return (
     <div>
-      <button onClick={start} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-brand-400/40 bg-brand-500/15 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:bg-brand-500/25">
-        {loading ? 'Creating room…' : '🌐 Start a live Court — everyone on their own phone'}
+      {/* THE page's one filled button. It was a tinted outline pill with a
+          fifteen-word label; the single primary action reads as one. */}
+      <button
+        onClick={start}
+        disabled={loading}
+        data-testid="start-court"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-base font-bold text-white shadow-glow transition hover:bg-brand-500 disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none sm:w-auto"
+      >
+        {loading ? 'Creating room…' : 'Start a Court'}
       </button>
       {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
     </div>

@@ -7,7 +7,7 @@ import { scoreVerdict } from '@/lib/verdictVisual';
 import { Verd1ctBadge } from './Verd1ctBadge';
 
 /**
- * The WatchVerdict DNA Score — a per-user "odds you'll love it" (0..100). On the
+ * The WatchVerd1ct DNA Score — a per-user "odds you'll love it" (0..100). On the
  * title page it requests the AI adjustment layer (`?ai=1`): the deterministic
  * Watchability blend, refined by a bounded ±15 AI nudge with a one-line reason.
  * When the model has little of your data yet, it leans on the objective score.

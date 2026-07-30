@@ -1,13 +1,16 @@
 'use client';
 
+import { dayLabel } from '@/lib/viewing/localDay';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
+import { canonicalQueryKey, activeFilterChips } from '@/lib/refineState';
 import { STREAMING_SERVICES } from '@/lib/services';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { PosterCard } from '@/components/PosterCard';
-import { JudgeBench } from '@/components/JudgeBench';
 import { MatchMark } from '@/components/MatchMark';
+import { WhyVerdict } from '@/components/verdict/WhyVerdict';
+import { buildPills } from '@/lib/verdict/pills';
 import { type TileRatings } from '@/lib/ratings';
 import type { FinderQuery } from '@/lib/finder';
 
@@ -33,6 +36,21 @@ interface ResultItem {
   deciderUrl: string;
   ratings?: TileRatings;
   airing?: { network: string; time: string; airstamp: string } | null;
+  /** "Why this Verd1ct?" — real reasons/requirements/confidence from the engine. */
+  explain?: {
+    rose: string[];
+    heldBack: string[];
+    requirements: { label: string; satisfied: boolean; evidence: string }[];
+    availability: { text: string; confidence: string } | null;
+    confidence: { level: 'high' | 'medium' | 'low'; because: string[] };
+  };
+  /** Floor-weighted joint verdict when several people are watching. */
+  household?: {
+    score: number;
+    call: 'strong' | 'good' | 'toss_up' | 'warning';
+    perMember: { name: string; match: number }[];
+    explanation: string[];
+  } | null;
 }
 
 /** How far ahead a broadcast still counts as "what to watch" — 48 hours. A show
@@ -53,15 +71,12 @@ function airingInfo(a: { network: string; time: string; airstamp: string }): { t
   // Beyond the 48h window (or more than a few hours past) it isn't watch-now.
   if (airMs - now > AIRING_WINDOW_MS || airMs - now < -3 * 60 * 60 * 1000) return null;
 
-  const dayMs = 86_400_000;
   const d = new Date(airMs);
-  const isToday = d.toDateString() === new Date(now).toDateString();
-  const isTomorrow = new Date(now + dayMs).toDateString() === d.toDateString();
-  const day = isToday
-    ? 'Tonight'
-    : isTomorrow
-      ? 'Tomorrow'
-      : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  // The day word comes from the shared, DST-safe `localDay` module (calendar
+  // comparison, never `now + 24h`). "Today" reads as "Tonight" here because
+  // this row is specifically about tonight's viewing.
+  const label = dayLabel(airMs, now, 'short');
+  const day = label === 'Today' ? 'Tonight' : label;
 
   let clock = '';
   const m = a.time.match(/^(\d{1,2}):(\d{2})/);
@@ -164,16 +179,36 @@ export function FinderUI({
 }) {
   const [text, setText] = useState('');
   const [q, setQ] = useState<FinderQuery>({ ...EMPTY_QUERY });
-  const [watcherIdx, setWatcherIdx] = useState(-1); // -1 = You
+  // Who's watching — MULTI-select co-watchers. "You" is always in the room;
+  // selecting anyone else switches to household mode (floor-weighted joint
+  // scoring server-side, never a blind average).
+  const [watcherSel, setWatcherSel] = useState<Set<number>>(new Set());
   const [items, setItems] = useState<ResultItem[] | null>(null);
   const [scoredFor, setScoredFor] = useState('Your match');
   const [relaxed, setRelaxed] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The canonical key of the request the current results came from. Comparing
+  // it to the key of the CURRENT controls is what detects "these results are
+  // stale relative to the filters" — no guessing from individual fields.
+  const [lastRunKey, setLastRunKey] = useState<string | null>(null);
+  // Fields the user has set BY HAND since the current ask was typed. The server
+  // re-parses the free text on every run, so without this list a slider drag
+  // after a text search is silently overwritten by the sentence and the results
+  // come back identical — the control looks broken because it is being
+  // discarded. Typing a new ask clears it; so does adopting the server's parse.
+  const [touched, setTouched] = useState<Set<string>>(new Set());
+  const [justUpdated, setJustUpdated] = useState(false);
+  // Latest-request-wins: a monotonic id + AbortController so a slow older
+  // response can never overwrite a newer result set.
+  const seqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   function onText(v: string) {
     setText(v);
     setQ(naiveParseQuery(v));
+    // A new sentence supersedes the manual edits made against the old one.
+    setTouched(new Set());
   }
 
   // Deep-link support: "State Your Case" (and links) can open the Finder pre-
@@ -215,35 +250,79 @@ export function FinderUI({
   }, [loading, items]);
   function set<K extends keyof FinderQuery>(key: K, val: FinderQuery[K]) {
     setQ((prev) => ({ ...prev, [key]: val }));
+    setTouched((prev) => new Set(prev).add(key as string));
   }
   function toggleGenre(id: number) {
     setQ((prev) => ({
       ...prev,
       genreIds: prev.genreIds.includes(id) ? prev.genreIds.filter((g) => g !== id) : [...prev.genreIds, id],
     }));
+    setTouched((prev) => new Set(prev).add('genreIds'));
   }
   async function find(qOverride?: FinderQuery, textOverride?: string) {
+    const mySeq = ++seqRef.current;
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
     setLoading(true);
     setError(null);
+    // Selected co-watchers — any selection means the household (You + them)
+    // decides together.
+    const selected = watchers.filter((_, i) => watcherSel.has(i));
+    const householdMode = selected.length > 0;
+    const effQuery = qOverride ?? q;
+    const effText = (textOverride ?? text).trim();
+    const runKey = canonicalQueryKey(effQuery, effText, ['You', ...selected.map((w) => w.name)].join('+'));
+    const isRefinement = items != null;
     try {
-      const watcher = watcherIdx >= 0 ? watchers[watcherIdx] : null;
       const res = await fetch('/api/finder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // Send the raw ask too, so the server can parse it smartly (actor names,
         // counts, "over 70%", etc.). Falls back to the tools below when empty.
-        body: JSON.stringify({ query: qOverride ?? q, text: (textOverride ?? text).trim(), watcher }),
+        body: JSON.stringify({
+          query: effQuery,
+          text: effText,
+          // Hand-set fields win over the re-parse of `text`.
+          overrides: Array.from(touched),
+          // Household (array): the server scores every member (You + each
+          // selected watcher) and ranks by the floor-weighted joint verdict.
+          ...(householdMode ? { watchers: selected } : {}),
+        }),
+        signal: ac.signal,
       });
       const data = await res.json();
+      if (mySeq !== seqRef.current) return; // superseded — a newer request owns the screen
       if (!res.ok) throw new Error(data.error ?? 'Failed');
       setItems(data.items ?? []);
       setScoredFor(data.scoredFor ?? 'Your match');
       setRelaxed(data.relaxed ?? null);
-    } catch {
+      // ADOPT WHAT ACTUALLY RAN. The server parses the ask far better than the
+      // client's regex does, so the sliders and the "Filtering by" chips must
+      // show ITS constraints, not the client's guess — otherwise the chips
+      // claim "Last 16 yr / Match 40+" while the search really ran "24 months /
+      // 80+", and any subsequent drag starts from a number the user never saw.
+      const applied = data.query ? ({ ...EMPTY_QUERY, ...(data.query as Partial<FinderQuery>) }) : null;
+      if (applied) {
+        setQ(applied);
+        setTouched(new Set());
+      }
+      setLastRunKey(
+        applied
+          ? canonicalQueryKey(applied, effText, ['You', ...selected.map((w) => w.name)].join('+'))
+          : runKey,
+      );
+      if (isRefinement) {
+        setJustUpdated(true);
+        window.setTimeout(() => setJustUpdated(false), 4000);
+      }
+    } catch (e) {
+      if (mySeq !== seqRef.current || (e instanceof DOMException && e.name === 'AbortError')) return;
       setError('Couldn’t run that search. Try again.');
       setItems([]);
+      setLastRunKey(runKey);
     } finally {
-      setLoading(false);
+      if (mySeq === seqRef.current) setLoading(false);
     }
   }
 
@@ -251,30 +330,47 @@ export function FinderUI({
     .map((id) => STREAMING_SERVICES.find((s) => s.id === id || s.ids.includes(id))?.name)
     .filter((n): n is string => Boolean(n));
 
+  // Staleness: the controls' canonical key vs. the key the results were
+  // fetched with. When they differ, the results no longer reflect the filters.
+  const currentKey = canonicalQueryKey(
+    q,
+    text.trim(),
+    ['You', ...watchers.filter((_, i) => watcherSel.has(i)).map((w) => w.name)].join('+'),
+  );
+  const filtersChanged = items != null && !loading && lastRunKey != null && currentKey !== lastRunKey;
+  const filterChips = activeFilterChips(q);
+  const ctaLabel = loading ? 'Searching…' : items != null ? 'Update results' : 'Find titles';
+
   return (
     <div className="space-y-5">
       {(q.providerIds?.length ?? 0) > 0 && (
-        <div className="flex items-center justify-between gap-2 rounded-xl border border-brand-400/40 bg-brand-500/10 px-3.5 py-2.5 text-sm text-brand-100">
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 rounded-xl border border-brand-400/40 bg-brand-500/10 px-3.5 py-2.5 text-sm text-brand-100">
           <span>📺 Filtered to <b className="text-white">{providerFilterNames.join(', ') || 'your pick'}</b> — real availability from TMDB.</span>
           <button onClick={() => set('providerIds', [])} className="flex-none text-xs font-semibold text-brand-200 underline underline-offset-2 hover:text-white">Clear</button>
         </div>
       )}
       {/* On the home screen, both ways to search live inside ONE outlined box —
           "say what you want" OR "build it by hand" — so it reads as two options
-          in a single section. Elsewhere the wrapper is transparent (`contents`). */}
+          in a single section. Elsewhere the wrapper is transparent (`contents`)
+          — it encloses the RESULTS too, so any width put on it would cap the
+          grid; the question column is capped on the form div below instead. */}
       <div className={embedded ? 'space-y-5 rounded-3xl border-2 border-brand-400/40 bg-brand-500/[0.05] p-4 sm:p-6' : 'contents'}>
         {embedded && (
           <div className="flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
-            <span aria-hidden>⚖️</span> Your opening statement
+            Your search
           </div>
         )}
 
-        {/* Hero — the judge & the bench on the left, your plain-English ask on the right */}
-        <div className={`grid gap-4 ${embedded ? '' : 'lg:grid-cols-2'}`}>
-        {!embedded && <JudgeBench big />}
+        {/* One column. This was `lg:grid-cols-2` from when a second panel sat
+            beside the ask; that panel is long gone, so on a laptop it left the
+            box stranded in the left half with an empty column beside it.
+            Standalone, the question keeps a readable centered column — a
+            1500px textarea is a worse textarea — while the results grid below
+            takes the whole container. That split IS the desktop layout. */}
+        <div className={`grid gap-4 ${embedded ? '' : 'mx-auto w-full max-w-2xl'}`}>
 
         <div className={embedded ? 'flex flex-col gap-3' : 'card flex flex-col gap-3 p-4'}>
-          {!embedded && <div className="eyebrow-lg">⚖️ Try your case</div>}
+          {!embedded && <div className="eyebrow-lg">Refine your search</div>}
           <textarea
             value={text}
             onChange={(e) => onText(e.target.value)}
@@ -296,39 +392,69 @@ export function FinderUI({
             ))}
           </div>
           <button onClick={() => void find()} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
-            {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
+            {ctaLabel}
           </button>
         </div>
       </div>
 
       {loading && (
-        <div className="card p-6 text-center">
-          <div className="text-sm font-semibold text-white">⚖️ The court is deliberating…</div>
-          <div className="mt-1 text-xs text-slate-400">Weighing your evidence against every candidate.</div>
+        <div className="card mx-auto w-full max-w-2xl p-6 text-center">
+          <div className="text-sm font-semibold text-white">Searching…</div>
+          <div className="mt-1 text-xs text-slate-400">Checking every candidate against your requirements.</div>
         </div>
       )}
-      {error && <p className="text-sm text-amber-300">{error}</p>}
+      {error && <p className="mx-auto w-full max-w-2xl text-sm text-amber-300">{error}</p>}
 
       {items && !loading && (
         <div id="finder-results" className="scroll-mt-4">
+          {filtersChanged && (
+            <div
+              data-testid="filters-changed"
+              className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400/40 bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-100"
+            >
+              <span>Filters changed — these results don’t reflect them yet.</span>
+              <button onClick={() => void find()} className="flex-none rounded-lg border border-amber-300/50 bg-amber-400/20 px-3 py-1.5 text-xs font-bold text-amber-50 transition hover:bg-amber-400/30">
+                Update results
+              </button>
+            </div>
+          )}
+          {justUpdated && !filtersChanged && (
+            <p data-testid="results-updated" role="status" className="mb-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-100">
+              ✓ Results updated — everything below matches your current filters.
+            </p>
+          )}
           {relaxed && <p className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{relaxed}</p>}
           {items.length === 0 ? (
-            <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and submit again.</p>
+            <p className="text-sm text-slate-400">Nothing matched all of that — loosen a constraint (drop the match bar or a genre) and search again.</p>
           ) : (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="inline-flex flex-wrap items-center gap-1 text-base font-bold text-white sm:text-lg">
-                  ⚖️ The verdict — {items.length} match{items.length === 1 ? '' : 'es'}, ranked by
+                  {items.length} match{items.length === 1 ? '' : 'es'} for you, ranked by
                   <MatchMark size="text-sm" /> {scoredFor}:
                 </div>
                 <button
                   onClick={() => document.getElementById('evidence')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                   className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
                 >
-                  ⚖️ Present new evidence ↓
+                  Update search ↓
                 </button>
               </div>
+              {filterChips.length > 0 && (
+                <div data-testid="active-filters" className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span className="uppercase tracking-wide text-slate-500">Filtering by</span>
+                  {filterChips.map((c) => (
+                    <span key={c} className="rounded-md border border-brand-400/30 bg-brand-500/10 px-2 py-0.5 font-semibold text-brand-100">{c}</span>
+                  ))}
+                </div>
+              )}
               <div className="poster-grid">
+                {/* `it.reason` used to render inside each card as a sentence
+                    beside the poster ("A near-perfect match — …"). Removed on
+                    request: it restated what the badge and Why-this-Verd1ct
+                    already say, and was a third of every card's height. The
+                    reasons live on in the Why-this-Verd1ct panel, which is
+                    where a reader who wants them goes. */}
                 {items.map((it) => (
                   <PosterCard
                     key={`${it.mediaType}-${it.id}`}
@@ -339,27 +465,82 @@ export function FinderUI({
                     year={it.year}
                     posterUrl={it.posterUrl}
                     posterPath={it.posterPath}
-                  >
-                    {it.reason && <p className="mt-1.5 line-clamp-3 text-xs text-slate-400">{it.reason}</p>}
-                    {(() => {
-                      const info = it.mediaType === 'tv' && it.airing ? airingInfo(it.airing) : null;
-                      if (!info) return null;
-                      return (
-                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-2 py-1 text-xs font-bold text-white">
-                          <span aria-hidden>📺</span>
-                          <span className="tabular-nums">{info.text}</span>
+                    evidence={
+                      <>
+                        {/* ONE NUMBER PER CARD. The badge above is the score;
+                            this row no longer restates it, nor the year or
+                            runtime the heading and facts line already carry
+                            (`buildPills` drops all of them). What is left is
+                            the next step — where to watch, drawn as a real
+                            affordance rather than a tag — and any evidence the
+                            card has not said elsewhere, kept quiet beside it. */}
+                        {/* RESERVED, EVEN WHEN EMPTY. A card without a
+                            streaming match (no `where`) rendered nothing here
+                            at all, so the row below it — Why this Verd1ct,
+                            then FOR · AGAINST · SAVE — sat 36px higher than on
+                            a neighbouring card that DID have a pill, and a row
+                            of five cards read as five different heights. The
+                            zone is now always present; the pills inside it are
+                            not (`result-pills` still renders zero elements
+                            when there is nothing to show). */}
+                        <div className="min-h-[36px]">
+                          {(() => {
+                            const pills = buildPills({ receipts: it.receipts, where: it.where });
+                            if (pills.length === 0) return null;
+                            return (
+                              <div data-testid="result-pills" className="flex flex-wrap items-center gap-1.5">
+                                {pills.map((p) => (
+                                  <span
+                                    key={p.label}
+                                    data-tone={p.tone}
+                                    className={
+                                      p.tone === 'watch'
+                                        ? 'inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[13px] font-bold text-white'
+                                        : 'inline-flex min-h-[36px] items-center rounded-lg border border-white/10 bg-white/[0.04] px-2.5 text-[12px] text-slate-400'
+                                    }
+                                  >
+                                    {p.tone === 'watch' ? <><span aria-hidden>📺</span>{p.label}</> : `✓ ${p.label}`}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
-                      );
-                    })()}
-                    {(it.receipts.length > 0 || it.where) && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {it.receipts.map((r) => (
-                          <span key={r} className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">✓ {r}</span>
-                        ))}
-                        {it.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>}
-                      </div>
-                    )}
-                  </PosterCard>
+                        {(() => {
+                          const info = it.mediaType === 'tv' && it.airing ? airingInfo(it.airing) : null;
+                          if (!info) return null;
+                          return (
+                            <div className="inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-2 py-1 text-xs font-bold text-white">
+                              <span aria-hidden>📺</span>
+                              <span className="tabular-nums">{info.text}</span>
+                            </div>
+                          );
+                        })()}
+                        {it.household && (
+                          <div
+                            data-testid="household-verdict"
+                            data-call={it.household.call}
+                            className={`rounded-lg border p-2 text-xs ${
+                              it.household.call === 'warning'
+                                ? 'border-amber-400/40 bg-amber-500/10 text-amber-100'
+                                : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'
+                            }`}
+                          >
+                            <div className="font-black">
+                              {it.household.call === 'warning' ? '⚠️ HOUSEHOLD WARNING' : `HOUSEHOLD MATCH: ${it.household.score}`}
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums">
+                              {it.household.perMember.map((m) => (
+                                <span key={m.name}>{m.name}: <b>{m.match}</b></span>
+                              ))}
+                            </div>
+                            {it.household.explanation[0] && <p className="mt-1 opacity-90">{it.household.explanation[0]}</p>}
+                          </div>
+                        )}
+                        {it.explain && <WhyVerdict data={it.explain} />}
+                      </>
+                    }
+                  />
                 ))}
               </div>
             </div>
@@ -368,16 +549,17 @@ export function FinderUI({
       )}
 
       {/* OR — type an opening statement above, or build the case with the controls. */}
-      <div className="flex items-center gap-4" aria-hidden>
+      <div className={`flex items-center gap-4 ${embedded ? '' : 'mx-auto w-full max-w-2xl'}`} aria-hidden>
         <span className="h-0.5 flex-1 rounded-full bg-white/15" />
         <span className="text-3xl font-black uppercase tracking-[0.15em] text-slate-300 sm:text-4xl">OR</span>
         <span className="h-0.5 flex-1 rounded-full bg-white/15" />
       </div>
 
-      {/* Submit your evidence — transparent, editable, no black box. */}
-      <div id="evidence" className={embedded ? 'space-y-4 scroll-mt-20' : 'card space-y-4 p-4 scroll-mt-20'}>
+      {/* Submit your evidence — transparent, editable, no black box. The
+          builder is a form, and forms keep the readable column standalone. */}
+      <div id="evidence" className={embedded ? 'space-y-4 scroll-mt-20' : 'card mx-auto w-full max-w-2xl space-y-4 p-4 scroll-mt-20'}>
         <div className="flex items-center gap-2 text-2xl font-extrabold text-white sm:text-3xl">
-          <span aria-hidden>🎛️</span> Submit your evidence
+          Refine your search
         </div>
 
         {watchers.length > 0 && (
@@ -385,22 +567,35 @@ export function FinderUI({
             <div className="label">Who’s watching</div>
             <div className="flex flex-wrap gap-1.5">
               <button
-                onClick={() => setWatcherIdx(-1)}
-                className={`rounded-lg border px-3 py-1.5 text-sm transition ${watcherIdx === -1 ? 'border-gold-400/60 bg-gold-500/15 text-gold-400' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                aria-pressed="true"
+                title="You're always in the room — add co-watchers to decide together"
+                className="rounded-lg border border-gold-400/60 bg-gold-500/15 px-3 py-1.5 text-sm text-gold-400"
               >
-                You
+                ✓ You
               </button>
               {watchers.map((w, i) => (
                 <button
                   key={w.name}
-                  onClick={() => setWatcherIdx(i)}
-                  className={`rounded-lg border px-3 py-1.5 text-sm transition ${watcherIdx === i ? 'border-gold-400/60 bg-gold-500/15 text-gold-400' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                  aria-pressed={watcherSel.has(i)}
+                  onClick={() =>
+                    setWatcherSel((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(i)) next.delete(i);
+                      else next.add(i);
+                      return next;
+                    })
+                  }
+                  className={`rounded-lg border px-3 py-1.5 text-sm transition ${watcherSel.has(i) ? 'border-gold-400/60 bg-gold-500/15 text-gold-400' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
                 >
-                  {w.name}
+                  {watcherSel.has(i) ? '✓ ' : ''}{w.name}
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-slate-400">Scores every result against their taste — “{(watcherIdx >= 0 ? watchers[watcherIdx]!.name : 'You')} match”.</p>
+            <p className="mt-1 text-xs text-slate-400">
+              {watcherSel.size > 0
+                ? `Household mode — every result is scored for each of you and ranked by the joint verdict (never a plain average).`
+                : 'Add co-watchers to score every result for the whole room.'}
+            </p>
           </div>
         )}
 
@@ -459,7 +654,7 @@ export function FinderUI({
           <Slider label="How far back" hint="How old a title can be" readout={releasedReadout(q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0)} min={0} max={75} step={1}
             minLabel="Any year" maxLabel="Classics"
             value={q.sinceMonths ? Math.max(1, Math.round(q.sinceMonths / 12)) : 0} onChange={(years) => set('sinceMonths', years === 0 ? null : years * 12)} />
-          <Slider label="🍿 Popcorn meter (audience)" hint="Minimum crowd score" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
+          <Slider label="🍿 Audience score" hint="Minimum crowd score" readout={q.minAudience ? `${q.minAudience}%+` : 'Any'} min={0} max={95} step={5}
             minLabel="Any" maxLabel="Crowd-loved"
             value={q.minAudience ?? 0} onChange={(v) => set('minAudience', v === 0 ? null : v)} />
           <Slider label="IMDb rating" hint="Minimum IMDb score" readout={q.minImdb ? `${q.minImdb.toFixed(1)}+` : 'Any'} min={0} max={9} step={0.5}
@@ -470,8 +665,8 @@ export function FinderUI({
             value={q.minMatch ?? 0} onChange={(v) => set('minMatch', v === 0 ? null : v)} accent />
         </div>
         <p className="-mt-1 text-[11px] leading-relaxed text-slate-400">
-          Each slider stays at “Any” until you drag it right. “Audience score” is the crowd rating from TMDB — the open
-          stand-in for Rotten Tomatoes’ audience/Popcorn score.
+          Each slider stays at “Any” until you drag it right. “Audience score” is the crowd rating from TMDB user
+          votes — a real audience signal, but not Rotten Tomatoes’ own audience score.
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -483,7 +678,7 @@ export function FinderUI({
             title="Only titles the judge rules Stream It — our “Watch It” verdict."
             className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.streamItOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
           >
-            {q.streamItOnly ? '✓ ' : ''}⚖️ “Stream It” verdicts only
+            {q.streamItOnly ? '✓ ' : ''}“Stream It” only
           </button>
           {q.mediaType !== 'movie' && (
             <button
@@ -512,7 +707,7 @@ export function FinderUI({
         </div>
 
         <button onClick={() => void find()} disabled={loading} className="btn-primary w-full py-2.5 text-base font-semibold sm:w-auto sm:self-start sm:px-8">
-          {loading ? 'The court is deliberating…' : '⚖️ Submit evidence'}
+          {ctaLabel}
         </button>
       </div>
       </div>

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
-import { Verd1ctBadge } from './Verd1ctBadge';
+import { Verd1ctBadge, verd1ctBadgeHeight } from './Verd1ctBadge';
 import { CardRatings } from './CardRatings';
 
 /**
@@ -18,6 +18,7 @@ export function AlgorithmScore({
   title,
   year,
   objectiveScore = null,
+  compact = false,
   className = '',
 }: {
   mediaType: MediaType;
@@ -25,6 +26,8 @@ export function AlgorithmScore({
   title: string;
   year?: number | null;
   objectiveScore?: number | null;
+  /** Row cards are height-constrained: smaller badge, tighter box, one line. */
+  compact?: boolean;
   className?: string;
 }) {
   const [dna, setDna] = useState<DnaClientResult | null>(null);
@@ -43,31 +46,56 @@ export function AlgorithmScore({
 
   return (
     <div
-      className={`rounded-xl border-2 border-pink-400/70 bg-gradient-to-br from-pink-500/30 to-rose-500/20 px-2 py-2 shadow-[0_0_16px_rgba(244,63,94,0.28)] ${className}`}
-      title="Your VERD1CT — your taste blended with every rating into one 0–100 estimate of how much YOU will like it. The blue TV means it’s from WatchVerdict."
+      /* A DARK PANEL WITH A PINK EDGE — not a pink block.
+         It was a tinted pink fill holding a pink label, a coloured call badge
+         and three rating chips, laid out as two stacked rows with air between
+         them: the largest, loudest area on the card, and most of it empty. The
+         fill is now the card's own near-black, so the ONLY bright things left
+         are the score and the call — which are the two things this panel
+         exists to say. Pink survives as the edge and the label, which is
+         enough for it to read as the brand's own verdict. */
+      className={`wv-score rounded-xl bg-ink-950/70 ring-1 ring-[#ff1493]/40 shadow-[0_0_14px_-6px_rgba(255,20,147,0.55)] ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'} ${className}`}
+      title="Your VERD1CT — your taste blended with every rating into one 0–100 estimate of how much YOU will like it. The blue TV means it’s from WatchVerd1ct."
     >
-      {/* The VERD1CT badge (number + TV) beside the ruling (Stream It / …). */}
-      <div className="flex items-center gap-2.5">
-        {score != null ? (
-          <Verd1ctBadge score={score} px={44} />
-        ) : (
-          <span className="grid h-11 w-11 flex-none place-items-center rounded-[24%] bg-white/10 text-xl font-black text-slate-400">—</span>
-        )}
+      {/* ONE ROW WHEN THE PANEL CAN HOLD ONE.
+          Score, call and the ratings that produced it belong on a single line;
+          they were stacked at every width, which cost a whole row of height to
+          say three things that fit side by side on all but the narrowest
+          cards. Below ~310px of panel the ratings wrap underneath (see
+          `.wv-score-ratings` in globals.css) rather than being squeezed. */}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        {(() => {
+          const px = compact ? 38 : 42;
+          if (score != null) return <Verd1ctBadge score={score} px={px} />;
+          // THE PLACEHOLDER IS THE BADGE'S REAL HEIGHT, antennas and feet
+          // included — sized to `px` alone it is 17px short, and every card in
+          // the grid grew by that the moment a score landed.
+          return (
+            <span
+              className="grid flex-none place-items-center rounded-[24%] bg-white/10 text-xl font-black text-slate-400"
+              style={{ width: px, height: verd1ctBadgeHeight(px) }}
+            >
+              —
+            </span>
+          );
+        })()}
         <div className="min-w-0">
           {v && (
             <span className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-sm font-black tracking-tight ${v.visual.badge}`}>
               {v.call}
             </span>
           )}
-          <div className="mt-1 text-[10px] font-black uppercase tracking-wide text-pink-100/90">
-            {personal ? (<>Your VERD<span style={{ color: '#ff1493' }}>1</span>CT</>) : 'WatchVerdict'}
+          {/* The source label is provenance, not a heading — it sits under the
+              call at the smallest size on the card and carries the pink. */}
+          <div className="text-[10px] font-black uppercase leading-tight tracking-wide text-pink-200/80">
+            {personal ? (<>Your VERD<span style={{ color: '#ff1493' }}>1</span>CT</>) : 'WatchVerd1ct'}
             {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 ? ' · learning' : ''}
           </div>
         </div>
-      </div>
 
-      {/* The source ratings that feed the score — shown prominently. */}
-      <CardRatings mediaType={mediaType} tmdbId={tmdbId} title={title} year={year} hideCall className="mt-2" />
+        {/* The source ratings that feed the score. */}
+        <CardRatings mediaType={mediaType} tmdbId={tmdbId} title={title} year={year} hideCall className="wv-score-ratings" />
+      </div>
     </div>
   );
 }
