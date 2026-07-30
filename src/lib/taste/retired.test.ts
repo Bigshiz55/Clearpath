@@ -104,13 +104,20 @@ describe('what was deliberately kept', () => {
     }
   });
 
-  it('TEST 11-13: the quiz still has exactly three actions and no Save', () => {
+  it('TEST 11-13: the quiz has its four real actions and no separate Save button', () => {
+    // Superseded by the single-screen 4-button redesign: Looks good / Watchlist /
+    // Not interested / Seen it, all visible at once (see DnaQuiz.tsx's doc
+    // comment). "Watchlist" is a first-class quiz action now, not a bolted-on
+    // Save — it both records the DNA event and saves the title, in one tap,
+    // through the same one write path (src/lib/actions/dnaQuiz.ts) rather than a
+    // second model or a separate <SaveButton>.
     const quiz = read('src/components/DnaQuiz.tsx');
-    expect(quiz).toContain('act-looks-good');
-    expect(quiz).toContain('act-skip');
-    expect(quiz).toContain('act-seen');
-    expect(quiz).not.toMatch(/act-save|onSave|addToWatchlist|<SaveButton/);
-    expect(read('src/lib/actions/dnaQuiz.ts')).not.toContain('addToWatchlist');
+    expect(quiz).toContain('btn-looks-good');
+    expect(quiz).toContain('btn-watchlist');
+    expect(quiz).toContain('btn-not-interested');
+    expect(quiz).toContain('btn-seen');
+    expect(quiz).not.toMatch(/<SaveButton/);
+    expect(read('src/lib/actions/dnaQuiz.ts')).toContain('addToWatchlist');
   });
 
   it('TEST 14: the ordinary Watchlist save still exists elsewhere', () => {

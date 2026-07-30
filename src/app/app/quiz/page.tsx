@@ -1,18 +1,41 @@
-import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
+import { createClient } from '@/lib/supabase/server';
+import { DnaQuiz } from '@/components/DnaQuiz';
 
-/**
- * The title quiz IS the Taste Quiz now, so this URL forwards instead of holding
- * a second copy of it. Many places link here — the DNA page, the dials empty
- * state, the booster packs, founder sessions — and all of them keep working,
- * including `?session=` for an isolated founder calibration.
- */
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  title: 'Build your Watch DNA · WatchVerd1ct',
+};
 
-export default function LegacyQuizRoute({ searchParams }: { searchParams?: { session?: string } }) {
-  // No `mode` any more — the Taste Quiz is the title grid, full stop. The
-  // founder session is the one parameter that still has to survive the hop.
-  const params = new URLSearchParams();
-  if (searchParams?.session) params.set('session', searchParams.session);
-  const qs = params.toString();
-  redirect(qs ? `/app/taste-quiz?${qs}` : '/app/taste-quiz');
+export default async function QuizPage({
+  searchParams,
+}: {
+  searchParams?: { session?: string };
+}) {
+  const sessionId = searchParams?.session || undefined;
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  let totalRated = 0;
+  if (user) {
+    const { count } = await supabase
+      .from('watchlist_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .not('rating', 'is', null);
+    totalRated = count ?? 0;
+  }
+
+  // Compact, height-bounded shell so the single-screen quiz fits within the app
+  // chrome (top nav + bottom nav) without scrolling; the poster flexes to fill.
+  return (
+    <div className="mx-auto flex h-[calc(100svh-8.5rem)] max-w-md flex-col">
+      <div className="shrink-0 text-center">
+        <h1 className="text-lg font-bold text-white">🧬 Build your Watch DNA</h1>
+        <p className="mt-0.5 text-xs text-slate-400">Rate what you’ve seen — “haven’t seen it” never counts against you.</p>
+      </div>
+      <div className="mt-2 min-h-0 flex-1">
+        <DnaQuiz totalRated={totalRated} sessionId={sessionId} />
+      </div>
+    </div>
+  );
 }

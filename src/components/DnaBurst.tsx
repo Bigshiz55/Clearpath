@@ -9,6 +9,9 @@ import { createPortal } from 'react-dom';
  * an "updating" line (green ↑ for a For, red ↓ for a Pass). Replaces the quiet
  * bottom-of-screen toast so the payoff lands right on the title. Purely visual —
  * no numbers. Auto-dismisses via onDone.
+ *
+ * Short-lived on purpose: this fires on every single rating, so it has to get
+ * out of the way fast rather than hold the next tap hostage.
  */
 export function DnaBurst({
   cx,
@@ -25,7 +28,7 @@ export function DnaBurst({
   onDoneRef.current = onDone;
 
   useEffect(() => {
-    const t = setTimeout(() => onDoneRef.current(), 1150);
+    const t = setTimeout(() => onDoneRef.current(), 700);
     return () => clearTimeout(t);
   }, []);
 
