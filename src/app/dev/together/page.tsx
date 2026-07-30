@@ -1,11 +1,11 @@
 import { notFound } from 'next/navigation';
-import { CourtIntro } from '@/components/court/CourtIntro';
-import { TogetherSecondary } from '@/components/TogetherSecondary';
+import { StartLiveCourt } from '@/components/StartLiveCourt';
+import { CourtSecondaryActions } from '@/components/court/CourtSecondaryActions';
 
-/** Tonight-Together harness (gated by MOBILE_HARNESS=1) — the exact layout of
- *  /app/together without a session, so Playwright can assert the single-entry
- *  hierarchy (one filled button, secondary links, centered column) at every
- *  width. 404 in any normal build. */
+/** The Verdict Room landing harness (gated by MOBILE_HARNESS=1) — the exact
+ *  layout of /app/together without a session, so Playwright can assert the
+ *  entry hierarchy (one primary CTA, two secondary cards, centered column) at
+ *  every width. 404 in any normal build. */
 export const dynamic = 'force-dynamic';
 
 export default function TogetherHarnessPage() {
@@ -13,15 +13,12 @@ export default function TogetherHarnessPage() {
   return (
     <main className="container-page py-6" data-testid="together-harness">
       <div className="mx-auto max-w-xl">
-        <h1 className="text-2xl font-bold text-white sm:text-3xl">Tonight, Together</h1>
-        <p className="mt-2 text-sm text-slate-400">
-          One pick the whole room will actually agree on — never suggesting something on someone’s
-          hard-no list.
-        </p>
-        <div className="mt-5">
-          <CourtIntro big />
+        <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">The Verdict Room</h1>
+        <p className="mt-1.5 text-sm text-slate-400">Everyone weighs in. One title wins.</p>
+        <div className="mt-6">
+          <StartLiveCourt />
         </div>
-        <TogetherSecondary />
+        <CourtSecondaryActions />
       </div>
     </main>
   );

@@ -24,7 +24,7 @@ const SECONDARY: NavLink[] = [
   { href: '/app/rapid-fire', label: 'Rapid Fire ⚡️' },
   { href: '/import-taste', label: 'Bring your taste with you' },
   { href: '/app/subscriptions', label: 'Subscription check 💸' },
-  { href: '/app/together', label: 'Movie night together' },
+  { href: '/app/together', label: 'The Verdict Room' },
   { href: '/app/reminders', label: 'My reminders' },
   { href: '/app/friends', label: 'Friends' },
   { href: '/app/chambers', label: 'Chambers' },

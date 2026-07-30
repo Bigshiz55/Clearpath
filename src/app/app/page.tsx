@@ -8,11 +8,10 @@ import { PosterCard } from '@/components/PosterCard';
 import { EmptyState } from '@/components/EmptyState';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictBadge } from '@/components/VerdictBadge';
-import { RecommendedForYou } from '@/components/RecommendedForYou';
+import { HomeRecommendations } from '@/components/HomeRecommendations';
 import { BuildCaseBox } from '@/components/BuildCaseBox';
 import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
-import { Top10Slate } from '@/components/Top10Slate';
 import { UpcomingTvRail } from '@/components/UpcomingTvRail';
 import { InstallHint } from '@/components/InstallHint';
 import { getTonight } from '@/lib/tonight';
@@ -77,7 +76,7 @@ export default async function DiscoverPage() {
       <TonightHome tonight={tonight} />
 
       <section className="space-y-6">
-        {/* Featured — Decide Together (Live Court): the group "wow", given top
+        {/* Featured — The Verdict Room (Live Court): the group "wow", given top
             billing as a wide, prominent card above the rest of the tiles. */}
         <Link
           href="/app/together"
@@ -94,8 +93,8 @@ export default async function DiscoverPage() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-100">⚖️ Live Court</span>
-            <span className="mt-1.5 block text-2xl font-black tracking-tight text-white sm:text-3xl">Decide Together</span>
-            <span className="mt-0.5 block text-sm text-slate-200 sm:text-base">One verdict for the whole room — everyone votes from their own phone, the judge settles it.</span>
+            <span className="mt-1.5 block text-2xl font-black tracking-tight text-white sm:text-3xl">The Verdict Room</span>
+            <span className="mt-0.5 block text-sm text-slate-200 sm:text-base">Everyone weighs in. One title wins.</span>
           </span>
           <span aria-hidden className="pointer-events-none flex-none text-2xl font-black text-brand-300 transition-transform duration-300 group-hover:translate-x-0.5 sm:text-3xl">→</span>
         </Link>
@@ -111,7 +110,7 @@ export default async function DiscoverPage() {
             // Discovery
             { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', rgb: '59,130,246' },
             { href: '/app/tv', icon: 'tv', title: 'On TV Now', sub: 'What’s live — next 12/24/48h', rgb: '16,185,129' },
-            { href: '/packs', icon: 'packs', title: 'Packs', sub: 'Hallmark & Lifetime, True Crime', rgb: '251,146,60' },
+            { href: '/packs', icon: 'packs', title: 'Packs', sub: 'Hallmark, Lifetime & true crime', rgb: '124,58,237' },
             // Your stuff
             { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', rgb: '14,165,233' },
             { href: '/app/subscriptions', icon: 'money', title: 'Subscription Check', sub: 'Where you overpay for streaming', rgb: '16,185,129' },
@@ -148,11 +147,10 @@ export default async function DiscoverPage() {
       </section>
 
       {/* The ranked shape, on the surface people actually browse — with the
-          arithmetic behind every number one tap away. It renders nothing until
-          there is a slate to rank, so a brand-new account sees no empty rail. */}
-      <Top10Slate surface="home" />
-
-      <RecommendedForYou label={label} />
+          arithmetic behind every number one tap away, and "Recommended for
+          you" continuing from #11 rather than repeating the same 10 titles
+          twice on one screen. One fetch, no empty rail on a brand-new account. */}
+      <HomeRecommendations label={label} />
 
       {/* Times are computed in the browser, in the viewer's own zone — see
           UpcomingTvRail. Rendering them here would print the server's clock. */}

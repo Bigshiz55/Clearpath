@@ -400,6 +400,7 @@ export function OnTvGuide({
           {filtered.map((a) => {
             const t = fmtTime(a.airstamp, a.time);
             const status = airingStatus(a.airstamp, a.runtime, nowMs);
+            const resolved = a.tmdbId != null && a.mediaType != null;
             return (
               <div
                 key={a.id}
@@ -502,6 +503,15 @@ export function OnTvGuide({
                     📅
                   </a>
                 </div>
+
+                {/* Same decision the Highlights cards offer — only where there's
+                    a real title to rule on, exactly like that strip's own gate. */}
+                {resolved && (
+                  <div className="wv-tv-decision wv-act-row mt-2 border-t border-white/10 pt-2" data-testid="airing-decision">
+                    <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                    <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                  </div>
+                )}
               </div>
             );
           })}

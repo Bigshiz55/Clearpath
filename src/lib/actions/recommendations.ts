@@ -26,6 +26,7 @@ export interface SlateItem {
   mediaType: 'movie' | 'tv';
   title: string;
   year: number | null;
+  posterPath: string | null;
   posterUrl: string | null;
   predicted: number;
   confidence: 'low' | 'medium' | 'high';
@@ -70,6 +71,7 @@ export async function buildRecommendationSlate(
     mediaType: r.mediaType,
     title: r.title,
     year: r.year,
+    posterPath: r.posterPath,
     posterUrl: tmdbImage(r.posterPath, 'w342'),
     predicted: r.personalScore,
     confidence: confidenceOf(r.personalScore),

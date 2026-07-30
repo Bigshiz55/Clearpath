@@ -19,26 +19,34 @@ export type TvmazeChannelMatch =
   | { mode: 'network'; networkNames: string[] }
   | { mode: 'show'; networkName: string; showNames: string[] };
 
+/**
+ * One group per Pack (see src/lib/packs/lazyIngest.ts's PACK_CHANNEL_GROUP) —
+ * previously a coarse 'A' (Hallmark+Lifetime combined) / 'B' (crime) split;
+ * now one group per real Pack so Hallmark Universe and Lifetime Movie Vault
+ * each get only their own stations, not each other's.
+ */
+export type TvmazeChannelGroup = 'hallmark' | 'lifetime' | 'crime';
+
 export interface TvmazeChannelDef {
   /** Stable key — used as `tv_stations.provider_station_id`. */
   key: string;
   displayName: string;
-  group: 'A' | 'B';
+  group: TvmazeChannelGroup;
   match: TvmazeChannelMatch;
 }
 
 export const TVMAZE_CHANNELS: TvmazeChannelDef[] = [
-  // --- Group A: Hallmark / Lifetime family -----------------------------------
+  // --- Hallmark family --------------------------------------------------------
   // Hallmark Channel and Hallmark Mystery both carry real, TVmaze-indexed
   // scripted series (When Calls the Heart / Chesapeake Shores; Mystery 101),
   // confirmed live. Coverage is sparse (Hallmark's schedule is mostly a
   // rotating movie library TVmaze does not track episode-by-episode) but real.
   {
-    key: 'hallmark_channel', displayName: 'Hallmark Channel', group: 'A',
+    key: 'hallmark_channel', displayName: 'Hallmark Channel', group: 'hallmark',
     match: { mode: 'network', networkNames: ['Hallmark Channel'] },
   },
   {
-    key: 'hallmark_mystery', displayName: 'Hallmark Mystery', group: 'A',
+    key: 'hallmark_mystery', displayName: 'Hallmark Mystery', group: 'hallmark',
     match: { mode: 'network', networkNames: ['Hallmark Mystery'] },
   },
   // No TVmaze network entity found for this name in any search performed
@@ -46,53 +54,55 @@ export const TVMAZE_CHANNELS: TvmazeChannelDef[] = [
   // the coverage report says "not found" rather than the channel just never
   // appearing anywhere.
   {
-    key: 'hallmark_family', displayName: 'Hallmark Family', group: 'A',
+    key: 'hallmark_family', displayName: 'Hallmark Family', group: 'hallmark',
     match: { mode: 'network', networkNames: ['Hallmark Family'] },
   },
+
+  // --- Lifetime family ---------------------------------------------------------
   {
-    key: 'lifetime', displayName: 'Lifetime', group: 'A',
+    key: 'lifetime', displayName: 'Lifetime', group: 'lifetime',
     match: { mode: 'network', networkNames: ['Lifetime'] },
   },
   // Not found under this name or "LMN" in any search or in a 7-day pull of
   // the full national schedule. Configured anyway, per the same rule above.
   {
-    key: 'lifetime_movie_network', displayName: 'Lifetime Movie Network', group: 'A',
+    key: 'lifetime_movie_network', displayName: 'Lifetime Movie Network', group: 'lifetime',
     match: { mode: 'network', networkNames: ['Lifetime Movie Network', 'LMN'] },
   },
   // Not found under this name in any search performed.
   {
-    key: 'great_american_family', displayName: 'Great American Family', group: 'A',
+    key: 'great_american_family', displayName: 'Great American Family', group: 'lifetime',
     match: { mode: 'network', networkNames: ['Great American Family'] },
   },
 
-  // --- Group B: true-crime cable + broadcast newsmagazines -------------------
+  // --- Crime: true-crime cable + broadcast newsmagazines ----------------------
   {
-    key: 'investigation_discovery', displayName: 'Investigation Discovery', group: 'B',
+    key: 'investigation_discovery', displayName: 'Investigation Discovery', group: 'crime',
     match: { mode: 'network', networkNames: ['Investigation Discovery'] },
   },
   // TVmaze's current network name for this channel is "Oxygen True Crime"
   // (its post-rebrand name), not plain "Oxygen" — confirmed live. Both are
   // listed so a future TVmaze rename in either direction still matches.
   {
-    key: 'oxygen', displayName: 'Oxygen', group: 'B',
+    key: 'oxygen', displayName: 'Oxygen', group: 'crime',
     match: { mode: 'network', networkNames: ['Oxygen', 'Oxygen True Crime'] },
   },
   // The newsmagazines are modeled as their own "channel" (a specific show on
   // a specific broadcast network), not "everything NBC/ABC/CBS air" — matching
   // by network name alone would pull in the network's entire schedule.
   {
-    key: 'dateline_nbc', displayName: 'Dateline (NBC)', group: 'B',
+    key: 'dateline_nbc', displayName: 'Dateline (NBC)', group: 'crime',
     match: { mode: 'show', networkName: 'NBC', showNames: ['Dateline NBC'] },
   },
   {
-    key: '20_20_abc', displayName: '20/20 (ABC)', group: 'B',
+    key: '20_20_abc', displayName: '20/20 (ABC)', group: 'crime',
     match: { mode: 'show', networkName: 'ABC', showNames: ['20/20'] },
   },
   // Exact-name match deliberately excludes TVmaze's separate spinoff shows
   // ("48 Hours: Suspicion", "48 Hours: Hard Evidence") and the unrelated
   // syndicated "48 Hours Weekday Edition" — distinct TVmaze shows, not this one.
   {
-    key: '48_hours_cbs', displayName: '48 Hours (CBS)', group: 'B',
+    key: '48_hours_cbs', displayName: '48 Hours (CBS)', group: 'crime',
     match: { mode: 'show', networkName: 'CBS', showNames: ['48 Hours'] },
   },
 ];

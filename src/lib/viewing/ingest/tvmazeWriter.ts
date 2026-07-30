@@ -1,6 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { TVMAZE_CHANNELS, type TvmazeChannelDef } from './tvmazeChannels';
+import { TVMAZE_CHANNELS, type TvmazeChannelDef, type TvmazeChannelGroup } from './tvmazeChannels';
 import {
   fetchScheduleDay, fetchShowOriginalAirdates, matchDay,
   buildProgrammeRow, buildAiringRow, toFetchedAiring,
@@ -24,7 +24,7 @@ const MARKET_TZ = 'America/New_York';
 export interface ChannelCoverage {
   key: string;
   displayName: string;
-  group: 'A' | 'B';
+  group: TvmazeChannelGroup;
   found: boolean;
   airingsIngested: number;
 }

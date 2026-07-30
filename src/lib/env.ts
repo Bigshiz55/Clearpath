@@ -234,6 +234,8 @@ export function envHealth() {
     resendKey: Boolean(optional('RESEND_API_KEY')),
     push: Boolean(optional('NEXT_PUBLIC_VAPID_PUBLIC_KEY') && optional('VAPID_PRIVATE_KEY')),
     affiliate: Boolean(optional('AMAZON_ASSOCIATES_TAG') || optional('APPLE_AFFILIATE_TOKEN')),
+    migrateSecret: Boolean(optional('MIGRATE_SECRET')),
+    migrationsDbUrl: Boolean(optional('SUPABASE_DB_URL') || optional('MIGRATIONS_DB_URL')),
     siteUrl: publicEnv.siteUrl(),
   };
 }

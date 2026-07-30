@@ -47,6 +47,20 @@ export interface PackPremiereEntry {
   startAtUtc: string;
 }
 
+/**
+ * A small, honest, real-data-only preview for a Pack's landing card. Every
+ * field is `null` when there is nothing real to show — the card renders
+ * without that line rather than inventing filler.
+ */
+export interface PackPreview {
+  /** Earliest upcoming premiere on this Pack's stations, if any. */
+  nextPremiere: { title: string; date: string } | null;
+  /** Signed-in user's watched count on this Pack's stations. Null when signed out. */
+  watchedCount: number | null;
+  /** Signed-in user's count of cases they follow, for case-tracking Packs. Null when signed out. */
+  trackedCaseCount: number | null;
+}
+
 export interface CaseRecord {
   id: string;
   slug: string;

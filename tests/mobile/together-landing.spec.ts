@@ -1,20 +1,19 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * TONIGHT, TOGETHER — one page, one action (Stage 1 acceptance).
- *
- * The page described Live Court twice and offered three competing entry
- * cards. These tests pin the corrected hierarchy: no duplicated description
- * copy, exactly one filled button above the fold, the other modes at link
- * weight, and a centered column at every desktop width.
+ * THE VERDICT ROOM — one obvious primary action, two clear secondary cards
+ * (Stage 1 acceptance, redesigned). Pins the corrected hierarchy: no
+ * duplicated description copy, one bright primary CTA above the fold, the
+ * two secondary modes as real tappable cards (not text links, not competing
+ * in color with the primary), and a centered column at every desktop width.
  */
 const ROUTE = '/dev/together';
 
-test('no phrase from the Live Court description appears twice', async ({ page }) => {
+test('no phrase from the page description appears twice', async ({ page }) => {
   await page.goto(ROUTE, { waitUntil: 'domcontentloaded' });
   const text = await page.locator('main').innerText();
   // Normalize and look for any repeated 5-word shingle — a stronger check
-  // than eyeballing the two paragraphs that used to overlap.
+  // than eyeballing the paragraphs that used to overlap.
   const words = text.toLowerCase().replace(/[^\w\s']/g, ' ').split(/\s+/).filter(Boolean);
   const seen = new Map<string, number>();
   const dupes: string[] = [];
@@ -27,37 +26,51 @@ test('no phrase from the Live Court description appears twice', async ({ page })
   expect(dupes, `repeated copy: ${[...new Set(dupes)].join(' | ')}`).toEqual([]);
 });
 
-test('exactly one filled button, with the other modes as text links', async ({ page }) => {
+test('one obvious primary action, above the fold, with two secondary cards', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(ROUTE, { waitUntil: 'domcontentloaded' });
 
   const start = page.getByTestId('start-court');
   await expect(start).toBeVisible();
-  await expect(start).toHaveText('Start a Court');
+  await expect(start).toHaveText('Start a Verdict Room');
   // Above the fold at 1440×900.
   const box = await start.boundingBox();
   expect(box!.y + box!.height).toBeLessThan(900);
 
-  // The one FILLED button: among visible buttons/links, only start-court has
-  // an opaque background fill.
-  const filled = await page.evaluate(() => {
-    const out: string[] = [];
-    for (const el of document.querySelectorAll<HTMLElement>('main button, main a')) {
-      if (!el.offsetParent) continue;
-      const bg = getComputedStyle(el).backgroundColor;
-      const m = bg.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/);
-      if (!m) continue;
-      const alpha = m[4] == null ? 1 : Number(m[4]);
-      if (alpha >= 0.9) out.push((el.textContent || '').trim().slice(0, 30));
-    }
-    return out;
-  });
-  expect(filled, `filled controls: ${filled.join(', ')}`).toEqual(['Start a Court']);
+  // The two secondary options are real tappable cards, not underlined text.
+  const device = page.getByTestId('open-device');
+  const invite = page.getByTestId('open-invite');
+  await expect(device).toBeVisible();
+  await expect(invite).toBeVisible();
+  await expect(device).toContainText('Quick Pick');
+  await expect(device).toContainText('Choose together on this phone');
+  await expect(invite).toContainText('Invite the Jury');
+  await expect(invite).toContainText('Everyone joins from their own phone');
 
-  // Secondary modes are links, not cards — and disclose in place.
-  await expect(page.getByTestId('open-crews')).toBeVisible();
-  await expect(page.getByTestId('open-device')).toBeVisible();
-  await page.getByTestId('open-device').click();
+  // Hierarchy: the primary button is the brightest fill on the page; the
+  // secondary cards use a distinctly different (navy, not brand-blue) fill so
+  // they never compete with it for attention.
+  const colors = await page.evaluate(() => {
+    const read = (testId: string) => {
+      const el = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
+      return el ? getComputedStyle(el).backgroundColor : null;
+    };
+    return { primary: read('start-court'), device: read('open-device'), invite: read('open-invite') };
+  });
+  expect(colors.primary).not.toBeNull();
+  expect(colors.device).not.toBeNull();
+  expect(colors.invite).not.toBeNull();
+  expect(colors.device, 'secondary card must not reuse the primary fill').not.toBe(colors.primary);
+  expect(colors.invite, 'secondary card must not reuse the primary fill').not.toBe(colors.primary);
+
+  // Every card is a comfortable tap target.
+  for (const testId of ['start-court', 'open-device', 'open-invite']) {
+    const b = await page.getByTestId(testId).boundingBox();
+    expect(b!.height, `${testId} tap target`).toBeGreaterThanOrEqual(44);
+  }
+
+  // Quick Pick discloses the on-device planner in place.
+  await device.click();
   await expect(page.getByTestId('together-secondary')).toContainText('stored just on this phone');
 });
 
@@ -86,4 +99,6 @@ test('fits a phone with no sideways scroll @ 390px', async ({ page }) => {
   );
   expect(over).toBeLessThanOrEqual(1);
   await expect(page.getByTestId('start-court')).toBeVisible();
+  await expect(page.getByTestId('open-device')).toBeVisible();
+  await expect(page.getByTestId('open-invite')).toBeVisible();
 });

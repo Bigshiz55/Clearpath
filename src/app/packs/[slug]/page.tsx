@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
@@ -11,9 +12,33 @@ import { PublicHeader, PublicFooter } from '@/components/discovery/DiscoveryLayo
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const supabase = createClient();
-  const pack = await getPackBySlug(supabase, params.slug);
-  return { title: pack ? `${pack.displayName} · WatchVerd1ct` : 'Pack · WatchVerd1ct' };
+  try {
+    const supabase = createClient();
+    const pack = await getPackBySlug(supabase, params.slug);
+    return { title: pack ? `${pack.displayName} · WatchVerd1ct` : 'Pack · WatchVerd1ct' };
+  } catch {
+    return { title: 'Pack · WatchVerd1ct' };
+  }
+}
+
+/** Readable failure card — names the cause instead of a bare digest, matching
+ *  the pattern already used by src/app/app/title/[type]/[id]/page.tsx. */
+function PackErrorCard({ message }: { message: string }) {
+  return (
+    <>
+      <PublicHeader />
+      <main className="container-page py-8">
+        <div className="mx-auto max-w-lg rounded-2xl border border-white/15 bg-white/[0.04] p-8 text-center">
+          <h1 className="text-xl font-semibold text-white">This Pack couldn’t load</h1>
+          <p className="mt-2 text-sm text-slate-400">{message}</p>
+          <Link href="." className="btn-primary mt-6 inline-flex">
+            ↻ Try again
+          </Link>
+        </div>
+      </main>
+      <PublicFooter />
+    </>
+  );
 }
 
 /**
@@ -27,24 +52,31 @@ export async function generateMetadata({ params }: { params: { slug: string } })
  */
 export default async function PackPage({ params }: { params: { slug: string } }) {
   const supabase = createClient();
-  const pack = await getPackBySlug(supabase, params.slug);
+
+  let pack;
+  try {
+    pack = await getPackBySlug(supabase, params.slug);
+  } catch (e) {
+    return <PackErrorCard message={causeMessage(e)} />;
+  }
   if (!pack) notFound();
 
-  // Lazy self-ingest: populates this Pack's data before rendering if it has
-  // none yet, or its last successful ingest is stale. Concurrent requests
-  // are serialized to exactly one actual ingest (migration 0038). A request
-  // that loses the race, or that hits any other error here, still renders —
-  // never blocked or blanked by ingest bookkeeping.
-  const ingest = await ensurePackIngested(supabase, pack);
+  try {
+    // Lazy self-ingest: populates this Pack's data before rendering if it has
+    // none yet, or its last successful ingest is stale. Concurrent requests
+    // are serialized to exactly one actual ingest (migration 0038). A request
+    // that loses the race, or that hits any other error here, still renders —
+    // never blocked or blanked by ingest bookkeeping.
+    const ingest = await ensurePackIngested(supabase, pack);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const hasAnyFeature = pack.premiereCalendar || pack.caseTracking;
+    const hasAnyFeature = pack.premiereCalendar || pack.caseTracking;
 
-  return (
-    <>
+    return (
+      <>
       <PublicHeader />
       <main className="container-page space-y-6 py-8">
         <section>
@@ -108,5 +140,26 @@ export default async function PackPage({ params }: { params: { slug: string } })
       </main>
       <PublicFooter />
     </>
-  );
+    );
+  } catch (e) {
+    return <PackErrorCard message={causeMessage(e)} />;
+  }
+}
+
+/**
+ * A Postgres/DB error message is safe, human-legible text (e.g. "relation
+ * \"packs\" does not exist") — never a secret — so it's fine to surface
+ * directly rather than only a digest.
+ *
+ * Supabase's PostgrestError (thrown by `if (error) throw error` in the
+ * packs data layer) is a plain object shaped like an Error, not always an
+ * actual `instanceof Error` — so this checks for a usable `.message` string
+ * on any thrown value, not only real Error instances.
+ */
+function causeMessage(e: unknown): string {
+  if (typeof e === 'object' && e !== null && 'message' in e && typeof (e as { message: unknown }).message === 'string') {
+    const msg = (e as { message: string }).message;
+    if (msg) return msg;
+  }
+  return 'An unexpected error occurred.';
 }

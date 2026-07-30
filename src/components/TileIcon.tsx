@@ -245,16 +245,15 @@ export function TileIcon({ name, className = 'h-11 w-11' }: { name: TileIconName
           </g>
         </>,
       );
-    case 'packs': // a stacked set of cards — a bundle of themed content
+    case 'packs': // stacked specialized collections
       return svg(
         <>
-          <defs><G id="ti-packs" from="#fb923c" to="#c2410c" /></defs>
+          <defs><G id="ti-packs" from="#c4b5fd" to="#7c3aed" /></defs>
           <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="url(#ti-packs)" />
           <Gloss />
-          <rect x="6.2" y="6.5" width="9.6" height="12" rx="1.8" fill="#fff" opacity="0.35" transform="rotate(-6 11 12.5)" />
-          <rect x="7.4" y="5.6" width="9.6" height="12" rx="1.8" fill="#fff" />
-          <line x1="9.6" y1="9.4" x2="15.6" y2="9.4" stroke="#c2410c" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="9.6" y1="12.2" x2="14" y2="12.2" stroke="#c2410c" strokeWidth="1.5" strokeLinecap="round" />
+          <rect x="6" y="13.5" width="12" height="3.4" rx="1.4" fill="#fff" opacity="0.55" />
+          <rect x="6" y="9.6" width="12" height="3.4" rx="1.4" fill="#fff" opacity="0.78" />
+          <rect x="6" y="5.7" width="12" height="3.4" rx="1.4" fill="#fff" />
         </>,
       );
   }

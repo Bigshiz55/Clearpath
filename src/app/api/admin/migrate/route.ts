@@ -4,8 +4,30 @@ import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 import { PENDING_MIGRATIONS } from '@/lib/pendingMigrations';
 
+// A raw Postgres connection needs real TCP/TLS sockets (`net`/`tls`), which
+// the Edge runtime does not provide — `pg` would fail to even load there.
+// Explicit so this can never silently end up on Edge.
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
+
+interface MigrationResult {
+  name: string;
+  ok: boolean;
+  error?: string;
+  code?: string;
+}
+
+/** A safe, structured summary of a thrown value: the message and, for a
+ *  pg/network error, its `.code` (e.g. `ENOTFOUND`, `28P01`, `ECONNREFUSED`)
+ *  — never the connection string or any other secret. */
+function describeError(e: unknown): { error: string; code?: string } {
+  if (e instanceof Error) {
+    const code = (e as NodeJS.ErrnoException).code;
+    return { error: e.message, code: typeof code === 'string' ? code : undefined };
+  }
+  return { error: 'Unknown error.' };
+}
 
 /**
  * Admin-gated migration runner. Applies a FIXED, embedded set of idempotent
@@ -48,31 +70,49 @@ export async function POST(request: Request) {
     );
   }
 
-  const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
-  const results: { name: string; ok: boolean; error?: string }[] = [];
+  // Everything below is wrapped so an unanticipated failure still reaches the
+  // client as a real JSON error instead of a bare, bodyless 500 — the exact
+  // failure mode this whole block exists to rule out.
   try {
-    await client.connect();
-  } catch (e) {
-    return NextResponse.json({ error: `Could not connect to the database: ${e instanceof Error ? e.message : 'unknown'}` }, { status: 502 });
-  }
-
-  try {
-    for (const m of PENDING_MIGRATIONS) {
-      const sql = Buffer.from(m.sqlB64, 'base64').toString('utf8');
-      try {
-        await client.query('begin');
-        await client.query(sql);
-        await client.query('commit');
-        results.push({ name: m.name, ok: true });
-      } catch (e) {
-        try { await client.query('rollback'); } catch { /* ignore */ }
-        results.push({ name: m.name, ok: false, error: e instanceof Error ? e.message : 'failed' });
-      }
+    // The `Client` constructor itself can throw synchronously (a malformed
+    // connection string, for one) — that's a connect-stage failure exactly
+    // like a refused/unreachable connection, so it's caught the same way,
+    // distinguishable from a migration's own SQL failing.
+    let client: Client;
+    try {
+      client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+      await client.connect();
+    } catch (e) {
+      const { error, code } = describeError(e);
+      return NextResponse.json(
+        { stage: 'connect', error: `Could not connect to the database: ${error}`, code },
+        { status: 502 },
+      );
     }
-  } finally {
-    await client.end().catch(() => {});
-  }
 
-  const applied = results.filter((r) => r.ok).length;
-  return NextResponse.json({ ok: true, applied, total: results.length, results });
+    const results: MigrationResult[] = [];
+    try {
+      for (const m of PENDING_MIGRATIONS) {
+        const sql = Buffer.from(m.sqlB64, 'base64').toString('utf8');
+        try {
+          await client.query('begin');
+          await client.query(sql);
+          await client.query('commit');
+          results.push({ name: m.name, ok: true });
+        } catch (e) {
+          try { await client.query('rollback'); } catch { /* ignore */ }
+          const { error, code } = describeError(e);
+          results.push({ name: m.name, ok: false, error, code });
+        }
+      }
+    } finally {
+      await client.end().catch(() => {});
+    }
+
+    const applied = results.filter((r) => r.ok).length;
+    return NextResponse.json({ ok: true, stage: 'migrations', applied, total: results.length, results });
+  } catch (e) {
+    const { error, code } = describeError(e);
+    return NextResponse.json({ stage: 'unexpected', error, code }, { status: 500 });
+  }
 }

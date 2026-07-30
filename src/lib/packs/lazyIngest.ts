@@ -1,7 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { runTvmazeIngest } from '@/lib/viewing/ingest/tvmazeWriter';
-import { TVMAZE_CHANNELS } from '@/lib/viewing/ingest/tvmazeChannels';
+import { TVMAZE_CHANNELS, type TvmazeChannelGroup } from '@/lib/viewing/ingest/tvmazeChannels';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { linkStationToPack } from './stations';
 import type { Pack } from './types';
@@ -10,13 +10,14 @@ const INGEST_FORWARD_DAYS = 14;
 
 /**
  * The one place that maps a Pack to its TVmaze channel group — see
- * src/lib/viewing/ingest/tvmazeChannels.ts's `group: 'A' | 'B'`. No other
+ * src/lib/viewing/ingest/tvmazeChannels.ts's `TvmazeChannelGroup`. No other
  * file needs to know this; Pack pages and components only ever read the
  * Pack's boolean feature flags, never its slug.
  */
-const PACK_CHANNEL_GROUP: Record<string, 'A' | 'B'> = {
-  'hallmark-lifetime': 'A',
-  'true-crime': 'B',
+const PACK_CHANNEL_GROUP: Record<string, TvmazeChannelGroup> = {
+  'hallmark-universe': 'hallmark',
+  'lifetime-vault': 'lifetime',
+  'crime-case-files': 'crime',
 };
 
 export interface LazyIngestOutcome {
@@ -88,7 +89,7 @@ export async function ensurePackIngested(supabase: SupabaseClient, pack: Pack): 
 }
 
 /** Link this Pack's channel-group stations into pack_stations. Idempotent. */
-async function wirePackStations(packId: string, group: 'A' | 'B'): Promise<void> {
+async function wirePackStations(packId: string, group: TvmazeChannelGroup): Promise<void> {
   const admin = createAdminClient();
   const groupChannels = TVMAZE_CHANNELS.filter((ch) => ch.group === group);
   for (const ch of groupChannels) {
