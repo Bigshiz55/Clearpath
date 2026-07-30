@@ -111,6 +111,7 @@ export default async function DiscoverPage() {
             // Discovery
             { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', rgb: '59,130,246' },
             { href: '/app/tv', icon: 'tv', title: 'On TV Now', sub: 'What’s live — next 12/24/48h', rgb: '16,185,129' },
+            { href: '/packs', icon: 'packs', title: 'Packs', sub: 'Hallmark & Lifetime, True Crime', rgb: '251,146,60' },
             // Your stuff
             { href: '/app/watchlist', icon: 'watchlist', title: 'Watchlist', sub: 'Everything you saved', rgb: '14,165,233' },
             { href: '/app/subscriptions', icon: 'money', title: 'Subscription Check', sub: 'Where you overpay for streaming', rgb: '16,185,129' },
