@@ -1,6 +1,18 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { PersonRecord } from './types';
+
+function slugifyName(name: string): string {
+  const base = name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 70);
+  return base.length >= 2 ? base : `person-${base || 'x'}`;
+}
 
 interface PersonRow {
   id: string;
@@ -40,6 +52,76 @@ export async function listCreditsForPerson(
     programmeId: row.programme_id,
     role: row.role,
   }));
+}
+
+/**
+ * Idempotent upsert keyed on `persons.tmdb_person_id` (unique index from
+ * migration 0039) — a real TMDB cast member is written at most once no
+ * matter how many programmes credit them.
+ */
+export async function upsertPerson(tmdbPersonId: number, fullName: string): Promise<PersonRecord> {
+  const admin = createAdminClient();
+
+  const { data: existing, error: existingError } = await admin
+    .from('persons')
+    .select('*')
+    .eq('tmdb_person_id', tmdbPersonId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (existing) return toPerson(existing as PersonRow);
+
+  const { data, error } = await admin
+    .from('persons')
+    .insert({ slug: slugifyName(fullName), full_name: fullName, tmdb_person_id: tmdbPersonId })
+    .select('*')
+    .maybeSingle();
+  if (error) {
+    // Unique-constraint race (slug or tmdb_person_id inserted concurrently
+    // by another request resolving the same premiere-calendar window) —
+    // read back the winner rather than fail the caller.
+    const { data: retry, error: retryError } = await admin
+      .from('persons')
+      .select('*')
+      .eq('tmdb_person_id', tmdbPersonId)
+      .maybeSingle();
+    if (retryError || !retry) throw error;
+    return toPerson(retry as PersonRow);
+  }
+  return toPerson(data as PersonRow);
+}
+
+/** Idempotent — safe to call repeatedly for the same person/programme/role. */
+export async function linkPersonToProgramme(personId: string, programmeId: string, role: string): Promise<void> {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from('person_programmes')
+    .upsert({ person_id: personId, programme_id: programmeId, role }, { onConflict: 'person_id,programme_id,role' });
+  if (error) throw error;
+}
+
+/**
+ * Pulls real TMDB cast credits for a programme (top-billed 8, per
+ * `getCredits`) and persists them via `upsertPerson`/`linkPersonToProgramme`
+ * so `listPersonsForProgramme` has real data instead of an empty result.
+ * A no-op past the first successful run for a given programme+role set —
+ * safe to call on every page load. Never fabricates a credit: anything
+ * TMDB doesn't return simply isn't linked.
+ */
+export async function ensureCreditsForProgramme(
+  programmeId: string,
+  tmdbId: number,
+  mediaType: 'movie' | 'tv',
+): Promise<void> {
+  const { getCredits } = await import('@/lib/tmdb/client');
+  const credits = await getCredits(mediaType, tmdbId).catch(() => null);
+  if (!credits || credits.cast.length === 0) return;
+
+  await Promise.all(
+    credits.cast.map(async (member) => {
+      const person = await upsertPerson(member.id, member.name);
+      await linkPersonToProgramme(person.id, programmeId, member.character ?? 'Cast');
+    }),
+  );
 }
 
 /** Persons credited on a programme, with role. Serves any Pack's person tracking — no Pack-specific table. */

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Poster } from '@/components/PosterCard';
 import { SeenToggle } from './SeenToggle';
+import { SimilarButton } from './SimilarButton';
 import type { ChecklistItem } from '@/lib/packs/types';
 
 type Filter = 'all' | 'watched' | 'unwatched';
@@ -81,6 +82,7 @@ export function ChecklistView({ items, packSlug, signedIn }: { items: ChecklistI
                   {item.releaseYear ?? ''}
                   {item.genres.length > 0 ? ` · ${item.genres.slice(0, 2).join(', ')}` : ''}
                 </p>
+                <SimilarButton programmeId={item.programmeId} />
               </div>
               {signedIn && (
                 <SeenToggle subjectType="programme" subjectId={item.programmeId} packSlug={packSlug} initialSeen={item.seen} />

@@ -1,11 +1,17 @@
 import { createClient } from '@/lib/supabase/server';
 import { getPackPremiereCalendar } from '@/lib/packs/packs';
 import { listStationsForPack } from '@/lib/packs/stations';
-import { listPersonsForProgramme } from '@/lib/packs/persons';
+import { listPersonsForProgramme, ensureCreditsForProgramme } from '@/lib/packs/persons';
 import { listSubscriptions } from '@/lib/packs/userTracking';
+import { resolveProgrammeTmdbId, getPackDnaScores } from '@/lib/packs/dna';
 import type { Pack } from '@/lib/packs/types';
 import { PremiereListOrCalendar, type PremiereEntry, type CreditedPerson } from './PremiereListOrCalendar';
 import { PackEmptyState } from './PackEmptyState';
+
+/** Resolution is a live TMDB search/credits call per title — bounded to a
+ *  small window (the premiere calendar, not the full checklist) so it stays
+ *  cheap. Shared by Watch DNA scoring and actor-credit ingest. */
+const DNA_SCORE_LIMIT = 20;
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -51,6 +57,20 @@ export async function PremiereCalendarView({ pack, userId }: { pack: Pack; userI
   const stationIdsUsed = [...new Set(premieres.map((p) => p.stationId))];
   const anonymousUserId = '00000000-0000-0000-0000-000000000000';
 
+  // TMDB id resolution — bounded to a small window (never the whole ingest)
+  // since it's a live search call per unresolved title. Feeds both Watch DNA
+  // and real actor-credit ingest below. Runs regardless of sign-in: credits
+  // are public data, useful to every visitor, not just DNA scoring.
+  const resolved = await Promise.all(
+    premieres.slice(0, DNA_SCORE_LIMIT).map((p) => resolveProgrammeTmdbId(supabase, p.programmeId).then((r) => [p.programmeId, r] as const)),
+  );
+  const tmdbIdByProgramme = new Map(resolved.filter(([, r]) => r != null).map(([pid, r]) => [pid, r!.tmdbId]));
+  const resolvedTitles = resolved.filter((r): r is [string, { tmdbId: number; mediaType: 'movie' | 'tv' }] => r[1] != null);
+
+  // Real TMDB cast credits for the same bounded window — idempotent past the
+  // first successful run per programme, so this is cheap on repeat visits.
+  await Promise.all(resolvedTitles.map(([programmeId, r]) => ensureCreditsForProgramme(programmeId, r.tmdbId, r.mediaType)));
+
   const [programmeRes, stationRes, seenRes, subs, creditsPerProgramme] = await Promise.all([
     supabase.from('tv_programmes').select('id, title, artwork_url').in('id', programmeIds),
     supabase.from('tv_stations').select('id, name').in('id', stationIdsUsed),
@@ -69,6 +89,10 @@ export async function PremiereCalendarView({ pack, userId }: { pack: Pack; userI
   );
   const creditsByProgramme = new Map(creditsPerProgramme);
 
+  // Watch DNA — cache-only: never a live classification call from here, only
+  // reads whatever's already cached from elsewhere in the app.
+  const dnaByTmdbId = userId ? await getPackDnaScores(supabase, userId, resolvedTitles.map(([, r]) => r)) : new Map();
+
   const entries: PremiereEntry[] = premieres.map((p) => {
     const credits = creditsByProgramme.get(p.programmeId) ?? [];
     const people: CreditedPerson[] = credits.map((c) => ({
@@ -77,6 +101,7 @@ export async function PremiereCalendarView({ pack, userId }: { pack: Pack; userI
       role: c.role,
       following: followedPersonIds.has(c.person.id),
     }));
+    const tmdbId = tmdbIdByProgramme.get(p.programmeId);
     return {
       programmeId: p.programmeId,
       title: programmeById.get(p.programmeId)?.title ?? p.title,
@@ -86,6 +111,7 @@ export async function PremiereCalendarView({ pack, userId }: { pack: Pack; userI
       startAtUtc: p.startAtUtc,
       seen: seenIds.has(p.programmeId),
       people,
+      dnaScore: tmdbId != null ? dnaByTmdbId.get(tmdbId) ?? null : null,
     };
   });
 

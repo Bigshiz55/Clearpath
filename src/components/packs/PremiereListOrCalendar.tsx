@@ -23,6 +23,10 @@ export interface PremiereEntry {
   startAtUtc: string;
   seen: boolean;
   people: CreditedPerson[];
+  /** Personal Watch DNA match, when the title has a cached fingerprint and the
+   *  user has enough learned taste to score against — null otherwise, never a
+   *  fabricated number. */
+  dnaScore?: { score: number; reason: string } | null;
 }
 
 function timeLabel(iso: string): string {
@@ -49,6 +53,14 @@ function EntryCard({ entry, packSlug, signedIn }: { entry: PremiereEntry; packSl
         <p className="text-sm text-slate-400">
           {entry.channel} · {timeLabel(entry.startAtUtc)}
         </p>
+        {entry.dnaScore && (
+          <p className="mt-1 inline-flex items-center gap-1.5 text-[12px] font-semibold text-emerald-300">
+            <span className="rounded-full border border-emerald-400/40 bg-emerald-500/15 px-1.5 py-0.5 tabular-nums">
+              {entry.dnaScore.score}
+            </span>
+            {entry.dnaScore.reason}
+          </p>
+        )}
         {entry.people.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {entry.people.map((person) => (
