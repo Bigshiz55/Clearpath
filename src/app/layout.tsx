@@ -5,6 +5,7 @@ import { ToastProvider } from '@/components/Toast';
 import { ServiceWorker } from '@/components/ServiceWorker';
 import { BuildVersionBadge } from '@/components/BuildVersionBadge';
 import { FeedbackButton } from '@/components/FeedbackButton';
+import { Footer } from '@/components/Footer';
 
 const siteUrl = publicEnv.siteUrl();
 
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <BuildVersionBadge />
         <ToastProvider>{children}</ToastProvider>
+        <Footer />
         <ServiceWorker />
         <FeedbackButton />
       </body>

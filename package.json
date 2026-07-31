@@ -8,8 +8,10 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm run migrate && next build",
+    "build": "npm run check:branch && npm run check:migrations && npm run migrate && next build",
     "migrate": "tsx scripts/migrate.ts",
+    "check:migrations": "tsx scripts/checkMigrationsRegistered.ts",
+    "check:branch": "tsx scripts/checkBranch.ts",
     "build:harness": "MOBILE_HARNESS=1 NEXT_PUBLIC_SUPABASE_URL=https://harness.invalid NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=harness-anon-key next build",
     "start": "next start",
     "lint": "next lint",
