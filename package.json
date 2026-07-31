@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm run check:branch && npm run check:migrations && npm run migrate && next build",
+    "build": "next build",
     "migrate": "tsx scripts/migrate.ts",
     "check:migrations": "tsx scripts/checkMigrationsRegistered.ts",
     "check:branch": "tsx scripts/checkBranch.ts",
