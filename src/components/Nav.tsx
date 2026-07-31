@@ -36,11 +36,13 @@ export function Nav({
   isGuest = false,
   pro = false,
   avatarLabel = '🍿',
+  email = null,
 }: {
   personalLabel?: string | null;
   isGuest?: boolean;
   pro?: boolean;
   avatarLabel?: string;
+  email?: string | null;
 }) {
   return (
     <>
@@ -133,7 +135,7 @@ export function Nav({
                 <Avatar label={avatarLabel} px={34} pro={pro} />
               </Link>
             )}
-            <HeaderOverflow personalLabel={personalLabel} isGuest={isGuest} />
+            <HeaderOverflow personalLabel={personalLabel} isGuest={isGuest} email={email} />
           </div>
         </div>
       </header>

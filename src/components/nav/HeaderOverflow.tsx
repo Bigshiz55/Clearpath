@@ -23,9 +23,11 @@ import { SignOutButton } from '../SignOutButton';
 export function HeaderOverflow({
   personalLabel,
   isGuest = false,
+  email = null,
 }: {
   personalLabel?: string | null;
   isGuest?: boolean;
+  email?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -68,8 +70,11 @@ export function HeaderOverflow({
           className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-white/10 bg-ink-850 p-2 shadow-card"
           data-testid="header-overflow-menu"
         >
-          {personalLabel && !isGuest && (
-            <div className="px-2 pb-2 pt-1 text-xs text-slate-400">{personalLabel}</div>
+          {!isGuest && (personalLabel || email) && (
+            <div className="px-2 pb-2 pt-1" data-testid="signed-in-as">
+              {personalLabel && <div className="text-xs text-slate-400">{personalLabel}</div>}
+              {email && <div className="truncate text-[11px] text-slate-500">{email}</div>}
+            </div>
           )}
           <div className="flex flex-col gap-1">
             {/* Pro is inline in the header from `sm`; on a phone this is where

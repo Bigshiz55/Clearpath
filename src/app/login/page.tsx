@@ -26,7 +26,10 @@ export default async function LoginPage({
   } catch {
     // Supabase not configured — allow the form to render its own errors.
   }
-  if (user) redirect(next);
+  // An anonymous session still needs to reach this form — that's the /login
+  // entry point for upgrading to a real account. Only a REAL signed-in user
+  // skips straight past it.
+  if (user && !user.is_anonymous) redirect(next);
 
   return (
     <div className="flex min-h-dvh flex-col">

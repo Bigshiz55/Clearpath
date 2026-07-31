@@ -41,7 +41,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-dvh pb-24 lg:pb-0">
-      <Nav personalLabel={personalLabelFor(profile)} isGuest={isGuest} pro={pro} avatarLabel={avatarLabel} />
+      <Nav
+        personalLabel={personalLabelFor(profile)}
+        isGuest={isGuest}
+        pro={pro}
+        avatarLabel={avatarLabel}
+        email={isGuest ? null : (user.email ?? null)}
+      />
       {/* The on-screen Back/Home/Forward row is gone: browser chrome (and the
           bottom nav on phones) already provides navigation, and the row spent
           ~48px of every screen duplicating it. */}
