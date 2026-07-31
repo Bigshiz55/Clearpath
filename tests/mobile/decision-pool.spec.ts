@@ -62,7 +62,7 @@ test('tapping the W adds that title to the pool, and says so', async ({ page }) 
   await open(page);
   const first = ws(page).first();
   await expect(first).toHaveAttribute('aria-pressed', 'false');
-  await expect(first).toHaveAttribute('aria-label', /add to decision pool/i);
+  await expect(first).toHaveAttribute('aria-label', /add to your docket/i);
 
   await first.click();
   await expect(first).toHaveAttribute('aria-pressed', 'true');
@@ -75,9 +75,9 @@ test('the selected state does not depend on colour alone', async ({ page }) => {
   const first = ws(page).first();
   await expect(first.getByTestId('w-check-tick')).toHaveCount(0);
   await first.click();
-  // A tick, beside a W that is still a W.
+  // A tick, beside a control that still reads "Docket".
   await expect(first.getByTestId('w-check-tick')).toBeVisible();
-  await expect(first).toContainText('W');
+  await expect(first).toContainText('Docket');
 });
 
 test('tapping it again takes the title back off', async ({ page }) => {
@@ -127,12 +127,12 @@ test('below the minimum the gavel is visible, disabled, and says what is missing
   }
 });
 
-test('the pool says how far there is to go, in words', async ({ page }) => {
-  await open(page, 768, 1024); // the width where the long form is shown
+test('the bar says how far there is to go, in words', async ({ page }) => {
+  await open(page, 768, 1024);
   await select(page, 2);
-  await expect(page.getByTestId('docket-status-long')).toHaveText('2 selected — choose 1 more');
+  await expect(page.getByTestId('docket-announce')).toHaveText('2 on your docket. 1 more to unlock the gavel.');
   await ws(page).nth(2).click();
-  await expect(page.getByTestId('docket-status-long')).toHaveText('3 selected — gavel ready');
+  await expect(page.getByTestId('docket-announce')).toHaveText('3 on your docket. Hit the Gavel.');
 });
 
 test('the gavel becomes available at exactly three, and is announced', async ({ page }) => {
@@ -144,8 +144,9 @@ test('the gavel becomes available at exactly three, and is announced', async ({ 
   const gavel = page.getByTestId('docket-deliver');
   await expect(gavel).toBeVisible();
   await expect(gavel).toHaveAttribute('href', '/app/verdict');
-  await expect(gavel).toHaveAttribute('aria-label', /gavel decide/i);
-  await expect(page.getByTestId('docket-announce')).toHaveText('3 selected — gavel ready');
+  await expect(gavel).toHaveAttribute('aria-label', /hit the gavel/i);
+  await expect(gavel).toContainText('Hit the Gavel');
+  await expect(page.getByTestId('docket-announce')).toHaveText('3 on your docket. Hit the Gavel.');
   await expect(page.getByTestId('docket-not-ready')).toHaveCount(0);
 });
 

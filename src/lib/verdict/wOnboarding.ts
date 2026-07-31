@@ -32,6 +32,14 @@ export interface CoachInput {
   dismissed: boolean;
   /** Is this the FIRST W rendered on the page? Only that one may coach. */
   isFirstOnPage: boolean;
+  /**
+   * Has the "what happens next" line already been shown once, ever?
+   * (persisted). Distinct from `dismissed`: this one retires itself the
+   * moment it is first rendered, so it appears exactly once per user no
+   * matter whether they tap "Got it", reach the minimum, or just navigate
+   * away without touching it.
+   */
+  progressShown: boolean;
 }
 
 export interface CoachView {
@@ -57,13 +65,16 @@ export function coachFor(i: CoachInput): CoachView {
     // empty right now → they know what it is; say nothing.
     return i.everSelected
       ? { step: 'none', text: '' }
-      : { step: 'explain', text: 'Tap W to add this title to tonight’s decision.' };
+      : { step: 'explain', text: 'Tap Docket to add this title to tonight’s decision.' };
   }
 
-  const need = MIN_FOR_VERDICT - i.selected;
+  // The "what happens next" line only ever shows once, ever — the moment it
+  // has been rendered it retires itself regardless of dismissal or outcome.
+  if (i.progressShown) return { step: 'none', text: '' };
+
   return {
     step: 'progress',
-    text: `${i.selected} selected — choose at least ${MIN_FOR_VERDICT} to unlock the gavel.`,
+    text: `${i.selected} on your docket — choose at least ${MIN_FOR_VERDICT} to unlock the gavel.`,
   };
 }
 

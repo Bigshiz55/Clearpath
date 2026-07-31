@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { coachFor, MIN_FOR_VERDICT, shouldRetire } from './wOnboarding';
 
-const base = { selected: 0, everSelected: false, dismissed: false, isFirstOnPage: true };
+const base = { selected: 0, everSelected: false, dismissed: false, isFirstOnPage: true, progressShown: false };
 
 describe('the first-timer is taught the control', () => {
   it('a brand-new user is told what the W does', () => {
     const c = coachFor(base);
     expect(c.step).toBe('explain');
-    expect(c.text).toMatch(/Tap W to add this title/i);
+    expect(c.text).toMatch(/Tap Docket to add this title/i);
   });
 
   it('and only the FIRST W on the page says it — a grid does not sprout thirty tooltips', () => {
@@ -19,13 +19,17 @@ describe('after the first selection it explains the GOAL, not the control', () =
   it('one selected says how many more unlock the gavel', () => {
     const c = coachFor({ ...base, selected: 1, everSelected: true });
     expect(c.step).toBe('progress');
-    expect(c.text).toBe(`1 selected — choose at least ${MIN_FOR_VERDICT} to unlock the gavel.`);
+    expect(c.text).toBe(`1 on your docket — choose at least ${MIN_FOR_VERDICT} to unlock the gavel.`);
   });
 
   it('the count is real at every step below the minimum', () => {
     for (let n = 1; n < MIN_FOR_VERDICT; n++) {
-      expect(coachFor({ ...base, selected: n, everSelected: true }).text).toContain(`${n} selected`);
+      expect(coachFor({ ...base, selected: n, everSelected: true }).text).toContain(`${n} on your docket`);
     }
+  });
+
+  it('shows the progress line exactly once, ever — never again once shown', () => {
+    expect(coachFor({ ...base, selected: 1, everSelected: true, progressShown: true }).step).toBe('none');
   });
 });
 
@@ -51,9 +55,9 @@ describe('it stops once the user has understood', () => {
 });
 
 describe('the copy is the copy that was asked for', () => {
-  it('names the W and the decision, not jargon', () => {
+  it('names the Docket control and the decision, not jargon', () => {
     const c = coachFor(base);
-    expect(c.text).toContain('W');
+    expect(c.text).toContain('Docket');
     expect(c.text.toLowerCase()).toContain('decision');
   });
 

@@ -16,6 +16,7 @@
  * stops reading as one consistent gesture.
  */
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Gavel } from 'lucide-react';
 import {
   addToDocketStore,
   docketKey,
@@ -35,6 +36,7 @@ import type { MediaType } from '@/lib/types';
 let coachClaimed = false;
 const DISMISS_KEY = 'wv.wcoach.dismissed.v1';
 const EVER_KEY = 'wv.wcoach.everSelected.v1';
+const PROGRESS_SHOWN_KEY = 'wv.wcoach.progressShown.v1';
 
 function readFlag(key: string): boolean {
   try {
@@ -77,6 +79,7 @@ export function WCheck({
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useState(true);
   const [everSelected, setEverSelected] = useState(true);
+  const [progressShown, setProgressShown] = useState(true);
   const isFirst = useRef(false);
 
   useEffect(() => {
@@ -86,6 +89,7 @@ export function WCheck({
     }
     setDismissed(readFlag(DISMISS_KEY));
     setEverSelected(readFlag(EVER_KEY));
+    setProgressShown(readFlag(PROGRESS_SHOWN_KEY));
     setMounted(true);
   }, []);
 
@@ -99,8 +103,17 @@ export function WCheck({
   }, [mounted, dismissed, docket.length]);
 
   const coach = mounted
-    ? coachFor({ selected: docket.length, everSelected, dismissed, isFirstOnPage: isFirst.current })
+    ? coachFor({ selected: docket.length, everSelected, dismissed, isFirstOnPage: isFirst.current, progressShown })
     : { step: 'none' as const, text: '' };
+
+  // The "what happens next" line retires itself the moment it is first
+  // rendered — once per user, ever, regardless of dismissal or navigation.
+  useEffect(() => {
+    if (mounted && coach.step === 'progress' && !progressShown) {
+      writeFlag(PROGRESS_SHOWN_KEY);
+      setProgressShown(true);
+    }
+  }, [mounted, coach.step, progressShown]);
 
   function toggle(e: React.MouseEvent) {
     // These sit inside card links; a tap here is never a navigation.
@@ -139,15 +152,16 @@ export function WCheck({
         data-testid={`w-check-${tmdbId}`}
         aria-label={
           on
-            ? `${title} — selected for the decision pool. Tap to remove.`
-            : `${title} — add to decision pool`
+            ? `${title} — on your docket. Tap to remove.`
+            : `${title} — add to your docket`
         }
-        title={on ? 'Selected — tap to remove from the decision pool' : 'Add to decision pool'}
+        title={on ? 'On your docket — tap to remove' : 'Add to your docket'}
         className={[
-          // 44px, always, on every surface. Glass rather than a flat black
-          // disc: it has to read against a bright poster and a dark one, and a
-          // translucent fill with a ring does that without a hard outline.
-          'absolute right-1.5 top-1.5 z-10 grid h-11 w-11 place-items-center rounded-full text-base font-black',
+          // A labeled pill, not a bare letter: the icon + word "Docket" have to
+          // be legible without a tooltip, on every surface — grid, wall,
+          // guide, search. Glass rather than a flat black fill so it reads
+          // against a bright poster and a dark one alike.
+          'absolute right-1.5 top-1.5 z-10 inline-flex h-8 min-h-[44px] items-center gap-1 rounded-full px-2.5 text-[11px] font-black uppercase tracking-wide',
           'transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/60',
           'active:scale-95 disabled:cursor-not-allowed disabled:opacity-50',
           on
@@ -159,32 +173,34 @@ export function WCheck({
           className,
         ].join(' ')}
       >
-        {/* The W IDENTITY IS KEPT IN BOTH STATES. Selected adds a tick beside
-            it rather than replacing it — swapping the glyph for a checkmark
-            makes the selected control look like a different feature. */}
-        <span aria-hidden className="relative leading-none">
-          W
-          {on && (
-            <svg
-              viewBox="0 0 24 24"
-              data-testid="w-check-tick"
-              className="absolute -right-2.5 -top-2 h-3.5 w-3.5 rounded-full bg-white p-[1px] text-[#ff1493]"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m5 13 4 4L19 7" />
-            </svg>
-          )}
+        {/* Filled (checked) vs outline is carried by the fill/ring above; the
+            icon + word give the SAME two states a label a first-time user can
+            read without a tooltip. */}
+        <Gavel aria-hidden className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+        <span aria-hidden className="leading-none">
+          Docket
         </span>
+        {on && (
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden
+            data-testid="w-check-tick"
+            className="h-3 w-3 shrink-0 rounded-full bg-white p-[1px] text-[#ff1493]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m5 13 4 4L19 7" />
+          </svg>
+        )}
       </button>
-      {/* The pool is a running state, and a change to it has to be audible as
-          well as visible — a screen-reader user gets no feedback at all from a
-          fill colour changing on a button they just left. */}
+      {/* The docket is a running state, and a change to it has to be audible
+          as well as visible — a screen-reader user gets no feedback at all
+          from a fill colour changing on a button they just left. */}
       <span className="sr-only" role="status" data-testid="w-check-announce">
-        {on ? `${title} added to the decision pool` : ''}
+        {on ? `${title} added to your docket` : ''}
       </span>
       {refused && (
         <span
