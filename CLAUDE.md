@@ -2,6 +2,21 @@
 
 WatchVerdict: Next.js 14 (App Router) + TypeScript strict + Supabase + TMDB.
 
+## Product
+WatchVerd1ct is a personalized TV guide. Every title carries a Verd1ct score
+telling a user whether *they* would personally like it — not a generic
+critic/audience average.
+
+- **Packs** are optional depth layers for specific audiences: a set of
+  channels plus enabled features, not a separate app. The first two are
+  **Hallmark & Lifetime** (premiere calendar, actor tracking) and **True
+  Crime** (browse by case, not episode).
+- **Court** is a group decision tool: a host and guests each nominate titles,
+  everyone votes, and the room gets a verdict for the whole group.
+- **The docket** is an ambient, single-player version of Court: tap the
+  Docket badge on titles as you browse, hit the gavel, get a verdict — no
+  session, no invite, no waiting on anyone else.
+
 ## Commands
 - Install: `npm ci`
 - Dev: `npm run dev` · Build: `npm run build` · Serve: `npm start`
@@ -45,10 +60,42 @@ WatchVerdict: Next.js 14 (App Router) + TypeScript strict + Supabase + TMDB.
   Public share reads go only through the `get_public_share` SECURITY DEFINER RPC
   — never add a broad anon SELECT policy on `shares`.
 - **Mutations** are server actions in `src/lib/actions/*` with zod validation.
+- **Never call an LLM in a user request path.** Extraction and enrichment
+  (e.g. the Case pipeline's episode-to-case matching) happen in batch at
+  ingest; results are stored and read back deterministically. The one
+  sanctioned exception is the AI adjustment layer above, which is bounded,
+  degrades to the deterministic score on any failure, and never runs in a
+  listing/grid path.
+- **No Pack-specific branching.** Nothing may `switch`/`if` on a Pack slug,
+  and no table may carry a Pack-specific column. Pack pages read from the
+  same shared architecture (`src/lib/packs/*`) that every Pack uses — a new
+  Pack should not require touching code that the others share.
+- **Listings come from TVmaze** (CC BY-SA — attribution required; images are
+  hotlinked, never mirrored/re-hosted). The Gracenote path is dead and must
+  never be revived.
+- **`catalog_titles` is synthetic fixture data**, not real content — don't
+  treat query results against it as production-representative.
+- **Production deploys from `claude/watch-verdict-app-wwbtbg`.** The `main`
+  branch line is separate and does not deploy; `scripts/checkBranch.ts` fails
+  a production build from any other branch (warns only on preview deploys).
 
 ## Data honesty
 Never fabricate ratings, provider availability, cast, or content-guide counts.
 When TMDB data is missing, label it unavailable (the UI and scoring already do).
+
+## Working agreement
+- Work orders have SCOPE, CHANGES with acceptance criteria, DO NOT TOUCH,
+  VERIFY, REPORT, COMMIT. Stop and report rather than expanding scope beyond
+  what was asked.
+- Never fabricate data or numbers. Report the blocker instead of guessing.
+- Run tests non-interactively with an explicit exit flag. Build and test have
+  separate time caps: build 480s, test 180s.
+- Never request credentials. If something needs production access, output the
+  exact command for the user to run themselves.
+- At the end of any work order, update `BACKLOG.md` to reflect what moved
+  (Now/Next/Blocked/Done), and note anything discovered along the way that
+  belongs in the queue — so the backlog stays current without the user having
+  to maintain it by hand.
 
 ## Deploying
 See `DEPLOYMENT.md`. Requires TMDB + Supabase keys and a Vercel connection.
