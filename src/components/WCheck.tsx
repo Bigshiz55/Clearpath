@@ -157,11 +157,10 @@ export function WCheck({
         }
         title={on ? 'On your docket — tap to remove' : 'Add to your docket'}
         className={[
-          // A labeled pill, not a bare letter: the icon + word "Docket" have to
-          // be legible without a tooltip, on every surface — grid, wall,
-          // guide, search. Glass rather than a flat black fill so it reads
-          // against a bright poster and a dark one alike.
-          'absolute right-1.5 top-1.5 z-10 inline-flex h-8 min-h-[44px] items-center gap-1 rounded-full px-2.5 text-[11px] font-black uppercase tracking-wide',
+          // 44px, always, on every surface. Glass rather than a flat black
+          // disc: it has to read against a bright poster and a dark one, and a
+          // translucent fill with a ring does that without a hard outline.
+          'absolute right-1.5 top-1.5 z-10 grid h-11 w-11 place-items-center rounded-full',
           'transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/60',
           'active:scale-95 disabled:cursor-not-allowed disabled:opacity-50',
           on
@@ -173,28 +172,27 @@ export function WCheck({
           className,
         ].join(' ')}
       >
-        {/* Filled (checked) vs outline is carried by the fill/ring above; the
-            icon + word give the SAME two states a label a first-time user can
-            read without a tooltip. */}
-        <Gavel aria-hidden className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
-        <span aria-hidden className="leading-none">
-          Docket
+        {/* THE GAVEL ICON IS THE IDENTITY IN BOTH STATES. Selected adds a tick
+            beside it rather than replacing it — swapping the icon for a
+            checkmark makes the selected control look like a different
+            feature. */}
+        <span aria-hidden className="relative leading-none">
+          <Gavel className="h-5 w-5" strokeWidth={2.25} />
+          {on && (
+            <svg
+              viewBox="0 0 24 24"
+              data-testid="w-check-tick"
+              className="absolute -right-2.5 -top-2 h-3.5 w-3.5 rounded-full bg-white p-[1px] text-[#ff1493]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m5 13 4 4L19 7" />
+            </svg>
+          )}
         </span>
-        {on && (
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden
-            data-testid="w-check-tick"
-            className="h-3 w-3 shrink-0 rounded-full bg-white p-[1px] text-[#ff1493]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m5 13 4 4L19 7" />
-          </svg>
-        )}
       </button>
       {/* The docket is a running state, and a change to it has to be audible
           as well as visible — a screen-reader user gets no feedback at all

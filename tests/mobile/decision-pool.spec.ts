@@ -75,9 +75,9 @@ test('the selected state does not depend on colour alone', async ({ page }) => {
   const first = ws(page).first();
   await expect(first.getByTestId('w-check-tick')).toHaveCount(0);
   await first.click();
-  // A tick, beside a control that still reads "Docket".
+  // A tick, beside a gavel icon that is still the same icon.
   await expect(first.getByTestId('w-check-tick')).toBeVisible();
-  await expect(first).toContainText('Docket');
+  await expect(first).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('tapping it again takes the title back off', async ({ page }) => {
