@@ -1,0 +1,49 @@
+name: Refresh TV ingest
+
+# Hourly external trigger for /api/cron/tv-ingest (TVmaze ingestion into the
+# 0032 tv_* tables). This route is deliberately NOT in vercel.json's crons —
+# Vercel's Hobby plan caps at two cron jobs, both already spent on daily-scan
+# and classify, and Hobby cron only runs daily regardless. Per this route's
+# own header comment and docs/SCHEDULE_PROVIDERS.md ("Cron scheduling
+# constraint"), an external hourly scheduler with the CRON_SECRET bearer
+# token is the documented way to run it on Hobby. The route itself is
+# idempotent per UTC calendar day (checked against tv_ingestion_runs), so an
+# hourly ping is a safe no-op once that day's run has already succeeded.
+#
+# Formerly pinged /api/cron/tv-grid, which fed the now-deprecated tv_grid
+# table via the retired, WAF-blocked Gracenote path (see 0035's migration
+# comment). That route was deleted along with the rest of the Gracenote code
+# path; every run of the old workflow failed as a result. Repointed here at
+# the real, currently-shipping TVmaze ingest endpoint instead of deleting the
+# workflow outright, since this is the only thing that keeps tv_providers /
+# tv_lineups / tv_stations / tv_programmes / tv_airings fresh on Hobby.
+#
+# Requires two repository secrets (Settings → Secrets and variables → Actions):
+#   SITE_URL     e.g. https://verd1ct.com  (no trailing slash)
+#   CRON_SECRET  the same value set as the CRON_SECRET env var on the deployment
+#
+# GitHub may delay scheduled runs under load; the app also self-heals on read.
+
+on:
+  schedule:
+    - cron: '0 * * * *' # top of every hour (UTC)
+  workflow_dispatch: {}
+
+concurrency:
+  group: tv-ingest-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping TVmaze ingest endpoint
+        run: |
+          if [ -z "${{ secrets.SITE_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "SITE_URL and CRON_SECRET repo secrets are required."; exit 1
+          fi
+          code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.SITE_URL }}/api/cron/tv-ingest")
+          echo "HTTP $code"; cat /tmp/out.json || true
+          test "$code" = "200"
