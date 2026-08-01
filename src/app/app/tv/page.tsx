@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfile, getPreferenceRules, regionFor } from '@/lib/profile';
 import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle, usBroadcastDate, type Airing } from '@/lib/onTv';
 import { scoreGuideAirings } from '@/lib/tv/scoreGuide';
+import { getIngestedGuideAirings } from '@/lib/tv/ingestedGuide';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
@@ -87,14 +88,16 @@ export default async function OnTvPage({
   // Add IMDb / Rotten Tomatoes / Metacritic to the placards (cached, bounded).
   const airings = await enrichAiringsWithCritics(airingsRaw).then((a) => enrichAiringsWithTmdb(a));
 
-  // THE FULL GUIDE — every channel, by channel, for the next 6 hours. The
-  // ingested cable lineup that used to back this (Gracenote's public grid) is
-  // retired: that endpoint is now WAF-blocked and not worked around (see
-  // docs/SCHEDULE_PROVIDERS.md). Until a licensed full-grid provider or the
-  // new TVmaze-ingested tables (see src/lib/viewing/ingest/) are wired into
-  // this view, it is honestly empty rather than showing stale or fabricated
-  // rows — the coverage banner below reflects that from real data, not a flag.
-  let guideAirings: Airing[] = [];
+  // THE FULL GUIDE — every channel, by channel, for the next 6 hours. Real
+  // rows only, from the same TVmaze-ingested tables that back the Packs
+  // feature (see src/lib/viewing/ingest/ and src/lib/tv/ingestedGuide.ts) —
+  // NOT the old Gracenote public grid, which is retired (WAF-blocked, not
+  // worked around; see docs/SCHEDULE_PROVIDERS.md). Only the handful of
+  // channels configured for that ingest can ever appear here; the coverage
+  // banner below reflects that narrowness from this same real data, not a flag.
+  let guideAirings: Airing[] = guideView
+    ? await getIngestedGuideAirings(supabase, now.getTime(), 6 * HOUR_MS).catch(() => [])
+    : [];
   // PER-PROGRAMME SCORES. A bounded set of the window's programmes (on-now
   // first) is resolved to real titles and run through the SAME deterministic
   // engine as every card, with this user's rules — so "this movie suits you

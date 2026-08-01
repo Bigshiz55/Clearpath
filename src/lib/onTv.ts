@@ -132,9 +132,19 @@ function toAiring(a: TvmazeAiring, show: TvmazeShow, network: string, requireTim
 }
 
 async function fetchJson(url: string): Promise<TvmazeAiring[]> {
-  const res = await fetch(url, { next: { revalidate: 3600 } }).catch(() => null);
-  if (!res || !res.ok) return [];
-  const data = (await res.json().catch(() => [])) as TvmazeAiring[];
+  const res = await fetch(url, { next: { revalidate: 3600 } }).catch((e) => {
+    console.error(`[onTv] fetch failed: ${url}`, e instanceof Error ? e.message : e);
+    return null;
+  });
+  if (!res) return [];
+  if (!res.ok) {
+    console.error(`[onTv] fetch non-OK: ${url} → ${res.status} ${res.statusText}`);
+    return [];
+  }
+  const data = (await res.json().catch((e) => {
+    console.error(`[onTv] JSON parse failed: ${url}`, e instanceof Error ? e.message : e);
+    return [];
+  })) as TvmazeAiring[];
   return Array.isArray(data) ? data : [];
 }
 
