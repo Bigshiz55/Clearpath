@@ -91,14 +91,19 @@ export async function resolveSchedule(o: ResolveOptions): Promise<ResolvedSchedu
   const ordered = [...o.adapters].sort((a, b) => a.priority - b.priority);
 
   // Adapters with no credentials are reported, not attempted — "not configured"
-  // and "configured but down" are different answers.
-  for (const a of ordered.filter((x) => !x.isConfigured())) {
-    sources.push({
-      sourceId: a.providerId, status: 'misconfigured', rawCount: 0,
-      errorCode: 'NO_CREDENTIALS',
-      errorMessage: `${a.providerId} has no credentials configured on this deployment`,
-    });
-  }
+  // and "configured but down" are different answers. Held separately rather
+  // than pushed into `sources` immediately: an unconfigured ALTERNATE or MOCK
+  // adapter that a healthy primary made unnecessary to even try is not a
+  // failure of THIS request, and must not drag a fully-answered response down
+  // to 'partial' — that would be exactly the kind of overstated caveat this
+  // status system exists to prevent, just pointed the other direction. It's
+  // folded into `sources` only on the paths below where the full picture
+  // (including what ISN'T configured) actually matters.
+  const unconfigured: SourceReport[] = ordered.filter((x) => !x.isConfigured()).map((a) => ({
+    sourceId: a.providerId, status: 'misconfigured', rawCount: 0,
+    errorCode: 'NO_CREDENTIALS',
+    errorMessage: `${a.providerId} has no credentials configured on this deployment`,
+  }));
   const usable = ordered.filter((a) => a.isConfigured());
 
   // ---- 1. primary, with bounded retry -------------------------------------
@@ -117,6 +122,9 @@ export async function resolveSchedule(o: ResolveOptions): Promise<ResolvedSchedu
       return { listings: res.listings, sources, fallbackUsed: false };
     }
   }
+  // Past this point the primary either doesn't exist or didn't fully answer —
+  // every other adapter's configuration state is now real, relevant context.
+  sources.push(...unconfigured);
 
   // ---- 2. cache ------------------------------------------------------------
   if (o.readCache) {

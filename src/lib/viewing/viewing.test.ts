@@ -409,6 +409,29 @@ describe('adapter fallback chain', () => {
     expect(r.sources[0]!.status).toBe('healthy');
   });
 
+  it('reports HEALTHY, not partial, when the primary fully answers and an unconfigured alternate never had to be tried', async () => {
+    // The real production shape: TV Media (configured, healthy) alongside
+    // Schedules Direct and a mock adapter that are simply never set up on
+    // this deployment. Those two being unconfigured is not a failure of
+    // THIS request — the primary already answered in full — and must not
+    // drag a genuinely complete response down to 'partial'.
+    let secondaryCalled = false;
+    const r = await resolveSchedule({
+      adapters: [
+        adapter('tv_media', { listings: grid(30), totalRaw: 30 }, true, 0),
+        adapter('schedules_direct', {}, false, 0),
+        { providerId: 'mock_grid', priority: 90, isConfigured: () => false, fetch: async () => { secondaryCalled = true; throw new Error('must not be called'); } },
+      ],
+      request: REQ,
+    });
+    expect(r.listings).toHaveLength(30);
+    expect(r.fallbackUsed).toBe(false);
+    expect(secondaryCalled).toBe(false);
+    expect(r.sources).toHaveLength(1);
+    expect(r.sources[0]!.sourceId).toBe('tv_media');
+    expect(combineStatus(r.sources.map((s) => s.status))).toBe('healthy');
+  });
+
   it('falls back to cache when the primary is blocked, and labels it stale', async () => {
     const r = await resolveSchedule({
       adapters: [adapter('primary', { status: 'provider_blocked', errorCode: 'WAF' })],
