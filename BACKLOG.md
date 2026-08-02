@@ -4,7 +4,10 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-Nothing in flight.
+Nothing in flight. **Action needed from you:** open `/admin/migrations` on
+production and apply pending migrations with your `MIGRATE_SECRET` — see the
+"Restored: /admin/migrations" entry below for why this is currently required
+and what it unblocks.
 
 ## Next
 - **Shared admin token gate across all `/admin` routes.** `/admin/content`
@@ -24,6 +27,26 @@ Nothing in flight.
   representative.
 
 ## Done
+- **Restored `/admin/migrations` and `/api/admin/migrate`.** Root-caused the
+  Hallmark Universe Pack showing "Nothing ingested yet" / "No premieres in
+  the next 6 weeks" with every section empty and no error banner: `feat(build):
+  run migrations automatically on deploy` deleted the manual migration route
+  in favor of an automatic `npm run migrate && next build` step; that step
+  broke five consecutive production deploys and was reverted
+  (`revert(build): remove migration step from build pipeline`), but the
+  manual route was never brought back. Net effect since Jul 31: no
+  mechanism at all, automatic or manual, applies anything registered in
+  `pendingMigrations.ts` after that point — migration 0038
+  (`pack_ingest_runs` + the `pack_try_start_ingest`/`pack_finish_ingest`
+  RPCs the lazy self-ingest on every Pack page depends on) is a prime
+  suspect for never having reached production. Restored the route, the
+  page, and the `ApplyMigrationsButton` component byte-for-byte from their
+  last-known-good version (a plain request-time API route, never part of
+  the build command, so not implicated in the deploy failures that caused
+  the revert). **This alone doesn't fix the Pack page** — someone with the
+  `MIGRATE_SECRET` needs to actually visit `/admin/migrations` and click
+  Apply; verify the Pack page afterward. (`fix(admin): restore migration
+  route after five-deploy-failure revert left it permanently missing`)
 - **Docket badge labeling and persistent docket bar** — the "W" badge is now
   a labeled Gavel+"Docket" pill, and the corner floating Gavel button is a
   full-width bottom bar stating "N on your docket · Hit the Gavel," reviewable
