@@ -3,6 +3,7 @@ import { Client } from 'pg';
 import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 import { PENDING_MIGRATIONS } from '@/lib/pendingMigrations';
+import { sanitizeDbUrl, validateDbUrl } from '@/lib/adminMigrateUrl';
 
 // A raw Postgres connection needs real TCP/TLS sockets (`net`/`tls`), which
 // the Edge runtime does not provide — `pg` would fail to even load there.
@@ -72,11 +73,26 @@ export async function POST(request: Request) {
   if (!authorized) return NextResponse.json({ error: 'Not authorized.' }, { status: 403 });
 
   // Connection string from the request (one-time, gated by the secret) or env.
-  const dbUrl = (typeof body.dbUrl === 'string' && body.dbUrl.startsWith('postgres') ? body.dbUrl : null) ?? serverEnv.migrationsDbUrl();
-  if (!dbUrl) {
+  // Sanitized before use — a wrapping quote or trailing newline from a
+  // copy-paste is the single most common reason this fails, and previously
+  // surfaced as the exact same opaque "Invalid URL" as a genuinely wrong
+  // connection string, with no way to tell the two apart.
+  const rawDbUrl = typeof body.dbUrl === 'string' && body.dbUrl.trim() ? body.dbUrl : serverEnv.migrationsDbUrl();
+  if (!rawDbUrl) {
     return NextResponse.json(
       { error: 'No database URL. Paste your Supabase connection string (Settings → Database → Connection string, "URI"), or set SUPABASE_DB_URL in your env.' },
       { status: 503 },
+    );
+  }
+  const dbUrl = sanitizeDbUrl(rawDbUrl);
+  const validation = validateDbUrl(dbUrl);
+  if (!validation.ok) {
+    return NextResponse.json(
+      {
+        stage: 'validate',
+        error: `The database URL is not usable: ${validation.reason}`,
+      },
+      { status: 400 },
     );
   }
 

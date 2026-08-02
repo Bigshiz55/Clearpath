@@ -21,11 +21,22 @@ interface MigrateResult {
  * readable on screen rather than a bare digest.
  *
  * The token lives only in this component's state — never localStorage, a
- * cookie, or the URL — so it's gone the moment the page reloads.
+ * cookie, or the URL — so it's gone the moment the page reloads. Same for
+ * the optional database URL below.
+ *
+ * The database URL field exists because SUPABASE_DB_URL living only in
+ * Vercel's env — invisible and unverifiable from here — was a real dead
+ * end: if that value is wrong (a wrapped quote, an unescaped password
+ * character), there was previously no way to fix it without leaving this
+ * page, editing Vercel, and hoping the next deploy picks it up. Pasting a
+ * known-good connection string here bypasses whatever the env var holds,
+ * for this one request only — never stored, never sent anywhere but this
+ * one fetch.
  */
 export function ApplyMigrationsButton() {
   const toast = useToast();
   const [token, setToken] = useState('');
+  const [dbUrl, setDbUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MigrateResult | null>(null);
 
@@ -40,7 +51,11 @@ export function ApplyMigrationsButton() {
       const res = await fetch('/api/admin/migrate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.trim()}` },
-        body: '{}',
+        // The route sanitizes this itself (wrapping quotes, whitespace) —
+        // sent as typed/pasted, not trimmed here, so that sanitization step
+        // is exercised the same way for a request-supplied URL as for the
+        // env var, rather than this form silently fixing it first.
+        body: JSON.stringify(dbUrl.trim() ? { dbUrl } : {}),
       });
       // Read the raw text first — a crash that never reaches our JSON
       // handlers (a platform-level 500, an HTML error page) still has a body
@@ -84,6 +99,28 @@ export function ApplyMigrationsButton() {
           className="input"
           placeholder="MIGRATE_SECRET"
         />
+      </div>
+
+      <div>
+        <label htmlFor="migrate-db-url" className="label">
+          Database URL <span className="font-normal text-slate-500">(optional — overrides SUPABASE_DB_URL for this run only)</span>
+        </label>
+        <input
+          id="migrate-db-url"
+          type="password"
+          autoComplete="off"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          value={dbUrl}
+          onChange={(e) => setDbUrl(e.target.value)}
+          className="input"
+          placeholder="postgres://postgres:...@db....supabase.co:5432/postgres"
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          Leave blank to use the server&apos;s configured SUPABASE_DB_URL. Fill this in if that keeps failing to
+          connect — Supabase → Settings → Database → Connection string → URI.
+        </p>
       </div>
 
       <button type="submit" disabled={busy || !token} className="btn-primary disabled:opacity-50">
