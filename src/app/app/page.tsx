@@ -14,6 +14,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { TonightHome } from '@/components/TonightHome';
 import { UpcomingTvRail } from '@/components/UpcomingTvRail';
 import { InstallHint } from '@/components/InstallHint';
+import { TourHint } from '@/components/onboarding/TourHint';
 import { getTonight } from '@/lib/tonight';
 import type { VerdictTier } from '@/lib/types';
 
@@ -71,6 +72,10 @@ export default async function DiscoverPage() {
 
       {/* App-install nudge for testers — self-hides once installed/dismissed. */}
       <InstallHint />
+
+      {/* One-time pointer to the full walkthrough — self-hides once opened
+          or dismissed, never returns. See TourHint.tsx. */}
+      <TourHint />
 
       {/* Welcome + 30-second tour. */}
       <TonightHome tonight={tonight} />
