@@ -1,14 +1,16 @@
 name: Refresh TV ingest
 
-# Hourly external trigger for /api/cron/tv-ingest (TVmaze ingestion into the
-# 0032 tv_* tables). This route is deliberately NOT in vercel.json's crons —
-# Vercel's Hobby plan caps at two cron jobs, both already spent on daily-scan
-# and classify, and Hobby cron only runs daily regardless. Per this route's
-# own header comment and docs/SCHEDULE_PROVIDERS.md ("Cron scheduling
-# constraint"), an external hourly scheduler with the CRON_SECRET bearer
-# token is the documented way to run it on Hobby. The route itself is
-# idempotent per UTC calendar day (checked against tv_ingestion_runs), so an
-# hourly ping is a safe no-op once that day's run has already succeeded.
+# Hourly external trigger for /api/cron/tv-ingest — TVmaze AND TV Media
+# ingestion into the 0032 tv_* tables. This route is deliberately NOT in
+# vercel.json's crons — Vercel's Hobby plan caps at two cron jobs, both
+# already spent on daily-scan and classify, and Hobby cron only runs daily
+# regardless. Per this route's own header comment and
+# docs/SCHEDULE_PROVIDERS.md ("Cron scheduling constraint"), an external
+# hourly scheduler with the CRON_SECRET bearer token is the documented way to
+# run it on Hobby. TVmaze runs at most once per UTC calendar day; TV Media
+# runs at most once every two hours and is a no-op with zero DB writes until
+# TVMEDIA_API_KEY is set — both checked against tv_ingestion_runs, so an
+# hourly ping is a safe no-op in between.
 #
 # Formerly pinged /api/cron/tv-grid, which fed the now-deprecated tv_grid
 # table via the retired, WAF-blocked Gracenote path (see 0035's migration
@@ -37,7 +39,7 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping TVmaze ingest endpoint
+      - name: Ping TV listings ingest endpoint
         run: |
           if [ -z "${{ secrets.SITE_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
             echo "SITE_URL and CRON_SECRET repo secrets are required."; exit 1

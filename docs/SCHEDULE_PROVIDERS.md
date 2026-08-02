@@ -205,4 +205,93 @@ The route itself is deployed and works. To schedule it:
   (GitHub Actions on a `schedule:` trigger, or Supabase's `pg_cron`) with the
   `CRON_SECRET` bearer token. The route's auth check is the same either way.
 
-Either path needs no code change.
+Either path needs no code change. As of the change that added TV Media
+ingestion, this route runs BOTH writers on every tick: TVmaze at most once
+per UTC calendar day, TV Media at most once every two hours (see "Cost
+control" below). Both checks live in `tv_ingestion_runs`, so an hourly
+external ping is a safe no-op in between either provider's own cadence.
+
+## Full guide ingestion — how TV Media becomes the primary
+
+`/api/cron/tv-ingest` → `src/lib/viewing/ingest/tvMediaWriter.ts` writes into
+the same 0032 tables (`tv_stations`, `tv_programmes`, `tv_airings`) that the
+pre-existing TVmaze writer already used — no new tables. The full guide's
+read path (`src/lib/tv/ingestedGuide.ts`) queries `tv_airings` by time window
+only, with no provider filter, so it was already provider-agnostic: once TV
+Media rows exist, the guide is a merge of both writers automatically, no
+route or component change required.
+
+**Stations are discovered, not configured.** Unlike the TVmaze writer, which
+matches against a hand-maintained ~30-channel list (`tvmazeChannels.ts`)
+because TVmaze's feed carries no channel list of its own, TV Media's
+`/listings` response IS the channel list — every station in the fetch becomes
+a `tv_stations` row via `stationsFrom()`
+(`src/lib/viewing/ingest/tvMediaIngest.ts`). A real key immediately yields
+however many channels the lineup carries; nothing to hand-configure.
+
+**Lineup handling (CHANGES §3).** One national default lineup, keyed off
+whichever of `TVMEDIA_LINEUP_ID` / `TVMEDIA_DEFAULT_ZIP` is set — the same
+default the query-time chain in `liveTv.ts` already used. A real per-user
+lineup selector would need: (1) a `postal_code` (or provider account) column
+on the user profile, collected once at signup or in settings; (2) the ingest
+job parameterized to run once per DISTINCT lineup in use, not once globally —
+straightforward with the existing `provider_lineup_id` key, just more rows in
+`tv_lineups` and more calls, scaling with the number of distinct markets
+actually in use, not the user count; (3) `getIngestedGuideAirings` filtered
+by the viewer's `lineup_id` instead of reading across all lineups. None of
+this is built — the "sensible default" acceptance criterion only asked for a
+working single national lineup, which is what's here.
+
+**Fallback behavior (CHANGES §7).** `runTvMediaIngest()` is a complete no-op
+— zero DB writes, zero HTTP calls — whenever `TVMEDIA_API_KEY` is unset or
+neither `TVMEDIA_LINEUP_ID` nor `TVMEDIA_DEFAULT_ZIP` is set. TVmaze's own
+writer is unaffected and keeps running on its own daily schedule regardless,
+so the full guide never goes blank: with no TV Media key it shows exactly
+what it showed before this change (TVmaze's narrow Hallmark/Lifetime/crime
+set), and the on-page coverage banner (`gridLive` in
+`src/app/app/tv/page.tsx`) already reflects that narrowness from the real
+row count, not a flag.
+
+### Cost control (CHANGES §6)
+
+TV Media's data refreshes upstream every two hours, so nothing here polls
+faster than that. Two independent guards, both real code, not just policy:
+
+1. **Cadence.** The cron route checks the most recent `tv_ingestion_runs` row
+   for `provider_id='tv_media'` and skips the run entirely if one succeeded
+   or partially succeeded within the last two hours.
+2. **Monthly budget.** `TVMEDIA_MONTHLY_CALL_LIMIT` (optional, default
+   unset/0 = unenforced — the real plan limit isn't known yet). When set,
+   `evaluateBudget()` (`src/lib/viewing/ingest/budget.ts`, previously written
+   but unused until this change) checks usage from `tv_call_ledger` before
+   the run starts, and again before each individual call, so a run stops —
+   never mid-call — the moment it would breach 90% of the configured limit.
+
+**Expected call volume.** Each run fetches the lineup one calendar day at a
+time — a conservative assumption, not a verified one (see "Verifying the
+field mapping" above: TV Media's real pagination behavior is unconfirmed).
+One call covers every channel in the lineup for that day, so **cost is
+independent of lineup size** — a 40-channel market and a 400-channel market
+both cost the same number of calls:
+
+| Ingest scope | Calls per run | Runs/day (as shipped) | Calls/day | Calls/month |
+|---|---:|---:|---:|---:|
+| 14-day forward window (default `TVMEDIA_INGEST_DAYS`) | 14 | 1 (once daily) | 14 | ~420 |
+| Same, if run at the maximum allowed cadence (every 2h) | 14 | 12 | 168 | ~5,040 |
+
+As shipped, the cron route runs the full 14-day window once per day (well
+under the 2-hour floor) — **~420 calls/month** is the number to size a plan
+against. Every call is logged to `tv_call_ledger` regardless of budget
+enforcement, so once real usage exists `SELECT count(*) FROM tv_call_ledger
+WHERE provider_id='tv_media' AND requested_at >= date_trunc('month', now())`
+gives the actual figure, not an estimate.
+
+### Attribution (CHANGES §5)
+
+A text credit + link to tvmedia.ca appears on `/app/tv`, next to the
+existing TVmaze credit, gated on `isTvMediaConfigured()` — it only renders
+once their data is actually in use. No logo: their brand-kit asset URL isn't
+verified, and hotlinking a guessed one would be fabricating a resource that
+doesn't exist. Add the real logo URL to the credit block in
+`src/app/app/tv/page.tsx` once it's confirmed from their docs — everything
+else about the credit's placement and gating stays the same.

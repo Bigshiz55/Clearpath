@@ -8,7 +8,7 @@ import { getIngestedGuideAirings } from '@/lib/tv/ingestedGuide';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
-import { hasFullGridProvider } from '@/lib/viewing/liveTv';
+import { hasFullGridProvider, isTvMediaConfigured } from '@/lib/viewing/liveTv';
 import { TvDetective } from '@/components/TvDetective';
 import { CoverageNote } from '@/components/tv/CoverageNote';
 import { Antenna, Film, Sparkles } from 'lucide-react';
@@ -311,6 +311,22 @@ export default async function OnTvPage({
           the deep-scan tool waits under them. */}
       {!guideView && <TvDetective />}
 
+      {/* TV Media attribution — required by their terms only while their data
+          is actually in use, so it's gated on isTvMediaConfigured() rather
+          than always shown. No logo: TV Media's brand-kit asset URL isn't
+          verified yet (see docs/SCHEDULE_PROVIDERS.md), and hotlinking a
+          guessed one would be exactly the kind of fabrication this codebase
+          avoids — a text credit is the compliant minimum until a real asset
+          URL is confirmed. */}
+      {isTvMediaConfigured() && (
+        <p className="text-[11px] text-slate-500">
+          Full channel listings from{' '}
+          <a href="https://www.tvmedia.ca" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">
+            TV Media
+          </a>
+          .
+        </p>
+      )}
       {/* TVmaze API attribution — a clickable link to tvmaze.com, per their
           terms. Every surface on this page that shows TVmaze-sourced listings
           shares this one credit; do not add a second, differently-worded one

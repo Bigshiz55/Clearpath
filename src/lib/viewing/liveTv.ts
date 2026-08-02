@@ -153,3 +153,22 @@ export function hasFullGridProvider(): boolean {
 export function activeProviderId(): string | null {
   return providerCapabilities().find((p) => p.configured && p.role !== 'supplement')?.providerId ?? null;
 }
+
+/** Whether TV Media specifically is configured — drives its attribution
+ *  credit, which their terms require only while their data is actually in
+ *  use (CHANGES §5). */
+export function isTvMediaConfigured(): boolean {
+  return new TvMediaAdapter().isConfigured();
+}
+
+/**
+ * A fresh TV Media adapter instance for the ingest writer
+ * (`ingest/tvMediaWriter.ts`), which needs THIS provider specifically — it
+ * writes rows tagged `provider_id='tv_media'` — not "whichever is
+ * configured" the way query-time resolution does. Keeping construction here
+ * rather than in the writer itself is what `independence.test.ts` enforces:
+ * this file and `registry.ts` are the only places any `*Adapter` is `new`'d.
+ */
+export function tvMediaAdapterForIngest(): TvMediaAdapter {
+  return new TvMediaAdapter();
+}
