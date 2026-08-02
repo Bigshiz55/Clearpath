@@ -59,7 +59,9 @@ export const TOUR_STEPS: TourStep[] = [
     title: 'Just ask, in plain English',
     body:
       'Type what you want the way you’d say it out loud — "something funny under 90 minutes on Netflix" — and get real matches only. A rule like "under 90 minutes" is never quietly relaxed to pad the results.',
-    actions: [{ label: 'Try State Your Case', href: '/app/watch' }],
+    // The input box itself only lives on the home hub — /app/watch is the
+    // curated recommendations grid, a different screen entirely.
+    actions: [{ label: 'Try State Your Case', href: '/app' }],
   },
   {
     id: 'beyond',
