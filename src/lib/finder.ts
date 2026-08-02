@@ -17,6 +17,7 @@ import {
   candidateTarget,
   discoverPages,
   enoughSurvivors,
+  isKeywordStarved,
   mapPool,
   waves,
   HYDRATE_CONCURRENCY,
@@ -429,7 +430,28 @@ export async function runFinder(
   let items = survivors.sort((a, b) => b.matchScore - a.matchScore);
   let relaxed: string | null = null;
 
-  // Honest fallback: if nothing hit every constraint, relax match, then services.
+  // Honest fallback #1: a fuzzy vibe/trope word ("feel-good", "cozy") resolves
+  // to a SINGLE TMDB keyword id via a plain text search with no popularity or
+  // usage gating (see askParse.ts's searchKeywords) — and TMDB's keyword
+  // tagging is crowd-sourced and sparse, so that one id can be tagged on only
+  // a handful of titles in the entire catalogue. Used as a hard `with_keywords`
+  // filter, that starves an otherwise-broad request down to almost nothing —
+  // not zero (so the existing zero-result fallback below never sees it), just
+  // far short of what was asked for. This is the root cause of "Something
+  // feel-good and uplifting" returning two titles: the vibe word survived as a
+  // rigid catalogue filter well past the point it stopped being useful as one.
+  // Detected on YIELD, not on the word itself — a request whose keyword really
+  // is well-tagged keeps its precision untouched.
+  if (isKeywordStarved(items.length, limit, !!(q.keywordIds && q.keywordIds.length > 0))) {
+    const relaxedQ: FinderQuery = { ...q, keywordIds: undefined };
+    const r = await runFinder(supabase, userId, relaxedQ, watcher, limit);
+    if (r.items.length > items.length) {
+      items = r.items;
+      relaxed = 'That exact vibe keyword wasn’t well-tagged in the catalog — here are the closest matches by genre and tone instead.';
+    }
+  }
+
+  // Honest fallback #2: if nothing hit every constraint, relax match, then services.
   if (items.length === 0 && (q.minMatch != null || q.onMyServices)) {
     const relaxedQ: FinderQuery = { ...q, minMatch: null, onMyServices: false };
     relaxed = q.onMyServices

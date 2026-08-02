@@ -108,3 +108,20 @@ export function waves<T>(items: readonly T[], size: number): T[][] {
   for (let i = 0; i < items.length; i += n) out.push(items.slice(i, i + n));
   return out;
 }
+
+/**
+ * Did a resolved TMDB vibe/trope keyword ("feel-good", "cozy") starve an
+ * otherwise-broad request?
+ *
+ * A keyword id from `searchKeywords` is the first plain-text match with no
+ * usage or popularity gating, and TMDB's keyword tagging is crowd-sourced and
+ * sparse — a fuzzy vibe word can resolve to an id tagged on only a handful of
+ * titles catalogue-wide. Used as a hard `with_keywords` filter, that starves
+ * a request down to almost nothing without ever hitting zero, so the ordinary
+ * "nothing matched" fallback never sees it — the two-result "Something
+ * feel-good and uplifting" defect. Detected on YIELD, not on the word itself:
+ * a keyword that really is well-tagged keeps its precision untouched.
+ */
+export function isKeywordStarved(survivorCount: number, limit: number, hadKeywords: boolean): boolean {
+  return hadKeywords && survivorCount < Math.max(1, Math.ceil(limit / 2));
+}

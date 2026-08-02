@@ -70,7 +70,7 @@ export default async function SubscriptionsPage() {
                       : `Get more out of what you already pay for.`}
                   </div>
                   <p className="mt-1 text-sm text-slate-300">
-                    WatchVerd1ct Pro ({PRO_PRICE_LABEL}) unlocks <span className="text-white">AI-tuned verdicts</span>, <span className="text-white">household profiles</span>, bigger Live Court, and an <span className="text-white">ad-free grid</span> — so the services you keep actually get used.
+                    WatchVerd1ct Pro ({PRO_PRICE_LABEL}) unlocks <span className="text-white">AI-tuned verdicts</span>, <span className="text-white">household profiles</span>, a bigger Verdict Room, and an <span className="text-white">ad-free grid</span> — so the services you keep actually get used.
                   </p>
                   <Link href="/app/pro" className="btn-primary mt-3 inline-flex">✨ Go Pro — {PRO_PRICE_LABEL}</Link>
                 </div>

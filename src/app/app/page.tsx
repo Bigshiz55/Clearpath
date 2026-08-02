@@ -81,8 +81,10 @@ export default async function DiscoverPage() {
       <TonightHome tonight={tonight} />
 
       <section className="space-y-6">
-        {/* Featured — The Verdict Room (Live Court): the group "wow", given top
-            billing as a wide, prominent card above the rest of the tiles. */}
+        {/* Featured — The Verdict Room: the group "wow", given top billing as a
+            wide, prominent card above the rest of the tiles. One product name
+            only — "Live Court" used to sit here as a second, competing name
+            for the same feature; the eyebrow below is purely descriptive now. */}
         <Link
           href="/app/together"
           style={{
@@ -97,7 +99,7 @@ export default async function DiscoverPage() {
             <TileIcon name="together" className="relative h-20 w-20 drop-shadow-[0_12px_26px_rgba(0,0,0,0.55)] transition-transform duration-300 group-hover:scale-[1.06] sm:h-24 sm:w-24" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-100">⚖️ Live Court</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-100">⚖️ Group decision, live</span>
             <span className="mt-1.5 block text-2xl font-black tracking-tight text-white sm:text-3xl">The Verdict Room</span>
             <span className="mt-0.5 block text-sm text-slate-200 sm:text-base">Everyone weighs in. One title wins.</span>
           </span>

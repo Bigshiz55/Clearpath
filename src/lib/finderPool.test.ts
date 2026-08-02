@@ -3,6 +3,7 @@ import {
   candidateTarget,
   discoverPages,
   enoughSurvivors,
+  isKeywordStarved,
   mapPool,
   waves,
   MAX_CANDIDATES,
@@ -64,6 +65,38 @@ describe('the candidate pool is sized by the ask, not by a constant', () => {
     // last one looked at — there would be nothing for the sort to choose from.
     expect(enoughSurvivors(24)).toBeGreaterThan(24);
     expect(enoughSurvivors(8)).toBeGreaterThan(8);
+  });
+});
+
+/**
+ * THE TWO-RESULT "FEEL-GOOD" BUG.
+ *
+ * A vibe keyword ("feel-good") resolves to one sparsely-tagged TMDB keyword
+ * id and, used as a hard `with_keywords` filter, starves an otherwise-broad
+ * request down to a couple of survivors — never exactly zero, so the
+ * pre-existing zero-result fallback never fired and the shortfall went
+ * unexplained. `isKeywordStarved` is the trigger for the relax-and-retry
+ * fallback that replaces it.
+ */
+describe('isKeywordStarved — detects a vibe keyword that starved the pool', () => {
+  it('is starved when a keyword search yields under half the ask', () => {
+    expect(isKeywordStarved(2, 24, true)).toBe(true);
+    expect(isKeywordStarved(0, 24, true)).toBe(true);
+  });
+
+  it('is not starved once survivors clear half the ask', () => {
+    expect(isKeywordStarved(12, 24, true)).toBe(false);
+    expect(isKeywordStarved(24, 24, true)).toBe(false);
+  });
+
+  it('never fires when the query had no keyword filter at all', () => {
+    expect(isKeywordStarved(0, 24, false)).toBe(false);
+    expect(isKeywordStarved(2, 24, false)).toBe(false);
+  });
+
+  it('a tiny ask (limit=1) still requires at least one survivor', () => {
+    expect(isKeywordStarved(0, 1, true)).toBe(true);
+    expect(isKeywordStarved(1, 1, true)).toBe(false);
   });
 });
 
