@@ -155,27 +155,64 @@ All server-only. None may take a `NEXT_PUBLIC_` prefix — an architectural test
 
 | Variable | Required | Format |
 |---|---|---|
-| `TVMEDIA_API_KEY` | **Yes** | The API key from your TV Media account. Sent as a request header, never a query parameter |
-| `TVMEDIA_LINEUP_ID` | Yes (or ZIP) | Your market's lineup id |
-| `TVMEDIA_DEFAULT_ZIP` | Yes (or lineup) | 5-digit US ZIP, used when no lineup id is set |
+| `TVMEDIA_API_KEY` | **Yes** | The API key from your TV Media account. Sent as the `api_key` query parameter on every call — that is TV Media's own auth contract, not ours; see below |
+| `TVMEDIA_LINEUP_ID` | Yes (or ZIP) | Your market's lineup id. Used immediately, with no extra call, when set |
+| `TVMEDIA_DEFAULT_ZIP` | Yes (or lineup) | 5-digit US ZIP, used to resolve a lineup id via `/lineups` when no lineup id is set (see below) |
 | `TVMEDIA_BASE_URL` | No | Overrides the API host — set only if TV Media gives you a sandbox endpoint |
 
 With none set, `/api/health/schedule` reports `"No TV Media credentials
 configured."` and the app runs in partial mode with an on-screen banner. It never
 implies a complete schedule.
 
-## Verifying the field mapping
+## The verified v4 contract
 
-The adapter was written before we held API access, so its field names are an
-informed mapping (`FIELD_MAP` in `src/lib/viewing/adapters/tvMedia.ts`). It
-accepts several aliases per field, which covers most naming differences. If the
-first live call returns rows but maps zero, the adapter reports
-`CONTRACT_MISMATCH` explicitly rather than looking like an empty schedule — then:
+`src/lib/viewing/adapters/tvMedia.ts` targets TV Media's documented v4 API:
+
+- Base: `https://api.tvmedia.ca/tv/v4`
+- Auth: `api_key` as a **query parameter** on every request. Confirmed against
+  TV Media's own docs — an earlier version of this adapter was written before
+  credentials existed, assumed header auth as the safer-looking default, and
+  authenticated with nothing as a result (every live call came back
+  `HTTP_404`/`malformed_response`). The key is still never logged and never
+  reaches an error message — only `res.status` and the response BODY (still
+  scrubbed of anything key-shaped) do.
+- Lineup resolution: `GET /lineups?postalCode={ZIP}&api_key={KEY}`, called
+  once per ZIP and cached in memory for 24h (a warm serverless instance
+  won't re-resolve on every request). When `TVMEDIA_LINEUP_ID` is set, this
+  call never happens at all. When `/lineups` can't resolve anything — common
+  on TV Media's Sample/trial plan — the adapter falls back to lineup `36617`
+  (the documented "US Generic Eastern" lineup, guaranteed to work on that
+  plan) rather than failing the request. The fallback is cached too, so a
+  Sample-plan deployment doesn't retry `/lineups` every time.
+- Listings: `GET /lineups/{lineupID}/listings?api_key={KEY}&start=...&end=...
+  &timezone=UTC&detail=brief`. `timezone=UTC` is what makes it safe to read
+  the documented zone-less `listDateTime` field as UTC directly — outside
+  this specific, contractually-guaranteed case, a zone-less timestamp is
+  still refused rather than guessed at, same as everywhere else in this
+  codebase.
+
+Field mapping is now the documented one, not aliases-and-hope: `stationID`,
+`callsign`, `number`, `listDateTime`, `duration`, `showID`, `seriesID`,
+`showName`, `episodeTitle`, `seasonNumber`, `episodeNumber`, `showTypeID`,
+`new`, `live`, `starRating`, `description`, `showPicture`. Two things worth
+knowing:
+
+- **Movie slots.** When `showTypeID` is `M` and `showName` is the generic
+  placeholder `"Movie"` or `"Cinéma"`, the real title is in `episodeTitle` —
+  the adapter swaps them so `title` is always the actual movie, never the
+  placeholder.
+- **No genre/year fields.** The documented contract has neither, so
+  `genres` is always `[]` and `year` is always `null` for TV Media rows —
+  not a bug, just nothing to report honestly.
+
+`validateContract()` still exists for the day a live payload's envelope (the
+wrapper key around the listings array, still not pinned down beyond
+"an array of objects with these fields") turns out to differ:
 
 1. Save a sample response from TV Media to a file.
 2. Run `validateContract(payload)` from that module.
-3. It prints which fields resolved and which did not.
-4. Correct `FIELD_MAP` accordingly. Nothing else changes.
+3. It prints which of the 16 documented fields resolved and which did not.
+4. Correct the row mapping in `mapListing()` accordingly. Nothing else changes.
 
 ## Migration to another provider
 

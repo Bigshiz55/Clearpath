@@ -12,23 +12,37 @@ import { statusFromHttp } from '../status';
  * IPTV, premium channels, sports, movies, reruns, news, kids and FAST channels.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * ONE HONEST CAVEAT, DELIBERATELY ISOLATED
+ * THE VERIFIED CONTRACT (v4)
  *
- * This adapter was written before we held API credentials, so the exact JSON
- * field names below are an INFORMED MAPPING, not a verified one. Every
- * provider-specific assumption lives in `FIELD_MAP` and `mapListing()` — two
- * adjacent, self-contained pieces. When the API docs arrive, correcting the
- * integration is an edit to those and nothing else: no route, component, test,
- * ranking rule or contract changes.
+ * This adapter previously targeted an INFORMED GUESS at TV Media's API (a
+ * different base path, header auth, a flat `/listings` endpoint) written
+ * before real credentials existed. Live against a real key, that guess
+ * produced HTTP_404 / malformed_response — wrong host, wrong auth
+ * mechanism, wrong endpoint shape, all at once. This version targets TV
+ * Media's documented v4 contract instead:
  *
- * `validateContract()` exists for exactly that moment: point it at a real
- * sample payload and it reports which mapped fields resolved and which did
- * not, so the mapping can be corrected in one pass instead of by trial and
- * error against a live page.
+ *   Base:      https://api.tvmedia.ca/tv/v4
+ *   Auth:      `api_key` QUERY PARAMETER (their contract, not ours — the
+ *              earlier "never a query parameter" stance was the right
+ *              instinct for an unverified guess, but the real API only
+ *              accepts the key this way; a header-only implementation
+ *              would authenticate with nothing and fail every call).
+ *   Lineups:   GET /lineups?postalCode={ZIP}&api_key={KEY}
+ *   Listings:  GET /lineups/{lineupID}/listings
+ *              ?api_key={KEY}&start=...&end=...&timezone=UTC&detail=brief
+ *
+ * The response FIELD NAMES below (stationID, callsign, listDateTime, ...)
+ * are the documented ones, not aliases-and-hope. `validateContract()` still
+ * exists for the day a live payload's envelope (which key wraps the array —
+ * still not pinned down beyond "an array of listing objects") turns out to
+ * differ from what `findArray()` checks for.
  * ────────────────────────────────────────────────────────────────────────────
  *
- * Credentials are server-only, never logged, never returned in an error body,
- * never sent to the client.
+ * Credentials are server-only, never logged, never returned in an error
+ * body, never sent to the client. Because auth is now a query parameter,
+ * this matters even more than before: nothing in this file ever logs or
+ * returns the constructed request URL — only `res.status` and the response
+ * BODY (still scrubbed of anything key-shaped) ever reach an error message.
  */
 
 export const TVM_API_KEY_ENV = 'TVMEDIA_API_KEY';
@@ -36,48 +50,31 @@ export const TVM_BASE_URL_ENV = 'TVMEDIA_BASE_URL';
 export const TVM_LINEUP_ENV = 'TVMEDIA_LINEUP_ID';
 export const TVM_ZIP_ENV = 'TVMEDIA_DEFAULT_ZIP';
 
-/** Sensible default; overridable so a sandbox/staging host needs no code change. */
-const DEFAULT_BASE = 'https://api.tvmedia.ca/v1';
+/** Documented v4 base. Overridable so a sandbox/staging host needs no code change. */
+const DEFAULT_BASE = 'https://api.tvmedia.ca/tv/v4';
 
 /**
- * Field aliases. Each entry lists the names we will accept, most likely first.
- * Providers differ on casing and naming; accepting several removes a whole
- * class of "integration returns zero rows" failures.
+ * The documented "US Generic Eastern" lineup. TV Media's Sample/trial plan
+ * does not resolve every postal code via `/lineups` — when it can't, this is
+ * the one lineup guaranteed to work on that plan, so a Sample-plan deployment
+ * still gets a real (if not hyper-local) grid instead of MISCONFIGURED.
  */
-const FIELD_MAP = {
-  listingsArray: ['listings', 'programs', 'schedule', 'events', 'data', 'results'],
-  channelsArray: ['channels', 'stations', 'lineup'],
-  channelId: ['channelId', 'stationId', 'id', 'callSign', 'callsign'],
-  channelName: ['channelName', 'stationName', 'name', 'callSign', 'callsign'],
-  channelNumber: ['channelNumber', 'number', 'displayNumber', 'chNum'],
-  startTime: ['startTime', 'start', 'startDateTime', 'airDateTime', 'air_time', 'begin'],
-  endTime: ['endTime', 'end', 'endDateTime', 'stopTime'],
-  duration: ['duration', 'runTime', 'runtime', 'length'],
-  title: ['title', 'programTitle', 'name', 'showName'],
-  episodeTitle: ['episodeTitle', 'subtitle', 'episodeName', 'subTitle'],
-  season: ['seasonNumber', 'season', 'seasonNum'],
-  episode: ['episodeNumber', 'episode', 'episodeNum'],
-  programId: ['programId', 'progId', 'seriesId', 'id', 'uid'],
-  description: ['description', 'synopsis', 'shortDescription', 'desc', 'plot'],
-  genres: ['genres', 'categories', 'genre', 'category'],
-  showType: ['showType', 'type', 'programType', 'contentType'],
-  isNew: ['isNew', 'new', 'firstRun'],
-  isLive: ['isLive', 'live'],
-  year: ['releaseYear', 'year', 'productionYear'],
-  image: ['image', 'thumbnail', 'poster', 'imageUrl', 'artwork'],
-  rating: ['rating', 'starRating', 'userRating'],
-} as const;
+const SAMPLE_PLAN_FALLBACK_LINEUP = '36617';
+
+/** How long a resolved ZIP → lineup mapping is trusted before re-resolving.
+ *  Lineup assignments don't change day to day; this just keeps a warm
+ *  serverless instance from re-hitting `/lineups` on every request. */
+const LINEUP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Module-level — persists across warm invocations of the same serverless
+ *  instance, cleared on redeploy. Same pattern already documented for
+ *  Schedules Direct's token cache. Keyed by ZIP; the fallback lineup is
+ *  cached too, so a Sample-plan deployment doesn't retry `/lineups` on
+ *  every single request once it's established that ZIP doesn't resolve. */
+const lineupCache = new Map<string, { lineupId: string; resolvedAt: number }>();
 
 type Json = Record<string, unknown>;
 
-/** First present, non-empty alias. */
-function field(obj: Json, aliases: readonly string[]): unknown {
-  for (const k of aliases) {
-    const v = obj[k];
-    if (v !== undefined && v !== null && v !== '') return v;
-  }
-  return undefined;
-}
 const str = (v: unknown): string | null =>
   typeof v === 'string' ? v : typeof v === 'number' ? String(v) : null;
 const num = (v: unknown): number | null => {
@@ -86,101 +83,126 @@ const num = (v: unknown): number | null => {
 };
 const bool = (v: unknown): boolean =>
   v === true || v === 'true' || v === 1 || v === '1' || v === 'Y';
+const present = (v: unknown): boolean => v !== undefined && v !== null && v !== '';
 
-/** Find the listings array wherever the payload happens to nest it. */
-function findArray(payload: unknown, aliases: readonly string[]): Json[] {
+/** Find an array of row objects wherever the payload happens to nest it —
+ *  the documented contract confirms the endpoint and its query parameters,
+ *  not which key (if any) wraps the listing array, so this stays defensive
+ *  rather than assuming a bare array. */
+function findArray(payload: unknown, wrapperKeys: readonly string[]): Json[] {
   if (Array.isArray(payload)) return payload as Json[];
   if (!payload || typeof payload !== 'object') return [];
   const o = payload as Json;
-  for (const k of aliases) {
+  for (const k of wrapperKeys) {
     const v = o[k];
     if (Array.isArray(v)) return v as Json[];
   }
-  // One level deeper — payloads often wrap in { data: { listings: [...] } }.
   for (const v of Object.values(o)) {
     if (v && typeof v === 'object') {
-      const inner = findArray(v, aliases);
+      const inner = findArray(v, wrapperKeys);
       if (inner.length > 0) return inner;
     }
   }
   return [];
 }
 
-function classify(showType: string | null, genres: string[]): ContentType {
-  const t = (showType ?? '').toLowerCase();
-  const g = genres.map((x) => x.toLowerCase()).join(' ');
-  if (t.includes('movie') || t === 'mv' || g.includes('movie')) return 'movie';
-  if (t.includes('sport') || g.includes('sport')) return 'sports';
-  if (t.includes('news') || g.includes('news')) return 'news';
-  if (g.includes('children') || g.includes('kids') || g.includes('family')) return 'kids';
-  if (t.includes('special')) return 'special';
-  if (t.includes('series') || t.includes('episode') || t === 'ep') return 'series';
-  return 'other';
-}
+const LISTINGS_WRAPPER_KEYS = ['listings', 'data', 'results'];
+const LINEUPS_WRAPPER_KEYS = ['lineups', 'data', 'results'];
 
 /**
- * Normalise a provider timestamp to a UTC instant.
- *
- * A value with no zone is REJECTED rather than assumed — silently reading a
- * naive timestamp as server-local is how a schedule ends up hours off for
- * everyone outside the server's region.
+ * `listDateTime` is documented as zone-less — safe to read as UTC ONLY
+ * because we explicitly request `timezone=UTC` on every listings call.
+ * Distinct from a generic "naive timestamp with no declared zone" case
+ * (which the rest of this codebase correctly refuses to guess at): here the
+ * absence of a zone suffix is the CONTRACT, not an unknown.
  */
-function instant(raw: unknown): number | null {
+function parseListDateTimeAsUtc(raw: unknown): number | null {
   const s = str(raw);
   if (!s) return null;
-  if (/^\d{10}$/.test(s)) return Number(s) * 1000;  // unix seconds
-  if (/^\d{13}$/.test(s)) return Number(s);         // unix millis
-  if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(s)) return null;
-  const t = Date.parse(s);
+  if (/^\d{10}$/.test(s)) return Number(s) * 1000; // unix seconds, just in case
+  if (/^\d{13}$/.test(s)) return Number(s); // unix millis
+  // Already zone-aware (defensive — the contract says it won't be, but a
+  // provider correcting a field later should not silently misparse).
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/i.test(s)) {
+    const t = Date.parse(s);
+    return Number.isFinite(t) ? t : null;
+  }
+  // Zone-less, as documented: append Z rather than letting Date.parse read
+  // it as the server's local time.
+  const t = Date.parse(`${s}Z`);
   return Number.isFinite(t) ? t : null;
 }
 
 /**
- * THE provider-specific mapping. Correct this against the real API docs and the
- * rest of the product needs no change.
+ * `showTypeID` classification. Only 'M' (movie) is documented; everything
+ * else stays 'other' rather than guessing at undocumented codes — the
+ * contract lists no genre/category field at all, so there is nothing else
+ * to classify from without fabricating a signal TV Media doesn't provide.
  */
-export function mapListing(row: Json, channelHint?: Json): ScheduleListing | null {
-  const start = instant(field(row, FIELD_MAP.startTime));
-  const title = str(field(row, FIELD_MAP.title));
-  const chSource = channelHint ?? row;
-  const channelId = str(field(chSource, FIELD_MAP.channelId));
-  if (start == null || !title || !channelId) return null; // structurally unusable
+function classify(showTypeId: string | null): ContentType {
+  if (showTypeId === 'M') return 'movie';
+  return 'other';
+}
 
-  let end = instant(field(row, FIELD_MAP.endTime));
-  if (end == null) {
-    const d = num(field(row, FIELD_MAP.duration));
-    // Duration may be minutes or seconds; >600 is implausible as minutes.
-    if (d != null && d > 0) end = start + (d > 600 ? d * 1000 : d * 60_000);
-  }
+/** Generic placeholder show names TV Media uses for movie slots — the real
+ *  title lives in `episodeTitle` for these rows, not `showName`. */
+const MOVIE_PLACEHOLDER_NAMES = new Set(['movie', 'cinéma', 'cinema']);
 
-  const rawGenres = field(row, FIELD_MAP.genres);
-  const genres = Array.isArray(rawGenres)
-    ? rawGenres.map((g) => str(g) ?? '').filter(Boolean)
-    : str(rawGenres) ? [str(rawGenres)!] : [];
-  const showType = str(field(row, FIELD_MAP.showType));
+/**
+ * THE documented row mapping. One listing row -> the normalized shape the
+ * rest of the product reads. Every field name here is from TV Media's own
+ * contract, not an alias guess.
+ */
+export function mapListing(row: Json): ScheduleListing | null {
+  const start = parseListDateTimeAsUtc(row.listDateTime);
+  const stationId = str(row.stationID);
+  const showTypeId = str(row.showTypeID);
+  const showName = str(row.showName);
+  const episodeTitleRaw = str(row.episodeTitle);
+
+  // Movie slots carry the real title in episodeTitle, with showName reduced
+  // to a generic placeholder — swap them so `title` is always the thing a
+  // viewer would recognize, never "Movie" or "Cinéma".
+  const isGenericMovieSlot = showTypeId === 'M'
+    && showName != null && MOVIE_PLACEHOLDER_NAMES.has(showName.trim().toLowerCase());
+  const title = isGenericMovieSlot ? episodeTitleRaw : showName;
+  const episodeTitle = isGenericMovieSlot ? null : episodeTitleRaw;
+
+  if (start == null || !title || !stationId) return null; // structurally unusable
+
+  const durationRaw = num(row.duration);
+  // Not documented as minutes vs seconds; minutes is the conventional unit
+  // for a TV guide API and the >600 check is the same safety net the rest
+  // of this file already uses elsewhere for an ambiguous duration field.
+  const end = durationRaw != null && durationRaw > 0
+    ? start + (durationRaw > 600 ? durationRaw * 1000 : durationRaw * 60_000)
+    : null;
+
+  const programId = str(row.seriesID) ?? str(row.showID);
 
   return {
-    listingId: `tvmedia|${channelId}|${new Date(start).toISOString()}|${str(field(row, FIELD_MAP.programId)) ?? title}`,
-    channelId,
-    channelName: str(field(chSource, FIELD_MAP.channelName)) ?? channelId,
-    channelNumber: str(field(chSource, FIELD_MAP.channelNumber)),
+    listingId: `tvmedia|${stationId}|${new Date(start).toISOString()}|${programId ?? title}`,
+    channelId: stationId,
+    channelName: str(row.callsign) ?? stationId,
+    channelNumber: str(row.number),
     startUtc: new Date(start).toISOString(),
     endUtc: end != null ? new Date(end).toISOString() : null,
     title,
-    episodeTitle: str(field(row, FIELD_MAP.episodeTitle)),
-    seasonNumber: num(field(row, FIELD_MAP.season)),
-    episodeNumber: num(field(row, FIELD_MAP.episode)),
-    programId: str(field(row, FIELD_MAP.programId)),
-    contentType: classify(showType, genres),
-    genres,
-    // Only when the PROVIDER flags it. Never inferred, per the data-honesty rule.
-    isNew: bool(field(row, FIELD_MAP.isNew)),
-    isLive: bool(field(row, FIELD_MAP.isLive)),
-    rating: num(field(row, FIELD_MAP.rating)),
-    ratingSource: field(row, FIELD_MAP.rating) !== undefined ? 'TV Media' : null,
-    posterUrl: str(field(row, FIELD_MAP.image)),
-    summary: str(field(row, FIELD_MAP.description)),
-    year: num(field(row, FIELD_MAP.year)),
+    episodeTitle,
+    seasonNumber: num(row.seasonNumber),
+    episodeNumber: num(row.episodeNumber),
+    programId,
+    contentType: classify(showTypeId),
+    // No genre/category field in the documented contract — never fabricated.
+    genres: [],
+    // Only when TV Media flags it. Never inferred.
+    isNew: bool(row.new),
+    isLive: bool(row.live),
+    rating: num(row.starRating),
+    ratingSource: present(row.starRating) ? 'TV Media' : null,
+    posterUrl: str(row.showPicture),
+    summary: str(row.description),
+    year: null, // not in the documented contract
   };
 }
 
@@ -188,35 +210,39 @@ export interface ContractReport {
   sampleRows: number;
   mapped: number;
   unmapped: number;
-  /** Fields that resolved on at least one row. */
+  /** Documented fields that were present on at least one row. */
   resolved: string[];
-  /** Fields that resolved on NO row — the mapping likely needs correcting. */
+  /** Documented fields absent on every row — the mapping likely needs correcting. */
   missing: string[];
 }
 
+const DOCUMENTED_FIELDS = [
+  'stationID', 'callsign', 'number', 'listDateTime', 'duration', 'showID', 'seriesID',
+  'showName', 'episodeTitle', 'seasonNumber', 'episodeNumber', 'showTypeID',
+  'new', 'live', 'starRating', 'description', 'showPicture',
+] as const;
+
 /**
- * Point this at a real TV Media sample payload to see exactly which fields the
- * mapping found. Turns "the integration returns nothing" into a specific list
- * of field names to fix.
+ * Point this at a real TV Media sample payload to see exactly which
+ * documented fields the mapping found. Turns "the integration returns
+ * nothing" into a specific list of field names to check.
  */
 export function validateContract(payload: unknown): ContractReport {
-  const rows = findArray(payload, FIELD_MAP.listingsArray);
+  const rows = findArray(payload, LISTINGS_WRAPPER_KEYS);
   const resolved = new Set<string>();
   let mapped = 0;
   for (const row of rows) {
-    for (const [key, aliases] of Object.entries(FIELD_MAP)) {
-      if (key === 'listingsArray' || key === 'channelsArray') continue;
-      if (field(row, aliases as readonly string[]) !== undefined) resolved.add(key);
+    for (const f of DOCUMENTED_FIELDS) {
+      if (present(row[f])) resolved.add(f);
     }
     if (mapListing(row)) mapped++;
   }
-  const all = Object.keys(FIELD_MAP).filter((k) => k !== 'listingsArray' && k !== 'channelsArray');
   return {
     sampleRows: rows.length,
     mapped,
     unmapped: rows.length - mapped,
     resolved: [...resolved].sort(),
-    missing: all.filter((k) => !resolved.has(k)).sort(),
+    missing: DOCUMENTED_FIELDS.filter((f) => !resolved.has(f)).sort(),
   };
 }
 
@@ -254,6 +280,41 @@ export class TvMediaAdapter implements ScheduleAdapter {
     };
   }
 
+  /**
+   * ZIP -> lineup ID, via `/lineups`. Never throws: any failure (network,
+   * non-OK status, empty/unparseable body, no resolvable id in the payload)
+   * falls back to the documented Sample-plan lineup rather than failing the
+   * whole request — CHANGES §4's "sensible default" applies here too, one
+   * level down from the top-level lineup/ZIP choice.
+   */
+  private async resolveLineupId(base: string, key: string, zip: string): Promise<string> {
+    const cached = lineupCache.get(zip);
+    if (cached && Date.now() - cached.resolvedAt < LINEUP_CACHE_TTL_MS) return cached.lineupId;
+
+    let resolved: string | null = null;
+    try {
+      const params = new URLSearchParams({ postalCode: zip, api_key: key });
+      const res = await fetch(`${base}/lineups?${params}`, {
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const body = await res.text().catch(() => '');
+        try {
+          const payload: unknown = JSON.parse(body);
+          for (const row of findArray(payload, LINEUPS_WRAPPER_KEYS)) {
+            const id = str(row.lineupID) ?? str(row.lineupId) ?? str(row.id);
+            if (id) { resolved = id; break; }
+          }
+        } catch { /* unparseable — fall through to the sample-plan fallback */ }
+      }
+    } catch { /* network error — fall through to the sample-plan fallback */ }
+
+    const lineupId = resolved ?? SAMPLE_PLAN_FALLBACK_LINEUP;
+    lineupCache.set(zip, { lineupId, resolvedAt: Date.now() });
+    return lineupId;
+  }
+
   async fetch(req: ScheduleRequest): Promise<ScheduleResponse> {
     const fetchedAt = new Date().toISOString();
     const key = process.env[TVM_API_KEY_ENV];
@@ -261,33 +322,33 @@ export class TvMediaAdapter implements ScheduleAdapter {
       return this.fail('misconfigured', 'NO_CREDENTIALS',
         `No TV Media credentials configured. Set ${TVM_API_KEY_ENV}.`, fetchedAt);
     }
-    const lineup = req.lineupId ?? process.env[TVM_LINEUP_ENV] ?? null;
-    const zip = req.postalCode ?? process.env[TVM_ZIP_ENV] ?? null;
-    if (!lineup && !zip) {
-      return this.fail('misconfigured', 'NO_LINEUP',
-        `Set ${TVM_LINEUP_ENV} (preferred) or ${TVM_ZIP_ENV} so we know which market to request.`, fetchedAt);
-    }
 
     const base = (process.env[TVM_BASE_URL_ENV] ?? DEFAULT_BASE).replace(/\/+$/, '');
+
+    // Lineup ID first (explicit, no extra call); ZIP resolves one, cached;
+    // otherwise nothing tells us which market to request.
+    let lineupId = req.lineupId ?? process.env[TVM_LINEUP_ENV] ?? null;
+    if (!lineupId) {
+      const zip = req.postalCode ?? process.env[TVM_ZIP_ENV] ?? null;
+      if (!zip) {
+        return this.fail('misconfigured', 'NO_LINEUP',
+          `Set ${TVM_LINEUP_ENV} (preferred) or ${TVM_ZIP_ENV} so we know which market to request.`, fetchedAt);
+      }
+      lineupId = await this.resolveLineupId(base, key, zip);
+    }
+
     const params = new URLSearchParams({
+      api_key: key,
       start: new Date(req.windowStartUtc).toISOString(),
       end: new Date(req.windowEndUtc).toISOString(),
-      country: req.region === 'CA' ? 'CA' : 'US',
+      timezone: 'UTC',
+      detail: 'brief',
     });
-    if (lineup) params.set('lineupId', lineup);
-    else if (zip) params.set('zip', zip);
-    if (req.channels?.length) params.set('channels', req.channels.join(','));
 
     let res: Response | null = null;
     try {
-      res = await fetch(`${base}/listings?${params}`, {
-        headers: {
-          // Sent as a header, never a query parameter — a key in a URL lands in
-          // access logs, proxy logs and Referer headers.
-          'x-api-key': key,
-          authorization: `Bearer ${key}`,
-          accept: 'application/json',
-        },
+      res = await fetch(`${base}/lineups/${encodeURIComponent(lineupId)}/listings?${params}`, {
+        headers: { accept: 'application/json' },
         cache: 'no-store',
       });
     } catch (e) {
@@ -307,35 +368,18 @@ export class TvMediaAdapter implements ScheduleAdapter {
         'TV Media returned a body that is not JSON', fetchedAt);
     }
 
-    // Payloads come either flat (each row carries its channel) or grouped
-    // (channels[] each with listings[]). Both are handled.
+    const rows = findArray(payload, LISTINGS_WRAPPER_KEYS);
     const listings: ScheduleListing[] = [];
-    let totalRaw = 0;
-    const channels = findArray(payload, FIELD_MAP.channelsArray);
-    if (channels.length > 0) {
-      for (const ch of channels) {
-        const rows = findArray(ch, FIELD_MAP.listingsArray);
-        totalRaw += rows.length;
-        for (const r of rows) {
-          const m = mapListing(r, ch);
-          if (m) listings.push(m);
-        }
-      }
+    for (const r of rows) {
+      const m = mapListing(r);
+      if (m) listings.push(m);
     }
-    if (listings.length === 0) {
-      const rows = findArray(payload, FIELD_MAP.listingsArray);
-      totalRaw = Math.max(totalRaw, rows.length);
-      for (const r of rows) {
-        const m = mapListing(r);
-        if (m) listings.push(m);
-      }
-    }
+    const totalRaw = rows.length;
 
     // Rows arrived but none mapped → the field mapping is wrong, not the data.
-    // Saying so is what makes this correctable in one pass.
     if (totalRaw > 0 && listings.length === 0) {
       return this.fail('malformed_response', 'CONTRACT_MISMATCH',
-        `Received ${totalRaw} rows but mapped 0. Run validateContract() against a sample payload and correct FIELD_MAP.`,
+        `Received ${totalRaw} rows but mapped 0. Run validateContract() against a sample payload and correct the field mapping.`,
         fetchedAt);
     }
 
