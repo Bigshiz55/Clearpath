@@ -20,42 +20,63 @@ interface MigrateResult {
  * it returns, in full, so a failure (wrong secret or a migration error) is
  * readable on screen rather than a bare digest.
  *
- * The token lives only in this component's state — never localStorage, a
- * cookie, or the URL — so it's gone the moment the page reloads. Same for
- * the optional database URL below.
+ * Every field here lives only in this component's state — never
+ * localStorage, a cookie, or the URL — so it's gone the moment the page
+ * reloads.
  *
- * The database URL field exists because SUPABASE_DB_URL living only in
- * Vercel's env — invisible and unverifiable from here — was a real dead
- * end: if that value is wrong (a wrapped quote, an unescaped password
- * character), there was previously no way to fix it without leaving this
- * page, editing Vercel, and hoping the next deploy picks it up. Pasting a
- * known-good connection string here bypasses whatever the env var holds,
- * for this one request only — never stored, never sent anywhere but this
- * one fetch.
+ * HOST/PORT/USER/PASSWORD/DATABASE, not a single connection-string field, is
+ * the PRIMARY way to connect. A combined connection string kept failing with
+ * a bare "Invalid URL" no matter how many copy-paste artifacts (wrapping
+ * quotes, trailing whitespace) got sanitized server-side, because the real
+ * cause was structural: a password containing @, #, %, or a space requires
+ * correct percent-encoding to survive being embedded in a URL, Supabase's
+ * own dashboard does not warn about or encode this when it generates a
+ * password, and there was no way to diagnose which specific character was
+ * the problem without seeing the secret. A raw password field sent as its
+ * own value needs no encoding at all, for any character — it goes straight
+ * into `pg`'s config object, never through a URL parser. The connection
+ * string field still exists below as a fallback for anyone who'd rather
+ * paste one, but it is no longer the default or the recommended path.
  */
 export function ApplyMigrationsButton() {
   const toast = useToast();
   const [token, setToken] = useState('');
+  const [host, setHost] = useState('');
+  const [port, setPort] = useState('5432');
+  const [database, setDatabase] = useState('postgres');
+  const [user, setUser] = useState('postgres');
+  const [password, setPassword] = useState('');
   const [dbUrl, setDbUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MigrateResult | null>(null);
+
+  const useDiscreteFields = host.trim().length > 0;
 
   async function apply(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setResult(null);
     try {
+      const payload: Record<string, string> = {};
+      if (useDiscreteFields) {
+        // Sent as typed — no client-side trimming of the password, since a
+        // real password could legitimately start or end with whitespace and
+        // silently altering it would just move the mismatch somewhere new.
+        payload.host = host.trim();
+        payload.port = port.trim();
+        payload.database = database.trim();
+        payload.user = user.trim();
+        payload.password = password;
+      } else if (dbUrl.trim()) {
+        payload.dbUrl = dbUrl;
+      }
       // A copy-pasted secret very commonly carries a trailing newline or
       // space from wherever it was copied — the route does an exact string
       // match, so an untrimmed value that LOOKS right still fails silently.
       const res = await fetch('/api/admin/migrate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.trim()}` },
-        // The route sanitizes this itself (wrapping quotes, whitespace) —
-        // sent as typed/pasted, not trimmed here, so that sanitization step
-        // is exercised the same way for a request-supplied URL as for the
-        // env var, rather than this form silently fixing it first.
-        body: JSON.stringify(dbUrl.trim() ? { dbUrl } : {}),
+        body: JSON.stringify(payload),
       });
       // Read the raw text first — a crash that never reaches our JSON
       // handlers (a platform-level 500, an HTML error page) still has a body
@@ -101,27 +122,123 @@ export function ApplyMigrationsButton() {
         />
       </div>
 
-      <div>
-        <label htmlFor="migrate-db-url" className="label">
-          Database URL <span className="font-normal text-slate-500">(optional — overrides SUPABASE_DB_URL for this run only)</span>
-        </label>
-        <input
-          id="migrate-db-url"
-          type="password"
-          autoComplete="off"
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-          value={dbUrl}
-          onChange={(e) => setDbUrl(e.target.value)}
-          className="input"
-          placeholder="postgres://postgres:...@db....supabase.co:5432/postgres"
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          Leave blank to use the server&apos;s configured SUPABASE_DB_URL. Fill this in if that keeps failing to
-          connect — Supabase → Settings → Database → Connection string → URI.
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+        <p className="label mb-2">
+          Database connection <span className="font-normal text-slate-500">— from Supabase → Settings → Database</span>
+        </p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1fr]">
+          <div>
+            <label htmlFor="migrate-host" className="text-xs text-slate-400">
+              Host
+            </label>
+            <input
+              id="migrate-host"
+              type="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+              className="input"
+              placeholder="db.xxxxxxxxxxxx.supabase.co (or the pooler host)"
+            />
+          </div>
+          <div>
+            <label htmlFor="migrate-port" className="text-xs text-slate-400">
+              Port
+            </label>
+            <input
+              id="migrate-port"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={port}
+              onChange={(e) => setPort(e.target.value)}
+              className="input"
+              placeholder="5432"
+            />
+          </div>
+          <div>
+            <label htmlFor="migrate-user" className="text-xs text-slate-400">
+              User
+            </label>
+            <input
+              id="migrate-user"
+              type="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={user}
+              onChange={(e) => setUser(e.target.value)}
+              className="input"
+              placeholder="postgres"
+            />
+          </div>
+          <div>
+            <label htmlFor="migrate-database" className="text-xs text-slate-400">
+              Database
+            </label>
+            <input
+              id="migrate-database"
+              type="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={database}
+              onChange={(e) => setDatabase(e.target.value)}
+              className="input"
+              placeholder="postgres"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="migrate-password" className="text-xs text-slate-400">
+              Password
+            </label>
+            <input
+              id="migrate-password"
+              type="password"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input"
+              placeholder="your database password — any characters are fine here, nothing needs escaping"
+            />
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Fill in Host and Password to use these directly — any character in the password is fine, nothing needs
+          URL-encoding. Leave Host blank to fall back to the connection-string field below (or the server&apos;s
+          SUPABASE_DB_URL if that&apos;s blank too).
         </p>
       </div>
+
+      <details className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm" open={!useDiscreteFields && dbUrl.length > 0}>
+        <summary className="cursor-pointer text-slate-300">Or paste a full connection string instead</summary>
+        <div className="mt-2">
+          <label htmlFor="migrate-db-url" className="text-xs text-slate-400">
+            Connection string <span className="text-slate-600">(ignored while Host above is filled in)</span>
+          </label>
+          <input
+            id="migrate-db-url"
+            type="password"
+            autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            value={dbUrl}
+            onChange={(e) => setDbUrl(e.target.value)}
+            className="input"
+            placeholder="postgres://postgres:...@db....supabase.co:5432/postgres"
+            disabled={useDiscreteFields}
+          />
+        </div>
+      </details>
 
       <button type="submit" disabled={busy || !token} className="btn-primary disabled:opacity-50">
         {busy ? 'Applying…' : 'Apply pending migrations'}

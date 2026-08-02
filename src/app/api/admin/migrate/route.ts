@@ -67,33 +67,49 @@ export async function POST(request: Request) {
   }
   // A secret passed in the JSON body also authorizes (so the /migrate page can
   // send it without a custom header).
-  let body: { dbUrl?: string; secret?: string } = {};
+  let body: { dbUrl?: string; secret?: string; host?: string; port?: string; database?: string; user?: string; password?: string } = {};
   try { body = (await request.json()) as typeof body; } catch { /* no body */ }
   if (!authorized && secret && body.secret === secret) authorized = true;
   if (!authorized) return NextResponse.json({ error: 'Not authorized.' }, { status: 403 });
 
-  // Connection string from the request (one-time, gated by the secret) or env.
-  // Sanitized before use — a wrapping quote or trailing newline from a
-  // copy-paste is the single most common reason this fails, and previously
-  // surfaced as the exact same opaque "Invalid URL" as a genuinely wrong
-  // connection string, with no way to tell the two apart.
-  const rawDbUrl = typeof body.dbUrl === 'string' && body.dbUrl.trim() ? body.dbUrl : serverEnv.migrationsDbUrl();
-  if (!rawDbUrl) {
-    return NextResponse.json(
-      { error: 'No database URL. Paste your Supabase connection string (Settings → Database → Connection string, "URI"), or set SUPABASE_DB_URL in your env.' },
-      { status: 503 },
-    );
-  }
-  const dbUrl = sanitizeDbUrl(rawDbUrl);
-  const validation = validateDbUrl(dbUrl);
-  if (!validation.ok) {
-    return NextResponse.json(
-      {
-        stage: 'validate',
-        error: `The database URL is not usable: ${validation.reason}`,
-      },
-      { status: 400 },
-    );
+  // TWO WAYS TO CONNECT. Discrete fields (host/user/password/...) are
+  // preferred when supplied: a raw password field needs no encoding at all,
+  // no matter what characters it contains — @, #, %, spaces, anything —
+  // which sidesteps connection-string parsing entirely, the actual source
+  // of the "Invalid URL" failures a single combined string kept producing
+  // even after sanitizing every copy-paste artifact anyone could reproduce.
+  // A connection-string field (request body or SUPABASE_DB_URL) is the
+  // fallback, still sanitized/validated the same way as before.
+  let clientConfig: { host: string; port: number; user: string; password: string; database: string } | { connectionString: string };
+  if (typeof body.host === 'string' && body.host.trim() && typeof body.password === 'string' && body.password) {
+    const port = Number(body.port);
+    clientConfig = {
+      host: body.host.trim(),
+      port: Number.isFinite(port) && port > 0 ? port : 5432,
+      user: (body.user ?? 'postgres').trim() || 'postgres',
+      password: body.password,
+      database: (body.database ?? 'postgres').trim() || 'postgres',
+    };
+  } else {
+    const rawDbUrl = typeof body.dbUrl === 'string' && body.dbUrl.trim() ? body.dbUrl : serverEnv.migrationsDbUrl();
+    if (!rawDbUrl) {
+      return NextResponse.json(
+        { error: 'No database connection info. Fill in Host/Password (preferred — never needs encoding), paste a full connection string, or set SUPABASE_DB_URL in your env.' },
+        { status: 503 },
+      );
+    }
+    const dbUrl = sanitizeDbUrl(rawDbUrl);
+    const validation = validateDbUrl(dbUrl);
+    if (!validation.ok) {
+      return NextResponse.json(
+        {
+          stage: 'validate',
+          error: `The database URL is not usable: ${validation.reason} If your password has special characters, use the Host/Password fields instead — they need no encoding at all.`,
+        },
+        { status: 400 },
+      );
+    }
+    clientConfig = { connectionString: dbUrl };
   }
 
   // Everything below is wrapped so an unanticipated failure still reaches the
@@ -106,7 +122,7 @@ export async function POST(request: Request) {
     // distinguishable from a migration's own SQL failing.
     let client: Client;
     try {
-      client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+      client = new Client({ ...clientConfig, ssl: { rejectUnauthorized: false } });
       await client.connect();
     } catch (e) {
       const { error, code } = describeError(e);
