@@ -27,6 +27,12 @@ const DISPLAY: Record<string, string> = {
   SUNDANCETV: 'Sundance TV',
   SUNDANCE: 'Sundance TV',
   HALLMARK: 'Hallmark Channel',
+  // Some grid rows arrive with a Gracenote-style short station code rather
+  // than the network's own name — "HAL" instead of "Hallmark Channel",
+  // "DISC" instead of "Discovery". Read alone that code IS the abbreviation
+  // the row header was repeating beside its own monogram badge. These alias
+  // to the SAME full names already trusted above, never a new guess.
+  HAL: 'Hallmark Channel',
   LIFETIME: 'Lifetime',
   LMN: 'LMN',
   ESPN: 'ESPN',
@@ -38,6 +44,7 @@ const DISPLAY: Record<string, string> = {
   STARZ: 'Starz',
   SHOWTIME: 'Showtime',
   BRAVO: 'Bravo',
+  BRA: 'Bravo',
   SYFY: 'Syfy',
   USA: 'USA Network',
   TNT: 'TNT',
@@ -47,7 +54,9 @@ const DISPLAY: Record<string, string> = {
   HGTV: 'HGTV',
   FOODNETWORK: 'Food Network',
   DISCOVERY: 'Discovery',
+  DISC: 'Discovery',
   HISTORY: 'History',
+  HIST: 'History',
   A_E: 'A&E',
   'A&E': 'A&E',
   ID: 'Investigation Discovery',
