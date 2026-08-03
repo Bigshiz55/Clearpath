@@ -2,14 +2,35 @@ import { NextResponse } from 'next/server';
 import { serverEnv, ConfigError } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { runDailyScan } from '@/lib/digest';
+import { runGatedTvIngest } from '@/lib/viewing/ingest/scheduledIngest';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
- * Daily new-release scan. Intended to be invoked by Vercel Cron (see vercel.json).
- * Protected by CRON_SECRET: the caller must send `Authorization: Bearer <secret>`
- * (Vercel Cron does this automatically when CRON_SECRET is set) or `?key=<secret>`.
+ * TV listings ingest, folded into this route rather than given its own
+ * Vercel Cron entry — Hobby caps at two cron jobs and both slots are already
+ * spent here and on `classify`. `/api/cron/tv-ingest` still exists (hourly
+ * cadence for an external scheduler, e.g. GitHub Actions or Supabase
+ * pg_cron), but a full guide only needs the tables kept warm, not hourly
+ * precision, so riding this daily tick is enough to stop the ingested guide
+ * (`getIngestedGuideAirings`) from being permanently empty for TV Media. Both
+ * providers gate themselves (see `runGatedTvIngest`), and a failure here must
+ * never fail the release-notes scan above it.
+ */
+async function runTvIngest(admin: ReturnType<typeof createAdminClient>) {
+  try {
+    return await runGatedTvIngest(admin);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'TV ingest failed.' };
+  }
+}
+
+/**
+ * Daily new-release scan, plus TV listings ingest. Intended to be invoked by
+ * Vercel Cron (see vercel.json). Protected by CRON_SECRET: the caller must
+ * send `Authorization: Bearer <secret>` (Vercel Cron does this automatically
+ * when CRON_SECRET is set) or `?key=<secret>`.
  */
 export async function GET(request: Request) {
   const secret = serverEnv.cronSecret();
@@ -29,7 +50,8 @@ export async function GET(request: Request) {
   try {
     const admin = createAdminClient();
     const summary = await runDailyScan(admin);
-    return NextResponse.json({ ok: true, ...summary, ranAt: new Date().toISOString() });
+    const tvIngest = await runTvIngest(admin);
+    return NextResponse.json({ ok: true, ...summary, tvIngest, ranAt: new Date().toISOString() });
   } catch (e) {
     if (e instanceof ConfigError) {
       return NextResponse.json({ error: e.userMessage }, { status: 503 });

@@ -232,21 +232,27 @@ Hobby also restricts cron frequency to once per day, so the hourly schedule this
 route needs (each lineup runs at its own local 2 AM) is unavailable there
 regardless.
 
-The route itself is deployed and works. To schedule it:
+**The ingest is not orphaned, though.** `/api/cron/daily-scan` calls the same
+gating logic (`src/lib/viewing/ingest/scheduledIngest.ts`) once a day, right
+after its release-notes scan, so `tv_stations`/`tv_programmes`/`tv_airings`
+get kept warm without a third cron slot. That's enough to keep the full guide
+non-empty; it is not hourly freshness. To get closer to hourly:
 
 * **On Vercel Pro** — add to `vercel.json` and redeploy:
   ```json
   { "path": "/api/cron/tv-ingest", "schedule": "0 * * * *" }
   ```
-* **Staying on Hobby** — trigger it hourly from an external scheduler
-  (GitHub Actions on a `schedule:` trigger, or Supabase's `pg_cron`) with the
-  `CRON_SECRET` bearer token. The route's auth check is the same either way.
+* **Staying on Hobby** — trigger `/api/cron/tv-ingest` hourly from an external
+  scheduler (GitHub Actions on a `schedule:` trigger, or Supabase's
+  `pg_cron`) with the `CRON_SECRET` bearer token. The route's auth check is
+  the same either way.
 
-Either path needs no code change. As of the change that added TV Media
-ingestion, this route runs BOTH writers on every tick: TVmaze at most once
-per UTC calendar day, TV Media at most once every two hours (see "Cost
-control" below). Both checks live in `tv_ingestion_runs`, so an hourly
-external ping is a safe no-op in between either provider's own cadence.
+Either path needs no code change. Both `daily-scan` and `tv-ingest` call the
+same shared gate: TVmaze runs at most once per UTC calendar day, TV Media at
+most once every two hours (see "Cost control" below). Both checks live in
+`tv_ingestion_runs`, so calling the gate from two different routes — or an
+hourly external ping on top of the daily one — is always a safe no-op in
+between either provider's own cadence, never a double-run.
 
 ## Full guide ingestion — how TV Media becomes the primary
 

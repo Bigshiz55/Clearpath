@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { runTvmazeIngest } from '@/lib/viewing/ingest/tvmazeWriter';
-import { runTvMediaIngest } from '@/lib/viewing/ingest/tvMediaWriter';
+import { runGatedTvIngest } from '@/lib/viewing/ingest/scheduledIngest';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -29,37 +28,19 @@ export const maxDuration = 300;
  * key exists, and if TV Media has never run the guide simply falls back to
  * whatever TVmaze already ingested (CHANGES §7 — never a blank page).
  *
- * NOT registered in vercel.json — see docs/SCHEDULE_PROVIDERS.md and this
- * route's own auth gate: Vercel Hobby caps at two cron jobs, both already
- * spent on daily-scan and classify. Trigger this hourly from an external
- * scheduler (GitHub Actions `schedule:`, or Supabase pg_cron) with the
- * CRON_SECRET bearer token until either a cron slot frees up or the project
- * moves to Pro. See the commit this route shipped with for the full writeup.
+ * NOT registered in vercel.json — Vercel Hobby caps at two cron jobs, both
+ * already spent on daily-scan and classify. `/api/cron/daily-scan` calls the
+ * same gated ingest once a day so the ingested tables are never permanently
+ * empty; this route exists for whoever wants finer-than-daily freshness —
+ * point an external scheduler at it (GitHub Actions `schedule:`, or Supabase
+ * pg_cron) with the CRON_SECRET bearer token, or register it directly if a
+ * cron slot frees up or the project moves to Pro.
  *
  * The browser never reaches either provider: this is the only path that does.
  */
 
 function unauthorized() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-}
-
-const INGEST_DAYS = 7;
-const TVMEDIA_INGEST_DAYS = 14;
-const TVMEDIA_MIN_INTERVAL_MS = 2 * 60 * 60 * 1000;
-
-/** Most recent run (any status) for a provider, so both the "once a day" and
- *  "once every 2h" gates can be expressed as one age check. */
-async function lastRunAt(
-  admin: ReturnType<typeof createAdminClient>, providerId: string,
-): Promise<string | null> {
-  const { data } = await admin
-    .from('tv_ingestion_runs')
-    .select('started_at, status')
-    .eq('provider_id', providerId)
-    .in('status', ['success', 'partial'])
-    .order('started_at', { ascending: false })
-    .limit(1);
-  return data?.[0]?.started_at ?? null;
 }
 
 export async function GET(req: Request) {
@@ -71,7 +52,6 @@ export async function GET(req: Request) {
     if (auth !== `Bearer ${secret}` && key !== secret) return unauthorized();
   }
 
-  const today = new Date().toISOString().slice(0, 10);
   let admin: ReturnType<typeof createAdminClient>;
   try {
     admin = createAdminClient();
@@ -82,33 +62,7 @@ export async function GET(req: Request) {
     }, { status: 200 });
   }
 
-  // TVmaze: once per UTC calendar day. A partial run (some days failed) still
-  // counts as "ran" — retrying it hourly on TVmaze's free API is a fine
-  // default, but a full success should not re-run six more times before
-  // midnight.
-  const { data: todaysRuns } = await admin
-    .from('tv_ingestion_runs')
-    .select('id, status, started_at')
-    .eq('provider_id', 'tvmaze')
-    .gte('started_at', `${today}T00:00:00.000Z`)
-    .order('started_at', { ascending: false })
-    .limit(1);
-  const alreadyRanToday = (todaysRuns ?? []).some((r) => r.status === 'success' || r.status === 'partial');
-
-  const tvmaze = alreadyRanToday
-    ? { ran: false, reason: `Already ran today (${today}, UTC).` }
-    : { ran: true, ...(await runTvmazeIngest(INGEST_DAYS)) };
-
-  // TV Media: no more than once every two hours (CHANGES §6). A no-op with no
-  // DB writes when unconfigured, so this check only matters once a key is
-  // set — attempting the call every hour before that would be harmless but
-  // wasteful against `tv_ingestion_runs`.
-  const lastTvMediaRun = await lastRunAt(admin, 'tv_media');
-  const tvMediaDue = !lastTvMediaRun || (Date.now() - Date.parse(lastTvMediaRun)) >= TVMEDIA_MIN_INTERVAL_MS;
-  const tvmedia = tvMediaDue
-    ? await runTvMediaIngest(TVMEDIA_INGEST_DAYS)
-    : { ok: true, ran: false, reason: `Ran within the last 2h (${lastTvMediaRun}).` };
-
+  const { tvmaze, tvmedia } = await runGatedTvIngest(admin);
   const ok = (tvmaze as { ok?: boolean }).ok !== false && tvmedia.ok !== false;
   return NextResponse.json({ tvmaze, tvmedia }, { status: ok ? 200 : 502 });
 }
