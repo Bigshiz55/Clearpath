@@ -168,18 +168,25 @@ export default async function LandingPage() {
             not a static mock result. */}
         <VerdictProcessPreview />
 
-        {/* THE ENTRANCE, AGAIN — same section as the top of the page (same
-            gold button, same secondary actions, same trust line), for
-            anyone who scrolled this far without tapping it yet. By now
-            they've seen the process (VerdictProcessPreview) and are about
-            to read what the controls do (HowYouRule); this is the moment to
-            offer the door again rather than make them scroll back to the
-            top. `h2`, not a second `h1` — one true page heading, still the
-            one above. */}
+        {/* THE ENTRANCE, AGAIN — the FULL block this time (headline, promise,
+            instructions, button, secondary actions, trust line), not the
+            trimmed headline+button version this replaced. Anyone who
+            scrolled this far has seen the process (VerdictProcessPreview)
+            and is about to read what the controls do (HowYouRule); this is
+            where to make the whole case again, not just point at the door.
+            `h2`, not a second `h1` — one true page heading, still the one
+            above. */}
         <section className="border-t border-white/10" data-testid="mid-cta">
           <div className="container-page py-14 text-center sm:py-20">
             <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-5xl">Enter the courtroom.</h2>
-            <div className="mt-6 flex flex-col items-center gap-2 sm:mt-8 sm:gap-3">
+            <p className="mx-auto mt-4 max-w-xl text-lg text-slate-200 sm:mt-6 sm:text-xl">
+              Tell us what you feel like watching. We&rsquo;ll weigh the evidence, match it to your taste, and hand
+              down one clear Verd1ct—with exactly where to watch it.
+            </p>
+            <p className="mx-auto mt-4 max-w-md text-base font-semibold text-slate-100 sm:mt-6 sm:text-lg">
+              Search a title, describe your mood, or let WatchVerd1ct choose for you.
+            </p>
+            <div className="mt-5 flex flex-col items-center gap-2 sm:mt-8 sm:gap-3">
               <Link
                 href="/app"
                 className="wv-gold-breathe btn-courtroom px-10 py-3.5 text-lg transition hover:scale-[1.02] sm:px-14 sm:py-5 sm:text-xl"
