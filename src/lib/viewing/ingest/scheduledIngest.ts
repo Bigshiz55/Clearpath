@@ -29,8 +29,17 @@ import { runTvMediaIngest } from './tvMediaWriter';
  * the guide simply falls back to whatever TVmaze already ingested.
  */
 
-const TVMAZE_INGEST_DAYS = 7;
-const TVMEDIA_INGEST_DAYS = 14;
+// Trimmed down from an original 7/14 after a real first-ever run — full
+// window, every discovered channel, one row at a time — produced a genuine
+// FUNCTION_INVOCATION_TIMEOUT in production. The write side is now batched
+// and TVmaze's premiere-detection fetches now run with bounded concurrency
+// (see tvmazeWriter.ts), but a smaller window is still the honest choice for
+// a cron that has to fit inside one function invocation, once a day, on top
+// of the release-notes scan it's riding along with. The guide only ever
+// displays a 6-hour window; a few days of coverage is already generous
+// headroom. Widen these once a live run has actually proven the timing.
+const TVMAZE_INGEST_DAYS = 3;
+const TVMEDIA_INGEST_DAYS = 3;
 const TVMEDIA_MIN_INTERVAL_MS = 2 * 60 * 60 * 1000;
 
 async function lastRunAt(

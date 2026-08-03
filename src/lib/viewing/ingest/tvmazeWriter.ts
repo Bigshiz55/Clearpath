@@ -1,5 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { mapPool } from '@/lib/finderPool';
 import { TVMAZE_CHANNELS, type TvmazeChannelDef, type TvmazeChannelGroup } from './tvmazeChannels';
 import {
   fetchScheduleDay, fetchShowOriginalAirdates, matchDay,
@@ -10,6 +11,13 @@ import { reconcile, chunk, type StoredAiring, type FetchedAiring } from './recon
 
 /** Rows per bulk write — see the matching constant in tvMediaWriter.ts. */
 const WRITE_BATCH_SIZE = 500;
+
+/** Concurrent /shows/{id}/episodes fetches during premiere detection. A real
+ *  US-national week can carry hundreds of distinct shows; one at a time with
+ *  a 100ms pause between each was what turned this stage into minutes, not
+ *  seconds, and was a real contributor to a production FUNCTION_INVOCATION_TIMEOUT.
+ *  Still bounded, still a reasonable citizen of a free API — just not serial. */
+const PREMIERE_FETCH_CONCURRENCY = 6;
 
 /**
  * THE WRITER — the part `tvmazeIngest.ts` deliberately has none of: talking to
@@ -192,14 +200,18 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
   const fetchComplete = daysFailed.length === 0;
 
   // ---- premiere detection: one /episodes fetch per distinct show ----------
-  // A short delay between calls keeps this a reasonable citizen of a free,
-  // unmetered API — no formal budget applies (see tv_providers.monthly_call_limit=0).
+  // Bounded concurrency, not one-at-a-time-with-a-sleep: a real US-national
+  // week can carry hundreds of distinct shows, and serial-with-100ms-pause
+  // was minutes of dead time that (combined with everything else this route
+  // does) produced a real FUNCTION_INVOCATION_TIMEOUT in production. Still a
+  // reasonable citizen of a free, unmetered API (see
+  // tv_providers.monthly_call_limit=0) — just concurrent rather than serial.
   const distinctShowIds = [...new Set(allMatched.map((m) => m.show.id))];
+  const originalAirdatesResults = await mapPool(
+    distinctShowIds, PREMIERE_FETCH_CONCURRENCY, (showId) => fetchShowOriginalAirdates(showId),
+  );
   const originalAirdatesByShow = new Map<number, Map<number, string> | null>();
-  for (const showId of distinctShowIds) {
-    originalAirdatesByShow.set(showId, await fetchShowOriginalAirdates(showId));
-    await new Promise((r) => setTimeout(r, 100));
-  }
+  distinctShowIds.forEach((showId, i) => originalAirdatesByShow.set(showId, originalAirdatesResults[i] ?? null));
 
   // ---- shape rows, dedupe programmes ---------------------------------------
   const programmeRows = new Map<string, ProgrammeRow>();
