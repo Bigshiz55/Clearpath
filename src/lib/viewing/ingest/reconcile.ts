@@ -149,6 +149,22 @@ export function selectExpiredByRetention(
     .map((s) => s.id);
 }
 
+/**
+ * Split into fixed-size batches for bulk writes.
+ *
+ * A first-time ingest across a wide window and every discovered channel can
+ * mean thousands of rows; one PostgREST call per row (thousands of sequential
+ * awaited round-trips) is what blew a real cron run past Vercel's function
+ * timeout. Batching turns that into a handful of bulk upsert/insert calls —
+ * still chunked, so one call's payload cannot grow unbounded either.
+ */
+export function chunk<T>(items: readonly T[], size: number): T[][] {
+  const n = Math.max(1, size);
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += n) out.push(items.slice(i, i + n));
+  return out;
+}
+
 /** Stable hash of a provider payload, for change detection. */
 export function hashPayload(o: unknown): string {
   const s = JSON.stringify(o, Object.keys(o as object).sort());

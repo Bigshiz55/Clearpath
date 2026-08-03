@@ -6,8 +6,12 @@ import type { ScheduleListing } from '../schedule';
 import {
   stationsFrom, programmeKeyFor, buildProgrammeRow, toFetchedAiring, type ProgrammeRow,
 } from './tvMediaIngest';
-import { reconcile, type StoredAiring, type FetchedAiring } from './reconcile';
+import { reconcile, chunk, type StoredAiring, type FetchedAiring } from './reconcile';
 import { evaluateBudget, type BudgetState } from './budget';
+
+/** Rows per bulk write. Comfortably under PostgREST's default payload limits
+ *  while still cutting a multi-thousand-row ingest down to single-digit calls. */
+const WRITE_BATCH_SIZE = 500;
 
 /**
  * THE TV MEDIA WRITER — talks to Supabase; `tvMediaIngest.ts` stays pure.
@@ -124,25 +128,49 @@ async function ensureProviderAndLineup(
   );
 }
 
+/**
+ * Stations and programmes, BATCHED — a first ingest across every discovered
+ * channel is exactly the case `upsertGetId` (one SELECT + one INSERT/UPDATE
+ * per row, awaited in sequence) cannot afford: dozens of channels is fine,
+ * but the programme count for a 14-day window is not, and one call per row
+ * is what turned a real run into a `FUNCTION_INVOCATION_TIMEOUT`. Both
+ * targets have a real unique constraint (migration 0032), so a single bulk
+ * `.upsert(..., { onConflict })` does the work of the whole loop in one
+ * round trip (chunked, so the payload itself stays bounded).
+ */
 async function ensureStations(
   admin: ReturnType<typeof createAdminClient>,
   lineupId: string,
   listings: ScheduleListing[],
 ): Promise<Map<string, string>> {
   const idByKey = new Map<string, string>();
-  for (const st of stationsFrom(listings)) {
-    const stationId = await upsertGetId(
-      admin, 'tv_stations',
-      { provider_id: PROVIDER_ID, provider_station_id: st.key },
-      { name: st.displayName, network: st.displayName, call_sign: null },
-    );
-    idByKey.set(st.key, stationId);
-    await upsertGetId(
-      admin, 'tv_lineup_channels',
-      { lineup_id: lineupId, station_id: stationId, provider_channel_id: st.key },
-      { channel_name: st.displayName, channel_number: st.channelNumber, enabled: true },
-    );
+  const defs = stationsFrom(listings);
+  if (defs.length === 0) return idByKey;
+
+  for (const batch of chunk(defs, WRITE_BATCH_SIZE)) {
+    const rows = batch.map((st) => ({
+      provider_id: PROVIDER_ID, provider_station_id: st.key,
+      name: st.displayName, network: st.displayName, call_sign: null,
+    }));
+    const { data, error } = await admin
+      .from('tv_stations')
+      .upsert(rows, { onConflict: 'provider_id,provider_station_id' })
+      .select('id, provider_station_id');
+    if (error || !data) throw new Error(`bulk upsert into tv_stations failed: ${error?.message ?? 'no rows returned'}`);
+    for (const row of data) idByKey.set(row.provider_station_id as string, row.id as string);
   }
+
+  for (const batch of chunk(defs, WRITE_BATCH_SIZE)) {
+    const rows = batch.map((st) => ({
+      lineup_id: lineupId, station_id: idByKey.get(st.key), provider_channel_id: st.key,
+      channel_name: st.displayName, channel_number: st.channelNumber, enabled: true,
+    }));
+    const { error } = await admin
+      .from('tv_lineup_channels')
+      .upsert(rows, { onConflict: 'lineup_id,station_id,provider_channel_id' });
+    if (error) throw new Error(`bulk upsert into tv_lineup_channels failed: ${error.message}`);
+  }
+
   return idByKey;
 }
 
@@ -151,18 +179,24 @@ async function ensureProgrammes(
   rows: Map<string, ProgrammeRow>,
 ): Promise<Map<string, string>> {
   const idByProviderId = new Map<string, string>();
-  for (const [providerProgrammeId, row] of rows) {
-    const id = await upsertGetId(
-      admin, 'tv_programmes',
-      { provider_id: PROVIDER_ID, provider_programme_id: providerProgrammeId },
-      {
-        title: row.title, episode_title: row.episodeTitle, programme_type: row.programmeType,
-        season_number: row.seasonNumber, episode_number: row.episodeNumber, genres: row.genres,
-        description: row.description, runtime_minutes: row.runtimeMinutes, artwork_url: row.artworkUrl,
-        metadata_source: 'tv_media', metadata_updated_at: new Date().toISOString(),
-      },
-    );
-    idByProviderId.set(providerProgrammeId, id);
+  const entries = [...rows.entries()];
+  if (entries.length === 0) return idByProviderId;
+
+  const metadataUpdatedAt = new Date().toISOString();
+  for (const batch of chunk(entries, WRITE_BATCH_SIZE)) {
+    const insertRows = batch.map(([providerProgrammeId, row]) => ({
+      provider_id: PROVIDER_ID, provider_programme_id: providerProgrammeId,
+      title: row.title, episode_title: row.episodeTitle, programme_type: row.programmeType,
+      season_number: row.seasonNumber, episode_number: row.episodeNumber, genres: row.genres,
+      description: row.description, runtime_minutes: row.runtimeMinutes, artwork_url: row.artworkUrl,
+      metadata_source: 'tv_media', metadata_updated_at: metadataUpdatedAt,
+    }));
+    const { data, error } = await admin
+      .from('tv_programmes')
+      .upsert(insertRows, { onConflict: 'provider_id,provider_programme_id' })
+      .select('id, provider_programme_id');
+    if (error || !data) throw new Error(`bulk upsert into tv_programmes failed: ${error?.message ?? 'no rows returned'}`);
+    for (const row of data) idByProviderId.set(row.provider_programme_id as string, row.id as string);
   }
   return idByProviderId;
 }
@@ -269,28 +303,40 @@ export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<T
   });
 
   const nowIso = new Date(nowMs).toISOString();
-  for (const f of plan.insert) {
-    await admin.from('tv_airings').insert({
-      provider_airing_id: f.providerAiringId, lineup_id: lineupId,
-      station_id: f.stationId, programme_id: f.programmeId,
-      start_at_utc: f.startAtUtc, end_at_utc: f.endAtUtc,
-      is_complete: f.endAtUtc != null, is_live: f.isLive ?? null, is_premiere: f.isNew ?? null,
-      raw_hash: f.rawHash, source: 'provider',
-      fetched_at: nowIso, last_seen_at: nowIso,
-    });
+  if (plan.insert.length > 0) {
+    for (const batch of chunk(plan.insert, WRITE_BATCH_SIZE)) {
+      const rows = batch.map((f) => ({
+        provider_airing_id: f.providerAiringId, lineup_id: lineupId,
+        station_id: f.stationId, programme_id: f.programmeId,
+        start_at_utc: f.startAtUtc, end_at_utc: f.endAtUtc,
+        is_complete: f.endAtUtc != null, is_live: f.isLive ?? null, is_premiere: f.isNew ?? null,
+        raw_hash: f.rawHash, source: 'provider',
+        fetched_at: nowIso, last_seen_at: nowIso,
+      }));
+      const { error } = await admin.from('tv_airings').insert(rows);
+      if (error) throw new Error(`bulk insert into tv_airings failed: ${error.message}`);
+    }
   }
-  for (const u of plan.update) {
-    await admin.from('tv_airings').update({
-      start_at_utc: u.row.startAtUtc, end_at_utc: u.row.endAtUtc,
-      is_complete: u.row.endAtUtc != null, is_live: u.row.isLive ?? null, is_premiere: u.row.isNew ?? null,
-      raw_hash: u.row.rawHash, last_seen_at: nowIso,
-    }).eq('id', u.id);
+  if (plan.update.length > 0) {
+    // Every id here already exists (from `stored`), so this upsert always
+    // hits the UPDATE branch of ON CONFLICT — same effect as the original
+    // one-row-at-a-time `.update().eq('id', ...)`, in bulk.
+    for (const batch of chunk(plan.update, WRITE_BATCH_SIZE)) {
+      const rows = batch.map((u) => ({
+        id: u.id,
+        start_at_utc: u.row.startAtUtc, end_at_utc: u.row.endAtUtc,
+        is_complete: u.row.endAtUtc != null, is_live: u.row.isLive ?? null, is_premiere: u.row.isNew ?? null,
+        raw_hash: u.row.rawHash, last_seen_at: nowIso,
+      }));
+      const { error } = await admin.from('tv_airings').upsert(rows, { onConflict: 'id' });
+      if (error) throw new Error(`bulk update of tv_airings failed: ${error.message}`);
+    }
   }
-  if (plan.unchanged.length > 0) {
-    await admin.from('tv_airings').update({ last_seen_at: nowIso }).in('id', plan.unchanged);
+  for (const batch of chunk(plan.unchanged, WRITE_BATCH_SIZE)) {
+    await admin.from('tv_airings').update({ last_seen_at: nowIso }).in('id', batch);
   }
-  if (plan.expire.length > 0) {
-    await admin.from('tv_airings').delete().in('id', plan.expire);
+  for (const batch of chunk(plan.expire, WRITE_BATCH_SIZE)) {
+    await admin.from('tv_airings').delete().in('id', batch);
   }
 
   await admin.from('tv_lineups').update({

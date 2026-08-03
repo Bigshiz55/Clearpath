@@ -5,7 +5,7 @@ import {
 } from '../scheduleState';
 import { normalizeInstant, normalizeAiring, resolveWallClock } from './normalizeTime';
 import { estimateRunCost, evaluateBudget, RunBudget, safetyThreshold } from './budget';
-import { reconcile, airingKey, hashPayload, selectExpiredByRetention, type StoredAiring, type FetchedAiring } from './reconcile';
+import { reconcile, airingKey, hashPayload, selectExpiredByRetention, chunk, type StoredAiring, type FetchedAiring } from './reconcile';
 
 const NOW = Date.parse('2026-07-26T20:00:00Z');
 const MIN = 60_000;
@@ -379,6 +379,31 @@ describe('reconciliation', () => {
       { id: 'recent', fetchedAt: at(-2 * 24 * H) },
     ];
     expect(selectExpiredByRetention(rows, 30, NOW)).toEqual(['old']);
+  });
+});
+
+/**
+ * A first-time TV Media ingest — every discovered channel, a 14-day window —
+ * is exactly the case that turned one-row-at-a-time writes into a real
+ * `FUNCTION_INVOCATION_TIMEOUT` in production. `chunk` is what the writers
+ * use to turn thousands of rows into a handful of bulk upsert/insert calls.
+ */
+describe('chunk — batching bulk writes', () => {
+  it('splits into fixed-size batches with a short tail', () => {
+    expect(chunk([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+  });
+
+  it('covers every item exactly once, in order', () => {
+    const items = Array.from({ length: 1234 }, (_, i) => i);
+    expect(chunk(items, 500).flat()).toEqual(items);
+  });
+
+  it('an empty input produces no batches at all — a safe no-op loop target', () => {
+    expect(chunk([], 500)).toEqual([]);
+  });
+
+  it('a size larger than the input still returns exactly one batch', () => {
+    expect(chunk([1, 2, 3], 500)).toEqual([[1, 2, 3]]);
   });
 });
 
