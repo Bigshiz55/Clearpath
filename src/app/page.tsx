@@ -111,11 +111,22 @@ export default async function LandingPage() {
               down one clear Verd1ct—with exactly where to watch it.
             </p>
 
+            {/* THE INSTRUCTIONS, WHERE THEY'RE ACTUALLY SEEN. This used to sit
+                under the gold button as a small gray afterthought — easy to
+                miss the moment your eye lands on the button itself and taps.
+                Dead center of the hero now: below the taste/match promise
+                above, above every button below, brighter and bigger so it
+                reads as the answer to "okay, HOW do I use this" rather than
+                fine print. */}
+            <p className="mx-auto mt-3 max-w-md animate-fade-up text-base font-semibold text-slate-100 sm:mt-8 sm:text-lg">
+              Search a title, describe your mood, or let WatchVerd1ct choose for you.
+            </p>
+
             {/* THE ONE WAY IN. ONE gold entry button, matching "enter the
                 courtroom" — Build my Watch DNA and Import my history stay
                 real, visible second-tier actions, but never compete with
                 the entrance for the eye. */}
-            <div className="mt-4 flex animate-fade-up flex-col items-center gap-2 sm:mt-10 sm:gap-3" data-testid="hero-ctas">
+            <div className="mt-3 flex animate-fade-up flex-col items-center gap-2 sm:mt-8 sm:gap-3" data-testid="hero-ctas">
               <Link
                 href="/app"
                 className="wv-gold-breathe btn-courtroom px-10 py-3.5 text-lg transition hover:scale-[1.02] sm:px-14 sm:py-5 sm:text-xl"
@@ -124,9 +135,6 @@ export default async function LandingPage() {
                 <span aria-hidden>⚖️</span> Enter the Courtroom
                 <span aria-hidden className="wv-cta-sheen pointer-events-none absolute inset-y-0 left-0 w-1/5 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
               </Link>
-              <p className="text-xs text-slate-400 sm:text-sm">
-                Search a title, describe your mood, or let WatchVerd1ct choose for you.
-              </p>
 
               <div className="mt-1 flex flex-wrap items-center justify-center gap-2 sm:mt-2">
                 <Link
