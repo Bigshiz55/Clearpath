@@ -1,11 +1,14 @@
+import { Gavel } from 'lucide-react';
+
 /**
- * WHAT THE BUTTONS ON A REAL CARD MEAN.
+ * WHAT THE CONTROLS ON A REAL CARD MEAN.
  *
- * Every result card in the app carries a FOR / AGAINST / SAVE row and, above
- * it all, the gold "Enter the Courtroom" gavel that starts the whole
- * process. A first-time visitor has never seen those controls before this
- * page sends them to one — so this shows the SAME icons and colors CardVerdict
- * and SaveButton actually render (see their own files), not a redrawn or
+ * Every result card in the app carries a FOR / AGAINST / SAVE row, a circle
+ * on the poster itself (the "docket" — see WCheck.tsx), and, above it all,
+ * the gold "Enter the Courtroom" gavel that starts the whole process. A
+ * first-time visitor has never seen any of them before this page sends them
+ * to one — so this shows the SAME icons and colors CardVerdict, SaveButton,
+ * and WCheck actually render (see their own files), not a redrawn or
  * simplified version, with one honest line each for what tapping it does.
  *
  * These are illustrative, not functional — there is no title behind them on
@@ -61,6 +64,13 @@ const ITEMS: {
     ),
   },
   {
+    key: 'docket',
+    label: 'The docket',
+    caption: 'The circle on every poster — tap to shortlist it, compared against the others you pick.',
+    tone: 'border-white/25 bg-white/10 text-white',
+    icon: <Gavel className="h-5 w-5" strokeWidth={2.25} aria-hidden />,
+  },
+  {
     key: 'gavel',
     label: 'The gavel',
     caption: 'Hit it for your Verd1ct.',
@@ -78,7 +88,7 @@ export function HowYouRule() {
     <section className="border-t border-white/10" data-testid="how-you-rule">
       <div className="container-page py-14 sm:py-20">
         <h2 className="text-center text-sm font-black uppercase tracking-[0.16em] text-slate-500">How you rule on a title</h2>
-        <div className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4" data-testid="how-you-rule-items">
+        <div className="mx-auto mt-8 grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5" data-testid="how-you-rule-items">
           {ITEMS.map((item) => (
             <div key={item.key} className="flex flex-col items-center text-center" data-testid={`rule-item-${item.key}`}>
               <div aria-hidden className={`grid h-12 w-12 flex-none place-items-center rounded-xl border font-semibold ${item.tone}`}>
