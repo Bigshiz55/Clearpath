@@ -281,7 +281,13 @@ export function ChannelGuide({
             return (
               <li
                 key={r.network}
-                className={`card p-2.5 transition ${
+                // A TOUCH LIGHTER THAN THE PAGE, ON PURPOSE. `.card`'s own fill
+                // (ink-850 at 70%) reads almost flush with the ink-950 page
+                // behind it once the blue border went away — there was nothing
+                // left marking where one card ends and the page begins. This
+                // is a plain override (utilities beat `.card` in the layer
+                // order), not a new class — the border logic is untouched.
+                className={`card bg-ink-800/70 p-2.5 transition ${
                   forYou ? 'border-brand-400/55 shadow-[0_0_0_1px_rgba(79,134,255,0.14)]' : 'hover:border-brand-400/40'
                 }`}
                 data-testid="guide-channel"
@@ -344,7 +350,7 @@ export function ChannelGuide({
                         True Crime episode from another with the same show
                         name, or a rerun from tonight's new hour. */}
                     {r.onNow.episodeName && (
-                      <div className="mt-0.5 truncate text-[12px] text-slate-400" data-testid="guide-on-now-episode" title={r.onNow.episodeName}>
+                      <div className="mt-0.5 truncate text-[12px] text-slate-300" data-testid="guide-on-now-episode" title={r.onNow.episodeName}>
                         {r.onNow.episodeName}
                       </div>
                     )}
@@ -375,15 +381,21 @@ export function ChannelGuide({
                       if (!paid && a.match != null) lastShownScore = a.match;
                       return (
                         <div key={a.id}>
-                          <div className={`flex items-center gap-2 text-[12px] ${paid ? 'opacity-50' : 'opacity-80'}`}>
-                            <span suppressHydrationWarning className="flex-none font-semibold tabular-nums text-slate-400">
+                          {/* Paid programming still mutes — that dimming is
+                              earning its keep (it's marking "not real
+                              programming"). A normal up-next slot doesn't get
+                              a blanket opacity anymore: that was stacking on
+                              top of already-quiet slate colors below and the
+                              two together read as faded, not calm. */}
+                          <div className={`flex items-center gap-2 text-[12px] ${paid ? 'opacity-60' : ''}`}>
+                            <span suppressHydrationWarning className="flex-none font-semibold tabular-nums text-slate-300">
                               {displayClock(a.airstamp, a.time) ?? '—'}
                             </span>
-                            <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-slate-500">
+                            <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-slate-300">
                               {a.showType === 'Movie' && <Film size={12} className="flex-none" aria-hidden />}
                               <span className="truncate" title={a.episodeName ? `${a.showName} — ${a.episodeName}` : a.showName}>
                                 {a.showName}
-                                {a.episodeName && <span className="text-slate-600"> — {a.episodeName}</span>}
+                                {a.episodeName && <span className="text-slate-400"> — {a.episodeName}</span>}
                               </span>
                               {repeatTag && <RepeatTag status={repeatTag} />}
                               {showScore && <ScoreBadge score={a.match!} personalized={personalized} why={a.matchWhy ?? null} size="sm" />}
@@ -396,7 +408,7 @@ export function ChannelGuide({
                                 aria-label={isSaved ? `${a.showName} saved` : `Save ${a.showName} to your watchlist`}
                                 data-testid={`guide-save-${a.id}`}
                                 className={`grid h-6 w-6 flex-none place-items-center rounded-md transition active:scale-95 ${
-                                  isSaved ? 'text-pink-300' : 'text-slate-600 hover:bg-white/[0.06] hover:text-pink-200'
+                                  isSaved ? 'text-pink-300' : 'text-slate-400 hover:bg-white/[0.08] hover:text-pink-200'
                                 }`}
                               >
                                 {isSaved ? <Check size={14} aria-hidden /> : <Bookmark size={14} aria-hidden />}
@@ -409,7 +421,7 @@ export function ChannelGuide({
                               aria-label={isSet ? `Reminder set for ${a.showName}` : `Remind me before ${a.showName} starts`}
                               data-testid={`guide-remind-${a.id}`}
                               className={`grid h-6 w-6 flex-none place-items-center rounded-md transition active:scale-95 ${
-                                isSet ? 'text-emerald-300' : 'text-slate-600 hover:bg-white/[0.06] hover:text-emerald-200'
+                                isSet ? 'text-emerald-300' : 'text-slate-400 hover:bg-white/[0.08] hover:text-emerald-200'
                               }`}
                             >
                               {isSet ? <Check size={14} aria-hidden /> : <AlarmClock size={14} aria-hidden />}
@@ -448,17 +460,20 @@ function RepeatTag({ status }: { status: RepeatStatus }) {
       <span
         data-testid="guide-repeat-tag"
         title="A different episode from the slot before it"
-        className="flex-none rounded bg-emerald-500/10 px-1 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-300/80"
+        className="flex-none rounded bg-emerald-500/10 px-1 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-300"
       >
         New
       </span>
     );
   }
+  // SECONDARY, NOT DISABLED. bg-white/[0.05] + slate-500 read as a greyed-out
+  // control rather than a real (if uncertain) answer — bumped both a step so
+  // it stays the quietest of the three tags without looking inactive.
   return (
     <span
       data-testid="guide-repeat-tag"
       title="Same show as the slot before it — we can't tell if it's a repeat"
-      className="flex-none rounded bg-white/[0.05] px-1 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-500"
+      className="flex-none rounded bg-white/10 px-1 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-300"
     >
       Repeat unknown
     </span>
