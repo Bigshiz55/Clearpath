@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
-import { Tagline } from '@/components/Tagline';
 import { VerdictProcessPreview } from '@/components/landing/VerdictProcessPreview';
 import { HowYouRule } from '@/components/landing/HowYouRule';
 import { createClient } from '@/lib/supabase/server';
@@ -44,17 +43,15 @@ export default async function LandingPage() {
   const stage = await dnaStage();
   return (
     <div className="min-h-dvh">
-      {/* flex-wrap so the auth buttons drop below the logo lockup on narrow
-          phones instead of forcing horizontal overflow. `xl` gives the mark
-          and tagline the whole top-left corner — this page gives the logo a
-          full line to itself, unlike the app header which shares one with
-          search, account and overflow controls. */}
-      <header className="container-page flex flex-wrap items-start justify-between gap-y-2 py-2 sm:gap-y-3 sm:py-6">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <Logo size="xl" />
-          <Tagline className="pl-[4.5rem] text-lg sm:pl-[5.75rem] sm:text-2xl lg:pl-[7rem] lg:text-3xl" />
-        </div>
-        <div className="flex shrink-0 items-center gap-2 pt-2 sm:pt-4 lg:pt-6">
+      {/* flex-wrap so the auth buttons drop below the logo on narrow phones
+          instead of forcing horizontal overflow. No tagline here any more —
+          the hero below says "Thousands of titles. One Verd1ct." itself, as
+          its closing line; printing the identical sentence a second time,
+          above the fold before the hero even starts, spoiled that line's
+          job as a payoff instead of an opener. */}
+      <header className="container-page flex flex-wrap items-center justify-between gap-y-2 py-2 sm:py-6">
+        <Logo size="xl" />
+        <div className="flex shrink-0 items-center gap-2">
           <Link href="/login" className="btn-ghost">
             Sign in
           </Link>
