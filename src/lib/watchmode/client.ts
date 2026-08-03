@@ -49,7 +49,14 @@ function mapType(t: string): WatchProvider['type'] {
   }
 }
 
-async function fetchWatchmode(mediaType: MediaType, tmdbId: number, region: string): Promise<WatchProviders | null> {
+/**
+ * The one real HTTP call — title-details, one region's sources. Exported so
+ * `src/lib/watchmode/sync.ts` (the ONLY caller allowed to run this outside a
+ * `WATCHMODE_API_KEY`-gated dormant no-op) can reuse this exact tested
+ * request/parse logic from the cron sync job, instead of a per-request path
+ * calling it live — see that module for why.
+ */
+export async function fetchWatchmode(mediaType: MediaType, tmdbId: number, region: string): Promise<WatchProviders | null> {
   const key = serverEnv.watchmodeKey();
   if (!key) return null;
 

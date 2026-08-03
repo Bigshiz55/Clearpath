@@ -1,18 +1,48 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
-import type { MediaType, TitleMetadata, WatchProviders, SimilarTitle } from '@/lib/types';
+import type { MediaType, TitleMetadata, WatchProvider, WatchProviders, SimilarTitle } from '@/lib/types';
 import { getTitle, getWatchProviders, getCollectionId, getSimilar } from '@/lib/tmdb/client';
 import { getCriticRatings } from '@/lib/omdb';
 import { getMdbRatings } from '@/lib/mdblist';
-import { getWatchmodeProviders, mergeWatchmode } from '@/lib/watchmode/client';
+import { mergeWatchmode } from '@/lib/watchmode/client';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getBriefing, type Briefing } from '@/lib/briefing';
 
-/** Availability = TMDB providers, with Watchmode's deep links + fresher sources
- *  merged in when WATCHMODE_API_KEY is set (dormant/no-op otherwise). */
+/**
+ * Watchmode's contribution is read from OUR OWN cache table
+ * (`watchmode_availability`, written only by the cron sync in
+ * `src/lib/watchmode/sync.ts`) — never a live Watchmode call. Every title
+ * page view and Finder-scoring hydration used to call Watchmode directly
+ * here; under real traffic that alone could burn a whole month's free-tier
+ * quota in hours. A cache miss (never synced yet, or genuinely nothing
+ * found) is indistinguishable from "no Watchmode data" to this function —
+ * TMDB's own provider list is always the fallback either way.
+ */
+async function cachedWatchmodeAsProviders(mediaType: MediaType, id: number, region: string): Promise<WatchProviders | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from('watchmode_availability')
+    .select('source_name, source_type, deeplink')
+    .eq('tmdb_id', id)
+    .eq('tmdb_media_type', mediaType)
+    .eq('region', region);
+  if (!data || data.length === 0) return null;
+  const options: WatchProvider[] = data.map((r) => ({
+    providerId: 0,
+    providerName: r.source_name as string,
+    logoPath: null,
+    type: r.source_type === 'subscription' ? 'flatrate' : (r.source_type as WatchProvider['type']),
+    link: (r.deeplink as string | null) ?? null,
+  }));
+  return { region, link: null, options, available: options.length > 0 };
+}
+
+/** Availability = TMDB providers, with Watchmode's deep links + fresher
+ *  cached sources merged in whenever the sync job has checked this title. */
 async function resolveAvailability(mediaType: MediaType, id: number, region: string): Promise<WatchProviders | null> {
   const [tmdb, wm] = await Promise.all([
     getWatchProviders(mediaType, id, region).catch(() => null),
-    getWatchmodeProviders(mediaType, id, region).catch(() => null),
+    cachedWatchmodeAsProviders(mediaType, id, region).catch(() => null),
   ]);
   return mergeWatchmode(tmdb, wm);
 }

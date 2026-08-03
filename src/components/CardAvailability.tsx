@@ -1,0 +1,86 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { loadTileFacts } from '@/lib/tileFacts';
+import type { MediaType } from '@/lib/types';
+import type { CardAvailability as CardAvailabilityData } from '@/lib/watchmode/cardAvailability';
+
+/**
+ * WHERE TO WATCH IT — from the cache the Watchmode sync job fills, never a
+ * live call from here (see src/lib/watchmode/sync.ts). Three honest states,
+ * visually distinct on purpose (req: absence of data must not read as
+ * absence of availability):
+ *  - never checked yet   -> "Checking availability" (muted, no claim either way)
+ *  - checked, nothing    -> "Not currently available to stream" (a real result)
+ *  - checked, N sources  -> the source badges, linked where we have a deeplink
+ *
+ * Same per-title fetch `CardFacts`/`CardSynopsis` already make — see
+ * `src/lib/tileFacts.ts` — so this costs the card nothing extra.
+ */
+const TYPE_LABEL: Record<CardAvailabilityData['sources'][number]['type'], string> = {
+  subscription: 'Stream',
+  rent: 'Rent',
+  buy: 'Buy',
+  free: 'Free',
+};
+
+export function CardAvailability({ mediaType, tmdbId, className = '' }: { mediaType: MediaType; tmdbId: number; className?: string }) {
+  const [availability, setAvailability] = useState<CardAvailabilityData | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    loadTileFacts(mediaType, tmdbId).then((f) => {
+      if (active) setAvailability(f.availability);
+    });
+    return () => {
+      active = false;
+    };
+  }, [mediaType, tmdbId]);
+
+  if (!availability || availability.status === 'checking') {
+    return (
+      <div className={`text-[11px] text-slate-500 ${className}`} data-testid="card-availability-checking">
+        Checking availability…
+      </div>
+    );
+  }
+
+  if (availability.status === 'none') {
+    return (
+      <div className={`text-[11px] text-slate-500 ${className}`} data-testid="card-availability-none">
+        Not currently available to stream
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex flex-wrap items-center gap-1.5 ${className}`} data-testid="card-availability">
+      {availability.sources.map((s) => {
+        const label = `${TYPE_LABEL[s.type]} on ${s.name}`;
+        const pill = (
+          <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px] font-semibold text-slate-200">
+            {s.name}
+          </span>
+        );
+        return s.deeplink ? (
+          <a
+            key={`${s.name}|${s.type}`}
+            href={s.deeplink}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`${label} ↗`}
+            aria-label={`${label}, opens ${s.name} in a new tab`}
+            data-testid="card-availability-link"
+            className="transition hover:border-brand-400/60 hover:bg-brand-500/15"
+          >
+            {pill}
+          </a>
+        ) : (
+          <span key={`${s.name}|${s.type}`} title={label}>
+            {pill}
+          </span>
+        );
+      })}
+    </div>
+  );
+}

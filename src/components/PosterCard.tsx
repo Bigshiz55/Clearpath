@@ -7,6 +7,7 @@ import { WCheck } from './WCheck';
 import { CardSynopsis } from './CardSynopsis';
 import { CardFacts } from './CardFacts';
 import { CardFit } from './CardFit';
+import { CardAvailability } from './CardAvailability';
 
 interface PosterCardProps {
   href?: string;
@@ -232,6 +233,12 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             that used to fill this spot was removed on request, and silence is
             the honest empty state. */}
         {saveId != null && <CardFit mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+
+        {/* Where to watch it — cached Watchmode sources, never a live call
+            from a card. "Checking availability" and "not currently
+            available" are deliberately distinct from each other and from a
+            silent blank — see CardAvailability's own doc comment. */}
+        {saveId != null && <CardAvailability mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
 
         {/* Supporting evidence: the pills, the household verdict, and the
             "Why this Verd1ct?" panel. */}

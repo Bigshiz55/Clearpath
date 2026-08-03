@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getScoringData } from '@/lib/titleData';
 import { computeGeneralScore } from '@/lib/scoring/general';
 import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
+import { getCardAvailability, type CardAvailability } from '@/lib/watchmode/cardAvailability';
 
 export const runtime = 'nodejs';
 
@@ -17,6 +18,10 @@ export async function GET(_req: Request, { params }: { params: { type: string; i
   if (!Number.isFinite(id) || id <= 0) {
     return NextResponse.json({ ratings: EMPTY_TILE_RATINGS });
   }
+  // Read-only lookup against OUR OWN `watchmode_availability`/
+  // `watchmode_fetch_state` cache tables — never a live Watchmode call. See
+  // src/lib/watchmode/sync.ts for what writes them and why nothing here does.
+  const availability = await getCardAvailability(mediaType, id).catch((): CardAvailability => ({ status: 'checking', sources: [] }));
   try {
     const { meta, providers } = await getScoringData(mediaType, id, 'US');
     const general = computeGeneralScore(meta, providers);
@@ -50,10 +55,10 @@ export async function GET(_req: Request, { params }: { params: { type: string; i
       genres: Array.isArray(meta.genres) ? meta.genres.slice(0, 4) : [],
     };
     return NextResponse.json(
-      { ratings, overview, facts },
+      { ratings, overview, facts, availability },
       { headers: { 'Cache-Control': 'public, s-maxage=43200, stale-while-revalidate=86400' } },
     );
   } catch {
-    return NextResponse.json({ ratings: EMPTY_TILE_RATINGS, overview: null, facts: null });
+    return NextResponse.json({ ratings: EMPTY_TILE_RATINGS, overview: null, facts: null, availability });
   }
 }

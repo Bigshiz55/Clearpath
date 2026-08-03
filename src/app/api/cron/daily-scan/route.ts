@@ -3,6 +3,7 @@ import { serverEnv, ConfigError } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { runDailyScan } from '@/lib/digest';
 import { runGatedTvIngest } from '@/lib/viewing/ingest/scheduledIngest';
+import { runWatchmodeSync } from '@/lib/watchmode/sync';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -23,6 +24,22 @@ async function runTvIngest(admin: ReturnType<typeof createAdminClient>) {
     return await runGatedTvIngest(admin);
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'TV ingest failed.' };
+  }
+}
+
+/**
+ * Watchmode streaming-availability sync, riding this same daily tick for the
+ * same one-cron-slot reason TV ingest does — see `/api/cron/watchmode-sync`
+ * for the full explanation. `runWatchmodeSync` never throws on a Watchmode-
+ * side failure by itself, but this wrapper exists as the same belt-and-
+ * suspenders as `runTvIngest` above: a bug here must never fail the release-
+ * notes scan or the TV ingest that already run on this route.
+ */
+async function runWatchmode(admin: ReturnType<typeof createAdminClient>) {
+  try {
+    return await runWatchmodeSync(admin);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Watchmode sync failed.' };
   }
 }
 
@@ -51,7 +68,8 @@ export async function GET(request: Request) {
     const admin = createAdminClient();
     const summary = await runDailyScan(admin);
     const tvIngest = await runTvIngest(admin);
-    return NextResponse.json({ ok: true, ...summary, tvIngest, ranAt: new Date().toISOString() });
+    const watchmode = await runWatchmode(admin);
+    return NextResponse.json({ ok: true, ...summary, tvIngest, watchmode, ranAt: new Date().toISOString() });
   } catch (e) {
     if (e instanceof ConfigError) {
       return NextResponse.json({ error: e.userMessage }, { status: 503 });
