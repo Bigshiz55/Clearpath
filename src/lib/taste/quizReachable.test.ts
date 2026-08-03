@@ -36,27 +36,33 @@ describe('entry points', () => {
     expect(page).toContain("title: 'Taste Quiz");
   });
 
-  it('the landing hero makes ONE ceremonial entrance — everything else is a quiet link', () => {
+  it('the landing hero makes ONE ceremonial entrance — the DNA quiz and import history are visible but secondary', () => {
     const page = read('src/app/page.tsx');
     const heroBlock = page.slice(page.indexOf('data-testid="hero-ctas"'), page.indexOf('</section>'));
-    // The single entry button, styled as its own thing (gold, not the brand
-    // pink/blue), not competing with the DNA link for the eye.
-    const buttons = heroBlock.match(/btn-primary|btn-secondary|btn-pulse|btn-courtroom/g) ?? [];
-    expect(buttons).toEqual(['btn-courtroom']);
+    // The single entry button is styled as its own thing (gold, ceremonial) —
+    // nothing else in the hero may claim btn-primary or btn-pulse either, or
+    // a secondary action would compete with the entrance for the eye.
+    expect(heroBlock.match(/btn-primary/g)).toBeNull();
+    expect(heroBlock.match(/btn-pulse/g)).toBeNull();
+    expect(heroBlock.match(/btn-courtroom/g)).toHaveLength(1);
+    // The DNA quiz + import history are real, visible buttons (btn-secondary
+    // — a plain bordered pill, not the brand accent) rather than buried
+    // underlined text, but still a visibly quieter class than the gold CTA.
+    expect(heroBlock.match(/btn-secondary/g)).toHaveLength(2);
     expect(page).toContain('data-testid="cta-enter"');
     expect(page).toContain('data-testid="cta-dna"');
     expect(page).toContain(QUIZ_HREF);
   });
 
-  it('the DNA link and import history are supporting links, not hero buttons', () => {
+  it('the DNA link and import history are secondary buttons, never styled as the primary entrance', () => {
     const page = read('src/app/page.tsx');
     for (const testid of ['cta-dna', 'cta-import']) {
       const at = page.indexOf(`data-testid="${testid}"`);
       const link = page.slice(page.lastIndexOf('<Link', at), page.indexOf('</Link>', at));
       expect(link, testid).not.toContain('btn-primary');
-      expect(link, testid).not.toContain('btn-secondary');
       expect(link, testid).not.toContain('btn-pulse');
       expect(link, testid).not.toContain('btn-courtroom');
+      expect(link, testid).toContain('btn-secondary');
     }
     const importAt = page.indexOf('data-testid="cta-import"');
     const importLink = page.slice(page.lastIndexOf('<Link', importAt), page.indexOf('</Link>', importAt));
