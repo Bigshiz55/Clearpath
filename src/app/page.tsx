@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { Tagline } from '@/components/Tagline';
-import { HeroVerdictPreview } from '@/components/landing/HeroVerdictPreview';
+import { VerdictProcessPreview } from '@/components/landing/VerdictProcessPreview';
 import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -64,100 +64,94 @@ export default async function LandingPage() {
       </header>
 
       <main>
-        {/* TWO COLUMNS FROM `lg`: the pitch on the left, PROOF on the right.
-            The old hero was words alone in a centered column with ~340px of
-            empty space above and below it — a visitor had to already believe
-            the promise to want the button. Showing an actual result card
-            beside the promise answers "what do you mean, one clear verdict?"
-            in the same five seconds the copy is asking for. */}
-        <section className="container-page py-10 sm:py-14 lg:py-16">
-          <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-14">
-            <div className="mx-auto max-w-2xl text-center lg:mx-0 lg:max-w-none lg:text-left">
-              <h1 className="animate-fade-up text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-6xl xl:text-7xl">
-                Enter the courtroom.
-              </h1>
-              <p className="mx-auto mt-5 max-w-xl animate-fade-up text-lg text-slate-200 sm:mt-6 lg:mx-0 lg:text-xl">
-                No more endless scrolling. Every title stands trial and gets ONE clear verdict — picked for you.
-              </p>
-              <p className="mx-auto mt-2 max-w-xl animate-fade-up text-base text-slate-400 sm:mt-3 lg:mx-0">
-                Get one clear recommendation, matched to your taste, with exactly where to watch it.
+        {/* THE CINEMATIC OPENING SCREEN. One centered column, not a
+            two-column "pitch beside proof" layout — the proof moved below
+            the fold as its own reveal (VerdictProcessPreview), which is what
+            let this go back to a single ceremonial entrance and still fit
+            comfortably above the fold on a laptop. */}
+        <section className="relative isolate overflow-hidden">
+          {/* THE ATMOSPHERE. Decorative only — aria-hidden, pointer-events
+              none, behind everything. See its own doc comment in
+              globals.css for what each layer is and isn't (no stock art, no
+              invented poster). */}
+          <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+            <div className="wv-hero-glow absolute left-1/2 top-[-14%] h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-cinema-radial blur-3xl" />
+            <div
+              className="wv-hero-card absolute left-[6%] top-[16%] hidden h-40 w-28 rounded-xl border border-white/[0.06] bg-white/[0.02] sm:block"
+              style={{ '--wv-tilt': '-8deg' } as React.CSSProperties}
+            />
+            <div
+              className="wv-hero-card absolute right-[8%] top-[8%] hidden h-48 w-32 rounded-xl border border-white/[0.05] bg-white/[0.015] sm:block"
+              style={{ '--wv-tilt': '6deg', animationDelay: '-9s' } as React.CSSProperties}
+            />
+            <div
+              className="wv-hero-card absolute bottom-[8%] right-[18%] hidden h-36 w-24 rounded-xl border border-white/[0.05] bg-white/[0.015] lg:block"
+              style={{ '--wv-tilt': '10deg', animationDelay: '-17s' } as React.CSSProperties}
+            />
+            <div className="wv-hero-beam absolute left-[10%] top-0 h-full w-[220px] rotate-[9deg] bg-gradient-to-b from-gold-300/10 via-transparent to-transparent blur-2xl" />
+            <div
+              className="wv-hero-beam absolute right-[16%] top-0 h-full w-[180px] rotate-[-8deg] bg-gradient-to-b from-brand-400/10 via-transparent to-transparent blur-2xl"
+              style={{ animationDelay: '-8s' }}
+            />
+          </div>
+
+          <div className="container-page flex min-h-[72vh] flex-col items-center justify-center py-10 text-center sm:min-h-[74vh] sm:py-14">
+            <h1 className="animate-fade-up text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
+              Enter the courtroom.
+            </h1>
+            <p className="mx-auto mt-5 max-w-xl animate-fade-up text-lg text-slate-200 sm:mt-6 sm:text-xl">
+              Tell us what you feel like watching. We&rsquo;ll weigh the evidence, match it to your taste, and hand
+              down one clear Verd1ct—with exactly where to watch it.
+            </p>
+
+            {/* THE ONE WAY IN. ONE gold entry button, matching "enter the
+                courtroom" — Build my Watch DNA and Import my history stay
+                real, visible second-tier actions, but never compete with
+                the entrance for the eye. */}
+            <div className="mt-9 flex animate-fade-up flex-col items-center gap-3 sm:mt-10" data-testid="hero-ctas">
+              <Link
+                href="/app"
+                className="wv-gold-breathe btn-courtroom px-10 py-4 text-lg transition hover:scale-[1.02] sm:px-14 sm:py-5 sm:text-xl"
+                data-testid="cta-enter"
+              >
+                <span aria-hidden>⚖️</span> Enter the Courtroom
+                <span aria-hidden className="wv-cta-sheen pointer-events-none absolute inset-y-0 left-0 w-1/5 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+              </Link>
+              <p className="text-xs text-slate-400 sm:text-sm">
+                Search a title, describe your mood, or let WatchVerd1ct choose for you.
               </p>
 
-              {/* THE THREE THINGS THIS PAGE HAS TO PROVE IN FIVE SECONDS. */}
-              <div className="mx-auto mt-5 flex max-w-md flex-wrap justify-center gap-2 sm:mt-6 lg:mx-0 lg:justify-start" data-testid="hero-proof-points">
-                <span className="chip">
-                  <span aria-hidden>⚖️</span> General Verdict
-                </span>
-                <span className="chip">
-                  <span aria-hidden>🧬</span> Your Personal Match
-                </span>
-                <span className="chip">
-                  <span aria-hidden>📺</span> Where to Watch
-                </span>
-              </div>
-
-              {/* THE ONE WAY IN. The product does two things — answer tonight's
-                  question and learn who you are — but the hero makes ONE
-                  ceremonial move, matching "enter the courtroom": ONE gold
-                  entry button. Building Watch DNA and importing history are
-                  real second-tier CTAs now (small filled buttons, not buried
-                  in an underlined text run) — still visibly secondary to the
-                  gold button, but no longer easy to miss entirely. */}
-              <div className="mx-auto mt-7 flex max-w-md animate-fade-up flex-col items-center gap-3 sm:mt-8 lg:mx-0 lg:items-start" data-testid="hero-ctas">
-                <Link href="/app" className="btn-courtroom px-10 py-4 text-lg sm:px-14 sm:py-5 sm:text-xl" data-testid="cta-enter">
-                  <span aria-hidden>⚖️</span> Enter the Courtroom
-                  <span aria-hidden className="wv-cta-sheen pointer-events-none absolute inset-y-0 left-0 w-1/5 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                <Link
+                  href="/app/taste-quiz"
+                  className="btn-secondary text-sm transition hover:scale-[1.03] hover:border-white/25"
+                  data-testid="cta-dna"
+                >
+                  {DNA_CTA[stage]}
                 </Link>
-                <p className="text-xs text-slate-400 sm:text-sm">
-                  Search a title, tell us what you feel like, or let us choose for you.
-                </p>
-
-                <div className="mt-1 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
-                  <Link href="/app/taste-quiz" className="btn-secondary text-sm" data-testid="cta-dna">
-                    {DNA_CTA[stage]}
-                  </Link>
-                  <Link href="/import-taste" className="btn-secondary text-sm" data-testid="cta-import">
-                    Import my history
-                  </Link>
-                </div>
-
-                <p className="text-xs text-slate-500">No account needed to explore.</p>
+                <Link
+                  href="/import-taste"
+                  className="btn-secondary text-sm transition hover:scale-[1.03] hover:border-white/25"
+                  data-testid="cta-import"
+                >
+                  Import my history
+                </Link>
               </div>
+
+              <p className="text-xs text-slate-500">No account needed to explore.</p>
             </div>
 
-            {/* THE PROOF ITSELF — see HeroVerdictPreview's own doc comment for
-                why this is a mock of the real card, not stock art. */}
-            <div className="mx-auto w-full max-w-sm lg:mx-0 lg:max-w-none">
-              <HeroVerdictPreview />
-            </div>
+            {/* THE CLOSING LINE OF THE FIRST SCREEN. */}
+            <p className="mt-10 text-sm font-bold uppercase tracking-[0.14em] text-slate-500 sm:mt-12">
+              Thousands of titles. <span className="text-white">One Verd1ct.</span>
+            </p>
           </div>
         </section>
 
-        {/* THE THREE REASONS, ONE LINE EACH — not a feature list. This is the
-            whole second pitch: stop scrolling, understand why, know where.
-            Its own section (not folded into the footer) is what pushes the
-            TMDB/JustWatch attribution line further down the page, so the
-            footer reads as the page's quiet close rather than its next
-            thing to look at. */}
-        <section className="border-t border-white/10">
-          <div className="container-page grid gap-8 py-10 sm:grid-cols-3 sm:py-12">
-            <div className="text-center sm:text-left">
-              <div className="text-2xl" aria-hidden>🛑</div>
-              <h2 className="mt-2 text-base font-bold text-white">Stop scrolling</h2>
-              <p className="mt-1 text-sm text-slate-400">One decision, not fifty options to weigh yourself.</p>
-            </div>
-            <div className="text-center sm:text-left">
-              <div className="text-2xl" aria-hidden>🔍</div>
-              <h2 className="mt-2 text-base font-bold text-white">Understand why a title fits</h2>
-              <p className="mt-1 text-sm text-slate-400">Every verdict comes with a plain-English reason, not just a number.</p>
-            </div>
-            <div className="text-center sm:text-left">
-              <div className="text-2xl" aria-hidden>📺</div>
-              <h2 className="mt-2 text-base font-bold text-white">Know exactly where to watch</h2>
-              <p className="mt-1 text-sm text-slate-400">See the exact streaming service before you commit — no guessing.</p>
-            </div>
-          </div>
-        </section>
+        {/* THE PROOF, BELOW THE FOLD — see VerdictProcessPreview's own doc
+            comment for why this is the process (evidence / taste / verdict),
+            not a static mock result. */}
+        <VerdictProcessPreview />
       </main>
 
       <footer className="border-t border-white/10">

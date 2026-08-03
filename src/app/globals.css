@@ -997,6 +997,45 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+   THE HOMEPAGE HERO'S ATMOSPHERE — cinematic, not decorative for its own
+   sake. A slow drifting glow stands in for stage lighting, a scatter of
+   blank title-card silhouettes (empty rounded rectangles — the app's OWN
+   tile shape, never stock art or an invented poster) recedes into the dark,
+   and two soft diagonal beams reference a courtroom's high windows. Every
+   piece here is `aria-hidden`, `pointer-events-none`, and z-indexed behind
+   the real content. Durations are long (16–26s) on purpose: "very slow" was
+   the brief, and the blanket prefers-reduced-motion rule above already
+   collapses all of it to a single frame for anyone who asked for that.
+--------------------------------------------------------------------------- */
+@keyframes wv-hero-glow-drift {
+  0%, 100% { transform: translate3d(-2%, -1%, 0) scale(1); opacity: 0.6; }
+  50%      { transform: translate3d(2%, 1.5%, 0) scale(1.08); opacity: 0.85; }
+}
+.wv-hero-glow { animation: wv-hero-glow-drift 22s ease-in-out infinite; will-change: transform, opacity; }
+
+@keyframes wv-hero-card-float {
+  0%, 100% { transform: translateY(0) rotate(var(--wv-tilt, -6deg)); }
+  50%      { transform: translateY(-14px) rotate(var(--wv-tilt, -6deg)); }
+}
+.wv-hero-card { animation: wv-hero-card-float 26s ease-in-out infinite; will-change: transform; }
+
+@keyframes wv-hero-beam-drift {
+  0%, 100% { opacity: 0.16; transform: translateX(0); }
+  50%      { opacity: 0.28; transform: translateX(2%); }
+}
+.wv-hero-beam { animation: wv-hero-beam-drift 17s ease-in-out infinite; }
+
+/* A restrained gold breath around the one gold button on the page — same
+   shape as the pink CTA's breath above, gold instead, and never below full
+   opacity so it never reads as disabled. Scoped to the homepage's
+   .btn-courtroom only (it is the only place that class is used). */
+@keyframes wv-gold-breathe {
+  0%, 100% { box-shadow: 0 10px 34px -8px rgba(245, 198, 90, 0.55); }
+  50%      { box-shadow: 0 12px 44px -6px rgba(245, 198, 90, 0.85), 0 0 0 6px rgba(245, 198, 90, 0.08); }
+}
+.wv-gold-breathe { animation: wv-gold-breathe 4.5s ease-in-out infinite; }
+
+/* ---------------------------------------------------------------------------
    BIG SCREENS GET BIG CONTROLS.
    On an iPad the cards are ~470px wide and the action row underneath was still
    drawn at phone scale: 11px labels in 44px boxes, which is what "too small on
