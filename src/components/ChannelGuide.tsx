@@ -10,8 +10,10 @@ import {
   filterGuideByMedia,
   guideSummary,
   isPaidProgramming,
+  repeatStatusFor,
   scheduleGaps,
   type GuideMediaFilter,
+  type RepeatStatus,
 } from '@/lib/tv/channelGuide';
 import { channelIdentity, channelHue } from '@/lib/tv/channelNames';
 import { rankGuideForTaste, type TasteRule } from '@/lib/tv/channelAffinity';
@@ -263,8 +265,27 @@ export function ChannelGuide({
                 const end = Date.parse(a.airstamp) + (a.runtime ?? 0) * 60_000;
                 return Math.abs(g.fromMs - end) < 60_000;
               });
+            // SAME SHOW, BACK TO BACK — is the later slot a new episode, the
+            // earlier one repeated, or can we not tell? Computed once per row
+            // against the SAME visible sequence the gap detector uses, then
+            // read back out by index below. index 0 (on-now, or up-next[0]
+            // when nothing's on now) has nothing before it to compare against.
+            const repeatTags = visible.map((a, i) => (i === 0 ? null : repeatStatusFor(visible[i - 1]!, a)));
+            const upNextOffset = r.onNow ? 1 : 0;
+            const forYou = 'forYou' in r && (r as { forYou: boolean }).forYou;
+            // ONE SCORE, NOT AN ECHO OF IT. The on-now programme always shows
+            // its score — that IS the headline. An up-next row only repeats
+            // the badge when the number actually CHANGED, so three slots of
+            // the same rerun don't print "Your 83" three times in a row.
+            let lastShownScore = r.onNow != null && !onNowPaid ? (r.onNow.match ?? null) : null;
             return (
-              <li key={r.network} className="card wv-tile p-3" data-testid="guide-channel">
+              <li
+                key={r.network}
+                className={`card p-2.5 transition ${
+                  forYou ? 'border-brand-400/55 shadow-[0_0_0_1px_rgba(79,134,255,0.14)]' : 'hover:border-brand-400/40'
+                }`}
+                data-testid="guide-channel"
+              >
                 <div className="flex items-baseline justify-between gap-2">
                   <h3 className="flex min-w-0 items-center gap-2 truncate text-sm font-black uppercase tracking-wide text-white">
                     <span
@@ -277,7 +298,7 @@ export function ChannelGuide({
                     <span className="truncate" title={id.mapped ? `${id.name} (${r.network})` : id.name} data-testid="guide-channel-name">
                       {id.name}
                     </span>
-                    {'forYou' in r && (r as { forYou: boolean }).forYou && (
+                    {forYou && (
                       <span
                         data-testid="guide-for-you"
                         title="This channel’s programming matches your taste rules"
@@ -295,9 +316,16 @@ export function ChannelGuide({
                 </div>
 
                 {r.onNow && (
-                  <div className={`mt-1.5 ${onNowPaid ? 'opacity-60' : ''}`} data-testid="guide-on-now">
+                  // THE MOST IMPORTANT LINE ON THE CARD. A quiet raised panel
+                  // and a larger, bolder title separate "on now" from the
+                  // quieter up-next rows below it at a glance, not just by
+                  // the "On now" pill up in the header.
+                  <div
+                    className={`mt-1.5 rounded-lg border border-white/[0.06] bg-white/[0.035] p-2 ${onNowPaid ? 'opacity-60' : ''}`}
+                    data-testid="guide-on-now"
+                  >
                     <div className="flex items-baseline gap-2">
-                      <span className="flex min-w-0 items-baseline gap-1.5 truncate text-[15px] font-semibold text-white">
+                      <span className="flex min-w-0 items-baseline gap-1.5 truncate text-base font-bold text-white">
                         {r.onNow.showType === 'Movie' && <Film size={14} className="flex-none self-center text-slate-400" aria-hidden />}
                         <span className="truncate">{r.onNow.showName}</span>
                       </span>
@@ -312,10 +340,21 @@ export function ChannelGuide({
                         )
                       )}
                     </div>
+                    {/* Episode title / case name — the only way to tell one
+                        True Crime episode from another with the same show
+                        name, or a rerun from tonight's new hour. */}
+                    {r.onNow.episodeName && (
+                      <div className="mt-0.5 truncate text-[12px] text-slate-400" data-testid="guide-on-now-episode" title={r.onNow.episodeName}>
+                        {r.onNow.episodeName}
+                      </div>
+                    )}
                     {/* How far in — so "join late?" is answerable at a glance. */}
                     {r.progress != null && (
-                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10" aria-hidden>
-                        <div className="h-full rounded-full bg-emerald-400/80" style={{ width: `${Math.round(r.progress * 100)}%` }} />
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.08]" aria-hidden>
+                        <div
+                          className="h-full rounded-full bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.55)]"
+                          style={{ width: `${Math.round(r.progress * 100)}%` }}
+                        />
                       </div>
                     )}
                     {gapAfter(r.onNow) && <GapRow gap={gapAfter(r.onNow)!} clockOf={clockOf} />}
@@ -323,24 +362,31 @@ export function ChannelGuide({
                 )}
 
                 {r.upNext.length > 0 && (
-                  <div className="mt-2 space-y-0.5" data-testid="guide-up-next">
-                    {r.upNext.map((a) => {
+                  <div className="mt-1.5 space-y-0.5" data-testid="guide-up-next">
+                    {r.upNext.map((a, i) => {
                       const isSet = reminded.has(a.id);
                       const isSaved = saved.has(a.id);
                       const paid = isPaidProgramming(a);
                       const gap = gapAfter(a);
+                      const repeatTag = repeatTags[i + upNextOffset];
+                      // Only the FIRST slot to carry a new score value shows
+                      // the badge — see `lastShownScore` above the row loop.
+                      const showScore = !paid && a.match != null && a.match !== lastShownScore;
+                      if (!paid && a.match != null) lastShownScore = a.match;
                       return (
                         <div key={a.id}>
-                          <div className={`flex items-center gap-2 text-[13px] ${paid ? 'opacity-60' : ''}`}>
-                            <span suppressHydrationWarning className="flex-none font-bold tabular-nums text-slate-300">
+                          <div className={`flex items-center gap-2 text-[12px] ${paid ? 'opacity-50' : 'opacity-80'}`}>
+                            <span suppressHydrationWarning className="flex-none font-semibold tabular-nums text-slate-400">
                               {displayClock(a.airstamp, a.time) ?? '—'}
                             </span>
-                            <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-slate-400">
-                              {a.showType === 'Movie' && <Film size={13} className="flex-none" aria-hidden />}
-                              <span className="truncate">{a.showName}</span>
-                              {!paid && a.match != null && (
-                                <ScoreBadge score={a.match} personalized={personalized} why={a.matchWhy ?? null} size="sm" />
-                              )}
+                            <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-slate-500">
+                              {a.showType === 'Movie' && <Film size={12} className="flex-none" aria-hidden />}
+                              <span className="truncate" title={a.episodeName ? `${a.showName} — ${a.episodeName}` : a.showName}>
+                                {a.showName}
+                                {a.episodeName && <span className="text-slate-600"> — {a.episodeName}</span>}
+                              </span>
+                              {repeatTag && <RepeatTag status={repeatTag} />}
+                              {showScore && <ScoreBadge score={a.match!} personalized={personalized} why={a.matchWhy ?? null} size="sm" />}
                             </span>
                             {a.tmdbId != null && a.mediaType != null && (
                               <button
@@ -349,13 +395,11 @@ export function ChannelGuide({
                                 disabled={isSaved || busy === a.id}
                                 aria-label={isSaved ? `${a.showName} saved` : `Save ${a.showName} to your watchlist`}
                                 data-testid={`guide-save-${a.id}`}
-                                className={`grid h-8 w-8 flex-none place-items-center rounded-lg border transition active:scale-95 ${
-                                  isSaved
-                                    ? 'border-[#ff1493]/40 bg-[#ff1493]/15 text-pink-200'
-                                    : 'border-white/15 bg-white/[0.05] text-slate-300 hover:border-brand-300 hover:text-white'
+                                className={`grid h-6 w-6 flex-none place-items-center rounded-md transition active:scale-95 ${
+                                  isSaved ? 'text-pink-300' : 'text-slate-600 hover:bg-white/[0.06] hover:text-pink-200'
                                 }`}
                               >
-                                {isSaved ? <Check size={16} aria-hidden /> : <Bookmark size={16} aria-hidden />}
+                                {isSaved ? <Check size={14} aria-hidden /> : <Bookmark size={14} aria-hidden />}
                               </button>
                             )}
                             <button
@@ -364,13 +408,11 @@ export function ChannelGuide({
                               disabled={isSet || busy === a.id}
                               aria-label={isSet ? `Reminder set for ${a.showName}` : `Remind me before ${a.showName} starts`}
                               data-testid={`guide-remind-${a.id}`}
-                              className={`grid h-8 w-8 flex-none place-items-center rounded-lg border transition active:scale-95 ${
-                                isSet
-                                  ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
-                                  : 'border-white/15 bg-white/[0.05] text-slate-300 hover:border-brand-300 hover:text-white'
+                              className={`grid h-6 w-6 flex-none place-items-center rounded-md transition active:scale-95 ${
+                                isSet ? 'text-emerald-300' : 'text-slate-600 hover:bg-white/[0.06] hover:text-emerald-200'
                               }`}
                             >
-                              {isSet ? <Check size={16} aria-hidden /> : <AlarmClock size={16} aria-hidden />}
+                              {isSet ? <Check size={14} aria-hidden /> : <AlarmClock size={14} aria-hidden />}
                             </button>
                           </div>
                           {gap && <GapRow gap={gap} clockOf={clockOf} />}
@@ -385,6 +427,41 @@ export function ChannelGuide({
         </ul>
       )}
     </div>
+  );
+}
+
+/** Same show, back to back — new episode, a repeat, or we genuinely can't tell. */
+function RepeatTag({ status }: { status: RepeatStatus }) {
+  if (status === 'repeat') {
+    return (
+      <span
+        data-testid="guide-repeat-tag"
+        title="Same episode as the slot before it"
+        className="flex-none rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-300"
+      >
+        Repeat
+      </span>
+    );
+  }
+  if (status === 'new-episode') {
+    return (
+      <span
+        data-testid="guide-repeat-tag"
+        title="A different episode from the slot before it"
+        className="flex-none rounded bg-emerald-500/10 px-1 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-300/80"
+      >
+        New
+      </span>
+    );
+  }
+  return (
+    <span
+      data-testid="guide-repeat-tag"
+      title="Same show as the slot before it — we can't tell if it's a repeat"
+      className="flex-none rounded bg-white/[0.05] px-1 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-500"
+    >
+      Repeat unknown
+    </span>
   );
 }
 

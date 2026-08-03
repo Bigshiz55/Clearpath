@@ -237,6 +237,25 @@ export function isPaidProgramming(a: Pick<Airing, 'showName' | 'showType'>): boo
   return pitchable && PITCH_RE.test(name);
 }
 
+export type RepeatStatus = 'new-episode' | 'repeat' | 'unknown';
+
+/**
+ * When the SAME show appears back-to-back in a channel's listings, is the
+ * later slot a new episode, the earlier one repeated, or can we not tell?
+ * Season+episode number is the only honest signal — a title-only match can't
+ * distinguish a rerun from a same-named new episode, and a case name alone
+ * (True Crime) doesn't carry a season/number either. Missing either side is
+ * `'unknown'`, never guessed toward one answer or the other. `null` when the
+ * two airings aren't even the same show — nothing to report.
+ */
+export function repeatStatusFor(prev: Airing, cur: Airing): RepeatStatus | null {
+  if (prev.showId !== cur.showId) return null;
+  const prevKnown = prev.season != null && prev.number != null;
+  const curKnown = cur.season != null && cur.number != null;
+  if (!prevKnown || !curKnown) return 'unknown';
+  return prev.season === cur.season && prev.number === cur.number ? 'repeat' : 'new-episode';
+}
+
 export interface ScheduleGap {
   /** ms timestamps of the unexplained hole between two listed rows. */
   fromMs: number;

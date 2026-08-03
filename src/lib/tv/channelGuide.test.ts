@@ -7,6 +7,7 @@ import {
   filterGuideByMedia,
   guideSummary,
   onNowOf,
+  repeatStatusFor,
   UP_NEXT,
 } from './channelGuide';
 import type { Airing } from '@/lib/onTv';
@@ -214,5 +215,33 @@ describe('one-tap channel groups', () => {
     const keys = GUIDE_CATEGORIES.map((c) => c.key);
     expect(new Set(keys).size).toBe(keys.length);
     expect(GUIDE_CATEGORIES.every((c) => c.label.length > 0)).toBe(true);
+  });
+});
+
+describe('same show, back to back — new episode, a repeat, or unknown', () => {
+  it('is null when the two airings are different shows', () => {
+    const a = airing({ showId: 1, season: 1, number: 1 });
+    const b = airing({ showId: 2, season: 1, number: 1 });
+    expect(repeatStatusFor(a, b)).toBeNull();
+  });
+
+  it('is "repeat" when the same show has the same season and episode number', () => {
+    const a = airing({ showId: 1, season: 3, number: 5, episodeName: 'The Alibi' });
+    const b = airing({ showId: 1, season: 3, number: 5, episodeName: 'The Alibi' });
+    expect(repeatStatusFor(a, b)).toBe('repeat');
+  });
+
+  it('is "new-episode" when the same show has a different season/number', () => {
+    const a = airing({ showId: 1, season: 3, number: 5 });
+    const b = airing({ showId: 1, season: 3, number: 6 });
+    expect(repeatStatusFor(a, b)).toBe('new-episode');
+  });
+
+  it('is "unknown" when either side is missing season/number — never guessed', () => {
+    const known = airing({ showId: 1, season: 3, number: 5 });
+    const unknown = airing({ showId: 1, season: null, number: null });
+    expect(repeatStatusFor(known, unknown)).toBe('unknown');
+    expect(repeatStatusFor(unknown, known)).toBe('unknown');
+    expect(repeatStatusFor(unknown, unknown)).toBe('unknown');
   });
 });

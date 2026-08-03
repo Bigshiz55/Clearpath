@@ -48,6 +48,32 @@ const GRID: Airing[] = [
   a({ network: 'Food Network', showName: 'Beat Bobby Flay', airstamp: '2026-07-28T21:00:00Z' }),
   a({ network: 'History', showName: 'The Proof Is Out There', airstamp: '2026-07-28T20:02:00Z', runtime: 58 }),
   a({ network: 'Dead Channel', showName: 'Already Over', airstamp: '2026-07-28T17:00:00Z', runtime: 30 }),
+  // A true-crime block: on now and the 10 o'clock rerun are the SAME episode
+  // (season/number match) — a viewer should be told it's a repeat, not a new
+  // case. The 11 o'clock slot is a genuinely different episode with a higher
+  // score, which must still show its own badge even though the show is the same.
+  a({
+    network: 'ID', showName: 'Cold Case Files', airstamp: '2026-07-28T20:00:00Z', runtime: 60, showType: 'Documentary',
+    showId: 9001, season: 4, number: 10, episodeName: 'The Lake House Murder', tmdbId: 501, mediaType: 'tv', match: 83,
+  }),
+  a({
+    network: 'ID', showName: 'Cold Case Files', airstamp: '2026-07-28T22:00:00Z', runtime: 60, showType: 'Documentary',
+    showId: 9001, season: 4, number: 10, episodeName: 'The Lake House Murder', tmdbId: 501, mediaType: 'tv', match: 83,
+  }),
+  a({
+    network: 'ID', showName: 'Cold Case Files', airstamp: '2026-07-28T23:00:00Z', runtime: 60, showType: 'Documentary',
+    showId: 9001, season: 4, number: 11, episodeName: 'The Missing Heir', tmdbId: 501, mediaType: 'tv', match: 91,
+  }),
+  // Same show, no season/episode number on either side — genuinely can't say
+  // whether the 9 o'clock airing repeats the 8 o'clock one.
+  a({
+    network: 'Court TV', showName: 'Body Cam', airstamp: '2026-07-28T20:00:00Z', runtime: 60, showType: 'Documentary',
+    showId: 9002, season: null, number: null, episodeName: 'Traffic Stop Gone Wrong', match: 76,
+  }),
+  a({
+    network: 'Court TV', showName: 'Body Cam', airstamp: '2026-07-28T21:00:00Z', runtime: 60, showType: 'Documentary',
+    showId: 9002, season: null, number: null, episodeName: 'Traffic Stop Gone Wrong', match: 76,
+  }),
 ];
 
 // `?taste=1` — the DNA-ordered variant: a viewer whose rules love classic noir
