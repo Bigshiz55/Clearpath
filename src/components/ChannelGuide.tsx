@@ -243,7 +243,7 @@ export function ChannelGuide({
           )}
         </div>
       ) : (
-        <ul className="space-y-2">
+        <ul className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {shown.map((r) => {
             // CHANNEL IDENTITY, not FCC paperwork. "KWPXDT" means nothing to a
             // viewer whose cable box says ION; the mapping names what it can
