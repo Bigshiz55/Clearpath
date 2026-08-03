@@ -168,6 +168,49 @@ export default async function LandingPage() {
             not a static mock result. */}
         <VerdictProcessPreview />
 
+        {/* THE ENTRANCE, AGAIN — same section as the top of the page (same
+            gold button, same secondary actions, same trust line), for
+            anyone who scrolled this far without tapping it yet. By now
+            they've seen the process (VerdictProcessPreview) and are about
+            to read what the controls do (HowYouRule); this is the moment to
+            offer the door again rather than make them scroll back to the
+            top. `h2`, not a second `h1` — one true page heading, still the
+            one above. */}
+        <section className="border-t border-white/10" data-testid="mid-cta">
+          <div className="container-page py-14 text-center sm:py-20">
+            <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-5xl">Enter the courtroom.</h2>
+            <div className="mt-6 flex flex-col items-center gap-2 sm:mt-8 sm:gap-3">
+              <Link
+                href="/app"
+                className="wv-gold-breathe btn-courtroom px-10 py-3.5 text-lg transition hover:scale-[1.02] sm:px-14 sm:py-5 sm:text-xl"
+                data-testid="cta-enter-repeat"
+              >
+                <span aria-hidden>⚖️</span> Enter the Courtroom
+                <span aria-hidden className="wv-cta-sheen pointer-events-none absolute inset-y-0 left-0 w-1/5 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+              </Link>
+
+              <div className="mt-1 flex flex-wrap items-center justify-center gap-2 sm:mt-2">
+                <Link
+                  href="/app/taste-quiz"
+                  className="btn-secondary text-sm transition hover:scale-[1.03] hover:border-white/25"
+                  data-testid="cta-dna-repeat"
+                >
+                  {DNA_CTA[stage]}
+                </Link>
+                <Link
+                  href="/import-taste"
+                  className="btn-secondary text-sm transition hover:scale-[1.03] hover:border-white/25"
+                  data-testid="cta-import-repeat"
+                >
+                  Import my history
+                </Link>
+              </div>
+
+              <p className="text-xs text-slate-500">No account needed to explore.</p>
+            </div>
+          </div>
+        </section>
+
         {/* WHAT THE CONTROLS ON A REAL CARD MEAN — see HowYouRule's own doc
             comment: same icons and colors the real FOR/AGAINST/SAVE row and
             the gavel CTA use, illustrative rather than functional. */}
