@@ -49,7 +49,7 @@ export default async function LandingPage() {
           and tagline the whole top-left corner — this page gives the logo a
           full line to itself, unlike the app header which shares one with
           search, account and overflow controls. */}
-      <header className="container-page flex flex-wrap items-start justify-between gap-y-3 py-5 sm:py-6">
+      <header className="container-page flex flex-wrap items-start justify-between gap-y-2 py-2 sm:gap-y-3 sm:py-6">
         <div className="flex min-w-0 flex-col gap-1.5">
           <Logo size="xl" />
           <Tagline className="pl-[4.5rem] text-lg sm:pl-[5.75rem] sm:text-2xl lg:pl-[7rem] lg:text-3xl" />
@@ -96,11 +96,17 @@ export default async function LandingPage() {
             />
           </div>
 
-          <div className="container-page flex min-h-[72vh] flex-col items-center justify-center py-10 text-center sm:min-h-[74vh] sm:py-14">
+          {/* MOBILE: no forced min-height (it doesn't achieve real centering
+              once content is taller than it, which it was) — packed tight
+              instead, so the gold button lands near the middle of a phone
+              screen through short, real gaps rather than empty flex space.
+              DESKTOP (`sm:`) keeps the roomier spacing already verified to
+              fit the first screen comfortably at 1440x900. */}
+          <div className="container-page flex flex-col items-center justify-center py-4 text-center sm:min-h-[74vh] sm:py-14">
             <h1 className="animate-fade-up text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
               Enter the courtroom.
             </h1>
-            <p className="mx-auto mt-5 max-w-xl animate-fade-up text-lg text-slate-200 sm:mt-6 sm:text-xl">
+            <p className="mx-auto mt-2 max-w-xl animate-fade-up text-lg text-slate-200 sm:mt-6 sm:text-xl">
               Tell us what you feel like watching. We&rsquo;ll weigh the evidence, match it to your taste, and hand
               down one clear Verd1ct—with exactly where to watch it.
             </p>
@@ -109,10 +115,10 @@ export default async function LandingPage() {
                 courtroom" — Build my Watch DNA and Import my history stay
                 real, visible second-tier actions, but never compete with
                 the entrance for the eye. */}
-            <div className="mt-9 flex animate-fade-up flex-col items-center gap-3 sm:mt-10" data-testid="hero-ctas">
+            <div className="mt-4 flex animate-fade-up flex-col items-center gap-2 sm:mt-10 sm:gap-3" data-testid="hero-ctas">
               <Link
                 href="/app"
-                className="wv-gold-breathe btn-courtroom px-10 py-4 text-lg transition hover:scale-[1.02] sm:px-14 sm:py-5 sm:text-xl"
+                className="wv-gold-breathe btn-courtroom px-10 py-3.5 text-lg transition hover:scale-[1.02] sm:px-14 sm:py-5 sm:text-xl"
                 data-testid="cta-enter"
               >
                 <span aria-hidden>⚖️</span> Enter the Courtroom
@@ -122,7 +128,7 @@ export default async function LandingPage() {
                 Search a title, describe your mood, or let WatchVerd1ct choose for you.
               </p>
 
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+              <div className="mt-1 flex flex-wrap items-center justify-center gap-2 sm:mt-2">
                 <Link
                   href="/app/taste-quiz"
                   className="btn-secondary text-sm transition hover:scale-[1.03] hover:border-white/25"
@@ -143,7 +149,7 @@ export default async function LandingPage() {
             </div>
 
             {/* THE CLOSING LINE OF THE FIRST SCREEN. */}
-            <p className="mt-10 text-sm font-bold uppercase tracking-[0.14em] text-slate-500 sm:mt-12">
+            <p className="mt-6 text-sm font-bold uppercase tracking-[0.14em] text-slate-500 sm:mt-12">
               Thousands of titles. <span className="text-white">One Verd1ct.</span>
             </p>
           </div>
