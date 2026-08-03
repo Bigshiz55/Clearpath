@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { Tagline } from '@/components/Tagline';
 import { VerdictProcessPreview } from '@/components/landing/VerdictProcessPreview';
+import { HowYouRule } from '@/components/landing/HowYouRule';
 import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -152,6 +153,11 @@ export default async function LandingPage() {
             comment for why this is the process (evidence / taste / verdict),
             not a static mock result. */}
         <VerdictProcessPreview />
+
+        {/* WHAT THE CONTROLS ON A REAL CARD MEAN — see HowYouRule's own doc
+            comment: same icons and colors the real FOR/AGAINST/SAVE row and
+            the gavel CTA use, illustrative rather than functional. */}
+        <HowYouRule />
       </main>
 
       <footer className="border-t border-white/10">

@@ -1,6 +1,6 @@
 # Difficult-Search Inspection (offline)
 
-- Commit `bee68de` · 12 queries
+- Commit `f2c13f4` · 12 queries
 - Parse-level fields are verified here; candidate counts / final titles / per-constraint metadata evidence are **LIVE-only** and require a TMDB key (see eval/live/audit.mjs).
 
 ## A Spanish film with English audio similar to A Christmas Story
