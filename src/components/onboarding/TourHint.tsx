@@ -10,7 +10,7 @@
  */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { SEEN_KEY } from './HowItWorksTour';
+import { SEEN_KEY } from './TourHub';
 
 const DISMISSED_KEY = 'wv.tourhint.dismissed.v1';
 

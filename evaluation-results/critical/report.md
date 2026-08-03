@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `e225ef2` · Branch: `claude/watch-verdict-app-wwbtbg`
+- Commit: `0c24035` · Branch: `claude/watch-verdict-app-wwbtbg`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 

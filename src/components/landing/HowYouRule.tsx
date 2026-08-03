@@ -73,25 +73,37 @@ export function HowYouRule() {
     <section className="border-t border-white/10" data-testid="how-you-rule">
       <div className="container-page py-14 sm:py-20">
         <h2 className="text-center text-sm font-black uppercase tracking-[0.16em] text-slate-500">How you rule on a title</h2>
-        <div className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4" data-testid="how-you-rule-items">
-          {ITEMS.map((item) => (
-            <div key={item.key} className="flex flex-col items-center text-center" data-testid={`rule-item-${item.key}`}>
-              <div aria-hidden className={`grid h-12 w-12 flex-none place-items-center rounded-xl border font-semibold ${item.tone}`}>
-                {item.icon}
-              </div>
-              <div className="mt-2.5 text-sm font-black uppercase tracking-wide text-white">{item.label}</div>
-              <p className="mt-1 text-xs text-slate-400">{item.caption}</p>
-            </div>
-          ))}
-          {/* THE DOCKET — round, like the real poster button, and demonstrated
-              rather than described (see DocketDemoIcon's own doc comment). */}
-          <div className="flex flex-col items-center text-center" data-testid="rule-item-docket">
-            <DocketDemoIcon />
-            <div className="mt-2.5 text-sm font-black uppercase tracking-wide text-white">The docket</div>
-            <p className="mt-1 text-xs text-slate-400">The circle on every poster — tap to shortlist it, compared against the others you pick.</p>
-          </div>
-        </div>
+        <CardControlsExplainer className="mx-auto mt-8 max-w-3xl" />
       </div>
     </section>
+  );
+}
+
+/**
+ * THE GRID ALONE — split out so the app's own /app/tour hub can embed the
+ * exact same illustration inside its own topic card, instead of a second,
+ * inevitably-drifting copy of the same four icons. See HowYouRule's doc
+ * comment above for what this actually shows and why.
+ */
+export function CardControlsExplainer({ className = '' }: { className?: string }) {
+  return (
+    <div className={`grid grid-cols-2 gap-4 sm:grid-cols-4 ${className}`} data-testid="how-you-rule-items">
+      {ITEMS.map((item) => (
+        <div key={item.key} className="flex flex-col items-center text-center" data-testid={`rule-item-${item.key}`}>
+          <div aria-hidden className={`grid h-12 w-12 flex-none place-items-center rounded-xl border font-semibold ${item.tone}`}>
+            {item.icon}
+          </div>
+          <div className="mt-2.5 text-sm font-black uppercase tracking-wide text-white">{item.label}</div>
+          <p className="mt-1 text-xs text-slate-400">{item.caption}</p>
+        </div>
+      ))}
+      {/* THE DOCKET — round, like the real poster button, and demonstrated
+          rather than described (see DocketDemoIcon's own doc comment). */}
+      <div className="flex flex-col items-center text-center" data-testid="rule-item-docket">
+        <DocketDemoIcon />
+        <div className="mt-2.5 text-sm font-black uppercase tracking-wide text-white">The docket</div>
+        <p className="mt-1 text-xs text-slate-400">The circle on every poster — tap to shortlist it, compared against the others you pick.</p>
+      </div>
+    </div>
   );
 }
