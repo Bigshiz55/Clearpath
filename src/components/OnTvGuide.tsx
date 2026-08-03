@@ -81,24 +81,6 @@ function ratingTone(r: number): string {
 
 const NOISE_TYPES = new Set(['News', 'Talk Show', 'Variety']);
 
-/** The ratings we hold, labelled by source. Renders nothing when we hold none. */
-function ratingRow(a: Airing) {
-  if (a.rating == null && a.criticRt == null && a.criticImdb == null) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold tabular-nums" data-testid="airing-ratings">
-      {a.rating != null && (
-        <span className={ratingTone(a.rating)} title="TVmaze community score">★ {a.rating.toFixed(1)}</span>
-      )}
-      {a.criticRt != null && (
-        <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes (critics)">🍅 {a.criticRt}%</span>
-      )}
-      {a.criticImdb != null && (
-        <span className="rounded bg-[#f5c518] px-1.5 py-0.5 text-xs font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>
-      )}
-    </div>
-  );
-}
-
 export function OnTvGuide({
   airings,
   dateLabel,
@@ -390,128 +372,117 @@ export function OnTvGuide({
         </div>
       </div>
 
-      {/* List */}
+      {/* List — SAME `.poster-grid` + `.wv-card` tile shape as the highlights
+          strip above, not a second hand-rolled row layout. This used to be a
+          five-column `.wv-tv-row` grid stacked one per line: on a wide screen
+          that meant one card's worth of information per full-width row, and
+          only the highlight strip actually used the real estate. The extra
+          facts the row carried that the strip doesn't — Remind/Calendar,
+          the day label, episode/season, and an honest "no ratings yet" line
+          when we hold nothing — are folded into the same card body below the
+          network chip, so nothing that was visible before is lost. */}
       {filtered.length === 0 ? (
         <p className="text-sm text-slate-400">
           Nothing on right now for that view — try a different time window or type.
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="poster-grid" data-testid="tv-list">
           {filtered.map((a) => {
             const t = fmtTime(a.airstamp, a.time);
             const status = airingStatus(a.airstamp, a.runtime, nowMs);
             const resolved = a.tmdbId != null && a.mediaType != null;
+            const dl = dayLabel(a.airstamp, nowMs);
+            const posterSrc = posterSrcFor(a);
+            const poster = posterSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={posterSrc} alt="" loading="lazy" onError={posterFallback} className="h-full w-full object-cover" />
+            ) : (
+              <div className="grid h-full w-full place-items-center p-2 text-center text-[11px] text-slate-400">{a.showName}</div>
+            );
+            const hasRatings = a.rating != null || a.criticRt != null || a.criticImdb != null;
             return (
-              <div
-                key={a.id}
-                className="card wv-tile wv-tv-row p-3"
-                data-testid="airing-row"
-                data-state={status.state}
-              >
-                <div className="wv-tv-when text-center">
-                  {(() => {
-                    const dl = dayLabel(a.airstamp, nowMs);
-                    // Already running. The window includes these on purpose —
-                    // joining twenty minutes late is a real option — but a start
-                    // time in the past under a "coming on" heading reads as a
-                    // broken clock, so say what it actually is.
-                    if (status.state === 'live') {
-                      return (
-                        <div
-                          suppressHydrationWarning
-                          data-testid="airing-live"
-                          className="rounded-md bg-emerald-500/20 px-1 py-1 text-[11px] font-black uppercase leading-tight tracking-wide text-emerald-200"
-                        >
-                          {liveLabel(status.startedMinutesAgo)}
-                        </div>
-                      );
-                    }
-                    if (t && a.minutes > 0) {
-                      return (
-                        <>
-                          <div suppressHydrationWarning className="whitespace-nowrap text-lg font-black tabular-nums leading-none text-white">{t}</div>
-                          {dl !== 'Today' && <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">{dl}</div>}
-                        </>
-                      );
-                    }
-                    return <div className="rounded-md bg-emerald-500/20 px-1 py-1 text-xs font-black uppercase tracking-wide text-emerald-200">{streaming ? dl : 'New'}</div>;
-                  })()}
-                  <div className="mt-1 line-clamp-2 text-[11px] font-bold leading-tight text-brand-200" data-testid="airing-channel">{a.network}</div>
-                </div>
-
-                <div className="wv-tv-poster">
-                  {posterSrcFor(a, 'w342') ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={posterSrcFor(a, 'w342')!} alt="" loading="lazy" onError={posterFallback} className="wv-tv-art" data-testid="airing-poster" />
-                  ) : (
-                    <div className="wv-tv-art grid place-items-center text-[10px] text-slate-500">TV</div>
-                  )}
-                </div>
-
-                <div className="wv-tv-info">
-                  <div className="line-clamp-2 text-base font-bold leading-snug text-white sm:text-lg">{a.showName}</div>
-                  <div className="truncate text-xs text-slate-400">
-                    {a.showType}
-                    {a.episodeName ? ` · ${a.episodeName}` : ''}
-                    {a.season && a.number ? ` (S${a.season}E${a.number})` : ''}
-                    {a.genres.length ? ` · ${a.genres.slice(0, 2).join(', ')}` : ''}
-                  </div>
-                  {/* Ratings stay in the info column below `lg`, where the panel
-                      is hidden — they must never disappear with the zone. */}
-                  <div className="mt-1 lg:hidden">{ratingRow(a)}</div>
-                </div>
-
-                {/* What we actually know. When we hold nothing it says so —
-                    an empty coloured block claiming a verdict is worse than
-                    an honest blank. */}
-                <div className="wv-tv-verdict" data-testid="airing-verdict">
-                  <div className="wv-tv-panel">
-                    {(a.rating != null || a.criticRt != null || a.criticImdb != null) ? (
-                      <>
-                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">What we know</div>
-                        <div className="mt-1">{ratingRow(a)}</div>
-                      </>
+              <div key={a.id} className="card wv-tile flex flex-col overflow-hidden" data-testid="airing-row" data-state={status.state}>
+                <div className="wv-card flex-1">
+                  <div className="wv-card-art wv-art-video bg-ink-800">
+                    {resolved && (
+                      <WCheck tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterUrl={a.image ?? null} />
+                    )}
+                    {resolved ? (
+                      <Link href={`/app/title/${a.mediaType}/${a.tmdbId}`} className="block h-full">{poster}</Link>
                     ) : (
-                      <div className="text-xs text-slate-500" data-testid="no-ratings">
-                        No ratings for this one yet.
+                      poster
+                    )}
+                  </div>
+                  <div className="wv-card-body">
+                    <div className="line-clamp-2 text-sm font-semibold leading-snug text-white">{a.showName}</div>
+                    <div className="mt-1 flex items-center justify-between gap-1">
+                      {status.state === 'live' ? (
+                        <span suppressHydrationWarning data-testid="airing-live" className="truncate rounded-md bg-emerald-500/20 px-1.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-emerald-200">
+                          {liveLabel(status.startedMinutesAgo)}
+                        </span>
+                      ) : (
+                        <span suppressHydrationWarning className="truncate text-base font-black tabular-nums text-white">
+                          {t && a.minutes > 0 ? t : streaming ? dl : 'New'}
+                        </span>
+                      )}
+                      {a.rating != null && <span className={`flex-none text-sm font-bold ${ratingTone(a.rating)}`}>★ {a.rating.toFixed(1)}</span>}
+                    </div>
+                    {status.state !== 'live' && dl !== 'Today' && (
+                      <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">{dl}</div>
+                    )}
+                    <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">
+                      {a.showType}
+                      {a.episodeName ? ` · ${a.episodeName}` : ''}
+                      {a.season && a.number ? ` (S${a.season}E${a.number})` : ''}
+                      {a.genres.length ? ` · ${a.genres.slice(0, 2).join(', ')}` : ''}
+                    </div>
+                    {a.criticRt != null || a.criticImdb != null ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-bold tabular-nums">
+                        {a.criticRt != null && <span className={a.criticRt >= 60 ? 'text-red-300' : 'text-emerald-300'} title="Rotten Tomatoes">🍅 {a.criticRt}%</span>}
+                        {a.criticImdb != null && <span className="rounded bg-[#f5c518] px-1 text-[10px] font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>}
+                      </div>
+                    ) : !hasRatings ? (
+                      <div className="mt-1 text-[11px] text-slate-500" data-testid="no-ratings">No ratings for this one yet.</div>
+                    ) : null}
+                    <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100" data-testid="airing-channel">{a.network}</div>
+                    {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
+
+                    <div className="mt-2 flex items-center gap-1.5 border-t border-white/10 pt-2">
+                      <button
+                        onClick={() => toggleReminder(a)}
+                        disabled={busy === a.id}
+                        className={`wv-tv-act ${reminded.has(a.id) ? 'wv-tv-act--on' : ''}`}
+                        title="Get a notification 1 hour and 5 minutes before it airs"
+                        data-testid="airing-remind"
+                      >
+                        {/* Not a bell — the same broadcast mark the Detective uses,
+                            and it only pulses once the reminder is actually set. */}
+                        <SignalIcon on={reminded.has(a.id)} className="h-4 w-4" />
+                        <span className="hidden sm:inline">{reminded.has(a.id) ? 'On' : 'Remind'}</span>
+                      </button>
+                      <a
+                        href={calendarUrl(a)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="wv-tv-act"
+                        title="Add it to your calendar"
+                        data-testid="airing-calendar"
+                      >
+                        📅
+                      </a>
+                    </div>
+
+                    {/* Same decision the Highlights cards offer — only where
+                        there's a real title to rule on, exactly like that
+                        strip's own gate. */}
+                    {resolved && (
+                      <div className="wv-act-row mt-2 border-t border-white/10 pt-2" data-testid="airing-decision">
+                        <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
+                        <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
                       </div>
                     )}
                   </div>
                 </div>
-
-                <div className="wv-tv-actions">
-                  <button
-                    onClick={() => toggleReminder(a)}
-                    disabled={busy === a.id}
-                    className={`wv-tv-act ${reminded.has(a.id) ? 'wv-tv-act--on' : ''}`}
-                    title="Get a notification 1 hour and 5 minutes before it airs"
-                    data-testid="airing-remind"
-                  >
-                    {/* Not a bell — the same broadcast mark the Detective uses,
-                        and it only pulses once the reminder is actually set. */}
-                    <SignalIcon on={reminded.has(a.id)} className="h-4 w-4" />
-                    <span className="hidden sm:inline">{reminded.has(a.id) ? 'On' : 'Remind'}</span>
-                  </button>
-                  <a
-                    href={calendarUrl(a)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="wv-tv-act"
-                    title="Add it to your calendar"
-                    data-testid="airing-calendar"
-                  >
-                    📅
-                  </a>
-                </div>
-
-                {/* Same decision the Highlights cards offer — only where there's
-                    a real title to rule on, exactly like that strip's own gate. */}
-                {resolved && (
-                  <div className="wv-tv-decision wv-act-row mt-2 border-t border-white/10 pt-2" data-testid="airing-decision">
-                    <CardVerdict tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
-                    <SaveButton wide tmdbId={a.tmdbId!} mediaType={a.mediaType!} title={a.showName} year={a.year ?? null} posterPath={a.posterPath ?? null} />
-                  </div>
-                )}
               </div>
             );
           })}
