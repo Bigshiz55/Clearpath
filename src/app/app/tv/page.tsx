@@ -290,7 +290,9 @@ export default async function OnTvPage({
                 </div>
               </div>
               <h2 className="pt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Meanwhile — actually coming on live TV
+                {filterLabel
+                  ? `Meanwhile — what's actually on live TV (not filtered to ${filterLabel})`
+                  : "Meanwhile — actually coming on live TV"}
               </h2>
               <OnTvGuide airings={windowed} dateLabel={`Next ${withinHours} hours`} country={region} mode="broadcast" remindedIds={remindedIds} windowHours={withinHours} />
             </>
