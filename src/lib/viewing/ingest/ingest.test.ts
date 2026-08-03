@@ -5,7 +5,10 @@ import {
 } from '../scheduleState';
 import { normalizeInstant, normalizeAiring, resolveWallClock } from './normalizeTime';
 import { estimateRunCost, evaluateBudget, RunBudget, safetyThreshold } from './budget';
-import { reconcile, airingKey, hashPayload, selectExpiredByRetention, chunk, type StoredAiring, type FetchedAiring } from './reconcile';
+import {
+  reconcile, airingKey, hashPayload, selectExpiredByRetention, chunk, dedupeByAiringIdentity,
+  type StoredAiring, type FetchedAiring,
+} from './reconcile';
 
 const NOW = Date.parse('2026-07-26T20:00:00Z');
 const MIN = 60_000;
@@ -388,6 +391,43 @@ describe('reconciliation', () => {
  * `FUNCTION_INVOCATION_TIMEOUT` in production. `chunk` is what the writers
  * use to turn thousands of rows into a handful of bulk upsert/insert calls.
  */
+/**
+ * THE tv_airings_identity CRASH.
+ *
+ * Two fetched rows with different providerAiringId values can still land on
+ * the exact same (station, start time, programme) tuple — the real DB
+ * uniqueness rule — and `reconcile()`'s own dedup (keyed by providerAiringId
+ * first) does not catch that. A bulk insert containing both hit a real
+ * production error: "duplicate key value violates unique constraint
+ * tv_airings_identity". This is the fix.
+ */
+describe('dedupeByAiringIdentity — matches the DB constraint reconcile() does not', () => {
+  const row = (over: Partial<FetchedAiring> = {}): FetchedAiring => ({
+    providerAiringId: 'p1', stationId: 'S1', programmeId: 'PR1',
+    startAtUtc: '2026-08-03T20:00:00.000Z', endAtUtc: null, rawHash: 'h1',
+    ...over,
+  });
+
+  it('collapses two rows that share station+time+programme despite different provider ids', () => {
+    const rows = [row({ providerAiringId: 'p1' }), row({ providerAiringId: 'p2' })];
+    expect(dedupeByAiringIdentity(rows)).toHaveLength(1);
+  });
+
+  it('keeps rows distinct when any identity field actually differs', () => {
+    const rows = [
+      row({ stationId: 'S1' }),
+      row({ stationId: 'S2' }),
+      row({ startAtUtc: '2026-08-03T23:00:00.000Z' }),
+      row({ programmeId: 'PR2' }),
+    ];
+    expect(dedupeByAiringIdentity(rows)).toHaveLength(4);
+  });
+
+  it('an empty input produces an empty output', () => {
+    expect(dedupeByAiringIdentity([])).toEqual([]);
+  });
+});
+
 describe('chunk — batching bulk writes', () => {
   it('splits into fixed-size batches with a short tail', () => {
     expect(chunk([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);

@@ -130,6 +130,28 @@ export function reconcile(i: ReconcileInput): ReconcilePlan {
 }
 
 /**
+ * Collapse rows that would collide on `tv_airings`'s real DB identity —
+ * `(lineup_id, station_id, start_at_utc, programme_id)`, migration 0032's
+ * `tv_airings_identity` index — which is NOT the same key `airingKey()` uses
+ * above. `airingKey` prefers `providerAiringId` when the provider supplies
+ * one, so two fetched rows with different provider ids can still describe
+ * the exact same station/slot/programme and both land in `plan.insert`
+ * uncaught. A single-row `.insert()` per plan entry never noticed (a
+ * conflict on either DB row just failed silently, one row at a time); a bulk
+ * insert of the same batch fails outright — Postgres refuses to let one
+ * multi-row `INSERT ... ON CONFLICT` statement affect the same row twice.
+ * Last one wins — no different from how the second of two colliding inserts
+ * would eventually win on any retry anyway.
+ */
+export function dedupeByAiringIdentity<T extends { stationId: string; startAtUtc: string; programmeId: string }>(
+  rows: readonly T[],
+): T[] {
+  const byKey = new Map<string, T>();
+  for (const r of rows) byKey.set(`${r.stationId}|${r.startAtUtc}|${r.programmeId}`, r);
+  return [...byKey.values()];
+}
+
+/**
  * Rows whose licence retention has lapsed.
  *
  * Licensed schedule data is not ours to keep indefinitely. This selects what

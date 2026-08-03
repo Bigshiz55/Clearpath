@@ -6,7 +6,7 @@ import type { ScheduleListing } from '../schedule';
 import {
   stationsFrom, programmeKeyFor, buildProgrammeRow, toFetchedAiring, type ProgrammeRow,
 } from './tvMediaIngest';
-import { reconcile, chunk, type StoredAiring, type FetchedAiring } from './reconcile';
+import { reconcile, chunk, dedupeByAiringIdentity, type StoredAiring, type FetchedAiring } from './reconcile';
 import { evaluateBudget, type BudgetState } from './budget';
 
 /** Rows per bulk write. Comfortably under PostgREST's default payload limits
@@ -303,8 +303,12 @@ export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<T
   });
 
   const nowIso = new Date(nowMs).toISOString();
-  if (plan.insert.length > 0) {
-    for (const batch of chunk(plan.insert, WRITE_BATCH_SIZE)) {
+  // Dedupe against the DB's real identity BEFORE writing — see
+  // dedupeByAiringIdentity's comment. Two fetched rows can differ only by
+  // provider_airing_id and still describe the same station/slot/programme.
+  const dedupedInserts = dedupeByAiringIdentity(plan.insert);
+  if (dedupedInserts.length > 0) {
+    for (const batch of chunk(dedupedInserts, WRITE_BATCH_SIZE)) {
       const rows = batch.map((f) => ({
         provider_airing_id: f.providerAiringId, lineup_id: lineupId,
         station_id: f.stationId, programme_id: f.programmeId,
@@ -313,7 +317,13 @@ export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<T
         raw_hash: f.rawHash, source: 'provider',
         fetched_at: nowIso, last_seen_at: nowIso,
       }));
-      const { error } = await admin.from('tv_airings').insert(rows);
+      // Upsert, not insert: even after the in-batch dedupe above, a row here
+      // can still collide with one already stored (e.g. a concurrent run, or
+      // reconcile classifying it "new" only because provider_airing_id
+      // differed from what's on disk for the same real slot).
+      const { error } = await admin
+        .from('tv_airings')
+        .upsert(rows, { onConflict: 'lineup_id,station_id,start_at_utc,programme_id' });
       if (error) throw new Error(`bulk insert into tv_airings failed: ${error.message}`);
     }
   }
@@ -361,7 +371,7 @@ export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<T
     requested_end_utc: new Date(windowEndMs).toISOString(),
     channels_requested: stationIdByKey.size, channels_returned: stationIdByKey.size,
     calls_used: callsUsed,
-    records_inserted: plan.stats.inserted, records_updated: plan.stats.updated,
+    records_inserted: dedupedInserts.length, records_updated: plan.stats.updated,
     records_unchanged: plan.stats.unchanged, records_expired: plan.stats.expired,
     errors: daysFailed.map((e) => ({ message: e })),
   });
@@ -371,6 +381,6 @@ export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<T
     lineupId, windowStartUtc: new Date(windowStartMs).toISOString(), windowEndUtc: new Date(windowEndMs).toISOString(),
     daysRequested: days, daysFetched: dates.length - daysFailed.length, daysFailed,
     callsUsed, stationsDiscovered: stationIdByKey.size, totalListingsFetched: allListings.length,
-    inserted: plan.stats.inserted, updated: plan.stats.updated, unchanged: plan.stats.unchanged, expired: plan.stats.expired,
+    inserted: dedupedInserts.length, updated: plan.stats.updated, unchanged: plan.stats.unchanged, expired: plan.stats.expired,
   };
 }

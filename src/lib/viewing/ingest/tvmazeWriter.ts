@@ -7,7 +7,7 @@ import {
   buildProgrammeRow, buildAiringRow, toFetchedAiring,
   type MatchedAiring, type ProgrammeRow,
 } from './tvmazeIngest';
-import { reconcile, chunk, type StoredAiring, type FetchedAiring } from './reconcile';
+import { reconcile, chunk, dedupeByAiringIdentity, type StoredAiring, type FetchedAiring } from './reconcile';
 
 /** Rows per bulk write — see the matching constant in tvMediaWriter.ts. */
 const WRITE_BATCH_SIZE = 500;
@@ -267,7 +267,11 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
 
   // ---- apply the plan, BATCHED (see tvMediaWriter.ts for why) ----------------
   const nowIso = new Date(nowMs).toISOString();
-  for (const batch of chunk(plan.insert, WRITE_BATCH_SIZE)) {
+  // Dedupe against the DB's real identity BEFORE writing — see
+  // dedupeByAiringIdentity's comment. Two fetched rows can differ only by
+  // provider_airing_id and still describe the same station/slot/programme.
+  const dedupedInserts = dedupeByAiringIdentity(plan.insert);
+  for (const batch of chunk(dedupedInserts, WRITE_BATCH_SIZE)) {
     const rows = batch.map((f) => ({
       provider_airing_id: f.providerAiringId, lineup_id: lineupId,
       station_id: f.stationId, programme_id: f.programmeId,
@@ -276,7 +280,11 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
       raw_hash: f.rawHash, source: 'provider',
       fetched_at: nowIso, last_seen_at: nowIso,
     }));
-    const { error } = await admin.from('tv_airings').insert(rows);
+    // Upsert, not insert: even after the in-batch dedupe above, a row here
+    // can still collide with one already stored.
+    const { error } = await admin
+      .from('tv_airings')
+      .upsert(rows, { onConflict: 'lineup_id,station_id,start_at_utc,programme_id' });
     if (error) throw new Error(`bulk insert into tv_airings failed: ${error.message}`);
   }
   for (const batch of chunk(plan.update, WRITE_BATCH_SIZE)) {
@@ -330,7 +338,7 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
     channels_returned: coverage.filter((c) => c.found).length,
     channels_no_listings: coverage.filter((c) => !c.found).length,
     calls_used: dates.length + distinctShowIds.length,
-    records_inserted: plan.stats.inserted, records_updated: plan.stats.updated,
+    records_inserted: dedupedInserts.length, records_updated: plan.stats.updated,
     records_unchanged: plan.stats.unchanged, records_expired: plan.stats.expired,
     errors: daysFailed.map((e) => ({ message: e })),
   });
@@ -345,7 +353,7 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
     daysFailed,
     coverage,
     totalAiringsMatched: allMatched.length,
-    inserted: plan.stats.inserted, updated: plan.stats.updated,
+    inserted: dedupedInserts.length, updated: plan.stats.updated,
     unchanged: plan.stats.unchanged, expired: plan.stats.expired,
     premiereUnreliable: [...premiereUnreliableByChannel.entries()].map(([channel, v]) => ({
       channel, count: v.count, sampleReasons: [...v.reasons],
