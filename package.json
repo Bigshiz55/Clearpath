@@ -33,7 +33,8 @@
     "eval:watchverdict:compare": "node eval/cli.mjs compare",
     "eval:watchverdict:optimize": "node eval/cli.mjs optimize",
     "check:schema": "tsx scripts/checkSchemaContract.ts",
-    "verify:schema": "tsx scripts/verifyProductionSchema.ts"
+    "verify:schema": "tsx scripts/verifyProductionSchema.ts",
+    "prove:migration": "tsx scripts/proveMigration.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

@@ -96,3 +96,23 @@ describe('both gates exist and are wired', () => {
     }
   });
 });
+
+describe('the build gate actually runs where the build actually happens', () => {
+  it('vercel.json runs it too — package.json alone is not enough', () => {
+    // vercel.json OVERRIDES package.json's build script. The gate was added to
+    // package.json first and was therefore inert on the only build that
+    // matters. Caught by reading vercel.json rather than by trusting the
+    // npm script.
+    const vercel = JSON.parse(read('vercel.json')) as { buildCommand?: string };
+    expect(vercel.buildCommand).toBeDefined();
+    expect(vercel.buildCommand).toContain('check:schema');
+  });
+
+  it('a migration can be proven against real Postgres before production', () => {
+    const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
+    expect(pkg.scripts['prove:migration']).toContain('proveMigration');
+    const s = read('scripts/proveMigration.ts');
+    // Applying twice is what turns "claims to be idempotent" into evidence.
+    expect(s).toContain('re-applied (idempotent)');
+  });
+});
