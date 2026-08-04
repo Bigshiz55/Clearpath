@@ -1,7 +1,3 @@
-'use client';
-
-import { useEffect, useRef, useState } from 'react';
-
 interface Stage {
   key: string;
   eyebrow: string;
@@ -10,15 +6,13 @@ interface Stage {
 }
 
 const STAGES: Stage[] = [
-  { key: 'evidence', eyebrow: '01', title: 'The evidence', body: 'General quality, audience response, and availability.' },
-  { key: 'taste', eyebrow: '02', title: 'Your taste', body: 'What fits this specific viewer.' },
-  { key: 'verdict', eyebrow: '03', title: 'The Verd1ct', body: 'One clear recommendation and where to watch.' },
+  { key: 'evidence', eyebrow: '01', title: 'The Evidence', body: 'General quality, audience response, and availability.' },
+  { key: 'taste', eyebrow: '02', title: 'Your Taste', body: 'What fits you specifically, learned from your ratings.' },
+  { key: 'verdict', eyebrow: '03', title: 'The Verd1ct', body: 'One clear recommendation and exactly where to watch it.' },
 ];
 
-const ROTATE_MS = 4200;
-
 /**
- * THE PROCESS, NOT A FAKE RESULT.
+ * THE PROCESS, NOT A FAKE RESULT — AND ALL THREE STEPS AT ONCE.
  *
  * This used to sit beside the hero as a static mock result card: a specific
  * title, a specific score, a specific "your match" number. None of that can
@@ -30,76 +24,35 @@ const ROTATE_MS = 4200;
  * neither — half-real reads as more credible than it is.
  *
  * So this shows what the engine actually DOES instead of a result it
- * produced: three short stages, self-playing, abstract on purpose. No
- * title, no score, no provider name — just the shape of the process, in the
- * app's own visual language (the DNA twist + halo from DnaBurst, the gavel
- * reveal from Live Court).
+ * produced: three short, abstract steps — no title, no score, no provider
+ * name, just the shape of the process. A one-at-a-time rotating panel used
+ * to sit here; it read as more interesting than a static list but hid two
+ * of the three steps behind a tap most visitors never made — the opposite
+ * of "easy to scan" for something that has to be understood in one look on
+ * the way down the page. All three sit still, stacked, at once.
  */
 export function VerdictProcessPreview() {
-  const [active, setActive] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  // Only animate while the section is actually on screen — no point spending
-  // a timer (or a battery) rotating a panel nobody is looking at yet.
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') {
-      setVisible(true);
-      return;
-    }
-    const io = new IntersectionObserver(([entry]) => setVisible(entry?.isIntersecting ?? false), { threshold: 0.35 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (paused || !visible) return;
-    const t = setInterval(() => setActive((a) => (a + 1) % STAGES.length), ROTATE_MS);
-    return () => clearInterval(t);
-  }, [paused, visible]);
-
-  const stage = STAGES[active]!;
-
   return (
     <section className="border-t border-white/10" data-testid="verdict-process-preview">
-      <div className="container-page py-14 sm:py-20">
-        <h2 className="text-center text-sm font-black uppercase tracking-[0.16em] text-slate-500">How a Verd1ct gets made</h2>
+      <div className="container-page py-6 sm:py-10">
+        <h2 className="text-center text-sm font-black uppercase tracking-[0.16em] text-slate-500">How a Verd1ct Gets Made</h2>
 
-        <div
-          ref={rootRef}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-          onFocus={() => setPaused(true)}
-          onBlur={() => setPaused(false)}
-          className="mx-auto mt-6 max-w-2xl"
-        >
-          <div className="flex flex-wrap items-center justify-center gap-2" role="tablist" aria-label="How WatchVerd1ct reaches a Verd1ct">
-            {STAGES.map((s, i) => (
-              <button
-                key={s.key}
-                type="button"
-                role="tab"
-                aria-selected={i === active}
-                data-testid={`vpp-tab-${s.key}`}
-                onClick={() => setActive(i)}
-                className={`min-h-[44px] rounded-full border px-4 text-xs font-bold uppercase tracking-wide transition ${
-                  i === active
-                    ? 'border-gold-400/60 bg-gold-500/15 text-amber-100'
-                    : 'border-white/10 bg-white/[0.03] text-slate-500 hover:border-white/25 hover:text-slate-300'
-                }`}
-              >
-                {s.eyebrow} · {s.title}
-              </button>
-            ))}
-          </div>
-
-          <div key={stage.key} className="wv-reveal-in mt-8 text-center" data-testid="vpp-panel">
-            <StageIcon stageKey={stage.key} />
-            <h3 className="mt-4 text-xl font-black text-white">{stage.title}</h3>
-            <p className="mx-auto mt-1.5 max-w-sm text-sm text-slate-400">{stage.body}</p>
-          </div>
+        <div className="mx-auto mt-4 max-w-xl space-y-2.5 sm:mt-6 sm:space-y-3">
+          {STAGES.map((stage) => (
+            <div
+              key={stage.key}
+              className="flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:gap-4 sm:p-3.5"
+              data-testid={`vpp-step-${stage.key}`}
+            >
+              <StageIcon stageKey={stage.key} />
+              <div className="min-w-0">
+                <div className="text-[11px] font-black uppercase tracking-wide text-slate-500">
+                  {stage.eyebrow} · {stage.title}
+                </div>
+                <p className="mt-0.5 text-sm text-slate-300 sm:text-[15px]">{stage.body}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -111,24 +64,24 @@ function StageIcon({ stageKey }: { stageKey: string }) {
     // Three abstract meter bars — evocative of "gathering signal", not a
     // score. No numbers: this is illustrative, never a claimed value.
     return (
-      <div className="mx-auto flex h-14 items-end justify-center gap-1.5" aria-hidden>
-        <span className="wv-reveal-in h-8 w-2.5 rounded-full bg-emerald-400/70" />
-        <span className="wv-reveal-in h-11 w-2.5 rounded-full bg-emerald-400/70" style={{ animationDelay: '90ms' }} />
-        <span className="wv-reveal-in h-6 w-2.5 rounded-full bg-emerald-400/70" style={{ animationDelay: '180ms' }} />
+      <div className="flex h-10 w-10 flex-none items-end justify-center gap-1" aria-hidden>
+        <span className="h-5 w-2 rounded-full bg-emerald-400/70" />
+        <span className="h-7 w-2 rounded-full bg-emerald-400/70" />
+        <span className="h-4 w-2 rounded-full bg-emerald-400/70" />
       </div>
     );
   }
   if (stageKey === 'taste') {
     return (
-      <div className="relative mx-auto grid h-14 w-14 place-items-center" aria-hidden>
-        <span className="wv-dna-halo absolute left-1/2 top-1/2 h-14 w-14 rounded-full bg-[#ff1493]/25 blur-md" />
-        <span className="wv-dna-twist relative text-3xl leading-none">🧬</span>
+      <div className="relative grid h-10 w-10 flex-none place-items-center" aria-hidden>
+        <span className="wv-dna-halo absolute left-1/2 top-1/2 h-10 w-10 rounded-full bg-[#ff1493]/25 blur-md" />
+        <span className="wv-dna-twist relative text-2xl leading-none">🧬</span>
       </div>
     );
   }
   return (
-    <div className="relative mx-auto grid h-14 w-14 place-items-center" aria-hidden>
-      <span className="wv-gavel absolute text-3xl leading-none">⚖️</span>
+    <div className="grid h-10 w-10 flex-none place-items-center" aria-hidden>
+      <span className="text-2xl leading-none">⚖️</span>
     </div>
   );
 }

@@ -71,9 +71,9 @@ const ITEMS: {
 export function HowYouRule() {
   return (
     <section className="border-t border-white/10" data-testid="how-you-rule">
-      <div className="container-page py-14 sm:py-20">
+      <div className="container-page py-6 sm:py-10">
         <h2 className="text-center text-sm font-black uppercase tracking-[0.16em] text-slate-500">How you rule on a title</h2>
-        <CardControlsExplainer className="mx-auto mt-8 max-w-3xl" />
+        <CardControlsExplainer className="mx-auto mt-4 max-w-3xl" />
       </div>
     </section>
   );
@@ -87,22 +87,22 @@ export function HowYouRule() {
  */
 export function CardControlsExplainer({ className = '' }: { className?: string }) {
   return (
-    <div className={`grid grid-cols-2 gap-4 sm:grid-cols-4 ${className}`} data-testid="how-you-rule-items">
+    <div className={`grid grid-cols-2 gap-3 sm:grid-cols-4 ${className}`} data-testid="how-you-rule-items">
       {ITEMS.map((item) => (
         <div key={item.key} className="flex flex-col items-center text-center" data-testid={`rule-item-${item.key}`}>
-          <div aria-hidden className={`grid h-12 w-12 flex-none place-items-center rounded-xl border font-semibold ${item.tone}`}>
+          <div aria-hidden className={`grid h-11 w-11 flex-none place-items-center rounded-xl border font-semibold ${item.tone}`}>
             {item.icon}
           </div>
-          <div className="mt-2.5 text-sm font-black uppercase tracking-wide text-white">{item.label}</div>
-          <p className="mt-1 text-xs text-slate-400">{item.caption}</p>
+          <div className="mt-2 text-sm font-black uppercase tracking-wide text-white">{item.label}</div>
+          <p className="mt-0.5 text-xs text-slate-400">{item.caption}</p>
         </div>
       ))}
       {/* THE DOCKET — round, like the real poster button, and demonstrated
           rather than described (see DocketDemoIcon's own doc comment). */}
       <div className="flex flex-col items-center text-center" data-testid="rule-item-docket">
         <DocketDemoIcon />
-        <div className="mt-2.5 text-sm font-black uppercase tracking-wide text-white">The docket</div>
-        <p className="mt-1 text-xs text-slate-400">The circle on every poster — tap to shortlist it, compared against the others you pick.</p>
+        <div className="mt-2 text-sm font-black uppercase tracking-wide text-white">The docket</div>
+        <p className="mt-0.5 text-xs text-slate-400">Tap to shortlist it against your other picks.</p>
       </div>
     </div>
   );

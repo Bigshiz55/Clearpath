@@ -38,7 +38,12 @@ describe('entry points', () => {
 
   it('the landing hero makes ONE ceremonial entrance — the DNA quiz and import history are visible but secondary', () => {
     const page = read('src/app/page.tsx');
-    const heroBlock = page.slice(page.indexOf('data-testid="hero-ctas"'), page.indexOf('</section>'));
+    // The CTA block is no longer the first `<section>` on the page — the
+    // intro and the two explanation sections come first, by design (see
+    // page.tsx's own doc comments) — so the search for its closing tag has
+    // to start at the block itself, not at the top of the file.
+    const ctaStart = page.indexOf('data-testid="hero-ctas"');
+    const heroBlock = page.slice(ctaStart, page.indexOf('</section>', ctaStart));
     // The single entry button is styled as its own thing (gold, ceremonial) —
     // nothing else in the hero may claim btn-primary or btn-pulse either, or
     // a secondary action would compete with the entrance for the eye.
