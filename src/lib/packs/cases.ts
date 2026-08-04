@@ -343,10 +343,13 @@ export interface BeforeYouWatchResult {
 /**
  * "Before You Watch" for a Crime programme: does the room already know this
  * Case, and has the user already seen a different programme covering it?
- * Uses only CONFIRMED case_programmes links (human-reviewed, see
- * src/lib/cases/reviewQueue.ts) — never a speculative/pending candidate
- * match — so this never over-claims. Non-blocking: the caller decides how
- * to show it, this never prevents anyone from watching.
+ * Uses only `case_programmes` — real ingested programmes curated onto a
+ * Case by hand (see `linkProgrammeToCase` above), never a speculative match
+ * — so this never over-claims. `src/lib/cases/reviewQueue.ts` is a separate
+ * pipeline (fixture-episode matching, feeding `case_match_episodes` for
+ * offline evaluation) and does not write here; see its own module doc for
+ * why that's kept a deliberately separate table. Non-blocking: the caller
+ * decides how to show it, this never prevents anyone from watching.
  */
 export async function beforeYouWatch(
   supabase: SupabaseClient,

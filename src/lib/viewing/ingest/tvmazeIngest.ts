@@ -242,14 +242,24 @@ export interface FetchResult<T> {
   error?: string;
 }
 
+// A hung TVmaze request used to be able to hang the whole ingest — and since
+// the Pack page's own request runs the ingest inline (see lazyIngest.ts), a
+// visitor's page load with it. Every call here is bounded so a stall fails
+// fast (as a normal FetchResult.ok=false) instead of hanging indefinitely.
+const FETCH_TIMEOUT_MS = 10_000;
+
 async function getJson<T>(url: string): Promise<FetchResult<T>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
     if (!res.ok) return { ok: false, data: null, status: res.status, error: `HTTP ${res.status}` };
     const data = (await res.json()) as T;
     return { ok: true, data, status: res.status };
   } catch (e) {
     return { ok: false, data: null, status: null, error: e instanceof Error ? e.message : String(e) };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

@@ -14,6 +14,13 @@ import { PublicHeader, PublicFooter } from '@/components/discovery/DiscoveryLayo
 import { publicEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
+// The request that wins the lazy-ingest race (see ensurePackIngested) runs a
+// real TVmaze ingest inline before rendering — every network call inside it
+// is now individually bounded (tvmazeIngest.ts's getJson), but the platform
+// default function timeout is still short enough for a busy day's schedule +
+// premiere-detection stage to exceed it. Matches the ceiling already used by
+// api/releases/route.ts for the same reason.
+export const maxDuration = 60;
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const canonical = `${publicEnv.siteUrl()}/packs/${params.slug}`;

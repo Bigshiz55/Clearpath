@@ -105,6 +105,19 @@ export function CaseList({
         </div>
       )}
 
+      {/* Every episode below is real (really ingested, really airing) —
+          "unmatched" only means no Case row has been linked to it yet. Case
+          linking is a curated, human-verified match (see
+          src/lib/cases/reviewQueue.ts), never an automatic guess, so a Pack
+          can legitimately have zero Cases for a while even with plenty of
+          episodes. Named here so a fully-unmatched list reads as "not yet
+          curated," not as a broken feature. */}
+      {cases.length === 0 && unmatched.length > 0 && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm text-slate-400">
+          No episodes have been linked to a verified Case yet. Case linking is reviewed by hand, not guessed automatically — the episodes below are real listings, just not grouped by case yet.
+        </div>
+      )}
+
       {unmatched.length > 0 && (
         <section>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">

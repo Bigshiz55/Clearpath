@@ -68,6 +68,13 @@ interface PremiereRow {
  * 'YYYY-MM-DD'). Reads `pack_premiere_calendar` directly — the view already
  * scopes by pack_stations, so this stays a single generic query for every
  * Pack; no per-Pack logic lives here or anywhere else.
+ *
+ * The view is one row per (programme, is_premiere airing, station) — a Pack
+ * whose channel group carries sister stations (Lifetime Movie Network, Great
+ * American Family, etc. alongside Lifetime) can legitimately have more than
+ * one `is_premiere=true` airing for the same title, which showed up as the
+ * same movie listed twice in the calendar. Dedupe to one entry per programme
+ * here, keeping its earliest airing, so every caller gets the same answer.
  */
 export async function getPackPremiereCalendar(
   supabase: SupabaseClient,
@@ -83,7 +90,7 @@ export async function getPackPremiereCalendar(
     .lte('premiere_date', endDate)
     .order('premiere_date', { ascending: true });
   if (error) throw error;
-  return (data as PremiereRow[]).map((row) => ({
+  const entries = (data as PremiereRow[]).map((row) => ({
     packId: row.pack_id,
     programmeId: row.programme_id,
     title: row.title,
@@ -92,6 +99,14 @@ export async function getPackPremiereCalendar(
     stationId: row.station_id,
     startAtUtc: row.start_at_utc,
   }));
+  const byProgramme = new Map<string, PackPremiereEntry>();
+  for (const entry of entries) {
+    const existing = byProgramme.get(entry.programmeId);
+    if (!existing || Date.parse(entry.startAtUtc) < Date.parse(existing.startAtUtc)) {
+      byProgramme.set(entry.programmeId, entry);
+    }
+  }
+  return [...byProgramme.values()].sort((a, b) => a.premiereDate.localeCompare(b.premiereDate));
 }
 
 /**
