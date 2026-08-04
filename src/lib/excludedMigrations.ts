@@ -34,4 +34,22 @@ export const EXCLUDED_MIGRATIONS: Record<string, string> = {
   // ever ran anywhere. Its SQL is commented out in the file itself and it
   // must stay that way — see the file's own header for the full explanation.
   '0033_voice_dna': 'deliberately never applied — feature retired before this migration ran; see the file header',
+  // WITHDRAWN PENDING CORRECTION, not retired. Every statement in 0042 ALTERs
+  // `public.watchmode_availability`, which does not exist in the production
+  // database: 0041 creates it, and 0041 has never run there. Running 0042
+  // would fail on its first statement.
+  //
+  // It is excluded rather than "fixed" by pointing it at a different table,
+  // because the correct target is an open design question — the production
+  // schema has `title_availability` (migration 0031, zero rows, no code path
+  // reads or writes it) with a DIFFERENT vocabulary from the one 0042 assumes.
+  // Choosing between extending that table, adding a per-provider claim table,
+  // or applying 0041 first is a decision that needs the evidence in
+  // docs/SCHEMA_DRIFT_0042.md, not a rename.
+  //
+  // Removing this entry re-arms the migration for every runner at once.
+  // Do not do it until a corrected 0042 (and its rollback) has been proven
+  // against a database that matches production.
+  '0042_canonical_availability':
+    'withdrawn pending correction — targets public.watchmode_availability, which does not exist in production; see docs/SCHEMA_DRIFT_0042.md',
 };

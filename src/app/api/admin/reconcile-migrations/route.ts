@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 import { sanitizeDbUrl, validateDbUrl } from '@/lib/adminMigrateUrl';
 import { LEDGER_DDL, MIGRATION_LOCK_KEY } from '@/lib/migrationLedger';
-import { PROBES, classify, shouldBackfill, type ReconcileResult } from '@/lib/migrationReconcile';
+import { runProbes, shouldBackfill, type ReconcileResult } from '@/lib/migrationReconcile';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -79,18 +79,24 @@ export async function POST(request: Request) {
     await client.query('select pg_advisory_lock($1)', [MIGRATION_LOCK_KEY]);
     lockHeld = true;
 
-    for (const probe of PROBES) {
-      let present: boolean | null = null;
+    // Probing is shared with the read-only /api/admin/reconcile-dry route, so
+    // the two can never disagree about what the database says — including
+    // which migrations are BLOCKED_PREREQUISITE_MISSING rather than pending.
+    // could not probe -> UNKNOWN, never a guess.
+    const probed = await runProbes(async (sql) => {
       try {
-        const { rows } = await client.query<{ exists: boolean }>(probe.sql);
-        present = Boolean(rows[0]?.exists);
+        const { rows } = await client.query<{ exists: boolean }>(sql);
+        return Boolean(rows[0]?.exists);
       } catch {
-        present = null; // could not probe -> UNKNOWN, never a guess
+        return null;
       }
-      const classification = classify(present, probe.evidence);
-      let backfilled = false;
+    });
 
-      if (!dryRun && shouldBackfill(classification)) {
+    for (const r of probed) {
+      let backfilled = false;
+      // shouldBackfill is PROVEN_APPLIED only — a blocked migration is never
+      // written to the ledger in any form.
+      if (!dryRun && shouldBackfill(r.classification) && r.evidence) {
         try {
           // reconciled=true, checksum NULL: we can prove it RAN, but not which
           // SQL text produced it. decideForMigration() treats a null checksum
@@ -101,18 +107,12 @@ export async function POST(request: Request) {
              values ($1,$2,null,now(),true,'reconciliation',$3,true,$4)
              on conflict (name) do update set
                success=true, reconciled=true, evidence=excluded.evidence`,
-            [probe.migration, `${probe.migration}.sql`, process.env.VERCEL_ENV ?? 'unknown', probe.evidence],
+            [r.migration, `${r.migration}.sql`, process.env.VERCEL_ENV ?? 'unknown', r.evidence],
           );
           backfilled = true;
         } catch { /* leave unbackfilled rather than record something unproven */ }
       }
-
-      results.push({
-        migration: probe.migration,
-        classification,
-        evidence: present === null ? null : probe.evidence,
-        backfilled,
-      });
+      results.push({ ...r, backfilled });
     }
   } finally {
     if (lockHeld) await client.query('select pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]).catch(() => {});
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
     dryRun,
     note: dryRun
       ? 'Dry run — nothing was written. Send {"dryRun": false} to backfill PROVEN_APPLIED rows only.'
-      : 'PROVEN_APPLIED rows backfilled. PROVEN_NOT_APPLIED and UNKNOWN were left untouched.',
+      : 'PROVEN_APPLIED rows backfilled. PROVEN_NOT_APPLIED, BLOCKED_PREREQUISITE_MISSING and UNKNOWN were left untouched.',
     results,
   });
 }

@@ -7,80 +7,55 @@ interface MigrateResult {
   ok?: boolean;
   applied?: number;
   total?: number;
-  results?: { name: string; ok: boolean; error?: string }[];
+  results?: { name: string; ok: boolean; error?: string; skipped?: boolean; reason?: string }[];
   error?: string;
 }
 
 /**
- * Fires the existing POST /api/admin/migrate route with a manually-entered
- * MIGRATE_SECRET as a bearer token — the same alternative authorization that
- * route already accepted for curl, just reachable from a phone browser now
- * that this page has no admin session to gate on. The route's authorization
- * and migration logic are untouched; this only calls it and renders whatever
- * it returns, in full, so a failure (wrong secret or a migration error) is
- * readable on screen rather than a bare digest.
+ * NO CREDENTIAL FIELDS. NOT ONE. THAT IS THE POINT OF THIS COMPONENT.
  *
- * Every field here lives only in this component's state — never
- * localStorage, a cookie, or the URL — so it's gone the moment the page
- * reloads.
+ * This form used to collect the production database Host, Port, User,
+ * Database and Password, a full connection string, and MIGRATE_SECRET, and
+ * POST them to /api/admin/migrate. All of it is gone, and none of it may come
+ * back:
  *
- * HOST/PORT/USER/PASSWORD/DATABASE, not a single connection-string field, is
- * the PRIMARY way to connect. A combined connection string kept failing with
- * a bare "Invalid URL" no matter how many copy-paste artifacts (wrapping
- * quotes, trailing whitespace) got sanitized server-side, because the real
- * cause was structural: a password containing @, #, %, or a space requires
- * correct percent-encoding to survive being embedded in a URL, Supabase's
- * own dashboard does not warn about or encode this when it generates a
- * password, and there was no way to diagnose which specific character was
- * the problem without seeing the secret. A raw password field sent as its
- * own value needs no encoding at all, for any character — it goes straight
- * into `pg`'s config object, never through a URL parser. The connection
- * string field still exists below as a fallback for anyone who'd rather
- * paste one, but it is no longer the default or the recommended path.
+ *   - A production password typed into a web page lives in component state, in
+ *     the browser's memory, in whatever autofill or password manager sees the
+ *     field, and in the request body crossing the network. A form field is not
+ *     a neutral convenience for a secret; it is four new places the secret
+ *     exists.
+ *   - MIGRATE_SECRET in the browser makes the browser a credential store. The
+ *     signed-in admin session is already an identity the server can verify on
+ *     its own, so the secret bought nothing here.
+ *
+ * Authorization is now the signed-in Supabase session, checked server-side
+ * against ADMIN_EMAILS. The database connection comes from the deployment's
+ * own environment. The browser sends an empty POST and receives a result — it
+ * never holds, displays, or transmits a secret of any kind.
+ *
+ * When the server has no connection configured, the honest answer is a 503
+ * saying so, NOT a field offering to supply one.
  */
 export function ApplyMigrationsButton() {
   const toast = useToast();
-  const [token, setToken] = useState('');
-  const [host, setHost] = useState('');
-  const [port, setPort] = useState('5432');
-  const [database, setDatabase] = useState('postgres');
-  const [user, setUser] = useState('postgres');
-  const [password, setPassword] = useState('');
-  const [dbUrl, setDbUrl] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState<'idle' | 'confirm' | 'busy'>('idle');
   const [result, setResult] = useState<MigrateResult | null>(null);
 
-  const useDiscreteFields = host.trim().length > 0;
-
-  async function apply(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
+  async function apply() {
+    setState('busy');
     setResult(null);
     try {
-      const payload: Record<string, string> = {};
-      if (useDiscreteFields) {
-        // Sent as typed — no client-side trimming of the password, since a
-        // real password could legitimately start or end with whitespace and
-        // silently altering it would just move the mismatch somewhere new.
-        payload.host = host.trim();
-        payload.port = port.trim();
-        payload.database = database.trim();
-        payload.user = user.trim();
-        payload.password = password;
-      } else if (dbUrl.trim()) {
-        payload.dbUrl = dbUrl;
-      }
-      // A copy-pasted secret very commonly carries a trailing newline or
-      // space from wherever it was copied — the route does an exact string
-      // match, so an untrimmed value that LOOKS right still fails silently.
       const res = await fetch('/api/admin/migrate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.trim()}` },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+        // Empty body, deliberately. The route accepts no parameters at all, so
+        // there is nothing a caller could set — no connection to redirect, no
+        // credential to inject, no secret to replay.
+        body: '{}',
       });
-      // Read the raw text first — a crash that never reaches our JSON
-      // handlers (a platform-level 500, an HTML error page) still has a body
-      // worth showing, and `res.json()` alone throws that text away.
+      // Read the raw text first — a crash that never reaches our JSON handlers
+      // (a platform-level 500, an HTML error page) still has a body worth
+      // showing, and `res.json()` alone throws that text away.
       const text = await res.text();
       let body: MigrateResult;
       try {
@@ -88,166 +63,67 @@ export function ApplyMigrationsButton() {
       } catch {
         body = { error: text ? `HTTP ${res.status}: ${text}` : `HTTP ${res.status}` };
       }
+      if (!res.ok && !body.error) {
+        body.error =
+          res.status === 403 ? 'This account is not on the admin allowlist (ADMIN_EMAILS).'
+          : res.status === 503 ? 'This deployment has no database connection configured.'
+          : `Failed (${res.status}).`;
+      }
       setResult(body);
       if (res.ok && body.ok) {
         toast.show(`Applied ${body.applied ?? 0} of ${body.total ?? 0} migrations.`, 'success');
       } else {
         toast.show(body.error ?? 'Migration run failed.', 'error');
       }
-    } catch (e2) {
-      setResult({ error: e2 instanceof Error ? e2.message : 'Network error.' });
+    } catch (e) {
+      setResult({ error: e instanceof Error ? e.message : 'Network error.' });
       toast.show('Could not reach the migrate endpoint.', 'error');
     } finally {
-      setBusy(false);
+      setState('idle');
     }
   }
 
   return (
-    <form onSubmit={(e) => void apply(e)} className="space-y-3">
-      <div>
-        <label htmlFor="migrate-secret" className="label">
-          Migrate secret
-        </label>
-        <input
-          id="migrate-secret"
-          type="password"
-          autoComplete="off"
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          className="input"
-          placeholder="MIGRATE_SECRET"
-        />
-      </div>
+    <section className="card p-5" data-testid="apply-migrations">
+      <h2 className="text-lg font-bold text-white">Apply pending migrations</h2>
+      <p className="mt-1 text-sm text-slate-400">
+        Runs the migrations registered in the build against this deployment&rsquo;s configured database. Authorization
+        is your signed-in admin session; the connection comes from server configuration. Nothing is entered here.
+      </p>
 
-      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-        <p className="label mb-2">
-          Database connection <span className="font-normal text-slate-500">— from Supabase → Settings → Database</span>
-        </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1fr]">
-          <div>
-            <label htmlFor="migrate-host" className="text-xs text-slate-400">
-              Host
-            </label>
-            <input
-              id="migrate-host"
-              type="text"
-              autoComplete="off"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              className="input"
-              placeholder="db.xxxxxxxxxxxx.supabase.co (or the pooler host)"
-            />
-          </div>
-          <div>
-            <label htmlFor="migrate-port" className="text-xs text-slate-400">
-              Port
-            </label>
-            <input
-              id="migrate-port"
-              type="text"
-              inputMode="numeric"
-              autoComplete="off"
-              value={port}
-              onChange={(e) => setPort(e.target.value)}
-              className="input"
-              placeholder="5432"
-            />
-          </div>
-          <div>
-            <label htmlFor="migrate-user" className="text-xs text-slate-400">
-              User
-            </label>
-            <input
-              id="migrate-user"
-              type="text"
-              autoComplete="off"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              value={user}
-              onChange={(e) => setUser(e.target.value)}
-              className="input"
-              placeholder="postgres"
-            />
-          </div>
-          <div>
-            <label htmlFor="migrate-database" className="text-xs text-slate-400">
-              Database
-            </label>
-            <input
-              id="migrate-database"
-              type="text"
-              autoComplete="off"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              value={database}
-              onChange={(e) => setDatabase(e.target.value)}
-              className="input"
-              placeholder="postgres"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label htmlFor="migrate-password" className="text-xs text-slate-400">
-              Password
-            </label>
-            <input
-              id="migrate-password"
-              type="password"
-              autoComplete="off"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input"
-              placeholder="your database password — any characters are fine here, nothing needs escaping"
-            />
+      {state !== 'confirm' ? (
+        <button
+          type="button"
+          onClick={() => setState('confirm')}
+          disabled={state === 'busy'}
+          data-testid="apply-migrations-open"
+          className="btn-primary mt-4 inline-flex min-h-[44px] items-center px-5 disabled:opacity-40"
+        >
+          {state === 'busy' ? 'Applying…' : 'Apply pending migrations'}
+        </button>
+      ) : (
+        <div className="mt-4 rounded-lg border border-amber-400/40 bg-amber-500/10 p-3" data-testid="apply-migrations-confirm">
+          <p className="text-sm text-amber-100">
+            This writes to the production schema. Migrations excluded in the build — including any blocked by a
+            missing prerequisite — will not run. Continue?
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button type="button" onClick={() => void apply()} data-testid="apply-migrations-confirm-yes"
+              className="btn-primary inline-flex min-h-[44px] items-center px-4 text-sm">
+              Yes, apply them
+            </button>
+            <button type="button" onClick={() => setState('idle')}
+              className="inline-flex min-h-[44px] items-center rounded-lg border border-white/15 px-4 text-sm font-semibold text-slate-200">
+              Cancel
+            </button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
-          Fill in Host and Password to use these directly — any character in the password is fine, nothing needs
-          URL-encoding. Leave Host blank to fall back to the connection-string field below (or the server&apos;s
-          SUPABASE_DB_URL if that&apos;s blank too).
-        </p>
-      </div>
-
-      <details className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm" open={!useDiscreteFields && dbUrl.length > 0}>
-        <summary className="cursor-pointer text-slate-300">Or paste a full connection string instead</summary>
-        <div className="mt-2">
-          <label htmlFor="migrate-db-url" className="text-xs text-slate-400">
-            Connection string <span className="text-slate-600">(ignored while Host above is filled in)</span>
-          </label>
-          <input
-            id="migrate-db-url"
-            type="password"
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            value={dbUrl}
-            onChange={(e) => setDbUrl(e.target.value)}
-            className="input"
-            placeholder="postgres://postgres:...@db....supabase.co:5432/postgres"
-            disabled={useDiscreteFields}
-          />
-        </div>
-      </details>
-
-      <button type="submit" disabled={busy || !token} className="btn-primary disabled:opacity-50">
-        {busy ? 'Applying…' : 'Apply pending migrations'}
-      </button>
+      )}
 
       {result && (
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm">
+        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm" data-testid="apply-migrations-result">
           {result.error && !result.results ? (
-            <p className="text-red-300">{result.error}</p>
+            <p className="text-red-300" role="alert">{result.error}</p>
           ) : (
             <>
               <p className="font-semibold text-white">
@@ -258,8 +134,10 @@ export function ApplyMigrationsButton() {
                   <li key={r.name} className="flex flex-col">
                     <span className={r.ok ? 'text-emerald-300' : 'text-red-300'}>
                       {r.ok ? '✓' : '✗'} <code>{r.name}</code>
+                      {r.skipped && <span className="ml-2 text-xs text-slate-400">already applied</span>}
                     </span>
                     {!r.ok && r.error && <span className="ml-4 text-xs text-red-200/80">{r.error}</span>}
+                    {r.reason && <span className="ml-4 text-xs text-slate-400">{r.reason}</span>}
                   </li>
                 ))}
               </ul>
@@ -267,6 +145,6 @@ export function ApplyMigrationsButton() {
           )}
         </div>
       )}
-    </form>
+    </section>
   );
 }

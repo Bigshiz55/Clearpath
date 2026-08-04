@@ -4,9 +4,20 @@
  * tracking table (created on first run) — a migration whose name is already
  * recorded there is skipped, so a second run applies nothing.
  *
- * Run automatically as part of `npm run build` (see package.json) so a
- * deploy never needs a human to open an admin page. Never prints
- * SUPABASE_DB_URL itself, only migration names/results.
+ * NOT RUN AUTOMATICALLY. This header used to say it ran as part of
+ * `npm run build`. It does not. That wiring existed for under two hours on
+ * 2026-07-31 (added in bb4195d, reverted in 67d1014 after five consecutive
+ * failed production deploys) and was never replaced, so `npm run build` is
+ * plain `next build` and this script runs only when a human invokes
+ * `npm run migrate`. See docs/SCHEMA_DRIFT_0042.md for what that gap did to
+ * the production schema.
+ *
+ * It also tracks migrations in `public.schema_migrations`, which is NOT the
+ * ledger Supabase's own tooling writes (`supabase_migrations.schema_migrations`).
+ * A migration applied through the Supabase CLI or dashboard is invisible to
+ * this script, and vice versa — never treat either table as the whole truth.
+ *
+ * Never prints SUPABASE_DB_URL itself, only migration names/results.
  */
 import { Client } from 'pg';
 import { PENDING_MIGRATIONS } from '../src/lib/pendingMigrations';

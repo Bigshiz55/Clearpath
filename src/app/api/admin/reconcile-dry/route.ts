@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 import { isAdminEmail } from '@/lib/admin';
 import { sanitizeDbUrl, validateDbUrl } from '@/lib/adminMigrateUrl';
-import { PROBES, classify, type ReconcileResult } from '@/lib/migrationReconcile';
+import { runProbes, type ReconcileResult } from '@/lib/migrationReconcile';
 import { recordReliabilityEvent } from '@/lib/monitoring';
 
 export const runtime = 'nodejs';
@@ -107,25 +107,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Could not connect to the database.' }, { status: 502 });
   }
 
-  const results: ReconcileResult[] = [];
+  let results: ReconcileResult[] = [];
   try {
     // READ-ONLY probes. No LEDGER_DDL, no advisory lock, no writes: this route
-    // only observes, so it cannot block a real migration run either.
-    for (const probe of PROBES) {
-      let present: boolean | null = null;
+    // only observes, so it cannot block a real migration run either. Shared
+    // with the backfilling route via runProbes so the two can never disagree
+    // about what the database says; `backfilled` comes back false regardless,
+    // because runProbes has no write path of its own.
+    results = await runProbes(async (sql) => {
       try {
-        const { rows } = await client.query<{ exists: boolean }>(probe.sql);
-        present = Boolean(rows[0]?.exists);
+        const { rows } = await client.query<{ exists: boolean }>(sql);
+        return Boolean(rows[0]?.exists);
       } catch {
-        present = null;
+        return null;
       }
-      results.push({
-        migration: probe.migration,
-        classification: classify(present, probe.evidence),
-        evidence: present === null ? null : probe.evidence,
-        backfilled: false, // always — this route cannot write
-      });
-    }
+    });
   } finally {
     await client.end().catch(() => {});
   }
@@ -138,6 +134,7 @@ export async function POST(request: Request) {
     admin: email.slice(0, 80),
     proven: results.filter((r) => r.classification === 'PROVEN_APPLIED').length,
     notApplied: results.filter((r) => r.classification === 'PROVEN_NOT_APPLIED').length,
+    blocked: results.filter((r) => r.classification === 'BLOCKED_PREREQUISITE_MISSING').length,
     unknown: results.filter((r) => r.classification === 'UNKNOWN').length,
   });
 

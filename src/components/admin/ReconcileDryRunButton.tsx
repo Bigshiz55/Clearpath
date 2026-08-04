@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 
 /**
  * One-click, read-only migration reconciliation for an authorized admin.
@@ -13,9 +13,11 @@ import { useEffect, useState } from 'react';
 
 interface Row {
   migration: string;
-  classification: 'PROVEN_APPLIED' | 'PROVEN_NOT_APPLIED' | 'UNKNOWN';
+  classification: 'PROVEN_APPLIED' | 'PROVEN_NOT_APPLIED' | 'BLOCKED_PREREQUISITE_MISSING' | 'UNKNOWN';
   evidence: string | null;
   backfilled: boolean;
+  /** Populated only when something is blocked — names the missing object. */
+  note?: string | null;
 }
 interface Result {
   ok?: boolean;
@@ -29,18 +31,23 @@ interface Result {
 const LEDGER_STATE: Record<Row['classification'], string> = {
   PROVEN_APPLIED: 'Eligible for backfill',
   PROVEN_NOT_APPLIED: 'Must stay unrecorded',
+  BLOCKED_PREREQUISITE_MISSING: 'Must stay unrecorded',
   UNKNOWN: 'Left alone — never guessed',
 };
 
 const ACTION: Record<Row['classification'], string> = {
   PROVEN_APPLIED: 'Backfill ledger row (evidence-based)',
   PROVEN_NOT_APPLIED: 'Apply the migration before recording anything',
+  // Deliberately NOT "apply the migration": it would fail on its first
+  // statement. The defect is the missing object named in the row's note.
+  BLOCKED_PREREQUISITE_MISSING: 'Do not apply — fix the missing object first',
   UNKNOWN: 'Add a schema probe, then re-check',
 };
 
 const TONE: Record<Row['classification'], string> = {
   PROVEN_APPLIED: 'text-emerald-300',
   PROVEN_NOT_APPLIED: 'text-amber-300',
+  BLOCKED_PREREQUISITE_MISSING: 'text-red-300',
   UNKNOWN: 'text-slate-400',
 };
 
@@ -193,13 +200,24 @@ export function ReconcileDryRunButton() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.migration} className="border-t border-white/10 align-top">
-                    <td className="py-1.5 pr-3 font-mono text-xs text-slate-200">{r.migration}</td>
-                    <td className={`py-1.5 pr-3 font-semibold ${TONE[r.classification]}`}>{r.classification}</td>
-                    <td className="py-1.5 pr-3 text-slate-300">{r.evidence ?? <span className="text-slate-500">could not probe</span>}</td>
-                    <td className="py-1.5 pr-3 text-slate-300">{LEDGER_STATE[r.classification]}</td>
-                    <td className="py-1.5 text-slate-300">{ACTION[r.classification]}</td>
-                  </tr>
+                  <Fragment key={r.migration}>
+                    <tr className="border-t border-white/10 align-top">
+                      <td className="py-1.5 pr-3 font-mono text-xs text-slate-200">{r.migration}</td>
+                      <td className={`py-1.5 pr-3 font-semibold ${TONE[r.classification]}`}>{r.classification}</td>
+                      <td className="py-1.5 pr-3 text-slate-300">{r.evidence ?? <span className="text-slate-500">could not probe</span>}</td>
+                      <td className="py-1.5 pr-3 text-slate-300">{LEDGER_STATE[r.classification]}</td>
+                      <td className="py-1.5 text-slate-300">{ACTION[r.classification]}</td>
+                    </tr>
+                    {/* The blocking object, spelled out. A classification name
+                        alone does not tell an operator WHICH object is missing
+                        or why applying the migration would not fix it. */}
+                    {r.note && (
+                      <tr data-testid="reconcile-dry-note">
+                        <td />
+                        <td colSpan={4} className="pb-2 pr-3 text-xs text-red-200/90">{r.note}</td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

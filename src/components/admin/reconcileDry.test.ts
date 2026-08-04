@@ -50,8 +50,11 @@ describe('structurally incapable of writing', () => {
     expect(route).toMatch(/dryRun: true/);
   });
 
-  it('always reports backfilled:false', () => {
-    expect(route).toMatch(/backfilled: false/);
+  it('always reports backfilled:false — it delegates to a probe runner with no write path', () => {
+    expect(routeCode).toContain('runProbes');
+    const reconcile = readFileSync(join(process.cwd(), 'src/lib/migrationReconcile.ts'), 'utf8');
+    expect(reconcile).toMatch(/backfilled: false/);
+    expect(stripComments(reconcile).toLowerCase()).not.toContain('insert into');
   });
 
   it('the client sends no body at all', () => {

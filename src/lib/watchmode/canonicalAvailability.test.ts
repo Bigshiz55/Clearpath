@@ -86,9 +86,32 @@ describe('migration safety', () => {
     expect(rb).not.toMatch(/alter column source_type/);
   });
 
-  it('is registered so it actually runs', () => {
+  /**
+   * WITHDRAWN. This assertion used to be its exact inverse — that 0042 was
+   * registered "so it actually runs". It must not run.
+   *
+   * Every statement in 0042 ALTERs `public.watchmode_availability`, which the
+   * production database does not have: 0041 creates it, and 0041 never ran
+   * there. The rollback above inherits the same defect. The migration is
+   * deregistered until its real target is decided — see
+   * docs/SCHEMA_DRIFT_0042.md.
+   *
+   * The assertions above still hold: they describe what the SQL says, which
+   * stays true and reviewable while it is withdrawn.
+   */
+  it('is deregistered from every runner until its target table is corrected', () => {
     const pending = readFileSync(join(process.cwd(), 'src/lib/pendingMigrations.ts'), 'utf8');
-    expect(pending).toContain('0042_canonical_availability');
+    expect(pending).not.toMatch(/name: '0042_canonical_availability'/);
+    const excluded = readFileSync(join(process.cwd(), 'src/lib/excludedMigrations.ts'), 'utf8');
+    expect(excluded).toContain('0042_canonical_availability');
+  });
+
+  it('still targets the absent table — deregistration is the only thing protecting production', () => {
+    // If this stops matching, 0042 was retargeted, and the exclusion in
+    // excludedMigrations.ts needs revisiting rather than silently outliving
+    // the reason it was added.
+    expect(sql).toContain('watchmode_availability');
+    expect(sql).not.toContain('title_availability');
   });
 });
 
