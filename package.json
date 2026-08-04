@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run check:schema && next build",
     "migrate": "tsx scripts/migrate.ts",
     "check:migrations": "tsx scripts/checkMigrationsRegistered.ts",
     "check:branch": "tsx scripts/checkBranch.ts",
@@ -31,7 +31,9 @@
     "eval:watchverdict:live": "node eval/cli.mjs live",
     "eval:watchverdict:baseline": "node eval/cli.mjs baseline",
     "eval:watchverdict:compare": "node eval/cli.mjs compare",
-    "eval:watchverdict:optimize": "node eval/cli.mjs optimize"
+    "eval:watchverdict:optimize": "node eval/cli.mjs optimize",
+    "check:schema": "tsx scripts/checkSchemaContract.ts",
+    "verify:schema": "tsx scripts/verifyProductionSchema.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

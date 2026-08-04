@@ -42,3 +42,7 @@ function main(): void {
 }
 
 main();
+
+// Module scope, so this script's `main` does not collide with another
+// script's in the shared type-check.
+export {};
