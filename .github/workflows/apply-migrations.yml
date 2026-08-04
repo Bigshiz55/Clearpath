@@ -1,0 +1,98 @@
+name: Apply database migrations
+
+# MANUAL ONLY. Applying DDL to production is not something that should happen
+# because someone merged a branch, so there is no push trigger here.
+#
+# Exists because migration 0041 was written, merged and deployed while its
+# tables were never created in production — and the only ways to apply it
+# required a secret that must never travel through a browser or a chat
+# message. GitHub Actions can USE a secret without anyone reading it, which
+# makes this the one path that needs no human to handle credentials.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type APPLY to run migrations against production'
+        required: true
+        default: 'no'
+
+jobs:
+  preflight:
+    # Reports WHICH credentials exist, as booleans. Never their values —
+    # `secrets.*` is masked in logs, but printing a boolean means nobody has
+    # to trust the masking.
+    runs-on: ubuntu-latest
+    outputs:
+      has_db_url: ${{ steps.check.outputs.has_db_url }}
+      has_migrate_secret: ${{ steps.check.outputs.has_migrate_secret }}
+      has_site_url: ${{ steps.check.outputs.has_site_url }}
+    steps:
+      - id: check
+        run: |
+          echo "has_db_url=${{ secrets.SUPABASE_DB_URL != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_migrate_secret=${{ secrets.MIGRATE_SECRET != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_site_url=${{ secrets.SITE_URL != '' }}" >> "$GITHUB_OUTPUT"
+          echo "SUPABASE_DB_URL configured : ${{ secrets.SUPABASE_DB_URL != '' }}"
+          echo "MIGRATE_SECRET configured  : ${{ secrets.MIGRATE_SECRET != '' }}"
+          echo "SITE_URL configured        : ${{ secrets.SITE_URL != '' }}"
+
+  apply:
+    needs: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse unless explicitly confirmed
+        if: inputs.confirm != 'APPLY'
+        run: |
+          echo "::error::Not confirmed. Re-run with the input set to APPLY."
+          exit 1
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+
+      # PATH 1 — a direct database URL. `npm run migrate` is idempotent and
+      # tracks what it applied in public.schema_migrations, so re-running it
+      # is safe and applies only what is genuinely missing.
+      - name: Apply migrations directly
+        if: needs.preflight.outputs.has_db_url == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: npm run migrate
+
+      # PATH 2 — no database URL here, but the deployment has one and accepts
+      # a bearer token. Same runner, reached over HTTP instead.
+      - name: Apply migrations via the deployment
+        if: needs.preflight.outputs.has_db_url != 'true' && needs.preflight.outputs.has_migrate_secret == 'true' && needs.preflight.outputs.has_site_url == 'true'
+        run: |
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${{ secrets.MIGRATE_SECRET }}" \
+            -H 'Content-Type: application/json' \
+            -d '{}' "${{ secrets.SITE_URL }}/api/admin/migrate")
+          echo "HTTP $code"
+          cat /tmp/out.json
+          test "$code" = "200"
+
+      - name: No credential available
+        if: needs.preflight.outputs.has_db_url != 'true' && (needs.preflight.outputs.has_migrate_secret != 'true' || needs.preflight.outputs.has_site_url != 'true')
+        run: |
+          echo "::error::No usable credential. Add repository secret SUPABASE_DB_URL,"
+          echo "::error::or MIGRATE_SECRET together with SITE_URL."
+          exit 1
+
+  verify:
+    # The gate that would have caught 0041, run immediately after applying so
+    # a partial or failed migration cannot be mistaken for a working one.
+    needs: apply
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Verify the live schema matches what the code needs
+        run: npx tsx scripts/verifyProductionSchema.ts "${{ secrets.SITE_URL || 'https://clearpath-pearl-chi.vercel.app' }}"
