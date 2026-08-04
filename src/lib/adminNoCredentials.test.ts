@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PENDING_MIGRATIONS } from './pendingMigrations';
-import { EXCLUDED_MIGRATIONS } from './excludedMigrations';
+import { EXCLUDED_MIGRATIONS, WITHDRAWN_MIGRATIONS } from './excludedMigrations';
 
 /**
  * TWO STANDING GUARANTEES, ENFORCED AT SOURCE LEVEL.
@@ -129,6 +129,27 @@ describe('0042 cannot reach a database through any runner', () => {
 
   it('the .sql file is kept — withdrawn for correction, not deleted', () => {
     expect(() => read('supabase/migrations/0042_canonical_availability.sql')).not.toThrow();
+  });
+
+  it('is reported as withdrawn by /api/version, not advertised as the newest migration', () => {
+    // latestMigrationInCode is a filename scan, so 0042 is still the newest
+    // FILE. Without this field it would read as the intended target state.
+    expect(WITHDRAWN_MIGRATIONS['0042_canonical_availability']).toBeDefined();
+    const version = read('src/app/api/version/route.ts');
+    expect(version).toContain('withdrawnMigrations');
+    expect(version).toContain('WITHDRAWN_MIGRATIONS');
+  });
+
+  it('withdrawn means defective, not retired — the categories stay distinct', () => {
+    // Retired/baseline exclusions are expected never to return; a withdrawn
+    // migration is expected back once corrected. Collapsing them would lose
+    // the only signal that 0042 still needs work.
+    expect(WITHDRAWN_MIGRATIONS['0033_voice_dna']).toBeUndefined();
+    expect(WITHDRAWN_MIGRATIONS['0001_init']).toBeUndefined();
+    // But every withdrawn migration is still excluded from the runners.
+    for (const name of Object.keys(WITHDRAWN_MIGRATIONS)) {
+      expect(EXCLUDED_MIGRATIONS[name], name).toBeDefined();
+    }
   });
 
   it('0041 stays registered — it is genuinely pending, not defective', () => {

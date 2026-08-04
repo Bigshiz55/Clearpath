@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getBuildInfo } from '@/lib/buildInfo';
 import { getAppliedMigrationInfo } from '@/lib/appliedMigration';
+import { WITHDRAWN_MIGRATIONS } from '@/lib/excludedMigrations';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,16 +25,24 @@ export async function GET() {
       deployedAt: info.buildTimeIso || null,
       vercelEnv: info.vercelEnv || 'development',
       appVersion: info.appVersion,
-      // TWO SEPARATE TRUTHS, never conflated again.
+      // THREE SEPARATE TRUTHS, never conflated again.
       //   latestMigrationInCode  - newest file in supabase/migrations/, known
       //                            at build time. Says nothing about the DB.
       //   appliedDatabaseMigration - read from the public.schema_migrations
       //                            ledger at request time, or 'unknown' when
       //                            it cannot be proven. Never falls back to
       //                            the code-side value.
+      //   withdrawnMigrations    - files that exist but NO runner will apply,
+      //                            because they are defective. Reported here
+      //                            because latestMigrationInCode is a filename
+      //                            scan: without this, a withdrawn migration
+      //                            still reads as the newest thing in the
+      //                            codebase, which is how 0042 would have
+      //                            looked like the intended target state.
       latestMigrationInCode: info.schemaVersion || null,
       appliedDatabaseMigration,
       migrationLedgerStatus,
+      withdrawnMigrations: Object.keys(WITHDRAWN_MIGRATIONS),
       // Retained temporarily so existing dashboards/scripts do not break, but
       // it is the CODE-side value and must not be read as the applied schema.
       schemaVersion: info.schemaVersion || null,
