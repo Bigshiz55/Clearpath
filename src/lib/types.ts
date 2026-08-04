@@ -104,6 +104,11 @@ export interface WatchProviders {
   link: string | null; // TMDB/JustWatch attribution link
   options: WatchProvider[];
   available: boolean; // whether TMDB returned any data for this region
+  /** ISO timestamp of when this availability was last confirmed — the more
+   *  conservative (older) of TMDB's fetch time and Watchmode's cached fetch
+   *  time when both contributed. Null only when unknown (should not normally
+   *  happen; never fabricated). */
+  checkedAt: string | null;
 }
 
 /** A user preference rule (penalty/boost) applied by the scoring engine. */

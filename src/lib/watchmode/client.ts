@@ -60,6 +60,7 @@ export async function fetchWatchmode(mediaType: MediaType, tmdbId: number, regio
   const key = serverEnv.watchmodeKey();
   if (!key) return null;
 
+  const checkedAt = new Date().toISOString();
   const titleId = `${mediaType === 'tv' ? 'tv' : 'movie'}-${tmdbId}`;
   const url = new URL(`${BASE}/title/${titleId}/details/`);
   url.searchParams.set('apiKey', key);
@@ -75,7 +76,7 @@ export async function fetchWatchmode(mediaType: MediaType, tmdbId: number, regio
   }
 
   const sources = (data.sources ?? []).filter((s) => (s.region ?? '').toUpperCase() === region.toUpperCase());
-  if (sources.length === 0) return { region, link: null, options: [], available: false };
+  if (sources.length === 0) return { region, link: null, options: [], available: false, checkedAt };
 
   // Dedupe by service name + type, keeping the first deep link we see.
   const seen = new Map<string, WatchProvider>();
@@ -93,7 +94,7 @@ export async function fetchWatchmode(mediaType: MediaType, tmdbId: number, regio
     });
   }
   const options = [...seen.values()];
-  return { region, link: null, options, available: options.length > 0 };
+  return { region, link: null, options, available: options.length > 0, checkedAt };
 }
 
 /** Watchmode availability for a title, cached 12h. Null when no key/miss. */
@@ -221,5 +222,14 @@ export function mergeWatchmode(tmdb: WatchProviders | null, wm: WatchProviders |
     if (!used.has(k)) merged.push(o);
   }
 
-  return { region: tmdb.region, link: tmdb.link, options: merged, available: merged.length > 0 };
+  // Watchmode's own fetch time is the more conservative (and often older, up
+  // to 14 days) of the two signals whenever it contributed — that's the more
+  // honest "last verified" to show, since TMDB's own data was just fetched.
+  return {
+    region: tmdb.region,
+    link: tmdb.link,
+    options: merged,
+    available: merged.length > 0,
+    checkedAt: wm.checkedAt ?? tmdb.checkedAt,
+  };
 }

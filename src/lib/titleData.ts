@@ -20,12 +20,20 @@ import { getBriefing, type Briefing } from '@/lib/briefing';
  */
 async function cachedWatchmodeAsProviders(mediaType: MediaType, id: number, region: string): Promise<WatchProviders | null> {
   const admin = createAdminClient();
-  const { data } = await admin
-    .from('watchmode_availability')
-    .select('source_name, source_type, deeplink')
-    .eq('tmdb_id', id)
-    .eq('tmdb_media_type', mediaType)
-    .eq('region', region);
+  const [{ data }, { data: state }] = await Promise.all([
+    admin
+      .from('watchmode_availability')
+      .select('source_name, source_type, deeplink')
+      .eq('tmdb_id', id)
+      .eq('tmdb_media_type', mediaType)
+      .eq('region', region),
+    admin
+      .from('watchmode_fetch_state')
+      .select('last_fetched_at')
+      .eq('tmdb_id', id)
+      .eq('tmdb_media_type', mediaType)
+      .maybeSingle(),
+  ]);
   if (!data || data.length === 0) return null;
   const options: WatchProvider[] = data.map((r) => ({
     providerId: 0,
@@ -34,7 +42,13 @@ async function cachedWatchmodeAsProviders(mediaType: MediaType, id: number, regi
     type: r.source_type === 'subscription' ? 'flatrate' : (r.source_type as WatchProvider['type']),
     link: (r.deeplink as string | null) ?? null,
   }));
-  return { region, link: null, options, available: options.length > 0 };
+  return {
+    region,
+    link: null,
+    options,
+    available: options.length > 0,
+    checkedAt: (state?.last_fetched_at as string | undefined) ?? null,
+  };
 }
 
 /** Availability = TMDB providers, with Watchmode's deep links + fresher

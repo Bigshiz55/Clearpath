@@ -29,7 +29,7 @@ export interface TileFacts {
   availability: CardAvailability;
 }
 
-const EMPTY_AVAILABILITY: CardAvailability = { status: 'checking', sources: [] };
+const EMPTY_AVAILABILITY: CardAvailability = { status: 'checking', sources: [], checkedAt: null };
 const EMPTY: TileFacts = { ratings: EMPTY_TILE_RATINGS, overview: null, facts: null, availability: EMPTY_AVAILABILITY };
 
 const cache = new Map<string, Promise<TileFacts>>();

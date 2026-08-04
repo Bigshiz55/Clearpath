@@ -55,9 +55,13 @@ export const PROVIDER_NAMES: Record<number, string> = {
   43: 'Starz',
 };
 
+// Fixed, deterministic fixture timestamp — not the real clock, so eval runs
+// stay reproducible regardless of when they're executed.
+const FIXTURE_CHECKED_AT = '2026-01-01T00:00:00.000Z';
+
 /** Synthesize a TMDB-shaped WatchProviders payload from provider ids. */
 export function providersFor(providerIds: number[], region = 'US'): WatchProviders {
-  if (providerIds.length === 0) return { region, link: null, options: [], available: false };
+  if (providerIds.length === 0) return { region, link: null, options: [], available: false, checkedAt: FIXTURE_CHECKED_AT };
   return {
     region,
     link: `https://example.test/watch`,
@@ -68,6 +72,7 @@ export function providersFor(providerIds: number[], region = 'US'): WatchProvide
       logoPath: null,
     })),
     available: true,
+    checkedAt: FIXTURE_CHECKED_AT,
   };
 }
 

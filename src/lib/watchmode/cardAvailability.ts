@@ -24,15 +24,31 @@ export type CardAvailabilityStatus =
 export interface CardAvailability {
   status: CardAvailabilityStatus;
   sources: CardAvailabilitySource[];
+  /** ISO timestamp of the sync job's last check for this title, or null when
+   *  never checked ('checking' status). Region-independent: the fetch-state
+   *  table tracks "have we checked this title at all", not per-region. */
+  checkedAt: string | null;
 }
 
-const CHECKING: CardAvailability = { status: 'checking', sources: [] };
+const CHECKING: CardAvailability = { status: 'checking', sources: [], checkedAt: null };
 
-export async function getCardAvailability(mediaType: MediaType, tmdbId: number): Promise<CardAvailability> {
+/**
+ * `region` defensively scopes the availability rows to the viewer's country
+ * (see `regionFor`). The sync job only populates `region = 'US'` today (see
+ * src/lib/watchmode/sync.ts), so this is currently a no-op for US viewers and
+ * an honest "nothing for you yet" for everyone else — but it means a future
+ * multi-region sync can't silently show a non-US viewer US-only sources.
+ */
+export async function getCardAvailability(mediaType: MediaType, tmdbId: number, region = 'US'): Promise<CardAvailability> {
   const supabase = createClient();
   const [{ data: state }, { data: rows }] = await Promise.all([
-    supabase.from('watchmode_fetch_state').select('last_status').eq('tmdb_id', tmdbId).eq('tmdb_media_type', mediaType).maybeSingle(),
-    supabase.from('watchmode_availability').select('source_name, source_type, deeplink').eq('tmdb_id', tmdbId).eq('tmdb_media_type', mediaType),
+    supabase.from('watchmode_fetch_state').select('last_fetched_at').eq('tmdb_id', tmdbId).eq('tmdb_media_type', mediaType).maybeSingle(),
+    supabase
+      .from('watchmode_availability')
+      .select('source_name, source_type, deeplink')
+      .eq('tmdb_id', tmdbId)
+      .eq('tmdb_media_type', mediaType)
+      .eq('region', region),
   ]);
 
   if (!state) return CHECKING;
@@ -42,5 +58,9 @@ export async function getCardAvailability(mediaType: MediaType, tmdbId: number):
     type: r.source_type as CardAvailabilitySource['type'],
     deeplink: (r.deeplink as string | null) ?? null,
   }));
-  return { status: sources.length > 0 ? 'available' : 'none', sources };
+  return {
+    status: sources.length > 0 ? 'available' : 'none',
+    sources,
+    checkedAt: (state.last_fetched_at as string | undefined) ?? null,
+  };
 }

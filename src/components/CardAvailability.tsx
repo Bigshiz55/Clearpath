@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { loadTileFacts } from '@/lib/tileFacts';
 import type { MediaType } from '@/lib/types';
 import type { CardAvailability as CardAvailabilityData } from '@/lib/watchmode/cardAvailability';
+import { timeAgo } from '@/lib/format/timeAgo';
 
 /**
  * WHERE TO WATCH IT — from the cache the Watchmode sync job fills, never a
@@ -45,16 +46,24 @@ export function CardAvailability({ mediaType, tmdbId, className = '' }: { mediaT
     );
   }
 
+  const checked = timeAgo(availability.checkedAt);
+
   if (availability.status === 'none') {
     return (
       <div className={`text-[11px] text-slate-500 ${className}`} data-testid="card-availability-none">
         Not currently available to stream
+        {checked && <span data-testid="card-availability-checked"> · checked {checked}</span>}
       </div>
     );
   }
 
   return (
-    <div className={`flex flex-wrap items-center gap-1.5 ${className}`} data-testid="card-availability">
+    <div
+      className={`flex flex-wrap items-center gap-1.5 ${className}`}
+      data-testid="card-availability"
+      data-checked-at={availability.checkedAt ?? undefined}
+      title={checked ? `Availability checked ${checked}` : undefined}
+    >
       {availability.sources.map((s) => {
         const label = `${TYPE_LABEL[s.type]} on ${s.name}`;
         const pill = (

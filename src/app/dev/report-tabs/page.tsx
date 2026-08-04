@@ -98,7 +98,7 @@ const REPORT: VerdictReport = {
     { label: 'Mystery Complexity', level: 'high', note: 'Puzzle-Forward, Rewards Attention' },
     { label: 'Humor', level: 'low', note: 'Limited / Situational' },
   ],
-  providers: { region: 'US', link: null, options: [], available: false },
+  providers: { region: 'US', link: null, options: [], available: false, checkedAt: '2026-07-28T00:00:00.000Z' },
   similar: [
     { id: 1, mediaType: 'tv', title: 'Fixture: Adam-12', year: 1968, posterPath: null, voteAverage: 7.1 },
     { id: 2, mediaType: 'tv', title: 'Fixture: Major Case', year: 2001, posterPath: null, voteAverage: 7.3 },

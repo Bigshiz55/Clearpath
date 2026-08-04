@@ -2,6 +2,7 @@ import type { WatchProviders, WatchProvider } from '@/lib/types';
 import { TMDB_IMAGE_BASE } from '@/lib/tmdb/client';
 import { isProviderMine } from '@/lib/services';
 import { outHref, providerPayout } from '@/lib/affiliate';
+import { timeAgo } from '@/lib/format/timeAgo';
 
 const TYPE_LABELS: Record<WatchProvider['type'], string> = {
   flatrate: 'Stream',
@@ -63,16 +64,26 @@ export function ProviderRow({
   if (!providers) {
     return (
       <p className="text-sm text-slate-400">
-        Streaming availability was not requested for this region.
+        We couldn&rsquo;t confirm streaming availability for this title right now &mdash; that&rsquo;s different
+        from confirming nothing is available. Try again shortly.
       </p>
     );
   }
+  const checked = timeAgo(providers.checkedAt);
   if (!providers.available || providers.options.length === 0) {
     return (
       <p className="text-sm text-slate-400">
         No legal streaming, rental, or purchase options were found for{' '}
         <span className="font-medium text-slate-200">{providers.region}</span> right now. Availability
         changes often — check again later.
+        {checked && (
+          <>
+            {' '}
+            <span data-testid="provider-checked-at" className="text-[11px] text-slate-500">
+              Checked {checked}.
+            </span>
+          </>
+        )}
       </p>
     );
   }
@@ -116,9 +127,9 @@ export function ProviderRow({
           </div>
         </div>
       ))}
-      <p className="pt-1 text-[11px] text-slate-500">
-        Availability for {providers.region} provided by TMDB / JustWatch. Data may change and is not
-        guaranteed to be current.
+      <p className="pt-1 text-[11px] text-slate-500" data-testid="provider-checked-at">
+        Availability for {providers.region} provided by TMDB / JustWatch.{' '}
+        {checked ? `Checked ${checked}.` : 'Data may change and is not guaranteed to be current.'}
         {providers.link ? (
           <>
             {' '}

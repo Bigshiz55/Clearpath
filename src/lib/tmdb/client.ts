@@ -927,10 +927,11 @@ export async function getWatchProviders(
   id: number,
   region = 'US',
 ): Promise<WatchProviders> {
+  const checkedAt = new Date().toISOString();
   const data = await tmdbFetch<TmdbProvidersResponse>(`/${mediaType}/${id}/watch/providers`);
   const regionData = data.results[region];
   if (!regionData) {
-    return { region, link: null, options: [], available: false };
+    return { region, link: null, options: [], available: false, checkedAt };
   }
   const options: WatchProvider[] = [];
   const push = (arr: typeof regionData.flatrate, type: WatchProvider['type']) => {
@@ -954,6 +955,7 @@ export async function getWatchProviders(
     link: regionData.link ?? null,
     options,
     available: options.length > 0,
+    checkedAt,
   };
 }
 
