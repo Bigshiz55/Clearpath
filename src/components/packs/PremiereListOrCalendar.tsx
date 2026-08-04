@@ -5,6 +5,8 @@ import { Calendar as CalendarIcon, List } from 'lucide-react';
 import { Poster } from '@/components/PosterCard';
 import { SeenToggle } from './SeenToggle';
 import { FollowButton } from './FollowButton';
+import { airingClock } from '@/lib/viewing/clock';
+import { localIsoDate } from '@/lib/viewing/localDay';
 
 export interface CreditedPerson {
   id: string;
@@ -30,7 +32,9 @@ export interface PremiereEntry {
 }
 
 function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  // Routed through the same viewer-local clock formatter every other airing
+  // time on the site uses, rather than a second ad hoc toLocaleTimeString.
+  return airingClock(iso) ?? '—';
 }
 
 function dayLabel(dateIso: string): string {
@@ -114,7 +118,10 @@ export function PremiereListOrCalendar({
   const sortedDates = useMemo(() => [...byDate.keys()].sort(), [byDate]);
 
   // Month grid for the month of the first entry (or today if none matched).
-  const monthAnchor = sortedDates[0] ?? new Date().toISOString().slice(0, 10);
+  // The empty-list fallback needs the VIEWER's calendar day — this runs in
+  // the browser, so toISOString()'s UTC day could show the wrong month for
+  // part of the evening near a month boundary.
+  const monthAnchor = sortedDates[0] ?? localIsoDate();
   const [year, month] = monthAnchor.split('-').map(Number) as [number, number];
   const firstOfMonth = new Date(Date.UTC(year, month - 1, 1));
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();

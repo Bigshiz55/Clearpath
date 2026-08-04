@@ -111,7 +111,14 @@ export async function getPackPreview(
     const today = new Date().toISOString().slice(0, 10);
     const end = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
     const upcoming = await getPackPremiereCalendar(supabase, pack.id, today, end).catch(() => []);
-    const soonest = upcoming[0];
+    // `premiere_date` is a calendar DAY, not an instant — a premiere that
+    // already aired earlier today still carries today's date, so the
+    // earliest-by-date row can be something that's already over by the time
+    // this loads. `start_at_utc` is the real instant; pick the soonest one
+    // that hasn't happened yet instead of trusting date order alone.
+    const soonest = upcoming
+      .filter((p) => Date.parse(p.startAtUtc) >= Date.now())
+      .sort((a, b) => Date.parse(a.startAtUtc) - Date.parse(b.startAtUtc))[0];
     if (soonest) {
       preview.nextPremiere = { title: soonest.title, date: soonest.premiereDate };
     }

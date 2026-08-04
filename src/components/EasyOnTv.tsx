@@ -1,6 +1,7 @@
 'use client';
 
 import { dayLabel } from '@/lib/viewing/localDay';
+import { airingClock } from '@/lib/viewing/clock';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
@@ -20,9 +21,7 @@ interface Airing {
  *  `localDay` module — comparing calendar days rather than adding 24h, so a
  *  daylight-saving day cannot make "Tomorrow" unreachable. */
 function whenLabel(iso: string): string {
-  const d = new Date(iso);
-  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return `${dayLabel(iso, Date.now(), 'long')} ${time}`;
+  return `${dayLabel(iso, Date.now(), 'long')} ${airingClock(iso) ?? '—'}`;
 }
 
 export function EasyOnTv() {

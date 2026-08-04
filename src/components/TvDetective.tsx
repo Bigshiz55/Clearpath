@@ -2,6 +2,7 @@
 
 import { SearchCheck } from 'lucide-react';
 import { dayLabel } from '@/lib/viewing/localDay';
+import { airingClock } from '@/lib/viewing/clock';
 import { useState } from 'react';
 import Link from 'next/link';
 import { RemindButton } from '@/components/RemindButton';
@@ -34,10 +35,7 @@ interface Pick {
 /** Day + clock, in the viewer's zone; the day word from the shared, DST-safe
  *  `localDay` module. */
 function whenLabel(iso: string): string {
-  const d = new Date(iso);
-  // Force 12-hour AM/PM regardless of the device/server locale.
-  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  return `${dayLabel(iso, Date.now(), 'long')} · ${time}`;
+  return `${dayLabel(iso, Date.now(), 'long')} · ${airingClock(iso) ?? '—'}`;
 }
 
 function Ratings({ p }: { p: Pick }) {

@@ -38,6 +38,20 @@ export function isSameLocalDay(a: Date, b: Date): boolean {
 }
 
 /**
+ * "YYYY-MM-DD" for the viewer's own calendar day — the local-day counterpart
+ * to `date.toISOString().slice(0, 10)`, which reads the UTC day instead. Only
+ * meaningful when called in the browser; on the server this is the server's
+ * zone, same caveat as the rest of this module.
+ */
+export function localIsoDate(nowMs: number = Date.now()): string {
+  const d = new Date(nowMs);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
  * "Today" / "Tomorrow" / "Yesterday" / a weekday name, in the viewer's zone.
  *
  * `style: 'short'` gives "Mon" for anything further out; `'long'` gives

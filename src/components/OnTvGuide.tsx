@@ -154,24 +154,27 @@ export function OnTvGuide({
   const [sort, setSort] = useState<SortFilter>(streaming ? 'rating' : 'time');
   const [media, setMedia] = useState<'all' | 'movie' | 'tv'>('all');
 
-  const nowMin = useMemo(() => {
-    const d = new Date();
-    return d.getHours() * 60 + d.getMinutes();
-  }, []);
-
   const filtered = useMemo(() => {
     let list = airings;
     if (media === 'movie') list = list.filter((a) => a.showType === 'Movie');
     else if (media === 'tv') list = list.filter((a) => a.showType !== 'Movie');
     if (!streaming) {
       if (time === 'primetime') list = list.filter((a) => a.minutes >= 18 * 60 && a.minutes <= 23 * 60);
-      else if (time === 'nownext') list = list.filter((a) => a.minutes >= nowMin - 30);
+      // "Now & next": upcoming airings, plus in-progress ones still worth
+      // joining. `a.minutes` is minutes-past-midnight in the NETWORK's local
+      // time (see onTv.ts), so comparing it against the viewer's own
+      // getHours()/getMinutes() silently broke for anyone outside that zone —
+      // and being computed once with an empty deps array, it never advanced
+      // as the tab stayed open either. `stillJoinable` sidesteps both: it
+      // works off `airstamp` (a real UTC instant) against the ticking `nowMs`
+      // clock already used by the highlight strip above.
+      else if (time === 'nownext') list = list.filter((a) => stillJoinable(a.airstamp, a.runtime, nowMs));
     }
     const sorted = [...list];
     if (sort === 'rating') sorted.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
     else sorted.sort((a, b) => a.minutes - b.minutes);
     return sorted;
-  }, [airings, time, sort, nowMin, streaming, media]);
+  }, [airings, time, sort, nowMs, streaming, media]);
 
   // Highlights — best-rated picks (prime-time for broadcast; overall for streaming).
   // In windowed mode the airings are already the curated next-N-hours set, so we

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dayLabel, dayOffset, isSameLocalDay, longDayLabel } from './localDay';
+import { dayLabel, dayOffset, isSameLocalDay, localIsoDate, longDayLabel } from './localDay';
 
 /** The runtime's zone is UTC under vitest, so these read as UTC calendar days.
  *  The DST cases below construct the boundary explicitly rather than relying on
@@ -94,5 +94,29 @@ describe('the long header form', () => {
     expect(s).not.toContain('Today');
     expect(s).not.toContain('Tomorrow');
     expect(s).toContain('Aug 4');
+  });
+});
+
+/**
+ * `localIsoDate` exists because `date.toISOString().slice(0, 10)` reads the
+ * UTC day — several client components (premiere-calendar month fallback)
+ * used that for "today" while running in the browser, which is wrong for
+ * every viewer whose local day has not yet caught up to (or has already
+ * passed) UTC's.
+ */
+describe('localIsoDate — the viewer\'s own calendar day, not UTC\'s', () => {
+  it('formats a given instant using its local calendar fields, not toISOString', () => {
+    const d = new Date(2026, 6, 28, 23, 30); // local Jul 28, 11:30pm — whatever the runtime's zone is
+    expect(localIsoDate(d.getTime())).toBe('2026-07-28');
+  });
+
+  it('zero-pads single-digit month and day', () => {
+    const d = new Date(2026, 0, 5); // local Jan 5
+    expect(localIsoDate(d.getTime())).toBe('2026-01-05');
+  });
+
+  it('defaults to the current instant when no argument is given', () => {
+    const now = Date.now();
+    expect(localIsoDate()).toBe(localIsoDate(now));
   });
 });
