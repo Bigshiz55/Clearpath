@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 /**
  * One-click, read-only migration reconciliation for an authorized admin.
@@ -44,10 +44,29 @@ const TONE: Record<Row['classification'], string> = {
   UNKNOWN: 'text-slate-400',
 };
 
+interface WhoAmI {
+  signedIn: boolean;
+  anonymous: boolean;
+  email: string | null;
+  isAdmin: boolean;
+  allowlistConfigured: boolean;
+  nextStep: 'sign_in' | 'configure_allowlist' | 'wrong_account' | 'ready';
+}
+
 export function ReconcileDryRunButton() {
   const [state, setState] = useState<'idle' | 'confirm' | 'busy'>('idle');
   const [result, setResult] = useState<Result | null>(null);
   const [copied, setCopied] = useState(false);
+  // Checked up front so the owner is not sent to sign in only to be refused
+  // for a different reason on the way back.
+  const [who, setWho] = useState<WhoAmI | null>(null);
+
+  useEffect(() => {
+    void fetch('/api/admin/whoami')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((w: WhoAmI | null) => setWho(w))
+      .catch(() => setWho(null));
+  }, []);
 
   async function run() {
     setState('busy');
@@ -114,6 +133,38 @@ export function ReconcileDryRunButton() {
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {who && who.nextStep !== 'ready' && (
+        <div className="mt-4 rounded-lg border border-amber-400/40 bg-amber-500/10 p-3 text-sm" data-testid="reconcile-dry-gate">
+          {who.nextStep === 'sign_in' && (
+            <>
+              <p className="text-amber-100">You are browsing as a guest, so there is no admin identity to check.</p>
+              <a href="/login?next=/admin/migrations"
+                 className="btn-primary mt-3 inline-flex min-h-[44px] items-center px-4 text-sm"
+                 data-testid="reconcile-dry-signin">
+                Sign in with your admin email
+              </a>
+              <p className="mt-2 text-xs text-amber-200/80">
+                You will get a one-time link by email and come straight back here.
+              </p>
+            </>
+          )}
+          {who.nextStep === 'configure_allowlist' && (
+            <p className="text-amber-100">
+              No admin allowlist is configured on the server, so no account can be authorized yet. Set
+              <code className="mx-1 rounded bg-black/30 px-1">ADMIN_EMAILS</code> in the Vercel project&rsquo;s
+              environment variables to your email address, then redeploy.
+            </p>
+          )}
+          {who.nextStep === 'wrong_account' && (
+            <p className="text-amber-100">
+              Signed in as <span className="font-semibold">{who.email}</span>, which is not on the admin
+              allowlist. Sign in with the address listed in <code className="mx-1 rounded bg-black/30 px-1">ADMIN_EMAILS</code>,
+              or add this one to it.
+            </p>
+          )}
         </div>
       )}
 

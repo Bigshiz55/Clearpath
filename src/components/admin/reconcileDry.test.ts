@@ -104,3 +104,33 @@ describe('results are readable', () => {
     expect(ui).toMatch(/clipboard\.writeText\(JSON\.stringify\(result/);
   });
 });
+
+describe('the failure explains itself instead of dead-ending', () => {
+  const who = readFileSync(join(process.cwd(), 'src/app/api/admin/whoami/route.ts'), 'utf8');
+  const whoCode = stripComments(who);
+
+  it('distinguishes the four reasons an admin action can be refused', () => {
+    for (const step of ['sign_in', 'configure_allowlist', 'wrong_account', 'ready']) {
+      expect(whoCode, step).toContain(step);
+    }
+  });
+
+  it('treats an anonymous Supabase session as NOT signed in — the app mints those for ordinary visitors', () => {
+    expect(whoCode).toMatch(/anonymous = !user\.email/);
+  });
+
+  it('never returns the allowlist itself or any secret — only whether one exists', () => {
+    expect(whoCode).toMatch(/allowlistConfigured/);
+    expect(whoCode).not.toMatch(/adminEmails\(\)\s*[,}]/);
+    expect(whoCode).not.toMatch(/MIGRATE_SECRET|SERVICE_ROLE/i);
+  });
+
+  it('the UI offers a one-click sign-in that returns to this page', () => {
+    expect(uiCode).toContain('/login?next=/admin/migrations');
+    expect(uiCode).toContain('reconcile-dry-signin');
+  });
+
+  it('tells the owner exactly what to fix when the allowlist is empty', () => {
+    expect(uiCode).toContain('ADMIN_EMAILS');
+  });
+});
