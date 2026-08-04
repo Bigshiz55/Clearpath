@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 import { PENDING_MIGRATIONS } from '@/lib/pendingMigrations';
 import { sanitizeDbUrl, validateDbUrl } from '@/lib/adminMigrateUrl';
+import { LEDGER_DDL, MIGRATION_LOCK_KEY, checksumOf, decideForMigration, type LedgerRow } from '@/lib/migrationLedger';
 
 // A raw Postgres connection needs real TCP/TLS sockets (`net`/`tls`), which
 // the Edge runtime does not provide — `pg` would fail to even load there.
@@ -17,6 +18,9 @@ interface MigrationResult {
   ok: boolean;
   error?: string;
   code?: string;
+  /** True when the ledger already proved this applied with a matching checksum. */
+  skipped?: boolean;
+  reason?: string;
 }
 
 /** A safe, structured summary of a thrown value: the message and, for a
@@ -133,17 +137,80 @@ export async function POST(request: Request) {
     }
 
     const results: MigrationResult[] = [];
+    let lockHeld = false;
     try {
+      // THE LEDGER. This route historically applied migrations and recorded
+      // NOTHING, leaning on every migration's SQL being idempotent. That made
+      // public.schema_migrations under-report permanently, so there was no way
+      // to ask the database what it actually had — and /api/version filled the
+      // gap with the newest FILE in the repo, which is how it reported 0042
+      // while the database was still at 0041.
+      await client.query(LEDGER_DDL);
+
+      // ONE WRITER AT A TIME. A session-level advisory lock on a fixed key, so
+      // two deployments (or a CLI run racing the admin route) cannot migrate
+      // simultaneously. Released in the finally below.
+      await client.query('select pg_advisory_lock($1)', [MIGRATION_LOCK_KEY]);
+      lockHeld = true;
+
+      const { rows: ledgerRows } = await client.query<LedgerRow>(
+        'select name, checksum, success, reconciled from public.schema_migrations',
+      );
+      const ledger = new Map(ledgerRows.map((r) => [r.name, r]));
+
       for (const m of PENDING_MIGRATIONS) {
         const sql = Buffer.from(m.sqlB64, 'base64').toString('utf8');
+        const checksum = checksumOf(sql);
+        const decision = decideForMigration(m.name, checksum, ledger.get(m.name));
+
+        if (decision.action === 'skip') {
+          results.push({ name: m.name, ok: true, skipped: true, reason: decision.reason });
+          continue;
+        }
+        if (decision.action === 'halt') {
+          // Changed SQL under an already-applied name. Stop the whole run
+          // rather than re-executing edited DDL against a live database.
+          results.push({ name: m.name, ok: false, error: decision.reason, code: 'CHECKSUM_MISMATCH' });
+          break;
+        }
+
+        const startedAt = new Date().toISOString();
         try {
           await client.query('begin');
           await client.query(sql);
           await client.query('commit');
+          // Written ONLY after the migration committed. A crash before this
+          // point leaves no success row, which is the correct, safe outcome.
+          try {
+            await client.query(
+              `insert into public.schema_migrations
+                 (name, filename, checksum, started_at, completed_at, success, execution_method, environment)
+               values ($1,$2,$3,$4,now(),true,'admin_route',$5)
+               on conflict (name) do update set
+                 checksum=excluded.checksum, started_at=excluded.started_at,
+                 completed_at=excluded.completed_at, success=true,
+                 error_message=null, error_code=null,
+                 execution_method=excluded.execution_method, environment=excluded.environment`,
+              [m.name, `${m.name}.sql`, checksum, startedAt, process.env.VERCEL_ENV ?? 'unknown'],
+            );
+          } catch { /* migration applied; only the bookkeeping missed */ }
           results.push({ name: m.name, ok: true });
         } catch (e) {
           try { await client.query('rollback'); } catch { /* ignore */ }
           const { error, code } = describeError(e);
+          // Record the FAILURE explicitly, success=false, so a later run
+          // retries it and nothing reads it as applied.
+          try {
+            await client.query(
+              `insert into public.schema_migrations
+                 (name, filename, checksum, started_at, completed_at, success, error_message, error_code, execution_method, environment)
+               values ($1,$2,$3,$4,now(),false,$5,$6,'admin_route',$7)
+               on conflict (name) do update set
+                 success=false, error_message=excluded.error_message, error_code=excluded.error_code,
+                 started_at=excluded.started_at, completed_at=excluded.completed_at`,
+              [m.name, `${m.name}.sql`, checksum, startedAt, error, code ?? null, process.env.VERCEL_ENV ?? 'unknown'],
+            );
+          } catch { /* best-effort */ }
           results.push({ name: m.name, ok: false, error, code });
         }
       }
@@ -159,6 +226,9 @@ export async function POST(request: Request) {
         await client.query("NOTIFY pgrst, 'reload schema'");
       } catch { /* best-effort */ }
     } finally {
+      if (lockHeld) {
+        await client.query('select pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]).catch(() => {});
+      }
       await client.end().catch(() => {});
     }
 
