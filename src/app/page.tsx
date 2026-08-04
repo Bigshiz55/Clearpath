@@ -4,6 +4,7 @@ import { VerdictProcessPreview } from '@/components/landing/VerdictProcessPrevie
 import { HowYouRule } from '@/components/landing/HowYouRule';
 import { ExampleVerdict } from '@/components/landing/ExampleVerdict';
 import { GroupVerdictSection } from '@/components/landing/GroupVerdictSection';
+import { PacksSpotlight } from '@/components/landing/PacksSpotlight';
 import { NeedSomethingSpecific } from '@/components/landing/NeedSomethingSpecific';
 import { createClient } from '@/lib/supabase/server';
 
@@ -150,6 +151,11 @@ export default async function LandingPage() {
             not a second copy of the hero's pitch. */}
         <GroupVerdictSection />
 
+        {/* PACKS' NOVEL VALUE, STATED PLAINLY — see PacksSpotlight's own
+            doc comment. Sits right above the compact chip row below so a
+            visitor reads what Packs actually do before the specific links. */}
+        <PacksSpotlight />
+
         {/* SPECIALIZED SURFACES, COMPACT — Hallmark/Lifetime, true crime,
             live TV, new releases, subscription check, the full filter
             builder. All existing routes, just not competing with the
@@ -178,8 +184,9 @@ export default async function LandingPage() {
               Title data &amp; availability provided by{' '}
               <a href="https://www.themoviedb.org" className="text-brand-300 underline" rel="noopener noreferrer" target="_blank">
                 TMDB
-              </a>{' '}
-              and JustWatch. WatchVerd1ct is not endorsed by TMDB.
+              </a>
+              , JustWatch, and Watchmode. Ratings from IMDb, Rotten Tomatoes, and Metacritic, when available.
+              WatchVerd1ct is not endorsed by TMDB.
             </p>
           </div>
         </div>

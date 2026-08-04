@@ -119,7 +119,7 @@ export default async function SharePage({ params }: { params: { token: string } 
       </main>
 
       <footer className="container-page py-8 text-center text-xs text-slate-500">
-        Shared via WatchVerd1ct — Thousands of titles. One verd1ct. · Data from TMDB / JustWatch
+        Shared via WatchVerd1ct — Thousands of titles. One verd1ct. · Data from TMDB / JustWatch and Watchmode
       </footer>
     </div>
   );

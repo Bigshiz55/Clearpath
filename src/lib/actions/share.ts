@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { VerdictReport } from '@/lib/types';
 import { tmdbImage } from '@/lib/tmdb/client';
+import { publicEnv } from '@/lib/env';
 
 export interface ShareResult {
   ok: boolean;
@@ -107,8 +108,7 @@ export async function createVerdictShare(
     });
     if (error) return { ok: false, error: error.message };
 
-    const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
-    return { ok: true, token, url: `${base}/share/${token}` };
+    return { ok: true, token, url: `${publicEnv.siteUrl()}/share/${token}` };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Failed to create share.' };
   }

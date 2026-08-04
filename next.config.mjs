@@ -25,6 +25,28 @@ function buildMeta() {
       .sort()
       .pop()?.replace(/\.sql$/, '') ?? '';
   } catch { /* none */ }
+  // The ONE place the site's canonical URL is computed. Every og:url,
+  // canonical tag, sitemap entry, and share/invite link reads this same
+  // value via `publicEnv.siteUrl()` (src/lib/env.ts) — nothing else may
+  // hardcode a domain or default to localhost.
+  //
+  // A manually-set NEXT_PUBLIC_SITE_URL always wins. Absent that, this
+  // self-heals from Vercel's own system env vars so a missing/forgotten
+  // dashboard setting can never again ship "localhost:3000" as the
+  // canonical/og:url on a real deployment: production always resolves to
+  // the stable production domain (VERCEL_PROJECT_PRODUCTION_URL, with the
+  // known permanent domain as a last-resort literal), a preview deploy
+  // points at its own preview URL rather than falsely claiming to be
+  // production, and only a plain local `next dev` with no Vercel env at
+  // all falls back to localhost.
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_ENV === 'production'
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL || 'clearpath-pearl-chi.vercel.app'}`
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000');
+
   return {
     NEXT_PUBLIC_APP_VERSION: pkg.version ?? '0.0.0',
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
@@ -34,6 +56,7 @@ function buildMeta() {
     NEXT_PUBLIC_DEPLOY_URL: process.env.VERCEL_URL || '',
     NEXT_PUBLIC_SCHEMA_VERSION: schema,
     NEXT_PUBLIC_API_VERSION: pkg.apiVersion ?? 'v1',
+    NEXT_PUBLIC_SITE_URL: siteUrl,
   };
 }
 

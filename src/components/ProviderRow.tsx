@@ -128,7 +128,8 @@ export function ProviderRow({
         </div>
       ))}
       <p className="pt-1 text-[11px] text-slate-500" data-testid="provider-checked-at">
-        Availability for {providers.region} provided by TMDB / JustWatch.{' '}
+        Availability for {providers.region} provided by TMDB / JustWatch, with deep links and additional
+        sources from Watchmode.{' '}
         {checked ? `Checked ${checked}.` : 'Data may change and is not guaranteed to be current.'}
         {providers.link ? (
           <>

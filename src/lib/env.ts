@@ -90,8 +90,18 @@ export const publicEnv = {
       'Set it to your Supabase publishable (anon) key.',
     );
   },
+  /**
+   * THE ONLY function that may know the site's own URL. Every canonical
+   * tag, og:url, sitemap entry, and share/invite link must call this —
+   * never read `NEXT_PUBLIC_SITE_URL` or hardcode a domain directly, or
+   * the value stops being centralized.
+   *
+   * `NEXT_PUBLIC_SITE_URL` itself is computed once, at build time, in
+   * next.config.mjs — it self-heals to the real deployment's domain via
+   * Vercel's own system env vars even when nobody has set it by hand, so
+   * this should only ever see localhost during a plain local `next dev`.
+   */
   siteUrl(): string {
-    // Falls back to localhost in dev; safe non-secret default.
     const value = process.env.NEXT_PUBLIC_SITE_URL;
     const trimmed = value && value.trim() !== '' ? value.trim() : null;
     if (trimmed && isSupabaseHost(trimmed)) return 'http://localhost:3000';

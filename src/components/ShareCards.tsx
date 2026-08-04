@@ -2,6 +2,11 @@
 
 import { useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
+import { publicEnv } from '@/lib/env';
+
+// Display-only host (no protocol) for the watermark on shared card images —
+// derived from the one centralized site URL, never a second hardcoded copy.
+const SITE_HOST = publicEnv.siteUrl().replace(/^https?:\/\//, '');
 
 const MARK = (
   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -101,7 +106,7 @@ export function TasteCardArt({ label, loves, avoids }: { label: string; loves: s
         </>
       )}
 
-      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>Stop scrolling. Get rolling. · clearpath-pearl-chi.vercel.app</div>
+      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>Stop scrolling. Get rolling. · {SITE_HOST}</div>
     </div>
   );
 }
@@ -132,7 +137,7 @@ export function WrappedCardArt({ monthLabel, watched, avgRating, top }: { monthL
           </div>
         </>
       )}
-      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>My month on WatchVerd1ct · clearpath-pearl-chi.vercel.app</div>
+      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>My month on WatchVerd1ct · {SITE_HOST}</div>
     </div>
   );
 }
@@ -150,7 +155,7 @@ export function CourtCardArt({ title, oneLiner, members }: { title: string; oneL
           <span key={m.name} style={{ fontSize: 13, padding: '5px 10px', borderRadius: 999, background: 'rgba(255,255,255,.08)' }}>{m.name} {m.score}</span>
         ))}
       </div>
-      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>Settled by WatchVerd1ct · clearpath-pearl-chi.vercel.app</div>
+      <div style={{ marginTop: 'auto', paddingTop: 22, fontSize: 12, color: '#5f6b85' }}>Settled by WatchVerd1ct · {SITE_HOST}</div>
     </div>
   );
 }
@@ -233,7 +238,7 @@ export function WatchDnaCardArt({
       <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div style={{ fontSize: 12, color: '#5f6b85' }}>
           {rated} rated{finishRate != null ? ` · ${Math.round(finishRate * 100)}% finish rate` : ''}
-          <div style={{ marginTop: 2 }}>clearpath-pearl-chi.vercel.app</div>
+          <div style={{ marginTop: 2 }}>{SITE_HOST}</div>
         </div>
         <div style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>What’s yours?</div>
       </div>

@@ -113,6 +113,10 @@ export function ChambersProfile(props: ChambersProfileProps) {
           <div className="mt-1 text-base font-semibold text-gold-400">
             {title ? `“${title}”` : 'Rate a few titles to earn your courtroom title'}
           </div>
+          <p className="mt-2 max-w-sm text-center text-xs text-slate-500">
+            Your taste profile — what you&rsquo;ve ruled on, what you love, what you avoid, and how far your
+            Watch DNA has come.
+          </p>
         </div>
 
         {/* Docket stats — entertainment activity first, social demoted. */}

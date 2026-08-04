@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { publicEnv } from '@/lib/env';
 
 export interface CrewPerson {
   id: string;
@@ -257,7 +258,7 @@ export async function getCrewInvite(
       .eq('owner_id', uid)
       .maybeSingle();
     if (!crew) return { ok: false, error: 'Crew not found.' };
-    const base = /^https?:\/\//.test(origin) ? origin.replace(/\/$/, '') : 'https://clearpath-pearl-chi.vercel.app';
+    const base = /^https?:\/\//.test(origin) ? origin.replace(/\/$/, '') : publicEnv.siteUrl();
     const url = `${base}/join/${crew.join_code as string}`;
     const QRCode = (await import('qrcode')).default;
     const qrSvg = await QRCode.toString(url, { type: 'svg', margin: 1, width: 240 });

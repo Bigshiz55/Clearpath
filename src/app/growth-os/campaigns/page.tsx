@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createTrackedLink } from '@/lib/actions/growth';
 import { shortLink } from '@/lib/growth/utm';
 import { SetupNote } from '@/app/growth-os/crm/page';
+import { publicEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,7 @@ interface LinkRow {
 
 export default async function CampaignsPage() {
   const supabase = createClient();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://clearpath-pearl-chi.vercel.app';
+  const origin = publicEnv.siteUrl();
   let links: LinkRow[] = [];
   let ready = true;
   try {

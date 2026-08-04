@@ -1,7 +1,8 @@
 import Link from 'next/link';
 
 const ENTRIES = [
-  { href: '/packs', label: 'Hallmark & Lifetime' },
+  { href: '/packs/hallmark-universe', label: 'Hallmark' },
+  { href: '/packs/lifetime-vault', label: 'Lifetime' },
   { href: '/packs/crime-case-files', label: 'True Crime' },
   { href: '/app/tv', label: "What's on tonight" },
   { href: '/app/new', label: 'New this week' },
