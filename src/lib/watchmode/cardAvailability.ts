@@ -17,7 +17,12 @@ export interface CardAvailabilitySource {
 }
 
 export type CardAvailabilityStatus =
-  | 'checking'   // never fetched — absence of data, not absence of availability
+  // Never fetched — and, given the sync job only advances ~50 titles/day from
+  // a fixed candidate pool (see sync.ts), for most titles NO fetch is ever
+  // queued at all. This must never be worded as an in-progress check (it
+  // usually isn't one) — it's a distinct, honest terminal state: "we don't
+  // have a confirmed answer," not "check back in a second."
+  | 'unconfirmed'
   | 'none'       // fetched, genuinely nothing found
   | 'available'; // fetched, at least one source
 
@@ -25,12 +30,13 @@ export interface CardAvailability {
   status: CardAvailabilityStatus;
   sources: CardAvailabilitySource[];
   /** ISO timestamp of the sync job's last check for this title, or null when
-   *  never checked ('checking' status). Region-independent: the fetch-state
-   *  table tracks "have we checked this title at all", not per-region. */
+   *  never checked ('unconfirmed' status). Region-independent: the
+   *  fetch-state table tracks "have we checked this title at all", not
+   *  per-region. */
   checkedAt: string | null;
 }
 
-const CHECKING: CardAvailability = { status: 'checking', sources: [], checkedAt: null };
+const UNCONFIRMED: CardAvailability = { status: 'unconfirmed', sources: [], checkedAt: null };
 
 /**
  * `region` defensively scopes the availability rows to the viewer's country
@@ -51,7 +57,7 @@ export async function getCardAvailability(mediaType: MediaType, tmdbId: number, 
       .eq('region', region),
   ]);
 
-  if (!state) return CHECKING;
+  if (!state) return UNCONFIRMED;
 
   const sources: CardAvailabilitySource[] = (rows ?? []).map((r) => ({
     name: r.source_name as string,

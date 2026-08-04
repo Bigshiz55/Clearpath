@@ -8,7 +8,7 @@ import { getProfile, regionFor } from '@/lib/profile';
 
 export const runtime = 'nodejs';
 
-const EMPTY_AVAILABILITY: CardAvailability = { status: 'checking', sources: [], checkedAt: null };
+const EMPTY_AVAILABILITY: CardAvailability = { status: 'unconfirmed', sources: [], checkedAt: null };
 
 /**
  * The viewer's own region when signed in, else the 'US' default — same rule

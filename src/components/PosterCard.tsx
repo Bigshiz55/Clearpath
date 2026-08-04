@@ -235,9 +235,9 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         {saveId != null && <CardFit mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
 
         {/* Where to watch it — cached Watchmode sources, never a live call
-            from a card. "Checking availability" and "not currently
-            available" are deliberately distinct from each other and from a
-            silent blank — see CardAvailability's own doc comment. */}
+            from a card. "Availability not currently confirmed" and "not
+            currently available" are deliberately distinct from each other
+            and from a silent blank — see CardAvailability's own doc comment. */}
         {saveId != null && <CardAvailability mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
 
         {/* Supporting evidence: the pills, the household verdict, and the

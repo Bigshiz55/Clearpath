@@ -11,15 +11,23 @@ import { timeAgo } from '@/lib/format/timeAgo';
  * live call from here (see src/lib/watchmode/sync.ts). Three honest states,
  * visually distinct on purpose (req: absence of data must not read as
  * absence of availability):
- *  - never checked yet   -> "Checking availability" (muted, no claim either way)
- *  - checked, nothing    -> "Not currently available to stream" (a real result)
- *  - checked, N sources  -> the source badges, linked where we have a deeplink
+ *  - never checked        -> "Availability not currently confirmed" (muted,
+ *                             no claim either way — NOT "checking", because
+ *                             the sync job only advances ~50 titles/day from
+ *                             a fixed pool, so for most titles no check is
+ *                             ever queued; claiming one is "in progress"
+ *                             when it structurally may never run is exactly
+ *                             the dead-end this wording used to produce)
+ *  - checked, nothing     -> "Not currently available to stream" (a real result)
+ *  - checked, N sources   -> the source badges, labeled by the real type we
+ *                             have (subscription/rent/buy/free) — linked
+ *                             where we have a deeplink
  *
  * Same per-title fetch `CardFacts`/`CardSynopsis` already make — see
  * `src/lib/tileFacts.ts` — so this costs the card nothing extra.
  */
 const TYPE_LABEL: Record<CardAvailabilityData['sources'][number]['type'], string> = {
-  subscription: 'Stream',
+  subscription: 'Available by subscription',
   rent: 'Rent',
   buy: 'Buy',
   free: 'Free',
@@ -38,10 +46,10 @@ export function CardAvailability({ mediaType, tmdbId, className = '' }: { mediaT
     };
   }, [mediaType, tmdbId]);
 
-  if (!availability || availability.status === 'checking') {
+  if (!availability || availability.status === 'unconfirmed') {
     return (
-      <div className={`text-[11px] text-slate-500 ${className}`} data-testid="card-availability-checking">
-        Checking availability…
+      <div className={`text-[11px] text-slate-500 ${className}`} data-testid="card-availability-unconfirmed">
+        Availability not currently confirmed
       </div>
     );
   }

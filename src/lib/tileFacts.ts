@@ -29,7 +29,7 @@ export interface TileFacts {
   availability: CardAvailability;
 }
 
-const EMPTY_AVAILABILITY: CardAvailability = { status: 'checking', sources: [], checkedAt: null };
+const EMPTY_AVAILABILITY: CardAvailability = { status: 'unconfirmed', sources: [], checkedAt: null };
 const EMPTY: TileFacts = { ratings: EMPTY_TILE_RATINGS, overview: null, facts: null, availability: EMPTY_AVAILABILITY };
 
 const cache = new Map<string, Promise<TileFacts>>();
@@ -39,14 +39,26 @@ export function loadTileFacts(mediaType: MediaType, tmdbId: number): Promise<Til
   let p = cache.get(key);
   if (!p) {
     p = fetch(`/api/ratings/${mediaType}/${tmdbId}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`ratings fetch failed: ${r.status}`);
+        return r.json();
+      })
       .then((d) => ({
         ratings: (d?.ratings as TileRatings) ?? EMPTY_TILE_RATINGS,
         overview: typeof d?.overview === 'string' && d.overview.trim() ? (d.overview as string) : null,
         facts: (d?.facts as CardFactsInput | null) ?? null,
         availability: (d?.availability as CardAvailability | undefined) ?? EMPTY_AVAILABILITY,
       }))
-      .catch(() => EMPTY);
+      .catch(() => {
+        // A genuine failure (offline, a dropped connection, a non-2xx/non-JSON
+        // response) must not be remembered as "this title has no facts"
+        // forever — that would permanently stick every card for this title on
+        // "Availability not currently confirmed" for the rest of the session,
+        // even once the network recovers. Evict so the NEXT mount retries;
+        // this call still resolves to EMPTY so the current render doesn't hang.
+        cache.delete(key);
+        return EMPTY;
+      });
     cache.set(key, p);
   }
   return p;

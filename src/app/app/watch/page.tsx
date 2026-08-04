@@ -71,8 +71,32 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
   const ratedCount = uid ? await getUserTasteDna(supabase, uid).then((d) => d.sampleSize).catch(() => 0) : 0;
   const recsHeading = recommendationHeading(ratedCount, recs.length > 0);
 
+  // NEVER A SILENT BLANK TAB. Every branch below is conditional on real data
+  // — a TMDB outage the free-titles lookup fails open into (discoverTitles
+  // swallows its own errors and returns []), or a brand-new guest with an
+  // empty watchlist and no recommendations yet, could previously leave this
+  // whole tab rendering nothing at all: no heading, no message, no way
+  // forward. This is the one explicit fallback for that case.
+  const readyIsEmpty = rankedReady.items.length === 0 && recs.length === 0 && (!rankedMore || rankedMore.items.length === 0);
+
   const readyContent = (
     <div className="space-y-8">
+      {readyIsEmpty && (
+        <section className="card p-6 text-center" data-testid="watch-now-empty">
+          <p className="text-sm font-semibold text-white">We couldn&rsquo;t put together picks right now.</p>
+          <p className="mt-1 text-sm text-slate-400">
+            This is usually a temporary hiccup reaching our title data, not an empty catalog.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <a href="/app/watch" className="btn-secondary inline-flex">
+              ↻ Try again
+            </a>
+            <Link href="/app/taste-quiz" className="btn-secondary inline-flex">
+              Build your Watch DNA
+            </Link>
+          </div>
+        </section>
+      )}
       {rankedReady.items.length > 0 && (
         <section>
           <h2 className="mb-1 text-lg font-semibold text-white">
