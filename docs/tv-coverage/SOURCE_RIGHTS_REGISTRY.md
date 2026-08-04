@@ -1,60 +1,62 @@
-# Source rights registry
+# Source rights registry (Tiers A–E)
 
-The authoritative record of what WatchVerd1ct is allowed to use. Nothing may
-be ingested into production unless it is listed **PERMITTED** here with its
-supporting authorization recorded.
+Authoritative record of what WatchVerd1ct may use. Posture set by the product
+owner: **in genuine gray areas take the most aggressive defensible position,
+implemented in the most conservative way.** Legal ambiguity is not a reason to
+stop engineering — it is a reason to build the adapter, document the risk, and
+leave production activation as a business decision.
 
-## Classification
+Never permitted, regardless of tier: hiding or randomizing sources, removing
+provenance, evading detection, bypassing logins/paywalls/CAPTCHAs/rate
+limits/technical protections, rotating identities or IPs, or misrepresenting
+WatchVerd1ct.
 
-| Status | Meaning |
-|---|---|
-| `PERMITTED` | An API, feed, licence, or written terms clearly allow our use |
-| `REQUIRES_PERMISSION` | A useful source exists, but commercial extraction or republication is not clearly authorized |
-| `PROHIBITED` | The applicable terms expressly prohibit automated extraction or commercial reuse |
-| `UNKNOWN` | Not yet reviewed |
+## Tiers
 
-## Two rules that this file exists to enforce
+- **A — Clearly permitted.** API, open licence, authorized feed, written
+  permission, or terms clearly allowing commercial use. Automatic in production.
+- **B — Press & publicity.** Press rooms, programming highlights, media
+  releases, premiere calendars, press kits. Extract *minimum factual fields
+  only* (network, title, date, airtime, premiere status, episode name). Never
+  promotional prose, layout, photography or artwork. Link back.
+- **C — Public facts, ambiguous terms.** No account, no payment, no clickwrap
+  accepted, no circumvention, visible in normal HTML/structured data, factual
+  fields only, no source-specific prohibition on this exact use. Facts only,
+  infrequent polling, aggressive caching, attribution, link-back, per-source
+  kill switch, immediate removal support, risk recorded.
+- **D — Administrator / partner supplied.** CSV, JSON, ICS, feeds, or data from
+  admins, partners, distributors, publicists, networks, creators. Fast
+  review-and-publish.
+- **E — Explicitly prohibited / technically restricted.** Do not retrieve.
+  Record exactly what blocks it and what permission would unblock it.
 
-1. **robots.txt is not a licence.** It governs crawler behaviour. It grants no
-   right to extract, store, or republish content commercially. A permissive
-   `Disallow:` is not evidence of authorization and must never be recorded as
-   the basis for `PERMITTED`.
-2. **Administrator review does not create rights.** A human approving an
-   extraction after the fact does not change the source's Terms of Use. The
-   review queue is a DATA-QUALITY control, not a RIGHTS control. Routing an
-   unauthorized source through review keeps it unauthorized.
+## Register — verified live 2026-08-04
 
-Both rules are written down because both were got wrong once already, on this
-project, in exactly these words.
+| Source | Tier | Evidence |
+|---|---|---|
+| **TVmaze API** | **A** | CC BY-SA at tvmaze.com/api: *"the data can freely be used for any purpose, as long as TVmaze is properly credited as source and your usage complies with the ShareAlike provision."* Attribution mandatory; ShareAlike copyleft attaches to derived data. ≥20 calls/10s. |
+| **TMDB** | **A** | Existing API terms. Enrichment only — no channel schedules. |
+| **Administrator / partner supplied** | **D** | First-party or supplied under that supplier's terms. |
+| **Hallmark press — `press.hallmarkmedia.com`** | **B (high priority)** | Redirects to `press-hallmark-1710766222.clipsource.com`, a press-distribution platform. Public `/post/…` press releases carry premiere and programming announcements (e.g. *The Way Home* final season, Christmas in July programming event) plus `/program/…` endpoints. **No valid robots.txt** (returns HTML). Also exposes `/login` and `/access/application` — a credentialed press portal. **Do not bypass the login.** Public posts only. **Best route: apply for press access — see continuation doc.** |
+| **A+E press — `press.aenetworks.com`** (Lifetime, LMN) | **E — FLAGGED** | robots.txt is exactly `User-agent: *` / `Disallow: /`. A blanket, explicit prohibition on automated retrieval. **This is the press route for Lifetime and LMN and it is closed.** Unblocked only by written permission from A+E. |
+| **WBD press — `press.wbd.com`** (ID, TCM) | **UNKNOWN / blocked** | Returns 403 to us. Not a stated prohibition; we simply cannot read it. Re-check from a normal browser session or apply for press access. |
+| **NBCU press — `nbcumv.com`** (Oxygen) | **UNKNOWN** | Redirects to `/mediavillage`, 1.7 KB. Not yet characterised. |
+| Lifetime / LMN site (`mylifetime.com`) | **C** | Full 24h grid verified parseable (28 listings, `data-starttime` + `show-name`). robots.txt allow-all. No account/payment/clickwrap. Facts-only extraction defensible; commercial republication not expressly authorized. Build behind flag. |
+| Investigation Discovery site | **C** | robots.txt `Allow: /`. Not yet content-verified. |
+| Oxygen site | **C** | robots.txt permits schedule paths (disallows are Drupal admin/user only). Not yet content-verified. |
+| TCM (`tcm.com`) | **C** | robots.txt blocks `/search*` only. Sitemap returns 403. |
+| Great American Family (`gactv.com`) | **C** | `Allow: /` plus `llms.txt` granting retrieval, `Disallow-Training: /`. We do not train — honour that. |
+| Schedules Direct | **E** | Not licensed for our commercial use (product owner). Do not purchase. |
+| iptv-org / community XMLTV grabbers | **E** | Operate by scraping sites whose terms forbid it. |
+| Pluto / Samsung TV Plus / Plex / Tubi internal EPG endpoints | **E** | Undocumented internal APIs, no grant of automated access. |
 
-## Current register
+## Two rules this file exists to enforce
 
-| Source | Status | Basis | Notes |
-|---|---|---|---|
-| **TVmaze API** | `PERMITTED` | CC BY-SA, stated at tvmaze.com/api: *"the data can freely be used for any purpose, as long as TVmaze is properly credited as source and your usage complies with the ShareAlike provision."* | Attribution mandatory (link back). **ShareAlike is copyleft** and attaches to derived data — an accepted obligation, not a resolved one. Rate limit ≥20 calls/10s. |
-| TMDB | `PERMITTED` | Existing API terms, already in use | No channel schedules — episode air dates only. Enrichment, never a guide source. |
-| Administrator-authored data | `PERMITTED` | Created by us | First-party. |
-| Licensed API / authorized feed / supplier-provided CSV or JSON | `PERMITTED` on receipt | Per that supplier's contract | Record the authorization alongside the adapter. |
-| **Lifetime / LMN (`mylifetime.com`)** | `REQUIRES_PERMISSION` | Schedule is retrievable and parses cleanly (verified 2026-08-04: 28 listings, full 24h grid). **No authorization for commercial reuse.** | Retrievability is not permission. Do not ingest. |
-| **Investigation Discovery** | `REQUIRES_PERMISSION` | robots.txt permissive only | Explicitly may **not** be marked permitted on robots.txt or visible HTML alone. |
-| **Oxygen True Crime** | `REQUIRES_PERMISSION` | robots.txt permissive only | As above. |
-| **Hallmark Channel / Mystery / Family** | `UNKNOWN` | `hallmarkchannel.com` did not respond to our request | Not reviewed. Absence of a response is not a finding either way. |
-| **Great American Family (`gactv.com`)** | `REQUIRES_PERMISSION` | `llms.txt` allows retrieval, disallows training | Says nothing about commercial republication of schedules. |
-| **TCM (`tcm.com`)** | `REQUIRES_PERMISSION` | robots.txt permissive only | Not reviewed for commercial terms. |
-| Schedules Direct | `PROHIBITED` for our use | Not licensed for our commercial use (per product owner) | Do not purchase or activate. |
-| iptv-org/epg and community XMLTV grabbers | `PROHIBITED` | Operate by scraping sites whose terms forbid automated retrieval | Using them would launder a prohibited scrape through a third party. |
-| Pluto TV / Samsung TV Plus / Plex / Tubi internal EPG endpoints | `PROHIBITED` | Undocumented internal APIs, no grant of automated access | |
+1. **robots.txt is not a licence.** It governs crawler behaviour and grants no
+   commercial reuse rights. It may support a Tier C classification; it may
+   never by itself justify Tier A.
+2. **Administrator review does not create rights.** Approving an extraction
+   after the fact changes nothing about a source's terms. The review queue is a
+   data-quality control, not a rights control.
 
-## Engineering consequences
-
-- The ingest layer must refuse any source not `PERMITTED`, as a code-level
-  guard rather than a convention.
-- No automatic URL fetching from Lifetime, Oxygen, Investigation Discovery,
-  Hallmark, GAC or TCM is to be built while they sit above.
-- The importer accepts licensed API responses, authorized feeds, supplier CSV
-  or JSON, administrator-authored data, and files confirmed usable — and must
-  not imply that pasting a copied network schedule confers reuse rights.
-- TVmaze data stays tagged to its own source with provenance preserved, so its
-  attribution and ShareAlike obligations remain traceable per row.
-- Adapters are written so a licensed feed can be attached later without
-  rebuilding the guide.
+Both are recorded because both were got wrong once on this project.
