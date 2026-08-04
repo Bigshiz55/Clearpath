@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { ApplyMigrationsButton } from '@/components/admin/ApplyMigrationsButton';
+import { ReconcileDryRunButton } from '@/components/admin/ReconcileDryRunButton';
 
 export const metadata: Metadata = {
   title: 'Migrations · WatchVerd1ct admin',
@@ -35,6 +36,8 @@ export default function AdminMigrationsPage() {
           <h1 className="text-2xl font-black text-white">Migrations</h1>
           <p className="mt-1 text-sm text-slate-400">Enter the migrate secret to apply pending database migrations.</p>
         </div>
+
+        <ReconcileDryRunButton />
 
         <ApplyMigrationsButton />
       </main>
