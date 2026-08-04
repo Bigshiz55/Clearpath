@@ -60,7 +60,9 @@ export async function getPersonForUser(
         const report = buildVerdict({
           meta,
           providers,
-          personal: personal ? { ...personal, collectionId: null } : { label: 'Your match', rules: [], likedFranchiseIds: [], collectionId: null },
+          personal: personal
+            ? { ...personal, collectionId: null }
+            : { label: 'General Verdict', rules: [], likedFranchiseIds: [], collectionId: null, hasSignal: false },
         });
         return {
           id: c.id,

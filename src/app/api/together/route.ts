@@ -92,6 +92,8 @@ export async function POST(request: Request) {
         ],
         likedFranchiseIds: [] as number[],
         collectionId: null,
+        // Explicit signal — this member's own typed loves/avoids for this session.
+        hasSignal: true,
       },
     }));
 

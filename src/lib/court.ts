@@ -81,6 +81,8 @@ export async function computeFinalists(
       rules: [...m.avoid.map((t) => avoidRule(t as PreferenceTrait)), ...m.love.map((t) => loveRule(t as PreferenceTrait))],
       likedFranchiseIds: [] as number[],
       collectionId: null,
+      // Explicit signal — this member's own typed loves/avoids for this Court.
+      hasSignal: true,
     },
   }));
 

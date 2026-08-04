@@ -11,6 +11,16 @@ const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 export interface PersonalContext extends DetectionContext {
   label: string;
   rules: PreferenceRule[];
+  /**
+   * Whether `rules`/`label` represent real, established taste signal for this
+   * viewer — explicit preference rules they set, liked franchises, or a
+   * household/Court member's own typed loves/avoids — as opposed to a
+   * brand-new or zero-signal viewer who has not built any Watch DNA yet.
+   * `computePersonalMatch` refuses to apply `rules` or `label` at all when
+   * this is false, so a silently-injected default rule set (see
+   * DEFAULT_NEW_USER_RULES) can never be presented as someone's own taste.
+   */
+  hasSignal: boolean;
 }
 
 /**
@@ -21,12 +31,23 @@ export interface PersonalContext extends DetectionContext {
  *
  * Hard preference penalties are never silently dropped and cannot be overridden
  * by AI prose downstream — this deterministic result is authoritative.
+ *
+ * A viewer with no real signal (`ctx.hasSignal === false`) always gets the
+ * neutral "General Verdict" back — score equal to baseScore, zero
+ * adjustments — regardless of what `ctx.rules` contains, so a fresh visitor
+ * is never shown a tier, one-liner, or "why it may work" reason framed as
+ * personal.
  */
 export function computePersonalMatch(
   meta: TitleMetadata,
   baseScore: number,
   ctx: PersonalContext,
 ): PersonalMatch {
+  if (!ctx.hasSignal) {
+    const score = clamp(Math.round(baseScore));
+    return { label: 'General Verdict', score, baseScore: score, adjustments: [], hasSignal: false };
+  }
+
   const adjustments: ScoreAdjustment[] = [];
   let score = baseScore;
 
@@ -69,5 +90,6 @@ export function computePersonalMatch(
     score,
     baseScore: clamp(Math.round(baseScore)),
     adjustments,
+    hasSignal: true,
   };
 }

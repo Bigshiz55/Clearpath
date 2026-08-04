@@ -188,10 +188,13 @@ export interface RatingSource {
 }
 
 export interface PersonalMatch {
-  label: string; // e.g. "Scott Match"
+  label: string; // e.g. "Scott Match", or "General Verdict" when hasSignal is false
   score: number; // 0..100
   adjustments: ScoreAdjustment[];
   baseScore: number;
+  /** False for a viewer with no established taste signal — label is always
+   *  "General Verdict" and adjustments is always empty in that case. */
+  hasSignal: boolean;
 }
 
 export interface VerdictReport {

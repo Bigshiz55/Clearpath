@@ -48,8 +48,10 @@ export async function getProfile(
 
 /**
  * Ensure an anonymous "guest" user has a usable profile so they skip onboarding
- * and land straight in the app. Uses neutral defaults (default preference rules
- * apply automatically since no preference_rules rows are inserted).
+ * and land straight in the app. No preference_rules rows are inserted, so
+ * `getPersonalContext` below treats this guest as having no signal — every
+ * title they see is scored and labeled as a neutral General Verdict until
+ * they actually build some taste signal (rate titles, pick loves/avoids).
  */
 export async function ensureGuestProfile(
   supabase: SupabaseClient,
@@ -81,7 +83,13 @@ export async function ensureGuestProfile(
   );
 }
 
-export async function getPreferenceRules(
+/**
+ * The user's own `preference_rules` rows, verbatim — empty when they have
+ * none. Never falls back to DEFAULT_NEW_USER_RULES; that fallback exists
+ * only as an editable starting template (see `getPreferenceRules` below) and
+ * must never be mistaken for a real signal by `getPersonalContext`.
+ */
+async function getRawPreferenceRules(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<PreferenceRule[]> {
@@ -90,9 +98,9 @@ export async function getPreferenceRules(
     .select('id, trait, weight, requires_defining, label')
     .eq('user_id', userId);
 
-  if (!data || data.length === 0) return DEFAULT_NEW_USER_RULES;
+  if (!data) return [];
 
-  const rules = data
+  return data
     .map((r) =>
       normalizeRule({
         id: r.id as string,
@@ -103,25 +111,53 @@ export async function getPreferenceRules(
       }),
     )
     .filter((r): r is PreferenceRule => r !== null);
+}
 
+/**
+ * Rules for editing UI (Settings) — a brand-new user with zero rows gets the
+ * default template pre-filled so they have something to start from. This is
+ * NOT the same thing as "this user's real signal"; scoring must never call
+ * this function — see `getPersonalContext`, which uses the raw, undefaulted
+ * rows to decide whether this viewer has any real taste signal at all.
+ */
+export async function getPreferenceRules(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<PreferenceRule[]> {
+  const rules = await getRawPreferenceRules(supabase, userId);
   return rules.length > 0 ? rules : DEFAULT_NEW_USER_RULES;
 }
 
-/** Build the scoring context for a user (label + rules + liked franchises). */
+/**
+ * Build the scoring context for a user (label + rules + liked franchises).
+ *
+ * `hasSignal` is the gate the deterministic engine (`computePersonalMatch`)
+ * uses to decide whether this viewer may be shown anything framed as
+ * personal at all. It is true only when they have real preference_rules
+ * rows or liked franchises of their own — never for a brand-new/anonymous
+ * viewer, even though `DEFAULT_NEW_USER_RULES` exists elsewhere as an
+ * editable starting template. A zero-signal viewer always gets rules: [] and
+ * label: 'General Verdict' here, so every consumer (title pages, Finder,
+ * Watch Now, the Mentalist, Ask the Judge) is honest about it without each
+ * one having to re-derive the check itself.
+ */
 export async function getPersonalContext(
   supabase: SupabaseClient,
   userId: string,
   collectionId: number | null,
 ): Promise<PersonalContext> {
-  const [profile, rules] = await Promise.all([
+  const [profile, rawRules] = await Promise.all([
     getProfile(supabase, userId),
-    getPreferenceRules(supabase, userId),
+    getRawPreferenceRules(supabase, userId),
   ]);
+  const likedFranchiseIds = profile?.liked_franchise_ids ?? [];
+  const hasSignal = rawRules.length > 0 || likedFranchiseIds.length > 0;
   return {
-    label: profile ? personalLabelFor(profile) : 'My Match',
-    rules,
-    likedFranchiseIds: profile?.liked_franchise_ids ?? [],
+    label: hasSignal ? (profile ? personalLabelFor(profile) : 'My Match') : 'General Verdict',
+    rules: hasSignal ? rawRules : [],
+    likedFranchiseIds,
     collectionId,
+    hasSignal,
   };
 }
 

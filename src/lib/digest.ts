@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { TitleMetadata } from '@/lib/types';
 import { discoverRecent, getTitle } from '@/lib/tmdb/client';
 import { buildVerdict } from '@/lib/scoring';
-import { normalizeRule, DEFAULT_NEW_USER_RULES } from '@/lib/scoring/preferences';
+import { normalizeRule } from '@/lib/scoring/preferences';
 import { personalLabelFor } from '@/lib/profile';
 import { sendPushToUser } from '@/lib/push';
 import type { PreferenceRule } from '@/lib/types';
@@ -30,13 +30,21 @@ interface DigestProfile {
   liked_franchise_ids: number[] | null;
 }
 
-async function rulesFor(supabase: SupabaseClient, userId: string): Promise<PreferenceRule[]> {
+/**
+ * This user's own `preference_rules` rows, verbatim — never
+ * DEFAULT_NEW_USER_RULES. A daily digest promising "titles that reach your
+ * threshold" is meaningless (and dishonestly labeled) for someone who never
+ * set a threshold; `scanUser` below skips zero-signal users entirely rather
+ * than silently scoring them against a generic default and calling the
+ * result personal.
+ */
+async function rawRulesFor(supabase: SupabaseClient, userId: string): Promise<PreferenceRule[]> {
   const { data } = await supabase
     .from('preference_rules')
     .select('id, trait, weight, requires_defining, label')
     .eq('user_id', userId);
-  if (!data || data.length === 0) return DEFAULT_NEW_USER_RULES;
-  const rules = data
+  if (!data) return [];
+  return data
     .map((r) =>
       normalizeRule({
         trait: r.trait as PreferenceRule['trait'],
@@ -46,7 +54,6 @@ async function rulesFor(supabase: SupabaseClient, userId: string): Promise<Prefe
       }),
     )
     .filter((r): r is PreferenceRule => r !== null);
-  return rules.length > 0 ? rules : DEFAULT_NEW_USER_RULES;
 }
 
 export interface ScanUserResult {
@@ -62,9 +69,13 @@ export async function scanUser(
   profile: DigestProfile,
   candidates: TitleMetadata[],
 ): Promise<ScanUserResult> {
-  const rules = await rulesFor(admin, profile.id);
-  const label = personalLabelFor({ personal_label: profile.personal_label, display_name: profile.display_name });
+  const rules = await rawRulesFor(admin, profile.id);
   const likedFranchiseIds = profile.liked_franchise_ids ?? [];
+  const hasSignal = rules.length > 0 || likedFranchiseIds.length > 0;
+  // No real taste signal yet — nothing to honestly call a personalized
+  // digest match, so this user gets no items rather than default-biased ones.
+  if (!hasSignal) return { userId: profile.id, matches: 0, newMatches: 0 };
+  const label = personalLabelFor({ personal_label: profile.personal_label, display_name: profile.display_name });
   const min = profile.digest_min_score ?? 72;
 
   // Respect prior dismissals — never resurface a title the user cleared.
@@ -89,7 +100,7 @@ export async function scanUser(
     const report = buildVerdict({
       meta,
       providers: null,
-      personal: { label, rules, likedFranchiseIds, collectionId: null },
+      personal: { label, rules, likedFranchiseIds, collectionId: null, hasSignal: true },
     });
     if (report.personal.score < min) continue;
     const topPos = report.personal.adjustments.find((a) => a.points > 0);

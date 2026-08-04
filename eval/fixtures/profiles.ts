@@ -46,7 +46,7 @@ export const PROFILES: Record<string, EvalProfile> = {
     region: 'US',
     timezone: 'America/New_York',
     subscriptions: [8, 9, 337], // Netflix, Prime, Disney+
-    personal: { label: 'Scott Match', rules: SCOTT_RULES, likedFranchiseIds: [], collectionId: null },
+    personal: { label: 'Scott Match', rules: SCOTT_RULES, likedFranchiseIds: [], collectionId: null, hasSignal: true },
     dimensionProfile: { realism: 82, darkness: 62, pacing: 58, suspense: 72, complexity: 66, warmth: 40 },
     history: [
       { id: 'movie-3003', rating: 9, status: 'watched' }, // loved The Quiet Patient
@@ -61,20 +61,22 @@ export const PROFILES: Record<string, EvalProfile> = {
     region: 'US',
     timezone: 'America/New_York',
     subscriptions: [8, 337],
-    personal: { label: 'Heather Match', rules: HEATHER_RULES, likedFranchiseIds: [], collectionId: null },
+    personal: { label: 'Heather Match', rules: HEATHER_RULES, likedFranchiseIds: [], collectionId: null, hasSignal: true },
     dimensionProfile: { warmth: 78, humor: 66, darkness: 35, realism: 60 },
     history: [{ id: 'movie-3005', rating: 8, status: 'watched' }],
     household: ['scott'],
   },
   // A cold-start user with no history and no subscriptions — tests weak-DNA and
-  // "no valid results / honest empty" behaviour.
+  // "no valid results / honest empty" behaviour. hasSignal: false mirrors the
+  // real getPersonalContext() result for a zero-signal viewer: label is the
+  // neutral "General Verdict", never a personal-sounding one.
   newbie: {
     key: 'newbie',
     displayName: 'Alex',
     region: 'US',
     timezone: 'America/Chicago',
     subscriptions: [],
-    personal: { label: 'Your match', rules: [], likedFranchiseIds: [], collectionId: null },
+    personal: { label: 'General Verdict', rules: [], likedFranchiseIds: [], collectionId: null, hasSignal: false },
     history: [],
     household: [],
   },
@@ -96,5 +98,6 @@ export function householdContext(a: EvalProfile, b: EvalProfile): PersonalContex
     rules: [...a.personal.rules, ...b.personal.rules],
     likedFranchiseIds: [],
     collectionId: null,
+    hasSignal: a.personal.hasSignal || b.personal.hasSignal,
   };
 }

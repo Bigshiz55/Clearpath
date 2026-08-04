@@ -293,7 +293,16 @@ export function SettingsView(props: {
       <section className="card p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Taste & preferences</h2>
-          <button onClick={loadScottPreset} className="text-xs text-brand-300 hover:underline">Load Scott preset</button>
+          {/* SCOTT_RULES is one real person's actual taste fingerprint (see
+              onboarding's matching isScott gate), not a generic starter
+              template — it must never be offered to a signed-in account
+              that isn't theirs, or another user could silently adopt
+              someone else's real preferences under a vague "preset" label. */}
+          {displayName.trim().toLowerCase().startsWith('scott') && (
+            <button onClick={loadScottPreset} className="text-xs text-brand-300 hover:underline">
+              Restore my saved preferences
+            </button>
+          )}
         </div>
         <div className="mt-4 space-y-4">
           <div>

@@ -46,6 +46,7 @@ function scottCtx(extra: Partial<PersonalContext> = {}): PersonalContext {
     rules: SCOTT_RULES,
     likedFranchiseIds: [],
     collectionId: null,
+    hasSignal: true,
     ...extra,
   };
 }
@@ -282,7 +283,7 @@ describe('per-user independence', () => {
     const dana = buildVerdict({
       meta,
       providers: null,
-      personal: { label: 'Dana Match', rules: [], likedFranchiseIds: [], collectionId: null },
+      personal: { label: 'Dana Match', rules: [], likedFranchiseIds: [], collectionId: null, hasSignal: true },
     });
     const scott = buildVerdict({ meta, providers: null, personal: scottCtx() });
     expect(dana.personal.label).toBe('Dana Match');
@@ -291,5 +292,41 @@ describe('per-user independence', () => {
     expect(scott.personal.score).toBeLessThan(dana.personal.score);
     expect(byTrait(scott.personal.adjustments, 'science_fiction')).toBeDefined();
     expect(dana.personal.adjustments.length).toBe(0);
+  });
+});
+
+describe('zero-signal viewers get an honest General Verdict, never a fake personal one', () => {
+  const zeroSignalCtx: PersonalContext = {
+    label: 'Your Match', // even a mislabeled/stale caller-supplied label must be ignored
+    rules: SCOTT_RULES, // even a non-empty rule set must be ignored when hasSignal is false
+    likedFranchiseIds: [],
+    collectionId: null,
+    hasSignal: false,
+  };
+
+  it('never applies rules or shows adjustments when hasSignal is false, even with real rules present', () => {
+    const meta = makeTitle({ genres: ['Horror'], keywords: ['supernatural', 'haunting', 'ghost'] });
+    const r = buildVerdict({ meta, providers: null, personal: zeroSignalCtx });
+    expect(r.personal.adjustments.length).toBe(0);
+    expect(r.personal.score).toBe(r.general.score);
+    expect(r.personal.label).toBe('General Verdict');
+  });
+
+  it('tier/call/one-liner/reasons never claim personalization for a zero-signal viewer', () => {
+    const meta = makeTitle({ genres: ['Horror'], keywords: ['supernatural', 'haunting', 'ghost'], voteAverage: 8.5, voteCount: 5000 });
+    const r = buildVerdict({ meta, providers: null, personal: zeroSignalCtx });
+    expect(r.tier).toBe(tierFromScore(r.general.score));
+    expect(r.oneLiner.toLowerCase()).not.toContain('your');
+    expect(r.oneLiner.toLowerCase()).not.toContain('taste');
+    expect(r.reasonsFor.join(' ').toLowerCase()).not.toContain('strong personal match');
+    expect(r.reasonsAgainst.join(' ').toLowerCase()).not.toContain('your taste');
+  });
+
+  it('a real signal user keeps seeing their own personalized result unaffected', () => {
+    const meta = makeTitle({ genres: ['Horror'], keywords: ['supernatural', 'haunting', 'ghost'] });
+    const r = buildVerdict({ meta, providers: null, personal: scottCtx() });
+    expect(r.personal.hasSignal).toBe(true);
+    expect(r.personal.label).toBe('Scott Match');
+    expect(r.personal.adjustments.length).toBeGreaterThan(0);
   });
 });

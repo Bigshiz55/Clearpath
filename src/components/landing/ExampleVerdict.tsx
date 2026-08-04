@@ -64,7 +64,14 @@ async function loadExample(): Promise<ExampleData | null> {
 
     const region = regionFor(null);
     const { meta, providers } = await getScoringData(top.mediaType, top.id, region);
-    const report = buildVerdict({ meta, providers, personal: { label: 'Sample match', rules: [] } });
+    const report = buildVerdict({
+      meta,
+      providers,
+      // No real visitor taste data exists here — this only ever reads
+      // report.general.score below, never report.personal, but hasSignal:
+      // false keeps the context honest regardless.
+      personal: { label: 'General Verdict', rules: [], likedFranchiseIds: [], collectionId: null, hasSignal: false },
+    });
 
     const quality = Math.round(report.general.standardScore ?? report.general.score);
     const ruling: ExampleData['ruling'] = report.primaryCall === 'SKIP IT' ? 'AGAINST' : 'FOR';

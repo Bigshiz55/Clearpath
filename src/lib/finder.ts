@@ -5,7 +5,7 @@ import type { PreferenceTrait } from '@/lib/types';
 import { discoverTitles } from '@/lib/tmdb/client';
 import { getScoringData } from '@/lib/titleData';
 import { buildVerdict, avoidRule, loveRule } from '@/lib/scoring';
-import { getProfile, getPersonalContext, regionFor, getMyServices, personalLabelFor } from '@/lib/profile';
+import { getProfile, getPersonalContext, regionFor, getMyServices } from '@/lib/profile';
 import { includedServiceNames, streamingNames } from '@/lib/services';
 import { deciderSearchUrl } from '@/lib/tmdb/meta-helpers';
 import { getNextAiring, type NextAiring } from '@/lib/onTv';
@@ -195,6 +195,9 @@ export async function runFinder(
     ],
     likedFranchiseIds: [],
     collectionId: null,
+    // Explicit signal — these are loves/avoids the account holder typed in
+    // for this named person, not a silently-injected default.
+    hasSignal: true,
   });
 
   let basePersonal: PersonalContext;
@@ -204,7 +207,9 @@ export async function runFinder(
     scoredFor = `${singleWatcher.name} match`;
   } else {
     basePersonal = await getPersonalContext(supabase, userId, null);
-    scoredFor = householdWatchers.length > 0 ? 'Household match' : profile ? personalLabelFor(profile) : 'Your match';
+    // basePersonal.label is already the single source of truth — 'General
+    // Verdict' for a zero-signal viewer, their real personal label otherwise.
+    scoredFor = householdWatchers.length > 0 ? 'Household match' : basePersonal.label;
   }
 
   // "Live TV" means TV shows with a real upcoming airing — always TV-only.
