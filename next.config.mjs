@@ -30,22 +30,34 @@ function buildMeta() {
   // value via `publicEnv.siteUrl()` (src/lib/env.ts) — nothing else may
   // hardcode a domain or default to localhost.
   //
-  // A manually-set NEXT_PUBLIC_SITE_URL always wins. Absent that, this
-  // self-heals from Vercel's own system env vars so a missing/forgotten
-  // dashboard setting can never again ship "localhost:3000" as the
-  // canonical/og:url on a real deployment: production always resolves to
-  // the stable production domain (VERCEL_PROJECT_PRODUCTION_URL, with the
-  // known permanent domain as a last-resort literal), a preview deploy
-  // points at its own preview URL rather than falsely claiming to be
-  // production, and only a plain local `next dev` with no Vercel env at
-  // all falls back to localhost.
+  // A manually-set NEXT_PUBLIC_SITE_URL wins — UNLESS it's a localhost URL
+  // on a real Vercel build. That carve-out is not hypothetical: production
+  // shipped "http://localhost:3000" as its canonical/og:url for a long time
+  // because the Vercel dashboard had NEXT_PUBLIC_SITE_URL explicitly set to
+  // localhost (not merely unset — an earlier version of this self-heal only
+  // covered the unset case and missed this one). `process.env.VERCEL_ENV`
+  // is set by Vercel on every build (production, preview, even a Vercel-run
+  // development build) and never set on a plain local `next dev`/`next
+  // build`, so it's the correct signal for "this is a real deployment, a
+  // localhost value here can only be a mistake."
+  //
+  // Absent (or overridden past) an explicit value, this self-heals from
+  // Vercel's own system env vars: production always resolves to the stable
+  // production domain (VERCEL_PROJECT_PRODUCTION_URL, with the known
+  // permanent domain as a last-resort literal), a preview deploy points at
+  // its own preview URL rather than falsely claiming to be production, and
+  // only a plain local dev server with no Vercel env at all falls back to
+  // localhost.
+  const explicitSiteUrl = (process.env.NEXT_PUBLIC_SITE_URL || '').trim();
+  const explicitIsBadLocalhost = process.env.VERCEL_ENV && /^https?:\/\/localhost(:\d+)?\/?$/i.test(explicitSiteUrl);
   const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_ENV === 'production'
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL || 'clearpath-pearl-chi.vercel.app'}`
-      : process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'http://localhost:3000');
+    explicitSiteUrl && !explicitIsBadLocalhost
+      ? explicitSiteUrl
+      : process.env.VERCEL_ENV === 'production'
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL || 'clearpath-pearl-chi.vercel.app'}`
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : 'http://localhost:3000';
 
   return {
     NEXT_PUBLIC_APP_VERSION: pkg.version ?? '0.0.0',
