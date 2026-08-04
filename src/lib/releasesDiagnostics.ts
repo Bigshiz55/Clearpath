@@ -21,6 +21,9 @@ export interface ReleasesEmptyState {
   message: string;
   /** Suggested recovery actions the UI renders as buttons (each maps to a state change). */
   actions: { label: string; patch: Partial<{ window: 'recent' | 'upcoming'; providerIds: number[] }> }[];
+  /** True when the UI should offer a plain "try again" (re-run the same
+   *  request) rather than / in addition to a filter-changing action. */
+  retry: boolean;
 }
 
 export interface ReleasesEmptyInput {
@@ -45,12 +48,13 @@ export function releasesEmptyState(i: ReleasesEmptyInput): ReleasesEmptyState {
   if (i.errored) {
     return {
       reason: 'api_error',
-      message: 'Couldn’t load new releases just now. Your previous view is unchanged — try again in a moment.',
+      message: 'Couldn’t confirm new releases just now — this isn’t “nothing found,” it’s a connection issue. Try again.',
       actions: [],
+      retry: true,
     };
   }
   if (i.itemCount > 0) {
-    return { reason: 'ok', message: '', actions: [] };
+    return { reason: 'ok', message: '', actions: [], retry: false };
   }
   // The headline case: upcoming + a provider filter can't be verified.
   if (i.window === 'upcoming' && i.providerIds.length > 0 && i.providerIds.every(providerSupportsUpcoming) === false) {
@@ -63,6 +67,7 @@ export function releasesEmptyState(i: ReleasesEmptyInput): ReleasesEmptyState {
         { label: 'View general upcoming (all platforms)', patch: { providerIds: [] } },
         { label: 'View that service’s titles out now', patch: { window: 'recent' } },
       ],
+      retry: false,
     };
   }
   // Genuinely empty for a supported combination.
@@ -76,5 +81,6 @@ export function releasesEmptyState(i: ReleasesEmptyInput): ReleasesEmptyState {
       ...(i.providerIds.length > 0 ? [{ label: 'Try all platforms', patch: { providerIds: [] as number[] } }] : []),
       ...(i.window === 'upcoming' ? [{ label: 'Switch to Out now', patch: { window: 'recent' as const } }] : []),
     ],
+    retry: false,
   };
 }

@@ -32,9 +32,14 @@ export async function POST(req: Request) {
       /* empty body is fine */
     }
     const query = coerce(body);
-    const items = await getReleases(supabase, user?.id ?? '', query);
+    const { items, degraded } = await getReleases(supabase, user?.id ?? '', query);
     return NextResponse.json({
       items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+      // True when one or more upstream TMDB calls failed — see
+      // ReleaseResult.degraded. Lets the client tell "we couldn't confirm"
+      // apart from "confirmed, genuinely nothing here" even on a 200.
+      degraded,
+      updatedAt: new Date().toISOString(),
     });
   } catch {
     return NextResponse.json({ error: 'Could not load releases.' }, { status: 500 });

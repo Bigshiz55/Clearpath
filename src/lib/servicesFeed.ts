@@ -1,7 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MediaType } from '@/lib/types';
-import { discoverTitles, getTvFreshness, getWatchProviders } from '@/lib/tmdb/client';
+import { discoverTitles, discoverTitlesChecked, getTvFreshness, getWatchProviders } from '@/lib/tmdb/client';
 import { getProfile, regionFor, getMyServices } from '@/lib/profile';
 import { streamingNames } from '@/lib/services';
 
@@ -25,6 +25,16 @@ export interface ReleaseQuery {
   providerIds: number[];
 }
 
+export interface ReleaseResult {
+  items: FeedItem[];
+  /** True when one or more of the underlying TMDB discover calls failed
+   *  (network error, timeout, non-2xx after retries) and were silently
+   *  omitted from the pool. A thin or empty `items` alongside `degraded:
+   *  true` means "we couldn't fully check," never "confirmed no matches" —
+   *  the caller must not render an honest-empty-state claiming the latter. */
+  degraded: boolean;
+}
+
 /**
  * The engine behind the New Release Wall — flexible discovery the client can
  * fine-tune: media type, recent vs. upcoming, sort order, and platform filter.
@@ -35,7 +45,7 @@ export async function getReleases(
   supabase: SupabaseClient,
   userId: string,
   query: ReleaseQuery,
-): Promise<FeedItem[]> {
+): Promise<ReleaseResult> {
   const profile = await getProfile(supabase, userId);
   const region = regionFor(profile);
   const types: MediaType[] = query.mediaType === 'all' ? ['movie', 'tv'] : [query.mediaType];
@@ -55,10 +65,14 @@ export async function getReleases(
     return mt === 'movie' ? 25 : 12;
   };
 
-  const pools = await Promise.all(
+  // `discoverTitlesChecked` (not the fail-open `discoverTitles`) so a real
+  // TMDB failure is distinguishable from a genuine zero-result page — see
+  // ReleaseResult.degraded above. Never `.catch()`d away here: a caught
+  // failure would silently look identical to "checked, found nothing."
+  const checkedPools = await Promise.all(
     types.flatMap((mt) =>
       [1, 2].map((page) =>
-        discoverTitles(mt, {
+        discoverTitlesChecked(mt, {
           region,
           providerIds: query.providerIds.length > 0 ? query.providerIds : undefined,
           sortBy: sortFor(mt),
@@ -67,10 +81,12 @@ export async function getReleases(
           sinceDays: upcoming ? undefined : 120,
           upcomingDays: upcoming ? 120 : undefined,
           page,
-        }).catch(() => []),
+        }),
       ),
     ),
   );
+  const degraded = checkedPools.some((p) => !p.ok);
+  const pools = checkedPools.map((p) => p.items);
 
   const wl = userId
     ? await supabase.from('watchlist_items').select('tmdb_id, media_type').eq('user_id', userId)
@@ -105,7 +121,7 @@ export async function getReleases(
   // 12h-cached provider data. Real availability only — null when TMDB has none
   // yet (common for still-upcoming titles), so the UI simply shows no badge.
   const top = items.slice(0, 36);
-  return Promise.all(
+  const withNetwork = await Promise.all(
     top.map(async (it) => {
       try {
         const providers = await getWatchProviders(it.mediaType, it.id, region);
@@ -116,6 +132,7 @@ export async function getReleases(
       }
     }),
   );
+  return { items: withNetwork, degraded };
 }
 
 export interface NewOnServices {

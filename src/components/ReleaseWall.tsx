@@ -31,6 +31,28 @@ type WindowFilter = 'recent' | 'upcoming';
 type SortFilter = 'popular' | 'new' | 'top';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** The provider fan-out behind this feed can legitimately take a while (see
+ *  servicesFeed.ts's two-phase discover + per-title provider lookups), so
+ *  this is a real ceiling on a slow request, not the aggressive few-second
+ *  budget a simpler fetch could hold to — but it's still bounded: a hung
+ *  request must eventually surface a real error/retry instead of leaving
+ *  the loading skeleton on screen forever. */
+const FETCH_TIMEOUT_MS = 20000;
+
+/** Short, relative "how fresh" label — never a bare timestamp a viewer has to
+ *  do math on, and never invented precision. */
+function agoLabel(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  if (ms < 60_000) return 'just now';
+  const mins = Math.round(ms / 60_000);
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}
 
 /** Short, human date label like "Aug 3" (no fabricated precision). */
 function dateLabel(iso: string | null | undefined): string | null {
@@ -86,27 +108,63 @@ export function ReleaseWall({
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<QuickLookTarget | null>(null);
   const [errored, setErrored] = useState(false);
+  // When the fetch resolves 200 but one or more of the underlying TMDB calls
+  // failed (see servicesFeed.ts's `degraded`), a THIN result must not be read
+  // as "confirmed empty" — see the empty-state branch below.
+  const [degraded, setDegraded] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   // Monotonic request id: a slower earlier fetch must never overwrite a newer
   // filter combination's results (latest state wins).
   const seqRef = useRef(0);
+  // `load` is memoized on the FILTER deps only (so changing a filter — not
+  // every items/loading update — is what re-triggers a fetch); reading
+  // `items` through a ref instead of the state variable directly means the
+  // Retry button (which calls this same memoized closure) always sees
+  // what's actually on screen right now, not a stale snapshot from whenever
+  // the filters last changed.
+  const itemsRef = useRef<WallItem[] | null>(null);
+  itemsRef.current = items;
 
   const load = useCallback(async () => {
     setLoading(true);
     setErrored(false);
     const mySeq = ++seqRef.current;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
       const res = await fetch('/api/releases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mediaType, window: win, sort, providerIds }),
+        signal: controller.signal,
       });
       const data = await res.json();
       if (mySeq !== seqRef.current) return; // superseded by a newer request
-      if (!res.ok) { setErrored(true); setItems([]); }
-      else setItems(data.items ?? []);
+      if (!res.ok) {
+        // A REAL failure: never discard whatever was already on screen — the
+        // point of "cached last-known-good" is that a failed refresh doesn't
+        // blank out a perfectly good previous view.
+        setErrored(true);
+      } else {
+        const receivedItems = (data.items ?? []) as WallItem[];
+        const isDegraded = Boolean(data.degraded);
+        setDegraded(isDegraded);
+        // Only replace what's on screen with a thin/empty degraded result if
+        // there's nothing better already showing — otherwise keep the last
+        // confirmed-good set rather than regressing to "fewer/no results"
+        // because of a partial upstream hiccup.
+        const current = itemsRef.current;
+        if (!(isDegraded && receivedItems.length === 0 && current && current.length > 0)) {
+          setItems(receivedItems);
+        }
+        if (typeof data.updatedAt === 'string') setLastUpdated(data.updatedAt);
+      }
     } catch {
-      if (mySeq === seqRef.current) { setErrored(true); setItems([]); }
+      // A network error and a timed-out abort both land here — either way,
+      // the honest treatment is identical: "couldn't confirm," not "empty."
+      if (mySeq === seqRef.current) setErrored(true);
     } finally {
+      clearTimeout(timer);
       if (mySeq === seqRef.current) setLoading(false);
     }
   }, [mediaType, win, sort, providerIds]);
@@ -123,14 +181,23 @@ export function ReleaseWall({
   }
   const shownServices = showAllPlatforms ? services : services.slice(0, 6);
 
+  const ago = agoLabel(lastUpdated);
+
   return (
     <div className="space-y-4">
       {/* ---- Controls ---- */}
       <div className="card space-y-3 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Seg value={mediaType} onChange={setMediaType} options={[{ v: 'all', label: 'All' }, { v: 'movie', label: 'Movies' }, { v: 'tv', label: 'Shows' }]} />
-          <Seg value={win} onChange={setWin} options={[{ v: 'recent', label: 'Out now' }, { v: 'upcoming', label: 'Upcoming' }]} />
-          <Seg value={sort} onChange={setSort} options={[{ v: 'popular', label: 'Popular' }, { v: 'new', label: win === 'upcoming' ? 'Soonest' : 'Newest' }, { v: 'top', label: 'Top rated' }]} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Seg value={mediaType} onChange={setMediaType} options={[{ v: 'all', label: 'All' }, { v: 'movie', label: 'Movies' }, { v: 'tv', label: 'Shows' }]} />
+            <Seg value={win} onChange={setWin} options={[{ v: 'recent', label: 'Out now' }, { v: 'upcoming', label: 'Upcoming' }]} />
+            <Seg value={sort} onChange={setSort} options={[{ v: 'popular', label: 'Popular' }, { v: 'new', label: win === 'upcoming' ? 'Soonest' : 'Newest' }, { v: 'top', label: 'Top rated' }]} />
+          </div>
+          {ago && (
+            <span data-testid="releases-updated" className="text-[11px] font-medium text-slate-500">
+              Updated {ago}
+            </span>
+          )}
         </div>
 
         {/* Platform filter — cover every service, plus a one-tap "my services". */}
@@ -166,6 +233,45 @@ export function ReleaseWall({
           )}
         </div>
       </div>
+
+      {/* A real failure that still has a last-known-good set on screen: keep
+          showing it (never blank out a working view) but disclose that the
+          latest refresh didn't succeed, with its own Retry. */}
+      {errored && items && items.length > 0 && (
+        <div
+          role="status"
+          data-testid="releases-stale-banner"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-100"
+        >
+          <span>Showing the last titles we could confirm{ago ? ` (${ago})` : ''} — the latest refresh failed.</span>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="rounded-md border border-amber-400/50 bg-amber-500/15 px-2.5 py-1 font-semibold hover:bg-amber-500/25"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {/* A 200 that came back thin/degraded but we still had something better
+          on screen (so `items` wasn't overwritten) — same disclosure, no
+          separate error state needed since nothing was lost. */}
+      {!errored && degraded && items && items.length > 0 && (
+        <div
+          role="status"
+          data-testid="releases-degraded-banner"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-100"
+        >
+          <span>Some sources didn’t respond — this list may be incomplete.</span>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="rounded-md border border-amber-400/50 bg-amber-500/15 px-2.5 py-1 font-semibold hover:bg-amber-500/25"
+          >
+            Refresh
+          </button>
+        </div>
+      )}
 
       {/* ---- Grid ---- */}
       {loading && items == null ? (
@@ -266,8 +372,18 @@ export function ReleaseWall({
           return (
             <div className="text-sm text-slate-400" role="status" data-testid="releases-empty" data-reason={es.reason}>
               <p>{es.message}</p>
-              {es.actions.length > 0 && (
+              {(es.actions.length > 0 || es.retry) && (
                 <div className="mt-3 flex flex-wrap gap-2">
+                  {es.retry && (
+                    <button
+                      type="button"
+                      onClick={() => void load()}
+                      data-testid="releases-empty-retry"
+                      className="rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 py-1.5 text-xs font-semibold text-brand-100 hover:bg-brand-500/25"
+                    >
+                      Try again
+                    </button>
+                  )}
                   {es.actions.map((a) => (
                     <button
                       key={a.label}

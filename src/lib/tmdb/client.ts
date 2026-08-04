@@ -325,10 +325,19 @@ export interface DiscoverOptions {
  * the mood finder and the "new on your services" feed. Returns only real TMDB
  * rows; on any error yields an empty list so callers degrade gracefully.
  */
-export async function discoverTitles(
+/**
+ * Same request `discoverTitles` makes, but honest about whether it actually
+ * succeeded — `discoverTitles` itself fails open to an empty array on any
+ * error (the right default for the many callers that just want "best
+ * effort, never throw"), which makes a genuine TMDB outage indistinguishable
+ * from a real zero-result query. Callers that need to tell those apart (see
+ * `getReleases` in servicesFeed.ts, and its "honest empty state" requirement)
+ * use this instead.
+ */
+export async function discoverTitlesChecked(
   mediaType: MediaType,
   opts: DiscoverOptions = {},
-): Promise<DiscoverItem[]> {
+): Promise<{ items: DiscoverItem[]; ok: boolean }> {
   const region = opts.region ?? 'US';
   const params: Record<string, string> = {
     language: 'en-US',
@@ -385,10 +394,15 @@ export async function discoverTitles(
     else params['first_air_date.gte'] = from;
   }
 
-  const data = await tmdbFetch<TmdbMultiResult>(`/discover/${mediaType}`, params).catch(
-    () => ({ page: 1, results: [] as TmdbMultiResult['results'] }),
-  );
-  return data.results
+  let data: TmdbMultiResult;
+  let ok = true;
+  try {
+    data = await tmdbFetch<TmdbMultiResult>(`/discover/${mediaType}`, params);
+  } catch {
+    ok = false;
+    data = { page: 1, results: [] };
+  }
+  const items = data.results
     .filter((r) => r.poster_path)
     .map((r) => ({
       id: r.id,
@@ -398,6 +412,19 @@ export async function discoverTitles(
       posterPath: r.poster_path ?? null,
       releaseDate: (mediaType === 'movie' ? r.release_date : r.first_air_date) ?? null,
     }));
+  return { items, ok };
+}
+
+/**
+ * The ordinary, fail-open discover call — every caller that just wants "best
+ * effort, never throw" (the large majority). See `discoverTitlesChecked`
+ * above for the one that also reports whether the fetch actually succeeded.
+ */
+export async function discoverTitles(
+  mediaType: MediaType,
+  opts: DiscoverOptions = {},
+): Promise<DiscoverItem[]> {
+  return (await discoverTitlesChecked(mediaType, opts)).items;
 }
 
 export interface TvFreshness {
