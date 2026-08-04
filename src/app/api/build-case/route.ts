@@ -5,6 +5,7 @@ import { serverEnv } from '@/lib/env';
 import { DIMENSIONS, DIMENSION_KEYS } from '@/lib/scoring/dimensions';
 import { searchTitles } from '@/lib/tmdb/client';
 import { rateQuizTitle } from '@/lib/actions/quiz';
+import { wantsTitleResults } from '@/lib/nlu/requestIntent';
 import {
   detectAiringHorizon,
   detectTemporalHorizon,
@@ -301,14 +302,10 @@ export async function POST(request: Request) {
     // Watch Now grid. Airing/platform/where-to-watch asks were handled above; a
     // pure "I love X, avoid Y" (no find verb) still just builds the DNA. Requires
     // BOTH a genre/media word and a find intent so we don't hijack taste-building.
-    const findWords = /\b(movies?|films?|shows?|series|documentar(y|ies)|comed(y|ies)|funny|scary|horror|thrillers?|family|kids?|action|adventure|dramas?|romance|romantic|rom-?com|sci-?fi|fantasy|animated|anime|western|musical|feel-?good|myster(y|ies)|crime|suspense|tearjerker|date night|something|anything)\b/i;
-    // Request verbs (imperatives + "I want/feel like"). Deliberately excludes
-    // preference verbs (love/like/enjoy/hate/avoid) so a pure taste statement
-    // still builds DNA instead of being hijacked into a search.
-    const findVerb = /\b(find|show me|recommend|suggest|give me|gimme|pull up|put on|i want|i wanna|i'?d like|in the mood for|looking for|feel like|to watch|can watch|could watch|movie night|good|great|best|binge|worth watching)\b/i;
-    // A request phrased as a bare description ("Something light and funny…").
-    const startsWithSomething = /^\s*(something|anything)\b/i.test(text);
-    if ((findWords.test(text) && findVerb.test(text)) || startsWithSomething) {
+    // The two tests live in lib/nlu/requestIntent.ts so they can be unit-tested
+    // — see that module for the "boxing movies I would like" regression that
+    // motivated pulling them out of here.
+    if (wantsTitleResults(text)) {
       const redirect = `/app/finder?q=${encodeURIComponent(text.slice(0, 200))}&run=1`;
       await logCase('find', redirect, { axes: parsed.axes.length });
       return NextResponse.json({
