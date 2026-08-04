@@ -41,9 +41,11 @@ Branch `claude/watch-verdict-app-wwbtbg`. Read
 - **A+E press (`press.aenetworks.com`) is `Disallow: /`.** Blanket explicit
   prohibition. This is the press route for **Lifetime and LMN**. Flagged per
   the standing instruction. Only written permission from A+E unblocks it.
-- **Hallmark press portal** has `/access/application`. Applying for press
-  access is the clean, high-value route to Hallmark premiere data and needs a
-  human to complete it. Do not bypass the login.
+- **Hallmark press portal** — press access **APPLIED FOR by the product owner
+  (2026-08-04)**. Approval status not yet confirmed. Before Phase 5 TV work,
+  ask whether access was granted; if it was, the credentialed portal becomes
+  the primary Hallmark premiere source. Do not bypass the login under any
+  circumstances, including while the application is pending.
 - **WBD press (ID, TCM) returns 403** to us; re-check or apply for access.
 
 ## Standing constraints
