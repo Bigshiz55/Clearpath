@@ -22,13 +22,6 @@ export async function GET() {
       vercelEnv: info.vercelEnv || 'development',
       appVersion: info.appVersion,
       schemaVersion: info.schemaVersion || null,
-      // TEMPORARY DIAGNOSTIC — remove once the canonical/og:url bug is
-      // confirmed fixed. See next.config.mjs.
-      debugRawSiteUrl: process.env.NEXT_PUBLIC_DEBUG_RAW_SITE_URL ?? null,
-      debugRawVercelEnv: process.env.NEXT_PUBLIC_DEBUG_RAW_VERCEL_ENV ?? null,
-      debugRawProdUrl: process.env.NEXT_PUBLIC_DEBUG_RAW_PROD_URL ?? null,
-      debugBadLocalhost: process.env.NEXT_PUBLIC_DEBUG_BAD_LOCALHOST ?? null,
-      debugComputedSiteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? null,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );

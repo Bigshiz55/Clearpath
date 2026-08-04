@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { TOUR_TOPICS, type TourTopic } from './tourTopics';
 import { CardControlsExplainer } from '@/components/landing/HowYouRule';
+import { DocketDemoIcon } from '@/components/landing/DocketDemoIcon';
 
 const SEEN_KEY = 'wv.tour.seen.v1';
 
@@ -118,6 +119,19 @@ function TopicDetail({
         <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-slate-300">{topic.body}</p>
 
         {topic.id === 'controls' && <CardControlsExplainer className="mx-auto mt-5 max-w-md" />}
+
+        {/* THE BADGE, ACTUALLY SHOWN. The body text above describes tapping a
+            pink gavel badge on a poster — a first-time reader has never seen
+            that happen, so this demonstrates the real circle (same component
+            as the card controls topic and the homepage) toggling between its
+            unselected and selected states rather than leaving it to the
+            imagination. */}
+        {topic.id === 'gavel' && (
+          <div className="mt-5 flex flex-col items-center gap-1.5" data-testid="tour-gavel-demo">
+            <DocketDemoIcon />
+            <span className="text-xs text-slate-500">Unselected → selected, on repeat</span>
+          </div>
+        )}
 
         {topic.bullets && topic.bullets.length > 0 && (
           <ul className="mx-auto mt-4 max-w-md space-y-2 text-left">

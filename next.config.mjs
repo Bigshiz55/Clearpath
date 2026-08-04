@@ -30,28 +30,41 @@ function buildMeta() {
   // value via `publicEnv.siteUrl()` (src/lib/env.ts) — nothing else may
   // hardcode a domain or default to localhost.
   //
-  // A manually-set NEXT_PUBLIC_SITE_URL wins — UNLESS it's a localhost URL
-  // on a real Vercel build. That carve-out is not hypothetical: production
-  // shipped "http://localhost:3000" as its canonical/og:url for a long time
-  // because the Vercel dashboard had NEXT_PUBLIC_SITE_URL explicitly set to
-  // localhost (not merely unset — an earlier version of this self-heal only
-  // covered the unset case and missed this one). `process.env.VERCEL_ENV`
-  // is set by Vercel on every build (production, preview, even a Vercel-run
-  // development build) and never set on a plain local `next dev`/`next
-  // build`, so it's the correct signal for "this is a real deployment, a
-  // localhost value here can only be a mistake."
+  // A manually-set NEXT_PUBLIC_SITE_URL wins — UNLESS it's obviously not
+  // this site's own URL on a real Vercel build. Root-caused on production:
+  // NEXT_PUBLIC_SITE_URL was set to the SUPABASE project URL (the adjacent
+  // field in DEPLOYMENT.md's env table — an easy paste mistake), which
+  // src/lib/env.ts's `isSupabaseHost` guard already caught at runtime, but
+  // that guard's own fallback was a bare 'http://localhost:3000' rather
+  // than a self-heal — so the canonical/og:url still ended up wrong, just
+  // one layer further downstream than expected. Localhost itself is the
+  // other documented mistake this must also catch. `process.env.VERCEL_ENV`
+  // is set by Vercel on every build (production, preview, even a
+  // Vercel-run development build) and never set on a plain local `next
+  // dev`/`next build`, so it's the right signal for "this is a real
+  // deployment — a value that clearly isn't our own domain can only be a
+  // mistake, not an intentional override."
   //
-  // Absent (or overridden past) an explicit value, this self-heals from
+  // Absent (or overridden past) a bad explicit value, this self-heals from
   // Vercel's own system env vars: production always resolves to the stable
   // production domain (VERCEL_PROJECT_PRODUCTION_URL, with the known
   // permanent domain as a last-resort literal), a preview deploy points at
   // its own preview URL rather than falsely claiming to be production, and
   // only a plain local dev server with no Vercel env at all falls back to
   // localhost.
+  const isObviouslyNotOurSite = (value) => {
+    let hostname;
+    try {
+      hostname = new URL(value).hostname;
+    } catch {
+      return true; // not even a valid absolute URL
+    }
+    return /^localhost$/i.test(hostname) || /(^|\.)supabase\.co$/i.test(hostname);
+  };
   const explicitSiteUrl = (process.env.NEXT_PUBLIC_SITE_URL || '').trim();
-  const explicitIsBadLocalhost = process.env.VERCEL_ENV && /^https?:\/\/localhost(:\d+)?\/?$/i.test(explicitSiteUrl);
+  const explicitIsBad = Boolean(process.env.VERCEL_ENV) && isObviouslyNotOurSite(explicitSiteUrl);
   const siteUrl =
-    explicitSiteUrl && !explicitIsBadLocalhost
+    explicitSiteUrl && !explicitIsBad
       ? explicitSiteUrl
       : process.env.VERCEL_ENV === 'production'
         ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL || 'clearpath-pearl-chi.vercel.app'}`
@@ -67,12 +80,6 @@ function buildMeta() {
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || (process.env.NODE_ENV === 'production' ? '' : 'development'),
     NEXT_PUBLIC_DEPLOY_URL: process.env.VERCEL_URL || '',
     NEXT_PUBLIC_SCHEMA_VERSION: schema,
-    // TEMPORARY DIAGNOSTIC — remove once the canonical/og:url bug is
-    // confirmed fixed on production. Exposes exactly what this build saw.
-    NEXT_PUBLIC_DEBUG_RAW_SITE_URL: JSON.stringify(process.env.NEXT_PUBLIC_SITE_URL ?? null),
-    NEXT_PUBLIC_DEBUG_RAW_VERCEL_ENV: JSON.stringify(process.env.VERCEL_ENV ?? null),
-    NEXT_PUBLIC_DEBUG_RAW_PROD_URL: JSON.stringify(process.env.VERCEL_PROJECT_PRODUCTION_URL ?? null),
-    NEXT_PUBLIC_DEBUG_BAD_LOCALHOST: String(explicitIsBadLocalhost),
     NEXT_PUBLIC_API_VERSION: pkg.apiVersion ?? 'v1',
     NEXT_PUBLIC_SITE_URL: siteUrl,
   };
