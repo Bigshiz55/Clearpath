@@ -46,7 +46,7 @@ describe('HomeRecommendations and Top10Slate — the homepage\'s main content ne
 
   it.each(sites)('%s wraps the slate call in try/catch — a rejection is no longer an unhandled promise', (path) => {
     const src = read(path);
-    expect(src).toMatch(/\}\s*catch\s*\{\s*\n\s*if \(live\) setFailed\(true\)/);
+    expect(src).toMatch(/\}\s*catch\s*\{\s*\n\s*if \(live\) \{?\s*\n?\s*setFailed\(true\)/);
   });
 
   it.each(sites)('%s shows a real error state with a retry, not a silent null/return', (path) => {

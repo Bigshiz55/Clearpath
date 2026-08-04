@@ -5,6 +5,7 @@ import { parseNetflixCsv, type ParseReport } from '@/lib/import/netflixCsv';
 import { consolidate, type ConsolidationResult } from '@/lib/import/consolidate';
 import { signalFor, signalForVerdict, type UserVerdict } from '@/lib/import/signalModel';
 import { importParsedTitles, undoImportedTitles, type ImportRowResult } from '@/lib/actions/import';
+import { reportReliabilityEvent } from '@/lib/monitoringClient';
 
 /**
  * BRING YOUR TASTE WITH YOU.
@@ -185,11 +186,13 @@ export function ImportTasteFlow() {
     }
 
     if (importFailed) {
-      if (/signed in/i.test(importFailed)) {
+      const needsSignIn = /signed in/i.test(importFailed);
+      if (needsSignIn) {
         setSignInRequired(true);
       } else {
         setError(importFailed);
       }
+      reportReliabilityEvent('import_failure', { reason: needsSignIn ? 'signin_required' : 'error' });
       setStage('review');
       return;
     }

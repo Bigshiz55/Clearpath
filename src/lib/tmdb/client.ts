@@ -1,5 +1,6 @@
 import 'server-only';
 import { serverEnv, ConfigError } from '@/lib/env';
+import { recordReliabilityEvent } from '@/lib/monitoring';
 import type {
   MediaType,
   SimilarTitle,
@@ -73,11 +74,15 @@ async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): 
         await sleep(300 * attempt);
         continue;
       }
+      void recordReliabilityEvent('api_failure', { provider: 'tmdb', status: 0, attempts: MAX_ATTEMPTS });
       throw new TmdbError(504, 'Could not reach the movie database. Please try again.');
     }
     clearTimeout(timeout);
 
-    if (res.status === 401) throw new TmdbError(401, 'The TMDB API key is invalid. Check your configuration.');
+    if (res.status === 401) {
+      void recordReliabilityEvent('api_failure', { provider: 'tmdb', status: 401 });
+      throw new TmdbError(401, 'The TMDB API key is invalid. Check your configuration.');
+    }
     if (res.status === 404) throw new TmdbError(404, 'That title could not be found.');
     // Rate limits and 5xx are transient — back off and retry before giving up.
     if (res.status === 429 || res.status >= 500) {
@@ -86,10 +91,14 @@ async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): 
         await sleep(res.status === 429 ? 700 * attempt : 300 * attempt);
         continue;
       }
+      void recordReliabilityEvent('api_failure', { provider: 'tmdb', status: res.status, attempts: MAX_ATTEMPTS });
       if (res.status === 429) throw new TmdbError(429, 'The movie database is rate-limiting requests. Please try again shortly.');
       throw new TmdbError(res.status, 'The movie database returned an unexpected error.');
     }
-    if (!res.ok) throw new TmdbError(res.status, 'The movie database returned an unexpected error.');
+    if (!res.ok) {
+      void recordReliabilityEvent('api_failure', { provider: 'tmdb', status: res.status });
+      throw new TmdbError(res.status, 'The movie database returned an unexpected error.');
+    }
     return (await res.json()) as T;
   }
   // Unreachable, but satisfies the type checker.

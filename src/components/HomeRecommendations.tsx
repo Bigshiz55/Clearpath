@@ -17,6 +17,7 @@ import { Top10Rail, type RailItem } from '@/components/Top10Rail';
 import { PosterCard } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
 import type { StandardContribution } from '@/lib/scoring/standardScore';
+import { reportReliabilityEvent } from '@/lib/monitoringClient';
 
 const TOP_COUNT = 10;
 const GRID_COUNT = 10;
@@ -49,11 +50,15 @@ export function HomeRecommendations({ label }: { label?: string | null }) {
         if (!live) return;
         if (!r.ok) {
           setFailed(true);
+          reportReliabilityEvent('page_load_failure', { surface: 'home_recommendations' });
           return;
         }
         setItems(r.items);
       } catch {
-        if (live) setFailed(true);
+        if (live) {
+          setFailed(true);
+          reportReliabilityEvent('page_load_failure', { surface: 'home_recommendations' });
+        }
       }
     })();
     return () => {

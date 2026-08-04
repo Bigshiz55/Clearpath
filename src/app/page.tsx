@@ -6,6 +6,7 @@ import { ExampleVerdict } from '@/components/landing/ExampleVerdict';
 import { GroupVerdictSection } from '@/components/landing/GroupVerdictSection';
 import { PacksSpotlight } from '@/components/landing/PacksSpotlight';
 import { NeedSomethingSpecific } from '@/components/landing/NeedSomethingSpecific';
+import { HomeArrivalBeacon } from '@/components/HomeArrivalBeacon';
 import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,7 @@ export default async function LandingPage() {
   const stage = await dnaStage();
   return (
     <div className="min-h-dvh">
+      <HomeArrivalBeacon />
       {/* LOGO + SIGN IN, NOTHING ELSE. The gold "Enter the Courtroom" button
           below is the one prominent entrance; a second, equally-weighted
           header button into `/app` would compete with it on every screen.

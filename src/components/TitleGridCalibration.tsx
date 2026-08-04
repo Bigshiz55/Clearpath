@@ -32,6 +32,7 @@ import { DnaBurst } from '@/components/DnaBurst';
 import { RecommendationSlate } from '@/components/RecommendationSlate';
 import { analysePicks, type AnalysedPick, type PickAnalysis } from '@/lib/preference/pickAnalysis';
 import { EARLY_COMPLETE } from '@/lib/preference/calibration';
+import { reportReliabilityEvent } from '@/lib/monitoringClient';
 
 const GRID_SIZE = 12;
 /** No single fetch attempt may hang the loading state forever — abort and
@@ -258,18 +259,21 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
       if (fresh.length === 0 && lastError) {
         setError(lastError);
         setItems([]);
+        reportReliabilityEvent('quiz_load_failure', { reason: 'api_error' });
         return;
       }
       for (const i of fresh) seen.current.add(keyOf(i));
       setExhausted(fresh.length === 0 && seen.current.size > 0);
       setItems(fresh);
     } catch (e) {
+      const timedOut = e instanceof DOMException && e.name === 'AbortError';
       setError(
-        e instanceof DOMException && e.name === 'AbortError'
+        timedOut
           ? 'That took too long to load. Check your connection and try again.'
           : 'Could not load titles right now.',
       );
       setItems([]);
+      reportReliabilityEvent('quiz_load_failure', { reason: timedOut ? 'timeout' : 'exception' });
     }
   }, [sessionId, round]);
 

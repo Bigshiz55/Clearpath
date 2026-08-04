@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getReleases, type ReleaseQuery } from '@/lib/servicesFeed';
 import { tmdbImage } from '@/lib/tmdb/image';
+import { recordReliabilityEvent } from '@/lib/monitoring';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -33,6 +34,9 @@ export async function POST(req: Request) {
     }
     const query = coerce(body);
     const { items, degraded } = await getReleases(supabase, user?.id ?? '', query);
+    if (degraded || items.length === 0) {
+      void recordReliabilityEvent('new_releases_empty', { degraded, window: query.window, itemCount: items.length });
+    }
     return NextResponse.json({
       items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
       // True when one or more upstream TMDB calls failed — see

@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildRecommendationSlate } from '@/lib/actions/recommendations';
 import { Top10Rail, type RailItem } from '@/components/Top10Rail';
 import type { StandardContribution } from '@/lib/scoring/standardScore';
+import { reportReliabilityEvent } from '@/lib/monitoringClient';
 
 // buildRecommendationSlate is a server action with no AbortController of
 // its own — race it against a timer so a stalled call can't leave the
@@ -37,6 +38,7 @@ export function Top10Slate({ surface = 'top10', sessionId }: { surface?: string;
         if (!live) return;
         if (!r.ok) {
           setFailed(true);
+          reportReliabilityEvent('page_load_failure', { surface });
           return;
         }
         setItems(
@@ -50,7 +52,10 @@ export function Top10Slate({ surface = 'top10', sessionId }: { surface?: string;
           })),
         );
       } catch {
-        if (live) setFailed(true);
+        if (live) {
+          setFailed(true);
+          reportReliabilityEvent('page_load_failure', { surface });
+        }
       }
     })();
     return () => {

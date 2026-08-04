@@ -5,6 +5,7 @@ import { TVMAZE_CHANNELS, type TvmazeChannelGroup } from '@/lib/viewing/ingest/t
 import { createAdminClient } from '@/lib/supabase/admin';
 import { linkStationToPack } from './stations';
 import type { Pack } from './types';
+import { recordReliabilityEvent } from '@/lib/monitoring';
 
 const INGEST_FORWARD_DAYS = 14;
 
@@ -66,6 +67,13 @@ export async function ensurePackIngested(supabase: SupabaseClient, pack: Pack): 
       p_rows_written: result.inserted + result.updated,
       p_error_message: result.daysFailed.length > 0 ? result.daysFailed.join('; ').slice(0, 500) : null,
     });
+    // pack_ingest_runs already carries the full outcome for operators who
+    // query it directly; this mirrors just the pass/fail shape into the
+    // same analytics_events stream every other reliability event lands in,
+    // so one dashboard can show all of them together.
+    if (!result.ok) {
+      void recordReliabilityEvent('pack_timeout', { pack: pack.slug, daysFailed: result.daysFailed.length });
+    }
     return {
       attempted: true,
       ok: result.ok,

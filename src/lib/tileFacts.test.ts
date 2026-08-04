@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// The reliability beacon fired on a failed load makes its own network call
+// (sendBeacon, or a fetch fallback in a jsdom-less test env) — mocked out so
+// it can't be miscounted as a second call to the ratings endpoint below.
+vi.mock('@/lib/monitoringClient', () => ({ reportReliabilityEvent: vi.fn() }));
+
 /**
  * RELIABILITY SPRINT — a network hiccup must not permanently stick a card on
  * "Availability not currently confirmed" for the rest of the session.

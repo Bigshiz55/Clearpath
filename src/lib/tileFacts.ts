@@ -16,6 +16,7 @@ import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 import type { CardFactsInput } from '@/lib/verdict/cardFacts';
 import type { MediaType } from '@/lib/types';
 import type { CardAvailability } from '@/lib/watchmode/cardAvailability';
+import { reportReliabilityEvent } from '@/lib/monitoringClient';
 
 export interface TileFacts {
   ratings: TileRatings;
@@ -57,6 +58,7 @@ export function loadTileFacts(mediaType: MediaType, tmdbId: number): Promise<Til
         // even once the network recovers. Evict so the NEXT mount retries;
         // this call still resolves to EMPTY so the current render doesn't hang.
         cache.delete(key);
+        reportReliabilityEvent('availability_resolution_failure', { mediaType });
         return EMPTY;
       });
     cache.set(key, p);

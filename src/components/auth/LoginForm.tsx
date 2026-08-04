@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { reportReliabilityEvent } from '@/lib/monitoringClient';
 
 export function LoginForm({ next }: { next: string }) {
   const [email, setEmail] = useState('');
@@ -29,6 +30,7 @@ export function LoginForm({ next }: { next: string }) {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong.';
       setError(message);
+      reportReliabilityEvent('signin_email_failure', {});
     } finally {
       setLoading(false);
     }

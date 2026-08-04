@@ -26,6 +26,7 @@ import { MIN_FOR_VERDICT, type DocketEntry } from '@/lib/verdict/docket';
 import { deliverVerdict, type Candidate, type Verdict } from '@/lib/verdict/rank';
 import { useSyncExternalStore } from 'react';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { reportFirstVerdictShown } from '@/lib/verdictTiming';
 
 /** Minutes out of quicklook's "1h 52m" / "3 seasons". Null when it is not a film. */
 function minutesOf(runtime: string | null): number | null {
@@ -83,6 +84,12 @@ export function VerdictDelivery() {
     if (state === 'idle' && docket.length >= MIN_FOR_VERDICT) void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docket.length]);
+
+  // The first real Verd1ct (a genuine winner, not the "too close to call"
+  // state) this tab has shown — see verdictTiming.ts for why it only fires once.
+  useEffect(() => {
+    if (state === 'done' && verdict?.winner) reportFirstVerdictShown();
+  }, [state, verdict]);
 
   if (docket.length < MIN_FOR_VERDICT) {
     return (
