@@ -127,3 +127,18 @@ describe('mobile readability', () => {
     expect(whereToWatch).toContain('min-h-[36px]');
   });
 });
+
+describe('the reasons read the field the data actually uses', () => {
+  const why = read('src/components/watch/WhyThisTitle.tsx');
+
+  it('prefers episodeRuntimeMinutes, which is where a series carries its length', () => {
+    // Caught against live production data: CSI: NY (tv/2458) and Harrow
+    // (tv/77947) both return runtimeMinutes:null and episodeRuntimeMinutes 42
+    // and 43. Reading only runtimeMinutes silently dropped the
+    // "43-minute episodes" reason on exactly the cards it was written for.
+    const line = why.split('\n').find((l) => l.includes('episodeMinutes:'))!;
+    // The regex fixes the ORDER too: episodeRuntimeMinutes must come first,
+    // with the movie field kept as the fallback rather than dropped.
+    expect(line).toMatch(/episodeRuntimeMinutes\s*\?\?\s*facts\.facts\?\.runtimeMinutes/);
+  });
+});

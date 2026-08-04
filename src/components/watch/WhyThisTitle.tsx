@@ -52,7 +52,11 @@ export function WhyThisTitle({
           buildWhyReasons({
             // `agree` is already ordered strongest-first by the DNA engine.
             tasteAgreements: (dna?.fit?.agree ?? []).map((a) => a.label),
-            episodeMinutes: facts.facts?.runtimeMinutes ?? null,
+            // `episodeRuntimeMinutes` FIRST. A series carries its per-episode
+            // length there and leaves `runtimeMinutes` null — CSI: NY and
+            // Harrow both do — so reading only the latter silently dropped the
+            // "43-minute episodes" reason on exactly the cards it was for.
+            episodeMinutes: facts.facts?.episodeRuntimeMinutes ?? facts.facts?.runtimeMinutes ?? null,
             seasons: facts.facts?.seasons ?? null,
             episodes: facts.facts?.episodes ?? null,
             ...context,
