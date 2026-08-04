@@ -365,6 +365,8 @@ export type RefreshReason = 'no_key' | 'budget_exhausted' | 'fetch_failed' | 'st
 export interface RefreshOneResult {
   ok: boolean;
   reason?: RefreshReason;
+  /** The underlying failure, for an operator. Never user-facing copy. */
+  detail?: string;
   /** How many verified sources the refresh landed. 0 is a real answer. */
   sourceCount?: number;
 }
@@ -400,11 +402,12 @@ export async function refreshOneTitle(
       nowIso,
     );
     if (outcome === 'error') return { ok: false, reason: 'fetch_failed' };
-  } catch {
-    // fetchAndStoreOne throws only when the availability INSERT fails, which
-    // in production today means the cache table is missing entirely — see
-    // docs/SCHEMA_DRIFT_0042.md. Distinct from a failed fetch on purpose.
-    return { ok: false, reason: 'store_failed' };
+  } catch (e) {
+    // fetchAndStoreOne throws only when the availability INSERT fails. The
+    // message names the actual cause — a missing table, a blocked write, a
+    // constraint — and is carried out so the failure can be diagnosed instead
+    // of guessed at. Distinct from a failed fetch on purpose.
+    return { ok: false, reason: 'store_failed', detail: e instanceof Error ? e.message : 'insert failed' };
   }
 
   const { count } = await admin
@@ -425,18 +428,35 @@ export async function refreshOneTitle(
 export async function refreshCapability(
   admin: Admin,
   nowMs = Date.now(),
-): Promise<{ available: boolean; reason?: RefreshReason }> {
+): Promise<{ available: boolean; reason?: RefreshReason; detail?: string }> {
   if (!serverEnv.watchmodeKey()) return { available: false, reason: 'no_key' };
+
+  // Each dependency is probed SEPARATELY and its own failure reported, because
+  // "we cannot refresh" has several causes and an operator has to fix the
+  // right one. The first version collapsed them into a single boolean and
+  // reported `available: true` while the write path was failing — a probe that
+  // is wrong is worse than no probe, because it makes the button lie.
+  const ledger = await admin.from('watchmode_call_ledger').select('id').limit(1);
+  if (ledger.error) {
+    return { available: false, reason: 'store_failed', detail: `call ledger: ${ledger.error.message}` };
+  }
+
   try {
     const used = await monthlyCallsUsed(admin, nowMs);
     if (used >= MONTHLY_CALL_LIMIT) return { available: false, reason: 'budget_exhausted' };
-  } catch {
-    // The ledger lives in the same schema as the cache. If we cannot read it,
-    // we cannot write the result either.
-    return { available: false, reason: 'store_failed' };
+  } catch (e) {
+    return { available: false, reason: 'store_failed', detail: e instanceof Error ? e.message : 'budget read failed' };
   }
-  // The cache table must exist for a refresh to have anywhere to land.
-  const { error } = await admin.from('watchmode_availability').select('id', { head: true, count: 'exact' }).limit(1);
-  if (error) return { available: false, reason: 'store_failed' };
+
+  // A SELECT succeeding does NOT prove an INSERT will: the table can be
+  // readable and the write still blocked, and that is exactly the state this
+  // deployment was in while the probe reported everything fine. Both the cache
+  // table and the fetch-state table must be reachable, and the answer records
+  // which one is not.
+  for (const table of ['watchmode_availability', 'watchmode_fetch_state'] as const) {
+    const { error } = await admin.from(table).select('*').limit(1);
+    if (error) return { available: false, reason: 'store_failed', detail: `${table}: ${error.message}` };
+  }
+
   return { available: true };
 }

@@ -94,9 +94,14 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const result = await refreshOneTitle(admin, tmdbId, mediaType).catch(
-    () => ({ ok: false, reason: 'store_failed' as const }),
-  );
+  // `detail` names the missing object or the blocked write. Surfaced for an
+  // operator, never rendered as user-facing copy — the panel shows
+  // REASON_TEXT keyed on the reason code instead.
+  const result = await refreshOneTitle(admin, tmdbId, mediaType).catch((e) => ({
+    ok: false,
+    reason: 'store_failed' as const,
+    detail: e instanceof Error ? e.message : 'refresh threw',
+  }));
 
   void recordReliabilityEvent('availability_resolution_failure', {
     action: 'on_demand_refresh',
@@ -110,7 +115,7 @@ export async function POST(request: Request) {
   const availability = await getCardAvailability(mediaType, tmdbId).catch(() => null);
 
   return NextResponse.json(
-    { ok: result.ok, reason: result.reason ?? null, availability },
+    { ok: result.ok, reason: result.reason ?? null, detail: result.detail ?? null, availability },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }
