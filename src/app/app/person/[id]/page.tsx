@@ -49,7 +49,7 @@ export default async function PersonPage({ params }: { params: { id: string } })
       {/* Filmography, scored for you */}
       <section>
         <h2 className="mb-1 text-lg font-semibold text-white">🎬 Their work — ranked for your taste</h2>
-        <p className="mb-3 text-xs text-slate-400">Best fit for you first, each with your VERD1CT score. Tap any for where to watch.</p>
+        <p className="mb-3 text-xs text-slate-400">Best fit for you first, each with your VERD1CT score. Open a title for details and any verified viewing options.</p>
         {view.works.length === 0 ? (
           <p className="text-sm text-slate-400">No scorable titles found for this person right now.</p>
         ) : (

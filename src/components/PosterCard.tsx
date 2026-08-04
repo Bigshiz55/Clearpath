@@ -227,13 +227,19 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             every title ("…until Andy's…"), which tells you less than none. The
             reserved height grows with it, so nothing moves when the text
             lands. */}
-        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1" />}
+        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={2} className="mt-1" />}
 
         {/* WHY THIS TITLE IS HERE — the first of the card's two questions,
             answered before the second. Compact reasons, one or two shown, the
             rest behind "Why?". Renders nothing when nothing can be
             substantiated; see src/lib/reasons/whyThisTitle.ts. */}
-        {saveId != null && <WhyThisTitle mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+        {saveId != null && (
+          <WhyThisTitle
+            mediaType={mediaType}
+            tmdbId={saveId}
+            className="mt-1.5"
+          />
+        )}
 
         {/* The one-sentence taste explanation, when the rated history supports
             one. Kept alongside the reason chips: the chips say WHAT matched,
@@ -247,7 +253,14 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             "Watch now" here. When we have not confirmed availability it says
             so and offers "Check availability" instead of a link that would go
             nowhere. See src/lib/availability/watchPresentation.ts. */}
-        {saveId != null && <WhereToWatch mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+        {saveId != null && <WhereToWatch
+            mediaType={mediaType}
+            tmdbId={saveId}
+            title={title}
+            year={year ?? null}
+            posterPath={posterPath ?? null}
+            className="mt-1.5"
+          />}
 
         {/* Supporting evidence: the pills, the household verdict, and the
             "Why this Verd1ct?" panel. */}

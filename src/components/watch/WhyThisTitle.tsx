@@ -56,9 +56,10 @@ export function WhyThisTitle({
             // length there and leaves `runtimeMinutes` null — CSI: NY and
             // Harrow both do — so reading only the latter silently dropped the
             // "43-minute episodes" reason on exactly the cards it was for.
-            episodeMinutes: facts.facts?.episodeRuntimeMinutes ?? facts.facts?.runtimeMinutes ?? null,
+            genres: [...(facts.facts?.genres ?? [])],
+            ratedCount: dna?.sampleSize ?? 0,
             seasons: facts.facts?.seasons ?? null,
-            episodes: facts.facts?.episodes ?? null,
+            episodeMinutes: facts.facts?.episodeRuntimeMinutes ?? facts.facts?.runtimeMinutes ?? null,
             ...context,
           }),
         );
@@ -77,7 +78,7 @@ export function WhyThisTitle({
 
   return (
     <section className={`space-y-1 ${className}`} data-testid="why-this-title" aria-label="Why this title is here">
-      <h4 className="text-[10px] font-black uppercase tracking-wide text-slate-500">Why it fits</h4>
+      <h4 className="text-[11px] font-black uppercase tracking-wide text-slate-300">Why it fits</h4>
       <ul className="flex flex-wrap gap-1">
         {shown.map((r) => (
           <li

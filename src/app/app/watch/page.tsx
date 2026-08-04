@@ -120,7 +120,7 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
           <p className="mb-3 text-xs text-slate-400">
             {recsHeading.note}{' '}
             <Link href="/app/taste-quiz" className="text-brand-300 hover:underline">Rate a few in the Taste Quiz</Link>{' '}
-            to sharpen it. Tap any for where to watch.
+            to sharpen it. Open a title for details and any verified viewing options.
           </p>
           {/* A DECK, NOT A PAGE. This used to be a fixed slice of twelve that
               re-sorted itself every time the user's own taps changed their

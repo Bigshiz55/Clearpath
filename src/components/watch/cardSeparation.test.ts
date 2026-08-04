@@ -31,8 +31,8 @@ describe('the verdict is visibly a verdict, not an availability instruction', ()
   });
 
   it('tells a screen reader which kind of claim it is', () => {
-    expect(verdictPanel).toMatch(/aria-label=\{`Your recommendation verdict/);
-    expect(verdictPanel).toContain('not where it is available');
+    expect(verdictPanel).toMatch(/aria-label=\{`Your recommendation verdict is/);
+    expect(verdictPanel).toContain('Current viewing availability is not confirmed');
   });
 
   it('the availability block announces itself separately', () => {
@@ -140,5 +140,94 @@ describe('the reasons read the field the data actually uses', () => {
     // The regex fixes the ORDER too: episodeRuntimeMinutes must come first,
     // with the movie field kept as the fallback rather than dropped.
     expect(line).toMatch(/episodeRuntimeMinutes\s*\?\?\s*facts\.facts\?\.runtimeMinutes/);
+  });
+});
+
+describe('the card does not repeat its own metadata', () => {
+  const why = read('src/components/watch/WhyThisTitle.tsx');
+  const reasons = read('src/lib/reasons/whyThisTitle.ts');
+
+  it('run length and episode length are not reasons on their own', () => {
+    // Shipped and observed: "Why it fits" read "3 seasons · 30 episodes",
+    // word for word the metadata line two rows above it.
+    expect(reasons).not.toMatch(/kind: 'run'[,}]/);
+    expect(reasons).not.toMatch(/kind: 'length'[,}]/);
+    expect(reasons).toContain("kind: 'length_request'");
+    expect(reasons).toContain("kind: 'run_request'");
+  });
+
+  it('they return only when an ACTIVE REQUEST makes them personal', () => {
+    expect(reasons).toContain('requestedMaxMinutes');
+    expect(reasons).toContain('requestedCompletedSeries');
+    expect(reasons).toContain('fit the time you asked for');
+  });
+
+  it('the fallback needs a real profile behind it', () => {
+    expect(reasons).toContain("(input.ratedCount ?? 0) > 0");
+  });
+
+  it('the card no longer needs an exclusion list to avoid duplicating itself', () => {
+    expect(why).not.toContain('exclude');
+    expect(posterCard).not.toContain('exclude=');
+  });
+});
+
+describe('no action is rendered without a destination', () => {
+  it('an unknown state gets a real button wired to the availability panel', () => {
+    expect(whereToWatch).toContain('setPanelOpen(true)');
+    expect(whereToWatch).toContain('<AvailabilityPanel');
+  });
+
+  it('the button label follows real server capability, not hope', () => {
+    expect(whereToWatch).toContain("'/api/availability/refresh'");
+    expect(whereToWatch).toMatch(/refreshable === false \? 'Notify me when confirmed'/);
+  });
+
+  it('a CTA with no link and no panel renders as text, not as a button', () => {
+    // The third branch: verified options exist but none carries a deep link.
+    // There is nothing to press, so nothing is styled as pressable.
+    expect(whereToWatch).toMatch(/<span data-testid="where-to-watch-cta"/);
+  });
+
+  it('the panel runs a real refresh and names every failure', () => {
+    const panel = read('src/components/watch/AvailabilityPanel.tsx');
+    expect(panel).toContain("fetch('/api/availability/refresh'");
+    for (const r of ['no_key', 'budget_exhausted', 'fetch_failed', 'store_failed', 'rate_limited']) {
+      expect(panel, r).toContain(r);
+    }
+  });
+
+  it('the notify path does something real, not just a label change', () => {
+    const panel = read('src/components/watch/AvailabilityPanel.tsx');
+    expect(panel).toContain('addToWatchlist');
+  });
+});
+
+describe('the unknown state is short', () => {
+  it('shows a two-word label, keeping the sentence as the description', () => {
+    expect(whereToWatch).toContain("'Not yet confirmed'");
+    expect(whereToWatch).toContain('title={note}');
+  });
+
+  it('the section labels are readable rather than near-invisible', () => {
+    for (const src of [whereToWatch, read('src/components/watch/WhyThisTitle.tsx')]) {
+      expect(src).not.toMatch(/text-\[10px\] font-black uppercase tracking-wide text-slate-500/);
+    }
+  });
+});
+
+describe('the verdict states both claims for a screen reader', () => {
+  it('names the recommendation AND the availability separately', () => {
+    expect(verdictPanel).toContain('Your recommendation verdict is');
+    expect(verdictPanel).toContain('Current viewing availability is not confirmed');
+  });
+});
+
+describe('the page header promises only what exists', () => {
+  it('does not claim every title has a place to watch', () => {
+    for (const f of ['src/app/app/watch/page.tsx', 'src/app/app/person/[id]/page.tsx']) {
+      expect(read(f), f).not.toContain('Tap any for where to watch');
+      expect(read(f), f).toContain('any verified viewing options');
+    }
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { AvailabilityPanel } from './AvailabilityPanel';
 import { loadTileFacts } from '@/lib/tileFacts';
 import type { MediaType } from '@/lib/types';
 import {
@@ -29,9 +30,28 @@ import {
  * inventing a second availability system. They are merged and ranked by the
  * same resolver as everything else.
  */
+/**
+ * CAN A LIVE CHECK ACTUALLY RUN? Asked ONCE per page, not once per card — a
+ * grid of twenty cards must not fire twenty identical probes. The answer
+ * decides which honest label the button carries: "Check availability" only
+ * when a check is genuinely possible, "Notify me when confirmed" when it is
+ * not. A button must never offer something the server cannot do.
+ */
+let capabilityProbe: Promise<boolean> | null = null;
+function canRefresh(): Promise<boolean> {
+  capabilityProbe ??= fetch('/api/availability/refresh')
+    .then((r) => (r.ok ? r.json() : { available: false }))
+    .then((j: { available?: boolean }) => Boolean(j.available))
+    .catch(() => false);
+  return capabilityProbe;
+}
+
 export function WhereToWatch({
   mediaType,
   tmdbId,
+  title = '',
+  year = null,
+  posterPath = null,
   extraOptions = [],
   originalNetwork = null,
   showCta = true,
@@ -39,6 +59,10 @@ export function WhereToWatch({
 }: {
   mediaType: MediaType;
   tmdbId: number;
+  /** Shown in the availability panel's heading. */
+  title?: string;
+  year?: number | null;
+  posterPath?: string | null;
   /** Verified options this surface already holds — e.g. a live airing. */
   extraOptions?: WatchOption[];
   /** Historical metadata. Rendered as history, never as availability. */
@@ -47,6 +71,16 @@ export function WhereToWatch({
   className?: string;
 }) {
   const [presentation, setPresentation] = useState<WatchPresentation | null>(null);
+  const [refreshable, setRefreshable] = useState<boolean | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void canRefresh().then((v) => active && setRefreshable(v));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -88,7 +122,7 @@ export function WhereToWatch({
       data-status={status}
       data-cta={cta.kind}
     >
-      <h4 className="text-[10px] font-black uppercase tracking-wide text-slate-500">Where to watch</h4>
+      <h4 className="text-[11px] font-black uppercase tracking-wide text-slate-300">Where to watch</h4>
 
       {lines.map((l, i) => {
         const body = (
@@ -125,9 +159,13 @@ export function WhereToWatch({
         );
       })}
 
+      {/* SHORT, NOT A SENTENCE. "We haven't confirmed where this is currently
+          available." is accurate but it is a paragraph on a card, repeated
+          twenty times down a grid. The label says the same thing in two words
+          and the full sentence stays as the accessible description. */}
       {note && (
-        <p className="text-[11px] text-slate-500" data-testid="where-to-watch-note">
-          {note}
+        <p className="text-[12px] font-semibold text-slate-400" data-testid="where-to-watch-note" title={note}>
+          {status === 'unknown' ? 'Not yet confirmed' : 'None found'}
         </p>
       )}
 
@@ -141,6 +179,13 @@ export function WhereToWatch({
         </p>
       )}
 
+      {/* THE PRIMARY ACTION. Three shapes, and none of them is a button with
+          nowhere to go:
+            - a real verified link  -> an anchor that opens it,
+            - an unknown state      -> a button that opens the panel and runs
+                                       a live check, or offers the notify path
+                                       when no check is possible,
+            - anything else         -> plain text, not styled as pressable. */}
       {showCta && (
         cta.href ? (
           <a
@@ -152,17 +197,37 @@ export function WhereToWatch({
           >
             {cta.label}
           </a>
-        ) : (
-          // No verified link means no link. The label still tells the user what
-          // the next real step is, but the card does not fabricate a
-          // destination to make the button feel complete.
-          <span
+        ) : status !== 'available' ? (
+          <button
+            type="button"
+            onClick={() => setPanelOpen(true)}
             data-testid="where-to-watch-cta"
-            className="mt-0.5 inline-flex min-h-[36px] items-center rounded-lg border border-white/15 px-3 text-[12px] font-bold text-slate-300"
+            data-refreshable={refreshable === null ? 'unknown' : String(refreshable)}
+            className="mt-0.5 inline-flex min-h-[36px] items-center rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[12px] font-bold text-brand-100 transition hover:bg-brand-500/25"
           >
+            {refreshable === false ? 'Notify me when confirmed' : cta.label}
+          </button>
+        ) : (
+          // Verified options exist but none carries a link (several services,
+          // no deep link). Rendered as a label, because there is nothing to
+          // press — the rows above are the answer.
+          <span data-testid="where-to-watch-cta" className="mt-0.5 inline-flex min-h-[36px] items-center text-[12px] font-bold text-slate-300">
             {cta.label}
           </span>
         )
+      )}
+
+      {panelOpen && (
+        <AvailabilityPanel
+          mediaType={mediaType}
+          tmdbId={tmdbId}
+          title={title}
+          year={year}
+          posterPath={posterPath}
+          originalNetwork={originalNetwork}
+          onClose={() => setPanelOpen(false)}
+          onResolved={(p) => setPresentation(p)}
+        />
       )}
     </section>
   );

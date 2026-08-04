@@ -336,3 +336,107 @@ export async function runWatchmodeSync(admin: Admin, nowMs = Date.now()): Promis
     fetched, errors, monthlyUsedBefore: usedBefore, monthlyUsedAfter,
   };
 }
+
+// ---------------------------------------------------------------------------
+// ON-DEMAND REFRESH — the one sanctioned request-time path
+// ---------------------------------------------------------------------------
+
+/**
+ * ONE TITLE, ON A USER'S EXPLICIT REQUEST.
+ *
+ * This module's header says Watchmode is called from a cron tick and never
+ * from a request handler. This is the deliberate, bounded exception, and it
+ * exists because the alternative was worse: the card's "Check availability"
+ * button had nothing behind it, and a button that does nothing is a lie told
+ * with a cursor.
+ *
+ * Every guard the cron path uses still applies, and one more besides:
+ *   - the SAME monthly budget ledger and the same 2,000-call hard cap,
+ *   - the same wholesale-replace write, so a dropped service disappears,
+ *   - and the caller must rate-limit per user (see the route), because this
+ *     is the only Watchmode path a stranger can trigger at all.
+ *
+ * Returns a REASON on every failure rather than a bare false — the panel
+ * shows the user why, and "we are out of budget this month" and "we have no
+ * key" are different things they may act on differently.
+ */
+export type RefreshReason = 'no_key' | 'budget_exhausted' | 'fetch_failed' | 'store_failed';
+
+export interface RefreshOneResult {
+  ok: boolean;
+  reason?: RefreshReason;
+  /** How many verified sources the refresh landed. 0 is a real answer. */
+  sourceCount?: number;
+}
+
+export async function refreshOneTitle(
+  admin: Admin,
+  tmdbId: number,
+  tmdbMediaType: 'movie' | 'tv',
+  nowMs = Date.now(),
+): Promise<RefreshOneResult> {
+  const apiKey = serverEnv.watchmodeKey();
+  if (!apiKey) return { ok: false, reason: 'no_key' };
+
+  const used = await monthlyCallsUsed(admin, nowMs);
+  if (used >= MONTHLY_CALL_LIMIT) return { ok: false, reason: 'budget_exhausted' };
+
+  // watchmodeId is only used for the fetch_state row's bookkeeping column —
+  // `fetchWatchmode` resolves from the TMDB id directly — so a title absent
+  // from the id map can still be refreshed rather than silently refused.
+  const { data: mapped } = await admin
+    .from('watchmode_title_map')
+    .select('watchmode_id')
+    .eq('tmdb_id', tmdbId)
+    .eq('tmdb_media_type', tmdbMediaType)
+    .maybeSingle();
+
+  const nowIso = new Date(nowMs).toISOString();
+  try {
+    const outcome = await fetchAndStoreOne(
+      admin,
+      apiKey,
+      { tmdbId, tmdbMediaType, watchmodeId: (mapped?.watchmode_id as number | undefined) ?? 0, tier: 'watchlist' },
+      nowIso,
+    );
+    if (outcome === 'error') return { ok: false, reason: 'fetch_failed' };
+  } catch {
+    // fetchAndStoreOne throws only when the availability INSERT fails, which
+    // in production today means the cache table is missing entirely — see
+    // docs/SCHEMA_DRIFT_0042.md. Distinct from a failed fetch on purpose.
+    return { ok: false, reason: 'store_failed' };
+  }
+
+  const { count } = await admin
+    .from('watchmode_availability')
+    .select('id', { count: 'exact', head: true })
+    .eq('tmdb_id', tmdbId)
+    .eq('tmdb_media_type', tmdbMediaType);
+
+  return { ok: true, sourceCount: count ?? 0 };
+}
+
+/**
+ * Can an on-demand refresh actually do anything right now? Answered WITHOUT
+ * spending a call, so the card can label its button truthfully before the
+ * user presses it — "Check availability" when a check is possible, and
+ * "Notify me when confirmed" when it is not.
+ */
+export async function refreshCapability(
+  admin: Admin,
+  nowMs = Date.now(),
+): Promise<{ available: boolean; reason?: RefreshReason }> {
+  if (!serverEnv.watchmodeKey()) return { available: false, reason: 'no_key' };
+  try {
+    const used = await monthlyCallsUsed(admin, nowMs);
+    if (used >= MONTHLY_CALL_LIMIT) return { available: false, reason: 'budget_exhausted' };
+  } catch {
+    // The ledger lives in the same schema as the cache. If we cannot read it,
+    // we cannot write the result either.
+    return { available: false, reason: 'store_failed' };
+  }
+  // The cache table must exist for a refresh to have anywhere to land.
+  const { error } = await admin.from('watchmode_availability').select('id', { head: true, count: 'exact' }).limit(1);
+  if (error) return { available: false, reason: 'store_failed' };
+  return { available: true };
+}

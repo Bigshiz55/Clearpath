@@ -101,7 +101,7 @@ export function AlgorithmScore({
               /* Screen readers get the distinction spelled out: without this,
                  "STREAM IT" is announced as a bare imperative indistinguishable
                  from the availability row beneath it. */
-              aria-label={`Your recommendation verdict: ${v.call}. This is how likely you are to enjoy it, not where it is available.`}
+              aria-label={`Your recommendation verdict is ${v.call}. Current viewing availability is not confirmed by this panel — see Where to watch.`}
             >
               {v.call}
             </span>
