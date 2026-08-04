@@ -4,12 +4,14 @@ import { createClient } from '@/lib/supabase/server';
 import { listPacks, getPackPreview } from '@/lib/packs/packs';
 import type { Pack, PackPreview } from '@/lib/packs/types';
 import { PublicHeader, PublicFooter } from '@/components/discovery/DiscoveryLayout';
+import { publicEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Packs · WatchVerd1ct',
   description: 'Specialized tracking, schedules, and recommendations for the way real fans watch — Hallmark, Lifetime, and true crime.',
+  alternates: { canonical: `${publicEnv.siteUrl()}/packs` },
 };
 
 /**

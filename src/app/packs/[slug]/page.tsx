@@ -11,16 +11,21 @@ import { FranchiseOrderView } from '@/components/packs/FranchiseOrderView';
 import { CaseSearchBox } from '@/components/packs/CaseSearchBox';
 import { PackEmptyState } from '@/components/packs/PackEmptyState';
 import { PublicHeader, PublicFooter } from '@/components/discovery/DiscoveryLayout';
+import { publicEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const canonical = `${publicEnv.siteUrl()}/packs/${params.slug}`;
   try {
     const supabase = createClient();
     const pack = await getPackBySlug(supabase, params.slug);
-    return { title: pack ? `${pack.displayName} · WatchVerd1ct` : 'Pack · WatchVerd1ct' };
+    return {
+      title: pack ? `${pack.displayName} · WatchVerd1ct` : 'Pack · WatchVerd1ct',
+      alternates: { canonical },
+    };
   } catch {
-    return { title: 'Pack · WatchVerd1ct' };
+    return { title: 'Pack · WatchVerd1ct', alternates: { canonical } };
   }
 }
 

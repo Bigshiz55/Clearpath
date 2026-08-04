@@ -3,9 +3,20 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { Logo } from '@/components/Logo';
 import { JoinForm } from '@/components/JoinForm';
+import { publicEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Join a jury · WatchVerd1ct' };
+
+export function generateMetadata({ params }: { params: { code: string } }): Metadata {
+  return {
+    title: 'Join a jury · WatchVerd1ct',
+    alternates: { canonical: `${publicEnv.siteUrl()}/join/${params.code}` },
+    openGraph: { url: `${publicEnv.siteUrl()}/join/${params.code}` },
+    // Invite codes are personal and single-use — not meant to be crawled or
+    // surfaced in search results.
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function JoinPage({ params }: { params: { code: string } }) {
   let crewName: string | null = null;

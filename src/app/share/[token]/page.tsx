@@ -8,6 +8,7 @@ import { ProviderRow } from '@/components/ProviderRow';
 import { Poster } from '@/components/PosterCard';
 import { getPublicShare } from '@/lib/share';
 import { primaryCallFromTier } from '@/lib/scoring/verdict';
+import { publicEnv } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,13 +16,19 @@ export async function generateMetadata({ params }: { params: { token: string } }
   const snap = await getPublicShare(params.token);
   if (!snap) return { title: 'Verdict not found' };
   const title = `${snap.title}${snap.year ? ` (${snap.year})` : ''} — ${snap.tier}`;
+  // Without its own canonical/og:url, this page fell back to the layout's
+  // root-domain default — every shared Verdict card unfurled with the
+  // homepage's URL instead of its own /share/[token] link.
+  const url = `${publicEnv.siteUrl()}/share/${params.token}`;
   return {
     title,
     description: snap.oneLiner,
+    alternates: { canonical: url },
     openGraph: {
       title,
       description: snap.oneLiner,
       type: 'article',
+      url,
     },
     twitter: { card: 'summary_large_image', title, description: snap.oneLiner },
   };
