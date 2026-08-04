@@ -26,6 +26,8 @@ import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
 import { SaveButton } from '@/components/SaveButton';
 import { CardVerdict } from '@/components/CardVerdict';
+import { WhereToWatch } from '@/components/watch/WhereToWatch';
+import { liveOptionFromAiring } from '@/lib/availability/watchPresentation';
 import { SignalIcon } from '@/components/RemindButton';
 import { WCheck } from '@/components/WCheck';
 import { groupByShow, repeatNote } from '@/lib/tvHighlights';
@@ -325,7 +327,21 @@ export function OnTvGuide({
                           {a.criticImdb != null && <span className="rounded bg-[#f5c518] px-1 text-[10px] font-black text-black" title="IMDb">IMDb {a.criticImdb.toFixed(1)}</span>}
                         </div>
                       )}
-                      <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
+                      {/* WHERE TO WATCH — the airing itself is a verified option, so the
+                          network, the local time and any streaming source we hold are
+                          resolved together by the one shared presenter rather than
+                          this card deciding for itself. An unresolved listing keeps
+                          the bare network chip: there is no title to look up. */}
+                      {resolved ? (
+                        <WhereToWatch
+                          mediaType={a.mediaType!}
+                          tmdbId={a.tmdbId!}
+                          extraOptions={[liveOptionFromAiring(a)]}
+                          className="mt-1"
+                        />
+                      ) : (
+                        <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100">{a.network}</div>
+                      )}
                       {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
                       {/* THE DECISION ROW, BELOW THE TITLE — and only on a card
                           that resolved to a real title. An unresolved listing
@@ -448,6 +464,9 @@ export function OnTvGuide({
                       <div className="mt-1 text-[11px] text-slate-500" data-testid="no-ratings">No ratings for this one yet.</div>
                     ) : null}
                     <div className="mt-1 line-clamp-1 rounded border border-brand-400/30 bg-brand-500/15 px-1 py-0.5 text-[11px] font-bold leading-tight text-brand-100" data-testid="airing-channel">{a.network}</div>
+                    {a.tmdbId != null && a.mediaType != null && (
+                      <WhereToWatch mediaType={a.mediaType} tmdbId={a.tmdbId} extraOptions={[liveOptionFromAiring(a)]} className="mt-1" />
+                    )}
                     {resolved && <CardDna mediaType={a.mediaType!} tmdbId={a.tmdbId!} className="mt-1.5" />}
 
                     <div className="mt-2 flex items-center gap-1.5 border-t border-white/10 pt-2">

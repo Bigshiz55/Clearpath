@@ -7,7 +7,8 @@ import { WCheck } from './WCheck';
 import { CardSynopsis } from './CardSynopsis';
 import { CardFacts } from './CardFacts';
 import { CardFit } from './CardFit';
-import { CardAvailability } from './CardAvailability';
+import { WhereToWatch } from './watch/WhereToWatch';
+import { WhyThisTitle } from './watch/WhyThisTitle';
 
 interface PosterCardProps {
   href?: string;
@@ -228,17 +229,25 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             lands. */}
         {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={3} className="mt-1" />}
 
-        {/* Why YOU would like it — one sentence, only when the user's rated
-            history genuinely supports one. Silent otherwise: the boilerplate
-            that used to fill this spot was removed on request, and silence is
-            the honest empty state. */}
+        {/* WHY THIS TITLE IS HERE — the first of the card's two questions,
+            answered before the second. Compact reasons, one or two shown, the
+            rest behind "Why?". Renders nothing when nothing can be
+            substantiated; see src/lib/reasons/whyThisTitle.ts. */}
+        {saveId != null && <WhyThisTitle mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+
+        {/* The one-sentence taste explanation, when the rated history supports
+            one. Kept alongside the reason chips: the chips say WHAT matched,
+            this says it in the user's own terms. */}
         {saveId != null && <CardFit mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
 
-        {/* Where to watch it — cached Watchmode sources, never a live call
-            from a card. "Availability not currently confirmed" and "not
-            currently available" are deliberately distinct from each other
-            and from a silent blank — see CardAvailability's own doc comment. */}
-        {saveId != null && <CardAvailability mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+        {/* WHERE TO WATCH — the question of FACT, kept separate from the
+            question of TASTE answered by the verdict panel above it.
+            Everything it says, including its call to action, comes from
+            `resolveWatchPresentation`; a high score can never produce
+            "Watch now" here. When we have not confirmed availability it says
+            so and offers "Check availability" instead of a link that would go
+            nowhere. See src/lib/availability/watchPresentation.ts. */}
+        {saveId != null && <WhereToWatch mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
 
         {/* Supporting evidence: the pills, the household verdict, and the
             "Why this Verd1ct?" panel. */}
