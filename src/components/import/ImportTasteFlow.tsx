@@ -408,10 +408,18 @@ export function ImportTasteFlow() {
             <li data-testid="sum-dnf">{summary.dnf} started but not finished</li>
             <li data-testid="sum-skipped">{summary.skipped} skipped</li>
           </ul>
+          {/* Both sentences below are load-bearing anti-overclaim copy that
+              predates this screen's rewrite; they were briefly lost when the
+              summary was rebuilt around real counts, and import-taste.spec
+              pins them for exactly that reason. A bigger import means we know
+              MORE about you, not that we are more RIGHT about you. */}
           <p className="mt-3 text-xs text-slate-400">
+            This measures how much we know about you, not how accurate our recommendations will be.
+            Watching something is recorded as watching it — we have not assumed you enjoyed it.
+          </p>
+          <p className="mt-2 text-xs text-slate-400">
             Ratings are a best-effort translation of what you told us (Loved/Liked/Disliked) — watching
-            something with no stated opinion is recorded as watched, with no rating and no assumption you
-            enjoyed it.
+            something with no stated opinion is recorded as watched, with no rating.
           </p>
         </div>
         {undoState === 'error' && (

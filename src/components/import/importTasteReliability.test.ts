@@ -72,9 +72,43 @@ describe('undoImportedTitles is a real deletion, not a decorative reset', () => 
   });
 });
 
-describe('the import-taste route gets the same auto-provisioned guest identity every other write-on-behalf-of-an-anonymous-visitor path uses', () => {
-  it('is listed as a protected prefix in the session middleware', () => {
-    const src = read('src/lib/supabase/middleware.ts');
-    expect(src).toMatch(/const PROTECTED_PREFIXES = \[.*'\/import-taste'.*\]/);
+/**
+ * A block here previously asserted the OPPOSITE — that `/import-taste` WAS a
+ * middleware-protected prefix, so the confirm step would always have a guest
+ * session to write with. That was my own change earlier in this sprint and it
+ * was wrong: PROTECTED_PREFIXES' failure mode is a redirect to /login, so a
+ * failed anonymous sign-in made the page unreachable instead of degraded, and
+ * the landing page's "No account needed to explore" became false. The full
+ * Playwright suite caught it as 30 failures. The replacement assertions are at
+ * the bottom of this file.
+ */
+
+/**
+ * REGRESSION: /import-taste must NOT be a middleware-protected prefix.
+ *
+ * Adding it there (briefly, during the reliability sprint) meant that whenever
+ * anonymous sign-in failed, the middleware redirected the whole page to
+ * /login — so the import became unreachable instead of degraded, and the
+ * landing page's "No account needed to explore" became false. The full
+ * Playwright suite caught it as 30 failures: `csv-input` never rendered
+ * because the page had been redirected away.
+ *
+ * The session is only needed by the final apply step, which the component
+ * already handles on its own (see the `import-signin-required` assertions
+ * above).
+ */
+describe('import-taste is reachable without a session', () => {
+  const middleware = readFileSync(join(process.cwd(), 'src/lib/supabase/middleware.ts'), 'utf8');
+
+  it('is not listed as a protected prefix', () => {
+    const line = middleware.match(/const PROTECTED_PREFIXES = \[[^\]]*\]/)?.[0] ?? '';
+    expect(line).not.toContain('import-taste');
+    // The routes that genuinely are gated must stay gated.
+    expect(line).toContain("'/app'");
+    expect(line).toContain("'/lite'");
+  });
+
+  it('still explains why, so it is not re-added by reflex', () => {
+    expect(middleware).toMatch(/DELIBERATELY NOT '\/import-taste'/);
   });
 });

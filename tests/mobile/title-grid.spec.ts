@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { stubQuizWriteSucceeds } from './quizWriteStub';
 
 /**
  * THE TWELVE-CARD GRID.
@@ -33,6 +34,10 @@ function items(n: number) {
 
 /** A server that honours `exclude`, like the real one now does. */
 async function open(page: Page, w = 1280, h = 800, n = 20) {
+  // The harness has no session, so the quiz's write can never land here on its
+  // own — see quizWriteStub.ts for why that is the harness's limitation and
+  // not the product's behaviour.
+  await stubQuizWriteSucceeds(page);
   await page.route('**/api/calibration*', async (route) => {
     const url = new URL(route.request().url());
     const excluded = new Set((url.searchParams.get('exclude') ?? '').split(',').filter(Boolean));

@@ -1,0 +1,759 @@
+{
+  "generatedAt": "2026-08-04",
+  "source": "TVmaze /schedule/full",
+  "license": "CC BY-SA",
+  "totalFutureAirings": 7476,
+  "usNetworks": 75,
+  "rows": [
+    {
+      "network": "Fox News Channel",
+      "tvmazeNetworkId": 185,
+      "timezone": "America/New_York",
+      "airings": 364,
+      "distinctDates": 28,
+      "distinctShows": 16,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-03"
+    },
+    {
+      "network": "MS NOW",
+      "tvmazeNetworkId": 201,
+      "timezone": "America/New_York",
+      "airings": 317,
+      "distinctDates": 35,
+      "distinctShows": 18,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-06"
+    },
+    {
+      "network": "Newsmax",
+      "tvmazeNetworkId": 1982,
+      "timezone": "America/New_York",
+      "airings": 288,
+      "distinctDates": 24,
+      "distinctShows": 12,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-03"
+    },
+    {
+      "network": "NewsNation",
+      "tvmazeNetworkId": 28,
+      "timezone": "America/New_York",
+      "airings": 255,
+      "distinctDates": 34,
+      "distinctShows": 12,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-06"
+    },
+    {
+      "network": "CNBC",
+      "tvmazeNetworkId": 93,
+      "timezone": "America/New_York",
+      "airings": 241,
+      "distinctDates": 25,
+      "distinctShows": 10,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-04"
+    },
+    {
+      "network": "CNN",
+      "tvmazeNetworkId": 40,
+      "timezone": "America/New_York",
+      "airings": 232,
+      "distinctDates": 36,
+      "distinctShows": 18,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-12-31"
+    },
+    {
+      "network": "Fox Business Network",
+      "tvmazeNetworkId": 524,
+      "timezone": "America/New_York",
+      "airings": 216,
+      "distinctDates": 24,
+      "distinctShows": 9,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-03"
+    },
+    {
+      "network": "NBC",
+      "tvmazeNetworkId": 1,
+      "timezone": "America/New_York",
+      "airings": 164,
+      "distinctDates": 75,
+      "distinctShows": 37,
+      "firstDate": "2026-08-03",
+      "lastDate": "2027-07-04"
+    },
+    {
+      "network": "CBS",
+      "tvmazeNetworkId": 2,
+      "timezone": "America/New_York",
+      "airings": 139,
+      "distinctDates": 64,
+      "distinctShows": 33,
+      "firstDate": "2026-08-03",
+      "lastDate": "2027-01-10"
+    },
+    {
+      "network": "ABC",
+      "tvmazeNetworkId": 3,
+      "timezone": "America/New_York",
+      "airings": 120,
+      "distinctDates": 53,
+      "distinctShows": 40,
+      "firstDate": "2026-08-03",
+      "lastDate": "2028-03-05"
+    },
+    {
+      "network": "ABC News Live",
+      "tvmazeNetworkId": 616,
+      "timezone": "America/New_York",
+      "airings": 82,
+      "distinctDates": 27,
+      "distinctShows": 5,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-04"
+    },
+    {
+      "network": "Syndication",
+      "tvmazeNetworkId": 72,
+      "timezone": "America/New_York",
+      "airings": 78,
+      "distinctDates": 28,
+      "distinctShows": 8,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-14"
+    },
+    {
+      "network": "ESPN",
+      "tvmazeNetworkId": 39,
+      "timezone": "America/New_York",
+      "airings": 68,
+      "distinctDates": 38,
+      "distinctShows": 34,
+      "firstDate": "2026-08-03",
+      "lastDate": "2027-01-25"
+    },
+    {
+      "network": "Peacock",
+      "tvmazeNetworkId": 347,
+      "timezone": "America/New_York",
+      "airings": 54,
+      "distinctDates": 27,
+      "distinctShows": 8,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-11-12"
+    },
+    {
+      "network": "PBS",
+      "tvmazeNetworkId": 85,
+      "timezone": "America/New_York",
+      "airings": 53,
+      "distinctDates": 41,
+      "distinctShows": 12,
+      "firstDate": "2026-08-03",
+      "lastDate": "2027-07-04"
+    },
+    {
+      "network": "Hulu",
+      "tvmazeNetworkId": 2,
+      "timezone": "America/New_York",
+      "airings": 43,
+      "distinctDates": 20,
+      "distinctShows": 6,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-28"
+    },
+    {
+      "network": "FOX",
+      "tvmazeNetworkId": 4,
+      "timezone": "America/New_York",
+      "airings": 43,
+      "distinctDates": 24,
+      "distinctShows": 24,
+      "firstDate": "2026-08-04",
+      "lastDate": "2027-05-30"
+    },
+    {
+      "network": "HGTV",
+      "tvmazeNetworkId": 192,
+      "timezone": "America/New_York",
+      "airings": 38,
+      "distinctDates": 23,
+      "distinctShows": 14,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-10-07"
+    },
+    {
+      "network": "History",
+      "tvmazeNetworkId": 53,
+      "timezone": "America/New_York",
+      "airings": 37,
+      "distinctDates": 22,
+      "distinctShows": 13,
+      "firstDate": "2026-08-04",
+      "lastDate": "2026-09-01"
+    },
+    {
+      "network": "The CW",
+      "tvmazeNetworkId": 5,
+      "timezone": "America/New_York",
+      "airings": 26,
+      "distinctDates": 24,
+      "distinctShows": 6,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-10-06"
+    },
+    {
+      "network": "Telemundo",
+      "tvmazeNetworkId": 219,
+      "timezone": "America/New_York",
+      "airings": 25,
+      "distinctDates": 25,
+      "distinctShows": 1,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-04"
+    },
+    {
+      "network": "Bravo",
+      "tvmazeNetworkId": 52,
+      "timezone": "America/New_York",
+      "airings": 24,
+      "distinctDates": 16,
+      "distinctShows": 8,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-08"
+    },
+    {
+      "network": "USA Network",
+      "tvmazeNetworkId": 30,
+      "timezone": "America/New_York",
+      "airings": 23,
+      "distinctDates": 13,
+      "distinctShows": 2,
+      "firstDate": "2026-08-07",
+      "lastDate": "2026-10-30"
+    },
+    {
+      "network": "Food Network",
+      "tvmazeNetworkId": 81,
+      "timezone": "America/New_York",
+      "airings": 22,
+      "distinctDates": 18,
+      "distinctShows": 9,
+      "firstDate": "2026-08-04",
+      "lastDate": "2026-09-08"
+    },
+    {
+      "network": "A&E",
+      "tvmazeNetworkId": 29,
+      "timezone": "America/New_York",
+      "airings": 21,
+      "distinctDates": 9,
+      "distinctShows": 8,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-08-20"
+    },
+    {
+      "network": "NBC.com",
+      "tvmazeNetworkId": 11,
+      "timezone": "America/New_York",
+      "airings": 20,
+      "distinctDates": 10,
+      "distinctShows": 2,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-08-14"
+    },
+    {
+      "network": "Comedy Central",
+      "tvmazeNetworkId": 23,
+      "timezone": "America/New_York",
+      "airings": 20,
+      "distinctDates": 18,
+      "distinctShows": 2,
+      "firstDate": "2026-09-08",
+      "lastDate": "2026-11-25"
+    },
+    {
+      "network": "Discovery",
+      "tvmazeNetworkId": 66,
+      "timezone": "America/New_York",
+      "airings": 19,
+      "distinctDates": 12,
+      "distinctShows": 10,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-08-19"
+    },
+    {
+      "network": "TNT",
+      "tvmazeNetworkId": 14,
+      "timezone": "America/New_York",
+      "airings": 19,
+      "distinctDates": 19,
+      "distinctShows": 2,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-26"
+    },
+    {
+      "network": "Nickelodeon",
+      "tvmazeNetworkId": 27,
+      "timezone": "America/New_York",
+      "airings": 19,
+      "distinctDates": 4,
+      "distinctShows": 4,
+      "firstDate": "2026-08-07",
+      "lastDate": "2026-11-14"
+    },
+    {
+      "network": "STARZ",
+      "tvmazeNetworkId": 17,
+      "timezone": "America/New_York",
+      "airings": 19,
+      "distinctDates": 17,
+      "distinctShows": 4,
+      "firstDate": "2026-08-07",
+      "lastDate": "2026-11-27"
+    },
+    {
+      "network": "TLC",
+      "tvmazeNetworkId": 80,
+      "timezone": "America/New_York",
+      "airings": 18,
+      "distinctDates": 11,
+      "distinctShows": 10,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-01"
+    },
+    {
+      "network": "Investigation Discovery",
+      "tvmazeNetworkId": 89,
+      "timezone": "America/New_York",
+      "airings": 18,
+      "distinctDates": 9,
+      "distinctShows": 6,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-09-30"
+    },
+    {
+      "network": "NFL Network",
+      "tvmazeNetworkId": 205,
+      "timezone": "America/New_York",
+      "airings": 17,
+      "distinctDates": 15,
+      "distinctShows": 5,
+      "firstDate": "2026-08-03",
+      "lastDate": "2027-05-01"
+    },
+    {
+      "network": "HBO",
+      "tvmazeNetworkId": 8,
+      "timezone": "America/New_York",
+      "airings": 17,
+      "distinctDates": 15,
+      "distinctShows": 8,
+      "firstDate": "2026-08-04",
+      "lastDate": "2026-12-25"
+    },
+    {
+      "network": "BET",
+      "tvmazeNetworkId": 56,
+      "timezone": "America/New_York",
+      "airings": 15,
+      "distinctDates": 14,
+      "distinctShows": 2,
+      "firstDate": "2026-08-04",
+      "lastDate": "2026-09-30"
+    },
+    {
+      "network": "FX",
+      "tvmazeNetworkId": 13,
+      "timezone": "America/New_York",
+      "airings": 14,
+      "distinctDates": 10,
+      "distinctShows": 2,
+      "firstDate": "2026-09-08",
+      "lastDate": "2026-11-19"
+    },
+    {
+      "network": "AMC",
+      "tvmazeNetworkId": 20,
+      "timezone": "America/New_York",
+      "airings": 13,
+      "distinctDates": 13,
+      "distinctShows": 1,
+      "firstDate": "2026-08-06",
+      "lastDate": "2026-10-29"
+    },
+    {
+      "network": "ESPN+",
+      "tvmazeNetworkId": 265,
+      "timezone": "America/New_York",
+      "airings": 12,
+      "distinctDates": 12,
+      "distinctShows": 2,
+      "firstDate": "2026-08-11",
+      "lastDate": "2026-11-28"
+    },
+    {
+      "network": "TBS",
+      "tvmazeNetworkId": 32,
+      "timezone": "America/New_York",
+      "airings": 11,
+      "distinctDates": 11,
+      "distinctShows": 3,
+      "firstDate": "2026-08-05",
+      "lastDate": "2026-09-22"
+    },
+    {
+      "network": "Syfy",
+      "tvmazeNetworkId": 16,
+      "timezone": "America/New_York",
+      "airings": 11,
+      "distinctDates": 11,
+      "distinctShows": 1,
+      "firstDate": "2026-08-05",
+      "lastDate": "2026-10-14"
+    },
+    {
+      "network": "Adult Swim",
+      "tvmazeNetworkId": 10,
+      "timezone": "America/New_York",
+      "airings": 11,
+      "distinctDates": 10,
+      "distinctShows": 3,
+      "firstDate": "2026-08-08",
+      "lastDate": "2026-09-27"
+    },
+    {
+      "network": "CBS News",
+      "tvmazeNetworkId": 607,
+      "timezone": "America/New_York",
+      "airings": 10,
+      "distinctDates": 10,
+      "distinctShows": 1,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-08-14"
+    },
+    {
+      "network": "Oprah Winfrey Network",
+      "tvmazeNetworkId": 236,
+      "timezone": "America/New_York",
+      "airings": 10,
+      "distinctDates": 9,
+      "distinctShows": 3,
+      "firstDate": "2026-08-07",
+      "lastDate": "2026-09-25"
+    },
+    {
+      "network": "SEC Network",
+      "tvmazeNetworkId": 214,
+      "timezone": "America/New_York",
+      "airings": 9,
+      "distinctDates": 9,
+      "distinctShows": 2,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-11-17"
+    },
+    {
+      "network": "Disney Channel",
+      "tvmazeNetworkId": 78,
+      "timezone": "America/New_York",
+      "airings": 8,
+      "distinctDates": 3,
+      "distinctShows": 3,
+      "firstDate": "2026-08-04",
+      "lastDate": "2026-08-13"
+    },
+    {
+      "network": "ALLBLK",
+      "tvmazeNetworkId": 209,
+      "timezone": "America/New_York",
+      "airings": 8,
+      "distinctDates": 8,
+      "distinctShows": 1,
+      "firstDate": "2026-08-06",
+      "lastDate": "2026-09-24"
+    },
+    {
+      "network": "REELZ",
+      "tvmazeNetworkId": 75,
+      "timezone": "America/New_York",
+      "airings": 8,
+      "distinctDates": 4,
+      "distinctShows": 2,
+      "firstDate": "2026-08-07",
+      "lastDate": "2026-08-15"
+    },
+    {
+      "network": "Oxygen True Crime",
+      "tvmazeNetworkId": 79,
+      "timezone": "America/New_York",
+      "airings": 7,
+      "distinctDates": 7,
+      "distinctShows": 2,
+      "firstDate": "2026-08-08",
+      "lastDate": "2026-09-12"
+    },
+    {
+      "network": "Me-TV",
+      "tvmazeNetworkId": 198,
+      "timezone": "America/New_York",
+      "airings": 7,
+      "distinctDates": 7,
+      "distinctShows": 2,
+      "firstDate": "2026-08-08",
+      "lastDate": "2026-08-29"
+    },
+    {
+      "network": "Magnolia Network",
+      "tvmazeNetworkId": 90,
+      "timezone": "America/New_York",
+      "airings": 6,
+      "distinctDates": 6,
+      "distinctShows": 1,
+      "firstDate": "2026-08-04",
+      "lastDate": "2026-09-08"
+    },
+    {
+      "network": "Freeform",
+      "tvmazeNetworkId": 26,
+      "timezone": "America/New_York",
+      "airings": 6,
+      "distinctDates": 6,
+      "distinctShows": 1,
+      "firstDate": "2026-08-06",
+      "lastDate": "2026-09-10"
+    },
+    {
+      "network": "AMC+",
+      "tvmazeNetworkId": 453,
+      "timezone": "America/New_York",
+      "airings": 6,
+      "distinctDates": 6,
+      "distinctShows": 1,
+      "firstDate": "2026-08-09",
+      "lastDate": "2026-09-13"
+    },
+    {
+      "network": "Lifetime",
+      "tvmazeNetworkId": 18,
+      "timezone": "America/New_York",
+      "airings": 5,
+      "distinctDates": 5,
+      "distinctShows": 1,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-08-31"
+    },
+    {
+      "network": "Disney Junior",
+      "tvmazeNetworkId": 1039,
+      "timezone": "America/New_York",
+      "airings": 5,
+      "distinctDates": 2,
+      "distinctShows": 3,
+      "firstDate": "2026-08-06",
+      "lastDate": "2026-08-07"
+    },
+    {
+      "network": "FYI",
+      "tvmazeNetworkId": 125,
+      "timezone": "America/New_York",
+      "airings": 4,
+      "distinctDates": 1,
+      "distinctShows": 2,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-08-03"
+    },
+    {
+      "network": "TV One",
+      "tvmazeNetworkId": 224,
+      "timezone": "America/New_York",
+      "airings": 4,
+      "distinctDates": 2,
+      "distinctShows": 2,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-08-10"
+    },
+    {
+      "network": "Vice TV",
+      "tvmazeNetworkId": 1006,
+      "timezone": "America/New_York",
+      "airings": 4,
+      "distinctDates": 4,
+      "distinctShows": 1,
+      "firstDate": "2026-08-04",
+      "lastDate": "2026-08-25"
+    },
+    {
+      "network": "MotorTrend",
+      "tvmazeNetworkId": 142,
+      "timezone": "America/New_York",
+      "airings": 4,
+      "distinctDates": 3,
+      "distinctShows": 3,
+      "firstDate": "2026-08-05",
+      "lastDate": "2026-08-12"
+    },
+    {
+      "network": "Hallmark+",
+      "tvmazeNetworkId": 279,
+      "timezone": "America/New_York",
+      "airings": 4,
+      "distinctDates": 4,
+      "distinctShows": 1,
+      "firstDate": "2026-08-06",
+      "lastDate": "2026-08-27"
+    },
+    {
+      "network": "Ovation",
+      "tvmazeNetworkId": 208,
+      "timezone": "America/New_York",
+      "airings": 4,
+      "distinctDates": 4,
+      "distinctShows": 1,
+      "firstDate": "2026-08-09",
+      "lastDate": "2026-08-30"
+    },
+    {
+      "network": "E!",
+      "tvmazeNetworkId": 43,
+      "timezone": "America/New_York",
+      "airings": 4,
+      "distinctDates": 3,
+      "distinctShows": 2,
+      "firstDate": "2026-08-18",
+      "lastDate": "2027-01-03"
+    },
+    {
+      "network": "Twitch",
+      "tvmazeNetworkId": 304,
+      "timezone": "America/New_York",
+      "airings": 4,
+      "distinctDates": 4,
+      "distinctShows": 1,
+      "firstDate": "2026-08-27",
+      "lastDate": "2026-09-17"
+    },
+    {
+      "network": "MGM+",
+      "tvmazeNetworkId": 503,
+      "timezone": "America/New_York",
+      "airings": 3,
+      "distinctDates": 3,
+      "distinctShows": 1,
+      "firstDate": "2026-08-09",
+      "lastDate": "2026-08-23"
+    },
+    {
+      "network": "FXX",
+      "tvmazeNetworkId": 47,
+      "timezone": "America/New_York",
+      "airings": 3,
+      "distinctDates": 2,
+      "distinctShows": 1,
+      "firstDate": "2026-08-17",
+      "lastDate": "2026-08-24"
+    },
+    {
+      "network": "ESPN2",
+      "tvmazeNetworkId": 180,
+      "timezone": "America/New_York",
+      "airings": 3,
+      "distinctDates": 3,
+      "distinctShows": 3,
+      "firstDate": "2026-08-30",
+      "lastDate": "2026-12-05"
+    },
+    {
+      "network": "Smithsonian Channel",
+      "tvmazeNetworkId": 86,
+      "timezone": "America/New_York",
+      "airings": 2,
+      "distinctDates": 2,
+      "distinctShows": 1,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-08-10"
+    },
+    {
+      "network": "PBS Kids",
+      "tvmazeNetworkId": 540,
+      "timezone": "America/New_York",
+      "airings": 2,
+      "distinctDates": 1,
+      "distinctShows": 1,
+      "firstDate": "2026-08-10",
+      "lastDate": "2026-08-10"
+    },
+    {
+      "network": "Playboy TV",
+      "tvmazeNetworkId": 1035,
+      "timezone": "America/New_York",
+      "airings": 1,
+      "distinctDates": 1,
+      "distinctShows": 1,
+      "firstDate": "2026-08-03",
+      "lastDate": "2026-08-03"
+    },
+    {
+      "network": "MTV",
+      "tvmazeNetworkId": 22,
+      "timezone": "America/New_York",
+      "airings": 1,
+      "distinctDates": 1,
+      "distinctShows": 1,
+      "firstDate": "2026-08-06",
+      "lastDate": "2026-08-06"
+    },
+    {
+      "network": "WE tv",
+      "tvmazeNetworkId": 122,
+      "timezone": "America/New_York",
+      "airings": 1,
+      "distinctDates": 1,
+      "distinctShows": 1,
+      "firstDate": "2026-08-07",
+      "lastDate": "2026-08-07"
+    },
+    {
+      "network": "Cartoon Network",
+      "tvmazeNetworkId": 11,
+      "timezone": "America/New_York",
+      "airings": 1,
+      "distinctDates": 1,
+      "distinctShows": 1,
+      "firstDate": "2026-08-08",
+      "lastDate": "2026-08-08"
+    },
+    {
+      "network": "Sundance Now",
+      "tvmazeNetworkId": 244,
+      "timezone": "America/New_York",
+      "airings": 1,
+      "distinctDates": 1,
+      "distinctShows": 1,
+      "firstDate": "2026-08-13",
+      "lastDate": "2026-08-13"
+    },
+    {
+      "network": "NBA TV",
+      "tvmazeNetworkId": 204,
+      "timezone": "America/New_York",
+      "airings": 1,
+      "distinctDates": 1,
+      "distinctShows": 1,
+      "firstDate": "2026-08-15",
+      "lastDate": "2026-08-15"
+    },
+    {
+      "network": "Pay-Per-View",
+      "tvmazeNetworkId": 138,
+      "timezone": "America/New_York",
+      "airings": 1,
+      "distinctDates": 1,
+      "distinctShows": 1,
+      "firstDate": "2026-08-21",
+      "lastDate": "2026-08-21"
+    }
+  ]
+}

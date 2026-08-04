@@ -11,9 +11,27 @@ import type { ReliabilityEventName, ReliabilityEventProps } from '@/lib/monitori
  * by the caller — a monitoring call must never block or fail the action
  * that triggered it.
  */
+/**
+ * ONE BEACON PER DISTINCT EVENT PER PAGE, NOT ONE PER CARD.
+ *
+ * A grid of twenty posters whose availability lookups all fail is ONE outage,
+ * not twenty. Without this, that single failure fired twenty identical
+ * beacons — pointless duplicate rows for an operator, and real extra request
+ * volume at exactly the moment the network is already struggling. It also
+ * meant a page full of failing cards could keep the connection busy long
+ * enough to matter (the /dev/feed harness stopped reaching `networkidle`,
+ * which is how this was noticed).
+ *
+ * Keyed on name + props so genuinely different failures still each report.
+ * Per page load: a reload is a new incident and reports again.
+ */
+const sent = new Set<string>();
+
 export function reportReliabilityEvent(name: ReliabilityEventName, props: ReliabilityEventProps = {}): void {
   try {
     const payload = JSON.stringify({ name, props });
+    if (sent.has(payload)) return;
+    sent.add(payload);
     if (typeof navigator !== 'undefined' && 'sendBeacon' in navigator) {
       const blob = new Blob([payload], { type: 'application/json' });
       navigator.sendBeacon('/api/monitor', blob);

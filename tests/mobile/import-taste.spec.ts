@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import path from 'node:path';
+import { stubImportWriteSucceeds } from './importWriteStub';
 
 /**
  * BRING YOUR TASTE WITH YOU — the real flow, driven with real files.
@@ -165,6 +166,7 @@ test.describe('household separation', () => {
 
 test.describe('mandatory review', () => {
   test('HARD: nothing is applied before the user confirms', async ({ page }) => {
+    await stubImportWriteSucceeds(page);
     await page.goto(R);
     await upload(page, 'h.csv', HISTORY);
     // Review is the stage we land on — never a summary.
@@ -209,6 +211,7 @@ test.describe('mandatory review', () => {
   });
 
   test('the summary does not claim recommendation accuracy', async ({ page }) => {
+    await stubImportWriteSucceeds(page);
     await page.goto(R);
     await upload(page, 'h.csv', HISTORY);
     await page.getByTestId('apply-import').click();
@@ -218,6 +221,7 @@ test.describe('mandatory review', () => {
   });
 
   test('an import can be undone', async ({ page }) => {
+    await stubImportWriteSucceeds(page);
     await page.goto(R);
     await upload(page, 'h.csv', HISTORY);
     await page.getByTestId('apply-import').click();

@@ -2,13 +2,20 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { publicEnv } from '@/lib/env';
 
-// '/import-taste' isn't gated content, but its confirm step writes real
-// watchlist rows (see ImportTasteFlow.tsx) — it needs the same auto-
-// provisioned guest identity as everywhere else that writes on an
-// anonymous visitor's behalf, so an import isn't blocked on signing in
-// first, and so it merges into a real account the same way a save/verdict
-// already does (see mergeAccount.ts).
-const PROTECTED_PREFIXES = ['/app', '/lite', '/import-taste'];
+// DELIBERATELY NOT '/import-taste'.
+//
+// It was briefly added here so the import's confirm step would have a session
+// to write with. That was the wrong lever: this list's failure mode is a
+// REDIRECT TO /login (see below), so a Supabase hiccup — or anonymous sign-ins
+// simply being disabled — made the whole page unreachable rather than
+// degraded. Strictly worse than the bug it was meant to fix, and it
+// contradicts the landing page's "No account needed to explore".
+//
+// The CSV is parsed entirely in the browser, so choosing a file and reviewing
+// it need no session at all. Only the final apply does, and ImportTasteFlow
+// already handles exactly that case itself with a real `import-signin-required`
+// state that keeps the parsed rows and offers a way forward.
+const PROTECTED_PREFIXES = ['/app', '/lite'];
 
 /**
  * Refreshes the Supabase session cookie on every request and guards protected

@@ -52,3 +52,20 @@ describe('reportReliabilityEvent', () => {
     expect(() => reportReliabilityEvent('quiz_load_failure', {})).not.toThrow();
   });
 });
+
+describe('beacon dedupe', () => {
+  it('sends one beacon per distinct event, not one per failing card', async () => {
+    vi.resetModules();
+    const sendBeacon = vi.fn((_url: string, _data?: BodyInit | null) => true);
+    Object.defineProperty(global, 'navigator', { value: { sendBeacon }, configurable: true });
+    const { reportReliabilityEvent: report } = await import('@/lib/monitoringClient');
+
+    // Twenty posters, one outage.
+    for (let i = 0; i < 20; i++) report('availability_resolution_failure', { mediaType: 'movie' });
+    expect(sendBeacon).toHaveBeenCalledTimes(1);
+
+    // A genuinely different failure still reports.
+    report('availability_resolution_failure', { mediaType: 'tv' });
+    expect(sendBeacon).toHaveBeenCalledTimes(2);
+  });
+});
