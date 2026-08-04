@@ -1,5 +1,22 @@
 # TV guide coverage — source and channel report
 
+> **SUPERSEDED IN PART — read `SOURCE_RIGHTS_REGISTRY.md` first.**
+>
+> Section 5 of this report concluded that a paid commercial feed was
+> *immediately* required for the movie-programmed channels. That conclusion was
+> drawn from automated API sources alone and was rejected: tiers 2-5 of the
+> source hierarchy were never tested when it was written.
+>
+> What followed also produced an error that this file must not be read without:
+> a permissive `robots.txt` was treated as authorization. It is not. robots.txt
+> governs crawler behaviour and grants no commercial reuse rights. Nor does an
+> administrator approving an extraction after the fact change a source's Terms
+> of Use.
+>
+> The measured TVmaze coverage numbers below (sections 3 and 4) were verified
+> against the live API and remain accurate. The rights conclusions do not.
+> `SOURCE_RIGHTS_REGISTRY.md` is authoritative on what may be used.
+
 Generated 2026-08-04 against live APIs. Every number below came from a real
 request made while writing this, not from memory. The raw inventory is in
 `tvmaze-us-inventory.json` next to this file.
