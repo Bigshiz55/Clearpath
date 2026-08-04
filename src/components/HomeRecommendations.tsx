@@ -20,6 +20,12 @@ import type { StandardContribution } from '@/lib/scoring/standardScore';
 
 const TOP_COUNT = 10;
 const GRID_COUNT = 10;
+// buildRecommendationSlate is a server action, not a fetch() — it has no
+// AbortController of its own, so this races it against a timer instead. A
+// slate that never resolves used to leave the skeleton spinning forever
+// AND had no try/catch at all, so a genuine rejection (not just a hang)
+// was an unhandled promise rejection that did the exact same thing.
+const SLATE_TIMEOUT_MS = 8000;
 
 /** A slate item, plus the score's arithmetic once it's been fetched on demand. */
 type Item = SlateItem & { work?: RailItem['work'] };
@@ -27,24 +33,33 @@ type Item = SlateItem & { work?: RailItem['work'] };
 export function HomeRecommendations({ label }: { label?: string | null }) {
   const [items, setItems] = useState<Item[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const loadedWork = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let live = true;
+    setItems(null);
+    setFailed(false);
     void (async () => {
-      const r = await buildRecommendationSlate({
-        surface: 'home',
-        excludeKeys: [],
-        limit: TOP_COUNT + GRID_COUNT,
-      });
-      if (!live) return;
-      if (!r.ok) setFailed(true);
-      setItems(r.items);
+      try {
+        const r = await Promise.race([
+          buildRecommendationSlate({ surface: 'home', excludeKeys: [], limit: TOP_COUNT + GRID_COUNT }),
+          new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('timeout')), SLATE_TIMEOUT_MS)),
+        ]);
+        if (!live) return;
+        if (!r.ok) {
+          setFailed(true);
+          return;
+        }
+        setItems(r.items);
+      } catch {
+        if (live) setFailed(true);
+      }
     })();
     return () => {
       live = false;
     };
-  }, []);
+  }, [attempt]);
 
   // Fill in the working for a top-10 score the moment someone asks to see it.
   const loadWork = useCallback(async (item: RailItem) => {
@@ -71,7 +86,16 @@ export function HomeRecommendations({ label }: { label?: string | null }) {
     }
   }, []);
 
-  if (failed) return null;
+  if (failed) {
+    return (
+      <section className="rounded-2xl border border-white/12 bg-white/[0.03] p-5 text-center" data-testid="top10-error">
+        <p className="text-sm text-slate-300">Couldn’t load your recommendations right now.</p>
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="btn-secondary mt-3">
+          Try again
+        </button>
+      </section>
+    );
+  }
 
   if (items && items.length === 0) {
     return (

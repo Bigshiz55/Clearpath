@@ -5,6 +5,7 @@ import { airingClock } from '@/lib/viewing/clock';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { setTvReminder, removeTvReminder } from '@/lib/actions/tvReminders';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 interface Airing {
   id: number;
@@ -29,21 +30,33 @@ export function EasyOnTv() {
   const [reminded, setReminded] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // A failed/timed-out fetch used to map to setAirings([]) — the exact same
+  // UI as "confirmed nothing airing," so an outage was indistinguishable
+  // from an honest empty result. Tracked separately, with its own retry.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
-    fetch('/api/easy-tv')
-      .then((r) => r.json())
+    setAirings(null);
+    setFailed(false);
+    fetchWithTimeout('/api/easy-tv')
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((d) => {
         if (!active) return;
         setAirings(d.airings ?? []);
         setReminded(new Set((d.remindedIds ?? []) as number[]));
       })
-      .catch(() => active && setAirings([]));
+      .catch(() => {
+        if (active) setFailed(true);
+      });
     return () => {
       active = false;
     };
-  }, []);
+  }, [attempt]);
 
   async function toggle(a: Airing) {
     setBusy(a.id);
@@ -69,6 +82,18 @@ export function EasyOnTv() {
     } finally {
       setBusy(null);
     }
+  }
+
+  if (failed) {
+    return (
+      <div className="rounded-2xl border-2 border-white/15 bg-white/5 p-6 text-center" data-testid="easy-tv-error">
+        <div className="text-3xl">📺</div>
+        <p className="mt-2 text-xl text-slate-200">Couldn’t check what’s on right now.</p>
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="btn-secondary mt-4 px-6 py-3 text-lg">
+          Try again
+        </button>
+      </div>
+    );
   }
 
   if (airings === null) {

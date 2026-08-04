@@ -25,6 +25,7 @@ import {
 import { MIN_FOR_VERDICT, type DocketEntry } from '@/lib/verdict/docket';
 import { deliverVerdict, type Candidate, type Verdict } from '@/lib/verdict/rank';
 import { useSyncExternalStore } from 'react';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 /** Minutes out of quicklook's "1h 52m" / "3 seasons". Null when it is not a film. */
 function minutesOf(runtime: string | null): number | null {
@@ -36,11 +37,11 @@ function minutesOf(runtime: string | null): number | null {
 
 async function factsFor(e: DocketEntry): Promise<Candidate> {
   const [dna, quick] = await Promise.all([
-    fetch(`/api/dna/${e.mediaType}/${e.tmdbId}`)
+    fetchWithTimeout(`/api/dna/${e.mediaType}/${e.tmdbId}`)
       .then((r) => r.json())
       .then((d) => (d?.dna ?? null) as { score?: number; confidence?: number; sampleSize?: number } | null)
       .catch(() => null),
-    fetch(`/api/quicklook/${e.mediaType}/${e.tmdbId}`)
+    fetchWithTimeout(`/api/quicklook/${e.mediaType}/${e.tmdbId}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d as { runtime?: string | null; where?: string[]; standardScore?: number; score?: number } | null)
       .catch(() => null),

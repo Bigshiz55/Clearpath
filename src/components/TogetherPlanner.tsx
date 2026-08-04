@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
 import { TasteCourt } from './TasteCourt';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 const AVOIDABLE: PreferenceTrait[] = ['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn'];
 const LOVABLE: PreferenceTrait[] = ['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer'];
@@ -201,7 +202,7 @@ export function TogetherPlanner() {
       : [];
     const excludeKeys = activeGroup ? activeGroup.dna.dislikedKeys : [];
     try {
-      const res = await fetch('/api/together', {
+      const res = await fetchWithTimeout('/api/together', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

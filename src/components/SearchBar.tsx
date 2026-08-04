@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Poster, PosterCard } from './PosterCard';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 interface Result {
   id: number;
@@ -128,7 +129,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
     const mySeq = ++seqRef.current;
     debounce.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const res = await fetchWithTimeout(`/api/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         if (mySeq !== seqRef.current) return; // a newer query superseded this one
         if (!res.ok) {

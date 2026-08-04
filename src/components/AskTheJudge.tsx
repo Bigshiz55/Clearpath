@@ -8,6 +8,7 @@ import type { TitleVerdict } from '@/lib/askTypes';
 import { type TileRatings } from '@/lib/ratings';
 import { naiveParseQuery, describeQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import type { FinderQuery } from '@/lib/finder';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 interface ResultItem {
   id: number;
@@ -84,7 +85,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
     say(text || `Filed my case — ${describeQuery(query)}.`, undefined, 'you');
     setLoading(true);
     try {
-      const res = await fetch('/api/ask', {
+      const res = await fetchWithTimeout('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, text: text || undefined }),

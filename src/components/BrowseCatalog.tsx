@@ -7,6 +7,7 @@ import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { TMDB_IMAGE_BASE } from '@/lib/tmdb/image';
 import type { MediaType } from '@/lib/types';
 import type { BrowseMonetization, BrowseSort } from '@/lib/browse';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 export interface CatalogProvider {
   id: number;
@@ -66,23 +67,32 @@ export function BrowseCatalog({
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [open, setOpen] = useState<QuickLookTarget | null>(null);
+  // A failed/timed-out request used to collapse into the same "Nothing
+  // matches those filters" copy as a genuine zero-result page (on the
+  // first page), and fail completely silently on "Load more" — no items
+  // added, no message, the button just sits there. Tracked separately so
+  // an outage never reads as a confirmed empty catalog.
+  const [failedPage, setFailedPage] = useState<number | null>(null);
 
   const filterKey = `${mediaType}|${[...providerIds].sort().join(',')}|${[...genreIds].sort().join(',')}|${monetization}|${minRating}|${sort}`;
 
   const fetchPage = useCallback(
     async (p: number, replace: boolean) => {
       setLoading(true);
+      setFailedPage(null);
       try {
-        const res = await fetch('/api/browse', {
+        const res = await fetchWithTimeout('/api/browse', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mediaType, providerIds, genreIds, monetization, minRating: minRating || null, sort, page: p }),
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const next: Item[] = data.items ?? [];
         setDone(next.length === 0);
         setItems((prev) => (replace ? next : [...prev, ...next]));
       } catch {
+        setFailedPage(p);
         if (replace) setItems([]);
       } finally {
         setLoading(false);
@@ -192,6 +202,13 @@ export function BrowseCatalog({
         <div className="poster-grid">
           {Array.from({ length: 12 }).map((_, i) => <div key={i} className="aspect-[2/3] animate-pulse rounded-2xl bg-white/5" />)}
         </div>
+      ) : items.length === 0 && failedPage != null ? (
+        <div className="space-y-3 text-sm text-slate-400" data-testid="browse-error">
+          <p>Couldn’t load results just now — this isn’t &ldquo;nothing matches,&rdquo; it’s a connection issue.</p>
+          <button type="button" onClick={() => void fetchPage(1, true)} className="btn-secondary px-6">
+            Try again
+          </button>
+        </div>
       ) : items.length === 0 ? (
         <p className="text-sm text-slate-400">Nothing matches those filters. Loosen the price, rating, or service and try again.</p>
       ) : (
@@ -210,6 +227,14 @@ export function BrowseCatalog({
               />
             ))}
           </div>
+          {failedPage != null && (
+            <p className="text-center text-sm text-amber-300" data-testid="browse-load-more-error">
+              Couldn’t load more results.{' '}
+              <button type="button" onClick={() => void fetchPage(failedPage, false)} className="font-semibold underline">
+                Try again
+              </button>
+            </p>
+          )}
           <div className="flex justify-center pt-2">
             {!done ? (
               <button onClick={loadMore} disabled={loading} className="btn-secondary px-6 disabled:opacity-50">

@@ -11,6 +11,7 @@ import { CardDna } from '@/components/CardDna';
 import { SaveButton } from '@/components/SaveButton';
 import { CardVerdict } from '@/components/CardVerdict';
 import type { MediaType } from '@/lib/types';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 const VISIBLE = 12; // show a window of the pool; hiding one slides the next in
 
@@ -63,6 +64,10 @@ export function TvDetective() {
   const [reminded, setReminded] = useState<Set<number>>(new Set());
   const [hidden, setHidden] = useState<Set<number>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
+  // A failed scan used to map to setPicks([]) — the same UI as "genuinely
+  // nothing found" — so an outage read as a confirmed empty scan. Tracked
+  // separately, with its own retry.
+  const [failed, setFailed] = useState(false);
 
   // Triage: drop a pick and let the next reserve item slide into view.
   function remove(id: number, note?: string) {
@@ -73,13 +78,16 @@ export function TvDetective() {
   async function scan(h: Horizon = hours) {
     setState('scanning');
     setHidden(new Set());
+    setFailed(false);
     try {
-      const res = await fetch(`/api/detective?hours=${h}`);
+      const res = await fetchWithTimeout(`/api/detective?hours=${h}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setPicks(data.picks ?? []);
       setReminded(new Set((data.remindedIds ?? []) as number[]));
     } catch {
       setPicks([]);
+      setFailed(true);
     } finally {
       setState('done');
     }
@@ -149,7 +157,12 @@ export function TvDetective() {
         const visible = picks.filter((p) => !hidden.has(p.id)).slice(0, VISIBLE);
         return (
         <div className="mt-5">
-          {picks.length === 0 ? (
+          {picks.length === 0 && failed ? (
+            <div className="text-sm text-slate-400" data-testid="detective-error">
+              <p>Couldn’t run the scan just now — this isn’t “nothing found,” it’s a connection issue.</p>
+              <button type="button" onClick={() => scan()} className="btn-secondary mt-3">Try again</button>
+            </div>
+          ) : picks.length === 0 ? (
             <p className="text-sm text-slate-400">The trail went cold — nothing notable in the {horizonLabel(hours)}. Try a wider window or check back later.</p>
           ) : visible.length === 0 ? (
             <p className="text-sm text-slate-400">You’ve been through them all. Scan again or widen the window for more.</p>

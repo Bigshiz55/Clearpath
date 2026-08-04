@@ -6,6 +6,7 @@ import { RatingsStrip } from './RatingsStrip';
 import { SaveButton } from './SaveButton';
 import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 import type { MediaType } from '@/lib/types';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 export interface QuickLookTarget {
   id: number;
@@ -46,19 +47,21 @@ export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClos
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
 
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
     let active = true;
     setData(null);
     setFailed(false);
     setPlaying(false);
-    fetch(`/api/quicklook/${target.mediaType}/${target.id}`)
+    fetchWithTimeout(`/api/quicklook/${target.mediaType}/${target.id}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => active && setData(d as QuickLookData))
       .catch(() => active && setFailed(true));
     return () => {
       active = false;
     };
-  }, [target.id, target.mediaType]);
+  }, [target.id, target.mediaType, attempt]);
 
   // Close on Escape; lock body scroll while open.
   useEffect(() => {
@@ -165,7 +168,13 @@ export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClos
 
           {/* Synopsis */}
           {data?.overview && <p className="text-sm leading-relaxed text-slate-200">{data.overview}</p>}
-          {failed && <p className="text-sm text-slate-400">Couldn’t load the full details — open the title for everything.</p>}
+          {failed && (
+            <p className="text-sm text-slate-400">
+              Couldn’t load the full details.{' '}
+              <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold underline">Try again</button>
+              {' '}or open the title for everything.
+            </p>
+          )}
 
           {/* Where to watch */}
           {data && data.where.length > 0 && (

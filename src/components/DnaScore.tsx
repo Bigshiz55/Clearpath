@@ -5,6 +5,7 @@ import type { MediaType } from '@/lib/types';
 import { isPersonalized, type DnaClientResult as Dna } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
 import { Verd1ctBadge } from './Verd1ctBadge';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 /**
  * The WatchVerd1ct DNA Score — a per-user "odds you'll love it" (0..100). On the
@@ -20,7 +21,11 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
     let active = true;
     // Dedicated fetch (not the shared card loader) so the title page gets the AI
     // adjustment + reasoning that the many-card grids deliberately skip.
-    fetch(`/api/dna/${mediaType}/${tmdbId}?ai=1`)
+    // Bounded so a stalled request can't leave the loading skeleton on
+    // screen forever — a failure here degrades to no badge (the
+    // deterministic score shown elsewhere on the page still stands), per
+    // the AI layer's documented "always degrade, never block" contract.
+    fetchWithTimeout(`/api/dna/${mediaType}/${tmdbId}?ai=1`)
       .then((r) => r.json())
       .then((d) => {
         if (!active) return;

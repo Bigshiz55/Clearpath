@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Poster, PosterCard } from './PosterCard';
 import { SaveButton } from './SaveButton';
 import { addToWatchlist } from '@/lib/actions/watchlist';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 interface SearchHit {
   id: number;
@@ -64,7 +65,7 @@ export function Mentalist() {
     setSearching(true);
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/search?q=${encodeURIComponent(term)}`);
+        const r = await fetchWithTimeout(`/api/search?q=${encodeURIComponent(term)}`);
         const d = await r.json();
         if (active) setHits((d.results ?? []) as SearchHit[]);
       } catch {
@@ -95,7 +96,7 @@ export function Mentalist() {
     setSaved(false);
     setConfirmed({});
     try {
-      const r = await fetch('/api/mentalist', {
+      const r = await fetchWithTimeout('/api/mentalist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ seeds: seeds.map((s) => ({ id: s.id, mediaType: s.mediaType })) }),
