@@ -67,6 +67,12 @@ function buildMeta() {
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || (process.env.NODE_ENV === 'production' ? '' : 'development'),
     NEXT_PUBLIC_DEPLOY_URL: process.env.VERCEL_URL || '',
     NEXT_PUBLIC_SCHEMA_VERSION: schema,
+    // TEMPORARY DIAGNOSTIC — remove once the canonical/og:url bug is
+    // confirmed fixed on production. Exposes exactly what this build saw.
+    NEXT_PUBLIC_DEBUG_RAW_SITE_URL: JSON.stringify(process.env.NEXT_PUBLIC_SITE_URL ?? null),
+    NEXT_PUBLIC_DEBUG_RAW_VERCEL_ENV: JSON.stringify(process.env.VERCEL_ENV ?? null),
+    NEXT_PUBLIC_DEBUG_RAW_PROD_URL: JSON.stringify(process.env.VERCEL_PROJECT_PRODUCTION_URL ?? null),
+    NEXT_PUBLIC_DEBUG_BAD_LOCALHOST: String(explicitIsBadLocalhost),
     NEXT_PUBLIC_API_VERSION: pkg.apiVersion ?? 'v1',
     NEXT_PUBLIC_SITE_URL: siteUrl,
   };
