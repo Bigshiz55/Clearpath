@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { submitFeedbackReport } from '@/lib/actions/feedbackReport';
 
 type Severity = 'low' | 'medium' | 'high';
@@ -9,8 +10,18 @@ type Severity = 'low' | 'medium' | 'high';
  * A small, unobtrusive feedback trigger reachable from every page — mounted
  * once in the root layout. Bottom-LEFT so it never collides with the
  * bottom-right DocketTray or the top-right QuickSearch trigger inside /app.
+ *
+ * HIDDEN ON THE PUBLIC MARKETING HOMEPAGE. Every other page in the app is a
+ * scrolling list of cards with real gutters around them; the homepage is a
+ * tight, mostly-centered single column, and being fixed to one spot on the
+ * screen means this sits on top of whatever the page has scrolled to there —
+ * verified to land on the hero's own icon, the CTA's trust line, and the
+ * rule-grid's captions at different scroll depths, not a one-off. "Report a
+ * bug in the app" also isn't very meaningful to a visitor who hasn't signed
+ * in yet. Every other route is unaffected.
  */
 export function FeedbackButton() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<Severity | null>(null);
@@ -46,6 +57,10 @@ export function FeedbackButton() {
     }
     setSent(true);
   }
+
+  // Hooks above run unconditionally; the route check is the only thing that
+  // decides whether this renders anything at all.
+  if (pathname === '/') return null;
 
   return (
     <>

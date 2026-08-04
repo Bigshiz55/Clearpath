@@ -47,14 +47,19 @@ export default async function LandingPage() {
           logo on narrow phones instead of forcing horizontal overflow. Logo
           size stays `xl` — its own responsive scale-up from tablet to
           desktop is pinned by a test — but the header's own padding is
-          cut down so it reads as a strip, not a second hero. */}
+          cut down so it reads as a strip, not a second hero. "Start
+          watching" used to be filled brand-blue, which read as a second,
+          competing call to action next to the gold entrance below — it's a
+          quiet outline link now, the same weight as "Sign in" beside it.
+          The real entrance is the gold button; this is just a shortcut for
+          someone who already has an account. */}
       <header className="container-page flex flex-wrap items-center justify-between gap-y-1 py-1 sm:py-4">
         <Logo size="xl" />
         <div className="flex shrink-0 items-center gap-2">
-          <Link href="/login" className="btn-ghost">
+          <Link href="/login" className="btn-ghost text-sm">
             Sign in
           </Link>
-          <Link href="/app" className="btn-primary">
+          <Link href="/app" className="btn-ghost border border-white/15 text-sm">
             Start watching
           </Link>
         </div>
@@ -94,15 +99,15 @@ export default async function LandingPage() {
             />
           </div>
 
-          <div className="container-page py-4 text-center sm:py-8">
+          <div className="container-page py-3.5 text-center sm:py-6">
             <h1 className="animate-fade-up text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
               Enter the courtroom.
             </h1>
-            <p className="mx-auto mt-1.5 max-w-xl animate-fade-up text-lg text-slate-200 sm:mt-4 sm:text-xl">
+            <p className="mx-auto mt-1.5 max-w-xl animate-fade-up text-lg text-slate-200 sm:mt-3 sm:text-xl">
               Tell us what you feel like watching. We&rsquo;ll weigh the evidence, match it to your taste, and hand
               down one clear Verd1ct—with exactly where to watch it.
             </p>
-            <p className="mx-auto mt-2 max-w-md animate-fade-up text-base font-semibold text-slate-100 sm:mt-4 sm:text-lg">
+            <p className="mx-auto mt-2 max-w-md animate-fade-up text-base font-semibold text-slate-100 sm:mt-3 sm:text-lg">
               Search a title, describe your mood, or let WatchVerd1ct choose for you.
             </p>
           </div>
@@ -120,22 +125,19 @@ export default async function LandingPage() {
             once, not a static mock result or a tap-through rotator. */}
         <VerdictProcessPreview />
 
-        {/* WHAT THE CONTROLS ON A REAL CARD MEAN — see HowYouRule's own doc
-            comment: same icons and colors the real FOR/AGAINST/SAVE row and
-            the gavel CTA use, illustrative rather than functional. */}
-        <HowYouRule />
-
         {/* THE ONE WAY IN — the only "Enter the Courtroom" button on the
-            whole page, and the first one a visitor has seen: by the time
-            it appears they've read what a Verd1ct is, watched the process
-            that builds one, and seen what the card controls mean. Build my
-            Watch DNA and Import my history stay real, visible second-tier
-            actions right under it, but never compete with the entrance for
-            the eye. Shorter than the button used to be — tall enough to
-            still read as the one thing on the page that matters, not so
-            tall it reads as a banner ad. */}
+            whole page, right after the process that explains what it
+            hands you back. This is deliberately NOT after HowYouRule too:
+            the process (what a Verd1ct is) is what someone needs before
+            they can decide to enter, but the card controls (HowYouRule,
+            below) are supporting detail for once they're already in the
+            app — nice to know, not a precondition. Making a visitor read
+            both before the door even appears was the overcorrection this
+            replaced. Build my Watch DNA and Import my history stay real,
+            visible second-tier actions right under it, but never compete
+            with the entrance for the eye. */}
         <section className="border-t border-white/10" data-testid="main-cta">
-          <div className="container-page flex flex-col items-center py-6 text-center sm:py-10">
+          <div className="container-page flex flex-col items-center pb-5 pt-16 text-center sm:py-8">
             <div className="flex flex-col items-center gap-2 sm:gap-3" data-testid="hero-ctas">
               <Link
                 href="/app"
@@ -168,34 +170,41 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* A SMALL CLOSING NOTE — trust, not another pitch. Anyone still
-            reading this far already decided; this just says the data behind
-            the Verd1ct they're about to get is real, and points at the
-            fuller tour for anyone who wants the whole picture before they
-            commit. */}
-        <section className="border-t border-white/10">
-          <div className="container-page py-6 text-center sm:py-8">
-            <p className="mx-auto max-w-md text-xs text-slate-500">
-              No fabricated scores or fake providers — every Verd1ct is built from real ratings and real
-              availability.{' '}
-              <Link href="/app/tour" className="text-brand-300 underline hover:text-brand-200">
-                See how it all works →
-              </Link>
-            </p>
-          </div>
-        </section>
+        {/* WHAT THE CONTROLS ON A REAL CARD MEAN — moved below the door
+            itself now. See HowYouRule's own doc comment: same icons and
+            colors the real FOR/AGAINST/SAVE row and the gavel CTA use,
+            illustrative rather than functional. Supporting education for
+            people still scrolling, not a gate in front of the button
+            above. */}
+        <HowYouRule />
+
       </main>
 
+      {/* TRUST + SOURCES + FOOTER, ONE COMPACT BLOCK. These used to be a
+          separate trust section plus a full second bordered footer, each
+          with its own top/bottom padding — correct content, but it read as
+          dead air after the button everyone actually came for. One
+          `<footer>` now: the honesty line, a hairline divider, then the
+          same attribution as always, tighter throughout. */}
       <footer className="border-t border-white/10">
-        <div className="container-page flex flex-col items-center justify-between gap-3 py-8 text-sm text-slate-500 sm:flex-row">
-          <Logo compact />
-          <p>
-            Title data & availability provided by{' '}
-            <a href="https://www.themoviedb.org" className="text-brand-300 underline" rel="noopener noreferrer" target="_blank">
-              TMDB
-            </a>{' '}
-            and JustWatch. WatchVerd1ct is not endorsed by TMDB.
+        <div className="container-page py-5 text-center sm:py-6">
+          <p className="mx-auto max-w-md text-xs text-slate-500">
+            No fabricated scores or fake providers — every Verd1ct is built from real ratings and real
+            availability.{' '}
+            <Link href="/app/tour" className="text-brand-300 underline hover:text-brand-200">
+              See how it all works →
+            </Link>
           </p>
+          <div className="mx-auto mt-4 flex max-w-md flex-col items-center justify-between gap-2 border-t border-white/10 pt-4 text-xs text-slate-500 sm:flex-row">
+            <Logo compact />
+            <p>
+              Title data &amp; availability provided by{' '}
+              <a href="https://www.themoviedb.org" className="text-brand-300 underline" rel="noopener noreferrer" target="_blank">
+                TMDB
+              </a>{' '}
+              and JustWatch. WatchVerd1ct is not endorsed by TMDB.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

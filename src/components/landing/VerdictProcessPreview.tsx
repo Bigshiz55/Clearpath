@@ -34,14 +34,14 @@ const STAGES: Stage[] = [
 export function VerdictProcessPreview() {
   return (
     <section className="border-t border-white/10" data-testid="verdict-process-preview">
-      <div className="container-page py-6 sm:py-10">
+      <div className="container-page py-10 sm:py-10">
         <h2 className="text-center text-sm font-black uppercase tracking-[0.16em] text-slate-500">How a Verd1ct Gets Made</h2>
 
-        <div className="mx-auto mt-4 max-w-xl space-y-2.5 sm:mt-6 sm:space-y-3">
+        <div className="mx-auto mt-5 max-w-xl space-y-5 sm:mt-6 sm:space-y-3">
           {STAGES.map((stage) => (
             <div
               key={stage.key}
-              className="flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:gap-4 sm:p-3.5"
+              className="flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:gap-4 sm:p-3.5"
               data-testid={`vpp-step-${stage.key}`}
             >
               <StageIcon stageKey={stage.key} />
