@@ -237,7 +237,11 @@ export function WCheck({
               setDismissed(true);
             }}
             data-testid="w-coach-dismiss"
-            className="mt-1.5 inline-flex min-h-[28px] items-center rounded-md px-1 text-[11px] font-bold text-slate-400 transition hover:text-white"
+            // 44px minimum. This is the dismiss for the coach a brand-new
+            // visitor sees, so it was the smallest tap target in the product on
+            // the exact screen where a first-time user is least sure what to do.
+            // It was 43x28 and failed the 44px floor at every viewport.
+            className="mt-1.5 inline-flex min-h-[44px] items-center rounded-md px-2 text-[11px] font-bold text-slate-400 transition hover:text-white"
           >
             Got it
           </button>
