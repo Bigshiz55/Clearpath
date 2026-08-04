@@ -28,7 +28,7 @@ const ITEMS: {
   {
     key: 'for',
     label: 'For',
-    caption: "You're in — it counts toward your taste.",
+    caption: "I'd watch this.",
     tone: 'border-emerald-400/70 bg-emerald-500/25 text-emerald-100',
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -43,7 +43,7 @@ const ITEMS: {
   {
     key: 'against',
     label: 'Against',
-    caption: 'Pass on it — that counts too.',
+    caption: 'Not for me.',
     tone: 'border-red-400/70 bg-red-500/25 text-red-100',
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5 -scale-x-100" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -58,7 +58,7 @@ const ITEMS: {
   {
     key: 'save',
     label: 'Save',
-    caption: 'Hold it for later — no ruling yet.',
+    caption: 'Maybe later.',
     tone: 'border-2 border-[#ff1493]/70 bg-[#ff1493]/30 text-pink-50',
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -72,7 +72,9 @@ export function HowYouRule() {
   return (
     <section className="border-t border-white/10" data-testid="how-you-rule">
       <div className="container-page py-6 sm:py-10">
-        <h2 className="text-center text-sm font-black uppercase tracking-[0.16em] text-slate-500">How you rule on a title</h2>
+        <h2 className="text-center text-sm font-black uppercase tracking-[0.16em] text-slate-500">
+          How you shape your Watch DNA
+        </h2>
         <CardControlsExplainer className="mx-auto mt-4 max-w-3xl" />
       </div>
     </section>
@@ -102,7 +104,7 @@ export function CardControlsExplainer({ className = '' }: { className?: string }
       <div className="flex flex-col items-center text-center" data-testid="rule-item-docket">
         <DocketDemoIcon />
         <div className="mt-2 text-sm font-black uppercase tracking-wide text-white">The docket</div>
-        <p className="mt-0.5 text-xs text-slate-400">Tap to shortlist it against your other picks.</p>
+        <p className="mt-0.5 text-xs text-slate-400">Compare finalists.</p>
       </div>
     </div>
   );

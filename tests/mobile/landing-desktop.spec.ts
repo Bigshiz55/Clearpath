@@ -3,11 +3,13 @@ import { test, expect, type Page } from '@playwright/test';
 /**
  * THE LANDING PAGE, REBUILT AROUND THE COURTROOM.
  *
- * No promise bar, no "Stop scrolling" box, one ceremonial entry: "Enter the
- * courtroom." with a single gold button. The DNA quiz and history import stay
- * reachable as quiet links right under it — nothing lost, just no longer
- * competing with the entrance. The logo+tagline own a full top-left line, and
- * scale up further on a real desktop instead of stopping at tablet size.
+ * No promise bar, no "Stop scrolling" box, one ceremonial entry: "Thousands
+ * of choices. 1 Verd1ct." followed by the three-step process, then a single
+ * gold "Enter the Courtroom" button. The DNA quiz and history import stay
+ * reachable as quiet secondary buttons right under it — nothing lost, just
+ * no longer competing with the entrance. The logo+tagline own a full
+ * top-left line, and scale up further on a real desktop instead of stopping
+ * at tablet size.
  */
 async function open(page: Page, w = 390, h = 900) {
   await page.setViewportSize({ width: w, height: h });
@@ -21,13 +23,22 @@ test('the promise bar and the "stop scrolling" box are both gone', async ({ page
   await expect(page.getByText('Stop scrolling. Start watching the right thing.')).toHaveCount(0);
 });
 
-test('the hero says "Enter the courtroom" with one gold entry button', async ({ page }) => {
+test('the hero reads "Thousands of choices. 1 Verd1ct." with one gold entry button', async ({ page }) => {
   await open(page, 1440);
-  await expect(page.getByRole('heading', { name: 'Enter the courtroom.' })).toBeVisible();
+  const headline = page.getByTestId('hero-headline');
+  await expect(headline).toBeVisible();
+  await expect(headline).toContainText('THOUSANDS OF CHOICES.');
+  await expect(headline).toContainText('1 VERD1CT.');
   const enter = page.getByTestId('cta-enter');
   await expect(enter).toBeVisible();
   await expect(enter).toContainText('Enter the Courtroom');
   await expect(enter).toHaveAttribute('href', '/app');
+});
+
+test('never shows a header "Start watching" button alongside the gold entrance', async ({ page }) => {
+  await open(page, 1440);
+  await expect(page.getByText('Start watching')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
 });
 
 test('the DNA quiz and import history are still reachable, as quiet links under the button', async ({ page }) => {

@@ -38,8 +38,8 @@ describe('entry points', () => {
 
   it('the landing hero makes ONE ceremonial entrance — the DNA quiz and import history are visible but secondary', () => {
     const page = read('src/app/page.tsx');
-    // The CTA block is no longer the first `<section>` on the page — the
-    // intro and the two explanation sections come first, by design (see
+    // The CTA block is not the first `<section>` on the page — the hero and
+    // the three-card process explanation come first, by design (see
     // page.tsx's own doc comments) — so the search for its closing tag has
     // to start at the block itself, not at the top of the file.
     const ctaStart = page.indexOf('data-testid="hero-ctas"');
@@ -72,6 +72,11 @@ describe('entry points', () => {
     const importAt = page.indexOf('data-testid="cta-import"');
     const importLink = page.slice(page.lastIndexOf('<Link', importAt), page.indexOf('</Link>', importAt));
     expect(importLink).toContain('/import-taste');
+  });
+
+  it('never shows a second, equally-prominent "Start watching" button in the header', () => {
+    const page = read('src/app/page.tsx');
+    expect(page).not.toContain('Start watching');
   });
 
   it('the Build my Watch DNA call to action adapts to how much DNA there is', () => {

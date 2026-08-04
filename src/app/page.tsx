@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { VerdictProcessPreview } from '@/components/landing/VerdictProcessPreview';
 import { HowYouRule } from '@/components/landing/HowYouRule';
+import { ExampleVerdict } from '@/components/landing/ExampleVerdict';
+import { GroupVerdictSection } from '@/components/landing/GroupVerdictSection';
+import { NeedSomethingSpecific } from '@/components/landing/NeedSomethingSpecific';
 import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -43,45 +46,26 @@ export default async function LandingPage() {
   const stage = await dnaStage();
   return (
     <div className="min-h-dvh">
-      {/* TIGHTER, LESS DOMINANT. flex-wrap so the auth buttons drop below the
-          logo on narrow phones instead of forcing horizontal overflow. Logo
-          size stays `xl` — its own responsive scale-up from tablet to
-          desktop is pinned by a test — but the header's own padding is
-          cut down so it reads as a strip, not a second hero. "Start
-          watching" used to be filled brand-blue, which read as a second,
-          competing call to action next to the gold entrance below — it's a
-          quiet outline link now, the same weight as "Sign in" beside it.
-          The real entrance is the gold button; this is just a shortcut for
-          someone who already has an account. */}
+      {/* LOGO + SIGN IN, NOTHING ELSE. The gold "Enter the Courtroom" button
+          below is the one prominent entrance; a second, equally-weighted
+          header button into `/app` would compete with it on every screen.
+          Sign in stays because it's not a second front door, it's the same
+          door for someone who already has an account. */}
       <header className="container-page flex flex-wrap items-center justify-between gap-y-1 py-1 sm:py-4">
         <Logo size="xl" />
-        <div className="flex shrink-0 items-center gap-2">
-          <Link href="/login" className="btn-ghost text-sm">
-            Sign in
-          </Link>
-          <Link href="/app" className="btn-ghost border border-white/15 text-sm">
-            Start watching
-          </Link>
-        </div>
+        <Link href="/login" className="btn-ghost text-sm">
+          Sign in
+        </Link>
       </header>
 
       <main>
-        {/* THE INTRODUCTION — WHAT THIS IS, NOT YET A DOOR IN. The headline
-            and the two lines under it are the whole first screen now; no
-            button here at all. A giant gold CTA immediately under the
-            headline used to be the very first thing a visitor's thumb could
-            do, before they knew what "one clear Verd1ct" actually meant —
-            this reads the pitch first, then the two explanation sections
-            below make the case, and only then does the entrance appear. No
-            forced min-height either: the section is exactly as tall as its
-            own three lines of text need, so "How a Verd1ct Gets Made" starts
-            within the same first scroll on a phone instead of behind an
-            empty stretch of hero. */}
+        {/* THE CENTRAL PROMISE. "Thousands of choices. 1 Verd1ct." is the
+            headline itself now, not a small tagline under a different H1 —
+            "1 Verd1ct" carries the brand's pink accent so the payoff reads
+            as the decisive part of the sentence. No button here yet: the
+            three cards below make the case first, then the one gold
+            entrance appears once a visitor knows what it hands them. */}
         <section className="relative isolate overflow-hidden">
-          {/* THE ATMOSPHERE. Decorative only — aria-hidden, pointer-events
-              none, behind everything. See its own doc comment in
-              globals.css for what each layer is and isn't (no stock art, no
-              invented poster). */}
           <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
             <div className="wv-hero-glow absolute left-1/2 top-[-14%] h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-cinema-radial blur-3xl" />
             <div
@@ -100,44 +84,26 @@ export default async function LandingPage() {
           </div>
 
           <div className="container-page py-3.5 text-center sm:py-6">
-            <h1 className="animate-fade-up text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
-              Enter the courtroom.
+            <h1 className="animate-fade-up text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl" data-testid="hero-headline">
+              THOUSANDS OF CHOICES.
+              <br />
+              <span className="text-[#ff1493]">1 VERD1CT.</span>
             </h1>
             <p className="mx-auto mt-1.5 max-w-xl animate-fade-up text-lg text-slate-200 sm:mt-3 sm:text-xl">
-              Tell us what you feel like watching. We&rsquo;ll weigh the evidence, match it to your taste, and hand
-              down one clear Verd1ct—with exactly where to watch it.
-            </p>
-            <p className="mx-auto mt-2 max-w-md animate-fade-up text-base font-semibold text-slate-100 sm:mt-3 sm:text-lg">
-              Search a title, describe your mood, or let WatchVerd1ct choose for you.
+              Tell us what you feel like watching, who is watching, and what services you have. WatchVerd1ct weighs
+              the evidence and gives you one confident choice.
             </p>
           </div>
         </section>
 
-        {/* THE PAYOFF LINE, RIGHT WHERE THE PITCH ENDS. Said exactly once on
-            this page — see the header's own doc comment for why it no
-            longer also opens the page above the fold. */}
-        <p className="px-4 pb-1 text-center text-sm font-bold uppercase tracking-[0.14em] text-slate-500">
-          Thousands of titles. <span className="text-white">One Verd1ct.</span>
-        </p>
-
-        {/* THE PROOF — see VerdictProcessPreview's own doc comment for why
-            this is the process (evidence / taste / verdict), shown all at
-            once, not a static mock result or a tap-through rotator. */}
+        {/* THE PROOF — evidence / taste / verdict, all at once. Always
+            visible here (not tucked behind a tap) so a visitor understands
+            the process before the gold button below asks for a click. */}
         <VerdictProcessPreview />
 
-        {/* THE ONE WAY IN — the only "Enter the Courtroom" button on the
-            whole page, right after the process that explains what it
-            hands you back. This is deliberately NOT after HowYouRule too:
-            the process (what a Verd1ct is) is what someone needs before
-            they can decide to enter, but the card controls (HowYouRule,
-            below) are supporting detail for once they're already in the
-            app — nice to know, not a precondition. Making a visitor read
-            both before the door even appears was the overcorrection this
-            replaced. Build my Watch DNA and Import my history stay real,
-            visible second-tier actions right under it, but never compete
-            with the entrance for the eye. */}
+        {/* THE ONE WAY IN. The only gold, ceremonial button on the page. */}
         <section className="border-t border-white/10" data-testid="main-cta">
-          <div className="container-page flex flex-col items-center pb-5 pt-16 text-center sm:py-8">
+          <div className="container-page flex flex-col items-center py-8 text-center sm:py-8">
             <div className="flex flex-col items-center gap-2 sm:gap-3" data-testid="hero-ctas">
               <Link
                 href="/app"
@@ -170,27 +136,38 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* WHAT THE CONTROLS ON A REAL CARD MEAN — moved below the door
-            itself now. See HowYouRule's own doc comment: same icons and
-            colors the real FOR/AGAINST/SAVE row and the gavel CTA use,
-            illustrative rather than functional. Supporting education for
-            people still scrolling, not a gate in front of the button
-            above. */}
+        {/* PRODUCT PROOF — a real example of the output, not just the
+            process. See ExampleVerdict's own doc comment for the honesty
+            rules (live scoring, illustrative personal fit/availability). */}
+        <ExampleVerdict />
+
+        {/* WHAT THE CONTROLS ON A REAL CARD MEAN — supporting education,
+            below the door and the proof, never a gate in front of either. */}
         <HowYouRule />
 
+        {/* THE GROUP CASE — Verdict Room, a real working flow (useStartCourt)
+            that combines participant taste profiles into one shared Verd1ct,
+            not a second copy of the hero's pitch. */}
+        <GroupVerdictSection />
+
+        {/* SPECIALIZED SURFACES, COMPACT — Hallmark/Lifetime, true crime,
+            live TV, new releases, subscription check, the full filter
+            builder. All existing routes, just not competing with the
+            entrance for primary attention. */}
+        <NeedSomethingSpecific />
       </main>
 
-      {/* TRUST + SOURCES + FOOTER, ONE COMPACT BLOCK. These used to be a
-          separate trust section plus a full second bordered footer, each
-          with its own top/bottom padding — correct content, but it read as
-          dead air after the button everyone actually came for. One
-          `<footer>` now: the honesty line, a hairline divider, then the
-          same attribution as always, tighter throughout. */}
+      {/* TRUST, STATED POSITIVELY — what the product does, not a defense
+          against a suspicion nobody raised. Same TMDB/JustWatch attribution
+          as always underneath it. */}
       <footer className="border-t border-white/10">
         <div className="container-page py-5 text-center sm:py-6">
-          <p className="mx-auto max-w-md text-xs text-slate-500">
-            No fabricated scores or fake providers — every Verd1ct is built from real ratings and real
-            availability.{' '}
+          <p className="mx-auto max-w-md text-sm font-semibold text-slate-200">
+            Real ratings. Real availability. Transparent recommendations.
+          </p>
+          <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
+            Every Verd1ct shows why it was selected, how confident the match is, and where it is currently
+            available.{' '}
             <Link href="/app/tour" className="text-brand-300 underline hover:text-brand-200">
               See how it all works →
             </Link>

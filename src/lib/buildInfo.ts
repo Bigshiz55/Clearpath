@@ -42,7 +42,17 @@ export function shortBranch(branch: string): string {
   return branch.replace(/^refs\/heads\//, '');
 }
 
-/** "Jul 24, 2026 – 6:24 PM" from an ISO timestamp (locale-stable, UTC-safe). */
+/**
+ * "Jul 24, 2026 – 6:24 PM" from an ISO timestamp (locale-stable, UTC-safe).
+ *
+ * `timeZone: 'UTC'` is required, not cosmetic: `BuildVersionBadge` and
+ * `Footer` are client components, so this runs once during the server's
+ * initial render AND again in the browser during hydration. Without a fixed
+ * zone, `Intl.DateTimeFormat` uses whichever local timezone the runtime
+ * happens to be in — the Node server process and the visitor's browser can
+ * disagree, producing two different formatted strings for the same instant
+ * and a real React hydration-mismatch error on every single page.
+ */
 export function formatBuildTime(iso: string): string {
   if (!iso) return 'unknown';
   const d = new Date(iso);
@@ -54,6 +64,7 @@ export function formatBuildTime(iso: string): string {
       year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
+      timeZone: 'UTC',
     })
       .format(d)
       .replace(',', ',')

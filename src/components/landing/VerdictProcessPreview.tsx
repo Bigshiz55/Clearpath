@@ -6,9 +6,9 @@ interface Stage {
 }
 
 const STAGES: Stage[] = [
-  { key: 'evidence', eyebrow: '01', title: 'The Evidence', body: 'General quality, audience response, and availability.' },
-  { key: 'taste', eyebrow: '02', title: 'Your Taste', body: 'What fits you specifically, learned from your ratings.' },
-  { key: 'verdict', eyebrow: '03', title: 'The Verd1ct', body: 'One clear recommendation and exactly where to watch it.' },
+  { key: 'evidence', eyebrow: '01', title: 'The Evidence', body: 'Ratings, quality, availability, and viewing details from trusted sources.' },
+  { key: 'taste', eyebrow: '02', title: 'Your Taste', body: 'What fits you, not merely what is popular with everyone else.' },
+  { key: 'verdict', eyebrow: '03', title: 'The Verd1ct', body: 'One clear recommendation, why it fits, and where to watch it.' },
 ];
 
 /**
