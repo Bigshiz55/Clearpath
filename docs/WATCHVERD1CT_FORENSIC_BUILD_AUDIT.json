@@ -1,0 +1,470 @@
+{
+  "generated": "2026-08-04",
+  "auditBranch": "claude/watch-verdict-app-wwbtbg",
+  "auditHead": "ae86878",
+  "method": "Live repo, git history, live HTTP to production, executed tests. Chat recollection not used as truth.",
+  "statusLabels": [
+    "LIVE_AND_VERIFIED",
+    "BUILT_NOT_LIVE",
+    "PARTIALLY_BUILT",
+    "ARCHITECTURE_ONLY",
+    "RESEARCH_ONLY",
+    "BLOCKED_PERMISSION",
+    "BLOCKED_CREDENTIALS",
+    "BLOCKED_PAID_DATA",
+    "FAILED",
+    "DEPRECATED",
+    "UNKNOWN_REQUIRES_VERIFICATION"
+  ],
+  "production": {
+    "url": "https://clearpath-pearl-chi.vercel.app",
+    "commit": "48d84f8d1e039413c2e0ebd79568cde21a5407af",
+    "shortSha": "48d84f8",
+    "branchServing": "claude/watch-verdict-app-wwbtbg",
+    "vercelEnv": "production",
+    "deployedAt": "2026-08-04T19:00:48.212Z",
+    "schemaVersion": "0041_watchmode_availability",
+    "mainRef": "6f7947f253b4a5d8eb3114f39bb6c634bddbc40c",
+    "criticalFinding": "Production serves the FEATURE BRANCH, not main. main is 2 commits behind production; branch HEAD ae86878 is undeployed.",
+    "commitsNotOnMain": [
+      "ae86878",
+      "48d84f8",
+      "ff1bbee",
+      "0bf031e",
+      "adad182",
+      "bff6d83"
+    ]
+  },
+  "migrations": {
+    "0042_canonical_availability": {
+      "status": "BUILT_NOT_LIVE",
+      "blocker": "BLOCKED_CREDENTIALS: MIGRATE_SECRET",
+      "additive": true,
+      "rollbackCommitted": "supabase/migrations/rollback/0042_canonical_availability_rollback.sql",
+      "testedAgainstProductionData": false
+    },
+    "prefixCollision": [
+      "0039_growth_os",
+      "0039_packs_expansion"
+    ]
+  },
+  "tests": {
+    "unit": {
+      "passed": 2020,
+      "skipped": 17,
+      "files": 172
+    },
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass",
+    "playwrightFull": {
+      "passed": 830,
+      "failed": 118
+    },
+    "playwrightFailureSplit": {
+      "preExisting": 85,
+      "introduced": 33,
+      "introducedFixed": 33,
+      "preExistingRemaining": 85
+    },
+    "skippedSuites": [
+      "cases/matchingJob.db",
+      "cases/reviewQueue.db",
+      "founder/isolation.int",
+      "packs/packs.db",
+      "preference/store.int"
+    ],
+    "firstUseSuite": {
+      "file": "tests/mobile/first-use.spec.ts",
+      "tests": 23,
+      "consecutiveGreenRuns": 2,
+      "requiredThree": false,
+      "ciGate": false
+    },
+    "unresolved": {
+      "dnaQuizUndo": "UNKNOWN_REQUIRES_VERIFICATION - DnaQuiz never modified this sprint; cascade suspected, not proven"
+    }
+  },
+  "liveRoutes": [
+    {
+      "p": "/",
+      "http": 200,
+      "s": 1.17
+    },
+    {
+      "p": "/app",
+      "http": 200,
+      "s": 3.5
+    },
+    {
+      "p": "/app/watch",
+      "http": 200,
+      "s": 9.79
+    },
+    {
+      "p": "/app/new",
+      "http": 200,
+      "s": 1.94
+    },
+    {
+      "p": "/app/taste-quiz",
+      "http": 200,
+      "s": 1.74
+    },
+    {
+      "p": "/import-taste",
+      "http": 200,
+      "s": 0.32
+    },
+    {
+      "p": "/packs",
+      "http": 200,
+      "s": 1.37
+    },
+    {
+      "p": "/packs/hallmark-universe",
+      "http": 200,
+      "s": 11.73
+    },
+    {
+      "p": "/packs/lifetime-vault",
+      "http": 200,
+      "s": 3.48
+    },
+    {
+      "p": "/packs/crime-case-files",
+      "http": 200,
+      "s": 2.46
+    },
+    {
+      "p": "/app/tv",
+      "http": 200,
+      "s": 3.58
+    },
+    {
+      "p": "/login",
+      "http": 200,
+      "s": 0.34
+    },
+    {
+      "p": "/app/subscriptions",
+      "http": 200,
+      "s": 2.1
+    },
+    {
+      "p": "/app/verdict",
+      "http": 200,
+      "s": 0.95
+    },
+    {
+      "p": "/app/watchlist",
+      "http": 200,
+      "s": 1.37
+    },
+    {
+      "p": "/app/finder",
+      "http": 200,
+      "s": 1.33
+    },
+    {
+      "p": "/app/ask",
+      "http": 200,
+      "s": 0.94
+    },
+    {
+      "p": "/app/releases",
+      "http": 404,
+      "note": "real route is /app/new"
+    },
+    {
+      "p": "/app/subscription-check",
+      "http": 404,
+      "note": "real route is /app/subscriptions"
+    }
+  ],
+  "contentVerifiedRoutes": [
+    "/",
+    "/import-taste",
+    "/nope-xyz"
+  ],
+  "tvmaze": {
+    "licence": "CC BY-SA",
+    "attributionRequired": true,
+    "shareAlikeCopyleft": true,
+    "rateLimit": ">=20 calls/10s",
+    "endpointsTested": [
+      "/schedule?country=US&date=",
+      "/schedule/full"
+    ],
+    "endpointsUntested": [
+      "/schedule/web",
+      "/shows/:id/episodes",
+      "/episodesbydate",
+      "/updates/shows",
+      "/shows paginated"
+    ],
+    "futureAirings": 7476,
+    "usNetworks": 75,
+    "dateRange": "2026-08-03..2028-03-05",
+    "distinctDates": 187,
+    "note": "75 networks is a FLOOR - only one endpoint family harvested"
+  },
+  "priorityNetworks": [
+    {
+      "n": "Hallmark Channel",
+      "tvmaze": 0,
+      "rights": "REQUIRES_PERMISSION",
+      "adapter": "registered_disabled",
+      "blocker": "Hallmark press APPLIED FOR / PENDING APPROVAL"
+    },
+    {
+      "n": "Hallmark Mystery",
+      "tvmaze": 0,
+      "rights": "REQUIRES_PERMISSION",
+      "adapter": "registered_disabled",
+      "blocker": "same"
+    },
+    {
+      "n": "Hallmark Family",
+      "tvmaze": 0,
+      "rights": "REQUIRES_PERMISSION",
+      "adapter": "registered_disabled",
+      "blocker": "same"
+    },
+    {
+      "n": "Lifetime",
+      "tvmaze": 5,
+      "rights": "AMBIGUOUS_FACTS_ONLY",
+      "adapter": "none",
+      "blocker": "activation decision; A+E press EXPLICITLY_PROHIBITED"
+    },
+    {
+      "n": "LMN",
+      "tvmaze": 0,
+      "rights": "AMBIGUOUS_FACTS_ONLY",
+      "adapter": "none",
+      "blocker": "same"
+    },
+    {
+      "n": "Great American Family",
+      "tvmaze": 0,
+      "rights": "AMBIGUOUS_FACTS_ONLY",
+      "adapter": "none",
+      "blocker": "activation decision"
+    },
+    {
+      "n": "Investigation Discovery",
+      "tvmaze": 18,
+      "rights": "AMBIGUOUS_FACTS_ONLY",
+      "adapter": "none",
+      "blocker": "activation decision"
+    },
+    {
+      "n": "Oxygen True Crime",
+      "tvmaze": 7,
+      "rights": "AMBIGUOUS_FACTS_ONLY",
+      "adapter": "none",
+      "blocker": "activation decision"
+    },
+    {
+      "n": "TCM",
+      "tvmaze": 0,
+      "rights": "AMBIGUOUS_FACTS_ONLY",
+      "adapter": "none",
+      "blocker": "activation decision"
+    }
+  ],
+  "hallmarkPressAccess": {
+    "status": "APPLIED_FOR_PENDING_APPROVAL",
+    "submitted": "2026-08-04",
+    "adapterEnabled": false,
+    "authenticatedContentAccessed": false,
+    "loginBypassed": false,
+    "evidence": "src/lib/ingest/sourceRegistry.ts hallmark_press.enabled=false; test 'keeps Hallmark press dark while approval is pending'"
+  },
+  "streaming": {
+    "overallStatus": "RESEARCH_ONLY",
+    "servicesNamed": 42,
+    "servicesProbed": 7,
+    "servicesNotResearched": 35,
+    "adaptersBuilt": 0,
+    "servicesIntegrated": 0,
+    "probed": [
+      {
+        "s": "Paramount+",
+        "src": "paramountpressexpress.com",
+        "http": 200,
+        "rights": "PRESS_PUBLICITY"
+      },
+      {
+        "s": "Hulu",
+        "src": "press.hulu.com",
+        "http": 200,
+        "rights": "PRESS_PUBLICITY"
+      },
+      {
+        "s": "BritBox",
+        "src": "britbox.com",
+        "http": 200,
+        "rights": "PRESS_PUBLICITY"
+      },
+      {
+        "s": "Prime Video",
+        "src": "press.amazonmgmstudios.com",
+        "http": 403,
+        "rights": "UNCHARACTERIZED"
+      },
+      {
+        "s": "Peacock",
+        "src": "peacocktvpresssite.com",
+        "http": null,
+        "rights": "UNCHARACTERIZED"
+      },
+      {
+        "s": "Acorn TV",
+        "src": "press.acorn.tv",
+        "http": null,
+        "rights": "UNCHARACTERIZED"
+      },
+      {
+        "s": "HBO Max",
+        "src": "press.max.com",
+        "http": null,
+        "rights": "UNCHARACTERIZED"
+      }
+    ]
+  },
+  "ingestFoundation": {
+    "commit": "48d84f8",
+    "files": [
+      "src/lib/ingest/sourceRegistry.ts",
+      "src/lib/ingest/validate.ts",
+      "src/lib/ingest/ingest.foundation.test.ts"
+    ],
+    "tests": 11,
+    "status": "BUILT_NOT_LIVE",
+    "consumedBy": "NOTHING",
+    "bugFixed": "refusalReason() checked kill switch before rights state, concealing that a prohibited source stays prohibited"
+  },
+  "availability": {
+    "shippingStates": {
+      "titleLevel": [
+        "unconfirmed",
+        "none",
+        "available"
+      ],
+      "perSource": [
+        "subscription",
+        "rent",
+        "buy",
+        "free"
+      ]
+    },
+    "plannedStates": [
+      "included_with_base_subscription",
+      "included_with_premium_tier",
+      "included_with_prime",
+      "included_with_addon",
+      "free_with_ads",
+      "library_access",
+      "rent",
+      "buy",
+      "coming_soon",
+      "leaving_soon",
+      "unavailable",
+      "unverified"
+    ],
+    "migrationApplied": false,
+    "primeSeparation": "ARCHITECTURE_ONLY - defined, nothing populates it",
+    "legacyMapping": {
+      "subscription": "included_with_base_subscription",
+      "free": "free_with_ads",
+      "rent": "rent",
+      "buy": "buy",
+      "other": "unverified"
+    }
+  },
+  "paidProviders": {
+    "Watchmode": {
+      "inUse": true,
+      "contacted": "n/a"
+    },
+    "SchedulesDirect": {
+      "status": "EXPLICITLY_PROHIBITED_our_use",
+      "contacted": false
+    },
+    "Gracenote": {
+      "contacted": false,
+      "evidenceOfContact": null
+    },
+    "TVMedia": {
+      "contacted": false
+    },
+    "JustWatch": {
+      "researched": false
+    },
+    "TiVoMetadata": {
+      "researched": false
+    }
+  },
+  "gapAnalysis": {
+    "builtAndVerified": [
+      "homepage hero+CTAs",
+      "/import-taste csv-input renders",
+      "404 page"
+    ],
+    "builtNotVerified": [
+      "reliability items 1-9 live behaviour",
+      "New Releases titles",
+      "Pack content",
+      "TV guide content",
+      "sign-in",
+      "anon->account merge"
+    ],
+    "partiallyBuilt": [
+      "ingest foundation (wired to nothing)",
+      "migration 0042 (unapplied)",
+      "12 availability states (unpopulated)",
+      "Hallmark adapter slot",
+      "first-use suite (not a gate)",
+      "rights doc vs code inconsistency"
+    ],
+    "notBuilt": [
+      "all 42 streaming adapters",
+      "review queue",
+      "takedown workflow",
+      "coverage dashboards",
+      "adapter interfaces",
+      "New Releases filters",
+      "Subscription Check upgrade"
+    ]
+  },
+  "topFindings": [
+    "Production serves the feature branch, not main - earlier 'deployed to main and verified' was an overclaim",
+    "85 pre-existing Playwright failures remain unfixed, several touching first-use",
+    "Account-isolation integration test is SKIPPED - cross-user protection unproven by execution",
+    "Streaming engine is RESEARCH_ONLY: 0 of 42 services integrated, 35 never researched",
+    "Ingest foundation and 12 availability states are real and tested but connected to nothing"
+  ],
+  "overclaimsCorrected": [
+    "'Deployed to main and verified live' - main push succeeded but production tracks the branch",
+    "'Item 10 complete' - completed with 85 known failures outstanding",
+    "'No free source can fill the Packs' - drawn from APIs only; later disproved for Lifetime",
+    "Verification by HTTP 200 in earlier reporting"
+  ],
+  "maximumPossibleAssessment": {
+    "answer": "NO - not close",
+    "highestRemainingFreeLevers": [
+      "TVmaze endpoint exhaustion (5 of 7 families untested)",
+      "Paramount+/Hulu/BritBox adapters (sources confirmed reachable, none written)"
+    ]
+  },
+  "ownerActions": [
+    "Decide Vercel production branch tracking (main vs feature branch)",
+    "Apply migration 0042 via /admin/migrations with MIGRATE_SECRET",
+    "Decide AMBIGUOUS_FACTS_ONLY activation",
+    "Pursue A+E/WBD/NBCU written permission",
+    "Contact Gracenote/TV Media if desired",
+    "Await Hallmark press approval"
+  ]
+}
