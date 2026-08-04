@@ -112,4 +112,38 @@ describe('analysePicks', () => {
     expect(under.enough).toBe(false);
     expect(at.enough).toBe(true);
   });
+
+  describe('"Doesn\'t look good" — a chosen negative, not a silent one', () => {
+    it('counts toward the total and gets its own fact', () => {
+      const a = analysePicks([pick({ kind: 'not_interested', genre: 'horror' }), pick()], YEAR);
+      expect(a.total).toBe(2);
+      const passed = a.facts.find((f) => f.key === 'passed');
+      expect(passed?.detail).toContain('1');
+    });
+
+    it('never counts toward what you reached for — it is what to avoid, not a taste', () => {
+      const picks = [
+        ...Array.from({ length: 5 }, () => pick({ kind: 'not_interested', genre: 'horror' })),
+        pick({ genre: 'comedy' }),
+      ];
+      const a = analysePicks(picks, YEAR);
+      expect(a.leadingGenres).not.toContain('horror');
+    });
+
+    it('does not by itself claim enough evidence for a pattern', () => {
+      const allPassed = analysePicks(Array.from({ length: MIN_FOR_PATTERN }, () => pick({ kind: 'not_interested' })), YEAR);
+      expect(allPassed.enough).toBe(false);
+    });
+
+    it('a mixed round still reads the pattern from the positive picks alone', () => {
+      const picks = [
+        ...Array.from({ length: MIN_FOR_PATTERN }, () => pick({ genre: 'crime' })),
+        ...Array.from({ length: 3 }, () => pick({ kind: 'not_interested', genre: 'horror' })),
+      ];
+      const a = analysePicks(picks, YEAR);
+      expect(a.enough).toBe(true);
+      expect(a.leadingGenres).toContain('crime');
+      expect(a.leadingGenres).not.toContain('horror');
+    });
+  });
 });

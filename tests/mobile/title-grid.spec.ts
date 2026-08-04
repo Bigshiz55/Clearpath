@@ -74,6 +74,47 @@ test('tapping a poster selects it, tapping again clears it', async ({ page }) =>
   await expect(page.getByTestId('title-grid-submit')).toBeDisabled();
 });
 
+test('"Doesn\'t look good" is a real, chosen negative — distinct from leaving a tile alone', async ({ page }) => {
+  await open(page);
+  const bad = page.getByTestId('grid-bad-100');
+  await expect(bad).toHaveAttribute('aria-pressed', 'false');
+  await bad.click();
+  await expect(bad).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('title-grid-submit')).toContainText('add 1 to my DNA');
+  await bad.click();
+  await expect(bad).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('title-grid-submit')).toBeDisabled();
+});
+
+test('"Looks good" and "Doesn\'t look good" are mutually exclusive on one tile', async ({ page }) => {
+  await open(page);
+  const good = page.getByTestId('grid-like-100');
+  const bad = page.getByTestId('grid-bad-100');
+  await good.click();
+  await expect(good).toHaveAttribute('aria-pressed', 'true');
+  await bad.click();
+  await expect(bad).toHaveAttribute('aria-pressed', 'true');
+  await expect(good).toHaveAttribute('aria-pressed', 'false');
+  // Still exactly one pick on this tile, not two.
+  await expect(page.getByTestId('title-grid-submit')).toContainText('add 1 to my DNA');
+});
+
+test('a chosen "Doesn\'t look good" is sent as a real not_interested intent', async ({ page }) => {
+  const posts: string[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'POST') posts.push(r.postData() ?? '');
+  });
+
+  await open(page);
+  await page.getByTestId('grid-bad-100').click();
+  await page.getByTestId('title-grid-submit').click();
+  await expect(page.getByTestId('title-grid-done')).toBeVisible();
+
+  const body = posts.join('\n');
+  expect(body).toContain('Test Title 1');
+  expect(body).toContain('not_interested');
+});
+
 test('"Seen it" opens a rating without leaving the grid', async ({ page }) => {
   await open(page);
   await page.getByTestId('grid-seen-101').click();

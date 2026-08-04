@@ -19,7 +19,7 @@
  * Pure. No I/O, no clock — the current year is a parameter.
  */
 
-export type PickKind = 'like' | 'seen';
+export type PickKind = 'like' | 'seen' | 'not_interested';
 
 export interface AnalysedPick {
   title: string;
@@ -94,27 +94,37 @@ export function analysePicks(picks: readonly AnalysedPick[], currentYear: number
     return { total: 0, enough: false, headline: 'Nothing to read yet.', facts: [], leadingGenres: [], caveat };
   }
 
+  // "Doesn't look good" is a real, chosen negative — unlike an untouched tile,
+  // it is honest evidence. But it is evidence of what to AVOID, not what to
+  // reach for, so it is kept out of the genre/era/shape leans below (which
+  // describe taste, not avoidance) and reported as its own fact instead.
+  const passed = picks.filter((p) => p.kind === 'not_interested');
+  const positive = picks.filter((p) => p.kind !== 'not_interested');
+
   // ── Genres ────────────────────────────────────────────────────────────────
   const byGenre = new Map<string, number>();
-  for (const p of picks) {
+  for (const p of positive) {
     if (!p.genre) continue;
     byGenre.set(p.genre, (byGenre.get(p.genre) ?? 0) + 1);
   }
   const ranked = Array.from(byGenre.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  const leadingGenres = ranked
-    .filter(([, n]) => n >= LEAN_COUNT && n / total >= LEAN_SHARE)
-    .slice(0, 3)
-    .map(([g]) => g);
+  const leadingGenres =
+    positive.length > 0
+      ? ranked
+          .filter(([, n]) => n >= LEAN_COUNT && n / positive.length >= LEAN_SHARE)
+          .slice(0, 3)
+          .map(([g]) => g)
+      : [];
 
   // ── Era ───────────────────────────────────────────────────────────────────
-  const years = picks.map((p) => p.year).filter((y): y is number => typeof y === 'number' && y > 1900);
+  const years = positive.map((p) => p.year).filter((y): y is number => typeof y === 'number' && y > 1900);
   const recent = years.filter((y) => currentYear - y <= 10).length;
   const old = years.filter((y) => currentYear - y >= 25).length;
 
   // ── Shape ─────────────────────────────────────────────────────────────────
-  const movies = picks.filter((p) => p.mediaType === 'movie').length;
-  const shows = total - movies;
-  const seen = picks.filter((p) => p.kind === 'seen');
+  const movies = positive.filter((p) => p.mediaType === 'movie').length;
+  const shows = positive.length - movies;
+  const seen = positive.filter((p) => p.kind === 'seen');
   const loved = seen.filter((p) => p.rating === 'loved' || p.rating === 'liked').length;
 
   const facts: PickFact[] = [];
@@ -163,8 +173,18 @@ export function analysePicks(picks: readonly AnalysedPick[], currentYear: number
     });
   }
 
+  if (passed.length > 0) {
+    facts.push({
+      key: 'passed',
+      label: 'Not for you',
+      detail: `${passed.length} ${passed.length === 1 ? 'title' : 'titles'} you said didn't look good — that counts too, as what to steer away from.`,
+    });
+  }
+
   // ── Headline ──────────────────────────────────────────────────────────────
-  const enough = total >= MIN_FOR_PATTERN;
+  // Gated on POSITIVE picks: a round that is all "doesn't look good" is real,
+  // recorded signal, but it describes what to avoid, not a taste to name.
+  const enough = positive.length >= MIN_FOR_PATTERN;
   let headline: string;
   if (!enough) {
     headline = `${total} ${total === 1 ? 'pick' : 'picks'} — enough to start, not enough to describe you yet.`;

@@ -16,10 +16,14 @@
  *
  *   NOT TAPPING A TITLE RECORDS NOTHING.
  *
- * Nothing here manufactures a negative. Dislikes come from "Not for me" on real
- * cards elsewhere, where the person is actually looking at something they
- * understand. Everything sent from this grid is a positive the user chose, or a
- * rating they gave a title they have seen.
+ * Nothing here manufactures a negative from silence. But a title someone
+ * DOES recognise and DOES have an opinion on is exactly the case the old
+ * one-at-a-time lane got right — so "Doesn't look good" lives here too, as
+ * its own explicit button next to "Looks good" and "Seen it?". The
+ * difference from Skip is the whole point: Skip was never a choice, this is
+ * one. Everything sent from this grid is either a positive the user chose, a
+ * negative they chose, or a rating on a title they have seen — never an
+ * inference from a tile nobody touched.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SeeRecommendations } from '@/components/SeeRecommendations';
@@ -49,9 +53,12 @@ interface Item {
 
 type Rating = 'loved' | 'liked' | 'okay' | 'disliked';
 
-/** What the user said about a tile. Absence means "said nothing" — never a no. */
+/** What the user said about a tile. Absence means "said nothing" — never a no.
+ *  `not_interested` IS a real negative, unlike absence — it only ever gets
+ *  written when someone taps "Doesn't look good" for themselves. */
 type Pick =
   | { kind: 'like' }
+  | { kind: 'not_interested' }
   | { kind: 'seen'; rating: Rating };
 
 const RATINGS: Array<{ key: Rating; label: string; emoji: string }> = [
@@ -175,7 +182,28 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
       } else {
         next[k] = { kind: 'like' };
         chosenItems.current.set(k, i);
-        const r = el?.getBoundingClientRect();
+        const r = el?.closest('li')?.getBoundingClientRect();
+        if (r) setBurst({ cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+      }
+      return next;
+    });
+  }
+
+  /** The one explicit negative this grid allows — real evidence because it is
+   *  chosen, not assumed from silence (see the module doc comment). Toggles
+   *  the same way "Looks good" does, so tapping it twice is a real undo. */
+  function toggleNotInterested(i: Item, el: HTMLElement | null) {
+    const k = keyOf(i);
+    setOpenRating(null);
+    setPicks((p) => {
+      const next = { ...p };
+      if (next[k]?.kind === 'not_interested') {
+        delete next[k];
+        chosenItems.current.delete(k);
+      } else {
+        next[k] = { kind: 'not_interested' };
+        chosenItems.current.set(k, i);
+        const r = el?.closest('li')?.getBoundingClientRect();
         if (r) setBurst({ cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
       }
       return next;
@@ -214,7 +242,9 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
           recordQuizAnswer(
             pick.kind === 'like'
               ? { ...base, intent: 'looks_good' as const }
-              : { ...base, intent: 'seen' as const, rating: pick.rating },
+              : pick.kind === 'not_interested'
+                ? { ...base, intent: 'not_interested' as const }
+                : { ...base, intent: 'seen' as const, rating: pick.rating },
           ).catch(() => ({ ok: false })),
         ];
       }),
@@ -328,8 +358,8 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
       <header>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">Tap anything you like the look of</h1>
         <p className="mt-1 text-sm text-slate-400">
-          Twelve at a time. Tap the ones you would happily watch — and if you have already seen one, say what you
-          thought.{' '}
+          Twelve at a time. Say what you think of the ones you recognise — good or not — and if you have already
+          seen one, say what you thought.{' '}
           <span className="font-semibold text-slate-300" data-testid="grid-no-penalty">
             Leaving a title alone records nothing: not recognising something is not a dislike.
           </span>
@@ -354,19 +384,18 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
             const k = keyOf(i);
             const pick = picks[k];
             const liked = pick?.kind === 'like';
+            const notInterested = pick?.kind === 'not_interested';
             const seen = pick?.kind === 'seen' ? pick.rating : null;
             return (
               <li key={k} className="min-w-0" data-testid={`grid-tile-${i.mediaType}-${i.id}`}>
-                <button
-                  type="button"
-                  onClick={(e) => toggleLike(i, e.currentTarget)}
-                  aria-pressed={liked}
-                  data-testid={`grid-like-${i.id}`}
+                <div
                   className={[
                     'relative block w-full overflow-hidden rounded-xl border-2 transition',
                     liked || seen
                       ? 'border-brand-400 shadow-[0_0_0_3px_rgba(168,85,247,0.25)]'
-                      : 'border-white/10 hover:border-white/30',
+                      : notInterested
+                        ? 'border-slate-500'
+                        : 'border-white/10',
                   ].join(' ')}
                 >
                   <span className="block aspect-[2/3] w-full bg-ink-800">
@@ -384,11 +413,51 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
                       {liked ? '✓' : (RATINGS.find((r) => r.key === seen)?.emoji ?? '✓')}
                     </span>
                   )}
-                </button>
+                  {notInterested && (
+                    <span className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-slate-700 text-sm font-black text-white">
+                      ✕
+                    </span>
+                  )}
+                </div>
 
                 <div className="mt-1 line-clamp-2 text-xs font-semibold text-white">{i.title}</div>
                 <div className="text-[11px] text-slate-500">
                   {i.year ?? '—'} · {i.mediaType === 'movie' ? 'Movie' : 'TV'}
+                </div>
+
+                {/* THE TWO OPINIONS ON A TITLE YOU RECOGNISE. Both are chosen,
+                    both are real signal — "Doesn't look good" only ever writes
+                    because someone tapped it, never from leaving the tile
+                    alone (see the module doc comment above). */}
+                <div className="mt-1 grid grid-cols-2 gap-1">
+                  <button
+                    type="button"
+                    onClick={(e) => toggleLike(i, e.currentTarget)}
+                    aria-pressed={liked}
+                    data-testid={`grid-like-${i.id}`}
+                    className={[
+                      'inline-flex min-h-[36px] items-center justify-center rounded-lg border px-1 text-[11px] font-bold leading-tight transition',
+                      liked
+                        ? 'border-brand-400 bg-brand-500/25 text-brand-100'
+                        : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10',
+                    ].join(' ')}
+                  >
+                    👍 Looks good
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => toggleNotInterested(i, e.currentTarget)}
+                    aria-pressed={notInterested}
+                    data-testid={`grid-bad-${i.id}`}
+                    className={[
+                      'inline-flex min-h-[36px] items-center justify-center rounded-lg border px-1 text-[11px] font-bold leading-tight transition',
+                      notInterested
+                        ? 'border-slate-400 bg-white/10 text-slate-100'
+                        : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10',
+                    ].join(' ')}
+                  >
+                    👎 Doesn&rsquo;t look good
+                  </button>
                 </div>
 
                 {openRating === k ? (
