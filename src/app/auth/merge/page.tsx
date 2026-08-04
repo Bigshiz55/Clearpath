@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getMergePreview } from '@/lib/actions/mergeAccount';
+import { getMergePreview, performMerge } from '@/lib/actions/mergeAccount';
 import { MergeDecision } from '@/components/auth/MergeDecision';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,17 @@ export default async function AuthMergePage({
 
   // Already resolved (e.g. a reloaded/bookmarked link) or invalid — nothing
   // left to decide, just continue.
-  if (!preview || preview.anonItemCount === 0) redirect(next);
+  if (!preview) redirect(next);
+  if (preview.anonItemCount === 0 && preview.anonSignalCount === 0) redirect(next);
+  // No watchlist to conflict over — only Watch DNA quiz answers / verdicts,
+  // which merge additively and never overwrite the target's own data. That
+  // needs no decision; asking "merge or discard 0 titles?" would be
+  // confusing, and skipping it used to silently leave that signal stranded
+  // on the now-orphaned anonymous account forever.
+  if (preview.anonItemCount === 0) {
+    await performMerge(preview.anonUserId);
+    redirect(next);
+  }
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center p-6">

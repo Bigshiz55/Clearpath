@@ -4,6 +4,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { parseNetflixCsv, type ParseReport } from '@/lib/import/netflixCsv';
 import { consolidate, type ConsolidationResult } from '@/lib/import/consolidate';
 import { signalFor, signalForVerdict, type UserVerdict } from '@/lib/import/signalModel';
+import { importParsedTitles, undoImportedTitles, type ImportRowResult } from '@/lib/actions/import';
 
 /**
  * BRING YOUR TASTE WITH YOU.
@@ -13,12 +14,32 @@ import { signalFor, signalForVerdict, type UserVerdict } from '@/lib/import/sign
  * rather than a policy sentence: there is no raw upload to delete because there
  * was no raw upload.
  *
- * Nothing reaches Viewer DNA without passing the review step. The proposed
- * signal on every row is shown with its reasoning, so a user can see that we
- * treated "watched" as watched and not as "liked".
+ * Nothing reaches your watchlist without passing the review step. The
+ * proposed signal on every row is shown with its reasoning, so a user can
+ * see that we treated "watched" as watched and not as "liked" — even
+ * though, today, only the watched fact and a best-effort rating actually
+ * get written (see applyImport below); the richer per-title signal this
+ * module computes isn't persisted anywhere yet.
  */
 
 const MAX_BYTES = 20 * 1024 * 1024;
+// Matches importParsedTitles's own per-call cap (see src/lib/actions/import.ts).
+const IMPORT_BATCH = 40;
+
+/** A best-effort 1-10 rating from the verdict tier — importParsedTitles only
+ *  accepts a title + rating, so this is what actually reaches the watchlist
+ *  row. 'saved'/'interested' titles are excluded upstream (see toImport
+ *  below): the user hasn't watched them, so writing a 'watched' row would
+ *  misstate their real status. */
+function ratingForVerdict(v: UserVerdict | null): number | null {
+  switch (v) {
+    case 'loved': return 9;
+    case 'liked': return 7;
+    case 'disliked':
+    case 'not_for_me': return 2;
+    default: return null; // watched/did_not_finish/finished/okay/null — no rating claim
+  }
+}
 
 /* Line art rather than emoji for the three marks that carry meaning here: an
    emoji shield renders as a different object on every platform, and this one is
@@ -50,7 +71,7 @@ function UploadIcon({ className = '' }: { className?: string }) {
   );
 }
 
-type Stage = 'choose' | 'processing' | 'review' | 'applied';
+type Stage = 'choose' | 'processing' | 'review' | 'applying' | 'applied';
 
 interface ReviewItem {
   id: string;
@@ -72,6 +93,14 @@ export function ImportTasteFlow() {
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [profileChoice, setProfileChoice] = useState<Record<string, string>>({});
+  const [applyResult, setApplyResult] = useState<{
+    imported: number;
+    unmatched: number;
+    notImported: number;
+    importedKeys: { tmdbId: number; mediaType: 'movie' | 'tv' }[];
+  } | null>(null);
+  const [signInRequired, setSignInRequired] = useState(false);
+  const [undoState, setUndoState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
 
   const onFile = useCallback(async (file: File) => {
     setError(null);
@@ -130,6 +159,68 @@ export function ImportTasteFlow() {
     setItems((xs) => xs.map((x) => (x.id === id ? { ...x, verdict: v } : x)));
 
   const kept = useMemo(() => items.filter((i) => i.verdict !== 'remove' && i.verdict !== 'other_profile'), [items]);
+
+  const applyImport = useCallback(async () => {
+    setError(null);
+    setSignInRequired(false);
+    setStage('applying');
+
+    // 'saved'/'interested' means the user hasn't watched it — writing a
+    // 'watched' row for it would misstate their real status, so only the
+    // watched-type verdicts (or the unset default, which still means "this
+    // was in your viewing history") go to the watchlist.
+    const toImport = kept.filter((i) => i.verdict !== 'saved' && i.verdict !== 'interested');
+    const notImported = kept.length - toImport.length;
+
+    const allRows: ImportRowResult[] = [];
+    let importFailed: string | null = null;
+    for (let i = 0; i < toImport.length; i += IMPORT_BATCH) {
+      const batch = toImport.slice(i, i + IMPORT_BATCH).map((x) => ({ title: x.title, rating: ratingForVerdict(x.verdict) }));
+      const res = await importParsedTitles(batch);
+      if (!res.ok) {
+        importFailed = res.error ?? 'Something went wrong while adding these titles.';
+        break;
+      }
+      allRows.push(...res.rows);
+    }
+
+    if (importFailed) {
+      if (/signed in/i.test(importFailed)) {
+        setSignInRequired(true);
+      } else {
+        setError(importFailed);
+      }
+      setStage('review');
+      return;
+    }
+
+    setApplyResult({
+      imported: allRows.filter((r) => r.status === 'imported').length,
+      unmatched: allRows.filter((r) => r.status === 'unmatched').length,
+      notImported,
+      importedKeys: allRows
+        .filter((r): r is ImportRowResult & { tmdbId: number; mediaType: 'movie' | 'tv' } => r.status === 'imported' && r.tmdbId != null && r.mediaType != null)
+        .map((r) => ({ tmdbId: r.tmdbId, mediaType: r.mediaType })),
+    });
+    setUndoState('idle');
+    setStage('applied');
+  }, [kept]);
+
+  const undoApply = useCallback(async () => {
+    if (!applyResult) return;
+    setUndoState('busy');
+    const res = await undoImportedTitles(applyResult.importedKeys);
+    if (!res.ok) {
+      setUndoState('error');
+      return;
+    }
+    setUndoState('done');
+    setStage('choose');
+    setItems([]);
+    setReport(null);
+    setGrouped(null);
+    setApplyResult(null);
+  }, [applyResult]);
   const summary = useMemo(() => {
     const counts = { loved: 0, liked: 0, disliked: 0, watched: 0, saved: 0, dnf: 0, skipped: 0 };
     for (const i of items) {
@@ -177,7 +268,7 @@ export function ImportTasteFlow() {
             {[
               'We never ask for your Netflix password, and we never sign in to your account.',
               'Your file is read in this browser. It is not uploaded to our servers.',
-              'You review every title before anything is added to your Viewer DNA.',
+              'You review every title before anything is added to your watchlist.',
               'Nothing is saved until you confirm it, and any import can be undone.',
             ].map((line) => (
               <li key={line} className="flex gap-3 text-[15px] leading-relaxed text-emerald-50/90">
@@ -276,33 +367,63 @@ export function ImportTasteFlow() {
     );
   }
 
+  // ---- APPLYING ------------------------------------------------------------
+  // A real network step now (matching titles against TMDB, writing your
+  // watchlist) rather than an instant local-state flip — this can take a
+  // few seconds for a large history, so it gets its own honest wait state.
+  if (stage === 'applying') {
+    return (
+      <div className="card p-8 text-center" data-testid="import-applying" role="status" aria-live="polite">
+        <div className="text-3xl" aria-hidden>⏳</div>
+        <p className="mt-2 text-sm text-slate-300">Adding your titles — matching each one and saving it…</p>
+      </div>
+    );
+  }
+
   // ---- APPLIED -----------------------------------------------------------
-  if (stage === 'applied') {
+  if (stage === 'applied' && applyResult) {
     return (
       <div className="space-y-4" data-testid="import-summary">
-        <h1 className="text-2xl font-bold text-white">Added to your Viewer DNA</h1>
+        <h1 className="text-2xl font-bold text-white">Added to your watchlist</h1>
         <div className="card p-5">
           <ul className="space-y-1 text-sm text-slate-200">
-            <li data-testid="sum-watched">{summary.watched} watched titles</li>
+            <li data-testid="sum-imported">{applyResult.imported} title{applyResult.imported === 1 ? '' : 's'} matched and added, marked watched</li>
+            {applyResult.unmatched > 0 && (
+              <li data-testid="sum-unmatched" className="text-amber-300">
+                {applyResult.unmatched} couldn’t be matched to a real title and were skipped
+              </li>
+            )}
+            {applyResult.notImported > 0 && (
+              <li data-testid="sum-not-imported" className="text-slate-400">
+                {applyResult.notImported} marked “saved for later” weren’t added — this import is for what you’ve
+                watched, not what you plan to
+              </li>
+            )}
             <li data-testid="sum-loved">{summary.loved} loved</li>
             <li data-testid="sum-liked">{summary.liked} liked</li>
             <li data-testid="sum-disliked">{summary.disliked} disliked or not for you</li>
-            <li data-testid="sum-saved">{summary.saved} saved for later</li>
             <li data-testid="sum-dnf">{summary.dnf} started but not finished</li>
             <li data-testid="sum-skipped">{summary.skipped} skipped</li>
           </ul>
           <p className="mt-3 text-xs text-slate-400">
-            This measures how much we know about you, not how accurate our recommendations will be.
-            Watching something is recorded as watching it — we have not assumed you enjoyed it.
+            Ratings are a best-effort translation of what you told us (Loved/Liked/Disliked) — watching
+            something with no stated opinion is recorded as watched, with no rating and no assumption you
+            enjoyed it.
           </p>
         </div>
+        {undoState === 'error' && (
+          <p className="text-sm text-red-300" role="alert" data-testid="undo-error">
+            Couldn’t undo the import. Please try again.
+          </p>
+        )}
         <button
           type="button"
-          onClick={() => { setStage('choose'); setItems([]); setReport(null); setGrouped(null); }}
+          onClick={() => void undoApply()}
+          disabled={undoState === 'busy'}
           className="btn-secondary"
           data-testid="undo-import"
         >
-          Undo this import
+          {undoState === 'busy' ? 'Removing…' : `Undo this import (removes ${applyResult.imported} title${applyResult.imported === 1 ? '' : 's'})`}
         </button>
       </div>
     );
@@ -313,7 +434,7 @@ export function ImportTasteFlow() {
     <div className="space-y-5" data-testid="import-review">
       <header>
         <h1 className="text-2xl font-bold text-white">
-          We found these titles. Check them before adding them to your Viewer DNA.
+          We found these titles. Check them before adding them to your watchlist.
         </h1>
         {report && (
           <p className="mt-2 text-sm text-slate-300" data-testid="parse-stats">
@@ -321,6 +442,19 @@ export function ImportTasteFlow() {
             {report.invalid} could not be read
             {report.dateRange && ` · ${report.dateRange.first} to ${report.dateRange.last}`}
           </p>
+        )}
+        {/* An accepted extension (.csv/.txt) whose CONTENT doesn't parse the
+            way we expect used to land here silently — "0 usable, 0 duplicates,
+            0 could not be read" with an empty list and no explanation. The
+            parser already computes exactly why; it just wasn't shown. */}
+        {report && report.warnings.length > 0 && (
+          <ul className="mt-2 space-y-1" data-testid="parse-warnings">
+            {report.warnings.map((w) => (
+              <li key={w} className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                {w}
+              </li>
+            ))}
+          </ul>
         )}
         {grouped && (
           <p className="mt-1 text-sm text-slate-400" data-testid="group-stats">
@@ -430,14 +564,27 @@ export function ImportTasteFlow() {
         ))}
       </ul>
 
+      {signInRequired && (
+        <p className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-[15px] text-amber-100" role="alert" data-testid="import-signin-required">
+          Sign in to add these to your watchlist — nothing has been added yet.{' '}
+          <a href="/login?next=/import-taste" className="font-semibold underline">Sign in</a>
+        </p>
+      )}
+      {error && (
+        <p className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-[15px] text-red-100" role="alert" data-testid="apply-error">
+          {error}
+        </p>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           className="btn-primary"
           data-testid="apply-import"
-          onClick={() => setStage('applied')}
+          onClick={() => void applyImport()}
+          disabled={kept.length === 0}
         >
-          Add {kept.length} titles to my Viewer DNA
+          Add {kept.length} titles to my watchlist
         </button>
         <button
           type="button"

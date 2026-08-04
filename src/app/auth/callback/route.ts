@@ -61,9 +61,15 @@ export async function GET(request: Request) {
         return NextResponse.redirect(mergeUrl);
       }
     } catch {
-      // A merge failure should never block sign-in — the anonymous data
-      // simply stays unmerged (and the anon user row, unless something
-      // else cleans it up) rather than losing the sign-in itself.
+      // A merge failure should never block sign-in — but silently leaving
+      // the pre-signin data unmerged with no trace was itself a silent
+      // discard. Send the user to the same decision screen instead: it
+      // re-derives the preview fresh and offers an explicit "Merge both"
+      // retry (or "Discard"), rather than the data just vanishing.
+      const mergeUrl = new URL('/auth/merge', url.origin);
+      mergeUrl.searchParams.set('anon', anonUserId);
+      mergeUrl.searchParams.set('next', next);
+      return NextResponse.redirect(mergeUrl);
     }
   }
 

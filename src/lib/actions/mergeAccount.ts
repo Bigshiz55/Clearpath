@@ -10,6 +10,12 @@ export interface MergePreview {
   targetUserId: string;
   anonItemCount: number;
   targetItemCount: number;
+  /** Rows across preference_events, recommendation_feedback, and
+   *  dimension_signals for the anonymous session — Watch DNA quiz answers
+   *  and FOR/AGAINST verdicts, none of which live in watchlist_items. A
+   *  visitor who only did these (never saved anything) has anonItemCount
+   *  0 but real signal worth preserving. */
+  anonSignalCount: number;
   /** True when the target account has no existing watchlist data of its own
    *  — nothing to conflict with, so it's safe to merge without asking. */
   safeToAutoMerge: boolean;
@@ -18,6 +24,16 @@ export interface MergePreview {
 async function countWatchlistItems(admin: SupabaseClient, userId: string): Promise<number> {
   const { count } = await admin.from('watchlist_items').select('id', { count: 'exact', head: true }).eq('user_id', userId);
   return count ?? 0;
+}
+
+/** Rows across the DNA/verdict signal tables — see MergePreview.anonSignalCount. */
+async function countDnaSignals(admin: SupabaseClient, userId: string): Promise<number> {
+  const [pref, feedback, dims] = await Promise.all([
+    admin.from('preference_events').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    admin.from('recommendation_feedback').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    admin.from('dimension_signals').select('user_id', { count: 'exact', head: true }).eq('user_id', userId),
+  ]);
+  return (pref.count ?? 0) + (feedback.count ?? 0) + (dims.count ?? 0);
 }
 
 /**
@@ -39,9 +55,10 @@ export async function getMergePreview(anonUserId: string): Promise<MergePreview 
   const { data: anonLookup, error } = await admin.auth.admin.getUserById(anonUserId);
   if (error || !anonLookup?.user || anonLookup.user.is_anonymous !== true) return null;
 
-  const [anonItemCount, targetItemCount] = await Promise.all([
+  const [anonItemCount, targetItemCount, anonSignalCount] = await Promise.all([
     countWatchlistItems(admin, anonUserId),
     countWatchlistItems(admin, target.id),
+    countDnaSignals(admin, anonUserId),
   ]);
 
   return {
@@ -49,6 +66,7 @@ export async function getMergePreview(anonUserId: string): Promise<MergePreview 
     targetUserId: target.id,
     anonItemCount,
     targetItemCount,
+    anonSignalCount,
     safeToAutoMerge: targetItemCount === 0,
   };
 }
@@ -116,6 +134,70 @@ async function moveProfileIfMissing(admin: SupabaseClient, anonUserId: string, t
   await admin.from('profiles').insert({ id: targetUserId, ...rest });
 }
 
+/**
+ * Moves the Watch DNA quiz answers and FOR/AGAINST verdicts an anonymous
+ * visitor gave before signing in. These used to be silently lost: the merge
+ * only ever moved watchlist_items + profile, then deleted the anonymous
+ * user row, and every one of these tables has `on delete cascade` — a
+ * visitor who rated titles in the quiz or gave verdicts but never saved
+ * anything to a watchlist had that signal permanently destroyed on their
+ * very first sign-in, with no notice.
+ *
+ * `preference_events` and `recommendation_feedback_events` have no per-user
+ * uniqueness beyond their own generated id, so a bulk reassignment is safe.
+ * `recommendation_feedback` is unique on (user_id, tmdb_id, media_type) —
+ * dedupe like watchlist items: a title the target already gave feedback on
+ * keeps the target's own row. `dimension_signals` is a per-(user,dimension)
+ * running weighted sum, so the two sides are additive: sum them together
+ * rather than picking one when both exist.
+ */
+async function moveDnaSignals(admin: SupabaseClient, anonUserId: string, targetUserId: string): Promise<void> {
+  await admin
+    .from('preference_events')
+    .update({ user_id: targetUserId })
+    .eq('user_id', anonUserId);
+
+  await admin
+    .from('recommendation_feedback_events')
+    .update({ user_id: targetUserId })
+    .eq('user_id', anonUserId);
+
+  const [{ data: anonFeedback }, { data: targetFeedback }] = await Promise.all([
+    admin.from('recommendation_feedback').select('id, tmdb_id, media_type').eq('user_id', anonUserId),
+    admin.from('recommendation_feedback').select('tmdb_id, media_type').eq('user_id', targetUserId),
+  ]);
+  const targetKeys = new Set((targetFeedback ?? []).map((r) => `${r.tmdb_id}:${r.media_type}`));
+  const movableFeedbackIds = (anonFeedback ?? [])
+    .filter((r) => !targetKeys.has(`${r.tmdb_id}:${r.media_type}`))
+    .map((r) => r.id as string);
+  if (movableFeedbackIds.length > 0) {
+    await admin.from('recommendation_feedback').update({ user_id: targetUserId }).in('id', movableFeedbackIds);
+  }
+
+  const [{ data: anonDims }, { data: targetDims }] = await Promise.all([
+    admin.from('dimension_signals').select('dimension_key, w_sum, wv_sum').eq('user_id', anonUserId),
+    admin.from('dimension_signals').select('dimension_key, w_sum, wv_sum').eq('user_id', targetUserId),
+  ]);
+  const targetDimByKey = new Map((targetDims ?? []).map((r) => [r.dimension_key as string, r]));
+  for (const row of anonDims ?? []) {
+    const key = row.dimension_key as string;
+    const existing = targetDimByKey.get(key);
+    if (existing) {
+      await admin
+        .from('dimension_signals')
+        .update({ w_sum: (existing.w_sum as number) + (row.w_sum as number), wv_sum: (existing.wv_sum as number) + (row.wv_sum as number) })
+        .eq('user_id', targetUserId)
+        .eq('dimension_key', key);
+    } else {
+      await admin
+        .from('dimension_signals')
+        .update({ user_id: targetUserId })
+        .eq('user_id', anonUserId)
+        .eq('dimension_key', key);
+    }
+  }
+}
+
 async function logMergeDecision(
   admin: SupabaseClient,
   preview: MergePreview,
@@ -131,10 +213,10 @@ async function logMergeDecision(
 }
 
 /**
- * Runs the actual merge (watchlist + profile), logs it, then deletes the
- * anonymous auth.users row — its `on delete cascade` FKs clean up whatever
- * lower-value personalization data (dimension overrides, push subscriptions,
- * taste-quiz answers, ...) wasn't explicitly moved above.
+ * Runs the actual merge (watchlist + profile + DNA/verdict signals), logs
+ * it, then deletes the anonymous auth.users row — its `on delete cascade`
+ * FKs clean up only what's left: push subscriptions and anything else with
+ * no cross-session meaning to preserve.
  */
 export async function performMerge(anonUserId: string): Promise<{ ok: boolean; error?: string }> {
   const preview = await getMergePreview(anonUserId);
@@ -144,6 +226,7 @@ export async function performMerge(anonUserId: string): Promise<{ ok: boolean; e
   try {
     await moveWatchlistData(admin, preview.anonUserId, preview.targetUserId);
     await moveProfileIfMissing(admin, preview.anonUserId, preview.targetUserId);
+    await moveDnaSignals(admin, preview.anonUserId, preview.targetUserId);
     await logMergeDecision(admin, preview, preview.safeToAutoMerge ? 'auto_merged' : 'merged');
     await admin.auth.admin.deleteUser(preview.anonUserId);
     return { ok: true };
@@ -177,7 +260,12 @@ export async function discardAnonymousData(anonUserId: string): Promise<{ ok: bo
 export async function autoMergeIfSafe(anonUserId: string): Promise<{ status: 'merged' | 'no_anon_data' | 'needs_decision'; preview?: MergePreview }> {
   const preview = await getMergePreview(anonUserId);
   if (!preview) return { status: 'no_anon_data' };
-  if (preview.anonItemCount === 0) {
+  // Watchlist items used to be the only thing checked here — a visitor who
+  // only did the Watch DNA quiz or gave FOR/AGAINST verdicts (never saved
+  // anything) has anonItemCount 0 and would hit this branch, which deleted
+  // the anonymous user immediately. Their quiz answers and verdicts are
+  // real data too; anonSignalCount catches that case.
+  if (preview.anonItemCount === 0 && preview.anonSignalCount === 0) {
     // Nothing to merge — still clean up the now-orphaned anonymous user.
     const admin = createAdminClient();
     await logMergeDecision(admin, preview, 'auto_merged');

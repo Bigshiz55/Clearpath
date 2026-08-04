@@ -2,7 +2,13 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { publicEnv } from '@/lib/env';
 
-const PROTECTED_PREFIXES = ['/app', '/lite'];
+// '/import-taste' isn't gated content, but its confirm step writes real
+// watchlist rows (see ImportTasteFlow.tsx) — it needs the same auto-
+// provisioned guest identity as everywhere else that writes on an
+// anonymous visitor's behalf, so an import isn't blocked on signing in
+// first, and so it merges into a real account the same way a save/verdict
+// already does (see mergeAccount.ts).
+const PROTECTED_PREFIXES = ['/app', '/lite', '/import-taste'];
 
 /**
  * Refreshes the Supabase session cookie on every request and guards protected

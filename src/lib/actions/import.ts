@@ -19,6 +19,10 @@ export interface ImportRowResult {
   mediaType?: 'movie' | 'tv';
   rating?: number | null;
   message?: string;
+  /** Present only when status is 'imported' — lets a caller build a real
+   *  undo (delete exactly these rows) instead of only resetting local UI
+   *  state, which used to look like an undo without actually being one. */
+  tmdbId?: number;
 }
 
 export interface ImportSummary {
@@ -169,6 +173,7 @@ export async function importParsedTitles(
       year: m.year,
       mediaType: m.mediaType,
       rating: p.rating,
+      tmdbId: m.id,
     });
   }
 
@@ -188,4 +193,36 @@ export async function importParsedTitles(
     unmatched: rows.filter((r) => r.status === 'unmatched').length,
     rows,
   };
+}
+
+/**
+ * Removes exactly the rows a prior `importParsedTitles` call added — a real
+ * undo, not just resetting local UI state back to the upload screen while
+ * the data stays in the account. `keys` comes from that call's own
+ * `ImportRowResult.tmdbId`, so this can only ever remove titles that import
+ * actually wrote, never anything the user saved separately.
+ */
+export async function undoImportedTitles(keys: { tmdbId: number; mediaType: 'movie' | 'tv' }[]): Promise<{ ok: boolean; error?: string; removed: number }> {
+  if (keys.length === 0) return { ok: true, removed: 0 };
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'You need to be signed in.', removed: 0 };
+
+  let removed = 0;
+  for (const { tmdbId, mediaType } of keys) {
+    const { error, count } = await supabase
+      .from('watchlist_items')
+      .delete({ count: 'exact' })
+      .eq('user_id', user.id)
+      .eq('tmdb_id', tmdbId)
+      .eq('media_type', mediaType);
+    if (error) return { ok: false, error: error.message, removed };
+    removed += count ?? 0;
+  }
+
+  revalidatePath('/app/watchlist');
+  revalidatePath('/app');
+  return { ok: true, removed };
 }
