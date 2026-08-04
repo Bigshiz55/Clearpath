@@ -131,7 +131,7 @@ describe('what was deliberately kept', () => {
 
   it('TEST 8: Build Your Watch DNA offers exactly the quiz and the import', () => {
     const dna = read('src/app/app/dna/page.tsx');
-    expect(dna).toContain('link-title-quiz');
+    expect(dna).toContain('link-taste-quiz');
     expect(dna).toContain('link-import-taste');
     expect(dna).not.toContain('link-voice-dna');
     // ...and says DNA keeps growing on its own, so neither is a gate.

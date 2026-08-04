@@ -11,7 +11,7 @@ import { usePathname } from 'next/navigation';
  */
 export function BuildBadge({ sha, branch }: { sha: string; branch: string }) {
   const pathname = usePathname();
-  if (pathname === '/app/quiz') return null;
+  if (pathname === '/app/taste-quiz') return null;
   return (
     <div className="mt-10 text-center text-[10px] tracking-wide text-slate-600">
       build {sha}{branch ? ` · ${branch.replace(/^.*\//, '')}` : ''}

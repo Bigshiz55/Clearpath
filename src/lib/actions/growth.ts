@@ -60,7 +60,7 @@ export async function addProspect(formData: FormData): Promise<void> {
 
 const linkSchema = z.object({
   label: z.string().min(1).max(120),
-  destination: z.string().min(1).max(300).default('/app/quiz'),
+  destination: z.string().min(1).max(300).default('/app/taste-quiz'),
   source: z.string().min(1).max(60),
   medium: z.string().max(60).optional(),
   campaign: z.string().max(80).optional(),
@@ -72,7 +72,7 @@ export async function createTrackedLink(formData: FormData): Promise<void> {
   const { supabase, user } = await requireOwner();
   const v = linkSchema.parse({
     label: formData.get('label'),
-    destination: (formData.get('destination') as string) || '/app/quiz',
+    destination: (formData.get('destination') as string) || '/app/taste-quiz',
     source: formData.get('source'),
     medium: formData.get('medium') || undefined,
     campaign: formData.get('campaign') || undefined,
@@ -92,7 +92,7 @@ const campaignSchema = z.object({
   headline: z.string().max(200).optional(),
   cta: z.string().max(120).optional(),
   channel: z.string().max(60).optional(),
-  destination: z.string().max(300).default('/app/quiz'),
+  destination: z.string().max(300).default('/app/taste-quiz'),
 });
 
 export async function createCampaign(formData: FormData): Promise<void> {
@@ -104,7 +104,7 @@ export async function createCampaign(formData: FormData): Promise<void> {
     headline: formData.get('headline') || undefined,
     cta: formData.get('cta') || undefined,
     channel: formData.get('channel') || undefined,
-    destination: (formData.get('destination') as string) || '/app/quiz',
+    destination: (formData.get('destination') as string) || '/app/taste-quiz',
   });
   await supabase.from('growth_campaigns').insert({ owner_id: user.id, ...v });
   revalidatePath('/growth-os/campaigns');

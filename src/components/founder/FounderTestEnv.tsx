@@ -90,7 +90,7 @@ export async function FounderTestEnv({ founder }: { founder: FounderKey }) {
     countCalibrationAnswers(supabase, userId, sessionId).catch(() => 0),
   ]);
   const quizProgress = calibrationProgress(calAnswered);
-  const quizHref = sessionId ? `/app/quiz?session=${encodeURIComponent(sessionId)}` : '/app/quiz';
+  const quizHref = sessionId ? `/app/taste-quiz?session=${encodeURIComponent(sessionId)}` : '/app/taste-quiz';
 
   return (
     <div className="min-h-dvh bg-slate-950 text-white">

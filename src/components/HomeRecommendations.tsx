@@ -79,7 +79,7 @@ export function HomeRecommendations({ label }: { label?: string | null }) {
         <div className="text-2xl">🧬</div>
         <h2 className="mt-1 text-lg font-bold text-white">Your recommendations unlock fast</h2>
         <p className="mx-auto mt-1 max-w-sm text-sm text-slate-300">Rate a handful of titles and we’ll read your taste — then this fills with picks scored just for you, each with the reason it’s here.</p>
-        <Link href="/app/quiz" className="btn-primary mt-4 inline-flex">Build my VERD1CT DNA →</Link>
+        <Link href="/app/taste-quiz" className="btn-primary mt-4 inline-flex">Build my VERD1CT DNA →</Link>
       </section>
     );
   }
@@ -113,7 +113,7 @@ export function HomeRecommendations({ label }: { label?: string | null }) {
             {cold ? (
               <p className="text-xs text-amber-200/90">
                 We’re still getting to know you — these are well-loved, not yet personalized.{' '}
-                <Link href="/app/quiz" className="font-semibold underline">Rate a few</Link> and this becomes truly yours.
+                <Link href="/app/taste-quiz" className="font-semibold underline">Rate a few</Link> and this becomes truly yours.
               </p>
             ) : (
               <p className="text-xs text-slate-400">

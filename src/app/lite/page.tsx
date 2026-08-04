@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // obvious tiles. Each points at the feature that already exists in the full app.
 const TILES: { href: string; emoji: string; title: string; sub: string; accent: string }[] = [
   { href: '/app/ask', emoji: '⚖️', title: 'Ask the Judge', sub: 'Tell me what you feel like', accent: '#4f86ff' },
-  { href: '/app/quiz', emoji: '📋', title: 'Evidence Quiz', sub: 'Answer a few — get better picks', accent: '#f5c65a' },
+  { href: '/app/taste-quiz', emoji: '📋', title: 'Evidence Quiz', sub: 'Answer a few — get better picks', accent: '#f5c65a' },
   { href: '/app/together', emoji: '⚖️', title: 'The Verdict Room', sub: 'Everyone weighs in. One title wins.', accent: '#a78bfa' },
   { href: '/app/watch', emoji: '▶️', title: 'Watch Now', sub: 'Ready on your services', accent: '#34d399' },
   { href: '/app/watch?type=movie', emoji: '🎬', title: 'Movies', sub: 'Browse films', accent: '#7aa8ff' },

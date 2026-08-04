@@ -1,41 +1,25 @@
-import type { Metadata } from 'next';
-import { createClient } from '@/lib/supabase/server';
-import { DnaQuiz } from '@/components/DnaQuiz';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = {
-  title: 'Build your Watch DNA · WatchVerd1ct',
-};
 
-export default async function QuizPage({
+/**
+ * /app/quiz used to be a second, parallel Watch DNA onboarding flow
+ * (DnaQuiz — a one-at-a-time card swipe) alongside /app/taste-quiz
+ * (TitleGridCalibration — the recognition grid). Both wrote real signal
+ * through the same engine, so they weren't a scam-vs-real split — but two
+ * maintained implementations of "rate titles to build your DNA" drift apart
+ * over time, and this route is the one embedded in growth/outreach links and
+ * a few clean-slate entry points (`/begin`, `/start`) that may already be
+ * distributed, so it redirects rather than 404s. /app/taste-quiz is the
+ * canonical flow going forward: it's the one the persistent nav, the DNA
+ * hub, and the landing page already point to, and it's had the more active
+ * recent development.
+ */
+export default function QuizPage({
   searchParams,
 }: {
   searchParams?: { session?: string };
 }) {
-  const sessionId = searchParams?.session || undefined;
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  let totalRated = 0;
-  if (user) {
-    const { count } = await supabase
-      .from('watchlist_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .not('rating', 'is', null);
-    totalRated = count ?? 0;
-  }
-
-  // Compact, height-bounded shell so the single-screen quiz fits within the app
-  // chrome (top nav + bottom nav) without scrolling; the poster flexes to fill.
-  return (
-    <div className="mx-auto flex h-[calc(100svh-8.5rem)] max-w-md flex-col">
-      <div className="shrink-0 text-center">
-        <h1 className="text-lg font-bold text-white">🧬 Build your Watch DNA</h1>
-        <p className="mt-0.5 text-xs text-slate-400">Rate what you’ve seen — “haven’t seen it” never counts against you.</p>
-      </div>
-      <div className="mt-2 min-h-0 flex-1">
-        <DnaQuiz totalRated={totalRated} sessionId={sessionId} />
-      </div>
-    </div>
-  );
+  const session = searchParams?.session;
+  redirect(session ? `/app/taste-quiz?session=${encodeURIComponent(session)}` : '/app/taste-quiz');
 }

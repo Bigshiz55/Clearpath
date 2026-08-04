@@ -112,7 +112,7 @@ export default async function DiscoverPage() {
           {([
             // Core loop
             { href: '/app/watch', icon: 'watch', title: 'Watch Now', sub: 'Your VERD1CT DNA picks', rgb: '244,63,94' },
-            { href: '/app/quiz', icon: 'quiz', title: 'Take the Taste Quiz', sub: 'Rate a few · about 5 min', rgb: '168,85,247' },
+            { href: '/app/taste-quiz', icon: 'quiz', title: 'Take the Taste Quiz', sub: 'Rate a few · about 5 min', rgb: '168,85,247' },
             { href: '/app/finder', icon: 'search', title: 'Forensic Search', sub: 'Filter by genre, rating, length…', rgb: '99,102,241' },
             // Discovery
             { href: '/app/new', icon: 'new', title: 'New Releases', sub: 'Fresh, matched to you', rgb: '59,130,246' },

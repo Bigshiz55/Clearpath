@@ -65,7 +65,7 @@ export default async function CardsPage() {
           {w.length === 0 ? (
             <p className="text-sm text-slate-400">
               Watch and rate a few titles this month and your Wrapped fills in here. (Take the{' '}
-              <Link href="/app/quiz" className="text-brand-300 underline">Taste Quiz</Link> to kick it off.)
+              <Link href="/app/taste-quiz" className="text-brand-300 underline">Taste Quiz</Link> to kick it off.)
             </p>
           ) : (
             <ShareCard filename="watchverdict-wrapped">

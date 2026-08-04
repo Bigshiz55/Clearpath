@@ -57,19 +57,11 @@ export default async function WatchDnaPage() {
         <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Link href="/app/taste-quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-taste-quiz">
             <div className="flex items-center gap-2 text-base font-bold text-white">
-              <span aria-hidden>⚡</span> Quick Taste Quiz
+              <span aria-hidden>🎬</span> Taste Quiz
             </div>
             <p className="mt-1 text-sm text-slate-400">
-              A dozen short statements about what you actually like. Two minutes, and
-              &ldquo;depends&rdquo; is a real answer.
-            </p>
-          </Link>
-          <Link href="/app/taste-quiz?mode=titles" className="card p-4 transition hover:bg-white/10" data-testid="link-title-quiz">
-            <div className="flex items-center gap-2 text-base font-bold text-white">
-              <span aria-hidden>🎬</span> React to real titles
-            </div>
-            <p className="mt-1 text-sm text-slate-400">
-              React to a selection of films and shows so Verd1ct can begin learning your taste.
+              Tap the real titles you recognise — good or not — and say what you thought of the ones
+              you have already seen. Ignoring one costs nothing.
             </p>
           </Link>
           <Link href="/app/rapid-fire" className="card p-4 transition hover:bg-white/10" data-testid="link-rapid-fire">
@@ -159,7 +151,7 @@ export default async function WatchDnaPage() {
           <h2 className="text-lg font-bold text-white">Your taste dials</h2>
           <div className="flex items-center gap-3">
             <Link href="/app/dna/packs" className="text-sm font-semibold text-emerald-300 hover:text-emerald-200">🎯 Boosters</Link>
-            <Link href="/app/taste-quiz?mode=titles" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
+            <Link href="/app/taste-quiz" className="text-sm font-semibold text-brand-300 hover:text-brand-200">Rate more →</Link>
           </div>
         </div>
         {ready && dials.length > 0 ? (

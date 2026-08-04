@@ -95,7 +95,7 @@ describe('tracking links', () => {
     expect(slugify('!!!')).toMatch(/^[a-z0-9-]{3,}$/);
   });
   it('attaches UTM params to the destination and builds a short link', () => {
-    const dest = destinationWithUtm({ slug: 'x', destination: '/app/quiz', source: 'reddit', medium: 'post', campaign: 'launch', content: 'v1', referrer: 'u123' });
+    const dest = destinationWithUtm({ slug: 'x', destination: '/app/taste-quiz', source: 'reddit', medium: 'post', campaign: 'launch', content: 'v1', referrer: 'u123' });
     expect(dest).toContain('utm_source=reddit');
     expect(dest).toContain('utm_campaign=launch');
     expect(dest).toContain('ref=u123');

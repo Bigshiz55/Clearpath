@@ -76,7 +76,7 @@ export async function rateQuizTitle(
     revalidatePath('/app');
     revalidatePath('/app/watch');
     revalidatePath('/app/watchlist');
-    revalidatePath('/app/quiz');
+    revalidatePath('/app/taste-quiz');
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Failed to save.' };

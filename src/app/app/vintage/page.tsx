@@ -63,7 +63,7 @@ export default function VintagePage() {
       {/* Big simple buttons for the rest */}
       <section className="grid gap-4">
         <BigLink href="/app/tv" emoji="📺" label="What’s on TV now" sub="Live channels and times, big and clear" />
-        <BigLink href="/app/quiz" emoji="⭐" label="Play the Taste Game" sub="A few taps teaches us what you like" />
+        <BigLink href="/app/taste-quiz" emoji="⭐" label="Play the Taste Game" sub="A few taps teaches us what you like" />
         <BigLink href="/app/reminders" emoji="🔔" label="My reminders" sub="Shows you asked to be reminded about" />
         <BigLink href="/app/watchlist" emoji="📝" label="My list" sub="Everything you’ve saved to watch" />
       </section>

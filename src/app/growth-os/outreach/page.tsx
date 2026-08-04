@@ -14,7 +14,7 @@ export default function OutreachPage() {
   const [copied, setCopied] = useState(false);
 
   const draft = useMemo(
-    () => generateOutreach(channel, { name, audience, link: link || `${publicEnv.siteUrl()}/app/quiz` }),
+    () => generateOutreach(channel, { name, audience, link: link || `${publicEnv.siteUrl()}/app/taste-quiz` }),
     [channel, name, audience, link],
   );
   const full = (draft.subject ? `Subject: ${draft.subject}\n\n` : '') + draft.body;

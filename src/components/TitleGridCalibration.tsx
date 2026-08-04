@@ -31,8 +31,13 @@ import { recordQuizAnswer } from '@/lib/actions/dnaQuiz';
 import { DnaBurst } from '@/components/DnaBurst';
 import { RecommendationSlate } from '@/components/RecommendationSlate';
 import { analysePicks, type AnalysedPick, type PickAnalysis } from '@/lib/preference/pickAnalysis';
+import { EARLY_COMPLETE } from '@/lib/preference/calibration';
 
 const GRID_SIZE = 12;
+/** No single fetch attempt may hang the loading state forever — abort and
+ *  surface a real error/retry by this point (matches the reliability-sprint
+ *  standard: a useful error or fallback no later than 8s). */
+const FETCH_TIMEOUT_MS = 8000;
 
 /** Client-side event id — the engine is idempotent on it, so a double tap
  *  writes once rather than twice. */
@@ -40,6 +45,16 @@ const uid = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `g_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e9).toString(36)}`;
+
+async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { cache: 'no-store', signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 interface Item {
   id: number;
@@ -57,9 +72,9 @@ type Rating = 'loved' | 'liked' | 'okay' | 'disliked';
  *  `not_interested` IS a real negative, unlike absence — it only ever gets
  *  written when someone taps "Doesn't look good" for themselves. */
 type Pick =
-  | { kind: 'like' }
-  | { kind: 'not_interested' }
-  | { kind: 'seen'; rating: Rating };
+  | { kind: 'like'; id: string }
+  | { kind: 'not_interested'; id: string }
+  | { kind: 'seen'; rating: Rating; id: string };
 
 const RATINGS: Array<{ key: Rating; label: string; emoji: string }> = [
   { key: 'loved', label: 'Loved', emoji: '❤️' },
@@ -67,6 +82,60 @@ const RATINGS: Array<{ key: Rating; label: string; emoji: string }> = [
   { key: 'okay', label: 'Okay', emoji: '😐' },
   { key: 'disliked', label: 'Didn’t', emoji: '👎' },
 ];
+
+/** The finite onboarding progress model /api/calibration already computes
+ *  (see calibrationProgress in lib/preference/calibration.ts) — reused here
+ *  verbatim rather than re-derived, so the number on screen always matches
+ *  what the server actually counted. */
+interface CalProgress {
+  index: number;
+  size: number;
+  percent: number;
+  reachedEarly: boolean;
+  complete: boolean;
+}
+
+/** In-progress picks are draft data, not yet written anywhere server-side —
+ *  losing them on a refresh or a flaky connection means real work vanishes.
+ *  Mirrored to localStorage (best-effort; private browsing / quota failures
+ *  are silently ignored, same as the rest of the app) and cleared once every
+ *  picked title has actually been saved. */
+function draftKey(sessionId?: string): string {
+  return `wv.calibration.draft.v1${sessionId ? `:${sessionId}` : ''}`;
+}
+
+interface Draft {
+  picks: Record<string, Pick>;
+  items: Array<[string, Item]>;
+}
+
+function loadDraft(sessionId?: string): Draft | null {
+  try {
+    const raw = localStorage.getItem(draftKey(sessionId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Draft;
+    if (!parsed || typeof parsed !== 'object' || !parsed.picks || !Array.isArray(parsed.items)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(sessionId: string | undefined, draft: Draft) {
+  try {
+    localStorage.setItem(draftKey(sessionId), JSON.stringify(draft));
+  } catch {
+    /* private mode / quota — the round just isn't refresh-safe this time */
+  }
+}
+
+function clearDraft(sessionId?: string) {
+  try {
+    localStorage.removeItem(draftKey(sessionId));
+  } catch {
+    /* nothing to clean up if this throws */
+  }
+}
 
 export function TitleGridCalibration({ sessionId }: { sessionId?: string | undefined }) {
   const [items, setItems] = useState<Item[] | null>(null);
@@ -80,6 +149,17 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
   const [analysis, setAnalysis] = useState<PickAnalysis | null>(null);
   const [round, setRound] = useState(0);
   const [exhausted, setExhausted] = useState(false);
+  // The server's own onboarding progress model (see calibrationProgress) —
+  // the single source of truth for "how close to unlocked," never re-derived.
+  const [progress, setProgress] = useState<CalProgress | null>(null);
+  // Set only when some (not all) picks failed to save — the ones that DID
+  // save are removed from `picks` immediately, so retrying only resends what
+  // actually failed rather than double-writing (harmless either way, since
+  // writes are idempotent on eventId, but this keeps the count on screen honest).
+  const [saveIssue, setSaveIssue] = useState<string | null>(null);
+  // A round already restored from a previous, uncompleted session — used only
+  // to decide whether to mention it, once, in the header.
+  const [restoredDraft, setRestoredDraft] = useState(false);
   // The DNA pop, in the centre of the tile you just chose. Same moment the
   // rest of the app gives you for a For/Pass — this is the only feedback that
   // a tap did anything, so it belongs here more than anywhere.
@@ -94,6 +174,30 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
   const seen = useRef<Set<string>>(new Set());
 
   const keyOf = (i: Item) => `${i.mediaType}:${i.id}`;
+
+  // RESTORE UNSAVED WORK, ONCE, ON MOUNT. Picks only ever reach the server on
+  // "Done" (see submit()), so a refresh or a crash mid-round used to discard
+  // everything silently. This runs before the first `load()` paints anything,
+  // so a returning visitor sees their prior picks already counted.
+  useEffect(() => {
+    const draft = loadDraft(sessionId);
+    if (!draft || Object.keys(draft.picks).length === 0) return;
+    for (const [k, item] of draft.items) chosenItems.current.set(k, item);
+    setPicks(draft.picks);
+    setRestoredDraft(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // MIRROR EVERY PICK TO LOCAL STORAGE, IMMEDIATELY. Best-effort — a refresh
+  // or the tab dying mid-round no longer means redoing the work.
+  useEffect(() => {
+    if (Object.keys(picks).length === 0) {
+      clearDraft(sessionId);
+      return;
+    }
+    saveDraft(sessionId, { picks, items: Array.from(chosenItems.current.entries()) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picks, sessionId]);
 
   const load = useCallback(async () => {
     setItems(null);
@@ -122,12 +226,22 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
         const already = Array.from(seen.current).slice(-200);
         if (already.length > 0) qs.set('exclude', already.join(','));
 
-        const res = await fetch(`/api/calibration?${qs.toString()}`, { cache: 'no-store' });
-        const data = (await res.json()) as { items?: Item[]; error?: string };
+        // Bounded — a hung request must not leave the loading state on
+        // screen forever (see FETCH_TIMEOUT_MS).
+        const res = await fetchWithTimeout(`/api/calibration?${qs.toString()}`, FETCH_TIMEOUT_MS);
+        const data = (await res.json()) as {
+          items?: Item[];
+          error?: string;
+          answered?: number;
+          progress?: CalProgress;
+        };
         if (!res.ok) {
           lastError = data.error ?? 'Could not load titles right now.';
           break;
         }
+        // The server's own progress model — always present on a 200, so this
+        // stays accurate even on a round that comes back thin or empty.
+        if (data.progress) setProgress(data.progress);
         let added = 0;
         for (const i of data.items ?? []) {
           const k = `${i.mediaType}:${i.id}`;
@@ -149,8 +263,12 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
       for (const i of fresh) seen.current.add(keyOf(i));
       setExhausted(fresh.length === 0 && seen.current.size > 0);
       setItems(fresh);
-    } catch {
-      setError('Could not load titles right now.');
+    } catch (e) {
+      setError(
+        e instanceof DOMException && e.name === 'AbortError'
+          ? 'That took too long to load. Check your connection and try again.'
+          : 'Could not load titles right now.',
+      );
       setItems([]);
     }
   }, [sessionId, round]);
@@ -168,6 +286,7 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
     chosenItems.current.clear();
     setSavedCount(null);
     setAnalysis(null);
+    setSaveIssue(null);
     setRound((r) => r + 1);
   }
 
@@ -180,7 +299,7 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
         delete next[k];
         chosenItems.current.delete(k);
       } else {
-        next[k] = { kind: 'like' };
+        next[k] = { kind: 'like', id: uid() };
         chosenItems.current.set(k, i);
         const r = el?.closest('li')?.getBoundingClientRect();
         if (r) setBurst({ cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
@@ -201,7 +320,7 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
         delete next[k];
         chosenItems.current.delete(k);
       } else {
-        next[k] = { kind: 'not_interested' };
+        next[k] = { kind: 'not_interested', id: uid() };
         chosenItems.current.set(k, i);
         const r = el?.closest('li')?.getBoundingClientRect();
         if (r) setBurst({ cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
@@ -212,7 +331,7 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
 
   function setRating(i: Item, rating: Rating, el: HTMLElement | null) {
     const k = keyOf(i);
-    setPicks((p) => ({ ...p, [k]: { kind: 'seen', rating } }));
+    setPicks((p) => ({ ...p, [k]: { kind: 'seen', rating, id: p[k]?.id ?? uid() } }));
     chosenItems.current.set(k, i);
     setOpenRating(null);
     const r = el?.closest('li')?.getBoundingClientRect();
@@ -222,14 +341,24 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
   async function submit() {
     if (chosen === 0) return;
     setSaving(true);
+    setSaveIssue(null);
     // Everything picked across every round — a title chosen three rounds ago is
-    // still a title you chose.
+    // still a title you chose. The snapshot is taken here, before any await,
+    // so it can't drift if a tile is tapped mid-save.
+    const toSend = Array.from(chosenItems.current.values()).flatMap((i) => {
+      const pick = picks[keyOf(i)];
+      return pick ? [{ item: i, pick }] : []; // untouched → nothing is sent. This is the point.
+    });
+
     const results = await Promise.all(
-      Array.from(chosenItems.current.values()).flatMap((i) => {
-        const pick = picks[keyOf(i)];
-        if (!pick) return []; // untouched → nothing is sent. This is the point.
+      toSend.map(async ({ item: i, pick }) => {
         const base = {
-          eventId: uid(),
+          // Stable per-pick id (assigned when the tile was tapped, not here) —
+          // a retry after a partial failure resends the SAME id, so a write
+          // that actually landed server-side but whose response was lost
+          // (a timeout, a dropped connection) is a safe no-op, never a
+          // duplicate DNA event.
+          eventId: pick.id,
           tmdbId: i.id,
           mediaType: i.mediaType,
           title: i.title,
@@ -238,44 +367,67 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
           source: 'calibration',
           ...(sessionId ? { sessionId } : {}),
         };
-        return [
-          recordQuizAnswer(
-            pick.kind === 'like'
-              ? { ...base, intent: 'looks_good' as const }
-              : pick.kind === 'not_interested'
-                ? { ...base, intent: 'not_interested' as const }
-                : { ...base, intent: 'seen' as const, rating: pick.rating },
-          ).catch(() => ({ ok: false })),
-        ];
+        const ok = await recordQuizAnswer(
+          pick.kind === 'like'
+            ? { ...base, intent: 'looks_good' as const }
+            : pick.kind === 'not_interested'
+              ? { ...base, intent: 'not_interested' as const }
+              : { ...base, intent: 'seen' as const, rating: pick.rating },
+        )
+          .then((r) => r.ok)
+          .catch(() => false);
+        return { key: keyOf(i), item: i, pick, ok };
       }),
     );
     setSaving(false);
+
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length > 0) {
+      // NOT a silent under-count. Whatever DID save is removed from the
+      // pending set (so a retry can't double-submit it); whatever failed
+      // stays exactly as picked, in `picks` and in the localStorage draft,
+      // so "Retry saving" resends only what's actually missing.
+      const failedKeys = new Set(failed.map((r) => r.key));
+      setPicks((p) => {
+        const next: Record<string, Pick> = {};
+        for (const [k, v] of Object.entries(p)) if (failedKeys.has(k)) next[k] = v;
+        return next;
+      });
+      for (const r of results) if (r.ok) chosenItems.current.delete(r.key);
+      setSaveIssue(
+        failed.length === toSend.length
+          ? `Couldn't save ${failed.length === 1 ? 'that pick' : `any of those ${failed.length} picks`} — check your connection and try again.`
+          : `${toSend.length - failed.length} of ${toSend.length} saved. ${failed.length} couldn't be saved — try again.`,
+      );
+      return; // stay on the picking screen; do NOT show a false "done" state.
+    }
+
     setAnalysis(
       analysePicks(
-        Array.from(chosenItems.current.values()).flatMap((i): AnalysedPick[] => {
-          const p = picks[keyOf(i)];
-          if (!p) return [];
-          return [
-            {
-              title: i.title,
-              year: i.year,
-              mediaType: i.mediaType,
-              genre: i.genre,
-              kind: p.kind,
-              ...(p.kind === 'seen' ? { rating: p.rating } : {}),
-            },
-          ];
-        }),
+        toSend.map(({ item: i, pick: p }): AnalysedPick => ({
+          title: i.title,
+          year: i.year,
+          mediaType: i.mediaType,
+          genre: i.genre,
+          kind: p.kind,
+          ...(p.kind === 'seen' ? { rating: p.rating } : {}),
+        })),
         new Date().getFullYear(),
       ),
     );
-    setSavedCount(results.filter((r) => r.ok).length);
+    setSavedCount(results.length);
+    clearDraft(sessionId);
   }
 
   if (items === null) {
     return (
       <div className="card p-6 text-sm text-slate-400" data-testid="title-grid-loading">
         Pulling together a spread of films and shows…
+        {restoredDraft && (
+          <span className="mt-2 block text-xs text-slate-500" data-testid="title-grid-restored">
+            Your unsaved picks from last time are still here.
+          </span>
+        )}
       </div>
     );
   }
@@ -287,6 +439,19 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
     return (
       <div className="space-y-5" data-testid="title-grid-done">
         <section className="card p-5 sm:p-6">
+          {/* THE UNLOCK MOMENT, STATED PLAINLY. `progress` is the server's own
+              onboarding model (calibrationProgress) — reachedEarly is the same
+              10-title threshold the rest of the app (DNA_PERSONAL_MIN) treats
+              as "enough to personalize." Shown once it's actually true, never
+              claimed early. */}
+          {progress?.reachedEarly && (
+            <p
+              className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[#ff1493]/40 bg-[#ff1493]/10 px-3 py-1 text-xs font-bold text-pink-100"
+              data-testid="personalization-unlocked"
+            >
+              🔓 Personalized matching is unlocked
+            </p>
+          )}
           <div className="text-xs font-bold uppercase tracking-wide text-[#ff1493]">What your picks say</div>
           <h2 className="mt-1 text-2xl font-black text-white sm:text-3xl" data-testid="analysis-headline">
             {analysis?.headline ?? 'Saved.'}
@@ -364,20 +529,76 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
             Leaving a title alone records nothing: not recognising something is not a dislike.
           </span>
         </p>
+
+        {/* PROGRESS, TIED TO THE REAL UNLOCK THRESHOLD. `progress` is the
+            server's own onboarding model, never re-derived here — so the bar
+            can't drift from what actually unlocks personalized matching. */}
+        {progress && !progress.complete && (
+          <div className="mt-3" data-testid="calibration-progress">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
+              <span>
+                {progress.reachedEarly
+                  ? 'Personalized matching is unlocked — every extra pick sharpens it further.'
+                  : `${progress.index - 1} of ${EARLY_COMPLETE} answered to unlock personalized matching`}
+              </span>
+              <span>{progress.percent}%</span>
+            </div>
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+              <div
+                className={`h-full rounded-full transition-all ${progress.reachedEarly ? 'bg-[#ff1493]' : 'bg-brand-400'}`}
+                style={{ width: `${Math.min(100, progress.percent)}%` }}
+              />
+            </div>
+          </div>
+        )}
       </header>
 
       {error && (
-        <p className="mt-3 text-sm text-amber-200" data-testid="title-grid-error">
-          {error}
-        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="title-grid-error">
+          <p className="text-sm text-amber-200">{error}</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="inline-flex min-h-[36px] items-center rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 text-xs font-bold text-amber-100 transition hover:bg-amber-500/20"
+            data-testid="title-grid-retry"
+          >
+            ↻ Retry
+          </button>
+        </div>
+      )}
+
+      {saveIssue && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-500/10 p-3" data-testid="title-grid-save-issue">
+          <p className="text-sm text-amber-100">{saveIssue}</p>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={saving}
+            className="inline-flex min-h-[36px] items-center rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 text-xs font-bold text-amber-100 transition hover:bg-amber-500/25 disabled:opacity-40"
+            data-testid="title-grid-retry-save"
+          >
+            {saving ? 'Retrying…' : '↻ Retry saving'}
+          </button>
+        </div>
       )}
 
       {items.length === 0 && !error ? (
-        <p className="mt-4 text-sm text-slate-400" data-testid="title-grid-empty">
-          {exhausted
-            ? 'That is everything I can find that you have not already seen here. Come back later and there will be more.'
-            : 'Nothing to show right now.'}
-        </p>
+        <div className="mt-4" data-testid="title-grid-empty">
+          <p className="text-sm text-slate-400">
+            {exhausted
+              ? 'That is everything I can find that you have not already seen here. Come back later and there will be more.'
+              : "We couldn't put together a fresh set of titles just now."}
+          </p>
+          {!exhausted && (
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="mt-2 inline-flex min-h-[40px] items-center rounded-lg border border-white/15 px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+            >
+              ↻ Try again
+            </button>
+          )}
+        </div>
       ) : (
         <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {items.map((i) => {
@@ -518,7 +739,8 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
         )}
         {chosen > 0 && (
           <span className="text-sm font-semibold text-slate-300" data-testid="grid-running-total">
-            {chosen} picked so far · keep going, nothing is saved until you finish
+            {chosen} picked so far · keep going, nothing reaches your Watch DNA until you hit Done — but a refresh
+            won&rsquo;t lose them
           </span>
         )}
       </div>

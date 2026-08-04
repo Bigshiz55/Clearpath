@@ -34,7 +34,7 @@ describe('buildInfo (pure)', () => {
   });
 
   it('maps Vercel env when not on a founder route', () => {
-    expect(resolveEnvironment('/app/quiz', 'production')).toBe('Production');
+    expect(resolveEnvironment('/app/taste-quiz', 'production')).toBe('Production');
     expect(resolveEnvironment('/app', 'preview')).toBe('Preview');
     expect(resolveEnvironment('/', '')).toBe('Development');
   });

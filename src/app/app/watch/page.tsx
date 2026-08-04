@@ -95,7 +95,7 @@ export default async function WatchNowPage({ searchParams }: { searchParams?: { 
           </h2>
           <p className="mb-3 text-xs text-slate-400">
             {recsHeading.note}{' '}
-            <Link href="/app/quiz" className="text-brand-300 hover:underline">Rate a few in the Taste Quiz</Link>{' '}
+            <Link href="/app/taste-quiz" className="text-brand-300 hover:underline">Rate a few in the Taste Quiz</Link>{' '}
             to sharpen it. Tap any for where to watch.
           </p>
           {/* A DECK, NOT A PAGE. This used to be a fixed slice of twelve that

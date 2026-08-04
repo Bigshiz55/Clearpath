@@ -11,11 +11,11 @@ import { createClient } from '@/lib/supabase/client';
  * build their own DNA clean on their own device. Powers every clean-slate route
  * (/fresh, /begin, /start, /newuser) so they stay identical.
  */
-export function FreshStart({ to = '/app/quiz' }: { to?: string }) {
+export function FreshStart({ to = '/app/taste-quiz' }: { to?: string }) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
   // Only ever redirect to an internal path (never an attacker-supplied URL).
-  const dest = to.startsWith('/') && !to.startsWith('//') ? to : '/app/quiz';
+  const dest = to.startsWith('/') && !to.startsWith('//') ? to : '/app/taste-quiz';
 
   useEffect(() => {
     let active = true;

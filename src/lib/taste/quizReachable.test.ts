@@ -90,18 +90,24 @@ describe('entry points', () => {
   it('the DNA hub offers three ways in', () => {
     const hub = read('src/app/app/dna/page.tsx');
     expect(hub).toContain('data-testid="link-taste-quiz"');
-    expect(hub).toContain('data-testid="link-title-quiz"');
     expect(hub).toContain('data-testid="link-import-taste"');
     expect(hub).toContain(QUIZ_HREF);
   });
 
-  it('the card-flow quiz at /app/quiz is a second real instrument, not a stub', () => {
-    // /app/quiz (DnaQuiz — swipe-style card flow) and /app/taste-quiz
-    // (TitleGridCalibration — a grid of titles) are two distinct, real quiz
-    // instruments that coexist deliberately (see DnaQuiz.tsx's doc comment).
-    // Both need their own working entry point.
+  it('/app/quiz redirects to the one canonical quiz, /app/taste-quiz, forwarding the founder session', () => {
+    // /app/quiz (DnaQuiz — a swipe-style card flow) and /app/taste-quiz
+    // (TitleGridCalibration — a recognition grid) used to be two separately
+    // maintained "rate titles to build your DNA" instruments. Consolidated
+    // onto /app/taste-quiz — the route the persistent nav, the DNA hub, and
+    // the landing page already treat as canonical — with /app/quiz kept as a
+    // redirect (not deleted) because it's embedded in growth/outreach links
+    // and the /begin, /start clean-slate entry points that may already be
+    // distributed.
     const cardQuiz = read('src/app/app/quiz/page.tsx');
-    expect(cardQuiz).toContain('DnaQuiz');
+    expect(cardQuiz).not.toContain('import { DnaQuiz }');
+    expect(cardQuiz).not.toContain('<DnaQuiz');
+    expect(cardQuiz).toContain('redirect(');
+    expect(cardQuiz).toContain('/app/taste-quiz');
     // A founder session must survive the hop, or isolated calibration breaks.
     expect(cardQuiz).toContain('session');
   });
@@ -116,7 +122,8 @@ describe('honesty and safety of the title lane', () => {
     const grid = read('src/components/TitleGridCalibration.tsx');
     // Untouched tiles must send nothing at all. A negative attraction from this
     // surface would be a preference the user never stated.
-    expect(grid).toContain('if (!pick) return []');
+    expect(grid).toContain('untouched → nothing is sent');
+    expect(grid).toMatch(/pick \? \[.*\] : \[\]/);
     expect(grid).not.toMatch(/attraction:\s*'not_interested'/);
     expect(grid).not.toMatch(/attraction:\s*'absolutely_not'/);
     expect(grid).toContain('not recognising something is not a dislike');

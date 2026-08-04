@@ -36,7 +36,7 @@ export default async function CampaignsPage() {
         <input name="medium" placeholder="Medium (post, dm, referral)" className="rounded-lg border border-white/10 bg-slate-900 px-2.5 py-2 text-sm text-white placeholder:text-slate-500" />
         <input name="campaign" placeholder="Campaign (optional)" className="rounded-lg border border-white/10 bg-slate-900 px-2.5 py-2 text-sm text-white placeholder:text-slate-500" />
         <input name="content" placeholder="Variation (optional)" className="rounded-lg border border-white/10 bg-slate-900 px-2.5 py-2 text-sm text-white placeholder:text-slate-500" />
-        <input name="destination" defaultValue="/app/quiz" placeholder="Destination path" className="col-span-2 rounded-lg border border-white/10 bg-slate-900 px-2.5 py-2 text-sm text-white placeholder:text-slate-500" />
+        <input name="destination" defaultValue="/app/taste-quiz" placeholder="Destination path" className="col-span-2 rounded-lg border border-white/10 bg-slate-900 px-2.5 py-2 text-sm text-white placeholder:text-slate-500" />
         <button className="col-span-2 rounded-lg bg-indigo-500 px-3 py-2 text-sm font-bold text-white hover:bg-indigo-400">Create tracked link</button>
       </form>
 
