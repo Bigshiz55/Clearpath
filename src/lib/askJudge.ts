@@ -24,6 +24,7 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
 /** Strip season/series noise so "wisting season 2" resolves to "wisting". */
 function cleanTitleText(text: string): string {
   return text
+    .replace(UNSEEN_CLAUSE, '')
     .replace(/\bseasons?\s*\d+\b/gi, '')
     .replace(/\bs\d+(e\d+)?\b/gi, '')
     .replace(/\b(series|episodes?|the show|show|tv)\b/gi, '')
@@ -74,6 +75,25 @@ const TRAILING_FILLER =
   /\s*,?\s*\b(?:that\s+)?(?:i(?:'d|’d| would| will| might)?\s+(?:would\s+)?(?:like|enjoy|love|dig|go for)|for me|please)\b.*$/i;
 
 /**
+ * "…that I probably have not seen", "…I haven't watched", "…I've never
+ * caught it". Left attached, this clause becomes part of the "title": TMDB
+ * search and the exact-tier match both saw "Rocky that I probably have not
+ * seen" instead of "Rocky" — which is only ever a 'contains' match, never
+ * 'exact', so the seed silently failed to resolve and the whole ask fell back
+ * to generic genre discovery (a boxing request answering with an unrelated
+ * biopic that merely shared "biographical drama"). Stripped here so the
+ * clause can also be read as an explicit exclusion/deprioritization signal
+ * instead of being noise that poisons the search.
+ */
+const UNSEEN_CLAUSE =
+  /\s*,?\s*\b(?:that\s+|which\s+)?i(?:'ve|’ve)?\s+(?:probably\s+|likely\s+|maybe\s+)?(?:have\s+not|haven['’]?t|have\s+never|has\s+not|hasn['’]?t|never)\s+(?:seen|watched|caught)\b.*$/i;
+
+/** True when the ask explicitly wants titles the user probably hasn't seen. */
+export function wantsUnseenOnly(text: string): boolean {
+  return UNSEEN_CLAUSE.test(text);
+}
+
+/**
  * Pull the reference title out of a "more like X" ask, and only the title.
  * Returns null when there is no comparison in the text at all.
  */
@@ -90,6 +110,7 @@ export function extractReference(text: string): string | null {
   const tailOf = (hit: RegExpExecArray): string =>
     text
       .slice(hit.index + hit[0].length)
+      .replace(UNSEEN_CLAUSE, '')
       .replace(TRAILING_FILLER, '')
       .replace(/^\s*(?:to|the|a|an|watch|watching|some|something)\s+/i, '')
       .replace(/[?!.,]+\s*$/, '')
@@ -173,6 +194,9 @@ export async function askSimilarTo(
   /** The media type the ask states outright ("a boxing movie like…"), if any. */
   wantType: 'movie' | 'tv' | null = null,
 ): Promise<{ query: FinderQuery; scoredFor: string; items: FinderItem[] } | null> {
+  // Read BEFORE cleaning strips it — cleaning discards the clause entirely,
+  // so this is the only chance to know the ask said it at all.
+  const unseenOnly = wantsUnseenOnly(refText);
   const cleaned = cleanTitleText(refText);
   if (cleaned.length < 2) return null;
 
@@ -183,16 +207,28 @@ export async function askSimilarTo(
   const seed = seeds[0];
   if (!seed) return null; // no confident title → not a "more like this" ask
 
-  const neighbourhoods = await Promise.all(
-    seeds.map((s) => getSimilar(s.mediaType, s.id).catch(() => [])),
-  );
-  const similar = neighbourhoods.flat();
-  if (similar.length === 0) return null;
-
   const profile = await getProfile(supabase, userId);
   const region = regionFor(profile);
   const personal = await getPersonalContext(supabase, userId, null);
   const scoredFor = profile ? personalLabelFor(profile) : 'Your match';
+
+  // Pull TMDB's own neighbours AND the seed's keywords/genres in parallel —
+  // TMDB similar/recommendations already reasons on more than genre, and the
+  // keyword/genre overlap below is layered on top so every result can say
+  // what it actually shares with what was asked for, not just "same genre".
+  const [neighbourhoods, seedMetas] = await Promise.all([
+    Promise.all(seeds.map((s) => getSimilar(s.mediaType, s.id).catch(() => []))),
+    Promise.all(seeds.map((s) => getScoringData(s.mediaType, s.id, region).then((d) => d.meta).catch(() => null))),
+  ]);
+  const similar = neighbourhoods.flat();
+  if (similar.length === 0) return null;
+
+  const seedKeywords = new Set(
+    seedMetas.filter((m): m is NonNullable<typeof m> => m != null).flatMap((m) => m.keywords.map((k) => k.toLowerCase())),
+  );
+  const seedGenres = new Set(
+    seedMetas.filter((m): m is NonNullable<typeof m> => m != null).flatMap((m) => m.genres.map((g) => g.toLowerCase())),
+  );
 
   const { data: wl } = await supabase
     .from('watchlist_items')
@@ -228,33 +264,55 @@ export async function askSimilarTo(
     try {
       const { meta, providers } = await getScoringData(c.mediaType, c.id, region);
       const report = buildVerdict({ meta, providers, personal: { ...personal, collectionId: null } });
+      // What this candidate actually shares with the seed(s) — subject/theme
+      // keywords first (the specific thing that makes "Rocky" different from
+      // "a biographical drama"), genre only as a fallback when TMDB tagged no
+      // matching keyword at all.
+      const matchedKeywords = meta.keywords.filter((k) => seedKeywords.has(k.toLowerCase()));
+      const matchedGenres = matchedKeywords.length > 0 ? [] : meta.genres.filter((g) => seedGenres.has(g.toLowerCase()));
+      const matched = [...matchedKeywords, ...matchedGenres].slice(0, 4);
+      const receipts = [`${scoredFor.split(' ')[0]} ${report.personal.score}`, ...(meta.year ? [String(meta.year)] : [])];
+      if (matched.length > 0) receipts.push(`matched: ${matched.join(', ')}`);
       return {
-        id: c.id,
-        mediaType: c.mediaType,
-        title: meta.title,
-        year: meta.year,
-        posterPath: meta.posterPath,
-        matchScore: report.personal.score,
-        generalScore: report.general.score,
-        primaryCall: report.primaryCall,
-        reason: report.oneLiner,
-        where: whereFrom(providers),
-        receipts: [`${scoredFor.split(' ')[0]} ${report.personal.score}`, ...(meta.year ? [String(meta.year)] : [])],
-        deciderUrl: deciderSearchUrl(meta.title, meta.year),
-        ratings: tileRatingsFromScore(report.general),
-        imdbId: meta.imdbId ?? null,
-      } as FinderItem;
+        item: {
+          id: c.id,
+          mediaType: c.mediaType,
+          title: meta.title,
+          year: meta.year,
+          posterPath: meta.posterPath,
+          matchScore: report.personal.score,
+          generalScore: report.general.score,
+          primaryCall: report.primaryCall,
+          reason: report.oneLiner,
+          where: whereFrom(providers),
+          receipts,
+          deciderUrl: deciderSearchUrl(meta.title, meta.year),
+          ratings: tileRatingsFromScore(report.general),
+          imdbId: meta.imdbId ?? null,
+        } as FinderItem,
+        voteCount: meta.voteCount,
+      };
     } catch {
       return null;
     }
   });
 
   const items = scored
-    .filter((x): x is FinderItem => x !== null)
-    .sort((a, b) => b.matchScore - a.matchScore)
+    .filter((x): x is { item: FinderItem; voteCount: number } => x !== null)
+    .sort((a, b) => {
+      const scoreDiff = b.item.matchScore - a.item.matchScore;
+      if (!unseenOnly) return scoreDiff;
+      // "…that I probably have not seen" never overrides a genuinely better
+      // match, but within a close band of scores it deprioritizes the titles
+      // everyone has already seen in favor of ones they might not have.
+      const bandA = Math.round(a.item.matchScore / 5);
+      const bandB = Math.round(b.item.matchScore / 5);
+      return bandA !== bandB ? scoreDiff : a.voteCount - b.voteCount;
+    })
     // A "more like this" ask is a browse too — its own 20 was one more ceiling
     // below the requested limit.
-    .slice(0, Math.max(1, Math.min(limit, MAX_REQUESTED_COUNT)));
+    .slice(0, Math.max(1, Math.min(limit, MAX_REQUESTED_COUNT)))
+    .map((x) => x.item);
   if (items.length === 0) return null;
 
   // WHAT THEY SAID BEATS WHAT THE SEED HAPPENS TO BE. The read-back chip said

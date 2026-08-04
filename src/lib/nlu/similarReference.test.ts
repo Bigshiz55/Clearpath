@@ -15,8 +15,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { extractReference } from '@/lib/askJudge';
+import { extractReference, wantsUnseenOnly } from '@/lib/askJudge';
 import { classifySearch } from '@/lib/nlu/searchMode';
+import { titleMatchTier } from '@/lib/nlu/titleNormalize';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -54,6 +55,45 @@ describe('extractReference', () => {
   it('trims trailing punctuation rather than carrying it into the search', () => {
     expect(extractReference('anything like Ozark?')).toBe('Ozark');
     expect(extractReference('movies like Heat.')).toBe('Heat');
+  });
+});
+
+/**
+ * "GIVE ME A MOVIE LIKE ROCKY THAT I PROBABLY HAVE NOT SEEN".
+ *
+ * Returned two results, one of them an unrelated biopic. Root cause: the
+ * trailing "that I probably have not seen" clause was never stripped, so the
+ * extracted reference was "Rocky that I probably have not seen" — a string
+ * that only ever tiers as 'contains' against the real "Rocky" (never
+ * 'exact'), so resolveSeeds() rejected it, askSimilarTo() returned null, and
+ * the whole ask silently fell back to generic genre discovery (which is how
+ * an unrelated biopic got in: it only had to share "biographical drama").
+ */
+describe('extractReference: "that I have not seen"-style clauses', () => {
+  it('THE BUG: does not let a trailing "have not seen" clause eat the reference', () => {
+    expect(extractReference('Give me a movie like Rocky that I probably have not seen')).toBe('Rocky');
+    expect(extractReference('a show like Severance that I have not seen')).toBe('Severance');
+    expect(extractReference('movies like Heat I have never seen')).toBe('Heat');
+    expect(extractReference("something like Fargo that I haven't watched")).toBe('Fargo');
+    expect(extractReference("shows like Ozark I've never caught")).toBe('Ozark');
+  });
+
+  it('the extracted reference now tiers as an exact match, not a mere "contains"', () => {
+    expect(titleMatchTier('Rocky that I probably have not seen', 'Rocky')).toBe('contains');
+    expect(titleMatchTier(extractReference('like Rocky that I probably have not seen') ?? '', 'Rocky')).toBe('exact');
+  });
+});
+
+describe('wantsUnseenOnly', () => {
+  it('recognises the clause as an explicit exclusion/deprioritization signal', () => {
+    expect(wantsUnseenOnly('Give me a movie like Rocky that I probably have not seen')).toBe(true);
+    expect(wantsUnseenOnly("something like Fargo that I haven't watched")).toBe(true);
+    expect(wantsUnseenOnly('movies like Heat I have never seen')).toBe(true);
+  });
+
+  it('is false when the ask says nothing about what they have or have not seen', () => {
+    expect(wantsUnseenOnly('something like Tulsa King that I would like')).toBe(false);
+    expect(wantsUnseenOnly('shows like Mindhunter')).toBe(false);
   });
 });
 
