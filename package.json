@@ -2,7 +2,7 @@
   "name": "watchverdict",
   "version": "1.0.0",
   "private": true,
-  "description": "WatchVerdict — a personalized movie & TV recommendation app with deterministic scoring, watchlists, and shareable verdicts.",
+  "description": "WatchVerdict \u2014 a personalized movie & TV recommendation app with deterministic scoring, watchlists, and shareable verdicts.",
   "engines": {
     "node": ">=18.18.0"
   },
@@ -34,7 +34,8 @@
     "eval:watchverdict:optimize": "node eval/cli.mjs optimize",
     "check:schema": "tsx scripts/checkSchemaContract.ts",
     "verify:schema": "tsx scripts/verifyProductionSchema.ts",
-    "prove:migration": "tsx scripts/proveMigration.ts"
+    "prove:migration": "tsx scripts/proveMigration.ts",
+    "gates": "bash scripts/gates.sh"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
