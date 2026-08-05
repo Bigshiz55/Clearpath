@@ -124,7 +124,12 @@ describe('mobile readability', () => {
   });
 
   it('the call to action meets the tap-target minimum', () => {
-    expect(whereToWatch).toContain('min-h-[36px]');
+    // 44px, not the 36 this used to pin. A test named "meets the tap-target
+    // minimum" that asserted 36 was asserting the defect: "Notify me when
+    // confirmed" rendered 205x36, and the visual-QA sweep flagged it as the
+    // last sub-44px control in the grid at all twelve viewports.
+    expect(whereToWatch).toContain('min-h-[44px]');
+    expect(whereToWatch, 'no control here may go back under the floor').not.toContain('min-h-[36px]');
   });
 });
 
