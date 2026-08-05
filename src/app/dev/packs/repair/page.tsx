@@ -2,12 +2,12 @@ import { notFound } from 'next/navigation';
 import { UpcomingScheduleList } from '@/components/packs/UpcomingScheduleList';
 import { CatalogFranchiseGroups } from '@/components/packs/CatalogFranchiseGroups';
 import { StaleDataNotice } from '@/components/packs/StaleDataNotice';
-import { ChecklistView } from '@/components/packs/ChecklistView';
+import { PackTitleList } from '@/components/packs/PackTitleList';
 import { PackEmptyState } from '@/components/packs/PackEmptyState';
 import { PublicHeader, PublicFooter } from '@/components/discovery/DiscoveryLayout';
 import type { UpcomingEntry } from '@/lib/packs/schedule';
 import type { CatalogFranchise } from '@/lib/packs/catalogFranchises';
-import type { ChecklistItem } from '@/lib/packs/types';
+import type { PackTitle } from '@/lib/packs/checklist';
 
 /**
  * Pack REPAIR harness (gated by MOBILE_HARNESS=1, like every /dev/* page).
@@ -67,14 +67,14 @@ const FRANCHISES: CatalogFranchise[] = [
   },
 ];
 
-const CHECKLIST: ChecklistItem[] = [
+const CHECKLIST: PackTitle[] = [
   {
     programmeId: 'prog-10', title: 'Sample Checklist Movie One', posterUrl: null,
-    genres: ['Romance'], releaseYear: 2023, seen: true, latestAiringUtc: iso(1),
+    genres: ['Romance'], releaseYear: 2023, seen: true, latestAiringUtc: iso(1), onList: true,
   },
   {
     programmeId: 'prog-11', title: 'Sample Checklist Movie Two', posterUrl: null,
-    genres: ['Mystery'], releaseYear: 2024, seen: false, latestAiringUtc: iso(2),
+    genres: ['Mystery'], releaseYear: 2024, seen: false, latestAiringUtc: iso(2), onList: false,
   },
 ];
 
@@ -107,7 +107,14 @@ export default function PacksRepairHarness() {
 
         <section>
           <h2 className="mb-2 text-lg font-bold text-white">My Checklist (with items)</h2>
-          <ChecklistView items={CHECKLIST} packSlug="hallmark-universe" signedIn />
+          <PackTitleList
+            items={CHECKLIST}
+            packId="00000000-0000-0000-0000-000000000000"
+            packSlug="hallmark-universe"
+            signedIn
+            mode="checklist"
+            listStorageAvailable
+          />
         </section>
 
         <section>
