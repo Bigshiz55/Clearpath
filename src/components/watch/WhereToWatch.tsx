@@ -52,10 +52,13 @@ function canRefresh(): Promise<boolean> {
  *
  * One constant, used by BOTH the loading placeholder and the resolved
  * section, so the card is the same height before and after the availability
- * answer lands. 5rem covers the measured height of the ordinary answer —
- * heading (15px) + one line box (~28px) + the 36px action + gaps.
+ * answer lands. It covers the measured height of the ordinary answer —
+ * heading (15px) + one line box (~28px) + the action + gaps. The action is
+ * 44px, not the 36 it used to be: "Notify me when confirmed" was the last
+ * sub-44px tap target in the grid, flagged at every one of the twelve
+ * viewports the visual-QA suite walks.
  */
-const RESERVE = 'min-h-[5rem]';
+const RESERVE = 'min-h-[5.5rem]';
 
 export function WhereToWatch({
   mediaType,
@@ -223,7 +226,7 @@ export function WhereToWatch({
             target="_blank"
             rel="noopener noreferrer"
             data-testid="where-to-watch-cta"
-            className="mt-0.5 inline-flex min-h-[36px] items-center rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[12px] font-bold text-brand-100 transition hover:bg-brand-500/25"
+            className="mt-0.5 inline-flex min-h-[44px] items-center rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[12px] font-bold text-brand-100 transition hover:bg-brand-500/25"
           >
             {cta.label}
           </a>
@@ -233,7 +236,7 @@ export function WhereToWatch({
             onClick={() => setPanelOpen(true)}
             data-testid="where-to-watch-cta"
             data-refreshable={refreshable === null ? 'unknown' : String(refreshable)}
-            className="mt-0.5 inline-flex min-h-[36px] items-center rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[12px] font-bold text-brand-100 transition hover:bg-brand-500/25"
+            className="mt-0.5 inline-flex min-h-[44px] items-center rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[12px] font-bold text-brand-100 transition hover:bg-brand-500/25"
           >
             {refreshable === false ? 'Notify me when confirmed' : cta.label}
           </button>
@@ -241,7 +244,7 @@ export function WhereToWatch({
           // Verified options exist but none carries a link (several services,
           // no deep link). Rendered as a label, because there is nothing to
           // press — the rows above are the answer.
-          <span data-testid="where-to-watch-cta" className="mt-0.5 inline-flex min-h-[36px] items-center text-[12px] font-bold text-slate-300">
+          <span data-testid="where-to-watch-cta" className="mt-0.5 inline-flex min-h-[44px] items-center text-[12px] font-bold text-slate-300">
             {cta.label}
           </span>
         )

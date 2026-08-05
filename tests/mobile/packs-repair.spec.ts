@@ -77,7 +77,10 @@ for (const [label, width, height] of [
 
     test('checklist renders items and both honest empty states — never "Nothing ingested yet"', async ({ page }) => {
       await open(page, width, height);
-      await expect(page.getByText('Watched 1 of 2')).toBeVisible();
+      // The counter moved with the component: ChecklistView's "Watched 1 of 2"
+      // (deleted — it also carried the "Want to watch" inference) was replaced
+      // by PackTitleList's own line, which names the list the count describes.
+      await expect(page.getByText('2 on your checklist · 1 watched')).toBeVisible();
       await expect(page.getByText('Sample Checklist Movie Two')).toBeVisible();
 
       await expect(page.getByText("This Pack's channels aren't wired up")).toBeVisible();

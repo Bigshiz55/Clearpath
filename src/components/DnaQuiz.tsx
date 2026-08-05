@@ -225,8 +225,13 @@ export function DnaQuiz({ totalRated = 0, sessionId, items, onSubmit, onUndo }: 
         <div className="h-full bg-brand-400 transition-all duration-300" style={{ width: `${Math.min(100, (rated / 20) * 100)}%` }} />
       </div>
 
-      {/* Poster — the flexible element; shrinks to guarantee one-screen fit */}
-      <div className="mt-3 flex min-h-0 flex-1 items-center justify-center">
+      {/* Poster — the flexible element; shrinks to guarantee one-screen fit.
+          `quiz-poster` is the handle the responsive suite measures: this is
+          the only box on the screen allowed to change size, so "does the quiz
+          still fit one screen" is really a question about this element. The
+          testid was lost in a rewrite, and the suite had been failing on a
+          missing selector rather than on a layout fact. */}
+      <div data-testid="quiz-poster" className="mt-3 flex min-h-0 flex-1 items-center justify-center">
         {current.posterUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

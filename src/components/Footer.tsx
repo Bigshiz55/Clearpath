@@ -27,6 +27,19 @@ export function Footer() {
   const env = resolveEnvironment(pathname, info.vercelEnv);
   if (isPublicProduction(env)) return null;
 
+  // AND NOT ON A /dev HARNESS EITHER.
+  //
+  // The harnesses exist to measure one component against the whole screen —
+  // several are literally `h-[100svh] overflow-hidden` and assert "this fits,
+  // nothing scrolls". An in-flow footer after that box adds 50-66px of
+  // document height, so the quiz harness reported a vertical scroll at every
+  // viewport (measured: 634 vs 568 at 320, 910 vs 844 at 390, 850 vs 800 at
+  // 1280) and two dozen tests failed on a footer rather than on the layout
+  // they were written to guard. Nothing is lost: BuildVersionBadge still
+  // prints the same SHA at the top of every harness, and it is `fixed`, so it
+  // costs no height.
+  if (pathname.startsWith('/dev/')) return null;
+
   const sha = info.gitShaShort || 'dev';
   const fullSha = info.gitSha;
   const branch = info.gitBranch || 'dev';

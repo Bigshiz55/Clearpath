@@ -141,8 +141,11 @@ test('the edge survives the card being put in the decision pool', async ({ page 
   // The W turns pink; the tile's own boundary is a separate signal and must not
   // be repurposed as a selection state — the two mean different things.
   await expect.poll(async () => (await edgeOf(page, 0)).color).toBe(before.color);
-  await expect(page.locator('button[data-testid^="w-check-"]').first()).toHaveAttribute(
-    'aria-label',
-    /selected/i,
-  );
+  // The accessible name stopped saying "selected" when the control was renamed
+  // to Docket (WCheck.tsx); it now reads "… — on your docket. Tap to remove."
+  // The on/off state itself lives in `aria-pressed`, which is what a screen
+  // reader announces, so assert that too rather than only the wording.
+  const w = page.locator('button[data-testid^="w-check-"]').first();
+  await expect(w).toHaveAttribute('aria-pressed', 'true');
+  await expect(w).toHaveAttribute('aria-label', /on your docket/i);
 });

@@ -1120,6 +1120,21 @@ body {
 .wv-act-label {
   font-size: 11px;
 }
+/* A WORD NEEDS ROOM ON BOTH SIDES OF IT, NOT JUST ROOM.
+   `min-width: fit-content` guarantees AGAINST is never CUT — it does not
+   guarantee it is not touching. Measured on the On TV strip: a 57px label in a
+   61px button leaves 2px of air either side at 320, 375 and 390, which reads
+   as a word jammed against its own border. There is no spare width to widen
+   into (at 320 the row is 171px holding 49+61+49 plus gaps), so the label
+   gives up a point and some of its tracking at exactly the widths where the
+   row is tight. 10px black uppercase is still comfortably legible, and 4px of
+   air is the difference between a button and a squeeze. */
+@media (max-width: 413px) {
+  .wv-act-label {
+    font-size: 10px;
+    letter-spacing: 0.01em;
+  }
+}
 @media (min-width: 1024px) {
   .wv-act {
     min-height: 48px;

@@ -113,9 +113,15 @@ test.describe('TEST E — refresh', () => {
 test.describe('TEST F — returning user', () => {
   test('navigating away and back keeps the full view', async ({ page }) => {
     await page.addInitScript(() => { try { localStorage.setItem('wv_simple', '1'); } catch { /* ignore */ } });
-    await page.goto('/dev/visual-qa');
-    await page.goto('/dev/finder');
-    await page.goBack();
+    await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
+    await page.goto('/dev/finder', { waitUntil: 'networkidle' });
+    // `goBack()` resolves on the navigation COMMIT, not on the client render
+    // that follows it, so the first `page.evaluate` inside assertFullView was
+    // racing the App Router and dying with "Execution context was destroyed,
+    // most likely because of a navigation". Wait for the restored page to be
+    // the one actually under measurement.
+    await page.goBack({ waitUntil: 'networkidle' });
+    await page.waitForSelector('[data-testid="qa-grid"]');
     await assertFullView(page, 'returning user');
     await assertFlagsCleared(page, 'returning user');
   });

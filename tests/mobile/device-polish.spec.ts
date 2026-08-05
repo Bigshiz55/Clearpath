@@ -97,7 +97,28 @@ for (const w of WIDTHS) {
       expect(box.x + box.width).toBeLessThanOrEqual(w + 1);
       expect(box.width, 'the panel keeps its full width, not the poster’s').toBeGreaterThan(150);
 
-      // And "Got it" is genuinely tappable — the symptom that exposed this.
+      // IT NEVER EATS A TAP IT WAS NOT GIVEN. Floating free of the card, the
+      // panel can land over a poster or a search row — and it did: every
+      // "open the title" click in search-to-title started failing with
+      // "w-coach intercepts pointer events". A coach mark is advice, not a
+      // modal, so the panel is transparent to the pointer and only its own
+      // "Got it" takes clicks back.
+      const hit = await page.evaluate(
+        ([x, y]) => {
+          const el = document.elementFromPoint(x as number, y as number);
+          return el?.closest('[data-testid="w-coach"]') != null
+            ? el?.closest('[data-testid="w-coach-dismiss"]') != null
+              ? 'dismiss'
+              : 'panel'
+            : 'through';
+        },
+        // A point in the panel's TEXT, not on its button.
+        [box.x + box.width / 2, box.y + 8],
+      );
+      expect(hit, 'the coach body must not swallow taps meant for the page').toBe('through');
+
+      // And "Got it" is still genuinely tappable — the symptom that exposed
+      // the clipping in the first place.
       await page.getByTestId('w-coach-dismiss').click();
       await expect(page.getByTestId('w-coach')).toHaveCount(0);
     });

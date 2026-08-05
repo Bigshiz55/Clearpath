@@ -305,8 +305,23 @@ export function WCheck({
           /* FIXED, ON THE BODY. See placeCoach above: every ancestor that
              could host this panel clips it. Position comes from the button's
              own rect, clamped into the viewport, so it is fully visible and
-             fully tappable at 320px. */
-          style={{ position: 'fixed', top: coachPos.top, left: coachPos.left, width: coachPos.width }}
+             fully tappable at 320px.
+
+             AND IT NEVER EATS A TAP IT WAS NOT GIVEN. Floating free of the
+             card, the panel can land over a search result or the next poster —
+             and it did: every "open the title" click in search-to-title
+             started failing with "w-coach intercepts pointer events". A coach
+             mark is advice, not a modal. The panel is transparent to the
+             pointer and only its own "Got it" takes clicks back, so whatever
+             is underneath still receives the tap and the coach disappears with
+             the screen it was explaining. */
+          style={{
+            position: 'fixed',
+            top: coachPos.top,
+            left: coachPos.left,
+            width: coachPos.width,
+            pointerEvents: 'none',
+          }}
           className="z-[60] rounded-xl border border-[#ff1493]/50 bg-ink-950 p-2.5 text-left shadow-[0_12px_36px_-8px_rgba(0,0,0,0.9)]"
         >
           <span className="block text-[11px] font-semibold leading-snug text-slate-100">{coach.text}</span>
@@ -319,6 +334,9 @@ export function WCheck({
               setDismissed(true);
             }}
             data-testid="w-coach-dismiss"
+            // The ONE part of the panel that takes clicks back (the panel
+            // itself is pointer-events: none — see above).
+            style={{ pointerEvents: 'auto' }}
             // 44px minimum. This is the dismiss for the coach a brand-new
             // visitor sees, so it was the smallest tap target in the product on
             // the exact screen where a first-time user is least sure what to do.
