@@ -69,7 +69,11 @@ security definer
 set search_path = public
 as $$
 declare
-  v_got boolean := false;
+  -- GET DIAGNOSTICS ... = ROW_COUNT yields an INTEGER. Declaring this boolean
+  -- created a function that installs cleanly and then fails the first time it
+  -- is called with "operator does not exist: boolean > integer" — a latent
+  -- break that only a fresh environment running the lock would ever hit.
+  v_rows integer := 0;
 begin
   insert into public.tv_provider_ingest_locks (provider_id, locked_until)
   values (p_provider_id, now() - interval '1 second')
@@ -87,8 +91,8 @@ begin
        or last_finish_at <= now() - make_interval(secs => p_min_interval_seconds)
      );
 
-  get diagnostics v_got = row_count;
-  return v_got > 0;
+  get diagnostics v_rows = row_count;
+  return v_rows > 0;
 end;
 $$;
 
