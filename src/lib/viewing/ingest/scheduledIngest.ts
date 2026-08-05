@@ -66,6 +66,62 @@ async function lastRunAt(
   return data?.[0]?.started_at ?? null;
 }
 
+/**
+ * PROVIDER-LEVEL MUTUAL EXCLUSION (migration 0043).
+ *
+ * The time-based gates below answer "is a run DUE?" — they cannot answer "is
+ * a run HAPPENING?". Two triggers arriving together (the hourly workflow and
+ * a stale-pack refresh, say) both read the same last-run timestamp, both
+ * conclude they are due, and both start. The lease closes that window: it is
+ * taken and released in a single UPDATE, so exactly one caller wins.
+ *
+ * Leased rather than advisory because a serverless function can vanish
+ * mid-run; a lease expires on its own where a connection-scoped lock would
+ * be released while the upstream fetch it guarded was still in flight.
+ *
+ * Fail OPEN. If the lock RPC is unavailable — an environment that has not
+ * applied 0043 — ingestion must still happen. The time gates remain, so the
+ * worst case is the behaviour we had before the lock existed, not a pipeline
+ * that silently stops.
+ */
+async function withProviderLock<T, S>(
+  admin: ReturnType<typeof createAdminClient>,
+  providerId: string,
+  leaseSeconds: number,
+  run: () => Promise<T>,
+  // Its own type: "skipped" is a different shape from a completed run, and
+  // pretending otherwise would force a fake full result.
+  skipped: () => S,
+): Promise<T | S> {
+  let acquired = true;
+  let lockAvailable = true;
+  try {
+    const { data, error } = await admin.rpc('tv_try_acquire_ingest_lock', {
+      p_provider_id: providerId,
+      p_lease_seconds: leaseSeconds,
+      p_min_interval_seconds: 0,
+    });
+    if (error) lockAvailable = false;
+    else acquired = data === true;
+  } catch {
+    lockAvailable = false;
+  }
+
+  if (lockAvailable && !acquired) return skipped();
+
+  try {
+    return await run();
+  } finally {
+    if (lockAvailable) {
+      try {
+        await admin.rpc('tv_release_ingest_lock', { p_provider_id: providerId, p_ok: true });
+      } catch {
+        /* the lease expires on its own; a failed release must not mask the run */
+      }
+    }
+  }
+}
+
 export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClient>) {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -79,12 +135,23 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
   const alreadyRanToday = (todaysRuns ?? []).some((r) => r.status === 'success' || r.status === 'partial');
   const tvmaze = alreadyRanToday
     ? { ran: false, reason: `Already ran today (${today}, UTC).` }
-    : { ran: true, ...(await runTvmazeIngest(TVMAZE_INGEST_DAYS)) };
+    : await withProviderLock(
+        admin, 'tvmaze', 600,
+        async () => ({ ran: true, ...(await runTvmazeIngest(TVMAZE_INGEST_DAYS)) }),
+        () => ({ ran: false, reason: 'Another TVmaze ingest is already running.' }),
+      );
 
   const lastTvMediaRun = await lastRunAt(admin, 'tv_media');
   const tvMediaDue = !lastTvMediaRun || (Date.now() - Date.parse(lastTvMediaRun)) >= TVMEDIA_MIN_INTERVAL_MS;
   const tvmedia = tvMediaDue
-    ? await runTvMediaIngest(TVMEDIA_INGEST_DAYS)
+    ? await withProviderLock(
+        admin, 'tv_media', 600,
+        () => runTvMediaIngest(TVMEDIA_INGEST_DAYS),
+        () => ({
+          ok: true, ran: false, status: 'success' as const,
+          reason: 'Another TV Media ingest is already running.',
+        }),
+      )
     : { ok: true, ran: false, status: 'success' as const, reason: `Ran within the last 2h (${lastTvMediaRun}).` };
 
   return { tvmaze, tvmedia };

@@ -47,6 +47,8 @@ export interface CaseJobReport {
   programmesWithEvidence: number;
   /** Programmes whose own text describes a crime — the matcher's real input. */
   crimeScoped: number;
+  /** Fingerprints written to case_evidence — the audit trail. */
+  evidenceRows: number;
   casesCreated: number;
   casesReused: number;
   linksWritten: number;
@@ -126,7 +128,7 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
   if (stationIds.length === 0) {
     return {
       programmesConsidered: 0, programmesWithEvidence: 0, casesCreated: 0, casesReused: 0,
-      linksWritten: 0, queuedForReview: 0, unmatched: 0, reviewQueueStored: false, examples: [], crimeScoped: 0,
+      linksWritten: 0, queuedForReview: 0, unmatched: 0, reviewQueueStored: false, examples: [], crimeScoped: 0, evidenceRows: 0,
     };
   }
 
@@ -151,7 +153,7 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
   if (programmeIds.length === 0) {
     return {
       programmesConsidered: 0, programmesWithEvidence: 0, casesCreated: 0, casesReused: 0,
-      linksWritten: 0, queuedForReview: 0, unmatched: 0, reviewQueueStored: false, examples: [], crimeScoped: 0,
+      linksWritten: 0, queuedForReview: 0, unmatched: 0, reviewQueueStored: false, examples: [], crimeScoped: 0, evidenceRows: 0,
     };
   }
 
@@ -252,6 +254,44 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
     if (orphans.length > 0) await admin.from('cases').delete().in('id', orphans);
   }
 
+  // ── PERSIST THE EVIDENCE, LINKED OR NOT ─────────────────────────────────
+  // case_evidence is the audit trail: it records what the extractor actually
+  // saw for every crime-scoped programme, including the ones that matched
+  // nothing. Storing only the fingerprints of programmes that HAPPENED to
+  // link would make an unexplained non-match impossible to investigate —
+  // you could not tell "we found no subject names" from "we never looked".
+  //
+  // victims/perpetrators stay empty on purpose: this extractor identifies
+  // named subjects but does not assign roles, and guessing which name is the
+  // victim is exactly the kind of claim this Pack must not invent.
+  let evidenceRows = 0;
+  if (evidenceColumns) {
+    const rows = extractions.map((e) => {
+      const ids = e.identifiers;
+      return {
+        programme_id: programmes[e.episode.tvmazeEpisodeId]!.id,
+        entities: ids.subjectNames,
+        victims: [],
+        perpetrators: [],
+        locations: ids.location ? [ids.location] : [],
+        // Only a year the text actually stated — an air year is not a case year.
+        event_years: ids.yearFromText && ids.year != null ? [ids.year] : [],
+        signature: [
+          [...ids.subjectNames].sort().join('|').toLowerCase(),
+          ids.location ?? '',
+          ids.crimeType ?? '',
+        ].join('::'),
+        extracted_at: new Date().toISOString(),
+      };
+    });
+    for (let i = 0; i < rows.length; i += 200) {
+      const { error } = await admin
+        .from('case_evidence')
+        .upsert(rows.slice(i, i + 200), { onConflict: 'programme_id' });
+      if (!error) evidenceRows += rows.slice(i, i + 200).length;
+    }
+  }
+
   let casesCreated = 0;
   let casesReused = 0;
   let linksWritten = 0;
@@ -333,6 +373,7 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
     programmesConsidered: programmes.length,
     programmesWithEvidence: withEvidence,
     crimeScoped,
+    evidenceRows,
     casesCreated,
     casesReused,
     linksWritten,

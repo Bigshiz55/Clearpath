@@ -69,7 +69,7 @@ export function FeedbackButton() {
         onClick={() => setOpen(true)}
         aria-label="Send feedback"
         data-testid="feedback-fab"
-        className="fixed left-2 bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-ink-900/95 text-lg text-slate-200 shadow-lg transition hover:border-brand-400/60 hover:text-white active:scale-95 lg:left-4 lg:bottom-4"
+        className="fixed left-2 bottom-[calc(var(--wv-bottom-nav-h)+env(safe-area-inset-bottom)+0.75rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-ink-900/95 text-lg text-slate-200 shadow-lg transition hover:border-brand-400/60 hover:text-white active:scale-95 lg:left-4 lg:bottom-4"
       >
         <span aria-hidden>💬</span>
       </button>

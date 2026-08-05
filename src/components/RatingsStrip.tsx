@@ -140,14 +140,22 @@ export function RatingsStrip({
           tone={ratings.tomatometer != null ? tomatoColor(ratings.tomatometer) : ''}
           title="Rotten Tomatoes — Tomatometer (critics)"
         />
+        {/* HONEST SOURCING, VISIBLY. Only the real RT number may carry RT's
+            popcorn mark. The distinction used to live ONLY in `title`, which
+            is a hover tooltip — it does not exist on a phone, so on the device
+            where most people read this the TMDB stand-in was indistinguishable
+            from a Rotten Tomatoes audience score. The mark itself now differs,
+            and the accessible name states the source outright. */}
         <RatingChip
-          mark={<span aria-hidden className="wv-ratings-emoji flex-none text-[11px] leading-none sm:text-sm">🍿</span>}
+          mark={
+            <span aria-hidden className="wv-ratings-emoji flex-none text-[11px] leading-none sm:text-sm">
+              {ratings.rtAudience != null ? '🍿' : '👥'}
+            </span>
+          }
           value={popcorn != null ? `${popcorn}%` : null}
           tone={popcorn != null ? 'text-amber-200' : ''}
-          /* HONEST SOURCING: only the real RT number may carry RT's name. The
-             TMDB-derived stand-in is an "Audience score" that says exactly
-             where it came from — never Popcornmeter branding. */
           title={ratings.rtAudience != null ? 'Rotten Tomatoes audience score' : 'Audience score — from TMDB user votes (Rotten Tomatoes’ own audience score isn’t in our data feed for this title)'}
+          srLabel={ratings.rtAudience != null ? 'Rotten Tomatoes audience score' : 'Audience score from TMDB user votes'}
         />
         {/* IMDb was a SOLID YELLOW PILL — the highest-contrast object on the
             card, on a row that is reference information. It read as the
@@ -187,15 +195,20 @@ function RatingChip({
   value,
   tone,
   title,
+  srLabel,
 }: {
   mark: React.ReactNode;
   value: string | null;
   tone: string;
   title: string;
+  /** Accessible name. `title` is a hover tooltip and does not exist on touch,
+   *  so anything a phone user must know about the SOURCE belongs here too. */
+  srLabel?: string;
 }) {
   if (value == null) return null;
   return (
     <span
+      aria-label={srLabel}
       /* TIGHT ON PURPOSE. In a row card the body is ~186px wide, so each of
          the three chips gets ~58px. The first pass used px-1.5, gap-1 and 13px
          text, which needed ~62 and truncated every value to "5…". Padding is

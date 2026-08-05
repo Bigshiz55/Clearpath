@@ -33,7 +33,7 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
       {open && (
         <div className="fixed inset-0 z-40 bg-black/70 lg:hidden" onClick={() => setOpen(false)}>
           <div
-            className="absolute inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] mx-2 overflow-hidden rounded-2xl border border-white/10 bg-ink-850 p-2 shadow-card"
+            className="absolute inset-x-0 bottom-[calc(var(--wv-bottom-nav-h)+env(safe-area-inset-bottom))] mx-2 overflow-hidden rounded-2xl border border-white/10 bg-ink-850 p-2 shadow-card"
             onClick={(e) => e.stopPropagation()}
           >
             {secondary.map((l) => (

@@ -81,3 +81,26 @@ describe('wiring happens in the background, never in a render', () => {
     expect(route).toContain('runGatedTvIngest');
   });
 });
+
+describe('the ingest path actually takes the provider lock', () => {
+  const gate = read('src/lib/viewing/ingest/scheduledIngest.ts');
+
+  it('both providers run inside withProviderLock', () => {
+    // The time gates answer "is a run DUE?", never "is one HAPPENING?". Two
+    // triggers arriving together both read the same timestamp and both start.
+    expect(gate).toContain('tv_try_acquire_ingest_lock');
+    expect(gate).toContain('tv_release_ingest_lock');
+    expect(gate).toMatch(/withProviderLock\(\s*\n?\s*admin, 'tvmaze'/);
+    expect(gate).toMatch(/withProviderLock\(\s*\n?\s*admin, 'tv_media'/);
+  });
+
+  it('the lock is released in a finally, so a throwing ingest cannot strand it', () => {
+    expect(gate).toMatch(/finally\s*\{[\s\S]*tv_release_ingest_lock/);
+  });
+
+  it('an environment without the lock still ingests — it fails OPEN', () => {
+    // A missing RPC must not stop the pipeline; the time gates still bound it.
+    expect(gate).toContain('lockAvailable');
+    expect(gate).toMatch(/if \(lockAvailable && !acquired\) return skipped\(\)/);
+  });
+});

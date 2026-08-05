@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 :root {
+  /* Height of the mobile bottom bar, WITHOUT the safe-area inset. Anything
+     that must float clear of it references this instead of hard-coding a
+     number: the FAB used 5rem while MobileNav's own drawer used 4.75rem, so
+     the feedback bubble cleared the tab bar by four pixels and touched it on
+     any device that rendered the bar a hair taller. */
+  --wv-bottom-nav-h: 4.75rem;
   color-scheme: dark;
 }
 

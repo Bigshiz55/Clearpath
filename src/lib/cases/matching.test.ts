@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runExtractionBatch, type EpisodeInput } from './extraction';
 import { scoreMatch, proposeMatches, PROPOSAL_THRESHOLD, type EpisodeExtraction } from './matching';
@@ -124,5 +126,35 @@ describe('production false-positive regressions', () => {
     const { confidence, reasons } = scoreMatch(a, b);
     expect(confidence).toBeLessThan(0.75);
     expect(reasons.some((r) => r.startsWith('shared subject:'))).toBe(false);
+  });
+});
+
+describe('case evidence is persisted for every crime-scoped programme', () => {
+  const job = readFileSync(join(process.cwd(), 'src/lib/cases/productionCaseJob.ts'), 'utf8');
+
+  it('writes case_evidence, not merely feature-detects it', () => {
+    // The job used to read case_evidence only to decide whether extra COLUMNS
+    // existed, and never wrote a row — so an unexplained non-match could not
+    // be investigated at all.
+    expect(job).toMatch(/from\('case_evidence'\)\s*\.upsert/);
+    expect(job).toContain('onConflict: \'programme_id\'');
+  });
+
+  it('records fingerprints for programmes that matched NOTHING', () => {
+    // Evidence is written from `extractions` (every crime-scoped programme),
+    // not from the linked clusters.
+    const block = job.slice(job.indexOf('PERSIST THE EVIDENCE'), job.indexOf('let casesCreated'));
+    expect(block).toContain('extractions.map');
+  });
+
+  it('never invents a victim or perpetrator role', () => {
+    const block = job.slice(job.indexOf('PERSIST THE EVIDENCE'), job.indexOf('let casesCreated'));
+    expect(block).toMatch(/victims: \[\]/);
+    expect(block).toMatch(/perpetrators: \[\]/);
+  });
+
+  it('only a text-stated year reaches event_years', () => {
+    const block = job.slice(job.indexOf('PERSIST THE EVIDENCE'), job.indexOf('let casesCreated'));
+    expect(block).toContain('ids.yearFromText');
   });
 });
