@@ -54,7 +54,34 @@ From TMDB → `TMDB_API_KEY` (v4 read-access token or v3 key both work).
    | `SUPABASE_SERVICE_ROLE_KEY` | your service-role key | **secret** |
    | `TMDB_API_KEY` | your TMDB key | **secret** |
    | `NEXT_PUBLIC_SITE_URL` | `https://<your-app>.vercel.app` | set after first deploy, then redeploy |
+   | `DATA_MODE` | `fixture`, `free_live` or `paid_live` | **REQUIRED IN PRODUCTION — see below** |
    | `OPENAI_API_KEY` | (optional) | **secret**, optional |
+
+   ### `DATA_MODE` is required, and production fails closed without it
+
+   There is no production default. A production deployment with `DATA_MODE`
+   unset or unrecognised is a `CONFIGURATION_ERROR`: it makes zero external
+   provider requests, disables every ingestion adapter, reports the error
+   through `/api/health/tv`, and keeps serving whatever data is already
+   stored. Listings will not refresh until it is set.
+
+   That is deliberate. Defaulting production to a live mode would make an
+   unconfigured deployment indistinguishable from a deliberately configured
+   one, so a missing variable would silently start calling providers with
+   nobody having decided that it should.
+
+   Set it to **`free_live`** for the current setup: TVmaze and TMDB may run,
+   and metered providers still cannot spend. `paid_live` is never inferred,
+   and a metered adapter additionally needs its own flag (`TVMEDIA_ENABLED=1`)
+   before it can spend anything.
+
+   Verify after deploying:
+
+   ```
+   curl -s https://<your-app>.vercel.app/api/health/tv | jq '.verdict, .dataMode.mode'
+   ```
+
+   `"configuration_error"` means it is not set. See `docs/TV_PLATFORM.md`.
 
 4. **Deploy.** Note the production URL.
 5. Set `NEXT_PUBLIC_SITE_URL` to that URL and **redeploy** (so auth redirects,
