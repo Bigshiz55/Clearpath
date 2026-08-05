@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * PACK PAGES — Hallmark & Lifetime (premiere calendar) and True Crime (Case
- * browser), rendered through the /dev/packs harness with the exact same
+ * PACK PAGES — Hallmark Universe (premiere calendar) and Crime Case Files
+ * (Case browser), rendered through the /dev/packs harness with the exact same
  * PremiereListOrCalendar / CaseList / PackEmptyState components the real
  * /packs/[slug] route uses, driven by fixture data instead of a live
  * Supabase session (no credentials in this environment). Covers both
@@ -20,12 +20,12 @@ for (const [label, width, height] of [
   test.describe(`${label} (${width}x${height})`, () => {
     test('both Pack sections render with real content', async ({ page }) => {
       await open(page, width, height);
-      await expect(page.getByRole('heading', { name: 'Hallmark & Lifetime' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Hallmark Universe' })).toBeVisible();
       await expect(page.getByText('A Cranberry Christmas')).toBeVisible();
       await expect(page.getByText('Mystery 101: The Locked Room')).toBeVisible();
 
-      await expect(page.getByRole('heading', { name: 'True Crime' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'The Fixture Case' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Crime Case Files' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'The Fixture Case' })).toBeVisible();
       await expect(page.getByText(/Covered across 3 networks/)).toBeVisible();
       await expect(page.getByText('You have seen 1 of 3 episodes covering this case.')).toBeVisible();
       await expect(page.getByText(/Unmatched — not yet linked to a Case/)).toBeVisible();
