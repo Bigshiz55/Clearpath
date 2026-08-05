@@ -29,6 +29,18 @@ export interface ProviderHealth {
   coverageEndUtc: string | null;
   channelsRequested: number | null;
   channelsReturned: number | null;
+  /**
+   * PROOF THAT THE PROVIDER LOCK IS IN THE PATH, not merely defined.
+   * `lockLastStartAt` is stamped by tv_try_acquire_ingest_lock and
+   * `lockLastFinishAt` by tv_release_ingest_lock, so a run that bypassed the
+   * lock leaves these null while the run rows still say "success". null also
+   * legitimately means the 0043 table is absent.
+   */
+  lockLastStartAt: string | null;
+  lockLastFinishAt: string | null;
+  lockLastOk: boolean | null;
+  /** True while a lease is still in the future — an ingest is in flight. */
+  lockHeld: boolean;
 }
 
 export interface PackHealth {
@@ -97,7 +109,7 @@ export async function getTvHealth(): Promise<TvHealth> {
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
 
-  const [{ data: lineups }, { data: runs }, { data: packs }, { data: packStations }, { data: stations }] =
+  const [{ data: lineups }, { data: runs }, { data: packs }, { data: packStations }, { data: stations }, locksResult] =
     await Promise.all([
       admin.from('tv_lineups').select('provider_id, last_success_at, coverage_start_utc, coverage_end_utc'),
       admin
@@ -108,7 +120,25 @@ export async function getTvHealth(): Promise<TvHealth> {
       admin.from('packs').select('id, slug'),
       admin.from('pack_stations').select('pack_id, station_id'),
       admin.from('tv_stations').select('id, provider_id, name'),
+      // THE LOCK'S OWN LEDGER. An ingest that never takes the provider lock
+      // and one that takes it every time look identical from the run rows —
+      // both just say "success". These three timestamps are the only way to
+      // see from outside whether the serialization is actually in the path.
+      // Timestamps and a boolean; nothing here is a secret.
+      admin
+        .from('tv_provider_ingest_locks')
+        .select('provider_id, locked_until, last_start_at, last_finish_at, last_ok'),
     ]);
+
+  type LockRow = {
+    provider_id: string; locked_until: string | null;
+    last_start_at: string | null; last_finish_at: string | null; last_ok: boolean | null;
+  };
+  // Absent table (migration not applied yet) is a legitimate state, not an
+  // outage — health must still answer.
+  const lockByProvider = new Map<string, LockRow>(
+    ((locksResult.data ?? []) as LockRow[]).map((l) => [l.provider_id, l]),
+  );
 
   type RunRow = {
     provider_id: string; started_at: string; status: string;
@@ -131,6 +161,7 @@ export async function getTvHealth(): Promise<TvHealth> {
 
   function providerHealth(providerId: string, configured: boolean): ProviderHealth {
     const lineup = lineupByProvider.get(providerId);
+    const lock = lockByProvider.get(providerId);
     const providerRuns = runsByProvider.get(providerId) ?? [];
     const lastRun = providerRuns[0] ?? null;
     const lastSuccess = providerRuns.find((r) => r.status === 'success' || r.status === 'partial') ?? null;
@@ -146,6 +177,10 @@ export async function getTvHealth(): Promise<TvHealth> {
       coverageEndUtc: lineup?.coverage_end_utc ?? null,
       channelsRequested: lastSuccess?.channels_requested ?? null,
       channelsReturned: lastSuccess?.channels_returned ?? null,
+      lockLastStartAt: lock?.last_start_at ?? null,
+      lockLastFinishAt: lock?.last_finish_at ?? null,
+      lockLastOk: lock?.last_ok ?? null,
+      lockHeld: lock?.locked_until != null && Date.parse(lock.locked_until) > nowMs,
     };
   }
 

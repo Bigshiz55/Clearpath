@@ -15,7 +15,8 @@
  * sit in the same place on every surface — grid, wall, guide, search — or it
  * stops reading as one consistent gesture.
  */
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { Gavel } from 'lucide-react';
 import {
   addToDocketStore,
@@ -91,7 +92,7 @@ export function WCheck({
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useState(true);
   const [everSelected, setEverSelected] = useState(true);
-  const [progressShown, setProgressShown] = useState(true);
+  const [progressShown, setProgressShown] = useState(true); // persisted at mount only — see below
   const isFirst = useRef(false);
 
   useEffect(() => {
@@ -118,14 +119,83 @@ export function WCheck({
     ? coachFor({ selected: docket.length, everSelected, dismissed, isFirstOnPage: isFirst.current, progressShown })
     : { step: 'none' as const, text: '' };
 
-  // The "what happens next" line retires itself the moment it is first
-  // rendered — once per user, ever, regardless of dismissal or navigation.
+  /**
+   * "SHOWN ONCE, EVER" HAS TO MEAN ONCE AND *READ*, NOT ONCE AND GONE.
+   *
+   * This used to `setProgressShown(true)` as well as persisting the flag —
+   * which fed straight back into `coachFor` on the very next render and
+   * unmounted the panel one commit after it appeared. The line that explains
+   * what unlocks the gavel was therefore shown for a single frame and never
+   * read by anyone. (It is what made two of the onboarding specs fail: the
+   * element was gone before any assertion could reach it.)
+   *
+   * So: persist the flag once, so the line never returns in a LATER session —
+   * but leave this session's state alone, so the line stays up until the user
+   * dismisses it or reaches the minimum (`shouldRetire`).
+   */
+  const progressPersisted = useRef(false);
   useEffect(() => {
-    if (mounted && coach.step === 'progress' && !progressShown) {
+    if (mounted && coach.step === 'progress' && !progressPersisted.current) {
+      progressPersisted.current = true;
       writeFlag(PROGRESS_SHOWN_KEY);
-      setProgressShown(true);
     }
-  }, [mounted, coach.step, progressShown]);
+  }, [mounted, coach.step]);
+
+  /**
+   * THE COACH MARK CANNOT LIVE INSIDE THE CARD, AND THAT IS THE WHOLE PROBLEM.
+   *
+   * The W is pinned to the artwork's top-right, and `.wv-card-art` is
+   * `overflow-hidden` (it has to be — it clips the blurred matte and the
+   * rounded corner). On a phone that box is ~103-126px wide, so a 216px panel
+   * anchored inside it was CLIPPED to the poster's width: the first-run
+   * instruction, cut in half, on the exact screen where a new visitor is least
+   * sure what to do. Widening the panel or anchoring it left could not fix it;
+   * no descendant of a clipping box can escape the box. Measured on the
+   * shipped harness at 320/360/390: 216px of content in a 103-126px box, and
+   * on the title page the same panel overran the placard's own
+   * `overflow-hidden` header by 32px.
+   *
+   * So it is a portal on `document.body`, positioned from the button's own
+   * rect in viewport coordinates. `fixed` follows the button on scroll via the
+   * listeners below, and the clamp keeps all 216px on screen at 320px.
+   */
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const [coachPos, setCoachPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const coachOpen = mounted && coach.step !== 'none' && !refused;
+
+  const placeCoach = useCallback(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const width = Math.min(216, vw - 16);
+    // Grows leftward from the control, then clamped into the viewport.
+    const left = Math.max(8, Math.min(r.right - width, vw - width - 8));
+    // Below the control by default; above it only if there is no room below,
+    // so the panel never covers the thing it is pointing at.
+    const ESTIMATED_H = 112;
+    const below = r.bottom + 8;
+    const top = below + ESTIMATED_H > vh ? Math.max(8, r.top - ESTIMATED_H - 8) : below;
+    setCoachPos({ top, left, width });
+  }, []);
+
+  useEffect(() => {
+    if (!coachOpen) {
+      setCoachPos(null);
+      return;
+    }
+    placeCoach();
+    // `capture` so a scroll in any ancestor (a rail, the tray) repositions it,
+    // not just the window.
+    const onMove = () => placeCoach();
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => {
+      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
+    };
+  }, [coachOpen, coach.text, placeCoach]);
 
   function toggle(e: React.MouseEvent) {
     // These sit inside card links; a tap here is never a navigation.
@@ -158,6 +228,7 @@ export function WCheck({
   const body = (
     <>
       <button
+        ref={btnRef}
         type="button"
         onClick={toggle}
         aria-pressed={on}
@@ -227,18 +298,16 @@ export function WCheck({
           understand: "what is this" before the first-ever selection, then "how
           many more unlock the gavel" until the docket is full. Dismissible,
           and retired for good once a full docket has been assembled. */}
-      {coach.step !== 'none' && !refused && (
+      {coachOpen && coachPos != null && typeof document !== 'undefined' && createPortal(
         <span
           data-testid="w-coach"
           data-step={coach.step}
-          /* ANCHORED LEFT, NOT RIGHT. The W sits at the poster's top-RIGHT, so
-             a right-anchored panel grows leftward — and on a phone the poster
-             is only ~140px wide inside a card that starts ~28px from the
-             screen edge, which put a 216px panel at x = -48 and off the
-             screen entirely. Growing rightward from the poster's left edge
-             keeps it inside the card at every width; `max-w` is the belt to
-             that braces on the narrowest phones. */
-          className="absolute left-0 top-[3.25rem] z-20 w-[13.5rem] max-w-[min(13.5rem,72vw)] rounded-xl border border-[#ff1493]/50 bg-ink-950 p-2.5 text-left shadow-[0_12px_36px_-8px_rgba(0,0,0,0.9)]"
+          /* FIXED, ON THE BODY. See placeCoach above: every ancestor that
+             could host this panel clips it. Position comes from the button's
+             own rect, clamped into the viewport, so it is fully visible and
+             fully tappable at 320px. */
+          style={{ position: 'fixed', top: coachPos.top, left: coachPos.left, width: coachPos.width }}
+          className="z-[60] rounded-xl border border-[#ff1493]/50 bg-ink-950 p-2.5 text-left shadow-[0_12px_36px_-8px_rgba(0,0,0,0.9)]"
         >
           <span className="block text-[11px] font-semibold leading-snug text-slate-100">{coach.text}</span>
           <button
@@ -258,14 +327,16 @@ export function WCheck({
           >
             Got it
           </button>
-        </span>
+        </span>,
+        document.body,
       )}
     </>
   );
 
-  // ON A POSTER the button is already absolutely positioned, so the coach mark
-  // and the refusal toast anchor to the artwork. INLINE there is no such
-  // anchor — without a positioned wrapper they would hang off whatever
-  // ancestor happened to be positioned, which on the title page is the page.
+  // ON A POSTER the button is already absolutely positioned, so the refusal
+  // toast anchors to the artwork. INLINE there is no such anchor — without a
+  // positioned wrapper it would hang off whatever ancestor happened to be
+  // positioned, which on the title page is the page. (The coach mark no
+  // longer depends on either: it is a portal, see placeCoach.)
   return placement === 'inline' ? <span className="relative inline-flex">{body}</span> : body;
 }

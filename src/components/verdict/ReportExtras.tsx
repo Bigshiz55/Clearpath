@@ -58,7 +58,6 @@ export function AtAGlance({
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-bold text-white">{tier}</div>
-          <p className="line-clamp-2 text-xs text-slate-300 sm:text-sm">{oneLiner}</p>
         </div>
         {/* HOW SURE, BESIDE HOW GOOD. The call says what we think; this says
             how much evidence that rests on — and taps open the reasons in
@@ -73,6 +72,18 @@ export function AtAGlance({
           availabilityVerified={streamNames.length > 0}
         />
       </div>
+
+      {/* THE VERDICT SENTENCE IS NOT A CAPTION, AND MUST NEVER BE CLIPPED.
+          It used to sit in the middle column of the badge row under
+          `line-clamp-2` — a column ~130px wide on a phone, between a 100px
+          call badge and the confidence chip. Measured on the shipped harness:
+          at 320px the sentence needed 64px of height and got 32, so half the
+          product's actual recommendation was cut off, silently, with no
+          affordance to read the rest. It now gets its own full-width row and
+          no clamp: this is the one line the whole page exists to deliver. */}
+      <p data-testid="verdict-one-liner" className="mt-2 text-sm leading-snug text-slate-300">
+        {oneLiner}
+      </p>
 
       <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
         {/* The DNA Score is the headline personal call (its own Stream It / Skip

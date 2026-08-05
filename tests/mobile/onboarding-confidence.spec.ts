@@ -31,7 +31,10 @@ test.describe('the W teaches itself, once', () => {
     const coach = page.getByTestId('w-coach');
     await expect(coach).toBeVisible();
     await expect(coach).toHaveAttribute('data-step', 'explain');
-    await expect(coach).toContainText(/Tap W to add this title/i);
+    // The control is called "Docket" in the shipped copy
+    // (src/lib/verdict/wOnboarding.ts, pinned by wOnboarding.test.ts). This
+    // assertion still said "W" and had been failing since the rename.
+    await expect(coach).toContainText(/Tap Docket to add this title/i);
   });
 
   test('exactly ONE coach mark exists, however many posters are on screen', async ({ page }) => {
@@ -45,7 +48,7 @@ test.describe('the W teaches itself, once', () => {
     await ws(page).first().click();
     const coach = page.getByTestId('w-coach');
     await expect(coach).toHaveAttribute('data-step', 'progress');
-    await expect(coach).toContainText('1 selected');
+    await expect(coach).toContainText('1 on your docket');
     await expect(coach).toContainText(/unlock the gavel/i);
   });
 
@@ -53,7 +56,7 @@ test.describe('the W teaches itself, once', () => {
     await open(page);
     await ws(page).nth(0).click();
     await ws(page).nth(1).click();
-    await expect(page.getByTestId('w-coach')).toContainText('2 selected');
+    await expect(page.getByTestId('w-coach')).toContainText('2 on your docket');
     // And the docket agrees — the coach is reading real state, not its own.
     await expect(page.getByTestId('docket-count')).toHaveText('2');
   });

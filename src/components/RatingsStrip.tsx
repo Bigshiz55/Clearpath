@@ -128,7 +128,14 @@ export function RatingsStrip({
         {ratings.tomatometer == null && popcorn == null && ratings.imdb == null && (
           <span
             data-testid="ratings-none"
-            className="inline-flex h-[26px] items-center whitespace-nowrap text-[11px] font-semibold text-slate-500"
+            /* WRAPS, unlike the chips. The chips are nowrap because a score
+               broken across two lines is unreadable; this is a SENTENCE, and
+               it was nowrap inside this `overflow-hidden` row. Measured on a
+               320px row card: it needed 155px in a 151px body and was clipped
+               to "Ratings not available ye" — a data-honesty label, cut mid-
+               word. `min-h` instead of `h` so the row still holds its height
+               when this wraps to two lines. */
+            className="inline-flex min-h-[26px] min-w-0 items-center text-[11px] font-semibold leading-tight text-slate-500"
             title="No critic, audience or IMDb score is published for this title yet"
           >
             Ratings not available yet
