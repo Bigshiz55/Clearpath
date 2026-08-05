@@ -10,10 +10,13 @@ export default defineConfig({
       'server-only': fileURLToPath(new URL('./eval/shims/server-only.ts', import.meta.url)),
     },
   },
+  // The render tests use JSX. `automatic` means the runtime is imported for
+  // us, so a test file need not import React just to satisfy the transform.
+  esbuild: { jsx: 'automatic' },
   test: {
     environment: 'node',
     // Unit tests for the app + self-tests for the evaluation framework. The
     // eval *runner* specs (eval/runner/*.eval.ts) use eval/vitest.config.ts.
-    include: ['src/**/*.test.ts', 'eval/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'eval/**/*.test.ts'],
   },
 });
