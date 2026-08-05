@@ -45,6 +45,8 @@ export const AUTO_LINK_THRESHOLD = 0.75;
 export interface CaseJobReport {
   programmesConsidered: number;
   programmesWithEvidence: number;
+  /** Programmes whose own text describes a crime — the matcher's real input. */
+  crimeScoped: number;
   casesCreated: number;
   casesReused: number;
   linksWritten: number;
@@ -124,7 +126,7 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
   if (stationIds.length === 0) {
     return {
       programmesConsidered: 0, programmesWithEvidence: 0, casesCreated: 0, casesReused: 0,
-      linksWritten: 0, queuedForReview: 0, unmatched: 0, reviewQueueStored: false, examples: [],
+      linksWritten: 0, queuedForReview: 0, unmatched: 0, reviewQueueStored: false, examples: [], crimeScoped: 0,
     };
   }
 
@@ -149,7 +151,7 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
   if (programmeIds.length === 0) {
     return {
       programmesConsidered: 0, programmesWithEvidence: 0, casesCreated: 0, casesReused: 0,
-      linksWritten: 0, queuedForReview: 0, unmatched: 0, reviewQueueStored: false, examples: [],
+      linksWritten: 0, queuedForReview: 0, unmatched: 0, reviewQueueStored: false, examples: [], crimeScoped: 0,
     };
   }
 
@@ -177,12 +179,28 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
   }));
 
   const batch = runExtractionBatch(inputs);
-  const extractions: EpisodeExtraction[] = batch.results.map((r) => ({
+  const allExtractions: EpisodeExtraction[] = batch.results.map((r) => ({
     episode: inputs[r.tvmazeEpisodeId]!,
     identifiers: r.identifiers,
   }));
 
+  // ── ONLY CRIME COVERAGE CAN BE A CRIME CASE ─────────────────────────────
+  // The extractor treats any capitalized two-word run as a possible subject
+  // name, which is right for true-crime synopses and badly wrong for
+  // everything else a cable lineup carries. Measured across the full live
+  // corpus of 943 programmes it produced 145 "shared subject" pairs and
+  // every single high-scoring one was junk: "Washington Capitals",
+  // "Super Bowl", "Jewel School", "Rise & Shine Savings". None was a case.
+  //
+  // A programme only enters the matcher if its own text describes a crime
+  // (extractCrimeType found one). That is the cheapest possible statement of
+  // "this is about a case", it uses the classifier the module already has,
+  // and it means a shopping segment can never be linked to a murder however
+  // its brand name happens to capitalize.
+  const extractions = allExtractions.filter((e) => e.identifiers.crimeType != null);
+
   const withEvidence = extractions.filter((e) => e.identifiers.subjectNames.length > 0).length;
+  const crimeScoped = extractions.length;
 
   const candidates = proposeMatches(extractions);
   const autoPairs: Array<[number, number]> = [];
@@ -202,7 +220,10 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
     }
   }
 
-  const groups = cluster(extractions.length, autoPairs);
+  // Sized to `programmes`, NOT `extractions`: proposeMatches preserves each
+  // item's ORIGINAL index (tvmazeEpisodeId), so pair ids address the full
+  // programme list even though the matcher only saw the crime-scoped subset.
+  const groups = cluster(programmes.length, autoPairs);
   const multi = [...groups.values()].filter((g) => g.length > 1);
 
   const evidenceColumns = await hasTable(admin, 'case_evidence');
@@ -311,6 +332,7 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
   return {
     programmesConsidered: programmes.length,
     programmesWithEvidence: withEvidence,
+    crimeScoped,
     casesCreated,
     casesReused,
     linksWritten,
