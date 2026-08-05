@@ -271,8 +271,15 @@ export async function getTvHealth(): Promise<TvHealth> {
     totalFutureAirings: totalFuture ?? 0,
   });
   if (externalHourlyTriggerAppearsBroken) {
+    // SAY WHAT IS ACTUALLY KNOWN. This used to assert "the hourly trigger is
+    // not reaching production", which is a claim about the TRIGGER made from
+    // evidence about the RUNS — and it was wrong: the workflow was arriving on
+    // schedule and returning HTTP 200 while both providers sat inside their own
+    // time gates (TVmaze once per UTC day, TV Media once per 2h), and a gated
+    // no-op writes no run row. The honest statement is the observation plus
+    // both of its possible causes, in the order an operator should check them.
     notes.push(
-      'No ingest tick recorded in the last 3 hours — the hourly trigger is not reaching production. Check the "Refresh TV ingest" workflow; it posts to /api/tv/refresh, which needs no credentials, so a failure there is reachability or a server error.',
+      'No ingest has RUN in the last 3 hours. That is expected while both providers are inside their own gates (TVmaze runs once per UTC day, TV Media once per 2h) — check `providers[].lockLastStartAt` to see whether one has started since. If those are also old, check the "Refresh TV ingest" workflow: it posts to /api/tv/refresh, which needs no credentials, so a failure there is reachability or a server error rather than a configuration mismatch.',
     );
   }
   void stations; // reserved for future per-provider channel detail
