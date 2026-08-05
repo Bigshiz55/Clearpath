@@ -39,7 +39,18 @@ import { runTvMediaIngest } from './tvMediaWriter';
 // displays a 6-hour window; a few days of coverage is already generous
 // headroom. Widen these once a live run has actually proven the timing.
 const TVMAZE_INGEST_DAYS = 3;
-const TVMEDIA_INGEST_DAYS = 3;
+// Widened from 3. Two reasons, both real:
+//   1. A three-day "premiere calendar" is a thin product; a Pack that can
+//      only see to Friday cannot tell you what is on next week.
+//   2. Crime Case Files needs a corpus with REPEAT coverage to work at all.
+//      The same case airs under different series titles (Dateline vs
+//      Dateline: Secrets Uncovered) and on different channels days apart; a
+//      three-day window contains almost no such pairs, so the matcher had
+//      nothing to match. Measured on the live lineup: 0 cross-title pairs at
+//      3 days.
+// Affordable now that ingest is off the request path (maxDuration 300 on
+// /api/tv/refresh) and writes are batched.
+const TVMEDIA_INGEST_DAYS = 10;
 const TVMEDIA_MIN_INTERVAL_MS = 2 * 60 * 60 * 1000;
 
 async function lastRunAt(
