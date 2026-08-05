@@ -74,7 +74,23 @@ function buildMeta() {
 
   return {
     NEXT_PUBLIC_APP_VERSION: pkg.version ?? '0.0.0',
-    NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
+    // THE COMMIT'S TIME, NOT `new Date()`.
+    //
+    // `new Date()` here is evaluated more than once per build — Next compiles
+    // the server and the client separately — so the two halves of the app
+    // disagreed about when the build happened whenever those compilations
+    // straddled a minute boundary. The footer then rendered "Aug 5, 2026,
+    // 8:25 PM" on the server and "8:26 PM" in the browser, which is a text
+    // mismatch: React #425 on hydration, followed by #418 and #423, on EVERY
+    // route in the app. Caught by route-crawl; confirmed by diffing the SSR
+    // HTML against the hydrated DOM, where that one minute was the only
+    // difference on the whole page.
+    //
+    // The commit's timestamp is fixed, identical in both compilations, and a
+    // more honest answer to "which build is this" than a wall clock that moves
+    // while the build runs. The wall clock remains the fallback for a tree
+    // with no git history to ask.
+    NEXT_PUBLIC_BUILD_TIME: git('git log -1 --format=%cI') || new Date().toISOString(),
     NEXT_PUBLIC_GIT_SHA: sha,
     NEXT_PUBLIC_GIT_BRANCH: branch,
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || (process.env.NODE_ENV === 'production' ? '' : 'development'),

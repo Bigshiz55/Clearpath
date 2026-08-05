@@ -31,7 +31,11 @@ test('a phone keeps the compact control — the floor is the right size there', 
   await open(page, 390, 844);
   const m = await actionMetrics(page);
   expect(m.height, 'phone button height').toBeGreaterThanOrEqual(44);
-  expect(m.fontSize, 'phone label').toBeCloseTo(11, 0);
+  // 10px below 414, not 11: the label gives up a point there so AGAINST is not
+  // jammed against its own border in a 171px row (see `.wv-act-label` in
+  // globals.css and on-tv-highlights.spec.ts). The height floor — the thing
+  // this test is actually about — is unchanged at 44.
+  expect(m.fontSize, 'phone label').toBeCloseTo(10, 0);
 });
 
 test('an iPad gets a bigger control than a phone', async ({ page }) => {

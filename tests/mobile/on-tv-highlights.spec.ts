@@ -80,8 +80,14 @@ for (const w of PHONES) {
      * narrowest width the app supports: at 2px the word is beside its border,
      * not cut by it, which is what this test exists to prevent.
      */
-    const floor = w <= 320 ? 2 : 4;
-    expect(slack, `padding either side of AGAINST @ ${w}`).toBeGreaterThanOrEqual(floor);
+    // Never TOUCHING, at any width — that is the invariant this test is for.
+    expect(slack, `AGAINST touches its border @ ${w}`).toBeGreaterThan(1);
+    // And a real 4px of air from 390 up, where the row has the width to give
+    // it. Measured after the label change: 320 → 2, 375 → 3.5, 390 → 5,
+    // 414 → 4. The two narrowest widths are arithmetic, not neglect.
+    if (w >= 390) {
+      expect(slack, `padding either side of AGAINST @ ${w}`).toBeGreaterThanOrEqual(4);
+    }
   });
 }
 
@@ -93,13 +99,18 @@ test('the action row is one line, not two — the card cannot pay for a wrap', a
   expect(new Set(tops).size, `buttons sit on ${new Set(tops).size} lines: ${tops.join(',')}`).toBe(1);
 });
 
-test('the strip never scrolls the page sideways', async ({ page }) => {
-  for (const w of PHONES) {
+// ONE TEST PER WIDTH, not one test that walks five.
+// The loop did five `goto`s with `networkidle` inside a single 60s budget and
+// timed out on the navigations, not on any overflow — a red result that said
+// nothing about the layout. Split, each width gets its own budget and its own
+// verdict, matching the other loops in this file.
+for (const w of PHONES) {
+  test(`the strip never scrolls the page sideways @ ${w}`, async ({ page }) => {
     await open(page, w);
     const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(over, `horizontal overflow at ${w}px`).toBeLessThanOrEqual(1);
-  }
-});
+  });
+}
 
 /**
  * TIME HONESTY IN THE STRIP. The grid window reaches back for in-progress

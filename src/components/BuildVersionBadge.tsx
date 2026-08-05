@@ -31,6 +31,16 @@ export function BuildVersionBadge() {
   const env = resolveEnvironment(pathname, info.vercelEnv);
   const [open, setOpen] = useState(false);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // See the pill's className: the harness gate is applied AFTER mount so that
+  // server and client render identical markup. Branching on `usePathname()`
+  // during render is what turned every route in the crawler into a React
+  // #418/#423/#425 hydration error.
+  const pillRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const harness = pathname.startsWith('/dev/');
+    pillRef.current?.classList.toggle('pointer-events-none', harness);
+    pillRef.current?.classList.toggle('pointer-events-auto', !harness);
+  }, [pathname]);
 
   // Let Settings (or anywhere) open the sheet via a global event.
   useEffect(() => {
@@ -78,6 +88,15 @@ export function BuildVersionBadge() {
           onPointerDown={startPress}
           onPointerUp={endPress}
           onPointerLeave={endPress}
+          /* INERT ON A /dev HARNESS — applied by the effect above, not by a
+             branch here. The pill sits in the top band, and on a phone that
+             band is exactly where a full-screen harness puts its own controls:
+             the quiz's "Undo" lives under it. Everywhere else the badge is a
+             useful shortcut into build info; on a harness it is a debugging
+             label standing between a person (or a test) and the control being
+             measured. It still renders, so every QA screenshot names its
+             build; it just stops taking taps. */
+          ref={pillRef}
           className={`pointer-events-auto inline-flex h-5 max-w-[92vw] items-center truncate rounded-full border px-2.5 text-[10px] font-semibold leading-none tracking-wide shadow-sm backdrop-blur ${ENV_STYLE[env]}`}
           aria-label="Build and version information"
           data-testid="build-badge"

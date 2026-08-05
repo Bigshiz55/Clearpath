@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { getBuildInfo, resolveEnvironment, isPublicProduction } from '@/lib/buildInfo';
 
@@ -25,7 +26,6 @@ export function Footer() {
   const pathname = usePathname() || '/';
   const info = getBuildInfo();
   const env = resolveEnvironment(pathname, info.vercelEnv);
-  if (isPublicProduction(env)) return null;
 
   // AND NOT ON A /dev HARNESS EITHER.
   //
@@ -38,7 +38,21 @@ export function Footer() {
   // they were written to guard. Nothing is lost: BuildVersionBadge still
   // prints the same SHA at the top of every harness, and it is `fixed`, so it
   // costs no height.
-  if (pathname.startsWith('/dev/')) return null;
+  //
+  // HIDDEN AFTER MOUNT, NOT BRANCHED DURING RENDER. Making the rendered output
+  // depend on `usePathname()` is what broke it the first time: for prerendered
+  // routes the server's answer is not the browser's, and every route in the
+  // crawler started throwing React #418/#423/#425 hydration errors. Server and
+  // client now render byte-identical markup and an effect hides it afterwards,
+  // which hydration does not police.
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    ref.current?.classList.toggle('hidden', pathname.startsWith('/dev/'));
+  }, [pathname]);
+
+  // Hooks first, THEN the early return — public production still renders
+  // nothing here (a commit hash is a debugging instrument, not product chrome).
+  if (isPublicProduction(env)) return null;
 
   const sha = info.gitShaShort || 'dev';
   const fullSha = info.gitSha;
@@ -46,7 +60,10 @@ export function Footer() {
   const when = info.buildTimeIso ? info.buildTimeLabel : 'dev';
 
   return (
-    <footer className="border-t border-white/5 px-4 py-4 text-center text-[11px] text-slate-600">
+    <footer
+      ref={ref}
+      className="border-t border-white/5 px-4 py-4 text-center text-[11px] text-slate-600"
+    >
       <p>
         Build{' '}
         {fullSha ? (

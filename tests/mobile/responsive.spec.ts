@@ -81,7 +81,11 @@ test.describe('watch-dna calibration — responsive matrix', () => {
       // The quiz tile renders with its poster + the four-action grid visible.
       await expect(page.locator('[data-testid="dna-quiz"]')).toBeVisible();
       await expect(page.locator('[data-testid="quiz-poster"]')).toBeVisible();
-      await expect(page.locator('[data-testid="quiz-grid"]')).toBeVisible();
+      // `quiz-grid` was renamed to `quiz-actions` when the quiz gained its
+      // two-state (primary / rating) button group; the selector was left
+      // behind, so this matrix had been failing on a missing element rather
+      // than on any layout fact.
+      await expect(page.locator('[data-testid="quiz-actions"]')).toBeVisible();
 
       // The poster must be SUBSTANTIAL, never collapsed to a thumbnail (the real
       // on-device bug) — but it is ALSO structurally capped at 18dvh so it can
