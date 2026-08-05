@@ -5,25 +5,19 @@ import {
   markSearchRequested,
   consumeSearchRequest,
   hasPendingSearchRequest,
-  PENDING_ATTR,
+  PENDING_KEY,
   TRIGGER_ATTR,
   PREHYDRATION_SCRIPT,
-  type RootLike,
+  type PendingHost,
 } from './openRequest';
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 const stripComments = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
 
-/** The smallest thing that behaves like `document.documentElement`. */
-function fakeRoot(): RootLike & { attrs: Map<string, string> } {
-  const attrs = new Map<string, string>();
-  return {
-    attrs,
-    hasAttribute: (n) => attrs.has(n),
-    setAttribute: (n, v) => void attrs.set(n, v),
-    removeAttribute: (n) => void attrs.delete(n),
-  };
+/** The smallest thing that behaves like `window` for this module's purposes. */
+function fakeRoot(): PendingHost {
+  return {};
 }
 
 /**
@@ -94,7 +88,7 @@ describe('a request made before the sheet exists is not lost', () => {
 describe('a tap that lands before ANY javascript runs is still recorded', () => {
   it('the inline script watches for the trigger attribute in the capture phase', () => {
     expect(PREHYDRATION_SCRIPT).toContain(TRIGGER_ATTR);
-    expect(PREHYDRATION_SCRIPT).toContain(PENDING_ATTR);
+    expect(PREHYDRATION_SCRIPT).toContain(PENDING_KEY);
     // Capture phase, so it runs before anything React attaches later.
     expect(PREHYDRATION_SCRIPT).toContain('true');
     expect(PREHYDRATION_SCRIPT).toContain("addEventListener('click'");
@@ -137,14 +131,14 @@ describe('every trigger carries the attribute the safety net looks for', () => {
   });
 
   it('the sheet claims a pending request on mount, not only on the event', () => {
-    expect(src).toContain('hasPendingSearchRequest(document.documentElement)');
+    expect(src).toContain('hasPendingSearchRequest(searchRequestHost())');
   });
 
   it('mounting READS the request; only closing clears it', () => {
     // Consuming on mount reintroduced the dead button on exactly the slow
     // loads this fix is for — see openRequest.ts. The clear belongs in `close`.
     const closeBody = src.slice(src.indexOf('const close = useCallback'), src.indexOf('}, []);', src.indexOf('const close = useCallback')));
-    expect(closeBody).toContain('consumeSearchRequest(document.documentElement)');
+    expect(closeBody).toContain('consumeSearchRequest(searchRequestHost())');
   });
 });
 

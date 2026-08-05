@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { opensSearch, closesSearch } from '@/lib/search/quickSearch';
-import { markSearchRequested, consumeSearchRequest, hasPendingSearchRequest, TRIGGER_ATTR } from '@/lib/search/openRequest';
+import { markSearchRequested, consumeSearchRequest, hasPendingSearchRequest, searchRequestHost, TRIGGER_ATTR } from '@/lib/search/openRequest';
 import { resolveSearchDestination, classifySearchIntent, couldBeTitle, askHref, type CatalogResult } from '@/lib/search/searchIntent';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 import { SearchBar } from './SearchBar';
@@ -26,9 +26,10 @@ import { SearchBar } from './SearchBar';
  *    sheet through a one-shot CustomEvent, which is delivered only to whoever
  *    is already listening. On a slow device the trigger hydrates first, the
  *    event lands in an empty room, and the tap is silently lost. Now a request
- *    also PERSISTS on `<html>` and the sheet claims it on mount — see
- *    src/lib/search/openRequest.ts. A pre-hydration listener records taps that
- *    land before any JavaScript has run at all.
+ *    also PERSISTS on `window` and the sheet claims it on mount — see
+ *    src/lib/search/openRequest.ts, which explains why `window` and not the DOM.
+ *    A pre-hydration listener records taps that land before any JavaScript has
+ *    run at all.
  *
  * 2. EVERY QUERY WENT TO THE JUDGE. The sheet was a plain form wired to
  *    `quickSearchHref`, which routed everything to /app/ask — so searching
@@ -47,8 +48,9 @@ const OPEN_EVENT = 'wv:quick-search';
  * order there is no sequence in which the request is lost.
  */
 export function openQuickSearch(): void {
-  if (typeof document !== 'undefined') markSearchRequested(document.documentElement);
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_EVENT));
+  if (typeof window === 'undefined') return;
+  markSearchRequested(searchRequestHost());
+  window.dispatchEvent(new CustomEvent(OPEN_EVENT));
 }
 
 /** How far down the page the header is gone on a phone. */
@@ -177,13 +179,13 @@ export function QuickSearch() {
 
   /**
    * CLOSING IS WHAT CLEARS THE REQUEST — see openRequest.ts. While the sheet is
-   * open the mark stays on `<html>`, so if React tears the tree down and
+   * open the mark stays on `window`, so if React tears the tree down and
    * rebuilds it (which it does after any hydration mismatch) the sheet comes
    * back instead of silently disappearing mid-search.
    */
   const close = useCallback(() => {
     setOpen(false);
-    consumeSearchRequest(document.documentElement);
+    consumeSearchRequest(searchRequestHost());
   }, []);
 
   /**
@@ -205,14 +207,14 @@ export function QuickSearch() {
   useEffect(() => {
     if (lastPath.current === null) {
       lastPath.current = pathname;
-      if (hasPendingSearchRequest(document.documentElement)) setOpen(true);
+      if (hasPendingSearchRequest(searchRequestHost())) setOpen(true);
       return;
     }
     if (lastPath.current === pathname) return; // same screen — nothing happened
     lastPath.current = pathname;
     setOpen(false);
     setFloating(false);
-    consumeSearchRequest(document.documentElement);
+    consumeSearchRequest(searchRequestHost());
   }, [pathname]);
 
   useEffect(() => {
@@ -229,23 +231,36 @@ export function QuickSearch() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  /**
+   * ESCAPE HAS TO WORK ON THE VERY NEXT KEYSTROKE.
+   *
+   * The listener reads `open` from a ref, and the subscription does not depend
+   * on it. Closing over the state instead meant re-subscribing in an effect —
+   * and effects run AFTER paint, so there is a window where the sheet is on
+   * screen but the listener still believes it is closed. An Escape landing in
+   * that window did nothing, and since nothing else re-fires it, the sheet was
+   * simply stuck open. A ref is assigned during render, before paint, so the
+   * window does not exist.
+   */
+  const openRef = useRef(open);
+  openRef.current = open;
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!open && opensSearch(e)) {
+      if (!openRef.current && opensSearch(e)) {
         e.preventDefault();
         // Through the same mark-then-open path as a tap, so ⌘K survives a
         // remount exactly like every other way of asking.
         openQuickSearch();
         return;
       }
-      if (open && closesSearch(e)) {
+      if (openRef.current && closesSearch(e)) {
         e.preventDefault();
         close();
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, close]);
+  }, [close]);
 
   // Stop the page behind from scrolling under the sheet. SearchBar focuses its
   // own field via `autoFocus`.

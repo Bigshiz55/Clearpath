@@ -64,13 +64,11 @@ async function expectLandedOn(p: Page, path: string) {
 
 test('a request fired BEFORE the sheet mounts is honoured after it mounts', async ({ page }) => {
   await stubSearch(page);
-  // Exactly the lost-tap case: the mark is set while nothing is listening.
-  // An init script runs before the document has a root element at all, so the
-  // mark has to be left the moment one exists — still long before hydration.
+  // Exactly the lost-tap case: the mark is left while nothing is listening.
+  // An init script runs before any bundle, which is the whole point — and it
+  // writes to `window`, where React cannot reach in and delete it.
   await page.addInitScript(() => {
-    const mark = () => document.documentElement?.setAttribute('data-wv-search-pending', '1');
-    mark();
-    document.addEventListener('readystatechange', mark);
+    (window as unknown as Record<string, unknown>).__wvSearchPending = true;
   });
   await page.goto('/dev/feed', { waitUntil: 'domcontentloaded' });
   await expect(sheet(page)).toBeVisible();
@@ -98,6 +96,25 @@ test('open, close and open again — repeatedly', async ({ page }) => {
     await page.getByTestId('quick-search-close').click();
     await expect(sheet(page), `close ${i}`).toHaveCount(0);
   }
+});
+
+test('Escape closes it on the very next keystroke, with no settling time', async ({ page }) => {
+  // THE RACE: the key listener used to be re-subscribed by an effect keyed on
+  // `open`, and effects run after paint. So there was a window where the sheet
+  // was on screen and the listener still thought it was closed — an Escape
+  // landing there did nothing, and nothing else re-fires, so the sheet stayed
+  // stuck open. Nothing waits between opening it and pressing Escape.
+  //
+  // Opened by TAP rather than ⌘K on purpose: the pre-hydration safety net
+  // covers clicks only, so a keyboard shortcut genuinely cannot work before the
+  // bundle runs and asking it to would be testing something we do not claim.
+  // The click auto-waits for a live control; the Escape after it does not wait
+  // for anything, which is the part under test.
+  await feed(page, 1280, 900);
+  await page.getByTestId('header-search').click();
+  await expect(sheet(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(sheet(page)).toHaveCount(0);
 });
 
 test('the floating trigger works once the header scrolls away', async ({ page }) => {
