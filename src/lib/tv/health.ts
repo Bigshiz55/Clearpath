@@ -206,7 +206,7 @@ export async function getTvHealth(): Promise<TvHealth> {
   });
   if (externalHourlyTriggerAppearsBroken) {
     notes.push(
-      'No ingest tick recorded in the last 3 hours — the external hourly trigger (GitHub Actions) is not reaching production. Its last known failure mode: HTTP 401, meaning the repository CRON_SECRET does not match the deployment’s.',
+      'No ingest tick recorded in the last 3 hours — the hourly trigger is not reaching production. Check the "Refresh TV ingest" workflow; it posts to /api/tv/refresh, which needs no credentials, so a failure there is reachability or a server error.',
     );
   }
   void stations; // reserved for future per-provider channel detail
