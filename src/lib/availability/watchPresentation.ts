@@ -49,6 +49,14 @@ export interface StreamingOption {
   watchLink: string | null;
   lastVerifiedAt: string | null;
   logoPath?: string | null;
+  /**
+   * WHICH SYSTEM EVIDENCED THIS CLAIM. Tracked so nothing downstream can
+   * present TMDB provider data as Watchmode-verified: the two differ in
+   * precision (exact source type, deep links), and a claim must never look
+   * better-sourced than it is. Absent on options built before provenance
+   * existed — treat that as unknown, not as either source.
+   */
+  provenance?: 'watchmode' | 'tmdb';
 }
 
 export interface LiveOption {
@@ -426,6 +434,7 @@ export function optionsFromCardAvailability(a: LegacyCardAvailability): {
       price: null,
       watchLink: s.deeplink,
       lastVerifiedAt: a.checkedAt,
+      provenance: 'watchmode',
     })),
   };
 }

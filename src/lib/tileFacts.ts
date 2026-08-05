@@ -16,6 +16,7 @@ import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 import type { CardFactsInput } from '@/lib/verdict/cardFacts';
 import type { MediaType } from '@/lib/types';
 import type { CardAvailability } from '@/lib/watchmode/cardAvailability';
+import type { TileProviders } from '@/lib/availability/providerOptions';
 import { reportReliabilityEvent } from '@/lib/monitoringClient';
 
 export interface TileFacts {
@@ -28,10 +29,19 @@ export interface TileFacts {
    *  this same request, never a second client fetch. See
    *  src/lib/watchmode/cardAvailability.ts. */
   availability: CardAvailability;
+  /**
+   * TMDB/report providers from the SAME hydration that produced the score.
+   * The truthful fallback for the (very common) case where the Watchmode
+   * enrichment cache has no row for this title — see
+   * src/lib/availability/providerOptions.ts. Null when the request failed or
+   * TMDB returned nothing for the region; an empty `options` array is a
+   * RESULT ("nothing streams this here") and is not the same thing.
+   */
+  providers: TileProviders | null;
 }
 
 const EMPTY_AVAILABILITY: CardAvailability = { status: 'unconfirmed', sources: [], checkedAt: null };
-const EMPTY: TileFacts = { ratings: EMPTY_TILE_RATINGS, overview: null, facts: null, availability: EMPTY_AVAILABILITY };
+const EMPTY: TileFacts = { ratings: EMPTY_TILE_RATINGS, overview: null, facts: null, availability: EMPTY_AVAILABILITY, providers: null };
 
 const cache = new Map<string, Promise<TileFacts>>();
 
@@ -49,6 +59,7 @@ export function loadTileFacts(mediaType: MediaType, tmdbId: number): Promise<Til
         overview: typeof d?.overview === 'string' && d.overview.trim() ? (d.overview as string) : null,
         facts: (d?.facts as CardFactsInput | null) ?? null,
         availability: (d?.availability as CardAvailability | undefined) ?? EMPTY_AVAILABILITY,
+        providers: (d?.providers as TileProviders | null | undefined) ?? null,
       }))
       .catch(() => {
         // A genuine failure (offline, a dropped connection, a non-2xx/non-JSON

@@ -10,6 +10,7 @@ import {
   type WatchOption,
   type WatchPresentation,
 } from '@/lib/availability/watchPresentation';
+import { optionsFromTileProviders, mergeProviderOptions } from '@/lib/availability/providerOptions';
 
 /**
  * THE ONE WHERE-TO-WATCH BLOCK. Every card on every surface renders this.
@@ -86,7 +87,16 @@ export function WhereToWatch({
     let active = true;
     loadTileFacts(mediaType, tmdbId).then((f) => {
       if (!active) return;
-      const { options, checked } = optionsFromCardAvailability(f.availability);
+      // TWO SOURCES, ONE ANSWER. Watchmode's cache wins where it exists (deep
+      // links, exact source type); TMDB's providers — already on this same
+      // response — answer when it does not. Without the fallback a card said
+      // "Not yet confirmed" for a title whose own full page listed four
+      // platforms, because the Watchmode enrichment queue had never reached
+      // it. See src/lib/availability/providerOptions.ts.
+      const { options, checked } = mergeProviderOptions(
+        optionsFromCardAvailability(f.availability),
+        optionsFromTileProviders(f.providers),
+      );
       setPresentation(
         resolveWatchPresentation({
           options: [...options, ...extraOptions],

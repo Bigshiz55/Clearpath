@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Poster, PosterCard } from './PosterCard';
+import { Poster } from './PosterCard';
+import { SearchResultRow } from './search/SearchResultRow';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 import { classifySearchIntent, resolveSearchDestination, couldBeTitle, askHref } from '@/lib/search/searchIntent';
+import { consumeSearchRequest, searchRequestHost } from '@/lib/search/openRequest';
 
 interface Result {
   id: number;
@@ -77,10 +79,34 @@ export function SearchBar({
   function isRequest(text: string): boolean {
     return classifySearchIntent(text) === 'ask';
   }
+  /**
+   * EVERY WAY OUT OF SEARCH GOES THROUGH HERE.
+   *
+   * The old code called `onNavigate` only on the explicit Search-button path,
+   * so the button closed the sheet correctly while tapping a RESULT left the
+   * modal overlay mounted on top of the page it had just opened — the black
+   * screen. Three things have to happen, in this order, before the browser
+   * moves:
+   *
+   *   1. the results dropdown closes,
+   *   2. the host sheet is told to close (`onNavigate`),
+   *   3. the persisted open-search request is cleared, so the sheet does not
+   *      re-open itself on the destination (see lib/search/openRequest).
+   *
+   * Step 3 matters even with no host: a mark left on `window` by a
+   * pre-hydration tap outlives this page, and QuickSearch would honour it on
+   * arrival. `onNavigate` normally clears it too — clearing twice is a no-op.
+   */
+  function leaveForResult() {
+    setOpen(false);
+    onNavigate?.();
+    if (typeof window !== 'undefined') consumeSearchRequest(searchRequestHost());
+  }
+
   function fileWithJudge(text: string) {
     const href = askHref(text);
     if (!href) return;
-    onNavigate?.();
+    leaveForResult();
     router.push(href);
   }
 
@@ -126,7 +152,7 @@ export function SearchBar({
     const dest = resolveSearchDestination(query, found);
     if (!dest) return;
     clearAll();
-    onNavigate?.();
+    leaveForResult();
     router.push(dest.href);
   }
 
@@ -314,14 +340,16 @@ export function SearchBar({
       {open && (results.length > 0 || people.length > 0) && (
         <div className="absolute z-30 mt-2 max-h-[75vh] w-full overflow-auto rounded-2xl border border-white/10 bg-ink-850/95 p-3 shadow-card backdrop-blur">
           {people.length > 0 && (
-            <div className="mb-3" onClick={() => setOpen(false)}>
+            <div className="mb-3">
               <div className="eyebrow mb-1.5 text-[11px]">People</div>
               <div className="flex flex-col gap-1">
                 {people.map((p) => (
                   <Link
                     key={p.id}
                     href={`/app/person/${p.id}`}
-                    className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-white/10"
+                    onClick={leaveForResult}
+                    data-testid={`search-person-${p.id}`}
+                    className="flex min-h-[44px] items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-white/10"
                   >
                     <span className="h-11 w-11 flex-none overflow-hidden rounded-full border border-white/10 bg-ink-800">
                       <Poster posterUrl={p.profileUrl} title={p.name} />
@@ -335,21 +363,28 @@ export function SearchBar({
               </div>
             </div>
           )}
+          {/* A PURPOSE-BUILT RESULT, NOT THE GRID CARD. The old dropdown rendered
+              the full `PosterCard`, which is one card visually and several
+              disconnected targets in practice — most of it was dead to a tap.
+              See components/search/SearchResultRow.tsx. A list, because that is
+              what this is; the grid belongs on a page with room for one. */}
           {results.length > 0 && (
-            <div className="poster-grid" onClick={() => setOpen(false)}>
+            <ul className="flex flex-col gap-2" data-testid="search-results">
               {results.map((r) => (
-                <PosterCard
+                <SearchResultRow
                   key={`${r.mediaType}-${r.id}`}
-                  href={`/app/title/${r.mediaType}/${r.id}`}
-                  mediaType={r.mediaType}
-                  tmdbId={r.id}
-                  title={r.title}
-                  year={r.year}
-                  posterUrl={r.posterUrl}
-                  posterPath={r.posterPath}
+                  result={{
+                    id: r.id,
+                    mediaType: r.mediaType,
+                    title: r.title,
+                    year: r.year,
+                    posterUrl: r.posterUrl,
+                    posterPath: r.posterPath,
+                  }}
+                  onNavigate={leaveForResult}
                 />
               ))}
-            </div>
+            </ul>
           )}
         </div>
       )}

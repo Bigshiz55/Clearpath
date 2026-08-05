@@ -3,6 +3,7 @@ import { getScoringData } from '@/lib/titleData';
 import { computeGeneralScore } from '@/lib/scoring/general';
 import { EMPTY_TILE_RATINGS, type TileRatings } from '@/lib/ratings';
 import { getCardAvailability, type CardAvailability } from '@/lib/watchmode/cardAvailability';
+import type { TileProviders, TmdbProviderType } from '@/lib/availability/providerOptions';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
 
@@ -53,6 +54,31 @@ export async function GET(_req: Request, { params }: { params: { type: string; i
   try {
     const { meta, providers } = await getScoringData(mediaType, id, region);
     const general = computeGeneralScore(meta, providers);
+    // THE PROVIDERS WERE ALREADY HERE AND WERE BEING THROWN AWAY.
+    //
+    // `getScoringData` returns them, `computeGeneralScore` consumes them, and
+    // then the response carried only the Watchmode CACHE — which for most of
+    // the catalogue is empty and always will be, because the sync job advances
+    // ~50 titles a day from a fixed pool. So a search card said "Not yet
+    // confirmed" for a title whose full page, one tap later, listed four
+    // platforms. Same request, same second, two answers.
+    //
+    // Carrying them costs one extra object on a response we were already
+    // sending — no new upstream call, no per-card fetch. What the card is
+    // allowed to SAY about them is still decided in one place; see
+    // src/lib/availability/providerOptions.ts for the precedence rules and
+    // why provenance is preserved rather than flattened.
+    const tileProviders: TileProviders | null = providers
+      ? {
+          region: providers.region,
+          options: providers.options.map((o) => ({
+            name: o.providerName,
+            type: o.type as TmdbProviderType,
+            link: o.link ?? null,
+          })),
+          checkedAt: providers.checkedAt,
+        }
+      : null;
     // Build straight from metadata so every card reliably gets the verdict
     // (standardScore) and the real critic scores + Popcorn when available.
     const ratings: TileRatings = {
@@ -90,8 +116,11 @@ export async function GET(_req: Request, { params }: { params: { type: string; i
     // never be shared across viewers.
     const cacheControl =
       region === 'US' ? 'public, s-maxage=43200, stale-while-revalidate=86400' : 'private, no-store';
-    return NextResponse.json({ ratings, overview, facts, availability }, { headers: { 'Cache-Control': cacheControl } });
+    return NextResponse.json(
+      { ratings, overview, facts, availability, providers: tileProviders },
+      { headers: { 'Cache-Control': cacheControl } },
+    );
   } catch {
-    return NextResponse.json({ ratings: EMPTY_TILE_RATINGS, overview: null, facts: null, availability });
+    return NextResponse.json({ ratings: EMPTY_TILE_RATINGS, overview: null, facts: null, availability, providers: null });
   }
 }

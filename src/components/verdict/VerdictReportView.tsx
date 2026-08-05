@@ -7,6 +7,7 @@ import { Poster } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
 import { CardRatings } from '@/components/CardRatings';
 import { CardVerdict } from '@/components/CardVerdict';
+import { WCheck } from '@/components/WCheck';
 import { tmdbImage } from '@/lib/tmdb/client';
 import { VerdictActions } from './VerdictActions';
 import { AtAGlance, RatingIcons, LanguageEpisodes, RecommendationConsensus } from './ReportExtras';
@@ -153,6 +154,24 @@ export function VerdictReportView({
                 initialSaved={watchState?.itemId != null}
                 initialItemId={watchState?.itemId ?? null}
                 variant="inline"
+              />
+              {/* THE W BELONGS HERE TOO, AND WAS MISSING.
+                  Save and W are not interchangeable and never were: Save is a
+                  persistent watchlist ("someday"), W is the ACTIVE docket —
+                  what is being weighed right now, against the others. The full
+                  title page offered Save, For and Against but no way to put
+                  the thing you had just opened in front of the judge, so the
+                  one screen where you have read everything was the one screen
+                  where you could not act on it. Same circular control, same
+                  behaviour, same store as every card; only `placement` differs,
+                  because here there is no poster corner to pin it to. */}
+              <WCheck
+                tmdbId={t.id}
+                mediaType={t.mediaType}
+                title={t.title}
+                year={t.year}
+                posterUrl={poster}
+                placement="inline"
               />
               {/* Rule on it here too — feeds your DNA, same as the cards, and
                   reversible in the same way. */}

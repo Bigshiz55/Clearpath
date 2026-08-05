@@ -216,12 +216,18 @@ test('“Find me three crime thrillers under two hours” goes to Ask the Judge'
 test('the trigger is present and 44px at every phone width', async ({ page }) => {
   for (const w of [320, 390, 430] as const) {
     await feed(page, w, 844);
-    // Measured only once it is genuinely laid out — `boundingBox()` on a page
-    // that has not painted yet returns null and would fail for the wrong reason.
-    await expect(page.getByTestId('header-search')).toBeVisible();
-    const box = (await page.getByTestId('header-search').boundingBox())!;
-    expect(box.width, `${w}px width`).toBeGreaterThanOrEqual(44);
-    expect(box.height, `${w}px height`).toBeGreaterThanOrEqual(44);
+    // POLLED, not read once. `boundingBox()` returns null on a page that has
+    // not finished laying out, and `toBeVisible()` passing is not a guarantee
+    // that it has — so a single read fails intermittently for a reason that
+    // has nothing to do with the tap target's size.
+    const trigger = page.getByTestId('header-search');
+    await expect(trigger).toBeVisible();
+    await expect
+      .poll(async () => (await trigger.boundingBox())?.width ?? 0, { timeout: 10000 })
+      .toBeGreaterThanOrEqual(44);
+    await expect
+      .poll(async () => (await trigger.boundingBox())?.height ?? 0, { timeout: 10000 })
+      .toBeGreaterThanOrEqual(44);
   }
 });
 

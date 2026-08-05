@@ -190,6 +190,12 @@ test('the keyboard opens and closes it', async ({ page }) => {
 });
 
 test('the sheet never scrolls the page sideways', async ({ page }) => {
+  // FOUR navigations, and `open()` waits for network idle — which on this
+  // harness (twelve cards, each loading its own facts) is ~15s apiece. That is
+  // 60s of waiting inside a 60s test timeout, so this spec passed or failed on
+  // machine speed rather than on layout. The wait itself is left alone: four
+  // of the tests below genuinely need the feed's data settled.
+  test.setTimeout(150_000);
   for (const w of [320, 390, 430, 1024] as const) {
     await open(page, w, 900);
     await page.getByTestId('header-search').click();

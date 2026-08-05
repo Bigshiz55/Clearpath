@@ -59,6 +59,7 @@ export function WCheck({
   title,
   year = null,
   posterUrl = null,
+  placement = 'poster',
   className = '',
 }: {
   tmdbId: number;
@@ -66,6 +67,17 @@ export function WCheck({
   title: string;
   year?: number | null;
   posterUrl?: string | null;
+  /**
+   * WHERE THIS ONE SITS — the only thing that varies between surfaces.
+   *
+   * 'poster' is the established position and the default: pinned to the
+   * artwork's top-right on every card, which is what makes it read as one
+   * gesture across grid, wall, guide and search. 'inline' drops the absolute
+   * positioning so it can stand in a normal action row — the full title
+   * page, where there is no poster corner to pin to. Same size, same colours,
+   * same behaviour; only `position` changes.
+   */
+  placement?: 'poster' | 'inline';
   className?: string;
 }) {
   const docket = useSyncExternalStore(subscribeDocket, getDocket, getDocketServerSnapshot);
@@ -143,7 +155,7 @@ export function WCheck({
     }
   }
 
-  return (
+  const body = (
     <>
       <button
         type="button"
@@ -160,7 +172,8 @@ export function WCheck({
           // 44px, always, on every surface. Glass rather than a flat black
           // disc: it has to read against a bright poster and a dark one, and a
           // translucent fill with a ring does that without a hard outline.
-          'absolute right-1.5 top-1.5 z-10 grid h-11 w-11 place-items-center rounded-full',
+          placement === 'poster' ? 'absolute right-1.5 top-1.5 z-10' : 'relative',
+          'grid h-11 w-11 place-items-center rounded-full',
           'transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/60',
           'active:scale-95 disabled:cursor-not-allowed disabled:opacity-50',
           on
@@ -249,4 +262,10 @@ export function WCheck({
       )}
     </>
   );
+
+  // ON A POSTER the button is already absolutely positioned, so the coach mark
+  // and the refusal toast anchor to the artwork. INLINE there is no such
+  // anchor — without a positioned wrapper they would hang off whatever
+  // ancestor happened to be positioned, which on the title page is the page.
+  return placement === 'inline' ? <span className="relative inline-flex">{body}</span> : body;
 }
