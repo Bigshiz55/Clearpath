@@ -88,7 +88,7 @@ export interface TvHealth {
     counts: ReturnType<typeof egressCounts>;
     recent: ReturnType<typeof recentEgress>;
   };
-  verdict: 'healthy' | 'stale' | 'degraded';
+  verdict: 'healthy' | 'stale' | 'degraded' | 'configuration_error';
   notes: string[];
 }
 
@@ -129,6 +129,7 @@ export function tvHealthVerdict(input: {
 }
 
 export async function getTvHealth(): Promise<TvHealth> {
+  const modeReport = dataModeReport();
   const admin = createAdminClient();
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
@@ -314,10 +315,19 @@ export async function getTvHealth(): Promise<TvHealth> {
     packs: packHealths,
     lastIngestTickAt,
     externalHourlyTriggerAppearsBroken,
-    dataMode: dataModeReport(),
+    dataMode: modeReport,
     egress: { counts: egressCounts(), recent: recentEgress(20) },
-    verdict,
-    notes,
+    // A production deployment with no DATA_MODE is not "stale" and not
+    // "degraded" — those describe a pipeline that is trying and failing. This
+    // one is not trying, on purpose, because nobody has said what it may do.
+    // It outranks every other verdict: fix the configuration first, and the
+    // other signals become meaningful again.
+    verdict: modeReport.configured ? verdict : 'configuration_error',
+    notes: modeReport.configured
+      ? notes
+      : [modeReport.configurationError!.reason,
+         'Stored data is still being served with its own freshness labelling; ingestion is disabled until DATA_MODE is set.',
+         ...notes],
   };
 }
 

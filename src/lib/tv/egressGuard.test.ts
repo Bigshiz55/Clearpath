@@ -38,10 +38,24 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function inProduction(mode?: string) {
+/**
+ * A CONFIGURED production deployment. The mode defaults to `free_live`
+ * because production fails closed without one — leaving it unset here would
+ * make every case below pass for the wrong reason (configuration_error rather
+ * than the rule actually under test). The unconfigured case gets its own
+ * describe block, further down.
+ */
+function inProduction(mode: string = 'free_live') {
   process.env.VERCEL_ENV = 'production';
   env.NODE_ENV = 'production';
-  if (mode !== undefined) process.env[DATA_MODE_ENV] = mode;
+  process.env[DATA_MODE_ENV] = mode;
+}
+
+/** A production deployment nobody has configured. */
+function inUnconfiguredProduction() {
+  process.env.VERCEL_ENV = 'production';
+  env.NODE_ENV = 'production';
+  delete process.env[DATA_MODE_ENV];
 }
 
 const TVM = { adapterId: 'tv_media', cost: 'metered', trigger: 'cron', target: 'tvmedia:listings' } as const;
@@ -147,7 +161,6 @@ describe('requestEgress — a denied metered call is CRITICAL', () => {
 
   it('does not shout about a denied FREE adapter — that is routine, not a defect', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-    process.env[DATA_MODE_ENV] = 'fixture';
     inProduction('fixture');
     requestEgress(MAZE);
     expect(err).not.toHaveBeenCalled();
@@ -168,6 +181,31 @@ describe('requestEgress — a denied metered call is CRITICAL', () => {
     requestEgress({ ...TVM, target: 'tvmedia:listings' });
     expect(String(err.mock.calls[0]![0])).not.toContain('super-secret-value');
     delete process.env.TVMEDIA_API_KEY;
+  });
+});
+
+describe('an unconfigured production deployment reaches nothing', () => {
+  it('denies the free adapter as well as the metered one', () => {
+    inUnconfiguredProduction();
+    for (const attempt of [TVM, MAZE]) {
+      const d = requestEgress(attempt);
+      expect(d.allowed).toBe(false);
+      expect(d.allowed === false && d.code).toBe('configuration_error');
+    }
+  });
+
+  it('still shouts CRITICAL for the metered adapter', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    inUnconfiguredProduction();
+    requestEgress(TVM);
+    expect(String(err.mock.calls[0]![0])).toContain('configuration_error');
+  });
+
+  it('records the denial so the health surface can show it', () => {
+    inUnconfiguredProduction();
+    requestEgress(MAZE);
+    expect(egressCounts().denied).toBe(1);
+    expect(recentEgress()[0]!.decision.allowed).toBe(false);
   });
 });
 

@@ -2,7 +2,7 @@ import 'server-only';
 import type { createAdminClient } from '@/lib/supabase/admin';
 import { runTvmazeIngest } from './tvmazeWriter';
 import { runTvMediaIngest } from './tvMediaWriter';
-import { mayCallUpstream } from '@/lib/tv/dataMode';
+import { mayCallUpstream, resolveDataMode } from '@/lib/tv/dataMode';
 
 /**
  * SHARED GATING — TV Media (primary) and TVmaze (fallback/supplement).
@@ -124,6 +124,21 @@ async function withProviderLock<T, S>(
 }
 
 export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClient>) {
+  // PRODUCTION FAILS CLOSED. An unconfigured production deployment disables
+  // EVERY ingestion adapter — free ones included. This is deliberately above
+  // the per-provider gates: the question "has anybody decided what this
+  // deployment is allowed to do" has to be answered before "is TVmaze due".
+  //
+  // Reads are untouched. Whatever verified data is already stored keeps being
+  // served, with its own freshness labelling, because deleting the listings we
+  // have because a variable is missing would turn a configuration mistake into
+  // an outage.
+  const policy = resolveDataMode();
+  if (!policy.configured) {
+    const blocked = { ok: true, ran: false, status: 'egress_denied' as const, reason: `${policy.code}: ${policy.reason}` };
+    return { tvmaze: { ran: false, reason: `${policy.code}: ${policy.reason}` }, tvmedia: blocked };
+  }
+
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: todaysRuns } = await admin

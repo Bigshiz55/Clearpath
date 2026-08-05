@@ -121,12 +121,14 @@ describe('runTvMediaIngest refuses to spend unless authorised', () => {
     expect(errors[0]!.message).toMatch(/DATA_MODE|paid_live|TVMEDIA_ENABLED/);
   });
 
-  it('names the production reason when the environment is production', async () => {
+  it('names the paid-mode reason on a CONFIGURED production deployment', async () => {
     // With VERCEL_ENV cleared the mode defaults to `fixture`, so the refusal
-    // is `mode_is_fixture`. In a real deployment it is the paid-mode rule
-    // that holds it — assert that one explicitly rather than infer it.
+    // is `mode_is_fixture`. On a production deployment that has explicitly
+    // chosen free_live it is the paid-mode rule that holds it — assert that
+    // one directly rather than infer it.
     process.env.VERCEL_ENV = 'production';
     env.NODE_ENV = 'production';
+    process.env.DATA_MODE = 'free_live';
     const result = await runTvMediaIngest(3);
     expect(result.status).toBe('egress_denied');
     expect(result.reason).toContain('paid_adapter_needs_paid_mode');
@@ -185,9 +187,47 @@ describe('runGatedTvIngest short-circuits TV Media before any cost', () => {
     expect((tvmaze as { ran: boolean }).ran).toBe(true);
   });
 
+  it('disables the FREE pipeline too when production has no DATA_MODE', async () => {
+    // Production fails closed. "Nobody has configured this deployment" must
+    // not be survivable by the free providers either — no provider runs until
+    // somebody has said what this deployment is allowed to do.
+    process.env.VERCEL_ENV = 'production';
+    env.NODE_ENV = 'production';
+    delete process.env.DATA_MODE;
+
+    const { tvmaze, tvmedia } = await runGatedTvIngest(createAdminClient() as never);
+    expect(tvmazeIngest).not.toHaveBeenCalled();
+    expect((tvmaze as { ran: boolean }).ran).toBe(false);
+    expect((tvmaze as { reason: string }).reason).toContain('CONFIGURATION_ERROR');
+    expect(tvmedia.status).toBe('egress_denied');
+    expect(tvmedia.reason).toContain('CONFIGURATION_ERROR');
+    expect(rpcCalls).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+  });
+
+  it('writes nothing at all on an unconfigured production tick', async () => {
+    // Not even a run row. A deployment that has not been told what it may do
+    // must not be writing rows that imply it tried.
+    process.env.VERCEL_ENV = 'production';
+    env.NODE_ENV = 'production';
+    delete process.env.DATA_MODE;
+    await runGatedTvIngest(createAdminClient() as never);
+    expect(selectedTables).toHaveLength(0);
+  });
+
+  it('resumes both pipelines the moment a valid DATA_MODE appears', async () => {
+    process.env.VERCEL_ENV = 'production';
+    env.NODE_ENV = 'production';
+    process.env.DATA_MODE = 'free_live';
+    const { tvmaze } = await runGatedTvIngest(createAdminClient() as never);
+    expect(tvmazeIngest).toHaveBeenCalledTimes(1);
+    expect((tvmaze as { ran: boolean }).ran).toBe(true);
+  });
+
   it('carries a reason a human can act on', async () => {
     process.env.VERCEL_ENV = 'production';
     env.NODE_ENV = 'production';
+    process.env.DATA_MODE = 'free_live';
     const { tvmedia } = await runGatedTvIngest(createAdminClient() as never);
     expect(tvmedia.reason).toContain('paid_adapter_needs_paid_mode');
     expect(tvmedia.reason).toMatch(/paid_live/);
