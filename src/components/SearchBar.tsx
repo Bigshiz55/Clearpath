@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Poster, PosterCard } from './PosterCard';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { classifySearchIntent, resolveSearchDestination, couldBeTitle, askHref } from '@/lib/search/searchIntent';
 
 interface Result {
   id: number;
@@ -24,10 +25,26 @@ interface Person {
   profileUrl: string | null;
 }
 
-export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
+export function SearchBar({
+  autoFocus = false,
+  inputTestId,
+  submitTestId,
+  onNavigate,
+}: {
+  autoFocus?: boolean;
+  /** Lets a host (the QuickSearch sheet) keep its established test hooks. */
+  inputTestId?: string;
+  /** Renders a visible Search button — a phone sheet needs one; the home
+   *  page's box does not, because Enter is right there on the keyboard. */
+  submitTestId?: string;
+  /** Called just before navigating, so a sheet can close itself. */
+  onNavigate?: () => void;
+}) {
   const router = useRouter();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Result[]>([]);
+  /** The query `results` came from — so Enter never reuses another query's. */
+  const [resultsFor, setResultsFor] = useState('');
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,19 +66,68 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
     setVoiceSupported('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
   }, []);
 
-  // A spoken/typed *request* ("give me a crime thriller under 2 hours") isn't a
-  // title lookup — hand it to the judge, who actually runs it. A short phrase is
-  // treated as a title search as before.
-  function looksLikeRequest(text: string): boolean {
-    const t = text.toLowerCase();
-    if (/\b(find|recommend|something|anything|give me|show me|what should|in the mood|tonight|binge|under|over|less than|minutes|hours|recent|new|funny|scary|match|audience|episodes?|movies|films|starring|directed by)\b/.test(t)) return true;
-    // "3 sylvester stallone movies", "five comedies" — a count + a plural noun is a
-    // request, not a single title. Send it to the judge (which corrects spelling).
-    if (/^\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/.test(t) && /\b(movie|film|show|series|comed|thriller|drama|pick)/.test(t)) return true;
-    return text.trim().split(/\s+/).length >= 5;
+  /**
+   * IS THIS A REQUEST OR A LOOKUP?
+   *
+   * Was a local heuristic that treated any five-word query as a request, which
+   * silently sent every long TITLE to the Judge ("Everything Everywhere All at
+   * Once" is five words). Now shared with the header bar and the sheet so all
+   * three entry points agree — see src/lib/search/searchIntent.ts.
+   */
+  function isRequest(text: string): boolean {
+    return classifySearchIntent(text) === 'ask';
   }
   function fileWithJudge(text: string) {
-    router.push(`/app/ask?q=${encodeURIComponent(text.trim())}`);
+    const href = askHref(text);
+    if (!href) return;
+    onNavigate?.();
+    router.push(href);
+  }
+
+  /**
+   * ACT ON A SUBMITTED QUERY.
+   *
+   * A request goes to the Judge. Anything else is a LOOKUP, and a lookup must
+   * find the actual title — so if the debounced results have not landed yet
+   * (someone typed and hit Enter straight away, which is the normal case) this
+   * fetches them rather than giving up and asking the Judge. That fallback was
+   * the bug: pressing Enter quickly on "CSI: NY" produced a recommendation.
+   */
+  async function go(raw: string) {
+    const query = raw.trim();
+    // An empty box does NOTHING — navigating would cost the screen you were on.
+    if (!query) return;
+
+    // A long request goes straight to the Judge. A short one is still looked
+    // up first: "Show Me a Hero" reads like a request and is a real series, and
+    // only the catalog can tell the two apart.
+    if (isRequest(query) && !couldBeTitle(query)) {
+      clearAll();
+      fileWithJudge(query);
+      return;
+    }
+
+    const mine = ++seqRef.current;
+    // Reuse what is already on screen only when it belongs to THIS query.
+    let found = resultsFor === query ? results : [];
+    if (found.length === 0) {
+      setLoading(true);
+      try {
+        const res = await fetchWithTimeout(`/api/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        if (res.ok) found = data.results ?? [];
+      } catch {
+        // Fall through with nothing; resolve() hands it to the Judge.
+      }
+      if (mine !== seqRef.current) return; // a newer query superseded this one
+      setLoading(false);
+    }
+
+    const dest = resolveSearchDestination(query, found);
+    if (!dest) return;
+    clearAll();
+    onNavigate?.();
+    router.push(dest.href);
   }
 
   /** Reset the field so it's ready for the next search (after firing one, or via
@@ -69,6 +135,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
   function clearAll() {
     setQ('');
     setResults([]);
+    setResultsFor('');
     setPeople([]);
     setError(null);
     setOpen(false);
@@ -97,7 +164,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
       if (!said) return;
       // The fix for "I said it but nothing happened": a spoken request is filed
       // with the judge and actually executed, not left sitting in the box.
-      if (looksLikeRequest(said)) fileWithJudge(said);
+      if (isRequest(said)) fileWithJudge(said);
       else setQ(said);
     };
     rec.onend = () => setListening(false);
@@ -139,6 +206,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
         } else {
           setError(null);
           setResults(data.results ?? []);
+          setResultsFor(query);
           setPeople(data.people ?? []);
           setOpen(true);
         }
@@ -182,19 +250,13 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
           }}
           onKeyDown={(e) => {
             if (e.key !== 'Enter') return;
-            const query = q.trim();
-            if (query.length < 2) return;
             e.preventDefault();
-            // Enter always acts: a request goes to the judge; otherwise open the
-            // top matching title; if there's no match yet, hand it to the judge.
-            const top = !looksLikeRequest(query) ? results[0] : null;
-            if (top) router.push(`/app/title/${top.mediaType}/${top.id}`);
-            else fileWithJudge(query);
-            clearAll(); // don't leave the query sitting in the box
+            void go(q);
           }}
           placeholder="Search by title, actor, genre, or platform…"
           className="w-full rounded-2xl border-2 border-white/25 bg-white/[0.07] py-4 pl-12 pr-11 text-base text-white outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:bg-white/[0.1] focus:ring-4 focus:ring-brand-500/25 shadow-[0_12px_40px_-14px_rgba(0,0,0,0.75)] min-h-[56px]"
           aria-label="Search for a movie, show, actor, or director"
+          {...(inputTestId ? { 'data-testid': inputTestId } : {})}
         />
         {loading && (
           <span className="absolute right-12 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-white/20 border-t-brand-400" />
@@ -230,6 +292,22 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
           </button>
         ) : null}
       </div>
+
+      {/* A VISIBLE SEARCH BUTTON, only where one is needed. The phone sheet
+          gets one because a thumb should not have to find the keyboard's
+          return key; the home page's box does not, because Enter is already
+          the obvious action there. Full width and 48px so it is a real target
+          under a thumb. */}
+      {submitTestId && (
+        <button
+          type="button"
+          onClick={() => void go(q)}
+          data-testid={submitTestId}
+          className="btn-primary mt-2 min-h-[48px] w-full text-sm"
+        >
+          Search
+        </button>
+      )}
 
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
 

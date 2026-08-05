@@ -6,6 +6,7 @@ import { ServiceWorker } from '@/components/ServiceWorker';
 import { BuildVersionBadge } from '@/components/BuildVersionBadge';
 import { FeedbackButton } from '@/components/FeedbackButton';
 import { Footer } from '@/components/Footer';
+import { PREHYDRATION_SCRIPT } from '@/lib/search/openRequest';
 
 const siteUrl = publicEnv.siteUrl();
 
@@ -79,6 +80,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               "try{['wv_simple','wv_simple_view','simpleView','simple_view','wv_view_mode'].forEach(function(k){localStorage.removeItem(k);sessionStorage.removeItem(k);document.cookie=k+'=; Max-Age=0; path=/';});document.documentElement.removeAttribute('data-simple');var u=new URL(location.href),d=0;['simple','simpleView','simple_view','view','viewMode','cardMode','resultMode'].forEach(function(p){var v=u.searchParams.get(p);if(v!==null&&/^(1|true|simple|compact|minimal)$/i.test(v)){u.searchParams.delete(p);d=1;}});if(d)history.replaceState(null,'',u.toString());if(localStorage.getItem('wv_view')==='desktop'){var m=document.querySelector('meta[name=viewport]');if(m)m.setAttribute('content','width=1200, viewport-fit=cover');}}catch(e){}",
           }}
         />
+        {/* SEARCH MUST WORK ON THE FIRST TAP, INCLUDING BEFORE HYDRATION.
+            The header's search trigger and the search sheet are separate React
+            trees. Until this existed they spoke through a one-shot CustomEvent,
+            so on a slow phone a tap could fire before the sheet was listening
+            and be lost — the button looked dead. This records the tap in the
+            DOM itself, before any bundle has run, and the sheet claims it on
+            mount. See src/lib/search/openRequest.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: PREHYDRATION_SCRIPT }} />
       </head>
       <body>
         <BuildVersionBadge />

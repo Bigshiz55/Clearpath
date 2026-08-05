@@ -167,15 +167,18 @@ test('an empty search does nothing at all', async ({ page }) => {
   expect(page.url()).toContain('/dev/feed');
 });
 
-test('a real query goes to the judge', async ({ page }) => {
+test('a real recommendation request goes to the judge', async ({ page }) => {
   await open(page);
   await page.getByTestId('header-search').click();
-  await page.getByTestId('quick-search-input').fill('Cinderella Man');
+  // A TITLE no longer comes here — that was the defect ("CSI: NY" returned an
+  // unrelated recommendation). A genuine request still does. Full title/catalog
+  // routing is covered in search-repair.spec.ts.
+  await page.getByTestId('quick-search-input').fill('find me a crime thriller under two hours');
   await page.getByTestId('quick-search-input').press('Enter');
   // The harness has no session, so /app/ask bounces to login — the query is
   // still what was carried, which is what this is checking.
-  await page.waitForURL(/q=Cinderella/);
-  expect(decodeURIComponent(page.url().replace(/\+/g, ' '))).toContain('Cinderella Man');
+  await page.waitForURL(/q=find/i);
+  expect(decodeURIComponent(page.url().replace(/\+/g, ' ')).toLowerCase()).toContain('crime thriller');
 });
 
 test('the keyboard opens and closes it', async ({ page }) => {

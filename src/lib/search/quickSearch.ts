@@ -22,24 +22,15 @@
  * rules can be tested without a browser.
  */
 
-/** Ask the Judge is the one front door for a typed query. */
-export const SEARCH_ROUTE = '/app/ask';
-
-/** Matches the route's own `slice(0, 300)`, so what is sent is what is read. */
-export const MAX_QUERY = 300;
-
 /**
- * Where a typed query goes, or null when there is nothing to ask.
+ * ROUTING LIVES IN `searchIntent.ts` NOW.
  *
- * Null rather than a bare `/app/ask`: submitting an empty box should do
- * NOTHING, not navigate you off the screen you were on. Losing your place is
- * the exact cost this control exists to remove.
+ * `quickSearchHref()` used to be here and sent EVERY query to /app/ask, which
+ * is why typing an exact title returned an unrelated recommendation. Routing
+ * is a decision about what the words MEAN, so it moved to a module that can
+ * tell a lookup from a request. What is left here is the keyboard, which is
+ * genuinely just key handling.
  */
-export function quickSearchHref(raw: string): string | null {
-  const q = raw.trim().slice(0, MAX_QUERY);
-  if (q.length === 0) return null;
-  return `${SEARCH_ROUTE}?q=${encodeURIComponent(q)}`;
-}
 
 /**
  * Fields that own the keystroke — a shortcut must never eat someone's typing.

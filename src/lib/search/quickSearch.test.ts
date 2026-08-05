@@ -1,39 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { quickSearchHref, opensSearch, closesSearch, SEARCH_ROUTE, MAX_QUERY } from './quickSearch';
+import { opensSearch, closesSearch } from './quickSearch';
 
-describe('where a query goes', () => {
-  it('lands on the one front door for typed questions', () => {
-    expect(quickSearchHref('Cinderella Man')).toBe(`${SEARCH_ROUTE}?q=Cinderella%20Man`);
-  });
-
-  it('does NOTHING on an empty box', () => {
-    // Navigating on empty would take you off the screen you were on, which is
-    // the exact cost this control exists to remove.
-    for (const empty of ['', '   ', '\n\t ']) {
-      expect(quickSearchHref(empty), JSON.stringify(empty)).toBeNull();
-    }
-  });
-
-  it('trims, so a trailing space is not part of the search', () => {
-    expect(quickSearchHref('  heat  ')).toBe(`${SEARCH_ROUTE}?q=heat`);
-  });
-
-  it('caps at what the route actually reads, rather than sending more', () => {
-    const href = quickSearchHref('x'.repeat(MAX_QUERY + 250))!;
-    expect(decodeURIComponent(href.split('q=')[1]!)).toHaveLength(MAX_QUERY);
-  });
-
-  it('encodes anything that would break the URL', () => {
-    const href = quickSearchHref('c&a? #1 100% "good"')!;
-    expect(href).not.toMatch(/[ "]/);
-    expect(href.includes('&q=') || href.split('?').length === 2).toBe(true);
-    expect(decodeURIComponent(href.split('q=')[1]!)).toBe('c&a? #1 100% "good"');
-  });
-
-  it('survives a title that is mostly punctuation', () => {
-    expect(quickSearchHref('9½ Weeks')).toContain('9%C2%BD');
-  });
-});
+/**
+ * WHERE A QUERY GOES IS NO LONGER DECIDED HERE.
+ *
+ * This file used to assert that EVERY query landed on /app/ask. That was the
+ * defect, not the contract: it meant searching "CSI: NY" asked the Judge for a
+ * recommendation instead of finding the show. The routing tests now live in
+ * `searchIntent.test.ts`, where a lookup and a request are told apart.
+ */
 
 describe('the keyboard', () => {
   // Duck-typed on purpose: the rule has to hold without a DOM, and across

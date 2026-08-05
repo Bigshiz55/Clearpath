@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { quickSearchHref, opensSearch, closesSearch } from '@/lib/search/quickSearch';
+import { opensSearch, closesSearch } from '@/lib/search/quickSearch';
+import { markSearchRequested, consumeSearchRequest, hasPendingSearchRequest, TRIGGER_ATTR } from '@/lib/search/openRequest';
+import { resolveSearchDestination, classifySearchIntent, couldBeTitle, askHref, type CatalogResult } from '@/lib/search/searchIntent';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { SearchBar } from './SearchBar';
 
 /**
  * SEARCH, FROM ANYWHERE.
@@ -11,32 +15,40 @@ import { quickSearchHref, opensSearch, closesSearch } from '@/lib/search/quickSe
  * screen you're on. In case something pops in your mind, you're like, I wonder
  * if that was rated good."
  *
- * The home screen's search box only serves people who are already on the home
- * screen. This is for the thought that arrives while you are halfway down a
- * title page or mid-way through ruling a stack — where acting on it used to
- * cost: leave, go home, scroll up, type, and lose your place.
- *
  * TWO TRIGGERS, ONE SHEET, AND NEVER BOTH AT ONCE:
  *
- *   • In the header, at every width. That is where a search control belongs and
- *     it is what you see at the top of any screen.
+ *   • In the header, at every width.
  *   • Floating in the corner ON A PHONE, ONCE THE HEADER HAS SCROLLED AWAY.
  *
- * The obvious alternative — stick the header — was rejected on purpose. Header
- * plus build badge is ~148px; sticking it spends that on every screen forever,
- * and "it chops off the top" is a complaint this app has already had once. One
- * 44px circle, and only while it is actually needed, costs nothing by
- * comparison. Above `sm` the header is already sticky, so the floating trigger
- * never appears there — two search buttons on one screen is worse than none.
+ * ── TWO DEFECTS THIS FILE USED TO HAVE ────────────────────────────────────
  *
- * The two are wired by a window event rather than a context so the header can
- * stay a server component.
+ * 1. THE BUTTON DID NOTHING, especially on a phone. The triggers talked to the
+ *    sheet through a one-shot CustomEvent, which is delivered only to whoever
+ *    is already listening. On a slow device the trigger hydrates first, the
+ *    event lands in an empty room, and the tap is silently lost. Now a request
+ *    also PERSISTS on `<html>` and the sheet claims it on mount — see
+ *    src/lib/search/openRequest.ts. A pre-hydration listener records taps that
+ *    land before any JavaScript has run at all.
+ *
+ * 2. EVERY QUERY WENT TO THE JUDGE. The sheet was a plain form wired to
+ *    `quickSearchHref`, which routed everything to /app/ask — so searching
+ *    "CSI: NY" asked for a recommendation and returned something unrelated.
+ *    The sheet now hosts the REAL search box (`SearchBar`), which queries
+ *    /api/search, shows live catalog results and people, and only hands over
+ *    to the Judge when the query is genuinely a request.
  */
 const OPEN_EVENT = 'wv:quick-search';
 
-/** Ask for the search sheet, from anywhere in the tree. */
+/**
+ * Ask for the search sheet, from anywhere in the tree.
+ *
+ * Marks FIRST, then shouts. If the sheet is listening it opens immediately and
+ * consumes the mark; if it is not, the mark is waiting when it mounts. In that
+ * order there is no sequence in which the request is lost.
+ */
 export function openQuickSearch(): void {
-  window.dispatchEvent(new CustomEvent(OPEN_EVENT));
+  if (typeof document !== 'undefined') markSearchRequested(document.documentElement);
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_EVENT));
 }
 
 /** How far down the page the header is gone on a phone. */
@@ -52,35 +64,63 @@ export function SearchIcon({ className = '' }: { className?: string }) {
 }
 
 /**
- * A REAL SEARCH BOX, VISIBLE, AT THE TOP OF EVERY SCREEN — not an icon that
- * opens one. "There needs to be a search box at the top of every screen no
- * matter where you go, you can just put in a show or movie."
+ * A REAL SEARCH BOX AT DESKTOP WIDTHS — not an icon that opens one.
  *
- * Header real estate is the constraint the icon+sheet design above exists to
- * respect (a phone header is ~148px and full at three controls), so this is
- * NOT a phone-width thing — it only appears once the header genuinely has a
- * free middle to put it in (`xl`, 1280px+; the app's own container starts
- * widening at the same breakpoint). Below that, the icon + QuickSearch sheet
- * above is still the always-there control, unchanged.
+ * Only from `xl` (1280px+), where the header genuinely has a free middle;
+ * below that the icon + sheet is the always-there control.
  *
- * A real form, not a trigger for the sheet: it types and submits inline,
- * routing through the exact same `quickSearchHref` the sheet uses, so typing
- * "Oppenheimer" and hitting enter goes straight there — no second box.
+ * ON SUBMIT IT SEARCHES THE CATALOG. It used to route every query to
+ * /app/ask, so an exact title typed here produced a Judge recommendation
+ * instead of the title. Now it asks /api/search first and opens the exact
+ * match when there is one — see `resolveSearchDestination`. A genuine
+ * recommendation request skips the lookup entirely, because it has no title
+ * to find.
  */
 export function HeaderSearchBar({ className = '' }: { className?: string }) {
   const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
+  // Monotonic: a slow earlier submit must never navigate over a newer one.
+  const seq = useRef(0);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const href = quickSearchHref(q);
-    if (!href) return;
+    const query = q.trim();
+    // An empty box does NOTHING — navigating would cost the screen you were on.
+    if (!query) return;
+
+    const mine = ++seq.current;
+
+    // A LONG request needs no catalog round trip; a sentence is never a title.
+    // A SHORT one is still looked up, because "Show Me a Hero" and "Anything
+    // Goes" read like requests and are real titles — the catalog settles it.
+    if (classifySearchIntent(query) === 'ask' && !couldBeTitle(query)) {
+      setQ('');
+      router.push(askHref(query)!);
+      return;
+    }
+
+    setBusy(true);
+    let results: CatalogResult[] = [];
+    try {
+      const res = await fetchWithTimeout(`/api/search?q=${encodeURIComponent(query)}`);
+      const data = (await res.json()) as { results?: CatalogResult[] };
+      if (res.ok) results = data.results ?? [];
+    } catch {
+      // Offline or slow: fall through with no results, which resolves to the
+      // Judge rather than a dead end.
+    }
+    if (mine !== seq.current) return; // superseded by a newer submit
+    setBusy(false);
+
+    const dest = resolveSearchDestination(query, results);
+    if (!dest) return;
     setQ('');
-    router.push(href);
+    router.push(dest.href);
   }
 
   return (
-    <form onSubmit={submit} className={`w-full max-w-md ${className}`} role="search">
+    <form onSubmit={(e) => void submit(e)} className={`w-full max-w-md ${className}`} role="search">
       <div className="flex h-10 items-center gap-2 rounded-lg border border-white/12 bg-white/5 px-3 transition focus-within:border-brand-400/60 focus-within:bg-white/[0.07]">
         <SearchIcon className="h-4 w-4 flex-none text-slate-400" />
         <input
@@ -94,16 +134,31 @@ export function HeaderSearchBar({ className = '' }: { className?: string }) {
           data-testid="header-search-bar"
           className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
         />
+        {busy && (
+          <span
+            aria-hidden
+            data-testid="header-search-busy"
+            className="h-3.5 w-3.5 flex-none animate-spin rounded-full border-2 border-white/20 border-t-brand-400"
+          />
+        )}
       </div>
     </form>
   );
 }
 
-/** The header's search control. Same destination, same sheet. */
+/**
+ * The header's search control.
+ *
+ * `TRIGGER_ATTR` is what makes the first tap reliable: the pre-hydration
+ * listener in the document watches for it, so a tap landing before React has
+ * hydrated is still recorded. The React onClick is the fast path, not the only
+ * path.
+ */
 export function QuickSearchTrigger({ className = '' }: { className?: string }) {
   return (
     <button
       type="button"
+      {...{ [TRIGGER_ATTR]: '' }}
       onClick={openQuickSearch}
       aria-label="Search titles, people and questions"
       title="Search (⌘K)"
@@ -118,19 +173,46 @@ export function QuickSearchTrigger({ className = '' }: { className?: string }) {
 export function QuickSearch() {
   const [open, setOpen] = useState(false);
   const [floating, setFloating] = useState(false);
-  const [q, setQ] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
   const pathname = usePathname();
 
-  const close = useCallback(() => setOpen(false), []);
+  /**
+   * CLOSING IS WHAT CLEARS THE REQUEST — see openRequest.ts. While the sheet is
+   * open the mark stays on `<html>`, so if React tears the tree down and
+   * rebuilds it (which it does after any hydration mismatch) the sheet comes
+   * back instead of silently disappearing mid-search.
+   */
+  const close = useCallback(() => {
+    setOpen(false);
+    consumeSearchRequest(document.documentElement);
+  }, []);
 
-  // A navigation closes it — otherwise the sheet sits over the page you just
-  // asked for. Also resets the floating trigger, since a new page starts at the
-  // top with the header visible again.
+  /**
+   * ON MOUNT: honour a request made before this component existed.
+   * ON NAVIGATION: close, because the sheet must not sit over the page you just
+   * asked for. Also resets the floating trigger, since a new page starts at the
+   * top with the header visible again.
+   *
+   * One effect for both so the order is unambiguous — a separate
+   * `[pathname]` effect also fires on mount and would clear the very request
+   * this one is trying to honour.
+   *
+   * It compares the PATH rather than counting runs, because React's strict mode
+   * (on in development) mounts, unmounts and mounts again on purpose: a "have I
+   * run before" flag reads that rehearsal as a navigation and closes the sheet
+   * the instant it opens.
+   */
+  const lastPath = useRef<string | null>(null);
   useEffect(() => {
+    if (lastPath.current === null) {
+      lastPath.current = pathname;
+      if (hasPendingSearchRequest(document.documentElement)) setOpen(true);
+      return;
+    }
+    if (lastPath.current === pathname) return; // same screen — nothing happened
+    lastPath.current = pathname;
     setOpen(false);
     setFloating(false);
+    consumeSearchRequest(document.documentElement);
   }, [pathname]);
 
   useEffect(() => {
@@ -151,7 +233,9 @@ export function QuickSearch() {
     function onKey(e: KeyboardEvent) {
       if (!open && opensSearch(e)) {
         e.preventDefault();
-        setOpen(true);
+        // Through the same mark-then-open path as a tap, so ⌘K survives a
+        // remount exactly like every other way of asking.
+        openQuickSearch();
         return;
       }
       if (open && closesSearch(e)) {
@@ -163,31 +247,16 @@ export function QuickSearch() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open, close]);
 
-  // Focus the field, and stop the page behind from scrolling under the sheet.
+  // Stop the page behind from scrolling under the sheet. SearchBar focuses its
+  // own field via `autoFocus`.
   useEffect(() => {
     if (!open) return;
-    const t = window.setTimeout(() => inputRef.current?.focus(), 30);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      window.clearTimeout(t);
       document.body.style.overflow = prev;
     };
   }, [open]);
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const href = quickSearchHref(q);
-    // An empty box does NOTHING. Navigating would cost you the screen you were
-    // on, which is the whole thing this control exists to protect.
-    if (!href) {
-      inputRef.current?.focus();
-      return;
-    }
-    setOpen(false);
-    setQ('');
-    router.push(href);
-  }
 
   return (
     <>
@@ -196,7 +265,8 @@ export function QuickSearch() {
       {floating && !open && (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          {...{ [TRIGGER_ATTR]: '' }}
+          onClick={openQuickSearch}
           aria-label="Search titles, people and questions"
           title="Search"
           data-testid="floating-search"
@@ -217,24 +287,19 @@ export function QuickSearch() {
             if (e.target === e.currentTarget) close();
           }}
         >
-          <form onSubmit={submit} className="mt-[calc(env(safe-area-inset-top)+3.5rem)] w-full max-w-2xl px-4">
-            <div className="card flex items-center gap-2 p-2">
-              <SearchIcon className="ml-1.5 h-5 w-5 flex-none text-slate-400" />
-              <input
-                ref={inputRef}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                type="search"
-                enterKeyHint="search"
-                autoComplete="off"
-                placeholder="A title, a person, or what you feel like…"
-                aria-label="Search"
-                data-testid="quick-search-input"
-                className="min-w-0 flex-1 bg-transparent py-2.5 text-base text-white outline-none placeholder:text-slate-500"
-              />
-              <button type="submit" className="btn-primary flex-none px-4 py-2 text-sm" data-testid="quick-search-submit">
-                Search
-              </button>
+          <div className="mt-[calc(env(safe-area-inset-top)+3.5rem)] w-full max-w-2xl px-4">
+            <div className="flex items-start gap-2">
+              {/* THE REAL SEARCH BOX, not a form that guesses. Live catalog
+                  results, people, voice, and Enter that opens the exact title
+                  when there is one. */}
+              <div className="min-w-0 flex-1">
+                <SearchBar
+                  autoFocus
+                  inputTestId="quick-search-input"
+                  submitTestId="quick-search-submit"
+                  onNavigate={close}
+                />
+              </div>
               <button
                 type="button"
                 onClick={close}
@@ -248,7 +313,7 @@ export function QuickSearch() {
             <p className="mt-2 px-1 text-xs text-slate-500">
               Was that any good? Ask from any screen — you come straight back to where you were.
             </p>
-          </form>
+          </div>
         </div>
       )}
     </>
