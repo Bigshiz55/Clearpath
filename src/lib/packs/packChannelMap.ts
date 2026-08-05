@@ -19,7 +19,7 @@
  * Pure and provider-agnostic: a mapping from (provider, station identity) to
  * pack slugs. The linking itself happens wherever stations already get wired
  * (lazy ingest, TV Media writer) — see `linkKnownStationsToPacks` in
- * lazyIngest.ts.
+ * packRefresh.ts.
  *
  * ── WHY CALL SIGNS ARE MATCHED EXACTLY ────────────────────────────────────
  * TV Media names stations by call sign ("HALL", "LIFE", "OXY"). An exact,
@@ -33,7 +33,7 @@ import type { TvmazeChannelGroup } from '@/lib/viewing/ingest/tvmazeChannels';
 
 export type PackSlug = 'hallmark-universe' | 'lifetime-vault' | 'crime-case-files';
 
-/** TVmaze channel groups → pack slug (the mapping lazyIngest already used). */
+/** TVmaze channel groups → pack slug (the mapping packRefresh uses). */
 export const GROUP_TO_PACK: Record<TvmazeChannelGroup, PackSlug> = {
   hallmark: 'hallmark-universe',
   lifetime: 'lifetime-vault',

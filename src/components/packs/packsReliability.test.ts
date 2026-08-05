@@ -11,10 +11,15 @@ const read = (p: string) => readFileSync(join(__dirname, '..', '..', '..', p), '
  * render meaningfully.
  */
 
-describe('Hallmark Universe — the lazy ingest that runs on a visitor\'s own page load is bounded', () => {
-  it('the Pack page declares a maxDuration long enough for an inline ingest to finish honestly', () => {
+describe('Hallmark Universe — a visitor\'s page load runs no ingest at all', () => {
+  it('the Pack page needs no maxDuration override, because it does no provider I/O', () => {
+    // This used to assert `maxDuration = 60`, which existed solely to give an
+    // INLINE TVmaze ingest room to finish inside a customer's GET. That ingest
+    // is gone (src/lib/packs/packRefresh.ts), so the override is gone with it;
+    // its reappearance would mean something slow is back on the request path.
     const src = read('src/app/packs/[slug]/page.tsx');
-    expect(src).toMatch(/export const maxDuration = 60/);
+    expect(src).not.toMatch(/export const maxDuration/);
+    expect(src).not.toMatch(/ensurePackIngested|runTvmazeIngest|runTvMediaIngest/);
   });
 
   it('every TVmaze fetch call is wrapped in an AbortController timeout, not left unbounded', () => {

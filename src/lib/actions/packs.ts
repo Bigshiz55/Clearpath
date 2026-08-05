@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { markSeen, unmarkSeen } from '@/lib/packs/userSeen';
 import { subscribe, unsubscribe } from '@/lib/packs/userTracking';
+import { addToPackList, removeFromPackList, packListStorageAvailable } from '@/lib/packs/checklist';
 import type { UserSeenSubjectType, TrackingSubscriptionType } from '@/lib/packs/types';
 import type { ActionResult } from './watchlist';
 
@@ -82,5 +83,43 @@ export async function unfollowSubject(input: z.infer<typeof unfollowSchema>): Pr
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Could not unfollow.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MY CHECKLIST — explicit add/remove.
+//
+// The checklist is a list the user builds, not a view of the schedule (see
+// src/lib/packs/checklist.ts). These are the only two ways a title can get
+// onto it or leave it; nothing else infers membership.
+// ---------------------------------------------------------------------------
+const listSchema = z.object({
+  packId: z.string().uuid(),
+  packSlug: z.string().min(1).max(80),
+  programmeId: z.string().uuid(),
+});
+
+export async function setOnChecklist(
+  input: z.infer<typeof listSchema> & { onList: boolean },
+): Promise<ActionResult> {
+  const parsed = listSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'Invalid request.' };
+  const { packId, packSlug, programmeId } = parsed.data;
+
+  try {
+    const supabase = createClient();
+    const user = await requireUser(supabase);
+    if (!(await packListStorageAvailable(supabase))) {
+      return { ok: false, error: 'Checklists are not available on this deployment yet.' };
+    }
+    if (input.onList) {
+      await addToPackList(supabase, user.id, packId, programmeId);
+    } else {
+      await removeFromPackList(supabase, user.id, packId, programmeId);
+    }
+    revalidatePath(`/packs/${packSlug}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Could not update your checklist.' };
   }
 }

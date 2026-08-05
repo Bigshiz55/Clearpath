@@ -101,6 +101,14 @@ export const SCHEMA_CONTRACT: SchemaRequirement[] = [
   { object: 'case_match_episodes', migration: '0037_case_matching' },
   { object: 'case_match_flags', migration: '0037_case_matching' },
   { object: 'pack_ingest_runs', migration: '0038_pack_ingest_runs' },
+  // 0043 — production hardening. The code feature-detects these (they are not
+  // present until the migration is applied), but the contract must still
+  // declare them or the gate cannot tell "not yet migrated" from "typo".
+  { object: 'pack_list_items', migration: '0043_production_hardening' },
+  { object: 'tv_provider_ingest_locks', migration: '0043_production_hardening' },
+  { object: 'pack_franchise_cache', migration: '0043_production_hardening' },
+  { object: 'case_evidence', migration: '0043_production_hardening' },
+  { object: 'case_link_candidates', migration: '0043_production_hardening' },
   { object: 'growth_campaigns', migration: '0039_growth_os' },
   { object: 'growth_feedback', migration: '0039_growth_os' },
   { object: 'growth_links', migration: '0039_growth_os' },

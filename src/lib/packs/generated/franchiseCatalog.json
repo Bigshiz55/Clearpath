@@ -1,0 +1,780 @@
+{
+  "generatedFrom": "https://clearpath-pearl-chi.vercel.app",
+  "groups": [
+    {
+      "pack": "hallmark-universe",
+      "name": "Aurora Teagarden Mysteries",
+      "kind": "movies",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 325078,
+          "mediaType": "movie",
+          "title": "A Bone to Pick: An Aurora Teagarden Mystery",
+          "year": 2015,
+          "posterPath": "/rqpbgbIlErLBO39Y2kpYCi39Xxa.jpg"
+        },
+        {
+          "tmdbId": 339580,
+          "mediaType": "movie",
+          "title": "Real Murders: An Aurora Teagarden Mystery",
+          "year": 2015,
+          "posterPath": "/boxsHCnOoAoQpXPfBf8olF6rT9w.jpg"
+        },
+        {
+          "tmdbId": 393737,
+          "mediaType": "movie",
+          "title": "Three Bedrooms, One Corpse: An Aurora Teagarden Mystery",
+          "year": 2016,
+          "posterPath": "/wRkZigA3uI3iqlTo1E024doHOps.jpg"
+        },
+        {
+          "tmdbId": 414768,
+          "mediaType": "movie",
+          "title": "The Julius House: An Aurora Teagarden Mystery",
+          "year": 2016,
+          "posterPath": "/uBwyOSg4JtgoZEpz9WQGFSVu4Yu.jpg"
+        },
+        {
+          "tmdbId": 436398,
+          "mediaType": "movie",
+          "title": "Dead Over Heels: An Aurora Teagarden Mystery",
+          "year": 2017,
+          "posterPath": "/p6TUrrWS9R2pNGRw7NMw2cyLqkv.jpg"
+        },
+        {
+          "tmdbId": 455034,
+          "mediaType": "movie",
+          "title": "A Bundle of Trouble: An Aurora Teagarden Mystery",
+          "year": 2017,
+          "posterPath": "/5855wwOnhlfK2cBHwA46KCwVFva.jpg"
+        },
+        {
+          "tmdbId": 494466,
+          "mediaType": "movie",
+          "title": "Last Scene Alive: An Aurora Teagarden Mystery",
+          "year": 2018,
+          "posterPath": "/bkNm43jTxBuv46SKUOtIS5enFpA.jpg"
+        },
+        {
+          "tmdbId": 531158,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: The Disappearing Game",
+          "year": 2018,
+          "posterPath": "/n922tm6mZm3m2XNv7VzhGqxgFF6.jpg"
+        },
+        {
+          "tmdbId": 590118,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: A Game of Cat and Mouse",
+          "year": 2019,
+          "posterPath": "/pb15uoxtqbK8JdSPbjEx1K0KPA7.jpg"
+        },
+        {
+          "tmdbId": 590121,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: An Inheritance to Die For",
+          "year": 2019,
+          "posterPath": "/nYkEw4fXfZnusQpR83k8GS8wBLH.jpg"
+        },
+        {
+          "tmdbId": 590123,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: A Very Foul Play",
+          "year": 2019,
+          "posterPath": "/wIJ9u8pL2Pi7bAfDto4mLTy9i9.jpg"
+        },
+        {
+          "tmdbId": 681638,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: Heist and Seek",
+          "year": 2020,
+          "posterPath": "/s0Jh029ZNtTmjEG8X4DUblFN8nl.jpg"
+        },
+        {
+          "tmdbId": 741755,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: Reunited and It Feels So Deadly",
+          "year": 2020,
+          "posterPath": "/mc5SHXpgl8D5R6AqMF4SvS46bSA.jpg"
+        },
+        {
+          "tmdbId": 793425,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: How to Con A Con",
+          "year": 2021,
+          "posterPath": "/5iMpl5atiDdG8GHZTAHPOhPDhGt.jpg"
+        },
+        {
+          "tmdbId": 793465,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: Til Death Do Us Part",
+          "year": 2021,
+          "posterPath": "/ujQEazbtIX9WnbXE9ZyJClabFiL.jpg"
+        },
+        {
+          "tmdbId": 845929,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: Honeymoon, Honeymurder",
+          "year": 2021,
+          "posterPath": "/gf9PUXMEXJ9tebdtGnmnb8pf9uD.jpg"
+        },
+        {
+          "tmdbId": 910765,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: Haunted By Murder",
+          "year": 2022,
+          "posterPath": "/76U8bHFPFXgfsdqLNOuNOzTk5tA.jpg"
+        },
+        {
+          "tmdbId": 1101840,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: Something New",
+          "year": 2023,
+          "posterPath": "/cGyAejFbRCctTMt74hK4aExzsKn.jpg"
+        },
+        {
+          "tmdbId": 1363916,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: A Lesson in Murder",
+          "year": 2024,
+          "posterPath": "/m5w7oPvKxtCFDHqmkEZ1kq8impf.jpg"
+        },
+        {
+          "tmdbId": 1364939,
+          "mediaType": "movie",
+          "title": "Aurora Teagarden Mysteries: Death at the Diner",
+          "year": 2024,
+          "posterPath": "/958StP9qK9Khen8CwFD7ED8qWD9.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "hallmark-universe",
+      "name": "Hannah Swensen / Murder, She Baked",
+      "kind": "movies",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 328848,
+          "mediaType": "movie",
+          "title": "Murder, She Baked: A Chocolate Chip Cookie Mystery",
+          "year": 2015,
+          "posterPath": "/mxUNSe2hQMaOAX4cUTxqkYSgaQu.jpg"
+        },
+        {
+          "tmdbId": 361751,
+          "mediaType": "movie",
+          "title": "Murder, She Baked: A Plum Pudding Mystery",
+          "year": 2015,
+          "posterPath": "/jcT1xa0rKzsBj6IBLgd8KJNKVsX.jpg"
+        },
+        {
+          "tmdbId": 371181,
+          "mediaType": "movie",
+          "title": "Murder, She Baked: A Peach Cobbler Mystery",
+          "year": 2016,
+          "posterPath": "/j01HSBHf7EhYXdlI4vbdRrqX7Tf.jpg"
+        },
+        {
+          "tmdbId": 392629,
+          "mediaType": "movie",
+          "title": "Murder, She Baked: A Deadly Recipe",
+          "year": 2016,
+          "posterPath": "/7DC9LYpEKu3nj7tRkahOKwB8Lp5.jpg"
+        },
+        {
+          "tmdbId": 436401,
+          "mediaType": "movie",
+          "title": "Murder, She Baked: Just Desserts",
+          "year": 2017,
+          "posterPath": "/s9B67nXWHR7fwv9tZwEeriSn2II.jpg"
+        },
+        {
+          "tmdbId": 840382,
+          "mediaType": "movie",
+          "title": "Sweet Revenge: A Hannah Swensen Mystery",
+          "year": 2021,
+          "posterPath": "/26QfVdLQ6hYEwvrnhdJChQUgJJ8.jpg"
+        },
+        {
+          "tmdbId": 1093396,
+          "mediaType": "movie",
+          "title": "Carrot Cake Murder: A Hannah Swensen Mystery",
+          "year": 2023,
+          "posterPath": "/yLYAq5d6pk8mXKzigfwcBn543lf.jpg"
+        },
+        {
+          "tmdbId": 1151579,
+          "mediaType": "movie",
+          "title": "A Zest For Death: A Hannah Swensen Mystery",
+          "year": 2023,
+          "posterPath": "/uiEqVYZlEPTyQoo7rscrVEM2702.jpg"
+        },
+        {
+          "tmdbId": 1248298,
+          "mediaType": "movie",
+          "title": "One Bad Apple: A Hannah Swensen Mystery",
+          "year": 2024,
+          "posterPath": "/cJcWag9R2KJt0LNumv2rs24u9Mo.jpg"
+        },
+        {
+          "tmdbId": 1353278,
+          "mediaType": "movie",
+          "title": "A Sprinkle of Deceit: A Hannah Swensen Mystery",
+          "year": 2024,
+          "posterPath": "/zcnCtpViLDoUI5WXSXxQ4CBfnbi.jpg"
+        },
+        {
+          "tmdbId": 1414157,
+          "mediaType": "movie",
+          "title": "Reality Bites: A Hannah Swensen Mystery",
+          "year": 2025,
+          "posterPath": "/yf5VehJTvUh0mIcKVv0mTSWhCkk.jpg"
+        },
+        {
+          "tmdbId": 1415211,
+          "mediaType": "movie",
+          "title": "Pie To Die For: A Hannah Swensen Mystery",
+          "year": 2025,
+          "posterPath": "/pJa8HPUZTjI40kNXLHTnHJ8vhey.jpg"
+        },
+        {
+          "tmdbId": 1627985,
+          "mediaType": "movie",
+          "title": "Sugar & Vice: A Hannah Swensen Mystery",
+          "year": 2026,
+          "posterPath": "/gN2AASKIg3vIWeMsNwhHpeD0TDX.jpg"
+        },
+        {
+          "tmdbId": 1663527,
+          "mediaType": "movie",
+          "title": "Best Served Cold: A Hannah Swensen Mystery",
+          "year": 2026,
+          "posterPath": "/4csEhoQbnMjRUbmKwwlNuIX50rK.jpg"
+        },
+        {
+          "tmdbId": 1414761,
+          "mediaType": "movie",
+          "title": "Cooked to Death: A Hannah Swensen Mystery",
+          "year": null,
+          "posterPath": null
+        }
+      ]
+    },
+    {
+      "pack": "hallmark-universe",
+      "name": "Mystery 101",
+      "kind": "movies",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 577091,
+          "mediaType": "movie",
+          "title": "Mystery 101",
+          "year": 2019,
+          "posterPath": "/uC8yqYQsylFEqB2OGDIGmspBw2i.jpg"
+        },
+        {
+          "tmdbId": 606462,
+          "mediaType": "movie",
+          "title": "Mystery 101: Playing Dead",
+          "year": 2019,
+          "posterPath": "/zzrV6Zf06GmQuNxtHOzmJImtYjx.jpg"
+        },
+        {
+          "tmdbId": 620743,
+          "mediaType": "movie",
+          "title": "Mystery 101: Dead Talk",
+          "year": 2019,
+          "posterPath": "/5qyj1YwuMhZRey0dgRLQV9arNgf.jpg"
+        },
+        {
+          "tmdbId": 620744,
+          "mediaType": "movie",
+          "title": "Mystery 101: Words Can Kill",
+          "year": 2019,
+          "posterPath": "/vp1AgRE4nRwO6ceooNuglOQQQNL.jpg"
+        },
+        {
+          "tmdbId": 676621,
+          "mediaType": "movie",
+          "title": "Mystery 101: An Education in Murder",
+          "year": 2020,
+          "posterPath": "/xy3GWpfmiHjKR5DS49HT4G7GEC9.jpg"
+        },
+        {
+          "tmdbId": 793252,
+          "mediaType": "movie",
+          "title": "Mystery 101: Killer Timing",
+          "year": 2021,
+          "posterPath": "/ku52Y9p3ZcB6q9AfVqdpmtR8su6.jpg"
+        },
+        {
+          "tmdbId": 847357,
+          "mediaType": "movie",
+          "title": "Mystery 101: Deadly History",
+          "year": 2021,
+          "posterPath": "/19pDGoSIq594OGEx3UQD1MFHzNY.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "hallmark-universe",
+      "name": "Signed, Sealed, Delivered",
+      "kind": "movies",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 231617,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered",
+          "year": 2013,
+          "posterPath": "/6BVCgmhLeSTF8nPBuE9ncHHcCNv.jpg"
+        },
+        {
+          "tmdbId": 61870,
+          "mediaType": "tv",
+          "title": "Signed, Sealed, Delivered",
+          "year": 2014,
+          "posterPath": "/ypUCDuxK0nS0EIbnuPOLyMMgxZH.jpg"
+        },
+        {
+          "tmdbId": 308686,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered for Christmas",
+          "year": 2014,
+          "posterPath": "/yoMg33yFaBs7JYt2pPAoe0E6q0Z.jpg"
+        },
+        {
+          "tmdbId": 1737510,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: Family Reunited",
+          "year": 2014,
+          "posterPath": "/lralsSx26DMwR3AJHvE1G1kNVVF.jpg"
+        },
+        {
+          "tmdbId": 118039,
+          "mediaType": "tv",
+          "title": "Signed, Sealed, Delivered: Inside the Post Office",
+          "year": 2015,
+          "posterPath": null
+        },
+        {
+          "tmdbId": 338485,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: From Paris with Love",
+          "year": 2015,
+          "posterPath": "/q03Qy0JLnrE72Dfbva4di9k57Xb.jpg"
+        },
+        {
+          "tmdbId": 355730,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: Truth Be Told",
+          "year": 2015,
+          "posterPath": "/joPBHpo9WhneE31N5LFpjnQDOlG.jpg"
+        },
+        {
+          "tmdbId": 361261,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: The Impossible Dream",
+          "year": 2015,
+          "posterPath": "/lXRQfIuDRSc4zcYfwnJPbjVFGji.jpg"
+        },
+        {
+          "tmdbId": 379992,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: From the Heart",
+          "year": 2016,
+          "posterPath": "/8KKfV5pPq6RETbEzLDHYYwAqN9m.jpg"
+        },
+        {
+          "tmdbId": 407171,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: One in a Million",
+          "year": 2016,
+          "posterPath": "/jsXUbL2kn6tiBZK23Nm8CPH36Wg.jpg"
+        },
+        {
+          "tmdbId": 414762,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: Lost Without You",
+          "year": 2016,
+          "posterPath": "/u7LaDx0TI9KWkhlIV5p9vegq2yD.jpg"
+        },
+        {
+          "tmdbId": 438573,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: Higher Ground",
+          "year": 2017,
+          "posterPath": "/dRDGYBPppvrLr7FGKD09jIujR9G.jpg"
+        },
+        {
+          "tmdbId": 473896,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: Home Again",
+          "year": 2017,
+          "posterPath": "/2Z5vO7xJ43qK8bBzdxV7fQvpfbI.jpg"
+        },
+        {
+          "tmdbId": 483180,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: The Road Less Traveled",
+          "year": 2018,
+          "posterPath": "/a5LAlfAEgxQA4VEjwRM1Ff8CnVh.jpg"
+        },
+        {
+          "tmdbId": 526089,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: To the Altar",
+          "year": 2018,
+          "posterPath": "/7wJod9ETta3AOMNsFzqyMLjLGDf.jpg"
+        },
+        {
+          "tmdbId": 860271,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: The Vows We Have Made",
+          "year": 2021,
+          "posterPath": "/b1BpnHcmaXXGbsKRDKIyJJueNeH.jpg"
+        },
+        {
+          "tmdbId": 1302757,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: A Tale of Three Letters",
+          "year": 2024,
+          "posterPath": "/bs9o9vtv0FUBj4xyVVOo8RW8N2p.jpg"
+        },
+        {
+          "tmdbId": 1425296,
+          "mediaType": "movie",
+          "title": "Signed, Sealed, Delivered: To the Moon and Back",
+          "year": 2025,
+          "posterPath": "/jMdsTGbM4riS5DaeyMHLqaRn81s.jpg"
+        },
+        {
+          "tmdbId": 1716756,
+          "mediaType": "movie",
+          "title": "Signed, Sealed & Delivered: Inside the Billion-Dollar World of Sports Collectibles",
+          "year": 2026,
+          "posterPath": "/t13QmJjxzqnzxX75dcu0nzVs8ZM.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "hallmark-universe",
+      "name": "Crossword Mysteries",
+      "kind": "movies",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 529245,
+          "mediaType": "movie",
+          "title": "Crossword Mysteries: A Puzzle to Die For",
+          "year": 2019,
+          "posterPath": "/6T3MopiUUWoye1VHDQ85lrj0hki.jpg"
+        },
+        {
+          "tmdbId": 639254,
+          "mediaType": "movie",
+          "title": "Crossword Mysteries: Proposing Murder",
+          "year": 2019,
+          "posterPath": "/7F68QPWGpQalpMeGVTGZjoWYvKi.jpg"
+        },
+        {
+          "tmdbId": 639289,
+          "mediaType": "movie",
+          "title": "Crossword Mysteries: Abracadaver",
+          "year": 2020,
+          "posterPath": "/rkFB81pZF0iJLxM0Hd4LzOXcIaO.jpg"
+        },
+        {
+          "tmdbId": 783508,
+          "mediaType": "movie",
+          "title": "Crossword Mysteries: Terminal Descent",
+          "year": 2021,
+          "posterPath": "/6H2nRC9GaFQNpMSzY54tGnGorNr.jpg"
+        },
+        {
+          "tmdbId": 784410,
+          "mediaType": "movie",
+          "title": "Crossword Mysteries: Riddle Me Dead",
+          "year": 2021,
+          "posterPath": "/7AC6r7wgq8gToysiVSZYlRnB4Rs.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "hallmark-universe",
+      "name": "Curious Caterer",
+      "kind": "movies",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 936897,
+          "mediaType": "movie",
+          "title": "Curious Caterer: Dying for Chocolate",
+          "year": 2022,
+          "posterPath": "/7quPRcCVUmMBxKO58QwPuIADtYG.jpg"
+        },
+        {
+          "tmdbId": 1068830,
+          "mediaType": "movie",
+          "title": "Curious Caterer: Grilling Season",
+          "year": 2023,
+          "posterPath": "/4uuk28oJVIqK8AyUpoxfHIndG9Z.jpg"
+        },
+        {
+          "tmdbId": 1132282,
+          "mediaType": "movie",
+          "title": "Curious Caterer: Fatal Vows",
+          "year": 2023,
+          "posterPath": "/9diQ2QpAwO9lJDtoL6UkOk2sdEZ.jpg"
+        },
+        {
+          "tmdbId": 1255418,
+          "mediaType": "movie",
+          "title": "Curious Caterer: Foiled Plans",
+          "year": 2024,
+          "posterPath": "/buJJMj1NLVufwPaFu1ApFHQQdxh.jpg"
+        },
+        {
+          "tmdbId": 1342268,
+          "mediaType": "movie",
+          "title": "Curious Caterer: Forbidden Fruit",
+          "year": 2024,
+          "posterPath": "/g0ggQ1hWvMsJTMPCkBCH0fojh1Q.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "hallmark-universe",
+      "name": "Chronicle Mysteries",
+      "kind": "movies",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 582623,
+          "mediaType": "movie",
+          "title": "Chronicle Mysteries: Recovered",
+          "year": 2019,
+          "posterPath": "/hUeovGYuCTTlZLnu2TgEDqkvduS.jpg"
+        },
+        {
+          "tmdbId": 582624,
+          "mediaType": "movie",
+          "title": "Chronicle Mysteries: The Wrong Man",
+          "year": 2019,
+          "posterPath": "/o3nIsEoEQHRFdm8KciKIhCIm44B.jpg"
+        },
+        {
+          "tmdbId": 583372,
+          "mediaType": "movie",
+          "title": "Chronicle Mysteries: Vines that Bind",
+          "year": 2019,
+          "posterPath": "/xqwXUeE4RAMDqVhs7S94vbmr7bH.jpg"
+        },
+        {
+          "tmdbId": 623922,
+          "mediaType": "movie",
+          "title": "Chronicle Mysteries: The Deep End",
+          "year": 2019,
+          "posterPath": "/gUUkmgY1jvRrdribqcjqK7oFQ7e.jpg"
+        },
+        {
+          "tmdbId": 783305,
+          "mediaType": "movie",
+          "title": "Chronicle Mysteries: Helped to Death",
+          "year": 2021,
+          "posterPath": "/5GD8v3YZj1DN1625vyv1Bn8pYCq.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "lifetime-vault",
+      "name": "Flowers in the Attic (Dollanganger saga)",
+      "kind": "movies",
+      "membership": "editorial",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 236399,
+          "mediaType": "movie",
+          "title": "Flowers in the Attic",
+          "year": 2014,
+          "posterPath": "/owzDkkxL2DogC2mq1fgIvrlDcux.jpg"
+        },
+        {
+          "tmdbId": 267793,
+          "mediaType": "movie",
+          "title": "Petals on the Wind",
+          "year": 2014,
+          "posterPath": "/9xiNrGj95JpvtRTEnBQ5Q3SKYEQ.jpg"
+        },
+        {
+          "tmdbId": 333653,
+          "mediaType": "movie",
+          "title": "If There Be Thorns",
+          "year": 2015,
+          "posterPath": "/9hL5RbsqidxK7bkXxKIxWdIVvPA.jpg"
+        },
+        {
+          "tmdbId": 333658,
+          "mediaType": "movie",
+          "title": "Seeds of Yesterday",
+          "year": 2015,
+          "posterPath": "/xj2wTGex2P9sEbMILBG9iOebc4A.jpg"
+        },
+        {
+          "tmdbId": 203728,
+          "mediaType": "tv",
+          "title": "Flowers in the Attic: The Origin",
+          "year": 2022,
+          "posterPath": "/uMbGo8zmkYngFL4M9dsbc7xrq9b.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "lifetime-vault",
+      "name": "The Wrong… thrillers",
+      "kind": "movies",
+      "membership": "editorial",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 495776,
+          "mediaType": "movie",
+          "title": "The Wrong Nanny",
+          "year": 2017,
+          "posterPath": "/1oFZbYWK9KLiKWL7E8eFURVKIDQ.jpg"
+        },
+        {
+          "tmdbId": 522915,
+          "mediaType": "movie",
+          "title": "The Wrong Daughter",
+          "year": 2018,
+          "posterPath": "/16KYr5PHbnjrDiReeAuj2xbJIrX.jpg"
+        },
+        {
+          "tmdbId": 571622,
+          "mediaType": "movie",
+          "title": "The Wrong Teacher",
+          "year": 2018,
+          "posterPath": "/yJGcsQGKtHgeVLyhepGkuiyHZRr.jpg"
+        },
+        {
+          "tmdbId": 614154,
+          "mediaType": "movie",
+          "title": "The Wrong Stepmother",
+          "year": 2019,
+          "posterPath": "/9nzNUzGirC1RFi3fwfvXAyv7R6j.jpg"
+        },
+        {
+          "tmdbId": 615114,
+          "mediaType": "movie",
+          "title": "The Wrong Boy Next Door",
+          "year": 2019,
+          "posterPath": "/hrzmmYPzUl6LtUK6abdRG7J9iOC.jpg"
+        },
+        {
+          "tmdbId": 630054,
+          "mediaType": "movie",
+          "title": "The Wrong Cheerleader",
+          "year": 2019,
+          "posterPath": "/s210TCu0NsUYMDbduHD8Ge0rDjQ.jpg"
+        },
+        {
+          "tmdbId": 754739,
+          "mediaType": "movie",
+          "title": "The Wrong Cheerleader Coach",
+          "year": 2020,
+          "posterPath": "/rm2ab8xkjiGaGTUd8Py9uPXyskp.jpg"
+        },
+        {
+          "tmdbId": 788757,
+          "mediaType": "movie",
+          "title": "The Wrong Prince Charming",
+          "year": 2021,
+          "posterPath": "/h3W6H1ZyaloHljmTRk0EWaoz3eI.jpg"
+        },
+        {
+          "tmdbId": 865050,
+          "mediaType": "movie",
+          "title": "The Wrong Cheer Captain",
+          "year": 2021,
+          "posterPath": "/dwWGP1NLhD4pL4lJFRvDsJXz8vY.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "crime-case-files",
+      "name": "Dateline",
+      "kind": "series",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 78,
+          "mediaType": "tv",
+          "title": "Dateline",
+          "year": 1992,
+          "posterPath": "/xj9zonhdomfBpEhZQmAON5u3CiB.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "crime-case-files",
+      "name": "48 Hours",
+      "kind": "series",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 3719,
+          "mediaType": "tv",
+          "title": "48 Hours",
+          "year": 1988,
+          "posterPath": "/kniPe4BLIcj2WnErZcFeHo50q6B.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "crime-case-files",
+      "name": "Snapped",
+      "kind": "series",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 10184,
+          "mediaType": "tv",
+          "title": "Snapped",
+          "year": 2004,
+          "posterPath": "/46YGiC5kJhX6ArAwOR8ONwCTgck.jpg"
+        }
+      ]
+    },
+    {
+      "pack": "crime-case-files",
+      "name": "The First 48",
+      "kind": "series",
+      "membership": "derived",
+      "orderSource": "release",
+      "entries": [
+        {
+          "tmdbId": 5146,
+          "mediaType": "tv",
+          "title": "The First 48",
+          "year": 2004,
+          "posterPath": "/i6bSut4XPepaJ5VC6oG303iGKQU.jpg"
+        }
+      ]
+    }
+  ]
+}

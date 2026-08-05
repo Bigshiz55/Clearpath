@@ -1,30 +1,34 @@
 name: Refresh TV ingest
 
-# Hourly external trigger for /api/cron/tv-ingest — TVmaze AND TV Media
-# ingestion into the 0032 tv_* tables. This route is deliberately NOT in
-# vercel.json's crons — Vercel's Hobby plan caps at two cron jobs, both
-# already spent on daily-scan and classify, and Hobby cron only runs daily
-# regardless. Per this route's own header comment and
-# docs/SCHEDULE_PROVIDERS.md ("Cron scheduling constraint"), an external
-# hourly scheduler with the CRON_SECRET bearer token is the documented way to
-# run it on Hobby. TVmaze runs at most once per UTC calendar day; TV Media
-# runs at most once every two hours and is a no-op with zero DB writes until
-# TVMEDIA_API_KEY is set — both checked against tv_ingestion_runs, so an
-# hourly ping is a safe no-op in between.
+# Hourly external trigger for the TVmaze + TV Media ingest into the 0032 tv_*
+# tables. Vercel's Hobby plan caps at two cron jobs, both already spent, and
+# Hobby cron only fires daily anyway — so an external hourly scheduler is the
+# documented way to run this (docs/SCHEDULE_PROVIDERS.md).
 #
-# Formerly pinged /api/cron/tv-grid, which fed the now-deprecated tv_grid
-# table via the retired, WAF-blocked Gracenote path (see 0035's migration
-# comment). That route was deleted along with the rest of the Gracenote code
-# path; every run of the old workflow failed as a result. Repointed here at
-# the real, currently-shipping TVmaze ingest endpoint instead of deleting the
-# workflow outright, since this is the only thing that keeps tv_providers /
-# tv_lineups / tv_stations / tv_programmes / tv_airings fresh on Hobby.
+# ── WHY THIS NO LONGER USES CRON_SECRET ───────────────────────────────────
+# It used to call /api/cron/tv-ingest with a bearer token that had to match
+# the deployment's CRON_SECRET byte for byte. The two values drifted, and the
+# workflow then failed with HTTP 401 every hour for days while TV Media
+# quietly stopped refreshing.
 #
-# Requires two repository secrets (Settings → Secrets and variables → Actions):
-#   SITE_URL     e.g. https://verd1ct.com  (no trailing slash)
-#   CRON_SECRET  the same value set as the CRON_SECRET env var on the deployment
+# That design made "two secrets in two vendors' dashboards stay identical
+# forever" a hard dependency of the data pipeline, for an operation that
+# needs no authorization in the first place. The ingest is:
 #
-# GitHub may delay scheduled runs under load; the app also self-heals on read.
+#   - idempotent — it reconciles a window, it does not append;
+#   - self-gated — TVmaze at most once per UTC day, TV Media at most once
+#     every two hours, both enforced server-side against tv_ingestion_runs,
+#     plus the monthly call budget;
+#   - caller-controlled in no respect whatsoever — it takes no parameters.
+#
+# So calling /api/tv/refresh repeatedly cannot cost more than the schedule
+# already allows, and the secret bought nothing but an outage. The
+# authenticated route (/api/cron/tv-ingest) still exists and still checks its
+# bearer token for anyone who wants it.
+#
+# SITE_URL remains a repository secret so this can be pointed at a staging
+# deployment. If it is unset the workflow targets production directly rather
+# than failing, because a missing URL should not stop the pipeline either.
 
 on:
   schedule:
@@ -39,16 +43,25 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping TV listings ingest endpoint
+      - uses: actions/checkout@v4
+      - name: Trigger TV listings ingest
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
         run: |
-          if [ -z "${{ secrets.SITE_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
-            echo "SITE_URL and CRON_SECRET repo secrets are required."; exit 1
+          set -euo pipefail
+          BASE="${SITE_URL:-https://clearpath-pearl-chi.vercel.app}"
+          BASE="${BASE%/}"
+          echo "Target: $BASE"
+
+          code=$(curl -sS -X POST -o /tmp/out.json -w "%{http_code}" \
+            --max-time 290 "$BASE/api/tv/refresh")
+          echo "HTTP $code"
+          cat /tmp/out.json || true
+          echo
+
+          if [ "$code" != "200" ]; then
+            echo "::error::TV ingest trigger returned HTTP $code (expected 200). This endpoint requires no credentials, so this is a reachability or server error, not a configuration mismatch."
+            exit 1
           fi
-          code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.SITE_URL }}/api/cron/tv-ingest")
-          echo "HTTP $code"; cat /tmp/out.json || true
-          if [ "$code" = "401" ]; then
-            echo "::error::401 Unauthorized — the repository CRON_SECRET does not match the CRON_SECRET on the deployment at SITE_URL. Fix: copy the value from Vercel → Project → Settings → Environment Variables (Production) into this repo's Actions secret CRON_SECRET (or vice versa). Production keeps refreshing itself daily via Vercel Cron and on-demand via /api/tv/refresh either way; this hourly trigger is the finer-grained extra."
-          fi
-          test "$code" = "200"
+
+          python3 scripts/check_tv_refresh.py /tmp/out.json

@@ -46,8 +46,11 @@ const UPCOMING: UpcomingEntry[] = [
 
 const FRANCHISES: CatalogFranchise[] = [
   {
+    pack: 'hallmark-universe',
     name: 'Sample Mystery Franchise',
     kind: 'movies',
+    membership: 'derived',
+    orderSource: 'release',
     entries: [
       { tmdbId: 900001, mediaType: 'movie', title: 'Sample Mystery: The First Case', year: 2015, posterPath: null },
       { tmdbId: 900002, mediaType: 'movie', title: 'Sample Mystery: The Second Case', year: 2017, posterPath: null },
@@ -55,8 +58,11 @@ const FRANCHISES: CatalogFranchise[] = [
     ],
   },
   {
+    pack: 'crime-case-files',
     name: 'Sample Flagship Series',
     kind: 'series',
+    membership: 'editorial',
+    orderSource: 'release',
     entries: [{ tmdbId: 900010, mediaType: 'tv', title: 'Sample Flagship Series', year: 1992, posterPath: null }],
   },
 ];

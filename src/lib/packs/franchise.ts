@@ -36,9 +36,19 @@ function toFranchiseEntry(row: FranchiseRow): FranchiseEntry {
  * no curated franchises yet returns an empty list, which the UI must show
  * as an honest "not yet verified" state, not silence or a guess.
  */
-export async function listFranchiseNames(supabase: SupabaseClient): Promise<string[]> {
-  const { data, error } = await supabase.from('franchise_entries').select('franchise');
-  if (error) throw error;
+export async function listFranchiseNames(supabase: SupabaseClient, packSlug?: string): Promise<string[]> {
+  // Scoped by pack_slug (migration 0043). Franchises used to be global, so
+  // enabling the feature on one Pack rendered every other Pack's franchises
+  // too. When the column is absent (migration not yet applied) this returns
+  // NOTHING rather than everything: a franchise shown under the wrong Pack is
+  // a factual error, an absent one is only a gap the catalog tier fills.
+  let query = supabase.from('franchise_entries').select('franchise');
+  if (packSlug) query = query.eq('pack_slug', packSlug);
+  const { data, error } = await query;
+  if (error) {
+    if (packSlug && /pack_slug|column|schema cache/i.test(error.message)) return [];
+    throw error;
+  }
   return [...new Set(((data ?? []) as { franchise: string }[]).map((r) => r.franchise))].sort();
 }
 

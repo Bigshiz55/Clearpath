@@ -5,6 +5,12 @@ import { packForStation, knownTvMediaCallSigns, GROUP_TO_PACK } from './packChan
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 
+/** These files DESCRIBE the code they must never contain, so prose would
+ *  otherwise trip the assertions guarding it. */
+const stripComments = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+
 /**
  * THE DEFECT THIS SUITE PINS: pack_stations only ever held the eleven TVmaze
  * stations, so 2,802 TV Media airings — including every Hallmark movie — were
@@ -48,19 +54,30 @@ describe('TV Media stations reach the right packs', () => {
   });
 });
 
-describe('the wiring actually runs where stations are linked', () => {
-  const lazy = read('src/lib/packs/lazyIngest.ts');
+describe('wiring happens in the background, never in a render', () => {
+  const refresh = stripComments(read('src/lib/packs/packRefresh.ts'));
 
-  it('lazy ingest links tv_media stations, not only tvmaze', () => {
-    expect(lazy).toContain("packForStation('tv_media'");
-    expect(lazy).toContain("eq('provider_id', 'tv_media')");
+  it('wiring links tv_media stations, not only tvmaze', () => {
+    expect(refresh).toContain("packForStation(s.provider_id");
+    expect(refresh).toContain('TVMAZE_CHANNELS');
   });
 
-  it('wiring runs on EVERY pack load, not only when an ingest is due', () => {
-    // The healing case — stations already ingested by another pipeline — is
-    // precisely the case where no fresh ingest is due, so gating the wiring
-    // on winning the ingest race would have left Hallmark blind for hours.
-    const noRunBranch = lazy.slice(lazy.indexOf('if (!decision?.should_run'), lazy.indexOf('const runId ='));
-    expect(noRunBranch).toContain('wirePackStations');
+  it('every Pack is wired in ONE pass — not one global ingest per Pack visited', () => {
+    // The defect: the per-Pack lock guarded a GLOBAL TVmaze ingest, so
+    // opening three Packs started three full-catalogue ingests.
+    expect(refresh).toContain('refreshAllPackWiring');
+    expect(refresh).not.toMatch(/runTvmazeIngest|pack_try_start_ingest/);
+  });
+
+  it('the render path reads freshness and nothing else', () => {
+    const page = stripComments(read('src/app/packs/[slug]/page.tsx'));
+    expect(page).toContain('getPackFreshness');
+    expect(page).not.toMatch(/ensurePackIngested|refreshAllPackWiring|maxDuration/);
+  });
+
+  it('the background refresh endpoint is what runs the wiring', () => {
+    const route = stripComments(read('src/app/api/tv/refresh/route.ts'));
+    expect(route).toContain('refreshAllPackWiring');
+    expect(route).toContain('runGatedTvIngest');
   });
 });

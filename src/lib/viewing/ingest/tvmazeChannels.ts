@@ -20,7 +20,7 @@ export type TvmazeChannelMatch =
   | { mode: 'show'; networkName: string; showNames: string[] };
 
 /**
- * One group per Pack (see src/lib/packs/lazyIngest.ts's PACK_CHANNEL_GROUP) —
+ * One group per Pack (see src/lib/packs/packRefresh.ts's PACK_CHANNEL_GROUP) —
  * previously a coarse 'A' (Hallmark+Lifetime combined) / 'B' (crime) split;
  * now one group per real Pack so Hallmark Universe and Lifetime Movie Vault
  * each get only their own stations, not each other's.

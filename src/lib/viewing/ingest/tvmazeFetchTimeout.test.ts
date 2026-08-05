@@ -4,7 +4,7 @@ import { fetchScheduleDay } from './tvmazeIngest';
 /**
  * RELIABILITY SPRINT — item 6, Hallmark Universe must load without timing
  * out. The Pack page's own request runs a real TVmaze ingest inline (see
- * lazyIngest.ts) when it wins the lazy-ingest race, and that ingest makes
+ * packRefresh.ts) when it wins the lazy-ingest race, and that ingest makes
  * many `fetch` calls through this module's `getJson`. Before this fix,
  * `getJson` had no timeout at all — a single hung TVmaze request could hang
  * the ingest, and therefore the visitor's own page load, indefinitely. This

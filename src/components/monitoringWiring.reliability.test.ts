@@ -16,6 +16,12 @@ function src(relPath: string): string {
   return readFileSync(join(process.cwd(), relPath), 'utf8');
 }
 
+/** These files DESCRIBE the code they must never contain, so prose would
+ *  otherwise trip the assertions guarding it. */
+const stripComments = (text: string) =>
+  text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+
 describe('not-found.tsx reports not_found', () => {
   const file = src('src/app/not-found.tsx');
   it('reports on mount with only the pathname, never the query string', () => {
@@ -125,9 +131,14 @@ describe('server-side reliability wiring', () => {
     expect(file).toMatch(/recordReliabilityEvent\('new_releases_empty'/);
     expect(file).toMatch(/degraded \|\| items\.length === 0/);
   });
-  it('lazyIngest records pack_timeout without duplicating pack_ingest_runs', () => {
-    const file = src('src/lib/packs/lazyIngest.ts');
-    expect(file).toMatch(/recordReliabilityEvent\('pack_timeout'/);
-    expect(file).toMatch(/pack_finish_ingest/);
+  it('a Pack render performs no ingest at all — so there is no pack_timeout to record', () => {
+    // Replaces an assertion that lazyIngest reported pack_timeout. Per-Pack
+    // ingest was deleted (see src/lib/packs/packRefresh.ts): a customer GET
+    // no longer runs provider I/O, so the timeout it guarded cannot happen
+    // on that path. Guarding the absence is what keeps it from coming back.
+    const refresh = stripComments(src('src/lib/packs/packRefresh.ts'));
+    expect(refresh).not.toMatch(/runTvmazeIngest|runTvMediaIngest/);
+    const page = stripComments(src('src/app/packs/[slug]/page.tsx'));
+    expect(page).not.toMatch(/ensurePackIngested|runTvmazeIngest/);
   });
 });

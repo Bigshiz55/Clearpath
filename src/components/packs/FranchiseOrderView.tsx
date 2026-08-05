@@ -13,40 +13,57 @@ const CONNECTION_LABEL: Record<string, string> = {
 };
 
 /**
- * Franchise Order — verified viewing order only. Never inferred from
- * title-string similarity: every entry here is a real `franchise_entries`
- * row with its own source and confidence (migration 0039). Empty and honest
- * until a franchise is actually curated.
+ * FRANCHISE ORDER — scoped to this Pack, and honest about how strong each
+ * claim is.
+ *
+ * Two tiers, in this order:
+ *
+ *   1. `franchise_entries` — an editorially VERIFIED viewing order, with a
+ *      source URL and confidence per entry. Scoped by `pack_slug` (0043) so
+ *      Lifetime's franchises can never render under Hallmark, which is what
+ *      the previous global lookup did.
+ *   2. The build-time catalog artifact — membership and RELEASE order,
+ *      resolved from TMDB at build time, doing zero upstream work here.
+ *
+ * The two are labelled differently on purpose. Release order is a derivable
+ * fact; a verified viewing order is somebody's checked judgement. Presenting
+ * them identically, as the old view did, quietly upgraded one into the other.
  */
 export async function FranchiseOrderView({ packSlug }: { packSlug: string }) {
   const supabase = createClient();
-  const names = await listFranchiseNames(supabase).catch(() => []);
-  const groups = await Promise.all(names.map(async (name) => ({ name, entries: await listFranchiseEntries(supabase, name) })));
 
-  // CATALOG-BACKED FRANCHISES — the fix for a section that stayed empty for
-  // as long as the curation table did. Membership and order come from the
-  // TMDB catalog at read time (real ids, release-date order) and are
-  // labelled as catalog-derived, distinct from editorially verified rows,
-  // which continue to render first. Franchises do not depend on whether
-  // today's listings feed carried their channels. See
-  // src/lib/packs/catalogFranchises.ts.
-  const catalog = await getCatalogFranchises(packSlug);
+  // Pack scoping depends on 0043's pack_slug column. Until it exists, show
+  // NO curated groups rather than every Pack's — a wrong franchise is worse
+  // than a missing one, and the catalog tier below still carries the section.
+  let names: string[] = [];
+  try {
+    names = await listFranchiseNames(supabase, packSlug);
+  } catch {
+    names = [];
+  }
+  const groups = await Promise.all(
+    names.map(async (name) => ({ name, entries: await listFranchiseEntries(supabase, name).catch(() => []) })),
+  );
+  const verified = groups.filter((g) => g.entries.length > 0);
 
-  if (names.length === 0 && catalog.length === 0) {
+  // Synchronous: a build artifact, not a lookup. See catalogFranchises.ts.
+  const catalog = getCatalogFranchises(packSlug);
+
+  if (verified.length === 0 && catalog.length === 0) {
     return (
       <PackEmptyState
         title="No franchises to show yet"
-        detail="Nothing verified has been curated for this Pack, and the catalog lookup returned nothing. Viewing order is never guessed from similar titles."
+        detail="Nothing has been curated for this Pack and the catalog holds no matching series. Viewing order is never guessed from similar titles."
       />
     );
   }
 
   return (
     <div className="space-y-5">
-      <CatalogFranchiseGroups groups={catalog} />
-      {groups.map((g) => (
-        <div key={g.name} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      {verified.map((g) => (
+        <div key={g.name} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4" data-testid="verified-franchise">
           <h3 className="text-base font-bold text-white">{g.name}</h3>
+          <p className="mt-0.5 text-[11px] text-brand-200">Verified viewing order — checked against a source, not derived.</p>
           <ol className="mt-3 space-y-2">
             {g.entries.map((e, i) => (
               <li key={e.id} className="flex items-start gap-3 rounded-lg border border-white/10 bg-ink-850 p-2.5">
@@ -63,6 +80,7 @@ export async function FranchiseOrderView({ packSlug }: { packSlug: string }) {
           </ol>
         </div>
       ))}
+      <CatalogFranchiseGroups groups={catalog} />
     </div>
   );
 }

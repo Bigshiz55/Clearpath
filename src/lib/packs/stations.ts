@@ -17,7 +17,7 @@ export async function listStationsForPack(supabase: SupabaseClient, packId: stri
 
 /**
  * Link a station to a Pack (idempotent). Used by the lazy self-ingest
- * (src/lib/packs/lazyIngest.ts) to wire freshly-ingested tv_stations rows to
+ * (src/lib/packs/packRefresh.ts) to wire freshly-ingested tv_stations rows to
  * the Pack whose channel list they belong to — the ingest job itself has no
  * notion of Packs; this is the seam.
  */

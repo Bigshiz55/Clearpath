@@ -243,7 +243,7 @@ export interface FetchResult<T> {
 }
 
 // A hung TVmaze request used to be able to hang the whole ingest — and since
-// the Pack page's own request runs the ingest inline (see lazyIngest.ts), a
+// the Pack page's own request runs the ingest inline (see packRefresh.ts), a
 // visitor's page load with it. Every call here is bounded so a stall fails
 // fast (as a normal FetchResult.ok=false) instead of hanging indefinitely.
 const FETCH_TIMEOUT_MS = 10_000;
