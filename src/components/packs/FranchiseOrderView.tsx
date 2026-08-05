@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { listFranchiseNames, listFranchiseEntries } from '@/lib/packs/franchise';
+import { getCatalogFranchises } from '@/lib/packs/catalogFranchises';
+import { CatalogFranchiseGroups } from './CatalogFranchiseGroups';
 import { PackEmptyState } from './PackEmptyState';
 import { SourceNote } from './SourceNote';
 
@@ -16,23 +18,32 @@ const CONNECTION_LABEL: Record<string, string> = {
  * row with its own source and confidence (migration 0039). Empty and honest
  * until a franchise is actually curated.
  */
-export async function FranchiseOrderView() {
+export async function FranchiseOrderView({ packSlug }: { packSlug: string }) {
   const supabase = createClient();
-  const names = await listFranchiseNames(supabase);
+  const names = await listFranchiseNames(supabase).catch(() => []);
+  const groups = await Promise.all(names.map(async (name) => ({ name, entries: await listFranchiseEntries(supabase, name) })));
 
-  if (names.length === 0) {
+  // CATALOG-BACKED FRANCHISES — the fix for a section that stayed empty for
+  // as long as the curation table did. Membership and order come from the
+  // TMDB catalog at read time (real ids, release-date order) and are
+  // labelled as catalog-derived, distinct from editorially verified rows,
+  // which continue to render first. Franchises do not depend on whether
+  // today's listings feed carried their channels. See
+  // src/lib/packs/catalogFranchises.ts.
+  const catalog = await getCatalogFranchises(packSlug);
+
+  if (names.length === 0 && catalog.length === 0) {
     return (
       <PackEmptyState
-        title="No verified franchises yet"
-        detail="Viewing order is only shown once it's been checked against a real source — never guessed from similar titles. Check back as franchises are curated."
+        title="No franchises to show yet"
+        detail="Nothing verified has been curated for this Pack, and the catalog lookup returned nothing. Viewing order is never guessed from similar titles."
       />
     );
   }
 
-  const groups = await Promise.all(names.map(async (name) => ({ name, entries: await listFranchiseEntries(supabase, name) })));
-
   return (
     <div className="space-y-5">
+      <CatalogFranchiseGroups groups={catalog} />
       {groups.map((g) => (
         <div key={g.name} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <h3 className="text-base font-bold text-white">{g.name}</h3>

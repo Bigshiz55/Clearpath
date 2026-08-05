@@ -48,4 +48,7 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.SITE_URL }}/api/cron/tv-ingest")
           echo "HTTP $code"; cat /tmp/out.json || true
+          if [ "$code" = "401" ]; then
+            echo "::error::401 Unauthorized — the repository CRON_SECRET does not match the CRON_SECRET on the deployment at SITE_URL. Fix: copy the value from Vercel → Project → Settings → Environment Variables (Production) into this repo's Actions secret CRON_SECRET (or vice versa). Production keeps refreshing itself daily via Vercel Cron and on-demand via /api/tv/refresh either way; this hourly trigger is the finer-grained extra."
+          fi
           test "$code" = "200"

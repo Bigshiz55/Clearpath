@@ -7,6 +7,8 @@ import { resolveProgrammeTmdbId, getPackDnaScores } from '@/lib/packs/dna';
 import type { Pack } from '@/lib/packs/types';
 import { PremiereListOrCalendar, type PremiereEntry, type CreditedPerson } from './PremiereListOrCalendar';
 import { PackEmptyState } from './PackEmptyState';
+import { getPackUpcoming } from '@/lib/packs/schedule';
+import { UpcomingScheduleList } from './UpcomingScheduleList';
 
 /** Resolution is a live TMDB search/credits call per title — bounded to a
  *  small window (the premiere calendar, not the full checklist) so it stays
@@ -45,10 +47,20 @@ export async function PremiereCalendarView({ pack, userId }: { pack: Pack; userI
   }
 
   if (premieres.length === 0) {
+    // NO VERIFIED PREMIERES IS NOT THE SAME FACT AS NO SCHEDULE. Providers
+    // set premiere flags sparsely (TV Media's isNew is rare; TVmaze's
+    // detection only covers episodic series), so a pack whose channels have
+    // dozens of real upcoming airings used to render a giant empty panel
+    // here that blamed the ingest. Show the schedule that exists, with each
+    // entry honestly labelled — see src/lib/packs/schedule.ts.
+    const upcoming = await getPackUpcoming(supabase, pack.id).catch(() => []);
+    if (upcoming.length > 0) {
+      return <UpcomingScheduleList entries={upcoming} />;
+    }
     return (
       <PackEmptyState
-        title="No premieres in the next 6 weeks"
-        detail="Listings refresh daily. Either nothing new is scheduled on this Pack's channels right now, or the ingest hasn't run yet — check back after the next refresh."
+        title="No upcoming listings for this Pack's channels"
+        detail="The listings feed currently has no future airings for these channels. This is a data-coverage gap, not an empty catalog — the checklist and franchise sections below still work from the catalog."
       />
     );
   }

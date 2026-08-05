@@ -4,6 +4,7 @@ import { runTvmazeIngest } from '@/lib/viewing/ingest/tvmazeWriter';
 import { TVMAZE_CHANNELS, type TvmazeChannelGroup } from '@/lib/viewing/ingest/tvmazeChannels';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { linkStationToPack } from './stations';
+import { packForStation, GROUP_TO_PACK } from './packChannelMap';
 import type { Pack } from './types';
 import { recordReliabilityEvent } from '@/lib/monitoring';
 
@@ -51,6 +52,13 @@ export async function ensurePackIngested(supabase: SupabaseClient, pack: Pack): 
   const decision = (Array.isArray(data) ? data[0] : data) as { should_run: boolean; run_id: string | null } | null;
 
   if (!decision?.should_run || !decision.run_id) {
+    // NOT gated on winning the ingest race: the station↔pack wiring is a
+    // read-time repair (idempotent, a handful of upserts) and the case it
+    // exists for — stations already ingested by ANOTHER pipeline that this
+    // pack has never been linked to — is precisely the case where no fresh
+    // ingest is due. Waiting for the next ingest here left Hallmark blind to
+    // 2,802 existing TV Media rows for days.
+    await wirePackStations(pack.id, group).catch(() => undefined);
     const inProgressElsewhere = await isIngestInProgress(pack.id);
     return { attempted: false, ok: true, error: null, inProgressElsewhere };
   }
@@ -96,7 +104,20 @@ export async function ensurePackIngested(supabase: SupabaseClient, pack: Pack): 
   }
 }
 
-/** Link this Pack's channel-group stations into pack_stations. Idempotent. */
+/**
+ * Link this Pack's stations into pack_stations — from EVERY provider.
+ * Idempotent, and run on every pack page load — both when this request wins
+ * the ingest race and when no ingest is due at all.
+ *
+ * The TVmaze half matches the channel-group config as before. The TV Media
+ * half is the fix for the defect that emptied Hallmark Universe: TV Media's
+ * stations (HALL, LIFE, OXY, A&E) were ingested into tv_stations but never
+ * linked to a Pack, so 2,802 freshly-ingested airings were invisible to every
+ * pack query. See src/lib/packs/packChannelMap.ts for the mapping and its
+ * measurement. Because this runs at read time against whatever stations exist
+ * NOW, deploying it heals the already-ingested production data without
+ * waiting for the next TV Media run.
+ */
 async function wirePackStations(packId: string, group: TvmazeChannelGroup): Promise<void> {
   const admin = createAdminClient();
   const groupChannels = TVMAZE_CHANNELS.filter((ch) => ch.group === group);
@@ -109,6 +130,17 @@ async function wirePackStations(packId: string, group: TvmazeChannelGroup): Prom
       .maybeSingle();
     if (station?.id) {
       await linkStationToPack(admin, packId, station.id as string);
+    }
+  }
+
+  const packSlug = GROUP_TO_PACK[group];
+  const { data: tvMediaStations } = await admin
+    .from('tv_stations')
+    .select('id, name')
+    .eq('provider_id', 'tv_media');
+  for (const st of (tvMediaStations ?? []) as { id: string; name: string }[]) {
+    if (packForStation('tv_media', st.name) === packSlug) {
+      await linkStationToPack(admin, packId, st.id);
     }
   }
 }

@@ -74,7 +74,7 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
   const tvMediaDue = !lastTvMediaRun || (Date.now() - Date.parse(lastTvMediaRun)) >= TVMEDIA_MIN_INTERVAL_MS;
   const tvmedia = tvMediaDue
     ? await runTvMediaIngest(TVMEDIA_INGEST_DAYS)
-    : { ok: true, ran: false, reason: `Ran within the last 2h (${lastTvMediaRun}).` };
+    : { ok: true, ran: false, status: 'success' as const, reason: `Ran within the last 2h (${lastTvMediaRun}).` };
 
   return { tvmaze, tvmedia };
 }

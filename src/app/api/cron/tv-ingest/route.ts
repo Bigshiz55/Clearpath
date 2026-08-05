@@ -63,6 +63,13 @@ export async function GET(req: Request) {
   }
 
   const { tvmaze, tvmedia } = await runGatedTvIngest(admin);
-  const ok = (tvmaze as { ok?: boolean }).ok !== false && tvmedia.ok !== false;
-  return NextResponse.json({ tvmaze, tvmedia }, { status: ok ? 200 : 502 });
+  // 502 is reserved for a provider actually FAILING upstream. A missing or
+  // unconfigured key is a configuration state — it now writes its own
+  // 'skipped' run row with a machine-readable code (see tvMediaWriter), and
+  // answering 502 for it every hour buried the one real signal this status
+  // code carries.
+  const tvmazeOk = (tvmaze as { ok?: boolean }).ok !== false;
+  const tvmediaUpstreamFailure =
+    tvmedia.ok === false && ['auth_failed', 'rate_limited', 'upstream_failed'].includes(tvmedia.status);
+  return NextResponse.json({ tvmaze, tvmedia }, { status: tvmazeOk && !tvmediaUpstreamFailure ? 200 : 502 });
 }

@@ -10,6 +10,8 @@ import { ChecklistSection } from '@/components/packs/ChecklistSection';
 import { FranchiseOrderView } from '@/components/packs/FranchiseOrderView';
 import { CaseSearchBox } from '@/components/packs/CaseSearchBox';
 import { PackEmptyState } from '@/components/packs/PackEmptyState';
+import { StaleDataNotice } from '@/components/packs/StaleDataNotice';
+import { coverageIsStale } from '@/lib/tv/health';
 import { PublicHeader, PublicFooter } from '@/components/discovery/DiscoveryLayout';
 import { publicEnv } from '@/lib/env';
 
@@ -90,6 +92,17 @@ export default async function PackPage({ params }: { params: { slug: string } })
 
     const hasAnyFeature = pack.premiereCalendar || pack.caseTracking;
 
+    // STALENESS IS A FACT THE CUSTOMER SEES, not one the page hides behind
+    // an empty state. tv_lineups is world-readable, so the ordinary client
+    // can ask; the notice itself also kicks the self-gated server refresh.
+    const { data: lineupRows } = await supabase
+      .from('tv_lineups')
+      .select('coverage_end_utc')
+      .order('coverage_end_utc', { ascending: false, nullsFirst: false })
+      .limit(1);
+    const coverageEndUtc = (lineupRows?.[0]?.coverage_end_utc as string | undefined) ?? null;
+    const listingsStale = coverageIsStale(coverageEndUtc);
+
     return (
       <>
       <PublicHeader />
@@ -98,6 +111,8 @@ export default async function PackPage({ params }: { params: { slug: string } })
           <h1 className="text-2xl font-bold text-white sm:text-3xl">{pack.displayName}</h1>
           {pack.description && <p className="mt-1 text-sm text-slate-400">{pack.description}</p>}
         </section>
+
+        {listingsStale && <StaleDataNotice coverageEndUtc={coverageEndUtc} />}
 
         {ingest.attempted && !ingest.ok && (
           <div className="rounded-xl border border-amber-400/30 bg-amber-500/[0.07] p-3 text-sm text-amber-200">
@@ -140,7 +155,7 @@ export default async function PackPage({ params }: { params: { slug: string } })
         {pack.franchiseContinuity && (
           <section>
             <h2 className="mb-2 text-lg font-bold text-white">Franchise Order</h2>
-            <FranchiseOrderView />
+            <FranchiseOrderView packSlug={pack.slug} />
           </section>
         )}
 

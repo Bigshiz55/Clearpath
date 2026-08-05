@@ -40,9 +40,30 @@ const WRITE_BATCH_SIZE = 500;
 const PROVIDER_ID = 'tv_media';
 const DEFAULT_MARKET_TZ = 'America/New_York';
 
+/**
+ * MACHINE-READABLE OUTCOME — never a silent no-op.
+ *
+ * The old contract returned `{ ok: false, ran: false, reason }` with ZERO
+ * database writes when the key was missing, which is how TV Media could stop
+ * refreshing on August 3 and leave no trace anywhere: no run row, no status,
+ * nothing for an operator to query. A provider three Packs depend on must
+ * leave a diagnosable record of every attempt, including the attempts that
+ * decided not to run.
+ */
+export type TvMediaIngestStatus =
+  | 'success'
+  | 'partial'
+  | 'missing_key'        // TVMEDIA_API_KEY not set in this environment
+  | 'not_configured'     // key set but no lineup/ZIP to request
+  | 'budget_exhausted'   // monthly call budget would be exceeded
+  | 'auth_failed'        // provider rejected the key (401/403)
+  | 'rate_limited'       // provider throttled us (429)
+  | 'upstream_failed';   // provider errored some other way
+
 export interface TvMediaIngestResult {
   ok: boolean;
   ran: boolean;
+  status: TvMediaIngestStatus;
   reason?: string;
   lineupId: string | null;
   windowStartUtc: string | null;
@@ -59,12 +80,49 @@ export interface TvMediaIngestResult {
   expired: number;
 }
 
-function noRun(reason: string): TvMediaIngestResult {
+function noRun(status: TvMediaIngestStatus, reason: string): TvMediaIngestResult {
   return {
-    ok: false, ran: false, reason, lineupId: null, windowStartUtc: null, windowEndUtc: null,
+    ok: false, ran: false, status, reason, lineupId: null, windowStartUtc: null, windowEndUtc: null,
     daysRequested: 0, daysFetched: 0, daysFailed: [], callsUsed: 0, stationsDiscovered: 0,
     totalListingsFetched: 0, inserted: 0, updated: 0, unchanged: 0, expired: 0,
   };
+}
+
+/**
+ * Record a decision NOT to run (or an inability to run) as a real
+ * `tv_ingestion_runs` row, so "TV Media has not refreshed since Tuesday" is a
+ * queryable fact with a cause instead of an absence. Uses the schema's
+ * existing status vocabulary ('skipped') and carries the machine-readable
+ * code in `errors`, where the health surface reads it back out. Best-effort:
+ * a bookkeeping failure must never mask the real outcome.
+ */
+async function recordNoRun(result: TvMediaIngestResult): Promise<TvMediaIngestResult> {
+  try {
+    const admin = createAdminClient();
+    const nowIso = new Date().toISOString();
+    await admin.from('tv_ingestion_runs').insert({
+      provider_id: PROVIDER_ID, lineup_id: result.lineupId,
+      started_at: nowIso, completed_at: nowIso,
+      status: 'skipped', trigger: 'cron',
+      errors: [{ code: result.status, message: result.reason ?? result.status }],
+    });
+  } catch {
+    /* the admin client itself may be unavailable — the returned result still says why */
+  }
+  return result;
+}
+
+/**
+ * Classify a failed fetch window by what the provider actually said.
+ * Every per-day failure string carries the adapter's errorCode; auth and
+ * rate-limit signatures are distinguishable from generic upstream failures,
+ * and the distinction is exactly what an operator needs to act.
+ */
+export function classifyFailure(daysFailed: string[]): TvMediaIngestStatus {
+  const joined = daysFailed.join(' ').toLowerCase();
+  if (/(^|[^0-9])(401|403)([^0-9]|$)|auth|unauthorized|forbidden|invalid[_ ]?key/.test(joined)) return 'auth_failed';
+  if (/(^|[^0-9])429([^0-9]|$)|rate[_ ]?limit|too many requests/.test(joined)) return 'rate_limited';
+  return 'upstream_failed';
 }
 
 function isoDate(ms: number): string {
@@ -210,10 +268,10 @@ async function ensureProgrammes(
  */
 export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<TvMediaIngestResult> {
   const adapter = tvMediaAdapterForIngest();
-  if (!adapter.isConfigured()) return noRun(`No ${PROVIDER_ID} credentials configured (TVMEDIA_API_KEY unset).`);
+  if (!adapter.isConfigured()) return recordNoRun(noRun('missing_key', 'TVMEDIA_API_KEY is not set in this environment.'));
 
   const lineupProviderId = process.env[TVM_LINEUP_ENV] ?? (process.env[TVM_ZIP_ENV] ? `zip:${process.env[TVM_ZIP_ENV]}` : null);
-  if (!lineupProviderId) return noRun('TVMEDIA_API_KEY is set but neither TVMEDIA_LINEUP_ID nor TVMEDIA_DEFAULT_ZIP is — nothing to request.');
+  if (!lineupProviderId) return recordNoRun(noRun('not_configured', 'TVMEDIA_API_KEY is set but neither TVMEDIA_LINEUP_ID nor TVMEDIA_DEFAULT_ZIP is — nothing to request.'));
 
   const admin = createAdminClient();
   const lineupId = await ensureProviderAndLineup(admin, lineupProviderId, true);
@@ -226,7 +284,7 @@ export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<T
     const daysInMonth = new Date(Date.UTC(new Date(nowMs).getUTCFullYear(), new Date(nowMs).getUTCMonth() + 1, 0)).getUTCDate();
     budgetState = { monthlyLimit, safetyPercent: 0.9, used, dayOfMonth, daysInMonth };
     const verdict = evaluateBudget(budgetState, days);
-    if (!verdict.allowed) return noRun(`Call budget: ${verdict.reason}`);
+    if (!verdict.allowed) return recordNoRun({ ...noRun('budget_exhausted', `Call budget: ${verdict.reason}`), lineupId });
   }
 
   const windowStartMs = Date.UTC(
@@ -350,11 +408,21 @@ export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<T
   }
 
   await admin.from('tv_lineups').update({
-    last_success_at: fetchComplete ? nowIso : null,
+    // `undefined`, never null: a partial/failed run must not ERASE the record
+    // of the last real success — that timestamp is the staleness signal the
+    // health surface depends on.
+    last_success_at: fetchComplete ? nowIso : undefined,
     status: fetchComplete ? 'healthy' : 'partial',
     last_error: daysFailed.length > 0 ? daysFailed.join('; ').slice(0, 500) : null,
-    coverage_start_utc: new Date(windowStartMs).toISOString(),
-    coverage_end_utc: new Date(windowEndMs).toISOString(),
+    // Coverage only advances when listings were actually fetched. A run that
+    // fetched nothing claiming a fresh window is exactly the lie that made
+    // "coverage through Friday" unfalsifiable.
+    ...(allListings.length > 0
+      ? {
+          coverage_start_utc: new Date(windowStartMs).toISOString(),
+          coverage_end_utc: new Date(windowEndMs).toISOString(),
+        }
+      : {}),
     lifetime_call_count: callsUsed,
   }).eq('id', lineupId);
 
@@ -367,6 +435,8 @@ export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<T
     provider_id: PROVIDER_ID, lineup_id: lineupId,
     started_at: nowIso, completed_at: new Date().toISOString(),
     status: fetchComplete ? 'success' : (allListings.length > 0 ? 'partial' : 'failed'), trigger: 'cron',
+    actual_start_utc: allListings.length > 0 ? new Date(windowStartMs).toISOString() : null,
+    actual_end_utc: allListings.length > 0 ? new Date(windowEndMs).toISOString() : null,
     requested_start_utc: new Date(windowStartMs).toISOString(),
     requested_end_utc: new Date(windowEndMs).toISOString(),
     channels_requested: stationIdByKey.size, channels_returned: stationIdByKey.size,
@@ -376,8 +446,13 @@ export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<T
     errors: daysFailed.map((e) => ({ message: e })),
   });
 
+  const status: TvMediaIngestStatus = fetchComplete
+    ? 'success'
+    : allListings.length > 0
+      ? 'partial'
+      : classifyFailure(daysFailed);
   return {
-    ok: fetchComplete, ran: true,
+    ok: fetchComplete, ran: true, status,
     lineupId, windowStartUtc: new Date(windowStartMs).toISOString(), windowEndUtc: new Date(windowEndMs).toISOString(),
     daysRequested: days, daysFetched: dates.length - daysFailed.length, daysFailed,
     callsUsed, stationsDiscovered: stationIdByKey.size, totalListingsFetched: allListings.length,
