@@ -29,6 +29,21 @@ name: Refresh TV ingest
 # SITE_URL remains a repository secret so this can be pointed at a staging
 # deployment. If it is unset the workflow targets production directly rather
 # than failing, because a missing URL should not stop the pipeline either.
+#
+# ── WHAT THIS TICK CAN AND CANNOT REACH ───────────────────────────────────
+# This schedule drives the FREE providers only. TV Media is metered, and the
+# data-mode gate (src/lib/tv/dataMode.ts) refuses it unless BOTH
+# DATA_MODE=paid_live and TVMEDIA_ENABLED=1 are set on the deployment —
+# neither of which is set today. `runGatedTvIngest` asks that gate before it
+# takes a lease or constructs the adapter, so this tick makes zero TV Media
+# requests and the response reports `tvmedia.status = "egress_denied"` with
+# the reason. That is the switch working; check_tv_refresh.py treats it as a
+# notice, not a failure.
+#
+# Deleting this schedule would NOT have made TV Media safe — two other
+# triggers reach the same code (the daily Vercel cron and /api/cron/tv-ingest).
+# The gate covers all three, which is why the schedule can stay: TVmaze is
+# free and still worth refreshing hourly.
 
 on:
   schedule:

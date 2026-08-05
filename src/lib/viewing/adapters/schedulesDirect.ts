@@ -4,6 +4,7 @@ import type {
   ScheduleAdapter, ScheduleRequest, ScheduleResponse, ScheduleListing, ContentType,
 } from '../schedule';
 import { statusFromHttp } from '../status';
+import { requestEgress } from '@/lib/tv/egressGuard';
 
 /**
  * SCHEDULES DIRECT — the recommended primary provider.
@@ -68,6 +69,9 @@ function classify(showType: string | undefined, genres: string[] | undefined): C
   return 'other';
 }
 
+/** The id the egress guard and the data-mode gate know this adapter by. */
+export const SD_ADAPTER_ID = 'schedules_direct';
+
 export class SchedulesDirectAdapter implements ScheduleAdapter {
   readonly providerId = 'schedules_direct';
   readonly priority = 0;
@@ -125,6 +129,17 @@ export class SchedulesDirectAdapter implements ScheduleAdapter {
 
   async fetch(req: ScheduleRequest): Promise<ScheduleResponse> {
     const fetchedAt = new Date().toISOString();
+
+    // Ahead of `token()`, which is itself a network call — a gate placed after
+    // authentication would already have leaked a request.
+    const gate = requestEgress({
+      adapterId: SD_ADAPTER_ID, cost: 'free',
+      trigger: 'schedule_fetch', target: 'schedulesdirect:schedules',
+    });
+    if (!gate.allowed) {
+      return this.fail('misconfigured', `EGRESS_DENIED_${gate.code.toUpperCase()}`, gate.reason, fetchedAt);
+    }
+
     if (!this.isConfigured()) {
       return this.fail('misconfigured', 'NO_CREDENTIALS',
         `Set ${SD_USERNAME_ENV} and ${SD_PASSWORD_ENV} to enable Schedules Direct`, fetchedAt);

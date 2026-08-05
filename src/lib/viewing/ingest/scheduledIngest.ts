@@ -2,6 +2,7 @@ import 'server-only';
 import type { createAdminClient } from '@/lib/supabase/admin';
 import { runTvmazeIngest } from './tvmazeWriter';
 import { runTvMediaIngest } from './tvMediaWriter';
+import { mayCallUpstream } from '@/lib/tv/dataMode';
 
 /**
  * SHARED GATING — TV Media (primary) and TVmaze (fallback/supplement).
@@ -140,6 +141,26 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
         async () => ({ ran: true, ...(await runTvmazeIngest(TVMAZE_INGEST_DAYS)) }),
         () => ({ ran: false, reason: 'Another TVmaze ingest is already running.' }),
       );
+
+  // DATA-MODE GATE, ahead of everything TV Media related.
+  //
+  // `runTvMediaIngest` asks the same door itself — that is the backstop for
+  // any caller, and it stays. Asking here as well is not belt-and-braces for
+  // its own sake: it means a denied provider costs nothing at all on a tick.
+  // No lease is taken, no adapter is constructed, and no `skipped` run row is
+  // written every hour for a decision that has not changed. The reason still
+  // travels back to the caller and to /api/health/tv, so "why is TV Media not
+  // refreshing" stays answerable without reading rows.
+  const tvMediaEgress = mayCallUpstream({ adapterId: 'tv_media', cost: 'metered' });
+  if (!tvMediaEgress.allowed) {
+    return {
+      tvmaze,
+      tvmedia: {
+        ok: true, ran: false, status: 'egress_denied' as const,
+        reason: `${tvMediaEgress.code}: ${tvMediaEgress.reason}`,
+      },
+    };
+  }
 
   const lastTvMediaRun = await lastRunAt(admin, 'tv_media');
   const tvMediaDue = !lastTvMediaRun || (Date.now() - Date.parse(lastTvMediaRun)) >= TVMEDIA_MIN_INTERVAL_MS;

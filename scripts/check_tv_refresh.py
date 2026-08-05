@@ -11,6 +11,10 @@ import sys
 
 UPSTREAM_FAILURES = ("auth_failed", "rate_limited", "upstream_failed")
 CONFIG_GAPS = ("missing_key", "not_configured")
+# The data-mode gate refused to spend. This is the kill switch working as
+# designed, not a fault — reported so the run log states plainly that TV Media
+# was not called, and why. See src/lib/tv/dataMode.ts.
+EGRESS_DENIED = "egress_denied"
 
 
 def main() -> int:
@@ -45,6 +49,11 @@ def main() -> int:
         return 1
     if status in CONFIG_GAPS:
         print(f"::warning::TV Media is {status}; Hallmark coverage depends on it.")
+    if status == EGRESS_DENIED:
+        print(
+            "::notice::TV Media made NO upstream request — the data-mode gate "
+            f"refused it. Reason: {tvmedia.get('reason', '-')}"
+        )
 
     return 0
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mapListing, validateContract, TvMediaAdapter, TVM_API_KEY_ENV, TVM_LINEUP_ENV, TVM_ZIP_ENV } from './tvMedia';
+import { __stubTransportForTest } from '@/lib/tv/egressGuard';
 
 /** A row shaped exactly like TV Media's documented v4 listings contract. */
 function row(over: Record<string, unknown> = {}) {
@@ -166,16 +167,36 @@ describe('TvMediaAdapter.fetch — the documented v4 request shape', () => {
   };
 
   beforeEach(() => {
+    // These cases stub `global.fetch` and assert what the adapter does with
+    // the response — the transport never leaves the process. The egress guard
+    // cannot see that, and would otherwise refuse before the adapter reached
+    // any of the behaviour under test, so the suite declares it out loud. See
+    // egressGuard.ts, and egressContract.test.ts which keeps the seam
+    // unreachable from non-test source.
+    __stubTransportForTest(true);
     process.env[TVM_API_KEY_ENV] = 'test-key-value';
     delete process.env[TVM_LINEUP_ENV];
     delete process.env[TVM_ZIP_ENV];
   });
 
   afterEach(() => {
+    __stubTransportForTest(false);
     delete process.env[TVM_API_KEY_ENV];
     delete process.env[TVM_LINEUP_ENV];
     delete process.env[TVM_ZIP_ENV];
     vi.unstubAllGlobals();
+  });
+
+  it('refuses outright when the transport is NOT stubbed — the gate is real', async () => {
+    // The seam above is a statement about the transport, not a disabling of
+    // the guard. With it off, this adapter refuses under vitest exactly as it
+    // refuses in an unauthorised production environment.
+    __stubTransportForTest(false);
+    process.env[TVM_LINEUP_ENV] = '36617';
+    const res = await new TvMediaAdapter().fetch(request);
+    expect(res.status).toBe('misconfigured');
+    expect(res.errorCode).toMatch(/^EGRESS_DENIED_/);
+    expect(res.listings).toEqual([]);
   });
 
   it('is misconfigured with no key at all', async () => {

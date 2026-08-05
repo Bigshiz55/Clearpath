@@ -1,6 +1,6 @@
 # Search Validation Campaign
 
-- Commit `3751e34` · Branch `claude/watch-verdict-app-wwbtbg` · Seed 7
+- Commit `af98c83` · Branch `claude/watch-verdict-app-wwbtbg` · Seed 7
 - **Total searches: 2000 · Passed 2000 (100.0%) · Failed 0 (0.0%)**
 
 ## Per-dimension pass rate (of cases naming that dimension)

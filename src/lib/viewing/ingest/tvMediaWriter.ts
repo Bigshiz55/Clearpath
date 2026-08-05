@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { TVM_LINEUP_ENV, TVM_ZIP_ENV } from '../adapters/tvMedia';
+import { TVM_LINEUP_ENV, TVM_ZIP_ENV, TVM_ADAPTER_ID } from '../adapters/tvMedia';
+import { requestEgress, egressDenialSummary } from '@/lib/tv/egressGuard';
 import { tvMediaAdapterForIngest } from '../liveTv';
 import type { ScheduleListing } from '../schedule';
 import {
@@ -55,6 +56,7 @@ export type TvMediaIngestStatus =
   | 'partial'
   | 'missing_key'        // TVMEDIA_API_KEY not set in this environment
   | 'not_configured'     // key set but no lineup/ZIP to request
+  | 'egress_denied'      // the data-mode gate refused: not paid_live, or not enabled
   | 'budget_exhausted'   // monthly call budget would be exceeded
   | 'auth_failed'        // provider rejected the key (401/403)
   | 'rate_limited'       // provider throttled us (429)
@@ -272,6 +274,27 @@ export async function runTvMediaIngest(days = 14, nowMs = Date.now()): Promise<T
 
   const lineupProviderId = process.env[TVM_LINEUP_ENV] ?? (process.env[TVM_ZIP_ENV] ? `zip:${process.env[TVM_ZIP_ENV]}` : null);
   if (!lineupProviderId) return recordNoRun(noRun('not_configured', 'TVMEDIA_API_KEY is set but neither TVMEDIA_LINEUP_ID nor TVMEDIA_DEFAULT_ZIP is — nothing to request.'));
+
+  // THE SPENDING GATE. TV Media is metered, and it reached production from
+  // three separate triggers (an hourly GitHub workflow, the daily Vercel
+  // cron, and a callable route). Rather than trust three call sites to each
+  // remember, every one of them lands here and asks the same door.
+  //
+  // It sits BELOW the two configuration checks and ABOVE everything else. The
+  // checks above touch neither the network nor the database, and "no key is
+  // set" is a more actionable diagnosis than "not authorised to spend" — an
+  // operator who sees `egress_denied` should be able to conclude the
+  // credentials are fine and only the mode is holding it. Nothing between
+  // here and the first `fetch` is reachable without passing this.
+  const gate = requestEgress({
+    adapterId: TVM_ADAPTER_ID,
+    cost: 'metered',
+    trigger: 'scheduled_ingest',
+    target: 'tvmedia:listings',
+  });
+  if (!gate.allowed) {
+    return recordNoRun({ ...noRun('egress_denied', egressDenialSummary(gate)), ok: true });
+  }
 
   const admin = createAdminClient();
   const lineupId = await ensureProviderAndLineup(admin, lineupProviderId, true);

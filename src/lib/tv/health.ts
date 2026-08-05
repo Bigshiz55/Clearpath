@@ -1,4 +1,6 @@
 import 'server-only';
+import { dataModeReport } from './dataMode';
+import { egressCounts, recentEgress } from './egressGuard';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { TVM_API_KEY_ENV, TVM_ZIP_ENV, TVM_LINEUP_ENV } from '@/lib/viewing/adapters/tvMedia';
 
@@ -64,6 +66,28 @@ export interface TvHealth {
   /** True when the newest tick is older than the external hourly trigger
    *  plus generous slack — i.e. the hourly GitHub cron is not landing. */
   externalHourlyTriggerAppearsBroken: boolean;
+  /**
+   * WHAT IS THIS DEPLOYMENT ALLOWED TO CALL, AND DID IT.
+   *
+   * `dataMode` is the standing policy: the resolved mode, whether it was set
+   * explicitly, and for every metered adapter the decision the gate would
+   * return right now — with its reason, never its credential.
+   *
+   * `egress` is what actually happened in this process: counts of allowed and
+   * denied attempts per adapter, plus the most recent few. It is in-memory and
+   * therefore per-instance and short-lived; it answers "is this instance
+   * calling anything" and is not a billing ledger. `tv_call_ledger` remains
+   * the durable record of real calls.
+   *
+   * Together they make "did anything call TV Media today, and was it allowed
+   * to" a question with an answer, which is precisely what was missing when a
+   * metered allowance drained from three trigger paths nobody could enumerate.
+   */
+  dataMode: ReturnType<typeof dataModeReport>;
+  egress: {
+    counts: ReturnType<typeof egressCounts>;
+    recent: ReturnType<typeof recentEgress>;
+  };
   verdict: 'healthy' | 'stale' | 'degraded';
   notes: string[];
 }
@@ -290,6 +314,8 @@ export async function getTvHealth(): Promise<TvHealth> {
     packs: packHealths,
     lastIngestTickAt,
     externalHourlyTriggerAppearsBroken,
+    dataMode: dataModeReport(),
+    egress: { counts: egressCounts(), recent: recentEgress(20) },
     verdict,
     notes,
   };

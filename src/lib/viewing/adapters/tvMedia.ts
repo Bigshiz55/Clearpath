@@ -3,6 +3,7 @@ import type {
   ScheduleAdapter, ScheduleRequest, ScheduleResponse, ScheduleListing, ContentType,
 } from '../schedule';
 import { statusFromHttp } from '../status';
+import { requestEgress } from '@/lib/tv/egressGuard';
 
 /**
  * TV MEDIA — WatchVerd1ct's licensed production listings provider.
@@ -45,6 +46,8 @@ import { statusFromHttp } from '../status';
  * BODY (still scrubbed of anything key-shaped) ever reach an error message.
  */
 
+/** Adapter id used by the egress gate and the source registry. */
+export const TVM_ADAPTER_ID = 'tv_media';
 export const TVM_API_KEY_ENV = 'TVMEDIA_API_KEY';
 export const TVM_BASE_URL_ENV = 'TVMEDIA_BASE_URL';
 export const TVM_LINEUP_ENV = 'TVMEDIA_LINEUP_ID';
@@ -291,6 +294,17 @@ export class TvMediaAdapter implements ScheduleAdapter {
     const cached = lineupCache.get(zip);
     if (cached && Date.now() - cached.resolvedAt < LINEUP_CACHE_TTL_MS) return cached.lineupId;
 
+    // `/lineups` is a SECOND billable endpoint, so it asks the door too rather
+    // than riding in on the listings call's permission. Denied means "use the
+    // documented sample-plan fallback", which costs nothing.
+    const gate = requestEgress({
+      adapterId: TVM_ADAPTER_ID,
+      cost: 'metered',
+      trigger: 'lineup_resolve',
+      target: 'tvmedia:lineups',
+    });
+    if (!gate.allowed) return SAMPLE_PLAN_FALLBACK_LINEUP;
+
     let resolved: string | null = null;
     try {
       const params = new URLSearchParams({ postalCode: zip, api_key: key });
@@ -317,6 +331,37 @@ export class TvMediaAdapter implements ScheduleAdapter {
 
   async fetch(req: ScheduleRequest): Promise<ScheduleResponse> {
     const fetchedAt = new Date().toISOString();
+
+    /**
+     * THE GATE COMES FIRST — before the credential check, before the lineup
+     * lookup, before any `fetch`.
+     *
+     * TV Media is metered, and this adapter used to begin spending the moment
+     * a key was present, reachable from three separate trigger paths (an
+     * hourly GitHub workflow, a daily Vercel cron, and a callable route). It
+     * now asks the one door (src/lib/tv/egressGuard.ts) whether it is
+     * authorised at all, and a denial is returned as a NAMED status rather
+     * than an empty grid: "nothing is on tonight" and "we are not allowed to
+     * ask" must never look the same to a reader.
+     *
+     * Denied by default. `DATA_MODE` must be `paid_live` AND `TVMEDIA_ENABLED`
+     * must be `1`; changing the mode alone is deliberately not sufficient.
+     */
+    const gate = requestEgress({
+      adapterId: TVM_ADAPTER_ID,
+      cost: 'metered',
+      trigger: 'schedule_fetch',
+      target: 'tvmedia:listings',
+    });
+    if (!gate.allowed) {
+      return this.fail(
+        'misconfigured',
+        `EGRESS_DENIED_${gate.code.toUpperCase()}`,
+        gate.reason,
+        fetchedAt,
+      );
+    }
+
     const key = process.env[TVM_API_KEY_ENV];
     if (!key) {
       return this.fail('misconfigured', 'NO_CREDENTIALS',

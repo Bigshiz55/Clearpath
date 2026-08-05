@@ -3,6 +3,7 @@ import type {
   ScheduleAdapter, ScheduleRequest, ScheduleResponse, ScheduleListing, ContentType,
 } from '../schedule';
 import { statusFromHttp } from '../status';
+import { requestEgress } from '@/lib/tv/egressGuard';
 
 /**
  * TVMAZE — a SUPPLEMENTARY premiere feed. Explicitly NOT a listings grid.
@@ -56,6 +57,9 @@ const strip = (h: string | null | undefined): string | null => {
   return t.length > 0 ? t : null;
 };
 
+/** The id the egress guard and the data-mode gate know this adapter by. */
+export const TVMAZE_ADAPTER_ID = 'tvmaze';
+
 export class TvmazeAdapter implements ScheduleAdapter {
   readonly providerId = 'tvmaze_premieres';
   /** Behind any real grid. It supplements; it never substitutes. */
@@ -66,6 +70,24 @@ export class TvmazeAdapter implements ScheduleAdapter {
 
   async fetch(req: ScheduleRequest): Promise<ScheduleResponse> {
     const fetchedAt = new Date().toISOString();
+
+    // Free, but it still asks. TVmaze costs nothing, so the interesting case
+    // is not money — it is that `fixture` mode and preview deployments must
+    // reach NOTHING, and an adapter that decides for itself whether that
+    // applies to it is an adapter that will get it wrong. One door, no
+    // exemptions.
+    const gate = requestEgress({
+      adapterId: TVMAZE_ADAPTER_ID, cost: 'free',
+      trigger: 'schedule_fetch', target: 'tvmaze:schedule',
+    });
+    if (!gate.allowed) {
+      return {
+        providerId: this.providerId, status: 'misconfigured', listings: [],
+        totalRaw: 0, totalNormalized: 0, fetchedAt,
+        errorCode: `EGRESS_DENIED_${gate.code.toUpperCase()}`, errorMessage: gate.reason,
+      };
+    }
+
     const days = new Set<string>();
     for (let t = req.windowStartUtc; t <= req.windowEndUtc + 86_400_000; t += 86_400_000) {
       days.add(new Date(t).toISOString().slice(0, 10));
