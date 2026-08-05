@@ -43,7 +43,12 @@ async function open(page: Page, w: number, h = 844) {
   await page.setViewportSize({ width: w, height: h });
   await page.route('**/api/detective**', (r) => r.fulfill({ json: { picks: PICKS, remindedIds: [] } }));
   await page.goto('/dev/detective', { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: /Scan the next/i }).click();
+  // The button used to read "Scan the next N hours"; the horizon moved into its
+  // own toggle above it and the button is now just "Scan" (TvDetective.tsx).
+  // The old selector matched nothing, so every test in this file died in setup
+  // on a 15s click timeout — 25 failures, one cause. `exact` so it cannot drift
+  // onto "Scanning…" or the "Scan again" link in the done state.
+  await page.getByRole('button', { name: 'Scan', exact: true }).click();
   await expect(page.locator('.wv-det-row').first()).toBeVisible();
 }
 

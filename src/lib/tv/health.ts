@@ -109,14 +109,38 @@ export async function getTvHealth(): Promise<TvHealth> {
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
 
-  const [{ data: lineups }, { data: runs }, { data: packs }, { data: packStations }, { data: stations }, locksResult] =
+  /**
+   * RUN ROWS, PER PROVIDER — not one shared 60-row window.
+   *
+   * The window was the bug. `tv_ingestion_runs` carries every tick of every
+   * provider, and one 60-row page shared between them cannot promise that a
+   * given provider's newest row is in it. In production that page was
+   * returning rows from 12:47 while the ingest gate — which queries the same
+   * table filtered to one provider — correctly saw a success at 17:46. So
+   * health reported "no ingest tick in the last 3 hours" and
+   * `externalHourlyTriggerAppearsBroken: true` about a pipeline that had run
+   * fifty minutes earlier. A monitoring surface that cries wolf is worse than
+   * none: it trains you to ignore the one time it is right.
+   *
+   * One small ordered query per provider, filtered, so the newest row for
+   * each is the newest row that exists.
+   */
+  const PROVIDER_IDS = ['tvmaze', 'tv_media'] as const;
+  const runsSelect = 'provider_id, started_at, status, channels_requested, channels_returned, errors';
+
+  const [{ data: lineups }, runsPerProvider, { data: packs }, { data: packStations }, { data: stations }, locksResult] =
     await Promise.all([
       admin.from('tv_lineups').select('provider_id, last_success_at, coverage_start_utc, coverage_end_utc'),
-      admin
-        .from('tv_ingestion_runs')
-        .select('provider_id, started_at, status, channels_requested, channels_returned, errors')
-        .order('started_at', { ascending: false })
-        .limit(60),
+      Promise.all(
+        PROVIDER_IDS.map((id) =>
+          admin
+            .from('tv_ingestion_runs')
+            .select(runsSelect)
+            .eq('provider_id', id)
+            .order('started_at', { ascending: false })
+            .limit(20),
+        ),
+      ),
       admin.from('packs').select('id, slug'),
       admin.from('pack_stations').select('pack_id, station_id'),
       admin.from('tv_stations').select('id, provider_id, name'),
@@ -146,11 +170,17 @@ export async function getTvHealth(): Promise<TvHealth> {
     errors: Array<{ code?: string; message?: string }> | null;
   };
   const runsByProvider = new Map<string, RunRow[]>();
-  for (const r of (runs ?? []) as RunRow[]) {
+  for (const r of runsPerProvider.flatMap((res) => (res.data ?? []) as RunRow[])) {
     const list = runsByProvider.get(r.provider_id) ?? [];
     list.push(r);
     runsByProvider.set(r.provider_id, list);
   }
+  // Every row already came back newest-first per provider; the flatMap only
+  // concatenates providers, so re-sort defensively rather than trust order.
+  for (const list of runsByProvider.values()) {
+    list.sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at));
+  }
+  const allRuns = [...runsByProvider.values()].flat();
 
   const lineupByProvider = new Map(
     ((lineups ?? []) as {
@@ -224,8 +254,9 @@ export async function getTvHealth(): Promise<TvHealth> {
     .select('id', { count: 'exact', head: true })
     .gte('start_at_utc', nowIso);
 
-  const allRuns = (runs ?? []) as RunRow[];
-  const lastIngestTickAt = allRuns[0]?.started_at ?? null;
+  const lastIngestTickAt = allRuns.length
+    ? allRuns.reduce((newest, r) => (Date.parse(r.started_at) > Date.parse(newest) ? r.started_at : newest), allRuns[0]!.started_at)
+    : null;
   const externalHourlyTriggerAppearsBroken =
     lastIngestTickAt == null || nowMs - Date.parse(lastIngestTickAt) > 3 * 3_600_000;
 

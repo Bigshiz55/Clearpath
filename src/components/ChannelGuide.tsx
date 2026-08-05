@@ -392,7 +392,17 @@ export function ChannelGuide({
                               {displayClock(a.airstamp, a.time) ?? '—'}
                             </span>
                             <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-slate-300">
-                              {a.showType === 'Movie' && <Film size={12} className="flex-none" aria-hidden />}
+                              {/* The movie marker used to be a 🎬 inside the
+                                  text run; it is an icon now, which neither a
+                                  text assertion nor a screen reader can see.
+                                  The testid gives the suite a hook and the
+                                  sr-only word gives the marker a name. */}
+                              {a.showType === 'Movie' && (
+                                <span className="flex-none" data-testid="guide-movie-mark">
+                                  <Film size={12} aria-hidden />
+                                  <span className="sr-only">Movie</span>
+                                </span>
+                              )}
                               <span className="truncate" title={a.episodeName ? `${a.showName} — ${a.episodeName}` : a.showName}>
                                 {a.showName}
                                 {a.episodeName && <span className="text-slate-400"> — {a.episodeName}</span>}

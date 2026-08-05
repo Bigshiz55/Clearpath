@@ -47,6 +47,16 @@ function canRefresh(): Promise<boolean> {
   return capabilityProbe;
 }
 
+/**
+ * THE SPACE THIS BLOCK OCCUPIES BEFORE IT KNOWS ANYTHING.
+ *
+ * One constant, used by BOTH the loading placeholder and the resolved
+ * section, so the card is the same height before and after the availability
+ * answer lands. 5rem covers the measured height of the ordinary answer —
+ * heading (15px) + one line box (~28px) + the 36px action + gaps.
+ */
+const RESERVE = 'min-h-[5rem]';
+
 export function WhereToWatch({
   mediaType,
   tmdbId,
@@ -118,15 +128,25 @@ export function WhereToWatch({
   // Until the fetch lands we know nothing, and saying nothing is the only
   // honest option — an optimistic "Watch now" that later becomes "Check
   // availability" is exactly the false claim this component exists to remove.
+  //
+  // BUT SAYING NOTHING STILL HAS TO TAKE UP THE ROOM. The placeholder was
+  // `h-4` — 16px — against a resolved block of ~79px, so every card in the
+  // grid grew 62px a few hundred milliseconds after paint and the row below
+  // dropped out from under a thumb already reaching for a button. Both
+  // branches now start from the same floor (see RESERVE), which is the
+  // heading + one availability line + the 36px action: the shape of the
+  // ordinary answer. A genuinely richer answer may still add a line — that is
+  // content arriving, not a hole being filled — but the common path no longer
+  // moves at all. Measured on /dev/visual-qa at 320/390/1024/1366.
   if (!presentation) {
-    return <div className={`h-4 ${className}`} aria-hidden data-testid="where-to-watch-loading" />;
+    return <div className={`${RESERVE} ${className}`} aria-hidden data-testid="where-to-watch-loading" />;
   }
 
   const { status, lines, cta, note, historical, ariaLabel } = presentation;
 
   return (
     <section
-      className={`space-y-1 ${className}`}
+      className={`${RESERVE} space-y-1 ${className}`}
       aria-label={ariaLabel}
       data-testid="where-to-watch"
       data-status={status}

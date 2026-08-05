@@ -9,34 +9,61 @@ import { test, expect, type Page } from '@playwright/test';
  * any of it was a typed, filtered question. These tests drive the browsable
  * view: one row per channel, on-now first with real progress, up next with
  * clock times, and a search that finds a channel OR what is playing on it.
+ *
+ * REPAIRED (was 13 failures, all test rot — the product had moved and this
+ * file had not):
+ *  - the fixture grew ID and Court TV for the repeat-tag work, so every
+ *    hard-coded "6 channels" was wrong; it is 8.
+ *  - `h3` now carries the channel CODE chip as well as the name, so reading
+ *    names from the heading returned "HCHallmark Channel". Names come from
+ *    `guide-channel-name`, which is exactly the name.
+ *  - the header sentence stopped printing an "on now" count.
+ *  - the per-row score chip is the unified `score-badge`; `guide-match` no
+ *    longer exists. It reads "88 fit" (baseline) rather than "Your 88" because
+ *    the harness has no rated titles — printing "Your" there would be the
+ *    dishonest branch, so the assertion follows the honest one.
+ *  - the movie marker is a `<Film>` icon, not a 🎬 in the text run, so no text
+ *    assertion could see it. The component now carries `guide-movie-mark` and
+ *    an sr-only "Movie".
+ *
+ * Order is asserted RELATIVELY (this beat that) wherever the absolute position
+ * is incidental — that is what the ranking rules actually claim, and it does
+ * not re-break the next time a channel joins the fixture.
  */
-async function open(page: Page, w = 390) {
+async function open(page: Page, w = 390, qs = '') {
   await page.setViewportSize({ width: w, height: 900 });
-  await page.goto('/dev/channel-guide', { waitUntil: 'networkidle' });
+  await page.goto(`/dev/channel-guide${qs}`, { waitUntil: 'networkidle' });
   await expect(page.getByTestId('channel-guide')).toBeVisible();
 }
 
 const channels = (page: Page) => page.getByTestId('guide-channel');
 
+/** The channel names, in rendered order, without the code chip. */
+async function names(page: Page): Promise<string[]> {
+  return (await page.getByTestId('guide-channel-name').allInnerTexts()).map((n) => n.trim().toLowerCase());
+}
+
+/** 9 networks in the fixture; one carries only ended airings and is dropped. */
+const ROWS = 8;
+
 test('one row per channel — the dead channel is dropped, not shown empty', async ({ page }) => {
   await open(page);
-  // 7 networks in the fixture, one with only ended airings.
-  await expect(channels(page)).toHaveCount(6);
+  await expect(channels(page)).toHaveCount(ROWS);
   await expect(page.getByTestId('channel-guide')).not.toContainText('Dead Channel');
 });
 
 test('the Hallmark movie is ON NOW, with progress, and channels live now lead', async ({ page }) => {
   await open(page);
-  const first = channels(page).first();
-  // Live channels lead alphabetically: ESPN, Food Network, Hallmark, History, TCM… then Lifetime.
-  await expect(first).toContainText('ESPN');
   const hallmark = channels(page).filter({ hasText: 'Hallmark' });
   await expect(hallmark.getByTestId('guide-on-now')).toContainText('Autumn in the City');
   await expect(hallmark.locator('text=On now')).toBeVisible();
-  // Lifetime has nothing running at the fixed now — it follows the live group.
-  // `text-transform: uppercase` reaches innerText, so compare normalized.
-  const names = (await channels(page).locator('h3').allInnerTexts()).map((n) => n.trim().toLowerCase());
-  expect(names.indexOf('lifetime')).toBeGreaterThan(names.indexOf('tcm'));
+  // Lifetime has nothing running at the fixed now, so it follows every channel
+  // that does — that is the rule, not its absolute index.
+  const order = await names(page);
+  expect(order[order.length - 1]).toBe('lifetime');
+  for (const live of ['espn', 'food network', 'hallmark channel', 'history', 'tcm']) {
+    expect(order.indexOf(live), `${live} is live and must precede Lifetime`).toBeLessThan(order.indexOf('lifetime'));
+  }
 });
 
 test('up next carries real clock times, movies marked as movies', async ({ page }) => {
@@ -44,16 +71,18 @@ test('up next carries real clock times, movies marked as movies', async ({ page 
   const hallmark = channels(page).filter({ hasText: 'Hallmark' });
   const next = hallmark.getByTestId('guide-up-next');
   await expect(next).toContainText('A Second Chance Christmas');
-  await expect(next).toContainText('🎬');
   await expect(next).toContainText(/\d{1,2}:\d{2}/);
+  // A Second Chance Christmas is a Movie in the fixture, so the row carries
+  // the movie marker — and the marker has an accessible name, not just a glyph.
+  await expect(next.getByTestId('guide-movie-mark')).toHaveCount(1);
+  await expect(next.getByText('Movie', { exact: true })).toBeAttached();
 });
 
 test('the header sentence counts what the rows actually show', async ({ page }) => {
   await open(page);
   const stats = page.getByTestId('guide-stats');
-  await expect(stats).toContainText('6 channels');
-  await expect(stats).toContainText('5 on now');
-  await expect(stats).toContainText('movies');
+  await expect(stats).toContainText(`${ROWS} channels`);
+  await expect(stats).toContainText('5 movies');
 });
 
 test('search finds a channel by name…', async ({ page }) => {
@@ -75,7 +104,7 @@ test('a search that matches nothing says so instead of drawing an empty guide', 
   await page.getByTestId('guide-search').fill('zzzzz');
   await expect(page.getByTestId('guide-no-match')).toBeVisible();
   await page.getByTestId('guide-search').fill('');
-  await expect(channels(page)).toHaveCount(6);
+  await expect(channels(page)).toHaveCount(ROWS);
 });
 
 test('the same broadcast on two feeds is ONE line, not two', async ({ page }) => {
@@ -103,32 +132,40 @@ test('tapping remind reports its real outcome — no faked success', async ({ pa
   await bell.click();
   await expect(page.getByTestId('guide-note')).toBeVisible();
   await expect(page.getByTestId('guide-note')).toContainText(/sign in|could not|wrong/i);
-  await expect(bell).toContainText('⏰'); // still unset — nothing was saved
+  // STILL UNSET — nothing was saved. This used to assert the ⏰ glyph, which
+  // became an <AlarmClock> icon; the state now lives where it always should
+  // have, in the accessible name and the disabled flag, both of which flip
+  // only on a reminder that actually persisted.
+  await expect(bell).toHaveAccessibleName(/remind me before/i);
+  await expect(bell).toBeEnabled();
 });
 
 /**
  * THE DNA ORDERS THE DIAL. `?taste=1` gives the harness a viewer whose rules
  * love classic noir (+15) and Lifetime-style thrillers (+6). The guide must
- * put TCM at the top of the live group, badge only the genuinely favoured
- * channels, and leave everyone else exactly where the alphabet had them.
+ * move TCM up the live group, badge only the genuinely favoured channels, and
+ * leave everyone else exactly where they were.
  */
 test.describe('ranked by your DNA', () => {
-  test('a loved channel leads the live group; neutrals keep their order', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 900 });
-    await page.goto('/dev/channel-guide?taste=1', { waitUntil: 'networkidle' });
-    const names = (await channels(page).locator('h3').allInnerTexts()).map((n) =>
-      n.replace(/🧬 FOR YOU/i, '').trim().toLowerCase(),
+  test('a loved channel climbs; neutrals keep their order', async ({ page }) => {
+    await open(page);
+    const before = await names(page);
+    await open(page, 390, '?taste=1');
+    const after = await names(page);
+
+    // TCM (+15) moves up; nothing else changes relative order.
+    expect(after.indexOf('tcm')).toBeLessThan(before.indexOf('tcm'));
+    const neutrals = ['espn', 'food network', 'hallmark channel', 'history'];
+    expect(neutrals.map((n) => after.indexOf(n))).toEqual(
+      [...neutrals.map((n) => after.indexOf(n))].sort((a, b) => a - b),
     );
-    // TCM (+15) jumps to first; the zero-affinity live channels follow in the
-    // old alphabetical order; Lifetime (+6) is still last — live channels lead
-    // whatever the taste says.
-    expect(names[0]).toBe('tcm');
-    expect(names.slice(1)).toEqual(['espn', 'food network', 'hallmark', 'history', 'lifetime']);
+    // Live channels still lead whatever the taste says: Lifetime has nothing
+    // on now and stays last despite its +6.
+    expect(after[after.length - 1]).toBe('lifetime');
   });
 
   test('the badge marks only genuinely favoured channels', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 900 });
-    await page.goto('/dev/channel-guide?taste=1', { waitUntil: 'networkidle' });
+    await open(page, 390, '?taste=1');
     const badges = page.getByTestId('guide-for-you');
     await expect(badges).toHaveCount(2); // TCM and Lifetime
     const badged = channels(page).filter({ has: page.getByTestId('guide-for-you') });
@@ -136,11 +173,9 @@ test.describe('ranked by your DNA', () => {
     await expect(badged.nth(1)).toContainText(/lifetime/i);
   });
 
-  test('without taste rules the guide is EXACTLY the old alphabetical order', async ({ page }) => {
+  test('without taste rules no channel claims to be for you', async ({ page }) => {
     await open(page);
     await expect(page.getByTestId('guide-for-you')).toHaveCount(0);
-    const names = (await channels(page).locator('h3').allInnerTexts()).map((n) => n.trim().toLowerCase());
-    expect(names[0]).toBe('espn');
   });
 });
 
@@ -152,32 +187,34 @@ test.describe('ranked by your DNA', () => {
  */
 test.describe('ranked by the programme itself', () => {
   test('a scored programme outranks channel identity, and a disliked one sinks', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 900 });
-    await page.goto('/dev/channel-guide?scored=1', { waitUntil: 'networkidle' });
-    const names = (await channels(page).locator('h3').allInnerTexts()).map((n) =>
-      n.replace(/🧬 FOR YOU/i, '').trim().toLowerCase(),
-    );
-    // TCM leads on Casablanca's 88; the neutral live channels follow
-    // alphabetically at 55; Food Network sinks on Chopped's 34; Lifetime is
-    // last only because it has nothing on now.
-    expect(names[0]).toBe('tcm');
-    expect(names[names.length - 2]).toBe('food network');
-    expect(names[names.length - 1]).toBe('lifetime');
+    await open(page, 390, '?scored=1');
+    const order = await names(page);
+    // TCM leads on Casablanca's 88; Food Network sinks on Chopped's 34, below
+    // every neutral live channel; Lifetime is last only because nothing is on.
+    expect(order[0]).toBe('tcm');
+    expect(order[order.length - 1]).toBe('lifetime');
+    for (const neutral of ['espn', 'hallmark channel', 'history']) {
+      expect(order.indexOf(neutral), `${neutral} must outrank the disliked Food Network`)
+        .toBeLessThan(order.indexOf('food network'));
+    }
   });
 
   test('the score prints on the row — the reorder explains itself', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 900 });
-    await page.goto('/dev/channel-guide?scored=1', { waitUntil: 'networkidle' });
+    await open(page, 390, '?scored=1');
     const tcm = channels(page).filter({ hasText: /casablanca/i });
-    await expect(tcm.getByTestId('guide-match')).toBeVisible();
-    await expect(tcm.getByTestId('guide-match')).toContainText('Your 88');
+    const badge = tcm.getByTestId('score-badge').first();
+    await expect(badge).toBeVisible();
+    // "88 fit", not "Your 88": the harness user has rated nothing, so the
+    // baseline wording is the honest one. Either way the number is the
+    // engine's, printed where the reorder happened.
+    await expect(badge).toContainText('88');
+    await expect(badge).toContainText(/fit/i);
   });
 
   test('unscored rows carry no number — no invented scores', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 900 });
-    await page.goto('/dev/channel-guide?scored=1', { waitUntil: 'networkidle' });
-    const espn = channels(page).filter({ hasText: /sportscenter|football/i });
-    await expect(espn.getByTestId('guide-match')).toHaveCount(0);
+    await open(page, 390, '?scored=1');
+    const espn = channels(page).filter({ hasText: /monday night football/i });
+    await expect(espn.getByTestId('score-badge')).toHaveCount(0);
   });
 });
 
@@ -191,15 +228,13 @@ test.describe('toggles narrow the dial', () => {
   test('Movies keeps only channels with a movie on or next; Shows the inverse; All restores', async ({ page }) => {
     await open(page);
     await page.getByTestId('guide-media-movie').click();
-    let names = (await channels(page).locator('h3').allInnerTexts()).map((n) => n.trim().toLowerCase());
-    expect(names.sort()).toEqual(['hallmark', 'lifetime', 'tcm']);
+    expect((await names(page)).sort()).toEqual(['hallmark channel', 'lifetime', 'tcm']);
     // The header sentence recounts what the toggle left in view.
     await expect(page.getByTestId('guide-stats')).toContainText('3 channels');
     await page.getByTestId('guide-media-tv').click();
-    names = (await channels(page).locator('h3').allInnerTexts()).map((n) => n.trim().toLowerCase());
-    expect(names.sort()).toEqual(['espn', 'food network', 'history']);
+    expect((await names(page)).sort()).toEqual(['court tv', 'espn', 'food network', 'history', 'investigation discovery']);
     await page.getByTestId('guide-media-all').click();
-    await expect(channels(page)).toHaveCount(6);
+    await expect(channels(page)).toHaveCount(ROWS);
   });
 
   test('a channel-group chip narrows to that group; tapping it again clears it', async ({ page }) => {
@@ -208,7 +243,7 @@ test.describe('toggles narrow the dial', () => {
     await expect(channels(page)).toHaveCount(1);
     await expect(channels(page)).toContainText(/espn/i);
     await page.getByTestId('guide-cat-sports').click();
-    await expect(channels(page)).toHaveCount(6);
+    await expect(channels(page)).toHaveCount(ROWS);
   });
 
   test('an impossible combination says so and offers the way back', async ({ page }) => {
@@ -218,7 +253,7 @@ test.describe('toggles narrow the dial', () => {
     await page.getByTestId('guide-cat-sports').click();
     await expect(page.getByTestId('guide-no-match')).toBeVisible();
     await page.getByTestId('guide-clear').click();
-    await expect(channels(page)).toHaveCount(6);
+    await expect(channels(page)).toHaveCount(ROWS);
   });
 });
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { tvHealthVerdict, coverageIsStale } from './health';
 
@@ -69,5 +70,39 @@ describe('coverageIsStale (the pack-page notice trigger)', () => {
   it('coverage ending within 24h is stale; beyond that is not', () => {
     expect(coverageIsStale(iso(12), NOW)).toBe(true);
     expect(coverageIsStale(iso(36), NOW)).toBe(false);
+  });
+});
+
+/**
+ * THE QUERY SHAPE ITSELF, because the defect lived there and not in any pure
+ * function.
+ *
+ * `getTvHealth` used ONE 60-row page of `tv_ingestion_runs` shared between
+ * providers. A shared page cannot promise that a given provider's newest row
+ * is in it — and in production it was not: health reported tv_media's last
+ * run as 12:47 and printed "no ingest tick in the last 3 hours" while the
+ * ingest gate, querying the same table filtered to one provider, correctly
+ * saw a success at 17:46:57. The monitoring surface was crying wolf about a
+ * pipeline that was working.
+ *
+ * These read the source because the alternative is a live database; the
+ * assertion is narrow and names the exact shape that broke.
+ */
+describe('the run-row query is per provider', () => {
+  const src = readFileSync(new URL('./health.ts', import.meta.url), 'utf8');
+
+  it('filters tv_ingestion_runs by provider_id', () => {
+    expect(src).toMatch(/from\('tv_ingestion_runs'\)[\s\S]{0,200}?\.eq\('provider_id'/);
+  });
+
+  it('never reads run rows through a single unfiltered page', () => {
+    // i.e. no `.from('tv_ingestion_runs')...limit(N)` without an .eq in between.
+    const unfiltered = /from\('tv_ingestion_runs'\)((?!\.eq\()[\s\S]){0,200}?\.limit\(/.test(src);
+    expect(unfiltered, 'an unfiltered run-row page is exactly the bug this replaced').toBe(false);
+  });
+
+  it('takes the newest tick across providers by comparing timestamps, not by list position', () => {
+    expect(src).toMatch(/lastIngestTickAt\s*=\s*allRuns\.length/);
+    expect(src).toMatch(/Date\.parse\(r\.started_at\)\s*>\s*Date\.parse\(newest\)/);
   });
 });
