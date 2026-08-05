@@ -40,6 +40,19 @@ export interface CaseIdentifiers {
   rawSubjectNames?: string[];
   location: string | null;
   year: number | null;
+  /**
+   * False when `year` is only the episode's AIR year, not a year the text
+   * actually states. Undefined means "not recorded" and is treated as
+   * trustworthy, so identifier literals written before this field existed
+   * keep their old meaning.
+   *
+   * This matters enormously at production scale: every programme in a
+   * ten-day listings window airs in the same calendar year, so crediting the
+   * air year as agreement handed out a free confidence bonus to EVERY pair
+   * in the corpus. It is what let an unrelated Storage Wars episode reach
+   * the auto-link threshold with a true-crime show.
+   */
+  yearFromText?: boolean;
   crimeType: string | null;
 }
 
@@ -208,6 +221,25 @@ function extractLocation(text: string): string | null {
   return null;
 }
 
+/**
+ * Multi-word place names ("Newport Beach", "Orange County", "Palm Springs")
+ * match the same capitalized-run pattern as person names. A fixed gazetteer
+ * cannot list every town, so this recognises the SHAPE of an American place
+ * name by its head noun, which generalises to places the gazetteer has never
+ * heard of.
+ */
+const PLACE_HEAD_NOUNS = [
+  'beach', 'county', 'city', 'springs', 'valley', 'park', 'heights', 'falls',
+  'island', 'harbor', 'harbour', 'lake', 'river', 'hills', 'ridge', 'creek',
+  'village', 'township', 'borough', 'shores', 'gardens', 'grove', 'bay',
+];
+
+export function looksLikePlaceName(name: string): boolean {
+  const words = name.trim().toLowerCase().split(/\s+/);
+  if (words.length < 2) return false;
+  return PLACE_HEAD_NOUNS.includes(words[words.length - 1]!);
+}
+
 function extractYear(text: string, airdate: string): number | null {
   const m = text.match(/\b(19[5-9]\d|20[0-4]\d)\b/);
   if (m) return Number(m[0]);
@@ -233,12 +265,16 @@ function extractCrimeType(text: string): string | null {
 export function extractCaseIdentifiers(episode: EpisodeInput): CaseIdentifiers {
   const text = `${episode.title}. ${episode.synopsis}`;
   const rawSubjectNames = extractSubjectNames(text);
-  const subjectNames = rawSubjectNames.filter((name) => !isStoplistedCorrespondent(episode.series, name));
+  const subjectNames = rawSubjectNames.filter(
+    (name) => !isStoplistedCorrespondent(episode.series, name) && !looksLikePlaceName(name),
+  );
+  const textYear = text.match(/\b(19[5-9]\d|20[0-4]\d)\b/);
   return {
     subjectNames,
     rawSubjectNames,
     location: extractLocation(text),
     year: extractYear(text, episode.airdate),
+    yearFromText: textYear != null,
     crimeType: extractCrimeType(text),
   };
 }

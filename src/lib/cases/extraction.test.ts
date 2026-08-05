@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   extractCaseIdentifiers,
   normalizeDiacritics,
+  looksLikePlaceName,
   runExtractionBatch,
   CORRESPONDENT_FREQUENCY_THRESHOLD,
   type EpisodeInput,
@@ -259,5 +260,37 @@ describe('correspondent and narrator suppression', () => {
       expect(r.identifiers.subjectNames).not.toContain(talkingHead);
     }
     expect(resultB.identifiers.subjectNames).toContain(talkingHead);
+  });
+});
+
+describe('place names are not people', () => {
+  it('recognises American place shapes the gazetteer never listed', () => {
+    for (const place of ['Newport Beach', 'Orange County', 'Palm Springs', 'Cedar Falls', 'Long Island']) {
+      expect(looksLikePlaceName(place), place).toBe(true);
+    }
+  });
+
+  it('does not mistake a person for a place', () => {
+    for (const person of ['Debbie Hawk', 'Glen Rogers', 'JonBenet Ramsey', 'Keith Morrison']) {
+      expect(looksLikePlaceName(person), person).toBe(false);
+    }
+  });
+
+  it('a place in the synopsis never becomes a subject name', () => {
+    const ids = extractCaseIdentifiers({
+      tvmazeEpisodeId: 1, series: 'The Real Murders of Orange County', network: 'Oxygen',
+      title: 'Wrong Place, Wrong Time', airdate: '2026-08-07',
+      synopsis: 'A shooting in Newport Beach leaves investigators searching for answers.',
+    });
+    expect(ids.subjectNames).not.toContain('Newport Beach');
+  });
+
+  it('the air year is recorded as NOT text-stated', () => {
+    const ids = extractCaseIdentifiers({
+      tvmazeEpisodeId: 2, series: 'Storage Wars', network: 'A&E',
+      title: "Smoke 'Em if You Find 'Em", airdate: '2026-08-07',
+      synopsis: 'The buyers head to a storage auction.',
+    });
+    expect(ids.yearFromText).toBe(false);
   });
 });

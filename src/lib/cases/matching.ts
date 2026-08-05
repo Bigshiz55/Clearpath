@@ -48,7 +48,11 @@ export function scoreMatch(a: CaseIdentifiers, b: CaseIdentifiers): { confidence
     reasons.push(`shared subject: ${shared.join(', ')}`);
   }
 
-  if (a.year != null && b.year != null && a.year === b.year) {
+  // Only a year the TEXT states counts. `yearFromText === false` means the
+  // value is just the episode's air year, which every programme in a listings
+  // window shares — agreement there is arithmetic, not evidence.
+  const yearIsEvidence = a.yearFromText !== false && b.yearFromText !== false;
+  if (yearIsEvidence && a.year != null && b.year != null && a.year === b.year) {
     confidence += 0.15;
     reasons.push(`same year: ${a.year}`);
   }

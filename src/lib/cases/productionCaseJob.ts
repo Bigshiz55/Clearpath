@@ -188,8 +188,18 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
   const autoPairs: Array<[number, number]> = [];
   const reviewPairs: typeof candidates = [];
   for (const c of candidates) {
-    if (c.confidence >= AUTO_LINK_THRESHOLD) autoPairs.push([c.episodeAId, c.episodeBId]);
-    else if (c.confidence >= PROPOSAL_THRESHOLD) reviewPairs.push(c);
+    // A shared NAMED SUBJECT is required to assert a case automatically.
+    // Circumstantial agreement (same location, same year, same crime type)
+    // can total 0.4 between two programmes that have nothing to do with each
+    // other, and a Pack that tells you a storage-auction show covered a
+    // murder has destroyed the only thing it was for. Those pairs are still
+    // surfaced for review; they are just never asserted.
+    const hasSharedSubject = c.reasons.some((r) => r.startsWith('shared subject:'));
+    if (hasSharedSubject && c.confidence >= AUTO_LINK_THRESHOLD) {
+      autoPairs.push([c.episodeAId, c.episodeBId]);
+    } else if (c.confidence >= PROPOSAL_THRESHOLD) {
+      reviewPairs.push(c);
+    }
   }
 
   const groups = cluster(extractions.length, autoPairs);
@@ -197,6 +207,29 @@ export async function runProductionCaseJob(packSlug = 'crime-case-files'): Promi
 
   const evidenceColumns = await hasTable(admin, 'case_evidence');
   const queueTable = await hasTable(admin, 'case_link_candidates');
+
+  // ── RECONCILE, DO NOT APPEND ────────────────────────────────────────────
+  // A rebuild must be able to RETRACT a link the current evidence no longer
+  // supports, not just add new ones. Without this the first bad match is
+  // permanent: an early run linked a storage-auction show to a murder show
+  // on a place name, and re-running with the fixed extractor would have left
+  // that row sitting in production for ever.
+  //
+  // Only automatic links are cleared. A curated link is somebody's checked
+  // judgement and is never touched by a batch job; when the linked_by column
+  // is absent (0043 not applied) there are no curated links to protect,
+  // because nothing can have written one.
+  {
+    let del = admin.from('case_programmes').delete().in('programme_id', programmeIds);
+    if (evidenceColumns) del = del.eq('linked_by', 'automatic');
+    await del;
+    // Cases left with no programmes at all are now empty shells.
+    const { data: remaining } = await admin.from('case_programmes').select('case_id');
+    const stillUsed = new Set(((remaining ?? []) as { case_id: string }[]).map((r) => r.case_id));
+    const { data: allCases } = await admin.from('cases').select('id');
+    const orphans = ((allCases ?? []) as { id: string }[]).map((c) => c.id).filter((id) => !stillUsed.has(id));
+    if (orphans.length > 0) await admin.from('cases').delete().in('id', orphans);
+  }
 
   let casesCreated = 0;
   let casesReused = 0;

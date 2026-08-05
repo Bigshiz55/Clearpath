@@ -94,3 +94,35 @@ describe('precision and recall against the hand-labeled fixture programmes', () 
     expect(report.groundTruthPairCount).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Regression: the two defects that produced a real false positive in
+ * production — an unrelated Storage Wars episode auto-linked to a true-crime
+ * show about Orange County murders.
+ */
+describe('production false-positive regressions', () => {
+  const base = { subjectNames: [] as string[], location: null, year: null, crimeType: null };
+
+  it('an air-year coincidence is not evidence', () => {
+    // Every programme in a listings window shares an air year. Crediting that
+    // handed a free +0.15 to every pair in the corpus.
+    const a = { ...base, year: 2026, yearFromText: false };
+    const b = { ...base, year: 2026, yearFromText: false };
+    expect(scoreMatch(a, b).confidence).toBe(0);
+  });
+
+  it('a year the text actually states still counts', () => {
+    const a = { ...base, year: 1996, yearFromText: true };
+    const b = { ...base, year: 1996, yearFromText: true };
+    expect(scoreMatch(a, b).reasons).toContain('same year: 1996');
+  });
+
+  it('circumstantial agreement alone stays under the auto-link bar', () => {
+    // Same place, same year, same crime type, no shared person: 0.4.
+    const a = { ...base, location: 'California', year: 2019, yearFromText: true, crimeType: 'murder' };
+    const b = { ...base, location: 'California', year: 2019, yearFromText: true, crimeType: 'murder' };
+    const { confidence, reasons } = scoreMatch(a, b);
+    expect(confidence).toBeLessThan(0.75);
+    expect(reasons.some((r) => r.startsWith('shared subject:'))).toBe(false);
+  });
+});
