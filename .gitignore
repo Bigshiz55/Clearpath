@@ -34,3 +34,7 @@ npm-debug.log*
 
 # Playwright transient artifacts
 /test-results/
+
+# Search-audit run artifacts (live responses, probe outputs) — evidence stays
+# local; only the frozen corpus + oracle are tracked, under scripts/searchAudit.
+/artifacts/
