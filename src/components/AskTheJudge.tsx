@@ -61,6 +61,9 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
   const [conv, setConv] = useState<CanonicalRequest>({ ...EMPTY_REQUEST });
   const [chips, setChips] = useState<Chip[]>([]);
   const userKeyRef = useRef<string | null>(null);
+  // Monotonic turn counter — a late response from an earlier turn must never
+  // overwrite the state a newer turn already produced.
+  const turnSeq = useRef(0);
   const nextId = useRef(1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
@@ -150,6 +153,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
     setInput('');
     if (text || !convOverride) say(text || `Filed my case — ${describeQuery(query)}.`, undefined, 'you');
     setLoading(true);
+    const mySeq = ++turnSeq.current;
     try {
       const res = await fetchWithTimeout('/api/ask', {
         method: 'POST',
@@ -158,11 +162,18 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
           query,
           text: text || undefined,
           conversation: convOverride ?? conv,
+          // Send back the server-issued key so the SERVER can reject a
+          // conversation that belongs to a different account.
+          userKey: userKeyRef.current ?? undefined,
           turnContext: lastShown(),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'failed');
+
+      // STALE-RESPONSE GUARD: a newer turn already superseded this one, so its
+      // late response must not clobber the current state or append results.
+      if (mySeq !== turnSeq.current) return;
 
       // Adopt the server's merged state. If the account changed since the
       // stored conversation was created, drop the stale one instead of mixing.
