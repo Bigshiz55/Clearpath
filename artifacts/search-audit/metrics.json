@@ -1,0 +1,57 @@
+{
+ "corpus": {
+  "tests": 1000,
+  "seed": "WATCHVERDICT_FORENSIC_SEARCH_20260805",
+  "sha256": "32fbe0234141fcf272e31b1e666ee53edb14b29caf5cbe9fd684121e67711002"
+ },
+ "layerA": {
+  "judged": 900,
+  "not_verified": 100,
+  "passed": 715,
+  "pass_rate": "79.4%",
+  "live_requests_per_pass": 889,
+  "transport_errors": 0
+ },
+ "layerB": {
+  "judged": 504,
+  "deferred_to_layerA": 496,
+  "passed": 266,
+  "pass_rate": "52.8%"
+ },
+ "layerC": {
+  "desktop_cases": 200,
+  "mobile_cases": 67,
+  "categories_covered": 20,
+  "leaks": 0,
+  "uncaught_page_errors": 0,
+  "routed_to_judge": 134,
+  "routed_to_title_page": 64,
+  "no_navigation": 2
+ },
+ "routing": {
+  "recommendation_tests": 388,
+  "landed_at_judge": 379,
+  "opened_a_title_page": 9
+ },
+ "severity": {
+  "P0": 113,
+  "P1": 306,
+  "P2": 4,
+  "P3": 0
+ },
+ "latency": {
+  "samples": 900,
+  "p50": 154,
+  "p90": 173,
+  "p95": 186,
+  "p99": 466,
+  "max": 765,
+  "min": 132
+ },
+ "determinism": {
+  "layerA_verdict_changes": 0,
+  "layerA_top_result_changes": 0,
+  "layerB_verdict_changes": 0,
+  "layerC_route_changes": 0
+ }
+}
