@@ -30,7 +30,7 @@ export const EMPTY_QUERY: FinderQuery = {
  * "documentary". These aliases live here, next to the parser that needs them,
  * so no other consumer of `GENRE_IDS` changes behaviour.
  */
-const GENRE_WORDS: Record<string, number> = {
+export const GENRE_WORDS: Record<string, number> = {
   ...GENRE_IDS,
   animated: GENRE_IDS.animation!,
   cartoon: GENRE_IDS.animation!,
@@ -87,7 +87,7 @@ const NEGATOR =
  * and the ids come from TMDB's own `/search/keyword` at request time
  * (`searchKeywords`). Nothing here invents an id.
  */
-const SUBJECT_TERMS = [
+export const SUBJECT_TERMS = [
   'boxing', 'mma', 'wrestling', 'martial arts', 'underdog', 'heist', 'zombie', 'vampire',
   'werewolf', 'time travel', 'space', 'alien', 'robot', 'dystopia', 'post-apocalyptic',
   'spy', 'espionage', 'assassin', 'courtroom', 'legal', 'prison', 'survival', 'shipwreck',
@@ -241,7 +241,11 @@ export function naiveParseQuery(input: string): FinderQuery {
   // was dropped between the sentence and the search.
   // "not before 2020" MEANS "after 2020" — normalise the polarity before
   // matching, or the negated form sets the opposite bound.
-  const ty = t.replace(/\bnot before\b/g, 'after').replace(/\bnot after\b/g, 'before');
+  // "not/nothing before 2020" MEANS "2020 or later" — normalise negated
+  // polarity before matching, or the bound lands on the wrong side.
+  const ty = t
+    .replace(/\b(?:not|nothing(?:\s+from)?|no\s+titles?|none)\s+before\b/g, 'after')
+    .replace(/\b(?:not|nothing(?:\s+from)?|no\s+titles?|none)\s+after\b/g, 'before');
   const between = ty.match(/\bbetween\s+((?:19|20)\d{2})\s+and\s+((?:19|20)\d{2})\b/);
   const afterYear = ty.match(/\b(?:after|since|from|later than|newer than|post[- ]?)\s*((?:19|20)\d{2})\b/);
   const beforeYear = ty.match(/\b(?:before|prior to|earlier than|older than|up to|pre[- ]?)\s*((?:19|20)\d{2})\b/);
@@ -269,6 +273,13 @@ export function naiveParseQuery(input: string): FinderQuery {
   else {
     const hrMatch = t.match(/(?:under|less than|below|max)\s+(\d(?:\.\d)?)\s*(?:hours?|hrs?|h)\b/);
     if (hrMatch) q.maxRuntime = Math.round(Number(hrMatch[1]) * 60);
+    else {
+      // People say "under two hours", not "under 2 hours".
+      const WORD_HOURS: Record<string, number> = { a: 60, an: 60, one: 60, two: 120, three: 180 };
+      const wordHr = t.match(/(?:under|less than|below|shorter than|max)\s+(an?|one|two|three)\s+hours?\b/);
+      if (wordHr) q.maxRuntime = WORD_HOURS[wordHr[1]!]!;
+      else if (/(?:under|less than|about)\s+an?\s+hour\s+and\s+a\s+half\b/.test(t)) q.maxRuntime = 90;
+    }
   }
 
   // Recency.
