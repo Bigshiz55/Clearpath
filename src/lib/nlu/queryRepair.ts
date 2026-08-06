@@ -233,7 +233,7 @@ export function misspellingCandidates(raw: string, max = 40): string[] {
   const words = q.split(/\s+/);
   const order = words
     .map((w, i) => ({ w, i }))
-    .filter(({ w }) => w.length >= 3 && !/\d/.test(w))
+    .filter(({ w }) => w.length >= 3 && !/\d/.test(w) && !/[^ -ɏ]/.test(w))
     .sort((a, b) => b.w.length - a.w.length);
   for (const { w, i: li } of order) {
     for (let i = 0; i + 1 < w.length && out.length < max; i++) {
@@ -269,9 +269,13 @@ export function insertionCandidates(raw: string, max = 120): string[] {
     const k = cand.toLowerCase();
     if (!seen.has(k) && k !== q.toLowerCase()) { seen.add(k); out.push(cand); }
   };
+  // Latin words only (≤ U+024F, diacritics included): an emoji is a surrogate
+  // PAIR, so "inserting a letter" into 🎄 splits it into two lone surrogates —
+  // a mangled candidate that can still get catalog hits and win the wave. CJK
+  // and other scripts are equally not letter-slip territory.
   const eligible = words
     .map((w, wi) => ({ w, wi }))
-    .filter(({ w }) => w.length >= 2 && !SKIP_WORDS.has(w.toLowerCase()) && !/^[ivxlcdm]+$/i.test(w) && !/\d/.test(w));
+    .filter(({ w }) => w.length >= 2 && !SKIP_WORDS.has(w.toLowerCase()) && !/^[ivxlcdm]+$/i.test(w) && !/\d/.test(w) && !/[^ -ɏ]/.test(w));
 
   // FIRST: re-double each existing letter. Doubled letters are where deletions
   // cluster — "Unforgoten" is "Unforgotten" minus one of its "tt" — and this

@@ -33,7 +33,7 @@ async function searchWithRepair(raw: string): Promise<{
 
   const [rawResults, bareResults] = await Promise.all([
     searchTitles(raw),
-    qualified && bare !== raw ? searchTitles(bare).catch(() => []) : Promise.resolve([]),
+    qualified && bare !== raw ? searchTitles(bare, { year }).catch(() => []) : Promise.resolve([]),
   ]);
 
   // Order by the evidence the qualifier stated: requested media type first,

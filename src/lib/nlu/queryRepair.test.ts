@@ -317,4 +317,24 @@ describe('contrast strips only title-vs-title, never predicates', () => {
   it('a transposition in a SHORT word is recoverable', () => {
     expect(misspellingCandidates('A Christmas Pirnce')).toContain('A Christmas Prince');
   });
+
+  it('a transposition deep in the LONG word is recoverable too', () => {
+    expect(misspellingCandidates('Betetr Call Saul')).toContain('Better Call Saul');
+    expect(misspellingCandidates('Mililon Dollar Baby')).toContain('Million Dollar Baby');
+  });
+
+  it('never mangles non-Latin words — an emoji is a surrogate pair, not two letters', () => {
+    // Splitting 🎄 produced a lone-surrogate candidate that STILL got catalog
+    // hits and won the repair wave; JSON/URL encoding of the survivors proves
+    // every emitted candidate is well-formed.
+    for (const fn of [misspellingCandidates, insertionCandidates]) {
+      for (const c of fn('🎄 christmas movies')) {
+        expect(() => encodeURIComponent(c)).not.toThrow();
+        expect(c).toContain('🎄');
+      }
+      for (const c of fn('寄生虫 the movie')) {
+        expect(c).toContain('寄生虫');
+      }
+    }
+  });
 });

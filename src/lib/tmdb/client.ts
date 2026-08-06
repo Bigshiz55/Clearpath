@@ -163,7 +163,7 @@ function toResult(r: MultiRow, forced?: MediaType): SearchResultItem | null {
   };
 }
 
-export async function searchTitles(query: string): Promise<SearchResultItem[]> {
+export async function searchTitles(query: string, opts?: { year?: number | null }): Promise<SearchResultItem[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
@@ -172,6 +172,28 @@ export async function searchTitles(query: string): Promise<SearchResultItem[]> {
   let results = data.results
     .map((r) => toResult(r))
     .filter((r): r is SearchResultItem => r !== null);
+
+  // A stated year is a lifeline for short titles: multi-search buries the 1999
+  // film "Go" beneath twenty popular near-matches, but the year-scoped movie
+  // and TV endpoints surface it directly. Widen the pool with those results —
+  // identity-first ranking below decides the order.
+  const year = opts?.year ?? null;
+  if (year != null) {
+    const [movies, tv] = await Promise.all([
+      tmdbFetch<TmdbMultiResult>('/search/movie', { ...params, primary_release_year: String(year) }).catch(
+        () => ({ page: 1, results: [] }),
+      ),
+      tmdbFetch<TmdbMultiResult>('/search/tv', { ...params, first_air_date_year: String(year) }).catch(
+        () => ({ page: 1, results: [] }),
+      ),
+    ]);
+    const scoped = [
+      ...movies.results.map((r) => toResult(r, 'movie')),
+      ...tv.results.map((r) => toResult(r, 'tv')),
+    ].filter((r): r is SearchResultItem => r !== null);
+    const have = new Set(results.map((r) => `${r.mediaType}-${r.id}`));
+    results = [...results, ...scoped.filter((r) => !have.has(`${r.mediaType}-${r.id}`))];
+  }
 
   // Fallback: if multi-search finds nothing, try the dedicated movie and TV
   // endpoints (they sometimes match where multi doesn't) so we never dead-end.
