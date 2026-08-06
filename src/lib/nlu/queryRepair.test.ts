@@ -194,3 +194,16 @@ describe('adversarial constraint pairs', () => {
     expect(extractReference('shows like Yellowstone')).toBe('Yellowstone');
   });
 });
+
+describe('release-year off-by-one tolerance', () => {
+  it('"Crash 2004" prefers the 2005-dated Crash over unrelated years', () => {
+    // TMDB dates the Haggis Crash by its 2005 wide release; the user knows it
+    // by its 2004 premiere. Both are right, so ±1 must match.
+    const dest = resolveSearchDestination('Crash 2004', [
+      { id: 1, mediaType: 'movie', title: 'Crash', year: 2024 },
+      { id: 2, mediaType: 'movie', title: 'Crash', year: 1996 },
+      { id: 3, mediaType: 'movie', title: 'Crash', year: 2005 },
+    ]);
+    expect(dest?.href).toBe('/app/title/movie/3');
+  });
+});

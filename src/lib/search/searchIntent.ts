@@ -191,6 +191,10 @@ export function resolveSearchDestination(raw: string, results: CatalogResult[] =
     results.find((r) => isExactTitle(q, r.title)) ??
     (year != null
       ? results.find((r) => isExactTitle(bare, r.title) && r.year === year) ??
+        // ±1: release-year conventions differ by one (festival vs wide
+        // release), and a user who knows the film should not lose the match
+        // for knowing it by its premiere year.
+        results.find((r) => isExactTitle(bare, r.title) && r.year != null && Math.abs(r.year - year) === 1) ??
         results.find((r) => isExactTitle(bare, r.title))
       : undefined);
   if (exact) return { href: titleHref(exact), reason: 'exact-title' };

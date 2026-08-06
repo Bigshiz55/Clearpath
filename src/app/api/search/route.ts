@@ -41,9 +41,14 @@ async function searchWithRepair(raw: string): Promise<{
     const exactForBare = bareResults.some((r) => isExactTitle(bare, r.title));
     const rawIsBetter = rawResults.some((r) => isExactTitle(raw, r.title));
     if (exactForBare && !rawIsBetter) {
-      const sameYear = bareResults.filter((r) => r.year === year);
+      // ±1 tolerance: release-year conventions genuinely differ by one — the
+      // Haggis "Crash" premiered in 2004 and TMDB dates its wide release 2005,
+      // so a strict match called the user wrong for knowing the film. Exact
+      // year first, then the adjacent year, then everything else untouched.
+      const dist = (r: { year?: number | null }) => (r.year == null ? 99 : Math.abs(r.year - year));
+      const near = bareResults.filter((r) => dist(r) <= 1).sort((a, b) => dist(a) - dist(b));
       return {
-        results: sameYear.length > 0 ? [...sameYear, ...bareResults.filter((r) => r.year !== year)] : bareResults,
+        results: near.length > 0 ? [...near, ...bareResults.filter((r) => dist(r) > 1)] : bareResults,
         correctedTo: bare,
         year,
       };
