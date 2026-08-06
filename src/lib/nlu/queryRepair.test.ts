@@ -86,7 +86,8 @@ describe('misspelling candidates', () => {
 
   it('is bounded — a hostile string cannot fan out', () => {
     expect(misspellingCandidates('a'.repeat(100))).toEqual([]);
-    expect(misspellingCandidates('<script>alert(1)</script>').length).toBeLessThanOrEqual(12);
+    expect(misspellingCandidates('<script>alert(1)</script>').length).toBeLessThanOrEqual(40);
+    expect(misspellingCandidates('ab cde fgh ijk lmn opq rst uvw xyz abc def ghi jkl mno pqr').length).toBeLessThanOrEqual(40);
     expect(misspellingCandidates('')).toEqual([]);
   });
 
@@ -290,5 +291,30 @@ describe('space-shift and deletion typo repairs', () => {
     expect(insertionCandidates('a'.repeat(100))).toEqual([]);
     expect(insertionCandidates('!!!!')).toEqual([]);
     expect(insertionCandidates('The Holiday').length).toBeLessThanOrEqual(120);
+  });
+});
+
+describe('contrast strips only title-vs-title, never predicates', () => {
+  it('predicate negations stay whole for the Judge', () => {
+    for (const q of [
+      'Severance but not as violent',
+      'what did I not finish',
+      'what did I not finish on Netflix',
+      'not another Yellowstone',
+      'Crash but not too scary',
+    ]) {
+      const got = splitTitleQualifiers(q);
+      expect(got.title).toBe(q);
+      expect(got.qualified).toBe(false);
+    }
+  });
+
+  it('title contrasts still split, without a dangling conjunction', () => {
+    expect(splitTitleQualifiers('CSI NY not CSI Miami').title).toBe('CSI NY');
+    expect(splitTitleQualifiers('Fargo but not Fargo the movie').title).toBe('Fargo');
+  });
+
+  it('a transposition in a SHORT word is recoverable', () => {
+    expect(misspellingCandidates('A Christmas Pirnce')).toContain('A Christmas Prince');
   });
 });

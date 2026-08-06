@@ -51,24 +51,27 @@ async function searchWithRepair(raw: string): Promise<{
     return rs.map((r, i) => ({ r, i })).sort((a, b) => tier(a.r) - tier(b.r) || a.i - b.i).map((x) => x.r);
   };
 
-  if (qualified && bareResults.length > 0) {
-    const exactForBare = bareResults.some((r) => isExactTitle(bare, r.title));
-    const rawIsBetter = rawResults.some((r) => isExactTitle(raw, r.title));
-    if (exactForBare && !rawIsBetter) {
-      return { results: ordered(bareResults), correctedTo: bare, year };
-    }
+  // The stripped reading is used ONLY on exact evidence. Returning non-exact
+  // bare results turned over-stripped conversational asks ("Severance but…")
+  // into navigable junk; with no exact match the honest answer is the raw
+  // results or nothing, and nothing is what routes a request to the Judge.
+  const exactForBare = qualified && bareResults.some((r) => isExactTitle(bare, r.title));
+  if (exactForBare && !rawResults.some((r) => isExactTitle(raw, r.title))) {
+    return { results: ordered(bareResults), correctedTo: bare, year };
   }
   if (rawResults.length > 0) return { results: rawResults, correctedTo: null, year };
-  if (bareResults.length > 0) return { results: ordered(bareResults), correctedTo: bare, year };
+  if (exactForBare) return { results: ordered(bareResults), correctedTo: bare, year };
+  if (bareResults.length > 0) return { results: [], correctedTo: null, year };
 
   // Zero results anywhere: bounded corrections in two waves — cheap slips
   // (doubles, space shifts, transpositions) first, then the deletion-class
   // insertions ONLY if the first wave also found nothing. Every candidate is
   // judged by the catalog; the first that returns anything wins.
+  const deadline = Date.now() + 6_000; // repair may add latency, never a hang
   for (const wave of [misspellingCandidates(bare || raw), insertionCandidates(bare || raw)]) {
     if (wave.length === 0) continue;
     // Chunked so a dead query never fires one giant burst at the provider.
-    for (let at = 0; at < wave.length; at += 10) {
+    for (let at = 0; at < wave.length && Date.now() < deadline; at += 10) {
       const chunk = wave.slice(at, at + 10);
       const settled = await Promise.all(chunk.map((c) => searchTitles(c).catch(() => [])));
       for (let i = 0; i < chunk.length; i++) {

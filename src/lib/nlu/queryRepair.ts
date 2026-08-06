@@ -82,8 +82,23 @@ const TRAILING_QUALIFIERS: [RegExp, 'movie' | 'tv' | null][] = [
   // Bare network / country tokens: "Sherlock BBC", "The Office UK".
   [/\s+(?:uk|us|usa|bbc|cbs|nbc|abc|itv)$/i, null],
 ];
-/** "CSI NY not CSI Miami" — the contrast names what is NOT wanted. */
-const CONTRAST_TAIL = /\s*,?\s+not\s+\S.*$/i;
+/**
+ * "CSI NY not CSI Miami" — the contrast names a TITLE that is not wanted.
+ *
+ * A first version cut at every " not " and turned predicate negations into
+ * junk titles: "Severance but not as violent" became the "title" "Severance
+ * but", whose results then let the router open a title page for what was a
+ * recommendation request — 23 live regressions from one greedy regex. A
+ * contrast tail must be a NAME: it may not begin with a degree word, a verb,
+ * or an article, because "not as violent", "not finish" and "not another
+ * Yellowstone" are constraints, and constraints belong to the Judge.
+ */
+const CONTRAST_TAIL = /\s*,?\s+not\s+(\S+).*$/i;
+const CONTRAST_DENY = new Set([
+  'as', 'too', 'very', 'really', 'quite', 'so', 'that', 'this', 'it', 'a', 'an', 'the',
+  'another', 'about', 'be', 'been', 'being', 'seen', 'watched', 'finish', 'finished',
+  'sure', 'my', 'me', 'i', 'we', 'like', 'just', 'only', 'again', 'anymore', 'available',
+]);
 
 export function splitTitleQualifiers(raw: string): QualifiedTitle {
   let t = (raw ?? '').trim();
@@ -95,8 +110,14 @@ export function splitTitleQualifiers(raw: string): QualifiedTitle {
     if (cut !== t && cut.trim().length >= 2) { t = cut.trim(); qualified = true; }
   }
   const contrast = t.match(CONTRAST_TAIL);
-  if (contrast && contrast.index !== undefined && contrast.index > 0) {
-    t = t.slice(0, contrast.index).trim();
+  if (
+    contrast &&
+    contrast.index !== undefined &&
+    contrast.index > 0 &&
+    !CONTRAST_DENY.has((contrast[1] ?? '').toLowerCase().replace(/[^a-z]/g, ''))
+  ) {
+    // Also drop a dangling conjunction the cut leaves behind ("X but not Y").
+    t = t.slice(0, contrast.index).replace(/\s+(?:but|though|and|or)$/i, '').trim();
     qualified = true;
   }
   // Trailing qualifiers can stack ("the original series"); loop to a fixpoint,
@@ -166,7 +187,7 @@ export function extractPersonName(raw: string): string | null {
  * Only ever consulted after the raw query returned zero results, so a real
  * title that happens to look misspelled can never be "corrected" away.
  */
-export function misspellingCandidates(raw: string, max = 12): string[] {
+export function misspellingCandidates(raw: string, max = 40): string[] {
   const q = (raw ?? '').trim();
   if (q.length < 3 || q.length > 60 || !/[a-z]/i.test(q)) return [];
   const out: string[] = [];
@@ -202,16 +223,24 @@ export function misspellingCandidates(raw: string, max = 12): string[] {
     }
   }
 
-  // 3. Adjacent transpositions — but only in the LONGEST word, where a slip is
-  //    likeliest and where n candidates stay affordable.
+  // 3. Adjacent transpositions in EVERY meaningful word. Longest word first —
+  //    long words carry most slips, so their repairs land in the caller's
+  //    first lookup chunk — but the cap is sized so EVERY word's every
+  //    position fits: with a tight cap, no ordering covers both
+  //    "A Christmas Pirnce" (slip in the short word) and "Betetr Call Saul"
+  //    (slip deep in the long one). Candidates are only ever spent on
+  //    zero-result queries, chunked and deadline-gated by the caller.
   const words = q.split(/\s+/);
-  let li = 0;
-  words.forEach((w, i) => { if (w.length > (words[li]?.length ?? 0)) li = i; });
-  const w = words[li]!;
-  for (let i = 0; i + 1 < w.length && out.length < max; i++) {
-    if (w[i]!.toLowerCase() === w[i + 1]!.toLowerCase()) continue;
-    const swapped = w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2);
-    push([...words.slice(0, li), swapped, ...words.slice(li + 1)].join(' '));
+  const order = words
+    .map((w, i) => ({ w, i }))
+    .filter(({ w }) => w.length >= 3 && !/\d/.test(w))
+    .sort((a, b) => b.w.length - a.w.length);
+  for (const { w, i: li } of order) {
+    for (let i = 0; i + 1 < w.length && out.length < max; i++) {
+      if (w[i]!.toLowerCase() === w[i + 1]!.toLowerCase()) continue;
+      const swapped = w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2);
+      push([...words.slice(0, li), swapped, ...words.slice(li + 1)].join(' '));
+    }
   }
   return out.slice(0, max);
 }
