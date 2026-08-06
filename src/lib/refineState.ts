@@ -135,7 +135,11 @@ export function activeFilterChips(q: FinderQuery): string[] {
   if (q.upcoming) chips.push('Upcoming only');
   if (q.onMyServices) chips.push('My services');
   if (q.providerIds?.length) chips.push(`${q.providerIds.length} service${q.providerIds.length === 1 ? '' : 's'}`);
+  // A required subject ("Boxing") is the constraint the user actually named —
+  // it shows as its own chip and is never collapsed into a "N genres" count.
+  if (q.subjectLabel) chips.push(q.subjectLabel);
   if (q.genreIds.length) chips.push(`${q.genreIds.length} genre${q.genreIds.length === 1 ? '' : 's'}`);
+  if (q.excludeKeywordIds?.length) chips.push(`${q.excludeKeywordIds.length} subject excluded`);
   if (q.excludeGenreIds?.length) chips.push(`${q.excludeGenreIds.length} excluded`);
   if (q.originCountries?.length) chips.push(q.originCountries.join('/'));
   return chips;
