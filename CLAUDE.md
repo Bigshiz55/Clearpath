@@ -99,3 +99,28 @@ When TMDB data is missing, label it unavailable (the UI and scoring already do).
 
 ## Deploying
 See `DEPLOYMENT.md`. Requires TMDB + Supabase keys and a Vercel connection.
+
+## Operating rules for AI sessions (repository governance)
+
+The known-good search baseline is tag `watchverdict-search-baseline-2026-08-06`
+(SHA `68a5a9359a034e7a5224c8b8474dd88d491268bf`) — see
+`docs/SEARCH-BASELINE-GOVERNANCE.md`. Every session working in this repo MUST:
+
+1. Develop on a working branch — never directly on `main`.
+2. Run targeted tests continuously during development.
+3. Run the complete required gates before integration:
+   `npm run typecheck && npm run lint && npx vitest run && npm run build`,
+   plus `npx playwright test -c playwright.searchrouting.config.ts` and, for
+   any search-surface change, the frozen regression corpus
+   (`scripts/searchAudit/layerA.ts` / `layerBext.ts`).
+4. Integrate by opening or updating a pull request into `main`.
+5. Report actual process exit codes for every gate.
+6. Never claim a gate is green when its output went through a pipe (`| tail`,
+   `| grep`, …) that masked the exit code — check the command's real status.
+7. Never force-push `main`.
+8. Never change, regenerate, or remove the frozen search corpus, its oracle,
+   or its seed to make a regression pass. The corpus is evidence, not code.
+9. Compare any search behavior change against baseline SHA `68a5a93` and
+   report the delta (PASS→FAIL and FAIL→PASS counts), not just the new score.
+10. Never move or replace the known-good baseline tag without explicit owner
+    approval in the current conversation.
