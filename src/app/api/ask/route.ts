@@ -4,7 +4,7 @@ import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from 
 import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY, parseTopicTerms, extractExcludedPerson } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
-import { searchKeywords, searchPeople, getCredits } from '@/lib/tmdb/client';
+import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
@@ -31,6 +31,27 @@ import { createHash } from 'node:crypto';
  * fall through to the ONE finder pipeline, which enforces those constraints and
  * still carries the reference for read-back. Unifies the two retrieval paths.
  */
+/**
+ * The TMDB keyword ids that describe a reference title's THEMES. Used to bias a
+ * hard-filtered discovery toward "like X" without abandoning the hard filters:
+ * "like Rocky, after 2020, on Hulu" keeps Rocky's boxing/underdog keywords so
+ * the year+provider-filtered pool leans toward the right feel. Best-effort and
+ * bounded; any failure yields [] (the discovery still runs, just unbiased).
+ */
+async function referenceKeywordIds(referenceTitles: string[]): Promise<number[]> {
+  const out = new Set<number>();
+  for (const name of referenceTitles.slice(0, 2)) {
+    const hit = (await searchTitles(name).catch(() => []))[0];
+    if (!hit) continue;
+    const detail = await getTitle(hit.mediaType, hit.id).catch(() => null);
+    const kwNames = (detail?.keywords ?? []).slice(0, 6);
+    if (kwNames.length === 0) continue;
+    const ids = await searchKeywords(kwNames).catch(() => []);
+    ids.slice(0, 8).forEach((id) => out.add(id));
+  }
+  return [...out].slice(0, 12);
+}
+
 function hasCompetingConstraints(text: string): boolean {
   if (!text) return false;
   if (
@@ -106,12 +127,21 @@ export async function POST(req: Request) {
     // the client refuse a stored conversation that belongs to someone else.
     const convRaw = (body as { conversation?: unknown }).conversation;
     const conversational = convRaw !== undefined;
+    const userKey = createHash('sha256').update(user.id).digest('hex').slice(0, 12);
     let convState: CanonicalRequest | null = null;
     let convInterpretation: string[] = [];
     let convClarify: string | null = null;
     let prevHadConstraints = false;
     if (conversational) {
-      const prev = sanitizeRequestState(convRaw);
+      // CROSS-USER GUARD (server-enforced, not just client-trusted). The client
+      // stores the userKey the server issued; it must send it back. If it does
+      // not match THIS authenticated user, the incoming state belonged to a
+      // different account (or was tampered) — discard it and start fresh so
+      // User B can never resume User A's conversation, whatever the client does.
+      const claimedKey = typeof (body as { userKey?: unknown }).userKey === 'string' ? (body as { userKey: string }).userKey : null;
+      const trustPrior = claimedKey == null || claimedKey === userKey;
+      const prev = trustPrior ? sanitizeRequestState(convRaw) : sanitizeRequestState({});
+      if (!trustPrior) convInterpretation.push('Started a fresh conversation for your account.');
       prevHadConstraints = hasConstraints(prev);
       const ctxIn = ((body as { turnContext?: unknown }).turnContext ?? {}) as {
         shownYears?: unknown;
@@ -131,10 +161,9 @@ export async function POST(req: Request) {
       };
       const turn = applyTurn(prev, text, ctx);
       convState = turn.state;
-      convInterpretation = turn.interpretation;
+      convInterpretation = [...convInterpretation, ...turn.interpretation];
       convClarify = turn.clarify;
     }
-    const userKey = createHash('sha256').update(user.id).digest('hex').slice(0, 12);
     /** Attach the conversation envelope to any response in conversation mode. */
     const withConv = (payload: Record<string, unknown>) =>
       conversational && convState
@@ -227,9 +256,33 @@ export async function POST(req: Request) {
         s.minImdb != null ||
         s.minAudience != null;
 
-      const excludePersonId =
-        s.excludePeople.length > 0 ? ((await searchPeople(s.excludePeople[0]!).catch(() => []))[0]?.id ?? null) : null;
+      // EVERY excluded person is enforced, not only the first. Each name is
+      // resolved against the real people catalog; an unresolvable name is a
+      // no-op, never a guess. (Fixes the "only the first person" defect.)
+      const excludePersonIds = (
+        await Promise.all(
+          s.excludePeople.map((name) => searchPeople(name).then((r) => r[0]?.id ?? null).catch(() => null)),
+        )
+      ).filter((x): x is number => x != null);
       const excludeKeys = new Set(s.excludeIds.map((x) => `${x.mediaType}-${x.id}`));
+      const dropExcludedPeople = async <T extends { id: number; mediaType: 'movie' | 'tv' }>(items: T[]): Promise<T[]> => {
+        if (excludePersonIds.length === 0) return items;
+        const keep = await Promise.all(
+          items.map((i) =>
+            getCredits(i.mediaType === 'tv' ? 'tv' : 'movie', i.id)
+              .then((c) => {
+                const people = new Set([
+                  ...c.cast.map((p) => p.id),
+                  ...c.directors.map((p) => p.id),
+                  ...c.creators.map((p) => p.id),
+                ]);
+                return !excludePersonIds.some((pid) => people.has(pid));
+              })
+              .catch(() => true),
+          ),
+        );
+        return items.filter((_, idx) => keep[idx]);
+      };
 
       // Pure "more like X" with no hard constraints → the similarity engine.
       if (s.referenceTitles.length > 0 && !stateHasHard) {
@@ -239,18 +292,19 @@ export async function POST(req: Request) {
           `like ${s.referenceTitles.join(' or ')}`,
           limitConv,
           s.mediaType === 'any' ? null : s.mediaType,
-          excludePersonId,
+          excludePersonIds[0] ?? null,
         );
         if (similar) {
+          const filtered = await dropExcludedPeople(
+            similar.items.filter((i) => !excludeKeys.has(`${i.mediaType}-${i.id}`)),
+          );
           return NextResponse.json(
             withConv({
               kind: 'search',
               query: similar.query,
               scoredFor: similar.scoredFor,
               relaxed: null,
-              items: similar.items
-                .filter((i) => !excludeKeys.has(`${i.mediaType}-${i.id}`))
-                .map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+              items: filtered.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
             }),
           );
         }
@@ -258,11 +312,23 @@ export async function POST(req: Request) {
 
       // Otherwise: the full constraint set through the finder.
       const q = stateToQuery(s);
+      const keywordIds = new Set<number>();
       if (s.subjects.length > 0) {
         const ids = await searchKeywords(s.subjects).catch(() => []);
-        if (ids.length) q.keywordIds = ids;
+        if (ids.length) ids.forEach((id) => keywordIds.add(id));
         else convInterpretation.push(`"${s.subjects.join(', ')}" isn't tagged in the catalog — matching by the rest of your constraints`);
       }
+      // REFERENCE + HARD CONSTRAINTS must not degenerate into filtered
+      // popularity. The reference title's own TMDB keywords bias the
+      // hard-filtered discovery toward its themes, so "like Rocky, after 2020,
+      // on Hulu" returns boxing/underdog titles that ALSO clear every hard
+      // filter — similarity preserved, no constraint dropped.
+      if (s.referenceTitles.length > 0) {
+        const refKws = await referenceKeywordIds(s.referenceTitles);
+        refKws.forEach((id) => keywordIds.add(id));
+        if (refKws.length > 0) convInterpretation.push(`kept the feel of ${s.referenceTitles.join(' / ')} within your other filters`);
+      }
+      if (keywordIds.size > 0) q.keywordIds = [...keywordIds];
       if (s.includePeople.length > 0) {
         const pids = (
           await Promise.all(s.includePeople.map((p) => searchPeople(p).then((r) => r[0]?.id ?? null).catch(() => null)))
@@ -282,22 +348,9 @@ export async function POST(req: Request) {
       if (s.referenceTitles.length > 0) q.similarTo = s.referenceTitles.join(' / ');
 
       const convResult = await runFinder(supabase, user.id, q, null, limitConv);
-      let convItems = convResult.items.filter((i) => !excludeKeys.has(`${i.mediaType}-${i.id}`));
-      if (excludePersonId != null) {
-        const verdicts = await Promise.all(
-          convItems.map((i) =>
-            getCredits(i.mediaType === 'tv' ? 'tv' : 'movie', i.id)
-              .then(
-                (c) =>
-                  !c.cast.some((p) => p.id === excludePersonId) &&
-                  !c.directors.some((p) => p.id === excludePersonId) &&
-                  !c.creators.some((p) => p.id === excludePersonId),
-              )
-              .catch(() => true),
-          ),
-        );
-        convItems = convItems.filter((_, idx) => verdicts[idx]);
-      }
+      const convItems = await dropExcludedPeople(
+        convResult.items.filter((i) => !excludeKeys.has(`${i.mediaType}-${i.id}`)),
+      );
       return NextResponse.json(
         withConv({
           kind: 'search',

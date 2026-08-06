@@ -223,7 +223,7 @@ export function applyTurn(prev: CanonicalRequest, rawText: string, ctx: TurnCont
   const providerOps: { re: RegExp; op: 'remove' | 'add' | 'replace' }[] = [
     { re: /\b(?:remove|drop|without|not on|no)\s+([a-z0-9+ ]{2,24}?)(?=[,.!?]| and | or |$)/g, op: 'remove' },
     { re: /\b(?:actually\s+)?(?:add|include|also|plus)\s+([a-z0-9+ ]{2,24}?)(?:\s+too|\s+as well)?(?=[,.!?]| and | or |$)/g, op: 'add' },
-    { re: /\bonly (?:things? )?(?:on|included with|from)\s+([a-z0-9+ ]{2,24}?)(?=[,.!?]| and | or |$)/g, op: 'replace' },
+    { re: /\bonly (?:(?:things?|titles?|movies?|shows?|stuff) )?(?:on|included with|from|available on|streaming on)\s+([a-z0-9+ ]{2,24}?)(?=[,.!?]| and | or |$)/g, op: 'replace' },
     { re: /\b([a-z0-9+ ]{2,24}?)\s+too\b/g, op: 'add' },
   ];
   let replacedProviders = false;
