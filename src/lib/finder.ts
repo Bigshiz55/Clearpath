@@ -451,8 +451,17 @@ export async function runFinder(
     const relaxedQ: FinderQuery = { ...q, keywordIds: undefined };
     const r = await runFinder(supabase, userId, relaxedQ, watcher, limit);
     if (r.items.length > items.length) {
-      items = r.items;
-      relaxed = 'That exact vibe keyword wasn’t well-tagged in the catalog — here are the closest matches by genre and tone instead.';
+      // The titles that DID match the stated subject are the answer — a
+      // shortfall is filled AFTER them, never instead of them. Replacing them
+      // wholesale turned "boxing movies after 2020" (four honest matches)
+      // into a generic action list with the real answers deleted.
+      const have = new Set(items.map((i) => `${i.mediaType}-${i.id}`));
+      const strictCount = items.length;
+      items = [...items, ...r.items.filter((i) => !have.has(`${i.mediaType}-${i.id}`))].slice(0, Math.max(limit, strictCount));
+      relaxed =
+        strictCount > 0
+          ? `Only ${strictCount} title${strictCount === 1 ? ' is' : 's are'} tagged with that exact subject — the rest are the closest matches by genre and tone, after them.`
+          : 'That exact vibe keyword wasn’t well-tagged in the catalog — here are the closest matches by genre and tone instead.';
     }
   }
 
