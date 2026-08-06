@@ -10,7 +10,17 @@ import { augmentInternational } from '@/lib/askInternational';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
 import { buildQueryPlan } from '@/lib/nlu/queryPlan';
-import { mediaTypeSatisfies } from '@/lib/nlu/mediaOntology';
+import { mediaTypeSatisfies, resolveSource } from '@/lib/nlu/mediaOntology';
+import {
+  applyTurn,
+  chipsFor,
+  sanitizeRequestState,
+  stateToQuery,
+  hasConstraints,
+  type CanonicalRequest,
+  type TurnContext,
+} from '@/lib/nlu/conversationState';
+import { createHash } from 'node:crypto';
 
 /**
  * "Something like X" is best served by TMDB-similar ONLY when the reference is
@@ -86,6 +96,57 @@ export async function POST(req: Request) {
     const text = typeof body.text === 'string' ? body.text.slice(0, 300) : '';
     const cls = text.trim() ? classifySearch(text) : null;
 
+    // CONVERSATION MODE — the client sent its canonical request state, so this
+    // turn MERGES into that state instead of being read in isolation. "Newer."
+    // after "Something like Rocky." finally means newer-than-those, and every
+    // earlier constraint survives. The state is client-held and re-validated
+    // here on every request; there is no server-side conversation store to
+    // leak between users, and `userKey` (a one-way hash of the user id) lets
+    // the client refuse a stored conversation that belongs to someone else.
+    const convRaw = (body as { conversation?: unknown }).conversation;
+    const conversational = convRaw !== undefined;
+    let convState: CanonicalRequest | null = null;
+    let convInterpretation: string[] = [];
+    let convClarify: string | null = null;
+    let prevHadConstraints = false;
+    if (conversational) {
+      const prev = sanitizeRequestState(convRaw);
+      prevHadConstraints = hasConstraints(prev);
+      const ctxIn = ((body as { turnContext?: unknown }).turnContext ?? {}) as {
+        shownYears?: unknown;
+        shownRuntimes?: unknown;
+        shownIds?: unknown;
+      };
+      const ctx: TurnContext = {
+        shownYears: Array.isArray(ctxIn.shownYears)
+          ? ctxIn.shownYears.map(Number).filter(Number.isFinite).slice(0, 40)
+          : undefined,
+        shownRuntimes: Array.isArray(ctxIn.shownRuntimes)
+          ? ctxIn.shownRuntimes.map(Number).filter(Number.isFinite).slice(0, 40)
+          : undefined,
+        shownIds: Array.isArray(ctxIn.shownIds)
+          ? sanitizeRequestState({ excludeIds: ctxIn.shownIds }).excludeIds
+          : undefined,
+      };
+      const turn = applyTurn(prev, text, ctx);
+      convState = turn.state;
+      convInterpretation = turn.interpretation;
+      convClarify = turn.clarify;
+    }
+    const userKey = createHash('sha256').update(user.id).digest('hex').slice(0, 12);
+    /** Attach the conversation envelope to any response in conversation mode. */
+    const withConv = (payload: Record<string, unknown>) =>
+      conversational && convState
+        ? {
+            ...payload,
+            conversation: convState,
+            chips: chipsFor(convState),
+            interpretation: convInterpretation,
+            clarify: convClarify,
+            userKey,
+          }
+        : payload;
+
     // 0.5) A question about the USER'S OWN history is answered from their list,
     // never from the general catalog — "What haven't I finished?" was returning
     // this week's trending titles, which is a non-answer wearing a confident
@@ -131,9 +192,115 @@ export async function POST(req: Request) {
 
     // 1) Named-title lookup → put THAT title on trial (with the identity guard,
     // exact-match ranking and provider hard filter inside askJudgeTitle).
-    if (text.trim() && cls?.mode !== 'similar_to') {
+    // Mid-conversation this is OFF: once constraints have accumulated, a short
+    // follow-up ("Newer.", "Rocky") is a refinement of the case, not a fresh
+    // title lookup.
+    if (text.trim() && cls?.mode !== 'similar_to' && !(conversational && prevHadConstraints)) {
       const titled = await askJudgeTitle(supabase, user.id, text, cls ?? undefined);
-      if (titled) return NextResponse.json({ kind: 'title', ...titled });
+      if (titled) return NextResponse.json(withConv({ kind: 'title', ...titled }));
+    }
+
+    // 2a) CONVERSATION-DRIVEN DISCOVERY — the canonical state IS the query.
+    // Deterministic by design: no LLM parse of the raw sentence; the state the
+    // user can see as chips is exactly what runs.
+    if (conversational && convState) {
+      const s = convState;
+      const limitConv = text ? parseRequestedCount(text) : DEFAULT_RESULT_LIMIT;
+      // Hard constraints that the similarity path cannot enforce.
+      const stateHasHard =
+        s.minYear != null ||
+        s.maxYear != null ||
+        s.releasedAfter != null ||
+        s.maxRuntime != null ||
+        s.providers.length > 0 ||
+        s.monetization.length > 0 ||
+        s.onMyServices ||
+        s.excludeGenreIds.length > 0 ||
+        s.includeGenreIds.length > 0 ||
+        s.subjects.length > 0 ||
+        s.minImdb != null ||
+        s.minAudience != null;
+
+      const excludePersonId =
+        s.excludePeople.length > 0 ? ((await searchPeople(s.excludePeople[0]!).catch(() => []))[0]?.id ?? null) : null;
+      const excludeKeys = new Set(s.excludeIds.map((x) => `${x.mediaType}-${x.id}`));
+
+      // Pure "more like X" with no hard constraints → the similarity engine.
+      if (s.referenceTitles.length > 0 && !stateHasHard) {
+        const similar = await askSimilarTo(
+          supabase,
+          user.id,
+          `like ${s.referenceTitles.join(' or ')}`,
+          limitConv,
+          s.mediaType === 'any' ? null : s.mediaType,
+          excludePersonId,
+        );
+        if (similar) {
+          return NextResponse.json(
+            withConv({
+              kind: 'search',
+              query: similar.query,
+              scoredFor: similar.scoredFor,
+              relaxed: null,
+              items: similar.items
+                .filter((i) => !excludeKeys.has(`${i.mediaType}-${i.id}`))
+                .map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+            }),
+          );
+        }
+      }
+
+      // Otherwise: the full constraint set through the finder.
+      const q = stateToQuery(s);
+      if (s.subjects.length > 0) {
+        const ids = await searchKeywords(s.subjects).catch(() => []);
+        if (ids.length) q.keywordIds = ids;
+        else convInterpretation.push(`"${s.subjects.join(', ')}" isn't tagged in the catalog — matching by the rest of your constraints`);
+      }
+      if (s.includePeople.length > 0) {
+        const pids = (
+          await Promise.all(s.includePeople.map((p) => searchPeople(p).then((r) => r[0]?.id ?? null).catch(() => null)))
+        ).filter((x): x is number => x != null);
+        if (pids.length) q.castIds = pids;
+      }
+      if (s.providers.length > 0) {
+        const ids: number[] = [];
+        for (const name of s.providers) {
+          const src = resolveSource(name);
+          if (src?.providerId != null) ids.push(src.providerId);
+          else convInterpretation.push(`${name} is a TV network — network filtering isn't available in recommendations yet`);
+        }
+        if (ids.length) q.providerIds = ids;
+      }
+      if (s.monetization.length > 0) q.monetization = s.monetization.join('|');
+      if (s.referenceTitles.length > 0) q.similarTo = s.referenceTitles.join(' / ');
+
+      const convResult = await runFinder(supabase, user.id, q, null, limitConv);
+      let convItems = convResult.items.filter((i) => !excludeKeys.has(`${i.mediaType}-${i.id}`));
+      if (excludePersonId != null) {
+        const verdicts = await Promise.all(
+          convItems.map((i) =>
+            getCredits(i.mediaType === 'tv' ? 'tv' : 'movie', i.id)
+              .then(
+                (c) =>
+                  !c.cast.some((p) => p.id === excludePersonId) &&
+                  !c.directors.some((p) => p.id === excludePersonId) &&
+                  !c.creators.some((p) => p.id === excludePersonId),
+              )
+              .catch(() => true),
+          ),
+        );
+        convItems = convItems.filter((_, idx) => verdicts[idx]);
+      }
+      return NextResponse.json(
+        withConv({
+          kind: 'search',
+          query: q,
+          scoredFor: convResult.scoredFor,
+          relaxed: convResult.relaxed,
+          items: convItems.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+        }),
+      );
     }
 
     // 2) Otherwise → smart discovery. Let the LLM parse the ask (handles

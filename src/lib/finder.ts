@@ -98,6 +98,9 @@ export interface FinderQuery {
   /** A reference title the ask compared to ("shows like Mindhunter") — for the
    *  read-back only; the "more like this" seeding happens in askSimilarTo. */
   similarTo?: string;
+  /** Monetization filter for discovery — 'flatrate', 'flatrate|free|ads', … .
+   *  "Included with a subscription" is a HARD ask; rentals must not satisfy it. */
+  monetization?: string;
 }
 
 export interface FinderItem {
@@ -261,6 +264,7 @@ export async function runFinder(
           // with_origin_country). First entry wins when several are named.
           originalLanguage: q.originalLanguages?.[0],
           originCountry: q.originCountries?.[0],
+          monetization: q.monetization,
           sortBy: 'popularity.desc',
           page,
         }),

@@ -9,6 +9,15 @@ import { type TileRatings } from '@/lib/ratings';
 import { naiveParseQuery, describeQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import type { FinderQuery } from '@/lib/finder';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import {
+  EMPTY_REQUEST,
+  removeChip,
+  type CanonicalRequest,
+  type Chip,
+} from '@/lib/nlu/conversationState';
+
+/** sessionStorage key for conversation persistence across rerenders/refreshes. */
+const CONV_STORE_KEY = 'wv-judge-conversation-v1';
 
 interface ResultItem {
   id: number;
@@ -46,10 +55,53 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [assistantName] = useState('WatchVerd1ct');
+  // The canonical conversation state — the case as currently filed. Every turn
+  // sends it, the server merges the new sentence into it, and the chips below
+  // the thread ARE this object, each one removable.
+  const [conv, setConv] = useState<CanonicalRequest>({ ...EMPTY_REQUEST });
+  const [chips, setChips] = useState<Chip[]>([]);
+  const userKeyRef = useRef<string | null>(null);
   const nextId = useRef(1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
   const seededRef = useRef(false);
+
+  // Restore a conversation across rerenders/refreshes — but only for the same
+  // account: the stored blob carries the server-issued userKey, and the first
+  // response from a DIFFERENT user wipes it (no cross-account carryover).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(CONV_STORE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { userKey?: string; state?: CanonicalRequest; chips?: Chip[] };
+      if (saved.state) {
+        setConv(saved.state);
+        setChips(saved.chips ?? []);
+        userKeyRef.current = saved.userKey ?? null;
+      }
+    } catch {
+      /* a corrupt blob is just ignored */
+    }
+  }, []);
+
+  function persistConv(state: CanonicalRequest, chipList: Chip[], userKey: string | null) {
+    try {
+      sessionStorage.setItem(CONV_STORE_KEY, JSON.stringify({ userKey, state, chips: chipList }));
+    } catch {
+      /* storage full/blocked — persistence is best-effort */
+    }
+  }
+
+  function resetConversation() {
+    setConv({ ...EMPTY_REQUEST });
+    setChips([]);
+    try {
+      sessionStorage.removeItem(CONV_STORE_KEY);
+    } catch {
+      /* ignore */
+    }
+    say('Fresh docket. Tell me what you’re in the mood for.');
+  }
 
   const voiceSupported =
     typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
@@ -77,21 +129,55 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
     if (v.trim().length > 1) setQ(naiveParseQuery(v));
   }
 
-  async function submit(rawText?: string, queryOverride?: FinderQuery) {
+  /** Years + ids of the most recent results — what "newer"/"I saw those" refer to. */
+  function lastShown(): { shownYears: number[]; shownIds: { mediaType: 'movie' | 'tv'; id: number }[] } {
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const items = msgs[i]?.items;
+      if (items && items.length > 0) {
+        return {
+          shownYears: items.map((x) => x.year).filter((y): y is number => y != null),
+          shownIds: items.map((x) => ({ mediaType: x.mediaType, id: x.id })),
+        };
+      }
+    }
+    return { shownYears: [], shownIds: [] };
+  }
+
+  async function submit(rawText?: string, queryOverride?: FinderQuery, convOverride?: CanonicalRequest) {
     if (loading) return;
     const query = queryOverride ?? q;
     const text = (rawText ?? input).trim();
     setInput('');
-    say(text || `Filed my case — ${describeQuery(query)}.`, undefined, 'you');
+    if (text || !convOverride) say(text || `Filed my case — ${describeQuery(query)}.`, undefined, 'you');
     setLoading(true);
     try {
       const res = await fetchWithTimeout('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, text: text || undefined }),
+        body: JSON.stringify({
+          query,
+          text: text || undefined,
+          conversation: convOverride ?? conv,
+          turnContext: lastShown(),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'failed');
+
+      // Adopt the server's merged state. If the account changed since the
+      // stored conversation was created, drop the stale one instead of mixing.
+      if (data.conversation) {
+        if (userKeyRef.current && data.userKey && userKeyRef.current !== data.userKey) {
+          setConv({ ...EMPTY_REQUEST });
+          setChips([]);
+          try { sessionStorage.removeItem(CONV_STORE_KEY); } catch { /* ignore */ }
+        } else {
+          setConv(data.conversation);
+          setChips(data.chips ?? []);
+          persistConv(data.conversation, data.chips ?? [], data.userKey ?? null);
+        }
+        userKeyRef.current = data.userKey ?? userKeyRef.current;
+      }
 
       // A specifically-named title got put on trial — show the full ruling.
       if (data.kind === 'title' && data.verdict) {
@@ -106,15 +192,19 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
       }
 
       const items: ResultItem[] = data.items ?? [];
-      const read = describeQuery(query);
+      // Prefer the server's read-back of what THIS TURN changed — it is the
+      // actual interpretation, not a client-side guess.
+      const interp: string[] = Array.isArray(data.interpretation) ? data.interpretation : [];
+      const read = interp.length > 0 ? interp.join('; ') : describeQuery(query);
       let ruling: string;
       if (items.length > 0) {
         const top = items[0]!;
         ruling = `I read your case: ${read}. Ruling — ${items.length} title${items.length === 1 ? '' : 's'} worth your night. Top of the docket: ${top.title}${top.year ? ` (${top.year})` : ''} — ${top.primaryCall} at ${top.matchScore} match.`;
       } else {
-        ruling = `I read your case: ${read}. No title clears all of that. Try rephrasing — broaden the genre or drop a requirement — and re-file. For exact filters, use Forensic Search.`;
+        ruling = `I read your case: ${read}. No title clears all of that. Remove a chip below or re-file with fewer requirements.`;
       }
       if (data.relaxed) ruling += ` ${data.relaxed}`;
+      if (data.clarify) ruling += ` ${data.clarify}`;
       say(ruling, items);
     } catch {
       say('The court hit a snag pulling candidates. Try re-filing that in a moment.');
@@ -254,6 +344,40 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
             </div>
           )}
         </div>
+
+        {/* ============ The case as currently filed — removable chips ============ */}
+        {chips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-white/10 px-3 pt-2" data-testid="conversation-chips">
+            <span className="eyebrow mr-1 text-[10px]">Your case:</span>
+            {chips.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                data-testid={`chip-${c.id}`}
+                onClick={() => {
+                  const next = removeChip(conv, c.id);
+                  setConv(next);
+                  say(`Struck "${c.label}" from the case.`, undefined, 'you');
+                  void submit('', undefined, next);
+                }}
+                className="group flex min-h-[32px] items-center gap-1 rounded-full border border-brand-400/30 bg-brand-500/15 px-2.5 py-1 text-xs text-brand-100 hover:border-red-400/40 hover:bg-red-500/15"
+                aria-label={`Remove constraint: ${c.label}`}
+                title={`Remove "${c.label}"`}
+              >
+                {c.label}
+                <span aria-hidden className="text-brand-300 group-hover:text-red-300">×</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={resetConversation}
+              className="ml-auto min-h-[32px] rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-400 hover:bg-white/10"
+              aria-label="Start the conversation over"
+            >
+              Start over
+            </button>
+          </div>
+        )}
 
         <div className="border-t border-white/10 p-3">
           <div className="flex items-end gap-2">
