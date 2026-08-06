@@ -1,4 +1,5 @@
 import { isExactTitle } from '@/lib/nlu/titleNormalize';
+import { splitTitleYear, isGenericPhrase } from '@/lib/nlu/queryRepair';
 
 /**
  * WHERE A TYPED QUERY ACTUALLY GOES.
@@ -57,6 +58,16 @@ const LEADING_SOMETHING = /^\s*(something|anything)\b/i;
 const QUESTION = /^\s*(what|which|who|any|can you|could you)\b|[?]\s*$/i;
 
 /**
+ * A COMPARISON is a request: "movies like Creed" asks for neighbours, not for
+ * Creed. Without this cue the phrase classified as a catalog lookup and the
+ * top result — the reference title itself — opened as the destination. Titles
+ * that genuinely contain "like" ("Like Water for Chocolate") are safe because
+ * the exact-catalog-match rule in `resolveSearchDestination` runs FIRST and
+ * evidence beats phrasing.
+ */
+const SIMILARITY = /\b(?:like|similar to|in the vein of|in the style of|reminds me of|same (?:feel|vibe|feeling) as|(?:newer|older) than|(?:more|less) [a-z]+ than)\b/i;
+
+/**
  * Is this a recommendation request rather than a lookup?
  *
  * Deliberately conservative: when in doubt this returns false and the query
@@ -71,6 +82,7 @@ export function isRecommendationRequest(raw: string): boolean {
   if (REQUEST_VERBS.test(text)) return true;
   if (CONSTRAINT.test(text)) return true;
   if (QUESTION.test(text) && MEDIA_NOUN.test(text)) return true;
+  if (SIMILARITY.test(text) && MEDIA_NOUN.test(text)) return true;
   if (COUNT_PREFIX.test(text) && MEDIA_NOUN.test(text)) return true;
   return false;
 }
@@ -155,11 +167,32 @@ export function resolveSearchDestination(raw: string, results: CatalogResult[] =
   const q = (raw ?? '').trim();
   if (!q) return null;
 
+  // A GENERIC PHRASE NEVER NAVIGATES. "something good", "a movie", "newer",
+  // "not that" and "the sequel" each opened an unrelated title page because
+  // some film shares those literal words. A phrase whose every token is a
+  // function word or a bare adjective names nothing — it is a request, and the
+  // Judge is the only place that can do something useful with it. This runs
+  // before the exact-match rule on purpose: for these queries an "exact"
+  // catalog hit is a coincidence, not evidence.
+  if (isGenericPhrase(q)) {
+    return { href: askHref(q)!, reason: 'ask' };
+  }
+
   // AN EXACT TITLE ALWAYS WINS, even when the words read like a request.
   // Checked before intent precisely because intent cannot settle "Show Me a
   // Hero" and a catalog hit can: if what was typed IS the name of something,
   // that is what was meant.
-  const exact = results.find((r) => isExactTitle(q, r.title));
+  //
+  // A year beside the title disambiguates rather than defeating the match:
+  // "Creed 2015" is an exact ask for the 2015 Creed, so the bare title is
+  // compared and the stated year picks among the films that share it.
+  const { title: bare, year } = splitTitleYear(q);
+  const exact =
+    results.find((r) => isExactTitle(q, r.title)) ??
+    (year != null
+      ? results.find((r) => isExactTitle(bare, r.title) && r.year === year) ??
+        results.find((r) => isExactTitle(bare, r.title))
+      : undefined);
   if (exact) return { href: titleHref(exact), reason: 'exact-title' };
 
   if (classifySearchIntent(q) === 'ask') {

@@ -64,7 +64,7 @@ function whereFrom(providers: { available: boolean; options: { providerName: str
 // Fargo". Ordered longest-first within each group; the bare "like" is last so a
 // specific cue wins when several are present.
 const REF_CUE =
-  /\b(?:in the vein of|reminds me of|if i (?:really )?(?:like|liked|enjoy|enjoyed|love|loved)|similar to|(?:something|stuff|shows?|movies?|a show|a movie|more|kinda|kind of|sort of|just|a lot) like|like the (?:show|movie)|like watching|like)\b/gi;
+  /\b(?:in the vein of|in the style of|along the lines of|reminiscent of|reminds me of|same (?:feel|vibe|energy|tone|feeling|mood) as|if i (?:really )?(?:like|liked|enjoy|enjoyed|love|loved)|i (?:really )?(?:liked|enjoyed|loved)|similar to|(?:newer|older) than|(?:more|less) [a-z]+ than|(?:something|stuff|shows?|movies?|a show|a movie|more|kinda|kind of|sort of|just|a lot) like|like the (?:show|movie)|like watching|like)\b/gi;
 
 /**
  * Preference clauses people tack on the end: "…that I would like", "…I'd
@@ -134,7 +134,10 @@ export function extractReference(text: string): string | null {
   for (const group of [specific, bare]) {
     for (let i = group.length - 1; i >= 0; i--) {
       const tail = tailOf(group[i]!);
-      if (tail.length >= 2) return tail;
+      // A bare year is a DATE, not a reference: "newer than 2015" states a
+      // floor, and treating "2015" as a seed title would search for the film
+      // called 2015 and compare against the wrong thing entirely.
+      if (tail.length >= 2 && !/^\(?(?:19|20)\d{2}\)?$/.test(tail)) return tail;
     }
   }
   return null;
@@ -356,7 +359,15 @@ export async function askJudgeTitle(
   const near = results.filter((r) => titleMatches(cleaned, r.title));
   if (near.length === 0) return null;
   const exacts = near.filter((r) => isExactTitle(cleaned, r.title));
-  const pool = exacts.length ? exacts : near;
+  let pool = exacts.length ? exacts : near;
+  // A stated year DISAMBIGUATES between equally-good title matches — it never
+  // narrows to nothing. "Creed 2015" and "Dune 2021" name one specific film
+  // among several with the same name; if no candidate carries that year the
+  // hint is simply unused rather than turned into an empty result.
+  if (c.year != null) {
+    const sameYear = pool.filter((r) => (r as { year?: number | null }).year === c.year);
+    if (sameYear.length) pool = sameYear;
+  }
   const typed = wantsTv ? pool.filter((m) => m.mediaType === 'tv')
     : wantsMovie ? pool.filter((m) => m.mediaType === 'movie') : pool;
   const ranked = rankByTitleIdentity(cleaned, typed.length ? typed : pool, (r) => r.title, (r) => (r as { popularity?: number }).popularity ?? 0);

@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from '@/lib/finder';
 import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
-import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
+import { naiveParseQuery, EMPTY_QUERY, parseTopicTerms } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
+import { searchKeywords } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
@@ -134,6 +135,21 @@ export async function POST(req: Request) {
     // Foreign-origin / English-audio / runtime augmentation (deterministic; the
     // parser paths don't extract these) — restricts the pool to the real origin.
     query = augmentInternational(query, text);
+    // SUBJECT MATTER, when the parse did not already carry it. "boxing movies
+    // after 2020" names a subject TMDB models as a keyword rather than a genre,
+    // so without this the one word the request was actually about reached the
+    // search as nothing at all. Resolved through the same `searchKeywords` the
+    // AI path uses, so the ids are TMDB's and the behaviour is identical
+    // whether or not an OpenAI key is configured. Best-effort: an unresolved
+    // term is skipped, never guessed.
+    if (text && (!query.keywordIds || query.keywordIds.length === 0)) {
+      const topics = parseTopicTerms(text);
+      if (topics.length) {
+        const ids = await searchKeywords(topics).catch(() => []);
+        if (ids.length) query.keywordIds = ids;
+      }
+    }
+
     // Guarantee the actor filter regardless of AI: if a person is named and not
     // already resolved, look them up (fuzzy, so misspellings still match).
     if (text && (!query.castIds || query.castIds.length === 0)) {
@@ -169,6 +185,13 @@ export async function POST(req: Request) {
     const plan = text.trim() ? buildQueryPlan(text) : null;
     if (plan && plan.mediaTypes.length > 0) {
       items = items.filter((i) => plan.mediaTypes.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
+    }
+    // …and the same guard for what the request ruled OUT. "no documentaries"
+    // used to land in `mediaTypes` as a REQUESTED kind, so the whitelist above
+    // admitted exactly the thing the user excluded. Removing only, never
+    // substituting — an honest shortfall beats a wrong fill.
+    if (plan && plan.excludedMediaTypes.length > 0) {
+      items = items.filter((i) => !plan.excludedMediaTypes.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
     }
 
     return NextResponse.json({

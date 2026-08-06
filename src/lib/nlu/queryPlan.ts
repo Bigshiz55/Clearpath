@@ -27,6 +27,8 @@ export interface QueryPlan {
   intent: 'recommendation' | 'exact_title' | 'similar_to' | 'discovery';
   count: { requested: number | null; minimum: number | null; maximum: number | null };
   mediaTypes: MediaKind[]; // empty = no media constraint
+  /** Kinds the request ruled out ("no documentaries"). Empty = none stated. */
+  excludedMediaTypes: MediaKind[];
   sources: PlannedSource[]; // required sources (union unless grouped)
   personalized: boolean;
   uniqueResults: boolean;
@@ -60,13 +62,52 @@ function toPlanned(s: CanonicalSource, required: boolean): PlannedSource {
   return { canonicalName: s.canonicalName, sourceType: s.sourceType, networkKey: s.networkKey, providerId: s.providerId, required };
 }
 
+/**
+ * Media words that are being EXCLUDED, not requested.
+ *
+ * "Boxing movies after 2020, no documentaries" named two media words and the
+ * plan recorded BOTH as required. Because the ask route uses `mediaTypes` as a
+ * final whitelist filter, the exclusion became a permission: the one thing the
+ * user ruled out was the one thing guaranteed a place in the results.
+ */
+const NEGATED_MEDIA =
+  /\b(?:no|not|nothing|without|except|excluding|avoid|other than|apart from|rather not|don'?t want)\s+(?:any\s+)?((?:[a-z-]+\s+){0,2}?(?:movies?|films?|features?|flicks?|shows?|series|tv series|tv shows?|programmes?|programs?|sitcoms?|mini-?series|limited series|documentar(?:y|ies)|docs?|episodes?))/gi;
+
 /** Detect all media kinds named in a text span. Strips the verb "show me/us"
  *  first so the request verb is never mistaken for the media word "show". */
 function mediaTypesIn(text: string): MediaKind[] {
   const cleaned = text.replace(/\bshows?\s+(?:me|us|them)\b/gi, ' ');
+
+  // Collect the excluded kinds first, then remove them from what was named.
+  const excluded = new Set<MediaKind>();
+  for (const m of cleaned.matchAll(NEGATED_MEDIA)) {
+    for (const w of m[1]?.match(MEDIA_WORD) ?? []) {
+      const k = normalizeMediaWord(w);
+      if (k) excluded.add(k);
+    }
+  }
+
   const out = new Set<MediaKind>();
   const m = cleaned.match(MEDIA_WORD) ?? [];
   for (const w of m) { const k = normalizeMediaWord(w); if (k) out.add(k); }
+  for (const k of excluded) out.delete(k);
+  return [...out];
+}
+
+/**
+ * The media kinds the request ruled OUT. Exposed rather than discarded: a
+ * constraint that cannot be applied downstream must still be visible, or the
+ * system is quietly claiming to have honoured something it dropped.
+ */
+export function excludedMediaTypesIn(text: string): MediaKind[] {
+  const cleaned = (text ?? '').replace(/\bshows?\s+(?:me|us|them)\b/gi, ' ');
+  const out = new Set<MediaKind>();
+  for (const m of cleaned.matchAll(NEGATED_MEDIA)) {
+    for (const w of m[1]?.match(MEDIA_WORD) ?? []) {
+      const k = normalizeMediaWord(w);
+      if (k) out.add(k);
+    }
+  }
   return [...out];
 }
 
@@ -110,6 +151,7 @@ export function buildQueryPlan(rawQuery: string): QueryPlan {
   const ambiguities: string[] = [];
   const count = extractCount(text);
   const mediaTypes = mediaTypesIn(text);
+  const excludedMediaTypes = excludedMediaTypesIn(text);
   const personalized = PERSONAL_CUE.test(text);
   const groups = splitGroups(text);
   const sources = groups ? groups.flatMap((g) => g.sources) : allSources(text);
@@ -119,7 +161,7 @@ export function buildQueryPlan(rawQuery: string): QueryPlan {
   let intent: QueryPlan['intent'];
   if (SIMILARITY_CUE.test(text) && !/\b(life ?time|hallmark)\b/i.test(text.replace(SIMILARITY_CUE, ''))) {
     intent = 'similar_to';
-  } else if (count != null || mediaTypes.length > 0 || sources.length > 0 || personalized) {
+  } else if (count != null || mediaTypes.length > 0 || excludedMediaTypes.length > 0 || sources.length > 0 || personalized) {
     intent = 'recommendation';
   } else {
     intent = 'discovery';
@@ -128,6 +170,7 @@ export function buildQueryPlan(rawQuery: string): QueryPlan {
   const hard: string[] = [];
   if (count != null) hard.push(`count=${count}`);
   for (const mt of mediaTypes) hard.push(`mediaType=${mt}`);
+  for (const mt of excludedMediaTypes) hard.push(`mediaType!=${mt}`);
   for (const s of sources) hard.push(`source=${s.canonicalName}(${s.sourceType})`);
 
   // Ambiguity: a Hallmark-family source named generically may need a follow-up.
@@ -138,6 +181,7 @@ export function buildQueryPlan(rawQuery: string): QueryPlan {
     intent,
     count: { requested: count, minimum: count, maximum: count },
     mediaTypes,
+    excludedMediaTypes,
     sources,
     personalized,
     uniqueResults: true,

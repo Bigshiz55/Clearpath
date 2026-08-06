@@ -34,6 +34,15 @@ export interface SearchClassification {
   providerStrength: 'hard' | 'soft' | null;
   contentType: 'movie' | 'tv' | 'unknown';
   reference: string | null; // populated for similar_to
+  /**
+   * A year the user typed ALONGSIDE the title ("Creed 2015", "Dune 2021").
+   *
+   * It is a disambiguator, never part of the name: left inside the title the
+   * catalog searched for the literal string "Creed 2015" and returned nothing,
+   * so adding the one detail that identifies which Creed you meant made the
+   * search strictly worse.
+   */
+  year: number | null;
   ambiguities: string[];
 }
 
@@ -108,9 +117,18 @@ export function statedMediaType(
   return null;
 }
 
-function extractTitle(residual: string): { title: string | null; contentType: 'movie' | 'tv' | 'unknown' } {
+function extractTitle(residual: string): { title: string | null; contentType: 'movie' | 'tv' | 'unknown'; year: number | null } {
   let t = residual.replace(LEAD_VERBS, '');
   let contentType: 'movie' | 'tv' | 'unknown' = 'unknown';
+  // A bare 4-digit year sitting beside the title is a disambiguator. Only
+  // stripped when something is LEFT — "1917" and "2012" are films, and a query
+  // that is nothing but a year is that film's name.
+  let year: number | null = null;
+  const ym = t.match(/(?:^|\s)\(?((?:19|20)\d{2})\)?(?=\s|$)/);
+  if (ym) {
+    const without = (t.slice(0, ym.index) + ' ' + t.slice(ym.index! + ym[0].length)).replace(/\s+/g, ' ').trim();
+    if (without.length >= 2) { year = Number(ym[1]); t = without; }
+  }
   const ctm = t.match(CONTENT_TYPE_WORDS);
   if (ctm) {
     const w = ctm[0].toLowerCase();
@@ -119,7 +137,7 @@ function extractTitle(residual: string): { title: string | null; contentType: 'm
   }
   t = t.replace(/[?!.]+$/g, '').replace(/\s+/g, ' ').trim();
   // Drop a dangling leading article ONLY for length checks; keep for matching.
-  return { title: t.length >= 1 ? t : null, contentType };
+  return { title: t.length >= 1 ? t : null, contentType, year };
 }
 
 /** Classify a raw query into a search mode + structured fields. Pure. */
@@ -132,35 +150,35 @@ export function classifySearch(raw: string): SearchClassification {
   const hasSimilarity = SIMILARITY_CUE.test(text);
   const hasPerson = PERSON_CUE.test(text);
   const genre = detectGenre(residual);
-  const { title, contentType } = extractTitle(residual);
+  const { title, contentType, year } = extractTitle(residual);
 
   // E) Explicit similarity always wins ("shows like Gone on BritBox").
   if (hasSimilarity) {
     // Reference is what follows the similarity cue, minus the provider (already
     // stripped from `residual`). Reuse the title extraction on the residual.
     const ref = title;
-    return { mode: 'similar_to', requestedTitle: null, requiredProvider: provider, providerStrength, contentType, reference: ref, ambiguities };
+    return { mode: 'similar_to', requestedTitle: null, requiredProvider: provider, providerStrength, contentType, reference: ref, year, ambiguities };
   }
 
   // B) Person/credit search.
   if (hasPerson) {
-    return { mode: 'person', requestedTitle: title, requiredProvider: provider, providerStrength, contentType, reference: null, ambiguities };
+    return { mode: 'person', requestedTitle: title, requiredProvider: provider, providerStrength, contentType, reference: null, year, ambiguities };
   }
 
   // C) Provider catalog: a genre/topic + a provider but NO plausible title token
   // left (e.g. "crime dramas on BritBox" → residual is just "crime dramas").
   const residualIsJustGenre = genre != null && (!title || isGenreOnly(title));
   if (provider && residualIsJustGenre) {
-    return { mode: 'provider_catalog', requestedTitle: null, requiredProvider: provider, providerStrength, contentType, reference: null, ambiguities };
+    return { mode: 'provider_catalog', requestedTitle: null, requiredProvider: provider, providerStrength, contentType, reference: null, year, ambiguities };
   }
 
   // D) Forensic discovery: constraint language without a clear single title.
   if (!title || isConstraintPhrase(text)) {
-    return { mode: 'forensic', requestedTitle: null, requiredProvider: provider, providerStrength, contentType, reference: null, ambiguities };
+    return { mode: 'forensic', requestedTitle: null, requiredProvider: provider, providerStrength, contentType, reference: null, year, ambiguities };
   }
 
   // A) Default for a title(+provider) query → EXACT TITLE LOOKUP.
-  return { mode: 'exact_title', requestedTitle: title, requiredProvider: provider, providerStrength, contentType, reference: null, ambiguities };
+  return { mode: 'exact_title', requestedTitle: title, requiredProvider: provider, providerStrength, contentType, reference: null, year, ambiguities };
 }
 
 const GENRE_WORDS = new Set([

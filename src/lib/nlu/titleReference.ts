@@ -46,7 +46,46 @@ const TRAILING_CLAUSE =
   /\s*[,;]?\s*(?:\b(?:that|which|but)\s+)?\b(?:i|we)\b[^.?!]{0,40}?\b(?:seen|watched|caught|like|liked|enjoy|enjoyed|love|loved|dig|want|need)\b.*$/i;
 
 /** The other tail: who it is for, and when. */
-const TRAILING_ASK = /\s*[,;]?\s*\b(?:for (?:me|us)|please|tonight|preferably|if possible)\b.*$/i;
+const TRAILING_ASK =
+  /\s*[,;]?\s*\b(?:for (?:me|us)|please|tonight|preferably|if possible|what(?:'s| is| else| should| would| can| do)\b).*$/i;
+
+/**
+ * The CONSTRAINT tail — the rest of the request, glued to the title.
+ *
+ * `TRAILING_CLAUSE` above catches the preference clause ("that I haven't
+ * seen") because it keys on a first-person pronoun. Constraints have no
+ * pronoun, so they slipped straight through: "Movies like Rocky after 2020"
+ * produced the reference "Rocky after 2020" and "similar to Mindhunter but
+ * less violent" produced "Mindhunter but less violent". Neither resolves to
+ * anything, so the seed silently vanished and the ask degraded to generic
+ * discovery — the constraint did not merely go unused, it destroyed the
+ * reference on its way past.
+ */
+const TRAILING_CONSTRAINT = new RegExp(
+  [
+    // "…but less violent", "…though not as gory", "…except newer"
+    String.raw`\s*[,;]?\s*\b(?:but|though|although|except|only)\s+(?:not\s+)?(?:less|more|as|too|newer|older|shorter|longer|without|no|nothing)\b.*$`,
+    // "…after 2020", "…before 1995", "…since 1999"
+    String.raw`\s*[,;]?\s*\b(?:after|before|since|from|prior to|newer than|older than)\s+(?:the\s+)?(?:19|20)\d{2}\b.*$`,
+    // "…but no documentaries", "…and nothing scary"
+    String.raw`\s*[,;]?\s*\b(?:but|and)\s+(?:no|not|nothing|without)\b.*$`,
+    // "…but show me recent boxing films" — the comparison ends and a fresh
+    // instruction begins. A title never continues into "but show me".
+    String.raw`\s*[,;]?\s*\b(?:but|though|although)\s+(?:show|give|find|recommend|suggest|make|only|just|i|we)\b.*$`,
+  ].join('|'),
+  'i',
+);
+
+/**
+ * A SECOND SENTENCE is a second thought, never the rest of the title.
+ *
+ * "I like Rocky. What else should I watch?" carried the whole question into
+ * the reference. Cutting at any full stop would have been worse — "Mr. Robot"
+ * and "Dr. No" are titles — so the cut requires the next sentence to OPEN like
+ * a fresh request. No title begins "what else should".
+ */
+const TRAILING_SENTENCE =
+  /[.?!]\s+(?=(?:what|which|who|any|anything|something|show|give|find|recommend|suggest|can|could|do|please|i|we)\b)[\s\S]*$/i;
 
 /**
  * Cut a trailing clause off — but NEVER when it starts at position 0.
@@ -77,7 +116,9 @@ const SPLITTERS = /\s*(?:\bor\b|\band\b|\/|,|;|\+|&)\s*/i;
 
 /** Trim a single candidate down to something that could be a title. */
 function tidy(s: string): string {
-  return cutTrailing(cutTrailing(s ?? '', TRAILING_CLAUSE), TRAILING_ASK)
+  const cut = [TRAILING_CLAUSE, TRAILING_ASK, TRAILING_SENTENCE, TRAILING_CONSTRAINT]
+    .reduce((acc, re) => cutTrailing(acc, re), s ?? '');
+  return cut
     .replace(LEADING_NOISE, '')
     .replace(/["“”']/g, '')
     .replace(/[?!.,\s]+$/g, '')
@@ -96,6 +137,25 @@ export function referenceCandidates(raw: string): string[] {
   if (!whole) return [];
 
   const out: string[] = [whole];
+  // A SAFETY NET for the two NEWER cutters only.
+  //
+  // `TRAILING_SENTENCE` and `TRAILING_CONSTRAINT` are heuristics: a title that
+  // genuinely contains "…but no…" or a year would be unrecoverable if they
+  // guessed wrong. So the phrase with only those two skipped stays in the
+  // running behind the fully-trimmed one, and the resolver keeps whichever
+  // actually exists.
+  //
+  // It is NOT the raw input. Undoing `TRAILING_CLAUSE` as well put "…that I
+  // probably haven't seen" back into the candidate list — the exact string
+  // this module was written to remove.
+  const conservative = [TRAILING_CLAUSE, TRAILING_ASK]
+    .reduce((acc, re) => cutTrailing(acc, re), raw ?? '')
+    .replace(LEADING_NOISE, '')
+    .replace(/["“”']/g, '')
+    .replace(/[?!.,\s]+$/g, '')
+    .trim();
+  if (conservative && conservative !== whole) out.push(conservative);
+
   for (const part of whole.split(SPLITTERS)) {
     const p = tidy(part);
     // One- and two-character fragments are never a title worth searching, and
