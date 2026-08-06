@@ -24,6 +24,12 @@ import {
   WAVE_SIZE,
 } from '@/lib/finderPool';
 import { DEFAULT_RESULT_COUNT, MAX_REQUESTED_COUNT } from '@/lib/nlu/count';
+import {
+  evaluateSubjectCentrality,
+  type SubjectRequirement,
+  type SemanticStatus,
+  type SubjectCentrality,
+} from '@/lib/nlu/semanticEligibility';
 
 const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
 const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
@@ -107,6 +113,15 @@ export interface FinderQuery {
   subjectLabel?: string;
   /** Canonical subject key ("boxing") — for the per-title evidence receipt. */
   subjectCanonical?: string;
+  /** The subject's vocabulary for the semantic-eligibility evaluator. When
+   *  present, a keyword match is only a CANDIDATE signal — every returned title
+   *  must be judged CENTRAL (or MATERIAL when non-strict) before it is eligible. */
+  subjectLexemes?: string[];
+  /** Strict subject request ("a boxing movie") → only CENTRAL is eligible. */
+  subjectStrict?: boolean;
+  /** Final user-facing result count the phrasing asked for (1 for "a boxing
+   *  movie"). A FINAL-selection cap only — never the discovery pool size. */
+  finalCount?: number | null;
   /** Keyword ids to EXCLUDE (`without_keywords`) — "a boxing movie, not wrestling". */
   excludeKeywordIds?: number[];
   /** Exact earliest release date (ISO yyyy-mm-dd) — "made within the last 20
@@ -141,10 +156,58 @@ export interface FinderItem {
   explain?: VerdictExplanation;
   /** Floor-weighted joint verdict when several people are watching. */
   household?: HouseholdVerdict | null;
-  /** Proof a required subject ("boxing") is satisfied — present ONLY when the
-   *  request named one. A returned item without this, on a subject request, is
-   *  a bug the response assertion refuses to ship. */
-  subjectEvidence?: { constraint: string; satisfied: boolean; evidenceType: 'keyword'; evidence: string };
+  /** The semantic-eligibility verdict for a required subject ("boxing") —
+   *  present ONLY when the request named one. `satisfied` is TRUE only when the
+   *  subject is genuinely eligible (CENTRAL for a strict request), NOT merely
+   *  because a keyword matched. Carries the centrality class, confidence, the
+   *  real evidence summary, and the rejection reason when it did not qualify. */
+  subjectEvidence?: {
+    constraint: string;
+    satisfied: boolean;
+    status: SemanticStatus;
+    centrality: SubjectCentrality;
+    confidence: number;
+    evidenceType: 'centrality';
+    evidence: string;
+    rejectionReason: string | null;
+  };
+}
+
+/** The distinct pipeline stages, counted honestly — so "24 candidates" can
+ *  never again be reported as "24 recommendations". */
+export interface FinderDiagnostics {
+  /** What the phrasing asked for (1 for "a boxing movie"); null = browse. */
+  requestedCount: number | null;
+  /** Titles discovered (keyword/genre pool, after de-dupe & seen-removal). */
+  candidateCount: number;
+  /** Candidates that cleared every DETERMINISTIC hard filter (type, date, …). */
+  deterministicEligibleCount: number;
+  /** Deterministic survivors run through the SEMANTIC evaluator (0 if no subject). */
+  semanticEvaluatedCount: number;
+  /** Survivors the evaluator judged eligible on subject centrality
+   *  (CENTRAL for a strict request). Equals deterministic count when no subject. */
+  centralSubjectEligibleCount: number;
+  /** Eligible survivors that also met the quality/match bar. */
+  qualityEligibleCount: number;
+  /** What the user is actually shown after the requested-count selection. */
+  finalReturnedCount: number;
+  /** Per-candidate eligibility verdicts (subject requests only) — eligible AND
+   *  rejected, so the proof can show why each keyword candidate did or did not
+   *  qualify. Bounded; ordered by match score. Empty when no subject. */
+  evaluations?: Array<{
+    id: number;
+    mediaType: MediaType;
+    title: string;
+    year: number | null;
+    status: SemanticStatus;
+    centrality: SubjectCentrality;
+    confidence: number;
+    evidence: string;
+    rejectionReason: string | null;
+    eligible: boolean;
+    matchScore: number;
+    rankedByTasteDna: boolean;
+  }>;
 }
 
 export interface FinderResult {
@@ -153,6 +216,8 @@ export interface FinderResult {
   /** Set when we had to relax a constraint to return anything. */
   relaxed: string | null;
   total: number;
+  /** Per-stage counts for honest diagnostics (the Production Search Proof). */
+  diagnostics: FinderDiagnostics;
 }
 
 /**
@@ -399,20 +464,39 @@ export async function runFinder(
       }
       const effectiveMatch = household ? household.score : report.personal.score;
 
-      // REQUIRED-SUBJECT EVIDENCE. This candidate reached here only by clearing
-      // TMDB `with_keywords` on the subject keywords, so it carries a subject
-      // tag — that is the evidence, not a guess. Recorded per-title so the
-      // response can prove every card, and the "everything matches" assertion
-      // can refuse to ship a subject result that lacks it.
+      // REQUIRED-SUBJECT SEMANTIC ELIGIBILITY. Clearing TMDB `with_keywords`
+      // made this a CANDIDATE — it does NOT make it eligible. Judge whether the
+      // subject is genuinely CENTRAL to THIS title from its own evidence
+      // (title, overview, genres, keyword tags), deterministically. A keyword
+      // tag is one signal among several, never sufficient on its own.
       let subjectEvidence: FinderItem['subjectEvidence'];
-      if (q.subjectKeywordIds && q.subjectKeywordIds.length > 0) {
-        subjectEvidence = {
-          constraint: q.subjectCanonical ?? q.subjectLabel ?? 'subject',
-          satisfied: true,
-          evidenceType: 'keyword',
-          evidence: q.subjectLabel ?? q.subjectCanonical ?? 'subject',
+      if (q.subjectLexemes && q.subjectLexemes.length > 0) {
+        const requirement: SubjectRequirement = {
+          canonical: q.subjectCanonical ?? q.subjectLabel ?? 'subject',
+          label: q.subjectLabel ?? q.subjectCanonical ?? 'subject',
+          lexemes: q.subjectLexemes,
+          strict: q.subjectStrict !== false,
         };
-        receipts.unshift(`${q.subjectLabel ?? 'subject'} ✓`);
+        const verdict = evaluateSubjectCentrality(requirement, {
+          title: meta.title,
+          altTitle: meta.originalTitle ?? null,
+          overview: meta.overview,
+          genres: meta.genres,
+          keywords: meta.keywords,
+        });
+        subjectEvidence = {
+          constraint: requirement.canonical,
+          satisfied: verdict.status === 'PASS',
+          status: verdict.status,
+          centrality: verdict.centrality,
+          confidence: verdict.confidence,
+          evidenceType: 'centrality',
+          evidence: verdict.evidenceSummary,
+          rejectionReason: verdict.rejectionReason,
+        };
+        if (verdict.status === 'PASS') {
+          receipts.unshift(`${q.subjectLabel ?? 'subject'} ✓ ${verdict.centrality.toLowerCase()}`);
+        }
       }
 
       // Match threshold (against the score the user is actually shown).
@@ -475,15 +559,31 @@ export async function runFinder(
   //
   // Live TV is the exception — its real filter (does this show actually have an
   // upcoming airing?) runs after scoring, so it needs everything we pulled.
+  // A required subject means the SEMANTIC eligibility stage runs: only titles
+  // the evaluator judged eligible (CENTRAL for a strict request) count toward
+  // "enough", so we keep hydrating past keyword matches that turn out to be
+  // incidental instead of stopping early on a pool of look-alikes.
+  const subjectRequired = !!(q.subjectLexemes && q.subjectLexemes.length > 0);
+  const isEligible = (i: FinderItem): boolean =>
+    !subjectRequired || i.subjectEvidence?.satisfied === true;
+
   const survivors: FinderItem[] = [];
   const enough = q.liveOnly ? Number.POSITIVE_INFINITY : enoughSurvivors(limit);
   for (const wave of waves(candidates, WAVE_SIZE)) {
     const got = await mapPool(wave, HYDRATE_CONCURRENCY, scoreCandidate);
     for (const item of got) if (item) survivors.push(item);
-    if (survivors.length >= enough) break;
+    if (survivors.filter(isEligible).length >= enough) break;
   }
 
-  let items = survivors.sort((a, b) => b.matchScore - a.matchScore);
+  // Stage the counts honestly and DROP semantically-ineligible candidates
+  // BEFORE ranking — Taste DNA never ranks a title the subject gate rejected.
+  const candidateCount = candidates.length;
+  const deterministicEligibleCount = survivors.length;
+  const semanticEvaluatedCount = subjectRequired ? survivors.length : 0;
+  const eligibleSurvivors = subjectRequired ? survivors.filter(isEligible) : survivors;
+  const centralSubjectEligibleCount = subjectRequired ? eligibleSurvivors.length : deterministicEligibleCount;
+
+  let items = eligibleSurvivors.sort((a, b) => b.matchScore - a.matchScore);
   let relaxed: string | null = null;
 
   // Honest fallback #1: a fuzzy vibe/trope word ("feel-good", "cozy") resolves
@@ -503,13 +603,13 @@ export async function runFinder(
   // boxing movies exist, seven is the honest answer — a generic action list is
   // a wrong one. We say so plainly and stop; the vibe-keyword relaxation below
   // is skipped entirely.
-  const hasRequiredSubject = !!(q.subjectKeywordIds && q.subjectKeywordIds.length > 0);
+  const hasRequiredSubject = subjectRequired;
   if (hasRequiredSubject) {
     const n = items.length;
     if (n === 0) {
-      relaxed = `No verified ${q.subjectLabel ?? 'matching'} ${q.mediaType === 'movie' ? 'movies' : 'titles'} cleared every filter — nothing was padded in. Relax one constraint to widen the search.`;
+      relaxed = `No ${q.subjectLabel ?? 'matching'} ${q.mediaType === 'movie' ? 'movies' : 'titles'} where the subject is genuinely central cleared every filter — nothing was padded in. Relax one constraint to widen the search.`;
     } else {
-      relaxed = `Found ${n} verified ${q.subjectLabel ?? ''} ${q.mediaType === 'movie' ? 'movie' : 'title'}${n === 1 ? '' : 's'}${q.sinceMonths ? ` from the last ${Math.round(q.sinceMonths / 12)} years` : ''}, ranked for you.`.replace(/\s+/g, ' ').trim();
+      relaxed = `Found ${n} ${q.subjectLabel ?? ''} ${q.mediaType === 'movie' ? 'movie' : 'title'}${n === 1 ? '' : 's'} where ${q.subjectLabel ? `${q.subjectLabel.toLowerCase()} is` : 'the subject is'} genuinely central${q.sinceMonths ? ` from the last ${Math.round(q.sinceMonths / 12)} years` : ''}, ranked for you.`.replace(/\s+/g, ' ').trim();
     }
   } else if (isKeywordStarved(items.length, limit, !!(q.keywordIds && q.keywordIds.length > 0))) {
     const relaxedQ: FinderQuery = { ...q, keywordIds: undefined };
@@ -557,7 +657,15 @@ export async function runFinder(
     }
   }
 
-  const finalItems = items.slice(0, Math.max(1, Math.min(limit, MAX_RESULT_LIMIT)));
+  // Eligible + ranked + quality-passed titles (the match/quality bar is applied
+  // during hydration in scoreCandidate, so everything here already meets it).
+  const qualityEligibleCount = items.length;
+
+  // REQUESTED-COUNT SELECTION. "a boxing movie" asks for ONE — the final cap is
+  // the requested count, applied AFTER eligibility and ranking, never as a
+  // discovery limit. When the phrasing states no count, the browse limit stands.
+  const finalCap = q.finalCount != null ? q.finalCount : limit;
+  const finalItems = items.slice(0, Math.max(1, Math.min(finalCap, MAX_RESULT_LIMIT)));
   // Attach the real next airing (channel + time) to every TV result, so "ask for
   // a show" always shows where and when it's on. Best-effort; null when unknown.
   await Promise.all(
@@ -568,5 +676,41 @@ export async function runFinder(
       }),
   );
 
-  return { items: finalItems, scoredFor, relaxed, total: items.length };
+  // Per-candidate verdicts for the proof — eligible AND rejected, so a keyword
+  // candidate that failed shows WHY. Only the titles that survived to the final
+  // answer were "ranked by Taste DNA"; a rejected candidate never was.
+  const finalKeys = new Set(finalItems.map((i) => `${i.mediaType}-${i.id}`));
+  const evaluations = subjectRequired
+    ? survivors
+        .slice()
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .slice(0, 60)
+        .map((i) => ({
+          id: i.id,
+          mediaType: i.mediaType,
+          title: i.title,
+          year: i.year,
+          status: i.subjectEvidence?.status ?? ('UNKNOWN' as SemanticStatus),
+          centrality: i.subjectEvidence?.centrality ?? ('UNSUPPORTED' as SubjectCentrality),
+          confidence: i.subjectEvidence?.confidence ?? 0,
+          evidence: i.subjectEvidence?.evidence ?? '',
+          rejectionReason: i.subjectEvidence?.rejectionReason ?? null,
+          eligible: i.subjectEvidence?.satisfied === true,
+          matchScore: i.matchScore,
+          rankedByTasteDna: finalKeys.has(`${i.mediaType}-${i.id}`),
+        }))
+    : undefined;
+
+  const diagnostics: FinderDiagnostics = {
+    requestedCount: q.finalCount ?? null,
+    candidateCount,
+    deterministicEligibleCount,
+    semanticEvaluatedCount,
+    centralSubjectEligibleCount,
+    qualityEligibleCount,
+    finalReturnedCount: finalItems.length,
+    evaluations,
+  };
+
+  return { items: finalItems, scoredFor, relaxed, total: items.length, diagnostics };
 }

@@ -181,28 +181,31 @@ export async function POST(req: Request) {
 
     const result = await runFinder(supabase, user.id, query, household && household.length > 0 ? household : watcher, limit);
 
-    // NO-FILLER ASSERTION. When a subject was required, every returned title
-    // MUST carry its own subject evidence. If any lacks it, drop it rather than
-    // ship a filler card claiming to match — this makes "everything matches"
-    // impossible to render falsely.
+    // NO-FILLER SAFETY NET. Eligibility already ran inside runFinder (only
+    // titles the semantic evaluator judged eligible reach here), so this is a
+    // belt-and-braces assertion, not the gate itself: a subject request may
+    // never ship a title without a passing eligibility verdict.
     let items = result.items;
-    if (query.subjectKeywordIds && query.subjectKeywordIds.length > 0) {
+    if (query.subjectLexemes && query.subjectLexemes.length > 0) {
       items = items.filter((i) => i.subjectEvidence?.satisfied === true);
     }
 
-    // CONSTRAINT RECEIPT — the response's own proof of what actually ran.
+    // CONSTRAINT RECEIPT — the response's own proof of the distinct pipeline
+    // stages. Keyword matches populate `candidateCount`; only titles the
+    // evaluator judged the subject CENTRAL to reach `centralSubjectEligibleCount`
+    // and the final answer. No count here conflates "candidate" with "result".
     const constraintReceipt = {
       mediaType: query.mediaType,
       requiredSubject: query.subjectLabel ?? null,
       subjectCanonical,
+      subjectStrict: query.subjectStrict ?? null,
       minReleaseDate: query.minReleaseDate ?? null,
       sinceYears: query.sinceMonths ? Math.round(query.sinceMonths / 12) : null,
       excludedSubjectKeywordIds: query.excludeKeywordIds ?? [],
       genreIds: query.genreIds,
       providerIds: query.providerIds ?? [],
       monetization: query.monetization ?? null,
-      subjectSatisfiedCount: items.filter((i) => i.subjectEvidence?.satisfied).length,
-      returnedCount: items.length,
+      stages: result.diagnostics,
       generic_filler_possible: false,
     };
 
@@ -211,6 +214,7 @@ export async function POST(req: Request) {
       query,
       interpretation,
       constraintReceipt,
+      diagnostics: result.diagnostics,
       scoredFor: result.scoredFor,
       relaxed: result.relaxed,
       items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),

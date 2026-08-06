@@ -7,7 +7,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
-import { applyRequiredSubject } from '@/lib/finderSubject';
+import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
@@ -23,7 +23,7 @@ import {
   type CanonicalRequest,
   type TurnContext,
 } from '@/lib/nlu/conversationState';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 /**
  * "Something like X" is best served by TMDB-similar ONLY when the reference is
@@ -119,6 +119,9 @@ export async function POST(req: Request) {
     // recommendation/similarity search (which is what returned "Gone Girl").
     const text = typeof body.text === 'string' ? body.text.slice(0, 300) : '';
     const cls = text.trim() ? classifySearch(text) : null;
+    // A developer-safe request id, echoed on every response so a support report
+    // ("I searched boxing and got Absentia") can be traced to the exact call.
+    const requestId = randomUUID();
 
     // CONVERSATION MODE — the client sent its canonical request state, so this
     // turn MERGES into that state instead of being read in isolation. "Newer."
@@ -315,10 +318,26 @@ export async function POST(req: Request) {
       // Otherwise: the full constraint set through the finder.
       const q = stateToQuery(s);
       const keywordIds = new Set<number>();
+      // A NAMED SUBJECT is a HARD constraint on THIS path too — the exact same
+      // semantic-eligibility pipeline the Forensic Search uses. Bare subjects
+      // were previously resolved to SOFT keyword bias, so Taste DNA ranked a
+      // keyword-tinted popularity list and "boxing" came back as whatever the
+      // viewer's DNA liked (a crime/drama fan got Absentia). Now the subject
+      // sets the required-subject lexemes, so a keyword match is only a
+      // CANDIDATE and only titles where the subject is genuinely central are
+      // eligible — no silent fall-through to generic recommendations.
       if (s.subjects.length > 0) {
-        const ids = await searchKeywords(s.subjects).catch(() => []);
-        if (ids.length) ids.forEach((id) => keywordIds.add(id));
-        else convInterpretation.push(`"${s.subjects.join(', ')}" isn't tagged in the catalog — matching by the rest of your constraints`);
+        const sr = await resolveSubjectRequirementForTerms(s.subjects);
+        if (sr) {
+          q.subjectKeywordIds = sr.keywordIds;
+          q.subjectLexemes = sr.requirement.lexemes;
+          q.subjectStrict = true;
+          q.subjectLabel = sr.requirement.label;
+          q.subjectCanonical = sr.requirement.canonical;
+          if (sr.keywordIds.length === 0) {
+            convInterpretation.push(`"${s.subjects.join(', ')}" isn't a well-tagged catalog subject — showing only titles where it is genuinely central, if any`);
+          }
+        }
       }
       // REFERENCE + HARD CONSTRAINTS must not degenerate into filtered
       // popularity. The reference title's own TMDB keywords bias the
@@ -350,13 +369,22 @@ export async function POST(req: Request) {
       if (s.referenceTitles.length > 0) q.similarTo = s.referenceTitles.join(' / ');
 
       const convResult = await runFinder(supabase, user.id, q, null, limitConv);
-      const convItems = await dropExcludedPeople(
+      let convItems = await dropExcludedPeople(
         convResult.items.filter((i) => !excludeKeys.has(`${i.mediaType}-${i.id}`)),
       );
+      // NO-FILLER SAFETY NET: a named subject may never ship a title whose
+      // semantic verdict did not PASS — the Judge shows eligible titles or an
+      // honest shortfall, never a generic recommendation.
+      if (q.subjectLexemes && q.subjectLexemes.length > 0) {
+        convItems = convItems.filter((i) => i.subjectEvidence?.satisfied === true);
+      }
       return NextResponse.json(
         withConv({
           kind: 'search',
+          requestId,
+          appliedText: text || null,
           query: q,
+          diagnostics: convResult.diagnostics,
           scoredFor: convResult.scoredFor,
           relaxed: convResult.relaxed,
           items: convItems.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
@@ -556,9 +584,10 @@ export async function POST(req: Request) {
       items = items.filter((i) => !coarseExcluded.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
     }
 
-    // NO-FILLER ASSERTION (shared with Forensic Search): a required subject means
-    // every returned title must carry its own subject evidence, or it is dropped.
-    if (query.subjectKeywordIds && query.subjectKeywordIds.length > 0) {
+    // NO-FILLER SAFETY NET (shared with Forensic Search): eligibility already
+    // ran inside runFinder; a subject request may never ship a title whose
+    // semantic verdict did not PASS. The Judge receives only eligible titles.
+    if (query.subjectLexemes && query.subjectLexemes.length > 0) {
       items = items.filter((i) => i.subjectEvidence?.satisfied === true);
     }
 
@@ -566,9 +595,12 @@ export async function POST(req: Request) {
       {
         kind: 'search',
         route: '/api/ask',
+        requestId,
+        appliedText: text || null,
         sha: getBuildInfo().gitSha || 'unknown',
         query,
         interpretation: askInterpretation,
+        diagnostics: result.diagnostics,
         scoredFor: result.scoredFor,
         relaxed: result.relaxed,
         items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
