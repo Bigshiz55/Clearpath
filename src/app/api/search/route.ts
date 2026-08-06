@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { searchTitles, searchPeople, TmdbError, tmdbImage } from '@/lib/tmdb/client';
-import { splitTitleYear, misspellingCandidates, extractPersonName } from '@/lib/nlu/queryRepair';
+import { splitTitleQualifiers, misspellingCandidates, insertionCandidates, extractPersonName } from '@/lib/nlu/queryRepair';
 import { isExactTitle } from '@/lib/nlu/titleNormalize';
 
 /**
@@ -24,45 +24,56 @@ async function searchWithRepair(raw: string): Promise<{
   correctedTo: string | null;
   year: number | null;
 }> {
-  const { title: bare, year } = splitTitleYear(raw);
+  // Qualifiers ("Fargo the series", "It 1990 miniseries", "the first Rocky",
+  // "CSI NY not CSI Miami") and years are INSTRUCTIONS, not name fragments.
+  // Both readings are searched and exact catalog evidence decides: "The First
+  // Lady" resolves exactly as typed and is untouched; "the first Rocky"
+  // resolves to nothing as typed and the stripped reading rescues it.
+  const { title: bare, year, mediaType, qualified } = splitTitleQualifiers(raw);
 
-  // A stated year means BOTH searches run: the literal string can return junk
-  // that merely contains the digits ("It 2017" → "Security"), and junk being
-  // non-empty must not stop the real candidates from being found. The bare
-  // title wins whenever it produces an exact match for the name that was
-  // actually typed; the raw results remain the fallback so a title that
-  // genuinely contains a year ("Blade Runner 2049" typed in full… still exact
-  // via the raw search) is never lost.
   const [rawResults, bareResults] = await Promise.all([
     searchTitles(raw),
-    year != null && bare !== raw ? searchTitles(bare).catch(() => []) : Promise.resolve([]),
+    qualified && bare !== raw ? searchTitles(bare).catch(() => []) : Promise.resolve([]),
   ]);
-  if (year != null && bareResults.length > 0) {
+
+  // Order by the evidence the qualifier stated: requested media type first,
+  // then the requested year (±1 — release-year conventions genuinely differ by
+  // one: the Haggis "Crash" premiered 2004, TMDB dates its wide release 2005),
+  // otherwise the catalog's own order untouched.
+  const ordered = (rs: typeof bareResults) => {
+    const yd = (r: { year?: number | null }) => (year == null || r.year == null ? 99 : Math.abs(r.year - year));
+    const tier = (r: { mediaType: string; year?: number | null }) => {
+      let t = 0;
+      if (mediaType != null && r.mediaType !== mediaType) t += 4;
+      if (year != null) t += yd(r) === 0 ? 0 : yd(r) === 1 ? 1 : 2;
+      return t;
+    };
+    return rs.map((r, i) => ({ r, i })).sort((a, b) => tier(a.r) - tier(b.r) || a.i - b.i).map((x) => x.r);
+  };
+
+  if (qualified && bareResults.length > 0) {
     const exactForBare = bareResults.some((r) => isExactTitle(bare, r.title));
     const rawIsBetter = rawResults.some((r) => isExactTitle(raw, r.title));
     if (exactForBare && !rawIsBetter) {
-      // ±1 tolerance: release-year conventions genuinely differ by one — the
-      // Haggis "Crash" premiered in 2004 and TMDB dates its wide release 2005,
-      // so a strict match called the user wrong for knowing the film. Exact
-      // year first, then the adjacent year, then everything else untouched.
-      const dist = (r: { year?: number | null }) => (r.year == null ? 99 : Math.abs(r.year - year));
-      const near = bareResults.filter((r) => dist(r) <= 1).sort((a, b) => dist(a) - dist(b));
-      return {
-        results: near.length > 0 ? [...near, ...bareResults.filter((r) => dist(r) > 1)] : bareResults,
-        correctedTo: bare,
-        year,
-      };
+      return { results: ordered(bareResults), correctedTo: bare, year };
     }
   }
   if (rawResults.length > 0) return { results: rawResults, correctedTo: null, year };
-  if (bareResults.length > 0) return { results: bareResults, correctedTo: bare, year };
+  if (bareResults.length > 0) return { results: ordered(bareResults), correctedTo: bare, year };
 
-  // Zero results anywhere: try bounded corrections, most-likely first.
-  const candidates = misspellingCandidates(bare || raw);
-  if (candidates.length > 0) {
-    const settled = await Promise.all(candidates.map((c) => searchTitles(c).catch(() => [])));
-    for (let i = 0; i < candidates.length; i++) {
-      if (settled[i]!.length > 0) return { results: settled[i]!, correctedTo: candidates[i]!, year };
+  // Zero results anywhere: bounded corrections in two waves — cheap slips
+  // (doubles, space shifts, transpositions) first, then the deletion-class
+  // insertions ONLY if the first wave also found nothing. Every candidate is
+  // judged by the catalog; the first that returns anything wins.
+  for (const wave of [misspellingCandidates(bare || raw), insertionCandidates(bare || raw)]) {
+    if (wave.length === 0) continue;
+    // Chunked so a dead query never fires one giant burst at the provider.
+    for (let at = 0; at < wave.length; at += 10) {
+      const chunk = wave.slice(at, at + 10);
+      const settled = await Promise.all(chunk.map((c) => searchTitles(c).catch(() => [])));
+      for (let i = 0; i < chunk.length; i++) {
+        if (settled[i]!.length > 0) return { results: ordered(settled[i]!), correctedTo: chunk[i]!, year };
+      }
     }
   }
   return { results: [], correctedTo: null, year };

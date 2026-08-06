@@ -38,6 +38,86 @@ export function splitTitleYear(raw: string): { title: string; year: number | nul
   return { title: without, year: Number(m[1]) };
 }
 
+// ── Media-type and version qualifiers ─────────────────────────────────────
+
+export interface QualifiedTitle {
+  title: string;
+  year: number | null;
+  mediaType: 'movie' | 'tv' | null;
+  /** True when anything beyond the bare title was recognised and removed. */
+  qualified: boolean;
+}
+
+/**
+ * The words people add to say WHICH one they mean.
+ *
+ * "Fargo the series", "It 1990 miniseries", "Ghosts the CBS one", "The Office
+ * UK", "The Killing Danish original", "CSI NY not CSI Miami" — every qualifier
+ * is an instruction, and searched literally every one of them guaranteed zero
+ * results. 37 of the audit's remaining P0s were exactly this.
+ *
+ * The split is a CANDIDATE, not a verdict: the caller runs both readings and
+ * lets exact catalog evidence decide, so "The First Lady" (raw resolves
+ * exactly) is never damaged by the "the first X" rule that rescues "the first
+ * Rocky" (raw resolves to nothing).
+ */
+const LEADING_QUALIFIERS: [RegExp, 'movie' | 'tv' | null][] = [
+  [/^\s*which (?:one|version) is\s+/i, null],
+  [/^\s*the (?:first|original|newest|latest)\s+/i, null],
+  [/^\s*the (?:uk|us|british|american) version of\s+/i, null],
+];
+const TRAILING_QUALIFIERS: [RegExp, 'movie' | 'tv' | null][] = [
+  [/\s+the (?:tv )?(?:series|show)$/i, 'tv'],
+  [/\s+(?:tv|television) (?:series|show)$/i, 'tv'],
+  [/\s+(?:the )?mini-?series$/i, 'tv'],
+  [/\s+the (?:movie|film)$/i, 'movie'],
+  [/\s+the original(?: series| version)?$/i, null],
+  [/\s+the (?:remake|reboot)$/i, null],
+  [/\s+the (?:uk|us|usa|british|american) (?:version|one|original)$/i, null],
+  [/\s+(?:the )?[a-z]+ original$/i, null], // "Danish original"
+  // "the Jordan Peele film", "the Pixar one", "the Lifetime remake",
+  // "the Michael Mann one" — a name, then a version word.
+  [/\s+the [a-z][a-z.'-]*(?: [a-z][a-z.'-]*)? (?:film|movie)$/i, 'movie'],
+  [/\s+the [a-z][a-z.'-]*(?: [a-z][a-z.'-]*)? (?:one|version|remake)$/i, null],
+  // Bare network / country tokens: "Sherlock BBC", "The Office UK".
+  [/\s+(?:uk|us|usa|bbc|cbs|nbc|abc|itv)$/i, null],
+];
+/** "CSI NY not CSI Miami" — the contrast names what is NOT wanted. */
+const CONTRAST_TAIL = /\s*,?\s+not\s+\S.*$/i;
+
+export function splitTitleQualifiers(raw: string): QualifiedTitle {
+  let t = (raw ?? '').trim();
+  let mediaType: 'movie' | 'tv' | null = null;
+  let qualified = false;
+
+  for (const [re] of LEADING_QUALIFIERS) {
+    const cut = t.replace(re, '');
+    if (cut !== t && cut.trim().length >= 2) { t = cut.trim(); qualified = true; }
+  }
+  const contrast = t.match(CONTRAST_TAIL);
+  if (contrast && contrast.index !== undefined && contrast.index > 0) {
+    t = t.slice(0, contrast.index).trim();
+    qualified = true;
+  }
+  // Trailing qualifiers can stack ("the original series"); loop to a fixpoint,
+  // but NEVER cut at position 0 — a title cannot be entirely qualifier.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [re, mt] of TRAILING_QUALIFIERS) {
+      const m = t.match(re);
+      if (m && m.index !== undefined && m.index > 0) {
+        t = t.slice(0, m.index).trim();
+        if (mt) mediaType = mt;
+        qualified = true;
+        changed = true;
+      }
+    }
+  }
+  const { title, year } = splitTitleYear(t);
+  return { title, year, mediaType, qualified: qualified || year !== null };
+}
+
 // ── Person phrasing ───────────────────────────────────────────────────────
 
 const PERSON_LEAD =
@@ -108,7 +188,21 @@ export function misspellingCandidates(raw: string, max = 12): string[] {
   // …and the everything-collapsed form as a fallback for double slips.
   if (runs.length > 1) push(q.replace(/([a-z])\1+/gi, '$1'));
 
-  // 2. Adjacent transpositions — but only in the LONGEST word, where a slip is
+  // 2. A space that slipped one position — "TheG odfather", "HappyV alley",
+  //    "Murder, Sh eWrote". Swapping each space with its neighbouring letter
+  //    restores the boundary. Deterministic and cheap: one candidate per side
+  //    per space.
+  for (let i = 0; i < q.length; i++) {
+    if (q[i] !== ' ') continue;
+    if (i + 1 < q.length && /[a-z]/i.test(q[i + 1]!)) {
+      push(q.slice(0, i) + q[i + 1] + ' ' + q.slice(i + 2));
+    }
+    if (i > 0 && /[a-z]/i.test(q[i - 1]!)) {
+      push(q.slice(0, i - 1) + ' ' + q[i - 1] + q.slice(i + 1));
+    }
+  }
+
+  // 3. Adjacent transpositions — but only in the LONGEST word, where a slip is
   //    likeliest and where n candidates stay affordable.
   const words = q.split(/\s+/);
   let li = 0;
@@ -120,6 +214,59 @@ export function misspellingCandidates(raw: string, max = 12): string[] {
     push([...words.slice(0, li), swapped, ...words.slice(li + 1)].join(' '));
   }
   return out.slice(0, max);
+}
+
+/**
+ * DELETION-class repairs: the typo is a MISSING letter ("Holday" → "Holiday",
+ * "Succssion" → "Succession", "Cred III" → "Creed III").
+ *
+ * Recovering a deletion means trying insertions, which fans out fast — so this
+ * is a SEPARATE, last-resort wave the caller runs only after everything else
+ * found nothing, with the alphabet cut to the ten letters that account for
+ * most English text and the total hard-capped. Stopwords and numerals are
+ * skipped: nobody drops a letter from "the" and notices.
+ */
+const INSERT_LETTERS = ['e', 'a', 'i', 'o', 'u', 'r', 's', 'n', 't', 'l'] as const;
+const SKIP_WORDS = new Set(['the', 'a', 'an', 'of', 'at', 'in', 'and', 'or', 'to']);
+
+export function insertionCandidates(raw: string, max = 120): string[] {
+  const q = (raw ?? '').trim();
+  if (q.length < 3 || q.length > 40 || !/[a-z]/i.test(q)) return [];
+  const words = q.split(/\s+/);
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (wi: number, fixed: string) => {
+    const cand = [...words.slice(0, wi), fixed, ...words.slice(wi + 1)].join(' ');
+    const k = cand.toLowerCase();
+    if (!seen.has(k) && k !== q.toLowerCase()) { seen.add(k); out.push(cand); }
+  };
+  const eligible = words
+    .map((w, wi) => ({ w, wi }))
+    .filter(({ w }) => w.length >= 2 && !SKIP_WORDS.has(w.toLowerCase()) && !/^[ivxlcdm]+$/i.test(w) && !/\d/.test(w));
+
+  // FIRST: re-double each existing letter. Doubled letters are where deletions
+  // cluster — "Unforgoten" is "Unforgotten" minus one of its "tt" — and this
+  // class is only n candidates for the whole query.
+  for (const { w, wi } of eligible) {
+    for (let pos = 0; pos < w.length && out.length < max; pos++) {
+      if (/[a-z]/i.test(w[pos]!)) push(wi, w.slice(0, pos + 1) + w[pos] + w.slice(pos + 1));
+    }
+  }
+
+  // THEN the alphabet wave, ROUND-ROBIN across words by position so a long
+  // first word cannot exhaust the cap before the word that actually carries
+  // the deletion gets a turn ("Slow Horse" → "Slow Horses").
+  const maxLen = Math.max(0, ...eligible.map(({ w }) => w.length));
+  for (let pos = 1; pos <= maxLen && out.length < max; pos++) {
+    for (const { w, wi } of eligible) {
+      if (pos > w.length) continue;
+      for (const ch of INSERT_LETTERS) {
+        if (out.length >= max) break;
+        push(wi, w.slice(0, pos) + ch + w.slice(pos));
+      }
+    }
+  }
+  return out;
 }
 
 // ── Generic phrases ───────────────────────────────────────────────────────

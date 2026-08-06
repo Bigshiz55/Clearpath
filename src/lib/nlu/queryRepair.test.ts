@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitTitleYear, extractPersonName, misspellingCandidates, isGenericPhrase } from '@/lib/nlu/queryRepair';
+import { splitTitleYear, splitTitleQualifiers, extractPersonName, misspellingCandidates, insertionCandidates, isGenericPhrase } from '@/lib/nlu/queryRepair';
 import { resolveSearchDestination, type CatalogResult } from '@/lib/search/searchIntent';
 import { naiveParseQuery, parseTopicTerms } from '@/lib/finderParse';
 import { extractReference } from '@/lib/askJudge';
@@ -205,5 +205,90 @@ describe('release-year off-by-one tolerance', () => {
       { id: 3, mediaType: 'movie', title: 'Crash', year: 2005 },
     ]);
     expect(dest?.href).toBe('/app/title/movie/3');
+  });
+});
+
+describe('media-type and version qualifiers', () => {
+  const CASES: [string, string, 'movie' | 'tv' | null, number | null][] = [
+    ['Fargo the series', 'Fargo', 'tv', null],
+    ['It 1990 miniseries', 'It', 'tv', 1990],
+    ['The Killing Danish original', 'The Killing', null, null],
+    ['Sherlock BBC', 'Sherlock', null, null],
+    ['Ghosts the UK version', 'Ghosts', null, null],
+    ['Ghosts the CBS one', 'Ghosts', null, null],
+    ['Dexter the original series', 'Dexter', null, null],
+    ['Flowers in the Attic the Lifetime remake', 'Flowers in the Attic', null, null],
+    ['Up the Pixar one', 'Up', null, null],
+    ['Us the Jordan Peele film', 'Us', 'movie', null],
+    ['Her the Spike Jonze film', 'Her', 'movie', null],
+    ['Heat the Michael Mann one', 'Heat', null, null],
+    ['CSI NY not CSI Miami', 'CSI NY', null, null],
+    ['Murder She Baked not Murder She Wrote', 'Murder She Baked', null, null],
+    ['the first Rocky', 'Rocky', null, null],
+    ['which one is Rocky 1976', 'Rocky', null, 1976],
+    ['which one is Fargo the series', 'Fargo', 'tv', null],
+    ['which one is Ghosts the CBS one', 'Ghosts', null, null],
+    ['The Office UK', 'The Office', null, null],
+    ['Fargo the movie', 'Fargo', 'movie', null],
+  ];
+  for (const [raw, title, mt, year] of CASES) {
+    it(`${JSON.stringify(raw)} → ${title} / ${mt ?? '-'} / ${year ?? '-'}`, () => {
+      const got = splitTitleQualifiers(raw);
+      expect(got.title).toBe(title);
+      expect(got.mediaType).toBe(mt);
+      expect(got.year).toBe(year);
+      expect(got.qualified).toBe(true);
+    });
+  }
+
+  it('ADVERSARIAL PAIRS: titles that LOOK like qualifiers are untouched', () => {
+    // A qualifier match at position 0 is the title itself.
+    for (const t of ['The Office', 'Miniseries', 'The Original', 'Us', 'Anything Goes']) {
+      const got = splitTitleQualifiers(t);
+      expect(got.title).toBe(t);
+      expect(got.qualified).toBe(false);
+    }
+  });
+
+  it('ADVERSARIAL PAIR: "The First Lady" survives via catalog evidence, not the splitter', () => {
+    // The splitter legitimately proposes "Lady" as a candidate reading — the
+    // PROTECTION is the evidence rule: an exact match for the raw string
+    // always beats the stripped reading, in the route and in the router.
+    const dest = resolveSearchDestination('The First Lady', [
+      { id: 7, mediaType: 'tv', title: 'The First Lady', year: 2022 },
+      { id: 8, mediaType: 'movie', title: 'Lady', year: 2017 },
+    ]);
+    expect(dest?.href).toBe('/app/title/tv/7');
+  });
+});
+
+describe('space-shift and deletion typo repairs', () => {
+  it('a slipped space is repaired', () => {
+    for (const [typo, want] of [
+      ['TheG odfather', 'The Godfather'],
+      ['HappyV alley', 'Happy Valley'],
+      ['Murder, Sh eWrote', 'Murder, Sh eWrote'.replace('Sh eWrote', 'She Wrote')],
+      ['Everything Everywher eAll at Once', 'Everything Everywhere All at Once'],
+    ] as [string, string][]) {
+      expect(misspellingCandidates(typo)).toContain(want);
+    }
+  });
+
+  it('a missing letter is recoverable in the insertion wave', () => {
+    for (const [typo, want] of [
+      ['The Holday', 'The Holiday'],
+      ['Succssion', 'Succession'],
+      ['Auora Teagarden', 'Aurora Teagarden'],
+      ['Cred III', 'Creed III'],
+      ['crimnal minds', 'criminal minds'],
+    ] as [string, string][]) {
+      expect(insertionCandidates(typo).map((c) => c.toLowerCase())).toContain(want.toLowerCase());
+    }
+  });
+
+  it('the insertion wave is bounded and never fires on junk', () => {
+    expect(insertionCandidates('a'.repeat(100))).toEqual([]);
+    expect(insertionCandidates('!!!!')).toEqual([]);
+    expect(insertionCandidates('The Holiday').length).toBeLessThanOrEqual(120);
   });
 });

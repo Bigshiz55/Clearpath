@@ -1,5 +1,5 @@
 /**
- * EXTENDED DETERMINISTIC CORPUS — 1,100 cases over the NEW capabilities,
+ * EXTENDED DETERMINISTIC CORPUS — 1,200 cases over the NEW capabilities,
  * alongside (never replacing) the frozen 1,000-test forensic corpus.
  *
  * Every case is generated from the same seeded RNG discipline as the frozen
@@ -16,7 +16,7 @@
  */
 import './shimServerOnly';
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { splitTitleYear, extractPersonName, misspellingCandidates, isGenericPhrase } from '@/lib/nlu/queryRepair';
+import { splitTitleYear, splitTitleQualifiers, extractPersonName, misspellingCandidates, insertionCandidates, isGenericPhrase } from '@/lib/nlu/queryRepair';
 import { resolveSearchDestination, type CatalogResult } from '@/lib/search/searchIntent';
 import { naiveParseQuery, parseTopicTerms } from '@/lib/finderParse';
 import { referenceCandidates } from '@/lib/nlu/titleReference';
@@ -310,8 +310,56 @@ for (const input of ['1917', '2012', '1984', '2001', '1922']) {
   }
 }
 
+// ── 11. Media/version qualifiers (60, P0) ────────────────────────────────
+{
+  const QUAL: [string, 'movie' | 'tv' | null][] = [
+    ['{t} the series', 'tv'], ['{t} the tv show', 'tv'], ['{t} miniseries', 'tv'],
+    ['{t} the movie', 'movie'], ['{t} the film', 'movie'], ['{t} the original series', null],
+    ['which one is {t} the series', 'tv'], ['the first {t}', null],
+    ['{t} the uk version', null], ['{t} not Some Other Title', null],
+  ];
+  for (let i = 0; i < 60; i++) {
+    const t = TITLES[(i * 17) % TITLES.length]!;
+    const [tpl, mt] = QUAL[i % QUAL.length]!;
+    const input = tpl.replace('{t}', t);
+    check('qualifier_split', 'P0', input, `${t}/${mt ?? '-'}`, () => {
+      const got = splitTitleQualifiers(input);
+      return [got.title === t && got.mediaType === mt && got.qualified, `got ${got.title}/${got.mediaType}`];
+    });
+  }
+}
+
+// ── 12. Space-shift typos (20, P1) ───────────────────────────────────────
+{
+  for (let i = 0; i < 20; i++) {
+    const t = TITLES.filter((x) => x.includes(' '))[i % 14]!;
+    const sp = t.indexOf(' ');
+    const typo = t.slice(0, sp) + t[sp + 1] + ' ' + t.slice(sp + 2); // "TheG odfather" shape
+    check('space_shift', 'P1', typo, t, () => {
+      const c = misspellingCandidates(typo).map((x) => x.toLowerCase());
+      return [c.includes(t.toLowerCase()), `candidates=[${c.slice(0, 3).join('|')}]`];
+    });
+  }
+}
+
+// ── 13. Deletion-class insertion wave (20, P1) ───────────────────────────
+{
+  const rng = R('inserts');
+  for (let i = 0; i < 20; i++) {
+    const t = TITLES[(i * 19) % TITLES.length]!;
+    // Delete one vowel/common letter so the wave's alphabet can restore it.
+    const idxs = [...t].map((c, j) => (/[eaiou rsntl]/i.test(c) && c !== ' ' && j > 0 ? j : -1)).filter((j) => j > 0);
+    const j = idxs[rng.int(0, Math.max(0, idxs.length - 1))] ?? 1;
+    const typo = t.slice(0, j) + t.slice(j + 1);
+    check('deletion_insert_wave', 'P1', typo, t, () => {
+      const c = insertionCandidates(typo).map((x) => x.toLowerCase());
+      return [c.includes(t.toLowerCase()), `wave size ${c.length}`];
+    });
+  }
+}
+
 // ── Score ────────────────────────────────────────────────────────────────
-if (cases.length !== 1100) throw new Error(`extended corpus must be 1100, got ${cases.length}`);
+if (cases.length !== 1200) throw new Error(`extended corpus must be 1200, got ${cases.length}`);
 mkdirSync('artifacts/search-audit', { recursive: true });
 writeFileSync('artifacts/search-audit/layerBext-results.json', JSON.stringify({ seed: SEED, cases }, null, 1));
 

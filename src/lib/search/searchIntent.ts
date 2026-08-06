@@ -1,5 +1,5 @@
 import { isExactTitle } from '@/lib/nlu/titleNormalize';
-import { splitTitleYear, isGenericPhrase } from '@/lib/nlu/queryRepair';
+import { splitTitleQualifiers, isGenericPhrase } from '@/lib/nlu/queryRepair';
 
 /**
  * WHERE A TYPED QUERY ACTUALLY GOES.
@@ -186,16 +186,21 @@ export function resolveSearchDestination(raw: string, results: CatalogResult[] =
   // A year beside the title disambiguates rather than defeating the match:
   // "Creed 2015" is an exact ask for the 2015 Creed, so the bare title is
   // compared and the stated year picks among the films that share it.
-  const { title: bare, year } = splitTitleYear(q);
+  // Qualifiers and years are instructions: "Fargo the series" compares the
+  // bare title and prefers the stated media type; "Creed 2015" prefers the
+  // stated year (±1 — festival vs wide-release conventions differ by one, and
+  // a user who knows the film should not lose the match for knowing it by its
+  // premiere year).
+  const { title: bare, year, mediaType, qualified } = splitTitleQualifiers(q);
+  const bareExact = (extra: (r: CatalogResult) => boolean) =>
+    results.find((r) => isExactTitle(bare, r.title) && extra(r));
   const exact =
     results.find((r) => isExactTitle(q, r.title)) ??
-    (year != null
-      ? results.find((r) => isExactTitle(bare, r.title) && r.year === year) ??
-        // ±1: release-year conventions differ by one (festival vs wide
-        // release), and a user who knows the film should not lose the match
-        // for knowing it by its premiere year.
-        results.find((r) => isExactTitle(bare, r.title) && r.year != null && Math.abs(r.year - year) === 1) ??
-        results.find((r) => isExactTitle(bare, r.title))
+    (qualified
+      ? bareExact((r) => (mediaType == null || r.mediaType === mediaType) && (year == null || r.year === year)) ??
+        bareExact((r) => (mediaType == null || r.mediaType === mediaType) && year != null && r.year != null && Math.abs(r.year - year) === 1) ??
+        bareExact((r) => mediaType == null || r.mediaType === mediaType) ??
+        bareExact(() => true)
       : undefined);
   if (exact) return { href: titleHref(exact), reason: 'exact-title' };
 
