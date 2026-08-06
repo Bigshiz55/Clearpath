@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { isAdminEmail } from '@/lib/admin';
+import { isFounderOrAdminEmail } from '@/lib/admin';
 import { getBuildInfo } from '@/lib/buildInfo';
 import SearchProofClient from './SearchProofClient';
 
@@ -27,7 +27,10 @@ export default async function SearchProofPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user || !isAdminEmail(user.email)) notFound();
+  // SHARED founder diagnostic page — any configured founder OR admin may open
+  // it; everyone else gets the hidden 404. (Previously admin-only, which 404'd
+  // a legitimate founder who wasn't also in ADMIN_EMAILS.)
+  if (!user || !isFounderOrAdminEmail(user.email)) notFound();
 
   const pageSha = getBuildInfo().gitSha || 'unknown';
   return <SearchProofClient pageSha={pageSha} />;
