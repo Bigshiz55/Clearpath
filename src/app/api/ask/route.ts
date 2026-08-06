@@ -92,8 +92,11 @@ export async function POST(req: Request) {
     // face. Empty history gets an honest empty answer, not a trending dump.
     const HISTORY_ASK =
       /\bwhat\s+(?:have\s+i\s+not|haven'?t\s+i|didn'?t\s+i|did\s+i\s+not)\s+(?:finish(?:ed)?|watch(?:ed)?)\b|\bcontinue\s+watching\b|\bpick\s+up\s+where\s+i\s+left\s+off\b/i;
-    if (HISTORY_ASK.test(text)) {
-      const wantsFinish = /finish/i.test(text);
+    // People type curly apostrophes ("haven’t") as often as straight ones —
+    // normalise before matching or the intent silently misses.
+    const asked = text.replace(/[’‘]/g, "'");
+    if (HISTORY_ASK.test(asked)) {
+      const wantsFinish = /finish/i.test(asked);
       const { data: rows } = await supabase
         .from('watchlist_items')
         .select('tmdb_id, media_type, title, year, poster_path, status, added_at')
@@ -198,6 +201,24 @@ export async function POST(req: Request) {
       if (det.maxYear != null && query.maxYear == null) query.maxYear = det.maxYear;
       if (det.excludeGenreIds?.length) {
         query.excludeGenreIds = [...new Set([...(query.excludeGenreIds ?? []), ...det.excludeGenreIds])];
+      }
+      // "released after 2020" is a YEAR BOUND, not a recency window — but the
+      // LLM parse kept turning it into sinceMonths too, and the stacked pair
+      // ("since 2020" AND "last 36 months") shrank the window until nothing
+      // survived. When the sentence states a year and no explicit recency
+      // phrase, the year is the whole statement.
+      if (det.minYear != null && det.sinceMonths == null && query.sinceMonths != null) {
+        query.sinceMonths = null;
+      }
+      // A stated SUBJECT beats a guessed genre. "wrestling movies" reached
+      // discovery as (genre Action) AND (keyword wrestling) — the guessed
+      // genre starved the stated subject until the relaxation pass dropped
+      // the subject itself and answered with generic action. Keep only the
+      // genres the sentence actually states whenever a subject keyword is
+      // present; the subject is the request.
+      if ((query.keywordIds?.length ?? 0) > 0 || parseTopicTerms(text).length > 0) {
+        const stated = new Set(det.genreIds);
+        if (query.genreIds.length > 0) query.genreIds = query.genreIds.filter((g) => stated.has(g));
       }
     }
     // SUBJECT MATTER — always resolved and MERGED, not only when the parse came
