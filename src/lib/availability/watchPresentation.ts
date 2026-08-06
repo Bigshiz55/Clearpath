@@ -1,4 +1,5 @@
 import type { AvailabilityState } from '@/lib/watchmode/cardAvailability';
+import { reconcileOptions } from '@/lib/availability/reconcile';
 
 /**
  * THE ONE PLACE A CARD DECIDES WHAT TO SAY ABOUT WHERE SOMETHING CAN BE
@@ -296,7 +297,11 @@ export function resolveWatchPresentation(input: WatchPresentationInput): WatchPr
   const now = input.now ?? new Date();
   const historical = input.originalNetwork ? `Originally aired on ${input.originalNetwork}` : null;
 
-  const usable = usableOptions(input.options);
+  // One service → one claim, deterministically, before anything is worded.
+  // This is what keeps a fresh and a stale "Included with Hulu" from printing
+  // twice, and what keeps "Amazon Prime Video" and "Prime Video" from being two
+  // rows for the same service. Genuinely distinct services are untouched.
+  const usable = usableOptions(reconcileOptions(input.options));
   const live = usable.filter((o): o is LiveOption => o.kind === 'live')
     .map((o) => ({ o, status: airingStatus(o, now) }))
     .filter((x) => x.status !== 'ended');
