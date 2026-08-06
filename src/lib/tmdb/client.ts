@@ -344,6 +344,11 @@ export interface DiscoverOptions {
   excludeGenreIds?: number[];
   /** TMDB keyword ids (with_keywords) — trope/subject/vibe filtering (OR). */
   keywordIds?: number[];
+  /** TMDB keyword ids to EXCLUDE (without_keywords) — "a boxing movie, not wrestling". */
+  excludeKeywordIds?: number[];
+  /** Exact earliest release/air date (ISO yyyy-mm-dd). Overrides sinceDays' start
+   *  so "the last 20 years" is an exact calendar boundary, not months×30. */
+  minReleaseDate?: string;
   /** ISO-639-1 original language (with_original_language), e.g. 'ja' for anime. */
   originalLanguage?: string;
   /** ISO-3166-1 origin country (with_origin_country), e.g. 'KR' for K-drama. */
@@ -380,6 +385,7 @@ export async function discoverTitlesChecked(
   if (opts.genreIds && opts.genreIds.length > 0) params.with_genres = opts.genreIds.join('|');
   if (opts.excludeGenreIds && opts.excludeGenreIds.length > 0) params.without_genres = opts.excludeGenreIds.join(',');
   if (opts.keywordIds && opts.keywordIds.length > 0) params.with_keywords = opts.keywordIds.join('|'); // OR — any matching trope
+  if (opts.excludeKeywordIds && opts.excludeKeywordIds.length > 0) params.without_keywords = opts.excludeKeywordIds.join(','); // AND-NOT — none of these
   if (opts.originalLanguage) params.with_original_language = opts.originalLanguage;
   if (opts.originCountry) params.with_origin_country = opts.originCountry;
   // Monetization: an explicit filter wins; otherwise, when filtering by provider,
@@ -391,7 +397,19 @@ export async function discoverTitlesChecked(
   if (opts.minRating != null) params['vote_average.gte'] = String(opts.minRating);
   if (opts.maxRuntime != null) params['with_runtime.lte'] = String(opts.maxRuntime); // movies: feature length · tv: per-episode
   if (opts.castIds && opts.castIds.length > 0 && mediaType === 'movie') params.with_cast = opts.castIds.join('|'); // OR — any favorite actor
-  if (opts.sinceDays != null) {
+  if (opts.minReleaseDate != null) {
+    // Exact calendar boundary — e.g. "the last 20 years" resolves to a real
+    // date (2006-08-06 on 2026-08-06), not months×30 which would wrongly drop
+    // several months of otherwise-qualifying titles.
+    const to = isoDate(new Date());
+    if (mediaType === 'movie') {
+      params['primary_release_date.gte'] = opts.minReleaseDate;
+      params['primary_release_date.lte'] = to;
+    } else {
+      params['first_air_date.gte'] = opts.minReleaseDate;
+      params['first_air_date.lte'] = to;
+    }
+  } else if (opts.sinceDays != null) {
     const from = isoDate(new Date(Date.now() - opts.sinceDays * 86_400_000));
     const to = isoDate(new Date());
     if (mediaType === 'movie') {

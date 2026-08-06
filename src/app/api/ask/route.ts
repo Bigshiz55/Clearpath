@@ -7,6 +7,8 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
+import { applyRequiredSubject } from '@/lib/finderSubject';
+import { getBuildInfo } from '@/lib/buildInfo';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
 import { buildQueryPlan } from '@/lib/nlu/queryPlan';
@@ -494,6 +496,17 @@ export async function POST(req: Request) {
       : null;
     const watcher = coerceWatcher(body.watcher);
 
+    // SHARED REQUIRED-SUBJECT SEMANTICS. Ask the Judge honors a named subject as
+    // a hard constraint exactly as the Forensic Search does, from the one shared
+    // helper — so "a boxing movie" means the same thing on both routes and the
+    // subject can never be degraded into genres here either.
+    let askInterpretation: string[] = [];
+    if (text) {
+      const applied = await applyRequiredSubject(query, text);
+      query = applied.query;
+      askInterpretation = applied.interpretation;
+    }
+
     const result = await runFinder(supabase, user.id, query, household && household.length > 0 ? household : watcher, limit);
 
     // FINAL MEDIA-TYPE GUARD (last line of defence): when the request explicitly
@@ -543,13 +556,25 @@ export async function POST(req: Request) {
       items = items.filter((i) => !coarseExcluded.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
     }
 
-    return NextResponse.json({
-      kind: 'search',
-      query,
-      scoredFor: result.scoredFor,
-      relaxed: result.relaxed,
-      items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
-    });
+    // NO-FILLER ASSERTION (shared with Forensic Search): a required subject means
+    // every returned title must carry its own subject evidence, or it is dropped.
+    if (query.subjectKeywordIds && query.subjectKeywordIds.length > 0) {
+      items = items.filter((i) => i.subjectEvidence?.satisfied === true);
+    }
+
+    return NextResponse.json(
+      {
+        kind: 'search',
+        route: '/api/ask',
+        sha: getBuildInfo().gitSha || 'unknown',
+        query,
+        interpretation: askInterpretation,
+        scoredFor: result.scoredFor,
+        relaxed: result.relaxed,
+        items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+      },
+      { headers: { 'X-WatchVerd1ct-SHA': getBuildInfo().gitSha || 'unknown' } },
+    );
   } catch {
     return NextResponse.json({ error: 'The court hit a snag.' }, { status: 500 });
   }

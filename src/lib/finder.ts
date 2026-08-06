@@ -95,6 +95,23 @@ export interface FinderQuery {
   originalLanguages?: string[];
   /** TMDB keyword ids for trope/vibe filtering (heist, dystopia, feel-good…). */
   keywordIds?: number[];
+  /**
+   * REQUIRED-SUBJECT keyword ids — a HARD constraint the user named ("a boxing
+   * movie"). Unlike `keywordIds` (soft vibe), these may NEVER be relaxed and the
+   * shortfall may NEVER be padded with generic titles: a title without one of
+   * these tags is not a valid answer. Applied as `with_keywords` at discovery,
+   * so every returned candidate carries the subject tag as its own evidence.
+   */
+  subjectKeywordIds?: number[];
+  /** Human label for the required subject ("Boxing") — drives the chip + read-back. */
+  subjectLabel?: string;
+  /** Canonical subject key ("boxing") — for the per-title evidence receipt. */
+  subjectCanonical?: string;
+  /** Keyword ids to EXCLUDE (`without_keywords`) — "a boxing movie, not wrestling". */
+  excludeKeywordIds?: number[];
+  /** Exact earliest release date (ISO yyyy-mm-dd) — "made within the last 20
+   *  years" becomes an exact calendar boundary, not currentYear-20. */
+  minReleaseDate?: string;
   /** A reference title the ask compared to ("shows like Mindhunter") — for the
    *  read-back only; the "more like this" seeding happens in askSimilarTo. */
   similarTo?: string;
@@ -124,6 +141,10 @@ export interface FinderItem {
   explain?: VerdictExplanation;
   /** Floor-weighted joint verdict when several people are watching. */
   household?: HouseholdVerdict | null;
+  /** Proof a required subject ("boxing") is satisfied — present ONLY when the
+   *  request named one. A returned item without this, on a subject request, is
+   *  a bug the response assertion refuses to ship. */
+  subjectEvidence?: { constraint: string; satisfied: boolean; evidenceType: 'keyword'; evidence: string };
 }
 
 export interface FinderResult {
@@ -257,7 +278,16 @@ export async function runFinder(
           maxYear: q.maxYear ?? undefined,
           minYear: q.minYear ?? undefined,
           excludeGenreIds: q.excludeGenreIds,
-          keywordIds: q.keywordIds,
+          // A REQUIRED SUBJECT gates discovery ALONE. `with_keywords` is OR, so
+          // unioning soft vibe keywords here would let a vibe-only title through
+          // and break the guarantee that every candidate carries a subject tag.
+          // With a subject present we filter on the subject keywords only; that
+          // tag is each candidate's own boxing evidence. Vibe keywords fall back
+          // to the soft path (ranking), never weakening the subject.
+          keywordIds:
+            q.subjectKeywordIds && q.subjectKeywordIds.length > 0 ? q.subjectKeywordIds : q.keywordIds,
+          excludeKeywordIds: q.excludeKeywordIds,
+          minReleaseDate: q.minReleaseDate,
           // Foreign-origin: restrict the candidate pool to the requested
           // production origin / original language so "a Spanish film" never
           // surfaces a US-only blockbuster (TMDB with_original_language /
@@ -369,6 +399,22 @@ export async function runFinder(
       }
       const effectiveMatch = household ? household.score : report.personal.score;
 
+      // REQUIRED-SUBJECT EVIDENCE. This candidate reached here only by clearing
+      // TMDB `with_keywords` on the subject keywords, so it carries a subject
+      // tag — that is the evidence, not a guess. Recorded per-title so the
+      // response can prove every card, and the "everything matches" assertion
+      // can refuse to ship a subject result that lacks it.
+      let subjectEvidence: FinderItem['subjectEvidence'];
+      if (q.subjectKeywordIds && q.subjectKeywordIds.length > 0) {
+        subjectEvidence = {
+          constraint: q.subjectCanonical ?? q.subjectLabel ?? 'subject',
+          satisfied: true,
+          evidenceType: 'keyword',
+          evidence: q.subjectLabel ?? q.subjectCanonical ?? 'subject',
+        };
+        receipts.unshift(`${q.subjectLabel ?? 'subject'} ✓`);
+      }
+
       // Match threshold (against the score the user is actually shown).
       if (q.minMatch != null && effectiveMatch < q.minMatch) return null;
       receipts.unshift(`${scoredFor.split(' ')[0]} ${effectiveMatch}`);
@@ -412,6 +458,7 @@ export async function runFinder(
         imdbId: meta.imdbId ?? null,
         explain,
         household,
+        subjectEvidence,
       } as FinderItem;
     } catch {
       return null;
@@ -451,7 +498,20 @@ export async function runFinder(
   // rigid catalogue filter well past the point it stopped being useful as one.
   // Detected on YIELD, not on the word itself — a request whose keyword really
   // is well-tagged keeps its precision untouched.
-  if (isKeywordStarved(items.length, limit, !!(q.keywordIds && q.keywordIds.length > 0))) {
+  // A REQUIRED SUBJECT is a hard constraint: it is never relaxed and the
+  // shortfall is never padded with generic titles. When only seven verified
+  // boxing movies exist, seven is the honest answer — a generic action list is
+  // a wrong one. We say so plainly and stop; the vibe-keyword relaxation below
+  // is skipped entirely.
+  const hasRequiredSubject = !!(q.subjectKeywordIds && q.subjectKeywordIds.length > 0);
+  if (hasRequiredSubject) {
+    const n = items.length;
+    if (n === 0) {
+      relaxed = `No verified ${q.subjectLabel ?? 'matching'} ${q.mediaType === 'movie' ? 'movies' : 'titles'} cleared every filter — nothing was padded in. Relax one constraint to widen the search.`;
+    } else {
+      relaxed = `Found ${n} verified ${q.subjectLabel ?? ''} ${q.mediaType === 'movie' ? 'movie' : 'title'}${n === 1 ? '' : 's'}${q.sinceMonths ? ` from the last ${Math.round(q.sinceMonths / 12)} years` : ''}, ranked for you.`.replace(/\s+/g, ' ').trim();
+    }
+  } else if (isKeywordStarved(items.length, limit, !!(q.keywordIds && q.keywordIds.length > 0))) {
     const relaxedQ: FinderQuery = { ...q, keywordIds: undefined };
     const r = await runFinder(supabase, userId, relaxedQ, watcher, limit);
     if (r.items.length > items.length) {

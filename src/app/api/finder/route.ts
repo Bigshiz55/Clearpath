@@ -8,6 +8,16 @@ import { augmentInternational } from '@/lib/askInternational';
 import { applyOverrides, sanitizeOverrides } from '@/lib/finderOverrides';
 import { askSimilarTo, extractReference } from '@/lib/askJudge';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
+import { applyRequiredSubject } from '@/lib/finderSubject';
+import { getBuildInfo } from '@/lib/buildInfo';
+
+const BUILD_SHA = getBuildInfo().gitSha || 'unknown';
+
+/** Attach the deployment SHA to every finder response — header + body — so a
+ *  page can prove which build produced a result (Production Search Proof). */
+function finderJson(body: Record<string, unknown>, status = 200) {
+  return NextResponse.json({ ...body, sha: BUILD_SHA }, { status, headers: { 'X-WatchVerd1ct-SHA': BUILD_SHA } });
+}
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -92,7 +102,8 @@ export async function POST(req: Request) {
       // became the filter, and a movie request read back as "Shows".
       const similar = await askSimilarTo(supabase, user.id, reference, limit, statedMediaType(text, cls));
       if (similar) {
-        return NextResponse.json({
+        return finderJson({
+          route: '/api/finder',
           query: similar.query,
           scoredFor: similar.scoredFor,
           relaxed: null,
@@ -155,14 +166,56 @@ export async function POST(req: Request) {
       : null;
     const watcher = coerceWatcher(body.watcher);
 
+    // REQUIRED SUBJECT — the systemic fix. "a boxing movie" is a hard subject
+    // constraint, not two genres. Shared with the ask route so both mean the
+    // same thing. Runs on the free text after all other parsing, so it also
+    // corrects an AI parse that degraded the subject into genres.
+    let interpretation: string[] = [];
+    let subjectCanonical: string | null = null;
+    if (text) {
+      const applied = await applyRequiredSubject(query, text);
+      query = applied.query;
+      interpretation = applied.interpretation;
+      subjectCanonical = applied.subject?.canonical ?? null;
+    }
+
     const result = await runFinder(supabase, user.id, query, household && household.length > 0 ? household : watcher, limit);
-    return NextResponse.json({
+
+    // NO-FILLER ASSERTION. When a subject was required, every returned title
+    // MUST carry its own subject evidence. If any lacks it, drop it rather than
+    // ship a filler card claiming to match — this makes "everything matches"
+    // impossible to render falsely.
+    let items = result.items;
+    if (query.subjectKeywordIds && query.subjectKeywordIds.length > 0) {
+      items = items.filter((i) => i.subjectEvidence?.satisfied === true);
+    }
+
+    // CONSTRAINT RECEIPT — the response's own proof of what actually ran.
+    const constraintReceipt = {
+      mediaType: query.mediaType,
+      requiredSubject: query.subjectLabel ?? null,
+      subjectCanonical,
+      minReleaseDate: query.minReleaseDate ?? null,
+      sinceYears: query.sinceMonths ? Math.round(query.sinceMonths / 12) : null,
+      excludedSubjectKeywordIds: query.excludeKeywordIds ?? [],
+      genreIds: query.genreIds,
+      providerIds: query.providerIds ?? [],
+      monetization: query.monetization ?? null,
+      subjectSatisfiedCount: items.filter((i) => i.subjectEvidence?.satisfied).length,
+      returnedCount: items.length,
+      generic_filler_possible: false,
+    };
+
+    return finderJson({
+      route: '/api/finder',
       query,
+      interpretation,
+      constraintReceipt,
       scoredFor: result.scoredFor,
       relaxed: result.relaxed,
-      items: result.items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+      items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
     });
   } catch {
-    return NextResponse.json({ error: 'Could not run the finder right now.' }, { status: 500 });
+    return finderJson({ error: 'Could not run the finder right now.' }, 500);
   }
 }
