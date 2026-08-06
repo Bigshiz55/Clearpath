@@ -11,6 +11,7 @@ import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
 import { buildQueryPlan } from '@/lib/nlu/queryPlan';
 import { mediaTypeSatisfies, resolveSource } from '@/lib/nlu/mediaOntology';
+import { lexicalIntent } from '@/lib/search/searchIntent';
 import {
   applyTurn,
   chipsFor,
@@ -190,12 +191,17 @@ export async function POST(req: Request) {
       });
     }
 
+    // 0.8) A BARE vocabulary word ("crime", "Hulu", "boxing") is a browse
+    // request for that thing — it must never be treated as a title ask, no
+    // matter what happens to share the name.
+    const lex = text.trim() ? lexicalIntent(text) : null;
+
     // 1) Named-title lookup → put THAT title on trial (with the identity guard,
     // exact-match ranking and provider hard filter inside askJudgeTitle).
     // Mid-conversation this is OFF: once constraints have accumulated, a short
     // follow-up ("Newer.", "Rocky") is a refinement of the case, not a fresh
     // title lookup.
-    if (text.trim() && cls?.mode !== 'similar_to' && !(conversational && prevHadConstraints)) {
+    if (text.trim() && cls?.mode !== 'similar_to' && !lex && !(conversational && prevHadConstraints)) {
       const titled = await askJudgeTitle(supabase, user.id, text, cls ?? undefined);
       if (titled) return NextResponse.json(withConv({ kind: 'title', ...titled }));
     }
@@ -403,9 +409,17 @@ export async function POST(req: Request) {
       }
     }
 
+    // A bare PROVIDER search ("Hulu", "Acorn TV") is "what's good on that
+    // service" — filter to the provider's included/free tiers so every result
+    // is actually watchable there, never a rental dressed up as included.
+    if (lex?.kind === 'provider' && !(query.providerIds?.length)) {
+      query.providerIds = [lex.providerId];
+      if (!query.monetization) query.monetization = 'flatrate|free|ads';
+    }
+
     // Guarantee the actor filter regardless of AI: if a person is named and not
     // already resolved, look them up (fuzzy, so misspellings still match).
-    if (text && (!query.castIds || query.castIds.length === 0)) {
+    if (text && (!query.castIds || query.castIds.length === 0) && !lex) {
       const pid = await resolvePersonId(text);
       if (pid) {
         query.castIds = [pid];

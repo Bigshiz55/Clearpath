@@ -30,7 +30,7 @@ export const EMPTY_QUERY: FinderQuery = {
  * "documentary". These aliases live here, next to the parser that needs them,
  * so no other consumer of `GENRE_IDS` changes behaviour.
  */
-const GENRE_WORDS: Record<string, number> = {
+export const GENRE_WORDS: Record<string, number> = {
   ...GENRE_IDS,
   animated: GENRE_IDS.animation!,
   cartoon: GENRE_IDS.animation!,
@@ -87,7 +87,7 @@ const NEGATOR =
  * and the ids come from TMDB's own `/search/keyword` at request time
  * (`searchKeywords`). Nothing here invents an id.
  */
-const SUBJECT_TERMS = [
+export const SUBJECT_TERMS = [
   'boxing', 'mma', 'wrestling', 'martial arts', 'underdog', 'heist', 'zombie', 'vampire',
   'werewolf', 'time travel', 'space', 'alien', 'robot', 'dystopia', 'post-apocalyptic',
   'spy', 'espionage', 'assassin', 'courtroom', 'legal', 'prison', 'survival', 'shipwreck',

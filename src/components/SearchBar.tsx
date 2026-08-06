@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Poster } from './PosterCard';
 import { SearchResultRow } from './search/SearchResultRow';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
-import { classifySearchIntent, resolveSearchDestination, couldBeTitle, askHref } from '@/lib/search/searchIntent';
+import { classifySearchIntent, resolveSearchDestination, couldBeTitle, askHref, lexicalIntent, type LexicalIntent } from '@/lib/search/searchIntent';
 import { consumeSearchRequest, searchRequestHost } from '@/lib/search/openRequest';
 
 interface Result {
@@ -48,6 +48,8 @@ export function SearchBar({
   /** The query `results` came from — so Enter never reuses another query's. */
   const [resultsFor, setResultsFor] = useState('');
   const [people, setPeople] = useState<Person[]>([]);
+  /** Browse intent for a bare genre/provider/subject/network word. */
+  const [intent, setIntent] = useState<LexicalIntent | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -234,6 +236,7 @@ export function SearchBar({
           setResults(data.results ?? []);
           setResultsFor(query);
           setPeople(data.people ?? []);
+          setIntent((data.intent as LexicalIntent | null) ?? lexicalIntent(query));
           setOpen(true);
         }
       } catch {
@@ -337,8 +340,34 @@ export function SearchBar({
 
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
 
-      {open && (results.length > 0 || people.length > 0) && (
+      {open && (results.length > 0 || people.length > 0 || intent != null) && (
         <div className="absolute z-30 mt-2 max-h-[75vh] w-full overflow-auto rounded-2xl border border-white/10 bg-ink-850/95 p-3 shadow-card backdrop-blur">
+          {/* A bare genre/provider/subject/network word is a BROWSE, visually
+              distinct from title rows — "crime" offers Browse Crime, never a
+              film that merely shares the word. */}
+          {intent != null && (
+            <Link
+              href={intent.kind === 'network' && intent.packHref ? intent.packHref : askHref(q) ?? '#'}
+              onClick={leaveForResult}
+              data-testid="search-intent-card"
+              className="mb-3 flex min-h-[52px] items-center gap-3 rounded-xl border border-brand-400/40 bg-brand-500/15 px-3 py-2.5 hover:bg-brand-500/25"
+            >
+              <span aria-hidden className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-brand-500/25 text-base">
+                {intent.kind === 'provider' ? '📺' : intent.kind === 'network' ? '🏛️' : '🎬'}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold text-brand-50">
+                  {intent.kind === 'provider' && `Best on ${intent.label}`}
+                  {intent.kind === 'network' && `${intent.label}${intent.packHref ? ' Pack' : ' picks'}`}
+                  {intent.kind === 'genre' && `Browse ${intent.label}`}
+                  {intent.kind === 'subject' && `Browse ${intent.label} titles`}
+                </span>
+                <span className="block truncate text-[11px] text-brand-200/80">
+                  {intent.kind === 'provider' ? 'What’s worth watching there — scored for you' : 'Scored for you by the Judge'}
+                </span>
+              </span>
+            </Link>
+          )}
           {people.length > 0 && (
             <div className="mb-3">
               <div className="eyebrow mb-1.5 text-[11px]">People</div>

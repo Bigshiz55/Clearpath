@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { searchTitles, searchPeople, TmdbError, tmdbImage } from '@/lib/tmdb/client';
 import { splitTitleQualifiers, misspellingCandidates, insertionCandidates, extractPersonName } from '@/lib/nlu/queryRepair';
 import { isExactTitle } from '@/lib/nlu/titleNormalize';
+import { lexicalIntent } from '@/lib/search/searchIntent';
 
 /**
  * Find results for what the user MEANT, not only what they typed.
@@ -111,7 +112,12 @@ export async function GET(request: Request) {
         return searchPeople(parsed.data.q).catch(() => []);
       })(),
     ]);
+    // A bare genre/subject/provider/network word is a BROWSE intent — surfaced
+    // to the client so the dropdown can offer "Browse Crime" instead of a film
+    // that merely shares the word. Title results still ride along.
+    const intent = lexicalIntent(parsed.data.q);
     return NextResponse.json({
+      intent,
       correctedTo,
       results: results.map((r) => ({
         id: r.id,
