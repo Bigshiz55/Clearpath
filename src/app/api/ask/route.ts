@@ -556,9 +556,10 @@ export async function POST(req: Request) {
       items = items.filter((i) => !coarseExcluded.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
     }
 
-    // NO-FILLER ASSERTION (shared with Forensic Search): a required subject means
-    // every returned title must carry its own subject evidence, or it is dropped.
-    if (query.subjectKeywordIds && query.subjectKeywordIds.length > 0) {
+    // NO-FILLER SAFETY NET (shared with Forensic Search): eligibility already
+    // ran inside runFinder; a subject request may never ship a title whose
+    // semantic verdict did not PASS. The Judge receives only eligible titles.
+    if (query.subjectLexemes && query.subjectLexemes.length > 0) {
       items = items.filter((i) => i.subjectEvidence?.satisfied === true);
     }
 
@@ -569,6 +570,7 @@ export async function POST(req: Request) {
         sha: getBuildInfo().gitSha || 'unknown',
         query,
         interpretation: askInterpretation,
+        diagnostics: result.diagnostics,
         scoredFor: result.scoredFor,
         relaxed: result.relaxed,
         items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
