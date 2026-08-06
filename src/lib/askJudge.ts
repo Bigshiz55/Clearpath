@@ -1,6 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { searchTitles, getSimilar, type SearchResultItem } from '@/lib/tmdb/client';
+import { searchTitles, getSimilar, getCredits, type SearchResultItem } from '@/lib/tmdb/client';
 import { getScoringData } from '@/lib/titleData';
 import { buildVerdict } from '@/lib/scoring';
 import { getProfile, getPersonalContext, regionFor, personalLabelFor } from '@/lib/profile';
@@ -196,6 +196,9 @@ export async function askSimilarTo(
   limit = 10,
   /** The media type the ask states outright ("a boxing movie like…"), if any. */
   wantType: 'movie' | 'tv' | null = null,
+  /** A person the ask ruled out ("not another Stallone movie") — candidates
+   *  they acted in, directed, or created are dropped on real credit evidence. */
+  excludePersonId: number | null = null,
 ): Promise<{ query: FinderQuery; scoredFor: string; items: FinderItem[] } | null> {
   // Read BEFORE cleaning strips it — cleaning discards the clause entirely,
   // so this is the only chance to know the ask said it at all.
@@ -265,6 +268,20 @@ export async function askSimilarTo(
 
   const scored = await mapPool(cands, HYDRATE_CONCURRENCY, async (c) => {
     try {
+      // An excluded person is a HARD constraint, enforced on real credit
+      // evidence per candidate. A failed credits fetch keeps the candidate —
+      // an unverifiable maybe beats silently emptying the answer.
+      if (excludePersonId != null) {
+        const credits = await getCredits(c.mediaType, c.id).catch(() => null);
+        if (
+          credits &&
+          (credits.cast.some((p) => p.id === excludePersonId) ||
+            credits.directors.some((p) => p.id === excludePersonId) ||
+            credits.creators.some((p) => p.id === excludePersonId))
+        ) {
+          return null;
+        }
+      }
       const { meta, providers } = await getScoringData(c.mediaType, c.id, region);
       const report = buildVerdict({ meta, providers, personal: { ...personal, collectionId: null } });
       // What this candidate actually shares with the seed(s) — subject/theme

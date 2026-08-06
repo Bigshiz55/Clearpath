@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from '@/lib/finder';
 import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
-import { naiveParseQuery, EMPTY_QUERY, parseTopicTerms } from '@/lib/finderParse';
+import { naiveParseQuery, EMPTY_QUERY, parseTopicTerms, extractExcludedPerson } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
-import { searchKeywords } from '@/lib/tmdb/client';
+import { searchKeywords, searchPeople, getCredits } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
@@ -22,12 +22,19 @@ import { mediaTypeSatisfies } from '@/lib/nlu/mediaOntology';
  */
 function hasCompetingConstraints(text: string): boolean {
   if (!text) return false;
-  return (
+  if (
     detectOrigin(text).countries.length > 0 ||
     detectAudio(text).englishAudioRequired ||
     detectNetwork(text) != null ||
     detectPlatform(text) != null
-  );
+  ) {
+    return true;
+  }
+  // Stated years, recency, and genre exclusions are hard constraints too.
+  // Raw similar ignores every one of them — "like Rocky, released after 2020"
+  // was answering with Fat City (1972) because the year never left the sentence.
+  const det = naiveParseQuery(text);
+  return det.minYear != null || det.maxYear != null || det.sinceMonths != null || (det.excludeGenreIds?.length ?? 0) > 0;
 }
 
 export const dynamic = 'force-dynamic';
@@ -79,6 +86,46 @@ export async function POST(req: Request) {
     const text = typeof body.text === 'string' ? body.text.slice(0, 300) : '';
     const cls = text.trim() ? classifySearch(text) : null;
 
+    // 0.5) A question about the USER'S OWN history is answered from their list,
+    // never from the general catalog — "What haven't I finished?" was returning
+    // this week's trending titles, which is a non-answer wearing a confident
+    // face. Empty history gets an honest empty answer, not a trending dump.
+    const HISTORY_ASK =
+      /\bwhat\s+(?:have\s+i\s+not|haven'?t\s+i|didn'?t\s+i|did\s+i\s+not)\s+(?:finish(?:ed)?|watch(?:ed)?)\b|\bcontinue\s+watching\b|\bpick\s+up\s+where\s+i\s+left\s+off\b/i;
+    if (HISTORY_ASK.test(text)) {
+      const wantsFinish = /finish/i.test(text);
+      const { data: rows } = await supabase
+        .from('watchlist_items')
+        .select('tmdb_id, media_type, title, year, poster_path, status, added_at')
+        .eq('user_id', user.id)
+        .in('status', wantsFinish ? ['watching', 'paused'] : ['strict', 'possible', 'watching', 'paused'])
+        .order('added_at', { ascending: false })
+        .limit(20);
+      const items = (rows ?? []).map((r) => ({
+        id: r.tmdb_id,
+        mediaType: r.media_type,
+        title: r.title,
+        year: r.year,
+        posterPath: r.poster_path,
+        posterUrl: tmdbImage(r.poster_path, 'w342'),
+        matchScore: null,
+        generalScore: null,
+        reason: r.status === 'watching' ? 'You are partway through this' : r.status === 'paused' ? 'Paused on your list' : 'On your list, not watched yet',
+      }));
+      return NextResponse.json({
+        kind: 'search',
+        query: { ...EMPTY_QUERY },
+        scoredFor: 'Your list',
+        relaxed:
+          items.length > 0
+            ? null
+            : wantsFinish
+              ? 'Nothing on your list is marked as started — there is nothing waiting to be finished yet.'
+              : 'Your list is empty so far — add titles and this question will have a real answer.',
+        items,
+      });
+    }
+
     // 1) Named-title lookup → put THAT title on trial (with the identity guard,
     // exact-match ranking and provider hard filter inside askJudgeTitle).
     if (text.trim() && cls?.mode !== 'similar_to') {
@@ -110,10 +157,16 @@ export async function POST(req: Request) {
       (cls?.mode === 'similar_to' ? (cls.reference ?? null) : null);
     if (reference && cls?.mode === 'similar_to' && !hasCompetingConstraints(text)) {
       const wantCount = text ? parseRequestedCount(text) : 10;
+      // "…but not another Stallone movie" is a HARD constraint. The name is
+      // extracted deterministically and must resolve against the real people
+      // catalog before it excludes anything — an unresolvable candidate is a
+      // no-op, never a guess.
+      const exclName = text ? extractExcludedPerson(text) : null;
+      const excludePersonId = exclName ? ((await searchPeople(exclName).catch(() => []))[0]?.id ?? null) : null;
       // An explicitly stated media type ("a boxing MOVIE like Rocky") is not a
       // guess and must survive into the results. Without it the seed's own type
       // became the filter, and a movie request read back as "Shows".
-      const similar = await askSimilarTo(supabase, user.id, reference, wantCount, statedMediaType(text, cls));
+      const similar = await askSimilarTo(supabase, user.id, reference, wantCount, statedMediaType(text, cls), excludePersonId);
       if (similar) {
         return NextResponse.json({
           kind: 'search',
@@ -135,18 +188,30 @@ export async function POST(req: Request) {
     // Foreign-origin / English-audio / runtime augmentation (deterministic; the
     // parser paths don't extract these) — restricts the pool to the real origin.
     query = augmentInternational(query, text);
-    // SUBJECT MATTER, when the parse did not already carry it. "boxing movies
-    // after 2020" names a subject TMDB models as a keyword rather than a genre,
-    // so without this the one word the request was actually about reached the
-    // search as nothing at all. Resolved through the same `searchKeywords` the
-    // AI path uses, so the ids are TMDB's and the behaviour is identical
-    // whether or not an OpenAI key is configured. Best-effort: an unresolved
-    // term is skipped, never guessed.
-    if (text && (!query.keywordIds || query.keywordIds.length === 0)) {
+    // DETERMINISTIC CONSTRAINT OVERLAY. Stated years and genre exclusions are
+    // facts of the sentence, not judgment calls — when the LLM parse dropped
+    // one ("after 2020" arriving with no year bound), the regex parser's
+    // reading fills the gap. Overlay only, never override.
+    if (text.trim()) {
+      const det = naiveParseQuery(text);
+      if (det.minYear != null && query.minYear == null) query.minYear = det.minYear;
+      if (det.maxYear != null && query.maxYear == null) query.maxYear = det.maxYear;
+      if (det.excludeGenreIds?.length) {
+        query.excludeGenreIds = [...new Set([...(query.excludeGenreIds ?? []), ...det.excludeGenreIds])];
+      }
+    }
+    // SUBJECT MATTER — always resolved and MERGED, not only when the parse came
+    // back empty. "Three wrestling movies" flapped between real wrestling
+    // results and a trending dump depending on what the LLM parse happened to
+    // carry; the subject the sentence names must reach the search
+    // deterministically every time. Resolved through the same `searchKeywords`
+    // the AI path uses. Best-effort: an unresolved term is skipped, never
+    // guessed.
+    if (text) {
       const topics = parseTopicTerms(text);
       if (topics.length) {
         const ids = await searchKeywords(topics).catch(() => []);
-        if (ids.length) query.keywordIds = ids;
+        if (ids.length) query.keywordIds = [...new Set([...(query.keywordIds ?? []), ...ids])];
       }
     }
 
@@ -182,16 +247,45 @@ export async function POST(req: Request) {
     // on Lifetime" from surfacing TV series. It only REMOVES wrong-type results;
     // it never substitutes, so an honest shortfall is preferred over a wrong fill.
     let items = result.items;
+    // The same excluded-person hard constraint, on the discovery path. Enforced
+    // on real credit evidence, only when the ask names someone to rule out; an
+    // unverifiable candidate is kept rather than silently emptying the answer.
+    const finderExclName = text ? extractExcludedPerson(text) : null;
+    if (finderExclName) {
+      const pid = (await searchPeople(finderExclName).catch(() => []))[0]?.id ?? null;
+      if (pid != null) {
+        const verdicts = await Promise.all(
+          items.map((i) =>
+            getCredits(i.mediaType === 'tv' ? 'tv' : 'movie', i.id)
+              .then(
+                (c) =>
+                  !c.cast.some((p) => p.id === pid) &&
+                  !c.directors.some((p) => p.id === pid) &&
+                  !c.creators.some((p) => p.id === pid),
+              )
+              .catch(() => true),
+          ),
+        );
+        items = items.filter((_, idx) => verdicts[idx]);
+      }
+    }
     const plan = text.trim() ? buildQueryPlan(text) : null;
     if (plan && plan.mediaTypes.length > 0) {
       items = items.filter((i) => plan.mediaTypes.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
     }
-    // …and the same guard for what the request ruled OUT. "no documentaries"
-    // used to land in `mediaTypes` as a REQUESTED kind, so the whitelist above
-    // admitted exactly the thing the user excluded. Removing only, never
-    // substituting — an honest shortfall beats a wrong fill.
-    if (plan && plan.excludedMediaTypes.length > 0) {
-      items = items.filter((i) => !plan.excludedMediaTypes.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
+    // …and the same guard for what the request ruled OUT — but ONLY for kinds
+    // the coarse movie/tv type can actually decide. "documentary" is a GENRE
+    // dressed as a media word: every documentary satisfies 'movie', so running
+    // it through this filter deleted every movie in the answer and "Boxing
+    // movies after 2020, no documentaries" returned nothing at all. Documentary
+    // exclusion is enforced upstream as excludeGenreIds (TMDB genre 99), where
+    // it belongs. Removing only, never substituting — an honest shortfall
+    // beats a wrong fill.
+    const coarseExcluded = plan
+      ? plan.excludedMediaTypes.filter((mt) => mt === 'movie' || mt === 'tv_series' || mt === 'miniseries' || mt === 'episode')
+      : [];
+    if (coarseExcluded.length > 0) {
+      items = items.filter((i) => !coarseExcluded.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
     }
 
     return NextResponse.json({

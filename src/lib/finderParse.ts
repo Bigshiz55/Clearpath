@@ -117,6 +117,42 @@ export function parseTopicTerms(input: string): string[] {
   return out.slice(0, 4);
 }
 
+/**
+ * A PERSON the request rules out — "Movies like Rocky, but not another
+ * Stallone movie", "no Tom Cruise films", "without Adam Sandler".
+ *
+ * Returns the candidate NAME TEXT only; the caller must resolve it against the
+ * real people catalog and treat a non-resolving candidate as no exclusion.
+ * Genre and subject words ("not boxing movies", "no documentaries") are
+ * rejected here so a topic negation is never mistaken for a person.
+ */
+export function extractExcludedPerson(input: string): string | null {
+  const text = (input ?? '').trim();
+  if (!text) return null;
+  const m =
+    text.match(
+      /\b(?:not|no|without|excluding)\s+(?:another|any\s+more|more)\s+([\w.'’-]+(?:\s+[\w.'’-]+){0,2}?)\s+(?:movies?|films?|flicks?|pictures?)\b/i,
+    ) ??
+    text.match(/\b(?:no|not)\s+([A-Z][\w.'’-]+(?:\s+[A-Z][\w.'’-]+){1,2})\s+(?:movies?|films?|flicks?)\b/) ??
+    text.match(/\bwithout\s+([A-Z][\w.'’-]+(?:\s+[A-Z][\w.'’-]+){0,2})\b/);
+  if (!m) return null;
+  const candidate = m[1]!.trim();
+  // Every word must be a plausible name part — any genre/subject/common word
+  // means this negation is about content, not a person.
+  const NON_NAME = new Set([
+    ...Object.keys(GENRE_WORDS),
+    ...SUBJECT_TERMS,
+    'movie', 'movies', 'film', 'films', 'show', 'shows', 'series', 'tv',
+    'foreign', 'english', 'american', 'british', 'french', 'korean', 'japanese',
+    'scary', 'violent', 'long', 'short', 'new', 'old', 'recent', 'good', 'bad',
+    'sad', 'dark', 'gory', 'boring', 'subtitles', 'subtitle', 'sequel', 'sequels',
+    'remake', 'remakes', 'reboot', 'reboots', 'franchise', 'superhero',
+  ]);
+  const words = candidate.toLowerCase().split(/\s+/);
+  if (words.some((w) => NON_NAME.has(w))) return null;
+  return candidate;
+}
+
 /** Is the word starting at `idx` inside a negated span? */
 function isNegatedAt(text: string, idx: number): boolean {
   const runUp = text.slice(Math.max(0, idx - 40), idx);

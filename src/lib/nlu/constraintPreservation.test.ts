@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { naiveParseQuery, describeQuery, parseTopicTerms } from '@/lib/finderParse';
+import { naiveParseQuery, describeQuery, parseTopicTerms, extractExcludedPerson } from '@/lib/finderParse';
 import { buildQueryPlan } from '@/lib/nlu/queryPlan';
 import { classifySearch } from '@/lib/nlu/searchMode';
 import { referenceCandidates } from '@/lib/nlu/titleReference';
@@ -279,5 +279,38 @@ describe('subject matter that is not a genre', () => {
   it('is bounded so one sentence cannot flood the keyword filter', () => {
     const many = 'boxing heist zombie vampire spy prison christmas wedding dinosaur';
     expect(parseTopicTerms(many).length).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('excluded person extraction — "not another Stallone movie" is a hard constraint', () => {
+  it('extracts the person the ask rules out', () => {
+    expect(extractExcludedPerson('Movies like Rocky, but not another Stallone movie')).toBe('Stallone');
+    expect(extractExcludedPerson('no Tom Cruise movies')).toBe('Tom Cruise');
+    expect(extractExcludedPerson('something without Adam Sandler')).toBe('Adam Sandler');
+  });
+
+  it('never mistakes a topic or genre negation for a person', () => {
+    expect(extractExcludedPerson('Something like Rocky, but not boxing')).toBeNull();
+    expect(extractExcludedPerson('not another boxing movie')).toBeNull();
+    expect(extractExcludedPerson('Boxing movies after 2020, no documentaries.')).toBeNull();
+    expect(extractExcludedPerson('no scary movies')).toBeNull();
+    expect(extractExcludedPerson('not another remake')).toBeNull();
+  });
+
+  it('finds nothing in an ordinary ask', () => {
+    expect(extractExcludedPerson('Movies like Rocky')).toBeNull();
+    expect(extractExcludedPerson('')).toBeNull();
+  });
+});
+
+describe('year bounds survive a "like X" phrasing (the similar path must yield)', () => {
+  it('"released after 2020" parses to a hard minYear even with a reference present', () => {
+    const q = naiveParseQuery('I like Rocky, but I want to see other boxing movies released after 2020.');
+    expect(q.minYear).toBe(2020);
+  });
+  it('"no documentaries" lands in excludeGenreIds, not a media-type wipe', () => {
+    const q = naiveParseQuery('Boxing movies after 2020, no documentaries.');
+    expect(q.excludeGenreIds).toContain(GENRE_IDS.documentary);
+    expect(q.minYear).toBe(2020);
   });
 });
