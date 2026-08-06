@@ -12,12 +12,16 @@ import { AskTheJudge } from '@/components/AskTheJudge';
  */
 export const dynamic = 'force-dynamic';
 
-export default function JudgeHarness() {
+export default function JudgeHarness({ searchParams }: { searchParams: { q?: string } }) {
   if (process.env.MOBILE_HARNESS !== '1') notFound();
+  // `?q=` seeds the judge exactly as the header search does when it routes a
+  // subject query to /app/ask?q=… — so the harness exercises the real
+  // keystroke→results transport, not just an empty judge.
+  const seed = typeof searchParams.q === 'string' ? searchParams.q.slice(0, 300) : null;
   return (
     <main className="mx-auto max-w-3xl px-4 py-6">
       <h1 className="mb-4 text-lg font-bold text-white">Judge harness</h1>
-      <AskTheJudge />
+      <AskTheJudge seedQuery={seed} />
     </main>
   );
 }

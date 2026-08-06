@@ -5,6 +5,7 @@ import {
   detectRequiredSubject,
   detectGeneralSubject,
   isSingularSubjectRequest,
+  SUBJECTS,
   type SubjectSpec,
 } from '@/lib/nlu/requiredSubject';
 import type { SubjectRequirement } from '@/lib/nlu/semanticEligibility';
@@ -146,4 +147,46 @@ export async function applyRequiredSubject(query: FinderQuery, text: string): Pr
   }
 
   return { query: q, interpretation, subject: det.required, requirement, requestedCount: singular ? 1 : null };
+}
+
+/**
+ * Build a subject requirement + keyword ids from ALREADY-EXTRACTED subject
+ * TERMS (not a raw sentence).
+ *
+ * The conversation path (Ask the Judge) accumulates subjects into its canonical
+ * request as bare terms like "boxing" — there is no "a boxing movie" sentence to
+ * re-parse. Before this, those terms were resolved to SOFT keyword ids and the
+ * finder ranked a keyword-biased popularity list, so "boxing" came back as
+ * whatever the viewer's DNA liked (a crime/drama fan got Absentia). This routes
+ * a named subject through the SAME hard-eligibility pipeline the Forensic Search
+ * uses: a keyword match is a candidate, and only a title where the subject is
+ * genuinely central is eligible. Curated subjects (boxing/…) carry their vetted
+ * lexeme set; any other bare subject derives lexemes from its own words.
+ *
+ * Returns null when there is no subject, or `keywordIds: []` when the catalog
+ * has no matching keyword — the finder then reports an honest shortfall rather
+ * than padding with generic recommendations.
+ */
+export async function resolveSubjectRequirementForTerms(
+  terms: string[],
+): Promise<{ requirement: SubjectRequirement; keywordIds: number[] } | null> {
+  const term = (terms ?? []).map((t) => t.trim()).filter(Boolean)[0];
+  if (!term) return null;
+  const key = term.toLowerCase();
+
+  const curated: SubjectSpec | undefined = Object.values(SUBJECTS).find(
+    (s) => s.canonical === key || s.triggers.includes(key),
+  );
+  if (curated) {
+    const keywordIds = await searchKeywords(curated.expansion).catch(() => []);
+    return {
+      requirement: { canonical: curated.canonical, label: curated.label, lexemes: curated.lexemes, strict: true },
+      keywordIds,
+    };
+  }
+
+  const label = key.replace(/\b([a-z])/g, (_, c: string) => c.toUpperCase());
+  const lexemes = Array.from(new Set([key, ...key.split(/\s+/)])).filter(Boolean);
+  const keywordIds = await searchKeywords(lexemes.slice(0, 6)).catch(() => []);
+  return { requirement: { canonical: key, label, lexemes, strict: true }, keywordIds };
 }

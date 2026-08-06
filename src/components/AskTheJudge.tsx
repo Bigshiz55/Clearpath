@@ -60,6 +60,11 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
   // the thread ARE this object, each one removable.
   const [conv, setConv] = useState<CanonicalRequest>({ ...EMPTY_REQUEST });
   const [chips, setChips] = useState<Chip[]>([]);
+  // The exact query this screen is answering, and the server's request id — so a
+  // specific search always says what it searched for and can never be mistaken
+  // for the generic recommendations feed.
+  const [answeringFor, setAnsweringFor] = useState<string | null>(seedQuery?.trim() || null);
+  const [requestId, setRequestId] = useState<string | null>(null);
   const userKeyRef = useRef<string | null>(null);
   // Monotonic turn counter — a late response from an earlier turn must never
   // overwrite the state a newer turn already produced.
@@ -175,6 +180,10 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
       // late response must not clobber the current state or append results.
       if (mySeq !== turnSeq.current) return;
 
+      // Record what THIS search answered and its request id, for the header.
+      if (text) setAnsweringFor(text);
+      if (typeof data.requestId === 'string') setRequestId(data.requestId);
+
       // Adopt the server's merged state. If the account changed since the
       // stored conversation was created, drop the stale one instead of mixing.
       if (data.conversation) {
@@ -279,6 +288,25 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
 
   return (
     <div className="space-y-4">
+      {/* RESULTS-FOR HEADER. A specific search always says what it searched for,
+          so it can never be confused with the generic recommendations feed.
+          Present only when a real query is being answered. */}
+      {answeringFor && (
+        <div
+          data-testid="search-results-header"
+          data-answering-for={answeringFor}
+          className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-xl border border-brand-400/30 bg-brand-500/10 px-3 py-2"
+        >
+          <span className="text-sm font-bold text-white">
+            Results for <span className="text-brand-200">“{answeringFor}”</span>
+          </span>
+          {requestId && (
+            <span className="text-[11px] text-slate-400" data-testid="search-request-id">
+              request {requestId}
+            </span>
+          )}
+        </div>
+      )}
       {/* ============ The conversation ============ */}
       <div className="card flex h-[56vh] max-h-[620px] flex-col overflow-hidden p-0">
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">

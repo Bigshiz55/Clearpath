@@ -182,3 +182,25 @@ describe('the full destination', () => {
     expect(askHref('   ')).toBeNull();
   });
 });
+
+describe('a bare SUBJECT word is a discovery request, never a title or the generic feed', () => {
+  // The production defect: typing "boxing" showed the personalized
+  // recommendations feed (Absentia). A bare subject must route to the shared
+  // subject pipeline (/app/ask), even when a film literally shares the word.
+  it('"boxing" routes to /app/ask as a subject — not a coincidental title', () => {
+    const d = resolveSearchDestination('boxing', [
+      { id: 999, mediaType: 'movie', title: 'Boxing', year: 2010 },
+      { id: 998, mediaType: 'movie', title: 'Boxing Helena', year: 1993 },
+    ])!;
+    expect(d.reason).toBe('subject');
+    expect(d.href).toBe('/app/ask?q=boxing');
+    // Never a title page, never a generic browse.
+    expect(d.href).not.toContain('/app/title/');
+  });
+
+  it('classifies "boxing" as a catalog/lookup intent, not a recommendation sentence', () => {
+    // It reaches /app/ask via the SUBJECT rule, which is the discovery surface —
+    // not because it looks like a "find me…" request.
+    expect(classifySearchIntent('boxing')).toBe('catalog');
+  });
+});
