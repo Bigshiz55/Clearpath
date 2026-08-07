@@ -14,65 +14,113 @@ import { recordAnalyticsEvent } from '@/lib/actions/passFeedback';
 /**
  * THE ONE TRAILER-PREVIEW MEDIA WRAPPER.
  *
- * Wraps a card's existing poster (passed as children) inside the same media
- * box. Default is a pure passthrough — with the feature off, or no tmdbId, or
- * server-side render, it renders exactly the poster and changes nothing, so no
- * card can regress. With the feature on, the card that becomes the single
- * active trailer (see activeTrailer.ts) resolves its official trailer, mounts
- * ONE muted YouTube iframe over the poster, and offers minimal controls; when
- * another card wins, this one unmounts its iframe and the audio stops.
+ * Wraps a card's existing poster (passed as children) and adds an INLINE trailer
+ * that plays in place — never a modal, never a new tab, never a navigation. Two
+ * independent behaviours:
  *
- * Only the active card ever mounts an iframe, so a grid of 50 cards has at most
- * one player. Nothing here fabricates a trailer: a resolver miss stays on the
- * poster.
+ *   • MANUAL play is ALWAYS available (no feature flag): every movie/TV card
+ *     shows a small "▶ Trailer" affordance. Tapping it resolves the title's own
+ *     official trailer ON CLICK (zero network/iframe cost until then), mounts one
+ *     muted YouTube iframe over the poster, and offers mute / restart /
+ *     fullscreen / ✕-close. ✕ restores the poster. If the title has no verified
+ *     embeddable trailer it says so briefly and stays on the poster — trailer
+ *     enrichment never blocks a title.
+ *
+ *   • AUTOMATIC dwell/autoplay is what the `?trailers=1` flag gates. Only the
+ *     single most-visible ("active") card, and only when the user's Autoplay pref
+ *     is on and reduced-motion is off, begins muted playback on its own.
+ *
+ * SINGLE ACTIVE PLAYER: a module-level store holds the one card that is playing
+ * (manual OR auto). Starting any card stops the previous one, so a grid of 50
+ * cards has at most one iframe.
+ *
+ * INTERACTION HIERARCHY: TrailerMedia must be the OUTER element and the card's
+ * own click target (a button/Link/div) its child, so TrailerMedia's own control
+ * buttons are SIBLINGS of that target, never nested inside it. Every control here
+ * also calls stopPropagation + preventDefault, so a tap on ▶ Trailer / mute / ✕
+ * never triggers the card's own click (QuickLook, navigation). Trailer, Save,
+ * For, Against stay independent actions.
  */
 
 // Client memo so scrolling a grid never re-resolves the same title.
 const cache = new Map<string, ResolvedTrailer | null>();
 
+// ---- Single-active PLAYING store (manual + auto share one slot) --------------
+type Listener = () => void;
+const playing = {
+  id: null as string | null,
+  listeners: new Set<Listener>(),
+  claim(id: string) {
+    if (this.id === id) return;
+    this.id = id;
+    this.listeners.forEach((l) => l());
+  },
+  release(id: string) {
+    if (this.id !== id) return;
+    this.id = null;
+    this.listeners.forEach((l) => l());
+  },
+};
+
+function useIsPlayingSlot(id: string): boolean {
+  const [isSlot, setIsSlot] = useState(() => playing.id === id);
+  useEffect(() => {
+    const on = () => setIsSlot(playing.id === id);
+    playing.listeners.add(on);
+    on();
+    return () => {
+      playing.listeners.delete(on);
+    };
+  }, [id]);
+  return isSlot;
+}
+
 interface Props {
   tmdbId: number | null;
   mediaType: 'movie' | 'tv';
   title: string;
-  children: React.ReactNode; // the existing poster element
+  children: React.ReactNode; // the existing poster element (may itself be the card's click target)
 }
 
 export function TrailerMedia({ tmdbId, mediaType, title, children }: Props) {
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
-    setEnabled(trailerFeatureEnabled());
-  }, []);
-
-  // Passthrough: feature off or no id → just the poster, zero behavior change.
-  if (!enabled || tmdbId == null) return <>{children}</>;
-  return <TrailerMediaInner tmdbId={tmdbId} mediaType={mediaType} title={title}>{children}</TrailerMediaInner>;
+  // Passthrough only when there is no id to resolve (server render or missing
+  // metadata). NOT gated by the feature flag — manual play is always on.
+  if (tmdbId == null) return <>{children}</>;
+  return (
+    <TrailerMediaInner tmdbId={tmdbId} mediaType={mediaType} title={title}>
+      {children}
+    </TrailerMediaInner>
+  );
 }
 
 function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmdbId: number }) {
   const id = `${mediaType}:${tmdbId}`;
-  const isActive = useIsActiveTrailer(id);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
+  const isActive = useIsActiveTrailer(id); // dwell "most visible" — autoplay eligibility only
+  const isPlayingSlot = useIsPlayingSlot(id); // the one card actually playing
+
   const [trailer, setTrailer] = useState<ResolvedTrailer | null | undefined>(cache.get(id));
+  const [open, setOpen] = useState(false); // user (or autoplay) opened the inline player
+  const [loading, setLoading] = useState(false);
+  const [noTrailer, setNoTrailer] = useState(false);
   const [muted, setMuted] = useState(true);
-  const [playing, setPlaying] = useState(false);
   const impressionSent = useRef(false);
   const startedSent = useRef(false);
 
+  // Feature flag now controls ONLY automatic dwell/autoplay, never manual play.
+  const [autoplayFeature, setAutoplayFeature] = useState(false);
   const reducedMotion = useMemo(() => prefersReducedMotion(), []);
   const [autoplayPref, setAutoplayPref] = useState<'on' | 'off'>('on');
   useEffect(() => {
+    setAutoplayFeature(trailerFeatureEnabled());
     setAutoplayPref(getAutoplayPref());
     const onPref = () => setAutoplayPref(getAutoplayPref());
     window.addEventListener('wv-trailer-pref', onPref);
     return () => window.removeEventListener('wv-trailer-pref', onPref);
   }, []);
-
-  // Autoplay is allowed only when the user hasn't turned it off and hasn't
-  // asked for reduced motion. Otherwise the card can still become active — it
-  // just waits for a tap (manual play), never surprising the user.
-  const autoplayAllowed = autoplayPref === 'on' && !reducedMotion;
+  const autoplayAllowed = autoplayFeature && autoplayPref === 'on' && !reducedMotion;
 
   const emit = useCallback(
     (name: string, extra?: Record<string, unknown>) => {
@@ -81,7 +129,7 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
     [tmdbId, mediaType],
   );
 
-  // Report visibility to the coordinator glue.
+  // Report visibility to the dwell coordinator (drives autoplay eligibility only).
   useEffect(() => {
     const el = rootRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return;
@@ -98,56 +146,106 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
     };
   }, [id]);
 
-  // When this card becomes active, resolve its trailer once (cached).
+  // Resolve the title's OWN trailer by its TMDB id — never a text/YouTube search,
+  // so same-name reboots can't cross-contaminate. Cached; returns the memo fast.
+  const resolve = useCallback(async (): Promise<ResolvedTrailer | null> => {
+    if (cache.has(id)) {
+      const v = cache.get(id) ?? null;
+      setTrailer(v);
+      return v;
+    }
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/trailer/${mediaType}/${tmdbId}`, { cache: 'force-cache' });
+      const d = (r.ok ? await r.json() : { trailer: null }) as { trailer: ResolvedTrailer | null };
+      cache.set(id, d.trailer ?? null);
+      setTrailer(d.trailer ?? null);
+      return d.trailer ?? null;
+    } catch {
+      cache.set(id, null);
+      setTrailer(null);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [id, mediaType, tmdbId]);
+
+  // Losing the single-active PLAYING slot stops this card immediately.
+  useEffect(() => {
+    if (!isPlayingSlot && open) {
+      setOpen(false);
+      setMuted(true);
+      startedSent.current = false;
+    }
+  }, [isPlayingSlot, open]);
+
+  // AUTOMATIC dwell autoplay: only the active card, only when the flag + prefs
+  // allow. Resolve on becoming active, then autoplay if the trailer is eligible.
   useEffect(() => {
     if (!isActive) return;
     if (!impressionSent.current) {
       impressionSent.current = true;
       emit('trailer_impression');
     }
-    if (cache.has(id)) {
-      setTrailer(cache.get(id));
-      return;
-    }
+    if (!autoplayAllowed) return;
     let cancelled = false;
-    fetch(`/api/trailer/${mediaType}/${tmdbId}`, { cache: 'force-cache' })
-      .then((r) => (r.ok ? r.json() : { trailer: null }))
-      .then((d: { trailer: ResolvedTrailer | null }) => {
-        if (cancelled) return;
-        cache.set(id, d.trailer ?? null);
-        setTrailer(d.trailer ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          cache.set(id, null);
-          setTrailer(null);
-        }
-      });
+    void resolve().then((t) => {
+      if (cancelled || !t || t.autoplayEligible !== true) return;
+      playing.claim(id);
+      setMuted(true);
+      setOpen(true);
+    });
     return () => {
       cancelled = true;
     };
-  }, [isActive, id, mediaType, tmdbId, emit]);
+  }, [isActive, autoplayAllowed, resolve, emit, id]);
 
-  // Losing active status stops playback immediately (iframe unmounts below).
+  // When the inline player opens, fire the started event once.
   useEffect(() => {
-    if (!isActive) {
-      setPlaying(false);
+    if (open && trailer && !startedSent.current) {
+      startedSent.current = true;
+      emit('trailer_started', { official: trailer.official, type: trailer.type });
+    }
+  }, [open, trailer, emit]);
+
+  const showIframe = open && trailer != null;
+
+  const stop = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+  };
+
+  // MANUAL play — always available. Claims the single-active slot, resolves on
+  // click, plays inline. If no verified trailer, says so and stays on the poster.
+  const manualPlay = useCallback(
+    async (e: React.MouseEvent) => {
+      stop(e);
+      setNoTrailer(false);
+      playing.claim(id);
+      setMuted(true);
+      emit('trailer_manual_play');
+      const t = cache.has(id) ? cache.get(id) ?? null : await resolve();
+      if (t) {
+        setOpen(true);
+      } else {
+        setNoTrailer(true);
+        setTimeout(() => setNoTrailer(false), 2200);
+      }
+    },
+    [id, resolve, emit],
+  );
+
+  const close = useCallback(
+    (e: React.MouseEvent) => {
+      stop(e);
+      setOpen(false);
       setMuted(true);
       startedSent.current = false;
-    }
-  }, [isActive]);
-
-  const canAutoplay = isActive && autoplayAllowed && trailer?.autoplayEligible === true;
-  // Mount the iframe when auto-eligible, or when the user manually pressed play.
-  const showIframe = isActive && trailer != null && (canAutoplay || playing);
-
-  useEffect(() => {
-    if (showIframe && !startedSent.current) {
-      startedSent.current = true;
-      setPlaying(true);
-      emit('trailer_started', { official: trailer?.official, type: trailer?.type });
-    }
-  }, [showIframe, emit, trailer]);
+      playing.release(id);
+      emit('trailer_closed');
+    },
+    [id, emit],
+  );
 
   // Lightweight YouTube control via postMessage (no full SDK).
   const command = useCallback((func: string, args: unknown[] = []) => {
@@ -157,52 +255,55 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
     );
   }, []);
 
-  // Controls sit visually over the card's own click target; stop the event so a
-  // tap on a control never also opens/navigates the card.
-  const stop = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-  };
+  const toggleMute = useCallback(
+    (e: React.MouseEvent) => {
+      stop(e);
+      setMuted((m) => {
+        const next = !m;
+        command(next ? 'mute' : 'unMute');
+        emit(next ? 'trailer_muted' : 'trailer_unmuted');
+        return next;
+      });
+    },
+    [command, emit],
+  );
 
-  const toggleMute = useCallback((e: React.MouseEvent) => {
-    stop(e);
-    setMuted((m) => {
-      const next = !m;
-      command(next ? 'mute' : 'unMute');
-      emit(next ? 'trailer_muted' : 'trailer_unmuted');
-      return next;
-    });
-  }, [command, emit]);
+  const restart = useCallback(
+    (e: React.MouseEvent) => {
+      stop(e);
+      command('seekTo', [0, true]);
+      command('playVideo');
+      emit('trailer_replayed');
+    },
+    [command, emit],
+  );
 
-  const restart = useCallback((e: React.MouseEvent) => {
-    stop(e);
-    command('seekTo', [0, true]);
-    command('playVideo');
-    emit('trailer_replayed');
-  }, [command, emit]);
-
-  const fullscreen = useCallback((e: React.MouseEvent) => {
-    stop(e);
-    rootRef.current?.requestFullscreen?.().catch(() => {});
-    emit('trailer_fullscreen');
-  }, [emit]);
-
-  const manualPlay = useCallback((e: React.MouseEvent) => {
-    stop(e);
-    setPlaying(true);
-    emit('trailer_manual_play');
-  }, [emit]);
+  const fullscreen = useCallback(
+    (e: React.MouseEvent) => {
+      stop(e);
+      rootRef.current?.requestFullscreen?.().catch(() => {});
+      emit('trailer_fullscreen');
+    },
+    [emit],
+  );
 
   const embed = trailer ? youTubeEmbedUrl(trailer.videoId, { muted, autoplay: true }) : null;
 
   return (
-    <div ref={rootRef} className="relative h-full w-full" data-testid="trailer-media" data-active={isActive ? '1' : '0'}>
-      {/* The poster is always present underneath — the trailer crossfades over
-          it, and is what remains if resolution misses or the player is blocked. */}
+    <div
+      ref={rootRef}
+      className="relative h-full w-full"
+      data-testid="trailer-media"
+      data-active={isActive ? '1' : '0'}
+      data-playing={showIframe ? '1' : '0'}
+    >
+      {/* The poster (and the card's own click target) is always present underneath
+          — the trailer crossfades over it, and is what remains if resolution
+          misses or the player is closed. */}
       <div className={showIframe ? 'opacity-0 transition-opacity duration-500' : 'opacity-100'}>{children}</div>
 
       {showIframe && embed && (
-        <div className="absolute inset-0">
+        <div className="absolute inset-0" data-testid="trailer-player">
           <iframe
             ref={iframeRef}
             src={embed}
@@ -211,7 +312,18 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
             allowFullScreen
             className="h-full w-full"
           />
-          {/* Minimal, on-brand control overlay. */}
+          {/* Close (✕) — top-LEFT, restores the poster. (Top-right is where the
+              card's own W/docket badge lives, so ✕ goes left to avoid it.) */}
+          <button
+            type="button"
+            onClick={close}
+            aria-label={`Close ${title} trailer`}
+            data-testid="trailer-close"
+            className="absolute left-1 top-1 z-[3] grid h-8 w-8 place-items-center rounded-full bg-black/65 text-sm text-white backdrop-blur transition hover:bg-black/85"
+          >
+            ✕
+          </button>
+          {/* Minimal control overlay — mute / restart / fullscreen. */}
           <div className="absolute bottom-1 right-1 flex gap-1">
             <button
               type="button"
@@ -238,23 +350,21 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
               ⛶
             </button>
           </div>
-          <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white/90">
-            Trailer
-          </span>
         </div>
       )}
 
-      {/* Active, trailer exists, but not autoplaying (pref off / reduced motion
-          / autoplay blocked) → a manual play affordance over the poster. */}
-      {isActive && trailer != null && !showIframe && (
+      {/* MANUAL ▶ Trailer affordance — always present (no flag) while not playing.
+          Bottom-RIGHT so it clears bottom-left card labels (release date, etc.). */}
+      {!showIframe && (
         <button
           type="button"
           onClick={manualPlay}
           aria-label={`Play ${title} trailer`}
-          data-testid="trailer-manual-play"
-          className="absolute inset-0 grid place-items-center bg-black/0 transition hover:bg-black/20"
+          data-testid="trailer-play"
+          className="absolute bottom-1 right-1 z-[2] flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80"
         >
-          <span className="grid h-11 w-11 place-items-center rounded-full bg-black/60 text-lg text-white backdrop-blur">▶</span>
+          <span aria-hidden>▶</span>
+          <span>{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
         </button>
       )}
     </div>

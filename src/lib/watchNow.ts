@@ -25,7 +25,9 @@ export interface WatchNowItem {
   matchScore: number;
   primaryCall: string;
   kind: WatchNowKind; // on your services, or free
-  where: string; // provider to show
+  where: string; // provider name to show
+  /** The provider to badge — name + VERIFIED TMDB logo path (null → text). */
+  provider?: { name: string; logoPath: string | null };
   free: boolean; // watchable at no extra cost (your plan or an ad-free/free tier)
   ratings: TileRatings;
 }
@@ -75,8 +77,15 @@ export async function getReadyToWatch(supabase: SupabaseClient, userId: string):
       const opts = providers?.options ?? [];
       const mine = services.length > 0 ? includedServiceNames(opts, services) : [];
       const freeOpts = opts.filter((o) => FREE_TYPES.has(o.type));
-      if (mine.length > 0) return { r, mediaType, kind: 'mine' as WatchNowKind, where: mine[0]! };
-      if (freeOpts.length > 0) return { r, mediaType, kind: 'free' as WatchNowKind, where: freeOpts[0]!.providerName };
+      if (mine.length > 0) {
+        // Carry the VERIFIED TMDB logo path for the chosen provider so the card
+        // can render the real brand mark, not a bare name string.
+        const opt = opts.find((o) => o.providerName === mine[0]);
+        return { r, mediaType, kind: 'mine' as WatchNowKind, where: mine[0]!, providerLogo: opt?.logoPath ?? null };
+      }
+      if (freeOpts.length > 0) {
+        return { r, mediaType, kind: 'free' as WatchNowKind, where: freeOpts[0]!.providerName, providerLogo: freeOpts[0]!.logoPath ?? null };
+      }
       return null;
     }),
   );
@@ -84,7 +93,7 @@ export async function getReadyToWatch(supabase: SupabaseClient, userId: string):
 
   // Phase 2 — score only the watchable titles for this user's taste.
   const scored = await Promise.all(
-    watchable.map(async ({ r, mediaType, kind, where }) => {
+    watchable.map(async ({ r, mediaType, kind, where, providerLogo }) => {
       try {
         const { meta, providers } = await getScoringData(mediaType, r.tmdb_id, region);
         const report = buildVerdict({ meta, providers, personal: { ...personal, collectionId: null } });
@@ -99,6 +108,7 @@ export async function getReadyToWatch(supabase: SupabaseClient, userId: string):
           primaryCall: report.primaryCall,
           kind,
           where,
+          provider: { name: where, logoPath: providerLogo },
           free: true,
           ratings: tileRatingsFromScore(report.general),
         } as WatchNowItem;

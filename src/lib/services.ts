@@ -96,6 +96,21 @@ export function streamingNames(options: WatchProvider[]): string[] {
   return Array.from(names);
 }
 
+/** The single best included streaming provider to badge on a card — name PLUS
+ *  its verified TMDB logo path, so the UI can render the real brand mark instead
+ *  of a name string. Options are display-priority ordered upstream. Null when no
+ *  included (subscription/free/ads) provider exists. */
+export function topStreamingProvider(
+  options: WatchProvider[],
+): { providerId: number; name: string; logoPath: string | null } | null {
+  for (const o of options) {
+    if (INCLUDED_TYPES.has(o.type)) {
+      return { providerId: o.providerId, name: o.providerName, logoPath: o.logoPath ?? null };
+    }
+  }
+  return null;
+}
+
 export type TonightAvailability =
   | { kind: 'included'; services: string[] } // free with a plan you have
   | { kind: 'elsewhere'; services: string[] } // streams, but not on your plans
