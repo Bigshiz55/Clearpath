@@ -179,7 +179,7 @@ export async function ExampleVerdict() {
             <p className="mt-3 text-center text-xs text-slate-600">
               A live example, not personalized to you.{' '}
               <Link href="/app" className="text-brand-300 underline hover:text-brand-200">
-                Enter the Courtroom for your own Verd1ct →
+                Enter WatchVerd1ct for your own Verd1ct →
               </Link>
             </p>
           </div>

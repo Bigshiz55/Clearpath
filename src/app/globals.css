@@ -282,6 +282,35 @@ body {
     background: linear-gradient(135deg, #fff3cf 0%, #f5c65a 45%, #d89a1f 100%);
   }
 
+  /* THE MAIN DOOR INTO THE PRODUCT — "ENTER WATCHVERD1CT".
+     Gold and the word "Courtroom" belong to the Live Jury / Verdict Room
+     experience ONLY, so the landing hero's primary entrance no longer borrows
+     that ceremony. It carries the brand's own signature instead: a cinematic
+     blue → violet → magenta sweep (brand blue #2f6bff into the hero's pink
+     #ff1493 through a violet mid-stop), a taller premium footprint (~60px on
+     desktop), and a distinct pink focus ring. `.btn-courtroom` above is left
+     exactly as it was — this is a separate class, not a restyle of it.
+
+     Contrast: the label stays solid white across the whole gradient. The
+     darkest stop (the blue) clears WCAG AA for large/bold text, and the
+     magenta end would fail a magenta-on-magenta text tint — so the brand's
+     magenta reads from the background and glow, never from tinting "VERD1CT".
+     The light sweep is the shared `.wv-cta-sheen`, already disabled under
+     prefers-reduced-motion; the base `.btn` supplies the >=44px touch target
+     and the active:scale pressed state. */
+  .btn-watchverdict {
+    @apply btn relative overflow-hidden rounded-2xl border border-white/20
+           px-9 py-3.5 text-base font-black uppercase tracking-wide text-white
+           shadow-[0_10px_36px_-8px_rgba(124,58,237,0.55)] transition
+           hover:scale-[1.02] hover:brightness-[1.08]
+           hover:shadow-[0_14px_46px_-6px_rgba(255,20,147,0.6)]
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5bb0]/80
+           focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950
+           active:brightness-95
+           sm:px-12 sm:py-4 sm:text-lg;
+    background: linear-gradient(120deg, #2f6bff 0%, #7c3aed 52%, #ff1493 100%);
+  }
+
   .chip {
     @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5
            px-3 py-1 text-xs font-medium text-slate-200;
