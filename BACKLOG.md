@@ -42,6 +42,23 @@ and what it unblocks.
   representative.
 
 ## Done
+- **National-breadth TVmaze ingest (broaden-only).** Extracted the
+  `MAJOR_US_NETWORKS`/`isMajorUsNetwork` allowlist out of `onTv.ts` into a
+  shared pure module `src/lib/viewing/ingest/nationalNetworks.ts` (plus a
+  `networkSlug` helper) so the live guide path and the new ingest share ONE
+  source of truth; the live path is a byte-for-byte refactor. Added
+  `runTvmazeNationalIngest` in `tvmazeWriter.ts`: same `us-national` lineup and
+  reconcile machinery, but the BROADER `isMajorUsNetwork` filter (~80 networks)
+  instead of `matchChannel`, synthesized `tvmaze-net:<slug>` stations, no
+  per-show premiere fan-out (premiere/repeat left null), and a
+  `trigger:'national'` run row. Reconciliation is scoped per station-set on
+  BOTH sides (curated read now `.in(station_id, curatedStationIds)`, national
+  read `.like(provider_station_id, 'tvmaze-net:%')`) so neither ingest can
+  expire the other's airings. Wired into `runGatedTvIngest` on its own
+  `tvmaze_national` lock + independent once-per-UTC-day gate; surfaced in
+  `/api/cron/tv-ingest` and `/api/tv/refresh`. Read paths untouched (that is
+  the follow-up: route Highlights + easy-tv through the ingested tables). 14
+  new pure tests; typecheck/lint/vitest/build all green.
 - **AI + data platform architecture audit + typed tool boundary.** Inspected
   the real data layer (two Explore agents) and wrote `docs/AI_DATA_ARCHITECTURE.md`
   — the 11-part audit (current/target maps, gap analysis, source matrix,
