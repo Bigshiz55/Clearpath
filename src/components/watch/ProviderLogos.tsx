@@ -11,18 +11,19 @@ import { dedupeByBrand } from '@/lib/availability/providerBrand';
  * The card used to stack one full-width "Included with …" row per provider — a
  * seven-line directory that dwarfed the recommendation. This shows the same
  * facts as a compact, wrapped row of the networks' OWN logos: at most two rows,
- * one preferred, with a "+N" overflow that the section's "View options" CTA
- * expands. The full "Included with Hulu" / "Apple TV — buy $3.99" sentence is
- * preserved as each tile's title + aria-label, so a screen reader and a hover
- * lose nothing.
+ * one preferred, with a "+N" tile that simply states how many more services
+ * also carry the title. The full "Included with Hulu" / "Apple TV — buy $3.99"
+ * sentence is preserved as each tile's title + aria-label, so a screen reader
+ * and a hover lose nothing.
  *
  * WHAT IT DOES NOT DO:
  *  • It never invents a logo. When TMDB gave us no logo_path the tile shows the
  *    short service name — never a guessed image.
  *  • It never merges different services, and it never shows the same brand
  *    twice: "Peacock Premium" and "Peacock Premium Plus" collapse to a single
- *    Peacock tile (the exact plans stay in View options). Dedup is by the
- *    provider's own logo when present, else a brand key derived by stripping
+ *    Peacock tile (each tile's exact plan stays in its title + aria-label).
+ *    Dedup is by the provider's own logo when present, else a brand key from
+ *    stripping
  *    generic tier words — no per-brand table.
  *  • It never changes what may be claimed. Availability type is preserved as a
  *    small corner badge (Free / Rent / Buy; included is the unmarked default).
@@ -114,8 +115,8 @@ export function ProviderLogos({ lines }: { lines: WatchLine[] }) {
         <span
           data-testid="where-to-watch-more"
           className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-white/5 px-2 text-[11px] font-bold text-slate-300"
-          title={`${extra} more service${extra === 1 ? '' : 's'} — open View options for every plan`}
-          aria-label={`${extra} more services — see View options`}
+          title={`${extra} more service${extra === 1 ? '' : 's'} also carry this title`}
+          aria-label={`${extra} more services also carry this title`}
         >
           +{extra}
         </span>

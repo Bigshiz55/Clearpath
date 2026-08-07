@@ -4,8 +4,9 @@ import type { WatchLine } from '@/lib/availability/watchPresentation';
  * Collapsing several plan variants of the SAME service to one brand tile.
  *
  * "Peacock Premium" and "Peacock Premium Plus" are one brand (Peacock) and must
- * show one logo on the compact card; the exact plans stay in View options. This
- * is done with NO per-brand table: two options that share a TMDB logo are the
+ * show one logo on the compact card; each surviving tile keeps its exact plan
+ * in its own title + aria-label. This is done with NO per-brand table: two
+ * options that share a TMDB logo are the
  * same brand (language-independent and exact), and when a logo is missing a
  * brand key is derived by stripping the same list of generic tier words from
  * every service — so a brand we have never seen still dedupes correctly, and two

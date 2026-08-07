@@ -233,14 +233,14 @@ export function WhereToWatch({
           >
             {refreshable === false ? 'Notify me when confirmed' : cta.label}
           </button>
-        ) : (
-          // Verified options exist but none carries a link (several services,
-          // no deep link). Rendered as a label, because there is nothing to
-          // press — the rows above are the answer.
-          <span data-testid="where-to-watch-cta" className="mt-0.5 inline-flex min-h-[44px] items-center text-[12px] font-bold text-slate-300">
-            {cta.label}
-          </span>
-        )
+        ) : null
+        // Verified options exist but none carries a deep link (several
+        // services, no link). Nothing is rendered here: the logo strip above
+        // — brand tiles with Free/Rent/Buy badges and a "+N" overflow — is
+        // already the complete answer, so a trailing "View options" label just
+        // repeated it in words with nothing to press. (The pure resolver still
+        // reports cta.kind === 'view_options'; only this redundant render is
+        // dropped.)
       )}
 
       {panelOpen && (
