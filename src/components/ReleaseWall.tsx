@@ -8,6 +8,7 @@ import { AlgorithmScore } from './AlgorithmScore';
 import { WCheck } from './WCheck';
 import { CardVerdict } from './CardVerdict';
 import { TrailerMedia } from './trailer/TrailerMedia';
+import { ProviderChip } from './media/ProviderChip';
 import type { MediaType } from '@/lib/types';
 
 export interface WallService {
@@ -25,6 +26,8 @@ interface WallItem {
   posterUrl: string | null;
   releaseDate?: string | null;
   network?: string | null;
+  /** The primary streaming provider to badge — name + VERIFIED TMDB logo path. */
+  provider?: { name: string; logoPath: string | null } | null;
 }
 
 type MediaFilter = 'all' | 'movie' | 'tv';
@@ -291,39 +294,39 @@ export function ReleaseWall({
               <div key={`${t.mediaType}-${t.id}`} className="card wv-tile group wv-card text-left">
                 {/* The W lives on the artwork on every surface — a new release
                     goes on the docket with the same gesture as anything else. */}
+                {/* TrailerMedia is the OUTER element (matches PosterCard) so its
+                    inline ▶ Trailer button + player controls are SIBLINGS of the
+                    QuickLook button, never nested inside it — a trailer tap plays
+                    inline and never opens QuickLook. */}
                 <div className="wv-card-art">
                   <WCheck tmdbId={t.id} mediaType={t.mediaType} title={t.title} year={t.year} posterUrl={t.posterUrl} />
-                <button
-                  onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
-                  className="block h-full w-full"
-                  aria-label={`Quick look at ${t.title}`}
-                >
                   <TrailerMedia tmdbId={t.id} mediaType={t.mediaType} title={t.title}>
-                    {t.posterUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={t.posterUrl} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]" />
-                    ) : (
-                      <div className="grid h-full w-full place-items-center bg-gradient-to-br from-ink-700 to-ink-850 p-2 text-center text-[11px] text-slate-400">{t.title}</div>
-                    )}
+                    <button
+                      onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })}
+                      className="block h-full w-full"
+                      aria-label={`Quick look at ${t.title}`}
+                    >
+                      {t.posterUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={t.posterUrl} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]" />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center bg-gradient-to-br from-ink-700 to-ink-850 p-2 text-center text-[11px] text-slate-400">{t.title}</div>
+                      )}
+                      {label && (
+                        <span className={`pointer-events-none absolute bottom-1 left-1 rounded-md px-2 py-0.5 text-[10px] font-bold backdrop-blur ${soon ? 'bg-emerald-500/85 text-white' : 'bg-black/65 text-slate-100'}`}>
+                          {win === 'upcoming' ? `📅 ${label}` : label}
+                        </span>
+                      )}
+                    </button>
                   </TrailerMedia>
-                  {label && (
-                    <span className={`pointer-events-none absolute bottom-2 left-2 rounded-md px-2 py-0.5 text-[10px] font-bold backdrop-blur ${soon ? 'bg-emerald-500/85 text-white' : 'bg-black/65 text-slate-100'}`}>
-                      {win === 'upcoming' ? `📅 ${label}` : label}
-                    </span>
-                  )}
-                  <span className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
-                    <span className="grid h-11 w-11 place-items-center rounded-full bg-white/90 text-lg text-ink-950">▶</span>
-                  </span>
-                </button>
                 </div>
                 <div className="wv-card-body">
                   <button onClick={() => setOpen({ id: t.id, mediaType: t.mediaType, title: t.title, year: t.year, posterPath: t.posterPath })} className="block text-left">
                     <div className="line-clamp-2 text-sm font-semibold text-white">{t.title}</div>
                     <div className="mt-0.5 text-xs text-slate-400">{t.year ?? '—'}</div>
-                    {t.network && (
-                      <div className="mt-1 inline-flex max-w-full items-center gap-1 rounded-md border border-brand-400/50 bg-brand-500/20 px-2 py-1 text-xs font-bold text-brand-100">
-                        <span aria-hidden>📺</span>
-                        <span className="truncate">{t.network}</span>
+                    {t.provider && (
+                      <div className="mt-1">
+                        <ProviderChip data={{ name: t.provider.name, logoPath: t.provider.logoPath }} withLabel />
                       </div>
                     )}
                   </button>

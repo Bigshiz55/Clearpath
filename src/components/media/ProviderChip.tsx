@@ -1,0 +1,91 @@
+import { tmdbImage } from '@/lib/tmdb/image';
+
+/**
+ * THE ONE STREAMING-PROVIDER BRAND CHIP.
+ *
+ * Logo-first, compact, recognizable. When a VERIFIED logo path exists (TMDB
+ * `logo_path`) it renders the real branded logo in a consistent bounding box —
+ * aspect-preserved, never stretched or cropped, legible in dark mode, lazy, with
+ * an accessible label. When no verified logo exists it falls back to a clean
+ * short NAME — never a generic 📺 emoji, never a fabricated/guessed image URL.
+ *
+ * This is for STREAMING services (Netflix, Prime Video, …). Linear networks are a
+ * DIFFERENT factual entity — see NetworkChip below — and must not be rendered
+ * with a streaming provider's logo, or vice-versa.
+ */
+
+export interface ProviderChipData {
+  /** Canonical/display provider name, e.g. "Netflix", "Prime Video". */
+  name: string;
+  /** TMDB logo_path (verified) or null → text fallback. */
+  logoPath?: string | null;
+  /** Optional distribution note kept factually distinct, e.g. "via Amazon".
+   *  Presentation may simplify, but an add-on route is NOT the base service. */
+  via?: string | null;
+}
+
+export function ProviderChip({ data, withLabel = false }: { data: ProviderChipData; withLabel?: boolean }) {
+  const label = data.via ? `${data.name} (${data.via})` : data.name;
+  const logo = data.logoPath ? tmdbImage(data.logoPath, 'w92') : null;
+
+  if (logo) {
+    return (
+      <span
+        className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-white/95 px-1.5 py-1 align-middle shadow-sm ring-1 ring-black/5"
+        title={label}
+      >
+        {/* Fixed bounding box so one brand never dominates another because its
+            source image has different dimensions. object-contain keeps aspect. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logo}
+          alt={label}
+          loading="lazy"
+          className="h-4 w-auto max-w-[68px] object-contain"
+        />
+        {withLabel && <span className="truncate pr-0.5 text-xs font-semibold text-ink-900">{data.name}</span>}
+        {data.via && <span className="pr-0.5 text-[10px] font-medium text-ink-700">{data.via}</span>}
+      </span>
+    );
+  }
+
+  // Clean text fallback — no emoji, no guessed logo.
+  return (
+    <span
+      className="inline-flex max-w-full items-center rounded-md border border-white/15 bg-white/10 px-2 py-1 text-xs font-semibold text-slate-100"
+      title={label}
+    >
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+/**
+ * THE ONE LINEAR NETWORK/STATION BRAND CHIP.
+ *
+ * A LINEAR airing fact (ABC, CBS, Hallmark Channel…) — a different entity from a
+ * streaming provider. It renders a verified network logo ONLY when real logo data
+ * is present (today none is plumbed — `tv_stations.logo_url` / `linear_networks.
+ * logo_path` exist but are unwritten, see docs/AI_DATA_ARCHITECTURE.md), so this
+ * currently renders a clean network NAME. It never borrows a streaming logo and
+ * never uses a 📺 emoji. When a verified linear logo source lands, pass `logoUrl`.
+ */
+export function NetworkChip({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
+  if (logoUrl) {
+    return (
+      <span className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-white/95 px-1.5 py-1 align-middle shadow-sm ring-1 ring-black/5" title={name}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoUrl} alt={name} loading="lazy" className="h-4 w-auto max-w-[68px] object-contain" />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex max-w-full items-center rounded-md border border-brand-400/50 bg-brand-500/20 px-2 py-1 text-xs font-bold text-brand-100"
+      title={name}
+      data-testid="network-chip"
+    >
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}

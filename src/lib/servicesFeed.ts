@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MediaType } from '@/lib/types';
 import { discoverTitles, discoverTitlesChecked, getTvFreshness, getWatchProviders } from '@/lib/tmdb/client';
 import { getProfile, regionFor, getMyServices } from '@/lib/profile';
-import { streamingNames } from '@/lib/services';
+import { topStreamingProvider } from '@/lib/services';
 
 export interface FeedItem {
   id: number;
@@ -125,10 +125,12 @@ export async function getReleases(
     top.map(async (it) => {
       try {
         const providers = await getWatchProviders(it.mediaType, it.id, region);
-        const names = providers ? streamingNames(providers.options) : [];
-        return { ...it, network: names[0] ?? null };
+        const provider = providers ? topStreamingProvider(providers.options) : null;
+        // Keep `network` (name string) for back-compat, and add `provider` which
+        // carries the VERIFIED TMDB logo path so the card can render the brand.
+        return { ...it, network: provider?.name ?? null, provider };
       } catch {
-        return { ...it, network: null };
+        return { ...it, network: null, provider: null };
       }
     }),
   );
