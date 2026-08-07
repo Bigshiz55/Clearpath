@@ -661,6 +661,23 @@ export async function runFinder(
   // during hydration in scoreCandidate, so everything here already meets it).
   const qualityEligibleCount = items.length;
 
+  // HARD CODE-GUARD: for a required subject, the ranked-and-selected set may
+  // NEVER contain a title the semantic gate did not pass. The fallback paths
+  // above pad a shortfall with genre look-alikes ONLY when no subject was
+  // required (that branch is skipped for subjects), so if an ineligible title
+  // reached here it means a filter regressed — fail loud rather than serve a
+  // Snake-Eyes result. This makes the "ineligible candidates can never be
+  // ranked/returned" invariant enforced by code, not merely by convention.
+  if (subjectRequired) {
+    const leaked = items.filter((i) => i.subjectEvidence?.satisfied !== true);
+    if (leaked.length > 0) {
+      throw new Error(
+        `subject-eligibility guard: ${leaked.length} ineligible title(s) reached ranking for "${q.subjectCanonical ?? q.subjectLabel ?? 'subject'}" ` +
+          `(e.g. ${leaked.slice(0, 3).map((i) => `${i.title} [${i.subjectEvidence?.centrality ?? 'UNSUPPORTED'}]`).join(', ')})`,
+      );
+    }
+  }
+
   // REQUESTED-COUNT SELECTION. "a boxing movie" asks for ONE — the final cap is
   // the requested count, applied AFTER eligibility and ranking, never as a
   // discovery limit. When the phrasing states no count, the browse limit stands.
