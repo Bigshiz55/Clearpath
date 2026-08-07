@@ -1,32 +1,33 @@
 /**
- * SEMANTIC ELIGIBILITY — the general capability that separates
- *   "a title that merely carries related metadata"
- * from
- *   "a title that genuinely satisfies the requested subject".
+ * SEMANTIC ELIGIBILITY — does a candidate GENUINELY satisfy a required subject,
+ * or does it merely carry the subject's word somewhere in its metadata?
  *
- * THE PROBLEM THIS SOLVES. A TMDB keyword tag is enough to place a title in the
- * CANDIDATE pool (`with_keywords` is an OR over an expanded keyword set). It is
- * NOT, by itself, enough to make the title ELIGIBLE. Before this module, the
- * finder equated "tagged boxing" with "is a boxing movie", so X-Men Origins,
- * Nickel Boys and Brawl in Cell Block 99 — each tagged with a boxing-adjacent
- * keyword for one scene — were returned as boxing movies.
+ * THE PRODUCTION FAILURE THIS EXISTS TO STOP. "Give me three boxing movies"
+ * returned Snake Eyes (1998) — a political-assassination conspiracy in which a
+ * murder happens *at* a boxing match. Boxing is the setting of one scene, not
+ * the subject of the film. The earlier version approved it because it was
+ * TMDB-tagged "boxing" and the word appeared in the overview, and it even
+ * double-counted "boxing" and "boxing match" as two mentions. Pure keyword/word
+ * presence is CANDIDATE RECALL, never proof of centrality.
  *
- * WHAT IT DOES. For one candidate and one required subject, it decides whether
- * the subject is CENTRAL to the title (drives the protagonist / central
- * conflict / setting / profession / competition / investigation / main arc),
- * merely MATERIAL, only INCIDENTAL, or UNSUPPORTED — using the evidence the
- * product already has for every candidate (title, overview, genres, keyword
- * tags). It is DETERMINISTIC: no per-request LLM call, no network — so it is
- * safe to run in the request path and gives the same answer every time.
+ * WHAT CENTRALITY REQUIRES. The subject must materially and repeatedly define
+ * the work — its primary activity, central conflict, profession, competition,
+ * setting-as-focus, investigation or dramatic focus — not appear as one scene,
+ * an event backdrop, a character's former job, a metaphor, or a location.
  *
- * WHY IT GENERALIZES. It is subject-AGNOSTIC. It is driven entirely by the
- * subject's own vocabulary (`lexemes`), which the caller supplies. There is no
- * per-topic table and no hard-coded title list here: the identical code decides
- * boxing, courtroom, chess, mountaineering, journalism, heist, serial-killer,
- * medical, Christmas, or any future concept. Adding a new subject adds no code
- * here.
+ * HOW IT DECIDES (deterministic-first, multi-signal — no single signal decides):
+ *   • title carries the subject,
+ *   • a CLUSTER of exact subject keyword tags (≥2) corroborated by the summary,
+ *   • the summary is about the subject across ≥2 sentences (deduped, not one
+ *     span counted twice), and NOT only as a locative setting,
+ *   • an exact tag plus premise focus that is not merely a setting.
+ * A lone tag, a single mention, or a setting-only mention ("at a boxing match")
+ * is MATERIAL/INCIDENTAL — and for a HARD (central) requirement that FAILS. When
+ * the evidence is genuinely ambiguous, the verdict is UNKNOWN and a hard subject
+ * REJECTS on uncertainty rather than approve a bad recommendation.
  *
- * Pure. No I/O, no clock, no randomness. Unit-tested with real metadata.
+ * Subject-agnostic: driven only by the subject's own lexemes + its own tags. No
+ * per-topic table, no per-title logic. Pure, deterministic, unit-tested.
  */
 
 export type SemanticStatus = 'PASS' | 'FAIL' | 'UNKNOWN';
@@ -35,34 +36,27 @@ export type SemanticStatus = 'PASS' | 'FAIL' | 'UNKNOWN';
 export type SubjectCentrality = 'CENTRAL' | 'MATERIAL' | 'INCIDENTAL' | 'UNSUPPORTED';
 
 export interface SubjectRequirement {
-  /** Canonical key, e.g. "boxing". */
   canonical: string;
-  /** Human label, e.g. "Boxing". */
   label: string;
-  /**
-   * The subject's own vocabulary — the noun the user named plus a bounded set
-   * of lexical variants (e.g. ["boxing","boxer","prizefighter"], or
-   * ["courtroom","trial","court"]). Whole-word / whole-phrase matched,
-   * case-insensitive, with bounded morphological tolerance (plural/verb forms).
-   * The evaluator NEVER invents vocabulary; it evaluates only what it is given.
-   */
+  /** The subject's vocabulary — the noun plus bounded on-topic variants. */
   lexemes: string[];
-  /**
-   * STRICT means the request demands the subject be CENTRAL ("a boxing movie",
-   * "a courtroom movie where the trial is central"). A strict request accepts
-   * ONLY centrality === CENTRAL. A non-strict (relaxable) request also accepts
-   * MATERIAL. UNKNOWN and below are never accepted in strict mode.
-   */
+  /** A HARD requirement demands CENTRAL. */
   strict: boolean;
+  /**
+   * When the user asked for the subject to be merely present ("movies INVOLVING
+   * boxing", "featuring…", "with a … in it"), MATERIAL is allowed to pass too.
+   * Default false: "a boxing movie" / "about boxing" / "centered on boxing"
+   * accept only CENTRAL.
+   */
+  allowSubstantial?: boolean;
 }
 
 export interface CandidateEvidence {
   title: string;
-  /** Alternate/original title, when known — a title hit there counts too. */
   altTitle?: string | null;
   overview: string;
   genres: string[];
-  /** TMDB keyword tag labels for this candidate (names, not ids). */
+  /** TMDB keyword tag labels (names, not ids). */
   keywords: string[];
 }
 
@@ -71,214 +65,207 @@ export interface EligibilityVerdict {
   centrality: SubjectCentrality;
   /** 0..100 — strength of the centrality evidence. */
   confidence: number;
-  /** A human summary built ONLY from real signals — never fabricated. */
+  /** Human summary, from real signals only. */
   evidenceSummary: string;
   /** Non-null exactly when status !== 'PASS'. */
   rejectionReason: string | null;
-  /** The raw signals the decision was made from — surfaced for the diagnostic. */
+  /** Evidence FOR the subject being central. */
+  supportingEvidence: string[];
+  /** Evidence AGAINST (why it might be incidental). */
+  contraryEvidence: string[];
+  /** True when a bounded semantic classifier could refine this borderline case;
+   *  a hard subject rejects an ambiguous candidate when none is available. */
+  ambiguous: boolean;
   signals: {
-    /** A subject lexeme appears in the title (or alternate title). */
     titleHit: boolean;
-    /** A keyword tag's label IS a subject lexeme (an exact subject tag). */
-    keywordExact: boolean;
-    /** A keyword tag's label CONTAINS a subject lexeme but isn't an exact one. */
+    /** Distinct exact subject keyword tags (cluster density). */
+    keywordExactCount: number;
     keywordRelated: boolean;
-    /** How many times a subject lexeme appears in the overview. */
-    overviewHits: number;
-    /** A subject lexeme appears in the overview's premise (its first sentence). */
-    premiseHit: boolean;
+    /** Distinct summary SENTENCES that mention the subject (deduped). */
+    mentionSentences: number;
+    /** The subject appears in the first sentence, not only as a setting. */
+    premiseFocus: boolean;
+    /** Every summary mention is inside a locative/temporal setting phrase. */
+    settingOnly: boolean;
   };
 }
 
-/** Lowercase; punctuation → spaces; collapse whitespace. */
-function normalize(s: string): string {
-  return (s ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+const clean = (s: string) =>
+  (s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 
-/** Bounded English suffixes for morphological tolerance ("climb" → "climbing"). */
+/** Bounded English inflections applied to the FINAL word of a lexeme. */
 const SUFFIXES = ['', 's', 'es', 'er', 'ers', 'ing', 'ings', 'ed', 'ist', 'ists'];
 
-/**
- * Does `lexeme` occur as a whole word/phrase in the already-normalized
- * `haystack` (space-delimited tokens), allowing a small set of inflections on
- * the FINAL word only? Multi-word lexemes ("mixed martial arts") are matched as
- * an exact phrase. Morphology is applied only for lexemes of length >= 4 to
- * avoid short-token false positives.
- */
-function phraseHits(haystack: string, lexeme: string): number {
-  const lex = normalize(lexeme);
-  if (!lex) return 0;
+function lexemeVariants(lexeme: string): { phrase: string; head: string; variants: string[] } {
+  const lex = clean(lexeme);
   const parts = lex.split(' ');
-  const last = parts[parts.length - 1]!;
+  const last = parts[parts.length - 1] ?? '';
   const head = parts.slice(0, -1).join(' ');
-  const variants =
-    last.length >= 4 ? SUFFIXES.map((suf) => (suf ? `${last}${suf}` : last)) : [last];
-  const uniqueVariants = Array.from(new Set(variants));
-  let total = 0;
-  for (const v of uniqueVariants) {
-    const phrase = head ? `${head} ${v}` : v;
-    // Whole-word boundaries around the phrase within the padded haystack.
-    const re = new RegExp(`(?:^| )${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: |$)`, 'g');
-    const m = ` ${haystack} `.match(re);
-    if (m) total += m.length;
-  }
-  return total;
+  const variants = last.length >= 4 ? Array.from(new Set(SUFFIXES.map((s) => `${last}${s}`))) : [last];
+  return { phrase: lex, head, variants };
 }
 
-function anyPhraseHit(haystack: string, lexemes: string[]): boolean {
-  return lexemes.some((l) => phraseHits(haystack, l) > 0);
+/** Regex that matches any lexeme (with inflections) as a whole phrase. */
+function lexemeRegex(lexemes: string[], flags = 'g'): RegExp {
+  const alts = lexemes
+    .map(lexemeVariants)
+    .flatMap(({ head, variants }) => variants.map((v) => (head ? `${head} ${v}` : v)))
+    .filter(Boolean)
+    .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`(?:^| )(?:${alts.join('|')})(?= |$)`, flags);
 }
 
-function totalPhraseHits(haystack: string, lexemes: string[]): number {
-  return lexemes.reduce((sum, l) => sum + phraseHits(haystack, l), 0);
+/** Split an overview into sentences, preserving prepositions for setting checks. */
+function sentencesOf(overview: string): string[] {
+  return (overview ?? '')
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => ` ${clean(s)} `)
+    .filter((s) => s.trim().length > 0);
 }
 
-/** The premise = the overview's first sentence (or its first ~140 chars). */
-function premiseOf(overview: string): string {
-  const trimmed = (overview ?? '').trim();
-  if (!trimmed) return '';
-  const stop = trimmed.search(/[.!?]\s/);
-  const firstSentence = stop >= 0 ? trimmed.slice(0, stop + 1) : trimmed;
-  return firstSentence.length <= 160 ? firstSentence : trimmed.slice(0, 140);
-}
+const LOCATIVE = /\b(?:at|during|inside|outside|near|by|in)\s+(?:the\s+|an?\s+)?(?:[a-z']+\s+){0,3}$/;
 
-/**
- * Evaluate one candidate against one required subject.
- *
- * Contract:
- *  - PASS  → the subject is genuinely satisfied (CENTRAL; MATERIAL too when the
- *            request is not strict).
- *  - FAIL  → the subject is present only incidentally / not at all.
- *  - UNKNOWN → the evidence is too thin to decide (e.g. a tag but no descriptive
- *            text at all). UNKNOWN is NEVER treated as PASS — a strict request
- *            rejects it; the caller may offer a controlled relaxation.
- */
 export function evaluateSubjectCentrality(
   req: SubjectRequirement,
   ev: CandidateEvidence,
 ): EligibilityVerdict {
   const lexemes = req.lexemes.map((l) => l.trim()).filter(Boolean);
-  const titleNorm = normalize([ev.title, ev.altTitle ?? ''].join(' '));
-  const overviewNorm = normalize(ev.overview);
-  const premiseNorm = normalize(premiseOf(ev.overview));
-  const keywordsNorm = ev.keywords.map(normalize).filter(Boolean);
+  const lexSet = new Set(lexemes.map(clean));
+  const label = req.label || req.canonical;
 
-  const titleHit = anyPhraseHit(titleNorm, lexemes);
-  const overviewHits = totalPhraseHits(overviewNorm, lexemes);
-  const premiseHit = anyPhraseHit(premiseNorm, lexemes);
+  const titleNorm = ` ${clean([ev.title, ev.altTitle ?? ''].join(' '))} `;
+  const titleHit = lexemeRegex(lexemes).test(titleNorm);
 
-  // An EXACT subject tag: a keyword label that IS one of the subject lexemes
-  // (whole label match). A RELATED tag merely contains a lexeme as a word.
-  const lexSet = new Set(lexemes.map(normalize));
-  const keywordExact = keywordsNorm.some((k) => lexSet.has(k));
-  const keywordRelated = !keywordExact && keywordsNorm.some((k) => anyPhraseHit(k, lexemes));
+  // Keyword CLUSTER: distinct exact subject tags; related tags separately.
+  const keywordsNorm = ev.keywords.map(clean).filter(Boolean);
+  const exactTags = new Set(keywordsNorm.filter((k) => lexSet.has(k)));
+  const keywordExactCount = exactTags.size;
+  const keywordRelated =
+    keywordExactCount === 0 && keywordsNorm.some((k) => lexemeRegex(lexemes).test(` ${k} `));
 
-  const signals = {
-    titleHit,
-    keywordExact,
-    keywordRelated,
-    overviewHits,
-    premiseHit,
-  };
+  // Per-SENTENCE mentions (deduped) + setting detection. Counting sentences,
+  // not lexeme variants, stops "boxing" + "boxing match" reading as 2 mentions.
+  const sentences = sentencesOf(ev.overview);
+  let mentionSentences = 0;
+  let settingMentions = 0;
+  let plainMentions = 0;
+  let premiseFocus = false;
+  sentences.forEach((sent, idx) => {
+    const re = lexemeRegex(lexemes);
+    let m: RegExpExecArray | null;
+    let hitInSentence = false;
+    let nonSettingInSentence = false;
+    while ((m = re.exec(sent)) !== null) {
+      hitInSentence = true;
+      const before = sent.slice(0, m.index + (m[0].startsWith(' ') ? 1 : 0));
+      if (LOCATIVE.test(before)) settingMentions++;
+      else {
+        plainMentions++;
+        nonSettingInSentence = true;
+      }
+    }
+    if (hitInSentence) {
+      mentionSentences++;
+      if (idx === 0 && nonSettingInSentence) premiseFocus = true;
+    }
+  });
+  const hasOverview = sentences.length > 0;
+  const settingOnly = mentionSentences >= 1 && plainMentions === 0 && settingMentions > 0;
 
-  const hasOverviewText = overviewNorm.length > 0;
-
-  // ── CENTRALITY ──────────────────────────────────────────────────────────
-  // Strongest evidence first. The subject is CENTRAL when the title names it,
-  // the premise is about it, it is exactly tagged AND the summary describes it,
-  // or the summary is repeatedly about it. It is MATERIAL when there is a single
-  // real signal (an exact tag, or one summary mention) but not enough to prove
-  // it drives the story. It is INCIDENTAL when the only evidence is a related
-  // (non-exact) tag with no textual mention — a scene, not the subject.
-  // UNSUPPORTED when nothing connects the title to the subject at all.
-  //
-  // A bare summary mention is deliberately NOT sufficient for CENTRAL on its
-  // own: "a former boxer-turned-drug runner lands in prison" mentions boxing in
-  // the premise, but the film is about the prison — boxing is backstory. So
-  // centrality requires the subject to be NAMED in the title, EXACTLY tagged and
-  // corroborated by the summary, or mentioned REPEATEDLY. A single mention, or a
-  // tag the summary never echoes, is MATERIAL (present, not proven central).
+  // ── CENTRALITY ────────────────────────────────────────────────────────────
+  // No single signal decides. CENTRAL needs the subject in the TITLE, a CLUSTER
+  // of ≥2 distinct exact subject tags, or the summary describing the subject in
+  // ≥2 NON-SETTING places. A lone tag with a single mention (Pulp Fiction's
+  // "a boxer" among several characters), or a mention that is only a setting
+  // (Snake Eyes' "at a boxing match"), is not central.
   let centrality: SubjectCentrality;
-  if (!titleHit && !keywordExact && !keywordRelated && overviewHits === 0) {
+  if (!titleHit && keywordExactCount === 0 && !keywordRelated && mentionSentences === 0) {
     centrality = 'UNSUPPORTED';
-  } else if (titleHit || (keywordExact && overviewHits >= 1) || overviewHits >= 2) {
-    centrality = 'CENTRAL';
-  } else if (keywordExact || overviewHits === 1) {
-    centrality = 'MATERIAL';
-  } else {
+  } else if (settingOnly && !titleHit && keywordExactCount < 2) {
     centrality = 'INCIDENTAL';
+  } else if (titleHit || keywordExactCount >= 2 || plainMentions >= 2) {
+    centrality = 'CENTRAL';
+  } else if (keywordExactCount >= 1 || plainMentions >= 1 || mentionSentences >= 1) {
+    centrality = 'MATERIAL';
+  } else if (keywordRelated) {
+    centrality = 'INCIDENTAL';
+  } else {
+    centrality = 'UNSUPPORTED';
   }
 
-  // ── STATUS ──────────────────────────────────────────────────────────────
-  // A tag with NO descriptive text to corroborate it is UNKNOWN, not PASS: we
-  // literally cannot see whether the subject is central. This is the
-  // incomplete-evidence case, and strict mode rejects it.
-  const unverifiable = !hasOverviewText && !titleHit;
+  // A MATERIAL verdict on a hard subject is the ambiguous zone a bounded
+  // classifier would arbitrate; with none wired it rejects on uncertainty.
+  const ambiguous = centrality === 'MATERIAL';
+
+  // ── STATUS ────────────────────────────────────────────────────────────────
+  const unverifiable = !hasOverview && !titleHit && (keywordExactCount >= 1 || keywordRelated);
+  // A non-strict requirement ("involving boxing", or an explicitly relaxed
+  // request) accepts MATERIAL; a hard/strict subject accepts only CENTRAL.
+  const acceptSubstantial = req.allowSubstantial === true || req.strict === false;
   let status: SemanticStatus;
-  if (unverifiable && (keywordExact || keywordRelated)) {
+  if (unverifiable) {
     status = 'UNKNOWN';
   } else if (centrality === 'CENTRAL') {
     status = 'PASS';
-  } else if (!req.strict && centrality === 'MATERIAL') {
+  } else if (acceptSubstantial && centrality === 'MATERIAL') {
     status = 'PASS';
   } else {
     status = 'FAIL';
   }
 
-  // ── CONFIDENCE ──────────────────────────────────────────────────────────
+  // ── CONFIDENCE ──────────────────────────────────────────────────────────────
   let confidence: number;
   if (titleHit) confidence = 95;
-  else if (premiseHit && overviewHits >= 2) confidence = 90;
-  else if (premiseHit) confidence = 86;
-  else if (keywordExact && overviewHits >= 2) confidence = 88;
-  else if (keywordExact && overviewHits === 1) confidence = 80;
-  else if (overviewHits >= 2) confidence = 76;
+  else if (keywordExactCount >= 2 && mentionSentences >= 2) confidence = 92;
+  else if (keywordExactCount >= 2 && mentionSentences >= 1) confidence = 86;
+  else if (mentionSentences >= 2 && !settingOnly) confidence = 80;
+  else if (centrality === 'MATERIAL') confidence = 50;
+  else if (settingOnly) confidence = 88; // high confidence it is INCIDENTAL
+  else if (centrality === 'INCIDENTAL') confidence = 70;
   else if (status === 'UNKNOWN') confidence = 40;
-  else if (keywordExact) confidence = 52;
-  else if (overviewHits === 1) confidence = 50;
-  else if (keywordRelated) confidence = 24;
-  else confidence = 8;
+  else confidence = 20;
 
-  // ── EVIDENCE SUMMARY (from real signals only) ─────────────────────────────
-  const label = req.label || req.canonical;
-  let evidenceSummary: string;
-  if (titleHit) {
-    evidenceSummary = `“${label}” appears in the title.`;
-  } else if (premiseHit) {
-    evidenceSummary = `the premise describes ${label.toLowerCase()} (${overviewHits} mention${overviewHits === 1 ? '' : 's'} in the summary).`;
-  } else if (keywordExact && overviewHits >= 1) {
-    evidenceSummary = `tagged ${label.toLowerCase()} and the summary describes it (${overviewHits} mention${overviewHits === 1 ? '' : 's'}).`;
-  } else if (overviewHits >= 2) {
-    evidenceSummary = `the summary is repeatedly about ${label.toLowerCase()} (${overviewHits} mentions).`;
-  } else if (status === 'UNKNOWN') {
-    evidenceSummary = `tagged ${label.toLowerCase()} but there is no summary text to confirm it is central.`;
-  } else if (keywordExact) {
-    evidenceSummary = `tagged ${label.toLowerCase()}, but the summary never mentions it.`;
-  } else if (overviewHits === 1) {
-    evidenceSummary = `${label.toLowerCase()} is mentioned once in the summary, not as the main story.`;
-  } else if (keywordRelated) {
-    evidenceSummary = `matched only a related tag; ${label.toLowerCase()} appears nowhere in the title or summary.`;
-  } else {
-    evidenceSummary = `no evidence connects this title to ${label.toLowerCase()}.`;
-  }
+  // ── EVIDENCE ────────────────────────────────────────────────────────────────
+  const supportingEvidence: string[] = [];
+  const contraryEvidence: string[] = [];
+  if (titleHit) supportingEvidence.push(`“${label}” appears in the title.`);
+  if (keywordExactCount >= 2) supportingEvidence.push(`tagged with ${keywordExactCount} distinct ${label.toLowerCase()} keywords (a subject cluster).`);
+  else if (keywordExactCount === 1) supportingEvidence.push(`tagged ${label.toLowerCase()} (a single subject keyword).`);
+  if (mentionSentences >= 2 && !settingOnly) supportingEvidence.push(`the summary is about ${label.toLowerCase()} across ${mentionSentences} sentences.`);
+  else if (premiseFocus) supportingEvidence.push(`the premise centers on ${label.toLowerCase()}.`);
 
-  // ── REJECTION REASON ──────────────────────────────────────────────────────
+  if (settingOnly) contraryEvidence.push(`${label.toLowerCase()} appears only as a setting/event, not as the story.`);
+  if (mentionSentences === 1 && !settingOnly) contraryEvidence.push(`${label.toLowerCase()} is mentioned once, not sustained.`);
+  if (keywordExactCount <= 1 && mentionSentences === 0 && !titleHit) contraryEvidence.push(`no summary sentence describes ${label.toLowerCase()}.`);
+  if (keywordRelated && keywordExactCount === 0) contraryEvidence.push(`matched only a related tag, not ${label.toLowerCase()} itself.`);
+  if (status !== 'PASS' && ev.genres.length > 0) contraryEvidence.push(`primary genres are ${ev.genres.slice(0, 3).join(', ')}.`);
+
+  const evidenceSummary =
+    supportingEvidence.length > 0 && status === 'PASS'
+      ? supportingEvidence.join(' ')
+      : contraryEvidence[0] ?? `no evidence connects this title to ${label.toLowerCase()}.`;
+
   let rejectionReason: string | null = null;
   if (status === 'UNKNOWN') {
     rejectionReason = `requested subject unverifiable — tagged ${label.toLowerCase()} but no descriptive evidence`;
   } else if (status === 'FAIL') {
-    if (centrality === 'MATERIAL') {
-      rejectionReason = `requested subject is present but not central to the story`;
-    } else if (centrality === 'INCIDENTAL') {
-      rejectionReason = `requested subject appears only incidentally (a related tag, not the story)`;
-    } else {
-      rejectionReason = `requested subject not central to the story`;
-    }
+    rejectionReason =
+      centrality === 'MATERIAL'
+        ? `requested subject is present but not central to the story`
+        : centrality === 'INCIDENTAL'
+          ? `requested subject appears only incidentally (a setting or passing mention)`
+          : `requested subject is not central to the story`;
   }
 
-  return { status, centrality, confidence, evidenceSummary, rejectionReason, signals };
+  return {
+    status,
+    centrality,
+    confidence,
+    evidenceSummary,
+    rejectionReason,
+    supportingEvidence,
+    contraryEvidence,
+    ambiguous,
+    signals: { titleHit, keywordExactCount, keywordRelated, mentionSentences, premiseFocus, settingOnly },
+  };
 }

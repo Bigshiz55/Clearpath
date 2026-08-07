@@ -162,6 +162,39 @@ test('a second query after the first reaches the server and updates the header',
   await noGenericFeed(page);
 });
 
+test('the EXACT production sentence renders boxing movies, honors count=3, and never shows Snake Eyes', async ({ page }) => {
+  const SENTENCE = 'Give me three boxing movies that I would like.';
+  const bodies: Array<Record<string, unknown>> = [];
+  await page.route('**/api/ask', async (route: Route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    bodies.push(body);
+    // The server answers with the three CENTRAL boxing movies only. Snake Eyes
+    // (the exact live wrong answer) is deliberately absent from items — it was
+    // rejected upstream — and appears only as a REJECTED per-candidate verdict,
+    // never as a result the user is shown.
+    const payload = askPayload('boxing', BOXING_TITLES);
+    const diag = payload.diagnostics as Record<string, unknown>;
+    diag.requestedCount = 3;
+    diag.evaluations = [
+      { id: 9091, mediaType: 'movie', title: 'Snake Eyes', year: 1998, status: 'FAIL', centrality: 'INCIDENTAL', confidence: 20, evidence: 'boxing is the setting of one scene', rejectionReason: 'subject is incidental (setting only)', eligible: false, matchScore: 70, rankedByTasteDna: false },
+    ];
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
+  });
+
+  await page.goto(`/dev/judge-harness?q=${encodeURIComponent(SENTENCE)}`, { waitUntil: 'domcontentloaded' });
+
+  // Verbatim transport of the whole sentence.
+  await expect.poll(() => bodies.length).toBeGreaterThan(0);
+  expect(bodies[0]!.text).toBe(SENTENCE);
+
+  // The three central boxing movies render; the exact wrong answer never does.
+  await expect(page.getByText('Creed', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('The Fighter', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Snake Eyes')).toHaveCount(0);
+  await expect(page.getByText('Absentia')).toHaveCount(0);
+  await noGenericFeed(page);
+});
+
 // Cross-domain: the SAME transport carries any subject verbatim and never
 // degrades to the generic feed. No per-subject code anywhere in this path.
 for (const subject of ['courtroom', 'christmas', 'detective', 'journalism', 'chess', 'mountaineering', 'political campaign', 'medical drama', 'serial killer']) {

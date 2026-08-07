@@ -472,3 +472,77 @@ describe('semantic eligibility — invariants', () => {
     expect(a).toEqual(b);
   });
 });
+
+describe('semantic eligibility — incidental-subject decoys must be rejected (Snake Eyes class)', () => {
+  const boxing = (over: string, kws: string[], genres: string[] = ['Drama'], title = 'X') =>
+    evaluateSubjectCentrality(BOXING, { title, overview: over, genres, keywords: kws });
+
+  it('Snake Eyes — murder AT a boxing match → INCIDENTAL/FAIL', () => {
+    const v = boxing(
+      'Corrupt cop Rick Santoro is at an Atlantic City boxing match when the Secretary of Defense is assassinated in the seat beside him. As a hurricane rages outside, Rick uncovers a vast conspiracy.',
+      ['atlantic city', 'corruption', 'conspiracy', 'assassination', 'casino', 'boxing', 'dirty cop'],
+      ['Action', 'Crime', 'Thriller', 'Mystery'],
+      'Snake Eyes',
+    );
+    expect(v.status).toBe('FAIL');
+    expect(v.centrality).toBe('INCIDENTAL');
+    expect(v.signals.settingOnly).toBe(true);
+  });
+
+  it('Pulp Fiction — a boxer who throws a fight is a subplot → not CENTRAL', () => {
+    const v = boxing(
+      'The lives of two mob hitmen, a boxer, a gangster and his wife intertwine in four tales of violence and redemption.',
+      ['nonlinear timeline', 'crime', 'hitman', 'boxer'],
+      ['Thriller', 'Crime'],
+      'Pulp Fiction',
+    );
+    expect(v.centrality).not.toBe('CENTRAL');
+    expect(v.status).toBe('FAIL');
+  });
+
+  it('a former-boxer-turned-something-else single mention → not CENTRAL', () => {
+    const v = boxing(
+      'A former boxer now working as a bouncer gets pulled into a heist he cannot walk away from.',
+      ['heist', 'crime'],
+      ['Crime', 'Thriller'],
+      'The Bouncer',
+    );
+    expect(v.status).toBe('FAIL');
+  });
+});
+
+describe('semantic eligibility — additional central boxing titles pass', () => {
+  const central: Array<[string, string, string[]]> = [
+    ['Raging Bull', 'The story of boxer Jake LaMotta, whose violence and rage in the ring made him a champion while destroying his life outside it.', ['boxing', 'boxer', 'biography']],
+    ['Rocky', 'A small-time club boxer named Rocky Balboa gets a once-in-a-lifetime shot at the heavyweight championship of the world.', ['boxing', 'boxer', 'underdog']],
+    ['Million Dollar Baby', 'A determined woman works with a hardened boxing trainer to become a professional boxer and fight for the title.', ['boxing', 'boxer', 'female boxer']],
+    ['Southpaw', 'A boxing champion loses everything and must fight his way back through the ring to reclaim his life and his daughter.', ['boxing', 'boxer']],
+    ['Cinderella Man', 'During the Depression, boxer James J. Braddock makes an improbable comeback in the ring to become the heavyweight champion.', ['boxing', 'boxer', 'great depression']],
+  ];
+  for (const [title, overview, keywords] of central) {
+    it(`${title} → CENTRAL / PASS`, () => {
+      const v = evaluateSubjectCentrality(BOXING, { title, overview, genres: ['Drama'], keywords });
+      expect(v.centrality).toBe('CENTRAL');
+      expect(v.status).toBe('PASS');
+    });
+  }
+});
+
+describe('semantic eligibility — "about" (central) vs "involving" (substantial)', () => {
+  // A single-mention former-boxer title: strict "about boxing" rejects it,
+  // "involving boxing" (allowSubstantial) accepts it.
+  const ev = {
+    title: 'Brawl in Cell Block 99',
+    overview: 'A former boxer-turned-drug runner lands in a brutal prison battleground.',
+    genres: ['Action', 'Crime'],
+    keywords: ['prison', 'drug'],
+  };
+  it('"boxing movies" (central) rejects a former-boxer single mention', () => {
+    expect(evaluateSubjectCentrality(BOXING, ev).status).toBe('FAIL');
+  });
+  it('"movies involving boxing" (allowSubstantial) accepts MATERIAL', () => {
+    const v = evaluateSubjectCentrality({ ...BOXING, allowSubstantial: true }, ev);
+    expect(v.status).toBe('PASS');
+    expect(v.centrality).toBe('MATERIAL');
+  });
+});
