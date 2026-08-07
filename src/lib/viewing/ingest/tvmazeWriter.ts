@@ -494,7 +494,10 @@ export async function runTvmazeNationalIngest(days = 3, nowMs = Date.now()): Pro
   const airingRows = allMatched.map((m) => {
     programmeRows.set(String(m.show.id), buildProgrammeRow(m));
     // originalAirdate = null → isPremiere/isRepeat null (honest unknown).
-    return { m, row: buildAiringRow(m, null) };
+    // stationScopedId: the national airing id folds in the station key so the
+    // same syndicated episode on two networks the same day stays two distinct
+    // rows and never collides on tv_airings (lineup_id, provider_airing_id).
+    return { m, row: buildAiringRow(m, null, { stationScopedId: true }) };
   });
   const programmeIdByProviderId = await ensureProgrammes(admin, programmeRows);
 
