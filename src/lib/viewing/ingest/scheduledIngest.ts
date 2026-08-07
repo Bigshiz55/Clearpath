@@ -149,12 +149,24 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
     .order('started_at', { ascending: false })
     .limit(1);
   const alreadyRanToday = (todaysRuns ?? []).some((r) => r.status === 'success' || r.status === 'partial');
+  // PER-SOURCE FAILURE ISOLATION. The two providers are independent — a dark
+  // source should DEGRADE coverage, not erase the rest of the lineup. Both
+  // runs used to be plain sequential awaits, so a HARD throw inside the TVmaze
+  // writer (a DB outage mid-write, an adapter bug) propagated straight out of
+  // this function and TV Media never ran at all — one source's failure silently
+  // took the other down with it. Each run is now caught here and turned into a
+  // structured `failed` result; the sibling still runs, and the reason travels
+  // back to the caller and to /api/health/tv. Soft, per-day failures were
+  // always isolated inside the writers (`daysFailed`); this closes the hard
+  // path they never covered.
   const tvmaze = alreadyRanToday
     ? { ran: false, reason: `Already ran today (${today}, UTC).` }
-    : await withProviderLock(
-        admin, 'tvmaze', 600,
-        async () => ({ ran: true, ...(await runTvmazeIngest(TVMAZE_INGEST_DAYS)) }),
-        () => ({ ran: false, reason: 'Another TVmaze ingest is already running.' }),
+    : await isolateRun('tvmaze', () =>
+        withProviderLock(
+          admin, 'tvmaze', 600,
+          async () => ({ ran: true, ...(await runTvmazeIngest(TVMAZE_INGEST_DAYS)) }),
+          () => ({ ran: false, reason: 'Another TVmaze ingest is already running.' }),
+        ),
       );
 
   // DATA-MODE GATE, ahead of everything TV Media related.
@@ -180,15 +192,41 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
   const lastTvMediaRun = await lastRunAt(admin, 'tv_media');
   const tvMediaDue = !lastTvMediaRun || (Date.now() - Date.parse(lastTvMediaRun)) >= TVMEDIA_MIN_INTERVAL_MS;
   const tvmedia = tvMediaDue
-    ? await withProviderLock(
-        admin, 'tv_media', 600,
-        () => runTvMediaIngest(TVMEDIA_INGEST_DAYS),
-        () => ({
-          ok: true, ran: false, status: 'success' as const,
-          reason: 'Another TV Media ingest is already running.',
-        }),
+    ? await isolateRun('tv_media', () =>
+        withProviderLock(
+          admin, 'tv_media', 600,
+          () => runTvMediaIngest(TVMEDIA_INGEST_DAYS),
+          () => ({
+            ok: true, ran: false, status: 'success' as const,
+            reason: 'Another TV Media ingest is already running.',
+          }),
+        ),
       )
     : { ok: true, ran: false, status: 'success' as const, reason: `Ran within the last 2h (${lastTvMediaRun}).` };
 
   return { tvmaze, tvmedia };
+}
+
+/**
+ * Contain a single provider's hard failure so it cannot abort the rest of the
+ * lineup ingestion. A thrown error becomes a structured `failed` result — the
+ * same shape callers already handle — and is logged for observability; the
+ * sibling provider's run is unaffected because this never rethrows.
+ */
+export async function isolateRun<T>(providerId: string, run: () => Promise<T>): Promise<T | IsolatedFailure> {
+  try {
+    return await run();
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    console.error(`[tv-ingest] ${providerId} run threw and was isolated: ${reason}`);
+    return { ok: false, ran: false, status: 'failed', provider: providerId, reason: `Ingest failed: ${reason}` };
+  }
+}
+
+export interface IsolatedFailure {
+  ok: false;
+  ran: false;
+  status: 'failed';
+  provider: string;
+  reason: string;
 }
