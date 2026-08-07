@@ -8,6 +8,7 @@ import { CardSynopsis } from './CardSynopsis';
 import { CardFacts } from './CardFacts';
 import { CardFit } from './CardFit';
 import { WhereToWatch } from './watch/WhereToWatch';
+import { TrailerMedia } from './trailer/TrailerMedia';
 import { WhyThisTitle } from './watch/WhyThisTitle';
 
 interface PosterCardProps {
@@ -174,14 +175,22 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           <WCheck tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterUrl={posterUrl ?? null} />
         )}
         {/* `relative` so the real poster paints ABOVE the absolutely-positioned
-            matte behind it, regardless of DOM stacking specifics. */}
-        {onOpen ? (
-          <button type="button" onClick={onOpen} className="relative block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
-        ) : href ? (
-          <Link href={href} className="relative block h-full">{poster}</Link>
-        ) : (
-          <div className="relative h-full">{poster}</div>
-        )}
+            matte behind it, regardless of DOM stacking specifics.
+            TrailerMedia is a transparent passthrough by default (feature off /
+            no id / SSR): it renders exactly the click target below, unchanged.
+            When Smart Trailer Preview is on and this card becomes the single
+            active one, it crossfades a muted official trailer over the poster
+            inside the SAME box (no height change), with its controls as a
+            sibling overlay — never nested inside the button/Link. */}
+        <TrailerMedia tmdbId={saveId} mediaType={mediaType} title={title}>
+          {onOpen ? (
+            <button type="button" onClick={onOpen} className="relative block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
+          ) : href ? (
+            <Link href={href} className="relative block h-full">{poster}</Link>
+          ) : (
+            <div className="relative h-full">{poster}</div>
+          )}
+        </TrailerMedia>
       </div>
 
       <div className="wv-card-body">

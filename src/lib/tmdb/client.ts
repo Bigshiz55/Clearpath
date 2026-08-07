@@ -541,7 +541,20 @@ export async function getPopular(
 // Details
 // ---------------------------------------------------------------------------
 
-interface TmdbVideo { type: string; site: string; key: string; official?: boolean }
+// Widened to the fields TMDB already sends on /videos results (they were on the
+// wire but dropped): language, country, recency and name power the Smart
+// Trailer resolver's confidence ranking (src/lib/trailer/resolve.ts).
+interface TmdbVideo {
+  type: string;
+  site: string;
+  key: string;
+  official?: boolean;
+  name?: string;
+  iso_639_1?: string | null;
+  iso_3166_1?: string | null;
+  published_at?: string | null;
+  size?: number | null;
+}
 interface TmdbGenre { id: number; name: string }
 interface TmdbKeyword { id: number; name: string }
 
@@ -588,6 +601,51 @@ function pickTrailer(videos?: { results: TmdbVideo[] }): string | null {
     yt.find((v) => v.type === 'Trailer') ??
     yt.find((v) => v.type === 'Teaser');
   return trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null;
+}
+
+/**
+ * The raw video list for a title, for the Smart Trailer resolver.
+ *
+ * Fetched by title id (never a text query), so the title+year are correct by
+ * construction and the resolver only has to pick the best OFFICIAL video among
+ * this title's own videos. Fails open to `[]` on any error, like the rest of
+ * the client. The chosen key becomes a public YouTube embed id — the TMDB key
+ * never leaves the server.
+ */
+export interface TitleVideo {
+  key: string;
+  site: string;
+  type: string;
+  official: boolean;
+  name: string;
+  language: string | null;
+  country: string | null;
+  publishedAt: string | null;
+}
+
+export async function getTitleVideos(mediaType: MediaType, id: number): Promise<TitleVideo[]> {
+  try {
+    // include_video_language (not `language`, which would hard-filter to one
+    // locale): English plus language-agnostic videos, so the resolver can rank
+    // and prefer the viewer's language. A title whose only trailer is in a
+    // language we did not request simply shows the poster — deliberately, so we
+    // never autoplay a wrong/dubbed-language trailer.
+    const data = await tmdbFetch<{ results?: TmdbVideo[] }>(`/${mediaType}/${id}/videos`, {
+      include_video_language: 'en,null',
+    });
+    return (data.results ?? []).map((v) => ({
+      key: v.key,
+      site: v.site,
+      type: v.type,
+      official: v.official === true,
+      name: v.name ?? '',
+      language: v.iso_639_1 ?? null,
+      country: v.iso_3166_1 ?? null,
+      publishedAt: v.published_at ?? null,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 function movieCert(detail: TmdbDetail, region: string): string | null {
