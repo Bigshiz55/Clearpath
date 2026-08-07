@@ -63,7 +63,7 @@ export async function GET(req: Request) {
     }, { status: 200 });
   }
 
-  const { tvmaze, tvmedia } = await runGatedTvIngest(admin);
+  const { tvmaze, tvmazeNational, tvmedia } = await runGatedTvIngest(admin);
   // 502 is reserved for a provider actually FAILING upstream. A missing or
   // unconfigured key is a configuration state — it now writes its own
   // 'skipped' run row with a machine-readable code (see tvMediaWriter), and
@@ -72,5 +72,5 @@ export async function GET(req: Request) {
   const tvmazeOk = (tvmaze as { ok?: boolean }).ok !== false;
   const tvmediaUpstreamFailure =
     tvmedia.ok === false && ['auth_failed', 'rate_limited', 'upstream_failed'].includes(tvmedia.status);
-  return NextResponse.json({ tvmaze, tvmedia }, { status: tvmazeOk && !tvmediaUpstreamFailure ? 200 : 502 });
+  return NextResponse.json({ tvmaze, tvmazeNational, tvmedia }, { status: tvmazeOk && !tvmediaUpstreamFailure ? 200 : 502 });
 }

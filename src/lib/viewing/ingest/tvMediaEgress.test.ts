@@ -32,8 +32,8 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 function makeAdmin() {
   const chain = {
-    select: () => chain, eq: () => chain, in: () => chain,
-    gte: () => chain, order: () => chain,
+    select: () => chain, eq: () => chain, neq: () => chain, in: () => chain,
+    like: () => chain, gte: () => chain, lt: () => chain, order: () => chain,
     limit: () => Promise.resolve({ data: [], error: null }),
     then: (r: (v: { data: never[]; error: null }) => unknown) => r({ data: [], error: null }),
   };
@@ -56,8 +56,10 @@ function makeAdmin() {
 }
 
 const tvmazeIngest = vi.fn();
+const tvmazeNationalIngest = vi.fn();
 vi.mock('./tvmazeWriter', () => ({
   runTvmazeIngest: (...a: unknown[]) => tvmazeIngest(...a),
+  runTvmazeNationalIngest: (...a: unknown[]) => tvmazeNationalIngest(...a),
 }));
 
 import { runTvMediaIngest } from './tvMediaWriter';
@@ -83,6 +85,7 @@ beforeEach(() => {
   rpcCalls.length = 0;
   selectedTables.length = 0;
   tvmazeIngest.mockReset().mockResolvedValue({ inserted: 0, updated: 0 });
+  tvmazeNationalIngest.mockReset().mockResolvedValue({ inserted: 0, updated: 0 });
   for (const k of ENV_KEYS) {
     saved[k] = process.env[k];
     delete process.env[k];
