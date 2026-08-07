@@ -3,13 +3,21 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * THE TASTE INTERVIEW IS RETIRED.
+ * THE OLD TASTE INTERVIEW IS RETIRED.
  *
  * Removing a feature is easy to do incompletely: a link survives in one menu, a
  * route still renders, a component nobody imports keeps compiling. These pin
  * the removal so it cannot creep back, and pin what was DELIBERATELY KEPT — the
  * taste-modelling code now serves imports and ordinary product feedback, and
  * deleting it would take real capability with it.
+ *
+ * NOTE (Phase 3, Voice DNA Interview): the `/voice-dna` route has since been
+ * DELIBERATELY rebuilt as a distinct, founder-gated Voice DNA interview (a new
+ * engine under `src/lib/voice/*` + `src/components/voice/*`). That is a
+ * different feature from the retired "Taste Interview" whose SPECIFIC names
+ * ("Witness Testimony", "Quick/Full Interview", "answer out loud") these tests
+ * still keep out of the tree. "Voice DNA" is therefore no longer a banned name,
+ * and the route now renders instead of redirecting.
  */
 
 const root = process.cwd();
@@ -28,15 +36,16 @@ function sourceFiles(dir = 'src', out: string[] = []): string[] {
 describe('the interview is gone', () => {
   const files = sourceFiles();
 
-  it('TESTS 1-5: none of its names survive in the source', () => {
+  it('TESTS 1-5: none of the OLD interview names survive in the source', () => {
+    // "Voice DNA" is intentionally NOT here: the Phase-3 Voice DNA interview is a
+    // sanctioned, separately-built feature that legitimately carries that name.
+    // These are the retired Taste Interview's own, unmistakable names.
     const banned = [
-      'Witness Testimony', 'Taste Interview', 'Voice DNA',
+      'Witness Testimony', 'Taste Interview',
       'Quick Interview', 'Full Interview', 'answer out loud',
     ];
     const offenders: string[] = [];
     for (const f of files) {
-      // The retired route explains itself; that is the one allowed mention.
-      if (f === 'src/app/voice-dna/page.tsx') continue;
       if (f === 'src/components/RetiredInterviewNotice.tsx') continue;
       if (f === 'src/lib/taste/retired.test.ts') continue;
       const body = read(f);
@@ -66,12 +75,15 @@ describe('the interview is gone', () => {
     }
   });
 
-  it('TEST 6: the retired URL redirects instead of rendering', () => {
+  it('TEST 6: the /voice-dna route is now the rebuilt founder-gated interview, not a redirect', () => {
+    // Phase 3 deliberately un-retired this route. It no longer redirects to the
+    // DNA hub; it verifies identity server-side and renders the interview, or
+    // returns the hidden 404 for anyone who is not a founder/admin.
     const page = read('src/app/voice-dna/page.tsx');
-    expect(page).toContain('redirect(');
-    expect(page).toContain('/app/dna');
-    // No interview UI is imported by it.
-    expect(page).not.toMatch(/InterviewIntro|VoiceDnaClient|VoiceDnaInterview/);
+    expect(page).not.toContain("redirect('/app/dna");
+    expect(page).toContain('isFounderOrAdminEmail');
+    expect(page).toContain('notFound()');
+    expect(page).toContain('VoiceInterview');
   });
 
   it('TEST 7+8: no entry point remains in navigation or the DNA hub', () => {
