@@ -328,7 +328,13 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
     coverage_end_utc: new Date(windowEndMs).toISOString(),
   }).eq('id', lineupId);
 
-  await admin.from('tv_ingestion_runs').insert({
+  // The run row is the DURABLE record that this provider succeeded today; the
+  // ingest gate reads it to decide "already ran today". Swallowing an insert
+  // error here would make a run invisible to the gate and to /api/health/tv —
+  // the pipeline would silently re-ingest every tick and health would report a
+  // pipeline that just ran as stale. Surface it loudly, like every other write
+  // in this file.
+  const { error: runRowError } = await admin.from('tv_ingestion_runs').insert({
     provider_id: PROVIDER_ID, lineup_id: lineupId,
     started_at: nowIso, completed_at: new Date().toISOString(),
     status: fetchComplete ? 'success' : 'partial', trigger: 'cron',
@@ -342,6 +348,7 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
     records_unchanged: plan.stats.unchanged, records_expired: plan.stats.expired,
     errors: daysFailed.map((e) => ({ message: e })),
   });
+  if (runRowError) throw new Error(`tv_ingestion_runs insert failed: ${runRowError.message}`);
 
   return {
     ok: fetchComplete,
