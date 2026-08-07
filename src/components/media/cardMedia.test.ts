@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { topStreamingProvider } from '@/lib/services';
-import type { WatchProvider } from '@/lib/tmdb/types';
+import type { WatchProvider } from '@/lib/types';
 
 /**
  * CARD-MEDIA REGRESSION SUITE (production defects 1 + 2).
