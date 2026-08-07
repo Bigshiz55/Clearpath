@@ -129,6 +129,10 @@ export interface FetchedTitle {
   title: string;
   year: number | null;
   posterPath: string | null;
+  /** TMDB's one-paragraph synopsis, when it has one. Optional and only ever
+   *  carried through for display — the planner/tagger never read it. Null/absent
+   *  when TMDB gives none; never fabricated. */
+  overview?: string | null;
 }
 
 /** Turn a fetched TMDB title into a fully-tagged calibration candidate. */

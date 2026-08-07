@@ -97,7 +97,16 @@ export async function GET(request: Request) {
           originCountry: b.originCountry,
         }).catch(() => [] as Awaited<ReturnType<typeof discoverTitles>>);
         return rows.slice(0, Math.max(b.take + 2, b.take)).map((r) => {
-          const t: FetchedTitle = { id: r.id, mediaType: r.mediaType, title: r.title, year: r.year, posterPath: r.posterPath };
+          const t: FetchedTitle = {
+            id: r.id,
+            mediaType: r.mediaType,
+            title: r.title,
+            year: r.year,
+            posterPath: r.posterPath,
+            // Carried through only for the tile's one-line "what is this",
+            // never read by the planner/tagger. Null when TMDB has none.
+            overview: r.overview?.trim() ? r.overview.trim() : null,
+          };
           return { cand: taggedFromBucket(t, b, domestic), t };
         });
       }),
@@ -130,6 +139,9 @@ export async function GET(request: Request) {
         posterPath: src.t.posterPath,
         posterUrl: tmdbImage(src.t.posterPath, 'w342'),
         genre: c.genres[0] ?? null,
+        // A one-or-two-sentence "what is this" so an unrecognised tile still
+        // makes sense. Real TMDB synopsis; null when TMDB has none.
+        overview: src.t.overview ?? null,
       };
     });
 

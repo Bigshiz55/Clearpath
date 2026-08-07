@@ -65,6 +65,9 @@ interface Item {
   posterPath: string | null;
   posterUrl: string | null;
   genre: string | null;
+  /** A one-or-two-sentence synopsis so a tile you don't recognise still makes
+   *  sense. Real TMDB overview; null when TMDB has none (never invented). */
+  overview: string | null;
 }
 
 type Rating = 'loved' | 'liked' | 'okay' | 'disliked';
@@ -649,6 +652,22 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
                 <div className="text-[11px] text-slate-500">
                   {i.year ?? '—'} · {i.mediaType === 'movie' ? 'Movie' : 'TV'}
                 </div>
+
+                {/* THE GIST, FOR A TILE YOU DON'T RECOGNISE. A poster + a title
+                    is no help when you've never heard of the thing, and this
+                    grid's whole job is reacting to what you recognise — so each
+                    tile carries a one-or-two-sentence synopsis. Real TMDB
+                    overview, clamped to two lines; simply absent (never a
+                    placeholder) when TMDB has none. */}
+                {i.overview && (
+                  <p
+                    className="mt-1 line-clamp-2 text-[11px] leading-snug text-slate-400"
+                    title={i.overview}
+                    data-testid={`grid-overview-${i.id}`}
+                  >
+                    {i.overview}
+                  </p>
+                )}
 
                 {/* THE TWO OPINIONS ON A TITLE YOU RECOGNISE. Both are chosen,
                     both are real signal — "Doesn't look good" only ever writes

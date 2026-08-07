@@ -231,6 +231,11 @@ export interface DiscoverItem {
   year: number | null;
   posterPath: string | null;
   releaseDate: string | null;
+  /** TMDB's one-paragraph synopsis, when the discover row carried one. Optional
+   *  and additive — only `discoverTitles`/`discoverTitlesChecked` populate it
+   *  (the taste-quiz tile is the only consumer); other discover helpers omit it.
+   *  Empty/undefined means "no synopsis", and is never fabricated. */
+  overview?: string;
 }
 
 function isoDate(d: Date): string {
@@ -460,6 +465,7 @@ export async function discoverTitlesChecked(
       year: yearFrom(mediaType === 'movie' ? r.release_date : r.first_air_date),
       posterPath: r.poster_path ?? null,
       releaseDate: (mediaType === 'movie' ? r.release_date : r.first_air_date) ?? null,
+      overview: r.overview ?? '',
     }));
   return { items, ok };
 }
