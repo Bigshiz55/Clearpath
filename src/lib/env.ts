@@ -132,6 +132,54 @@ export const serverEnv = {
   openaiKey(): string | undefined {
     return optional('OPENAI_API_KEY');
   },
+  /**
+   * Anthropic API key for the AI orchestrator (the Claude interpretation layer).
+   * Server-only — never NEXT_PUBLIC, never logged, never returned to the browser
+   * or included in an artifact. Optional: absent means the discovery brain
+   * degrades to the deterministic path (see AI_DISCOVERY_MODE). Production traffic
+   * must use the official Anthropic API with a key set here — nothing else.
+   */
+  anthropicKey(): string | undefined {
+    return optional('ANTHROPIC_API_KEY');
+  },
+  /** Which provider the AI adapter uses. Provider-independent by design; only the
+   *  factory reads this. Defaults to anthropic. */
+  aiProvider(): string {
+    return (optional('AI_PROVIDER') ?? 'anthropic').toLowerCase();
+  },
+  /** The interpretation model id. Defaults to claude-sonnet-5. */
+  aiModel(): string {
+    return optional('AI_MODEL') ?? 'claude-sonnet-5';
+  },
+  /**
+   * Model-routing config (§11). Present so the fields exist and are documented,
+   * but multi-model routing is NOT enabled yet — every call uses aiModel() until
+   * routing is turned on deliberately. Each falls back to the primary model.
+   */
+  aiModelRouting(): { simple: string; primary: string; complex: string } {
+    const primary = optional('AI_PRIMARY_MODEL') ?? this.aiModel();
+    return {
+      simple: optional('AI_SIMPLE_MODEL') ?? primary,
+      primary,
+      complex: optional('AI_COMPLEX_MODEL') ?? primary,
+    };
+  },
+  /**
+   * The discovery brain's mode (§13). THREE values:
+   *   'legacy'    — the deterministic/OpenAI path serves every request; the
+   *                 Claude layer is never invoked. This is the DEFAULT, so
+   *                 turning the feature on is an explicit owner action and
+   *                 nothing changes in production until it is.
+   *   'shadow'    — legacy still serves the user; Claude interprets in parallel
+   *                 and only safe comparison telemetry is stored.
+   *   'anthropic' — Claude interpretation drives results, degrading to legacy on
+   *                 any failure.
+   * Any unrecognized value is treated as 'legacy' (fail safe).
+   */
+  aiDiscoveryMode(): 'legacy' | 'shadow' | 'anthropic' {
+    const v = (optional('AI_DISCOVERY_MODE') ?? 'legacy').toLowerCase();
+    return v === 'shadow' || v === 'anthropic' ? v : 'legacy';
+  },
   omdbKey(): string | undefined {
     return optional('OMDB_API_KEY');
   },
@@ -237,6 +285,13 @@ export function envHealth() {
     tmdbKey: Boolean(optional('TMDB_API_KEY')),
     serviceRoleKey: Boolean(optional('SUPABASE_SERVICE_ROLE_KEY')),
     openaiKey: Boolean(optional('OPENAI_API_KEY')),
+    anthropicKey: Boolean(optional('ANTHROPIC_API_KEY')),
+    aiProvider: (optional('AI_PROVIDER') ?? 'anthropic').toLowerCase(),
+    aiModel: optional('AI_MODEL') ?? 'claude-sonnet-5',
+    aiDiscoveryMode: (() => {
+      const v = (optional('AI_DISCOVERY_MODE') ?? 'legacy').toLowerCase();
+      return v === 'shadow' || v === 'anthropic' ? v : 'legacy';
+    })(),
     omdbKey: Boolean(optional('OMDB_API_KEY')),
     mdblistKey: Boolean(optional('MDBLIST_API_KEY')),
     watchmodeKey: Boolean(optional('WATCHMODE_API_KEY')),

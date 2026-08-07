@@ -24,6 +24,8 @@ import {
   type TurnContext,
 } from '@/lib/nlu/conversationState';
 import { createHash, randomUUID } from 'node:crypto';
+import { serverEnv } from '@/lib/env';
+import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBridge';
 
 /**
  * "Something like X" is best served by TMDB-similar ONLY when the reference is
@@ -223,6 +225,37 @@ export async function POST(req: Request) {
               : 'Your list is empty so far — add titles and this question will have a real answer.',
         items,
       });
+    }
+
+    // 0.7) AI ORCHESTRATOR (feature-flagged; default legacy = OFF, nothing here
+    // runs in production until the owner sets AI_DISCOVERY_MODE + a key). In
+    // ANTHROPIC mode Claude is the primary brain for single-shot semantic
+    // discovery/similarity: it interprets the request into a validated canonical
+    // form, the app resolves entities + qualifies via the deterministic engine,
+    // and only then ranks by DNA. Exact-title/person/live-TV intents defer back
+    // to the deterministic handlers below. Any AI failure falls through to the
+    // legacy path — the user never sees a broken search.
+    const aiMode = serverEnv.aiDiscoveryMode();
+    if (aiMode === 'anthropic' && !conversational && text.trim()) {
+      const ai = await runAiDiscovery({ supabase, userId: user.id, text, route: 'ask', limit: parseRequestedCount(text) });
+      if (ai.kind === 'clarify') {
+        return NextResponse.json({ kind: 'clarify', requestId, clarify: ai.question, options: ai.options, interpretation: ai.interpretation, query: { ...EMPTY_QUERY }, items: [] });
+      }
+      if (ai.kind === 'search') {
+        return NextResponse.json({
+          kind: 'search',
+          route: '/api/ask',
+          requestId,
+          appliedText: text,
+          brain: 'anthropic',
+          query: ai.query,
+          interpretation: ai.interpretation,
+          scoredFor: ai.scoredFor,
+          relaxed: ai.relaxed,
+          items: ai.items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+        });
+      }
+      // ai.kind === 'unavailable' → fall through to the deterministic path.
     }
 
     // 0.8) A BARE vocabulary word ("crime", "Hulu", "boxing") is a browse
@@ -589,6 +622,13 @@ export async function POST(req: Request) {
     // semantic verdict did not PASS. The Judge receives only eligible titles.
     if (query.subjectLexemes && query.subjectLexemes.length > 0) {
       items = items.filter((i) => i.subjectEvidence?.satisfied === true);
+    }
+
+    // SHADOW MODE: legacy served the user above; record a safe structural
+    // comparison of what Claude would have interpreted. Metadata only, never
+    // awaited into the response path. No-op unless AI_DISCOVERY_MODE=shadow.
+    if (aiMode === 'shadow' && text.trim()) {
+      void recordShadowInterpretation({ text, route: 'ask', legacyResultCount: items.length });
     }
 
     return NextResponse.json(
