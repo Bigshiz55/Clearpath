@@ -5,7 +5,7 @@ import type { WatchLine } from '@/lib/availability/watchPresentation';
 import { dedupeByBrand } from '@/lib/availability/providerBrand';
 
 /**
- * THE ONE PROVIDER-LOGO STRIP. Every WatchVerdict result card renders where a
+ * THE ONE PROVIDER-LOGO STRIP. Every WatchVerd1ct result card renders where a
  * title can be watched through this, so the behaviour is identical everywhere.
  *
  * The card used to stack one full-width "Included with …" row per provider — a
