@@ -270,8 +270,26 @@ export function FinderUI({
     // decides together.
     const selected = watchers.filter((_, i) => watcherSel.has(i));
     const householdMode = selected.length > 0;
-    const effQuery = qOverride ?? q;
     const effText = (textOverride ?? text).trim();
+    // UNTOUCHED SLIDERS NEVER CONSTRAIN A KEYWORD SEARCH.
+    //
+    // The refine sliders default to "Any" (null in EMPTY_QUERY), but a value the
+    // user never dragged — inherited from a previous run, or shown mid-track —
+    // must not silently filter a fresh keyword/subject search. So for a
+    // user-typed search (no preset qOverride), any slider field the user has not
+    // actually touched is reset to its neutral default before the request goes
+    // out. Seeded preset tiles (which pass qOverride with curated floors) are
+    // untouched by this, and typed constraints like "audience over 70%" still
+    // apply because the server parses them from `text`, not the sliders.
+    const SLIDER_KEYS: (keyof FinderQuery)[] = ['maxRuntime', 'sinceMonths', 'minAudience', 'minImdb', 'minMatch', 'pace'];
+    let effQuery = qOverride ?? q;
+    if (!qOverride && effText) {
+      const cleaned = { ...effQuery } as unknown as Record<string, unknown>;
+      for (const k of SLIDER_KEYS) {
+        if (!touched.has(k as string)) cleaned[k as string] = null;
+      }
+      effQuery = cleaned as unknown as FinderQuery;
+    }
     const runKey = canonicalQueryKey(effQuery, effText, ['You', ...selected.map((w) => w.name)].join('+'));
     const isRefinement = items != null;
     try {
