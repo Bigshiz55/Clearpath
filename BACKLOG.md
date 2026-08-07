@@ -42,6 +42,26 @@ and what it unblocks.
   representative.
 
 ## Done
+- **Voice DNA Interview — pure domain core.** Built the full pure, deterministic
+  conversation engine under `src/lib/voice/interview/` conforming to the frozen
+  `types.ts` contract (no changes to it): `categories.ts` (36-axis `CATEGORY_META`
+  with core≈3× niche weights + a ~90-entry title/genre/element/people lexicon and
+  `categoriesFor`), `confidence.ts` (diminishing-returns per-axis confidence +
+  weighted roll-up; 0.95 bar reachable only on broad coverage), `memory.ts`,
+  `contradiction.ts` (catches the flagship hate-horror→loved-Silence
+  `category_vs_title`, plus `sentiment_flip` and `attribute_conflict`),
+  `followup.ts` (never-accept-a-shallow-answer probe bank), `planner.ts`,
+  `stateMachine.ts` (warmup→…→complete with a challenge detour + hard turn cap),
+  `director.ts` (`decide`/`advance`/`createInterview`, termination-guaranteed and
+  garbage-safe), `reveal.ts` (leaves predicted titles empty for the server),
+  `dnaUpdate.ts` (maps title reactions to the existing `EventDraft` preference
+  shape with `source:'voice_interview'`, unchanged for `recordEvents`), and
+  `prompts.ts` (Realtime system prompt + `record_signal`/`acknowledge_contradiction`
+  tool schema + `buildTurnInstruction`). 81 new unit tests, all pure (no key /
+  network / DB). Gates: typecheck / lint / vitest / build all exit 0. FOLLOW-UP
+  (not in this order): the OpenAI Realtime session layer, server persistence
+  (`store.ts` + server action calling `recordEvents`), and the `/voice-dna` route
+  wiring are still to be built on top of this core.
 - **National-breadth TVmaze ingest (broaden-only).** Extracted the
   `MAJOR_US_NETWORKS`/`isMajorUsNetwork` allowlist out of `onTv.ts` into a
   shared pure module `src/lib/viewing/ingest/nationalNetworks.ts` (plus a
