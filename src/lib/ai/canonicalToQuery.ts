@@ -1,6 +1,7 @@
 import { EMPTY_QUERY } from '@/lib/finderParse';
 import { genreIdFromName } from '@/lib/finderGenres';
 import type { FinderQuery } from '@/lib/finder';
+import { applyInternationalConstraints, type InternationalConstraints } from '@/lib/nlu/internationalConstraints';
 import type { CanonicalDiscoveryRequest } from './schemas';
 
 /**
@@ -84,7 +85,24 @@ export function canonicalToQuery(req: CanonicalDiscoveryRequest): MappedQuery {
     subjectLexemes: h.requiredSubjects.length ? [...h.requiredSubjects] : undefined,
     subjectStrict: h.requiredSubjects.length ? true : undefined,
     subjectLabel: h.requiredSubjects.length ? h.requiredSubjects[0] : undefined,
+    // Explicit requested count survives as the FINAL-selection cap ("10 shows").
+    // Honored to the extent titles verify — the finder never pads to hit it.
+    finalCount: req.requestedCount ?? undefined,
   };
+
+  // International / language / audio constraints go through the ONE shared
+  // applier, so "foreign", "non-English original", "English audio" and "English
+  // dubbed" mean exactly what they mean on the legacy path. No constraint is
+  // allowed to disappear because a different subsystem parsed the sentence.
+  const intl: InternationalConstraints = {
+    originCountriesRequired: [...h.international.originCountriesRequired],
+    originCountriesExcluded: [...h.international.originCountriesExcluded],
+    originalLanguagesRequired: [...h.international.originalLanguagesRequired],
+    originalLanguagesExcluded: [...h.international.originalLanguagesExcluded],
+    originalLanguageClass: h.international.originalLanguageClass,
+    audioRequirement: h.international.audioRequirement,
+  };
+  applyInternationalConstraints(query, intl);
 
   return {
     query,

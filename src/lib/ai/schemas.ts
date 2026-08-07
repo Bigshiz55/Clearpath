@@ -70,6 +70,33 @@ export const GENRE_VOCAB = [
 /** Monetization asks the app enforces as hard constraints. */
 export const MONETIZATION_KINDS = ['flatrate', 'free', 'ads', 'rent', 'buy'] as const;
 
+/**
+ * The ORIGINAL-LANGUAGE class of the request. This is about the title's original
+ * language, NOT its audio track and NOT its production country:
+ *   - "english"     → an English-original title (e.g. "English-language films").
+ *   - "non_english" → a NON-English original (e.g. "foreign films", the usual
+ *                     reading of "foreign" when paired with a dub/subtitle ask).
+ *   - "any"         → unconstrained.
+ * Country and language-code lists refine this; the class is the coarse gate.
+ */
+export const ORIGINAL_LANGUAGE_CLASSES = ['any', 'english', 'non_english'] as const;
+
+/**
+ * The AUDIO requirement — deliberately distinct from the language class, because
+ * "English audio" and "English dubbed" are NOT the same ask:
+ *   - "english_audio" → an English track is acceptable, native OR dubbed.
+ *   - "english_dub"   → specifically a NON-English original WITH a verified
+ *                       English dub; native-English titles do NOT satisfy this.
+ *   - "original_audio"→ the original-language audio (subtitles acceptable).
+ *   - "any"           → unconstrained.
+ * The app VERIFIES the actual English availability; the model only expresses the
+ * requirement it understood.
+ */
+export const AUDIO_REQUIREMENTS = ['any', 'english_audio', 'english_dub', 'original_audio'] as const;
+
+/** A short ISO country / language code the model may emit (validated, bounded). */
+const CODE = z.string().min(2).max(8);
+
 // ---- Bounds (single source of truth, also asserted by tests) -----------------
 
 export const LIMITS = {
@@ -86,9 +113,13 @@ export const LIMITS = {
   maxAmbiguities: 4,
   maxOptions: 6,
   maxAssumptions: 8,
+  maxCountries: 8,
+  maxLanguages: 8,
   /** A runtime cap outside this band is absurd (a 3-second or 40-hour movie). */
   minRuntime: 1,
   maxRuntime: 1000,
+  /** The largest explicit result count the app will honor from a request. */
+  maxRequestedCount: 50,
 } as const;
 
 // ---- Primitive builders ------------------------------------------------------
@@ -121,6 +152,26 @@ const ambiguity = z.strictObject({
   options: z.array(boundedText).max(LIMITS.maxOptions).default([]),
 });
 
+/**
+ * International / language / audio hard constraints — a first-class, GENERAL
+ * block so "foreign show with an English dub" survives to the finder instead of
+ * being lost (or crammed into requiredSubjects). Origin, original language, and
+ * audio are three independent axes; keeping them separate is what lets the app
+ * enforce "non-English original AND English dub" without conflating the two.
+ */
+const international = z.strictObject({
+  /** ISO-3166 production origins that are REQUIRED / EXCLUDED. */
+  originCountriesRequired: z.array(CODE).max(LIMITS.maxCountries).default([]),
+  originCountriesExcluded: z.array(CODE).max(LIMITS.maxCountries).default([]),
+  /** ISO-639-1 original languages that are REQUIRED / EXCLUDED (e.g. "not Korean"). */
+  originalLanguagesRequired: z.array(CODE).max(LIMITS.maxLanguages).default([]),
+  originalLanguagesExcluded: z.array(CODE).max(LIMITS.maxLanguages).default([]),
+  /** The coarse original-language class (english / non_english / any). */
+  originalLanguageClass: z.enum(ORIGINAL_LANGUAGE_CLASSES).default('any'),
+  /** The audio requirement (english_audio / english_dub / original_audio / any). */
+  audioRequirement: z.enum(AUDIO_REQUIREMENTS).default('any'),
+});
+
 const hardConstraints = z.strictObject({
     requiredSubjects: z.array(boundedText).max(LIMITS.maxSubjects).default([]),
     excludedSubjects: z.array(boundedText).max(LIMITS.maxSubjects).default([]),
@@ -138,6 +189,7 @@ const hardConstraints = z.strictObject({
     requiredPeople: z.array(boundedText).max(LIMITS.maxPeople).default([]),
     requiredProviders: z.array(boundedText).max(LIMITS.maxProviders).default([]),
     requiredMonetization: z.array(z.enum(MONETIZATION_KINDS)).max(MONETIZATION_KINDS.length).default([]),
+    international: international.default(() => international.parse({})),
   });
 
 const softPreferences = z.strictObject({
@@ -159,6 +211,10 @@ export const CanonicalDiscoveryRequestSchema = z
     softPreferences: softPreferences.default(() => softPreferences.parse({})),
     ambiguities: z.array(ambiguity).max(LIMITS.maxAmbiguities).default([]),
     clarificationRequired: z.boolean().default(false),
+    /** An explicitly requested result count ("Find me 10 shows" → 10). Null when
+     *  the phrasing names none. This is a FINAL-selection target, honored to the
+     *  extent titles can be truthfully verified — never padded with filler. */
+    requestedCount: z.number().int().min(1).max(LIMITS.maxRequestedCount).nullable().default(null),
     interpretationSummary: boundedText,
     interpretationAssumptions: z.array(boundedText).max(LIMITS.maxAssumptions).default([]),
   })
@@ -202,6 +258,10 @@ function collectStrings(req: CanonicalDiscoveryRequest): string[] {
     ...h.excludedPeople,
     ...h.requiredPeople,
     ...h.requiredProviders,
+    ...h.international.originCountriesRequired,
+    ...h.international.originCountriesExcluded,
+    ...h.international.originalLanguagesRequired,
+    ...h.international.originalLanguagesExcluded,
   );
   out.push(...req.softPreferences.tones, ...req.softPreferences.themes);
   return out;
