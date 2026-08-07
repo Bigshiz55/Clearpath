@@ -7,6 +7,7 @@ import { QuickLook, type QuickLookTarget } from './QuickLook';
 import { AlgorithmScore } from './AlgorithmScore';
 import { WCheck } from './WCheck';
 import { CardVerdict } from './CardVerdict';
+import { TrailerMedia } from './trailer/TrailerMedia';
 import type { MediaType } from '@/lib/types';
 
 export interface WallService {
@@ -297,12 +298,14 @@ export function ReleaseWall({
                   className="block h-full w-full"
                   aria-label={`Quick look at ${t.title}`}
                 >
-                  {t.posterUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={t.posterUrl} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]" />
-                  ) : (
-                    <div className="grid h-full w-full place-items-center bg-gradient-to-br from-ink-700 to-ink-850 p-2 text-center text-[11px] text-slate-400">{t.title}</div>
-                  )}
+                  <TrailerMedia tmdbId={t.id} mediaType={t.mediaType} title={t.title}>
+                    {t.posterUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={t.posterUrl} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]" />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center bg-gradient-to-br from-ink-700 to-ink-850 p-2 text-center text-[11px] text-slate-400">{t.title}</div>
+                    )}
+                  </TrailerMedia>
                   {label && (
                     <span className={`pointer-events-none absolute bottom-2 left-2 rounded-md px-2 py-0.5 text-[10px] font-bold backdrop-blur ${soon ? 'bg-emerald-500/85 text-white' : 'bg-black/65 text-slate-100'}`}>
                       {win === 'upcoming' ? `📅 ${label}` : label}
