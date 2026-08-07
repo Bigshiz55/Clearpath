@@ -9,15 +9,16 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /**
- * TV listings ingest, folded into this route rather than given its own
- * Vercel Cron entry — Hobby caps at two cron jobs and both slots are already
- * spent here and on `classify`. `/api/cron/tv-ingest` still exists (hourly
- * cadence for an external scheduler, e.g. GitHub Actions or Supabase
- * pg_cron), but a full guide only needs the tables kept warm, not hourly
- * precision, so riding this daily tick is enough to stop the ingested guide
- * (`getIngestedGuideAirings`) from being permanently empty for TV Media. Both
- * providers gate themselves (see `runGatedTvIngest`), and a failure here must
- * never fail the release-notes scan above it.
+ * TV listings ingest, riding this daily tick as a harmless fallback. The
+ * authoritative schedule is now `/api/cron/tv-ingest`, registered directly in
+ * vercel.json at an hourly cadence (Vercel allows up to 100 cron jobs per
+ * project on every plan as of 2026-01-20, so there is no longer a two-cron
+ * ceiling forcing TV ingest to piggyback here). A full guide only needs the
+ * tables kept warm, so this daily call stays as belt-and-suspenders: if an
+ * hourly tick is ever missed, the ingested guide (`getIngestedGuideAirings`)
+ * still never goes permanently empty. Both providers gate themselves (see
+ * `runGatedTvIngest`), and a failure here must never fail the release-notes
+ * scan above it.
  */
 async function runTvIngest(admin: ReturnType<typeof createAdminClient>) {
   try {

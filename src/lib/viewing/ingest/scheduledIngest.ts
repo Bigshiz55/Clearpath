@@ -7,12 +7,12 @@ import { mayCallUpstream, resolveDataMode } from '@/lib/tv/dataMode';
 /**
  * SHARED GATING — TV Media (primary) and TVmaze (fallback/supplement).
  *
- * Used by both `/api/cron/tv-ingest` (an hourly tick, for whoever ends up
- * triggering it — an external scheduler, or a future freed-up Vercel Cron
- * slot) and `/api/cron/daily-scan` (a guaranteed once-a-day tick, ridden here
- * because Vercel Hobby's two-cron cap is already spent on daily-scan and
- * classify). Same gating either way so running from a daily tick never
- * double-runs what an hourly tick would have already done:
+ * Used by both `/api/cron/tv-ingest` (the authoritative hourly Vercel Cron
+ * tick, registered in vercel.json) and `/api/cron/daily-scan` (a guaranteed
+ * once-a-day tick that also rides this gate as a harmless fallback, so the
+ * tables stay warm even if an hourly tick is missed). Same gating either way
+ * so running from a daily tick never double-runs what an hourly tick would
+ * have already done:
  *
  *  - TVmaze: once per UTC calendar day, checked against `tv_ingestion_runs`
  *    rather than a fixed hour — its single national feed has no per-market
