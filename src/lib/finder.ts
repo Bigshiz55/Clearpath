@@ -29,7 +29,9 @@ import {
   type SubjectRequirement,
   type SemanticStatus,
   type SubjectCentrality,
+  type CandidateEvidence,
 } from '@/lib/nlu/semanticEligibility';
+import { adjudicateSubjectCentrality, type SubjectAdjudicator } from '@/lib/nlu/subjectAdjudicator';
 
 const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
 const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
@@ -170,6 +172,11 @@ export interface FinderItem {
     evidenceType: 'centrality';
     evidence: string;
     rejectionReason: string | null;
+    /** The deterministic verdict was borderline (a single tag + light mention):
+     *  the semantic adjudicator arbitrates these before ranking. */
+    ambiguous: boolean;
+    /** How the FINAL eligibility was decided — deterministic vs the model. */
+    decidedBy: 'deterministic' | 'adjudicator';
   };
 }
 
@@ -258,12 +265,20 @@ function fmtRuntime(min: number | null): string | null {
  */
 export const DEFAULT_RESULT_LIMIT = DEFAULT_RESULT_COUNT;
 export const MAX_RESULT_LIMIT = MAX_REQUESTED_COUNT;
+/** How many borderline candidates we will pay the model to adjudicate per
+ *  request. Bounded so an ambiguous pool can never fan out into a large,
+ *  expensive batch; the highest match-scored ambiguous candidates go first. */
+const ADJUDICATE_CAP = 24;
+
 export async function runFinder(
   supabase: SupabaseClient,
   userId: string,
   q: FinderQuery,
   watcher?: Watcher | Watcher[] | null,
   limit = DEFAULT_RESULT_LIMIT,
+  /** Injectable for tests; defaults to the bounded, cached, safe-absent model
+   *  adjudicator. Used ONLY for the deterministic ambiguous band. */
+  adjudicator: SubjectAdjudicator = adjudicateSubjectCentrality,
 ): Promise<FinderResult> {
   const profile = await getProfile(supabase, userId);
   const region = regionFor(profile);
@@ -376,6 +391,10 @@ export async function runFinder(
   }
   const candidates = Array.from(candMap.values()).slice(0, candidateTarget(limit));
 
+  // Raw subject evidence for borderline candidates, stashed during scoring so the
+  // ambiguity-band adjudicator can run after the wave without re-fetching TMDB.
+  const evidenceById = new Map<string, CandidateEvidence>();
+
   // Hydrate + score + hard-filter one candidate. Returns null when it fails any
   // hard constraint — which is most of why the pool has to be bigger than the
   // answer.
@@ -477,13 +496,14 @@ export async function runFinder(
           lexemes: q.subjectLexemes,
           strict: q.subjectStrict !== false,
         };
-        const verdict = evaluateSubjectCentrality(requirement, {
+        const candidateEvidence: CandidateEvidence = {
           title: meta.title,
           altTitle: meta.originalTitle ?? null,
           overview: meta.overview,
           genres: meta.genres,
           keywords: meta.keywords,
-        });
+        };
+        const verdict = evaluateSubjectCentrality(requirement, candidateEvidence);
         subjectEvidence = {
           constraint: requirement.canonical,
           satisfied: verdict.status === 'PASS',
@@ -493,7 +513,12 @@ export async function runFinder(
           evidenceType: 'centrality',
           evidence: verdict.evidenceSummary,
           rejectionReason: verdict.rejectionReason,
+          ambiguous: verdict.ambiguous,
+          decidedBy: 'deterministic',
         };
+        // Stash the raw evidence so a borderline candidate can be adjudicated
+        // after the wave without re-fetching TMDB.
+        if (verdict.ambiguous) evidenceById.set(`${mediaType}-${id}`, candidateEvidence);
         if (verdict.status === 'PASS') {
           receipts.unshift(`${q.subjectLabel ?? 'subject'} ✓ ${verdict.centrality.toLowerCase()}`);
         }
@@ -573,6 +598,60 @@ export async function runFinder(
     const got = await mapPool(wave, HYDRATE_CONCURRENCY, scoreCandidate);
     for (const item of got) if (item) survivors.push(item);
     if (survivors.filter(isEligible).length >= enough) break;
+  }
+
+  // ── AMBIGUITY-BAND ADJUDICATION ────────────────────────────────────────────
+  // The deterministic evaluator settles the confident cases (a title hit or a
+  // strong overview is central; a setting-only mention is incidental). What it
+  // cannot settle from metadata counts is the borderline band — a single
+  // authoritative keyword tag plus a light mention, where a genuine subject film
+  // (Moneyball → baseball) and an incidental one (Pulp Fiction's ensemble boxer)
+  // look identical. Those, and ONLY those, are escalated to the bounded semantic
+  // adjudicator, highest match-score first, before anything is ranked. The
+  // adjudicator is subject-agnostic, cached, and safe when unavailable: with no
+  // model the band stays rejected (precision preserved), so this never
+  // introduces an offline regression; in production the model resolves it.
+  if (subjectRequired) {
+    const requirement: SubjectRequirement = {
+      canonical: q.subjectCanonical ?? q.subjectLabel ?? 'subject',
+      label: q.subjectLabel ?? q.subjectCanonical ?? 'subject',
+      lexemes: q.subjectLexemes ?? [],
+      strict: q.subjectStrict !== false,
+    };
+    const acceptSubstantial = requirement.strict === false;
+    const borderline = survivors
+      .filter((i) => i.subjectEvidence && i.subjectEvidence.satisfied === false && i.subjectEvidence.ambiguous)
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, ADJUDICATE_CAP);
+    await Promise.all(
+      borderline.map(async (item) => {
+        const evidence = evidenceById.get(`${item.mediaType}-${item.id}`);
+        if (!evidence || !item.subjectEvidence) return;
+        const verdict = await adjudicator(requirement, evidence).catch(() => null);
+        if (!verdict) return; // reject-on-uncertainty: leave it ineligible
+        const promote =
+          verdict.centrality === 'CENTRAL' || (acceptSubstantial && verdict.centrality === 'MATERIAL');
+        // Map the adjudicator's classes onto the stored centrality (UNKNOWN,
+        // which the deterministic scale has no slot for, is recorded as
+        // UNSUPPORTED — it did not establish the subject).
+        const storedCentrality: SubjectCentrality =
+          verdict.centrality === 'UNKNOWN' ? 'UNSUPPORTED' : verdict.centrality;
+        item.subjectEvidence.decidedBy = 'adjudicator';
+        if (promote) {
+          item.subjectEvidence.satisfied = true;
+          item.subjectEvidence.status = 'PASS';
+          item.subjectEvidence.centrality = storedCentrality;
+          item.subjectEvidence.confidence = Math.round(verdict.confidence * 100);
+          item.subjectEvidence.evidence = verdict.reason || item.subjectEvidence.evidence;
+          item.subjectEvidence.rejectionReason = null;
+          item.receipts.unshift(`${requirement.label} ✓ ${storedCentrality.toLowerCase()}`);
+        } else {
+          item.subjectEvidence.centrality = storedCentrality;
+          item.subjectEvidence.rejectionReason =
+            verdict.reason || `requested subject judged ${verdict.centrality.toLowerCase()}, not central`;
+        }
+      }),
+    );
   }
 
   // Stage the counts honestly and DROP semantically-ineligible candidates
