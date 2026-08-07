@@ -44,15 +44,19 @@ describe('entry points', () => {
     // to start at the block itself, not at the top of the file.
     const ctaStart = page.indexOf('data-testid="hero-ctas"');
     const heroBlock = page.slice(ctaStart, page.indexOf('</section>', ctaStart));
-    // The single entry button is styled as its own thing (gold, ceremonial) —
+    // The single entry button is styled as its own thing (the brand
+    // blue→violet→magenta `.btn-watchverdict`, not the courtroom's gold) —
     // nothing else in the hero may claim btn-primary or btn-pulse either, or
-    // a secondary action would compete with the entrance for the eye.
+    // a secondary action would compete with the entrance for the eye. The
+    // gold `.btn-courtroom` is reserved for the Live Jury / Verdict Room and
+    // must never appear on the landing entrance.
     expect(heroBlock.match(/btn-primary/g)).toBeNull();
     expect(heroBlock.match(/btn-pulse/g)).toBeNull();
-    expect(heroBlock.match(/btn-courtroom/g)).toHaveLength(1);
+    expect(heroBlock.match(/btn-courtroom/g)).toBeNull();
+    expect(heroBlock.match(/btn-watchverdict/g)).toHaveLength(1);
     // The DNA quiz + import history are real, visible buttons (btn-secondary
     // — a plain bordered pill, not the brand accent) rather than buried
-    // underlined text, but still a visibly quieter class than the gold CTA.
+    // underlined text, but still a visibly quieter class than the brand CTA.
     expect(heroBlock.match(/btn-secondary/g)).toHaveLength(2);
     expect(page).toContain('data-testid="cta-enter"');
     expect(page).toContain('data-testid="cta-dna"');
@@ -67,6 +71,7 @@ describe('entry points', () => {
       expect(link, testid).not.toContain('btn-primary');
       expect(link, testid).not.toContain('btn-pulse');
       expect(link, testid).not.toContain('btn-courtroom');
+      expect(link, testid).not.toContain('btn-watchverdict');
       expect(link, testid).toContain('btn-secondary');
     }
     const importAt = page.indexOf('data-testid="cta-import"');

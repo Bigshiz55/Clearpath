@@ -49,11 +49,11 @@ export default async function LandingPage() {
   return (
     <div className="min-h-dvh">
       <HomeArrivalBeacon />
-      {/* LOGO + SIGN IN, NOTHING ELSE. The gold "Enter the Courtroom" button
-          below is the one prominent entrance; a second, equally-weighted
-          header button into `/app` would compete with it on every screen.
-          Sign in stays because it's not a second front door, it's the same
-          door for someone who already has an account. */}
+      {/* LOGO + SIGN IN, NOTHING ELSE. The "Enter WatchVerd1ct" button below
+          is the one prominent entrance; a second, equally-weighted header
+          button into `/app` would compete with it on every screen. Sign in
+          stays because it's not a second front door, it's the same door for
+          someone who already has an account. */}
       <header className="container-page flex flex-wrap items-center justify-between gap-y-1 py-1 sm:py-4">
         <Logo size="xl" />
         <Link href="/login" className="btn-ghost text-sm">
@@ -66,7 +66,7 @@ export default async function LandingPage() {
             headline itself now, not a small tagline under a different H1 —
             "1 Verd1ct" carries the brand's pink accent so the payoff reads
             as the decisive part of the sentence. No button here yet: the
-            three cards below make the case first, then the one gold
+            three cards below make the case first, then the one brand
             entrance appears once a visitor knows what it hands them. */}
         <section className="relative isolate overflow-hidden">
           <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
@@ -104,17 +104,19 @@ export default async function LandingPage() {
             the process before the gold button below asks for a click. */}
         <VerdictProcessPreview />
 
-        {/* THE ONE WAY IN. The only gold, ceremonial button on the page. */}
+        {/* THE ONE WAY IN. The single brand entrance — blue→violet→magenta,
+            not the courtroom's gold (that ceremony is reserved for the Live
+            Jury / Verdict Room, never the front door). */}
         <section className="border-t border-white/10" data-testid="main-cta">
           <div className="container-page flex flex-col items-center py-8 text-center sm:py-8">
             <div className="flex flex-col items-center gap-2 sm:gap-3" data-testid="hero-ctas">
               <Link
                 href="/app"
-                className="wv-gold-breathe btn-courtroom px-9 py-3 text-base transition hover:scale-[1.02] sm:px-12 sm:py-4 sm:text-lg"
+                className="btn-watchverdict"
                 data-testid="cta-enter"
               >
-                <span aria-hidden>⚖️</span> Enter the Courtroom
-                <span aria-hidden className="wv-cta-sheen pointer-events-none absolute inset-y-0 left-0 w-1/5 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+                <span aria-hidden className="text-[0.9em] opacity-90">⚖️</span> Enter WatchVerd1ct
+                <span aria-hidden className="wv-cta-sheen pointer-events-none absolute inset-y-0 left-0 w-1/5 bg-gradient-to-r from-transparent via-white/45 to-transparent" />
               </Link>
 
               <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
