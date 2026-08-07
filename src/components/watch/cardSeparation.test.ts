@@ -188,10 +188,14 @@ describe('no action is rendered without a destination', () => {
     expect(whereToWatch).toMatch(/refreshable === false \? 'Notify me when confirmed'/);
   });
 
-  it('a CTA with no link and no panel renders as text, not as a button', () => {
+  it('a CTA with no link and no panel renders nothing — the logo strip is the answer', () => {
     // The third branch: verified options exist but none carries a deep link.
-    // There is nothing to press, so nothing is styled as pressable.
-    expect(whereToWatch).toMatch(/<span data-testid="where-to-watch-cta"/);
+    // There is nothing to press AND nothing new to say — the ProviderLogos
+    // strip (brand tiles + Free/Rent/Buy badges + "+N") already IS the answer,
+    // so the branch returns null rather than repeating it as a "View options"
+    // label. No pressable element, and no redundant text either.
+    expect(whereToWatch).toMatch(/\)\s*:\s*null/);
+    expect(whereToWatch).not.toMatch(/<span data-testid="where-to-watch-cta"/);
   });
 
   it('the panel runs a real refresh and names every failure', () => {
