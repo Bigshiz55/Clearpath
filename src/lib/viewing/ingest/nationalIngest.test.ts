@@ -81,6 +81,22 @@ describe('matchNationalDay', () => {
     expect(matchNationalDay([episode({ show: null })], isMajorUsNetwork, networkSlug)).toEqual([]);
     expect(matchNationalDay([episode({ show: { id: 4, name: 'No Net' } })], isMajorUsNetwork, networkSlug)).toEqual([]);
   });
+
+  it('SKIPS a network the curated Pack ingest already owns (no double-write / no id collision)', () => {
+    // Lifetime is a curated TVMAZE_CHANNELS entry AND passes the national
+    // allowlist. The curated ingest owns it; the national ingest must skip it
+    // so the same airing is never written twice (which duplicated it in the
+    // guide and collided on tv_airings' (lineup_id, provider_airing_id) index —
+    // the production failure this guards against).
+    const out = matchNationalDay(
+      [episode({ show: { id: 5, name: 'A Lifetime Movie', network: { name: 'Lifetime' } } })],
+      isMajorUsNetwork, networkSlug,
+    );
+    expect(out).toHaveLength(0);
+    // Oxygen and Investigation Discovery are likewise curated crime channels.
+    expect(matchNationalDay([episode({ show: { id: 6, name: 'Snapped', network: { name: 'Oxygen' } } })], isMajorUsNetwork, networkSlug)).toHaveLength(0);
+    expect(matchNationalDay([episode({ show: { id: 7, name: 'Case', network: { name: 'Investigation Discovery' } } })], isMajorUsNetwork, networkSlug)).toHaveLength(0);
+  });
 });
 
 describe('national row building (reuses the pure builders)', () => {
@@ -92,20 +108,41 @@ describe('national row building (reuses the pure builders)', () => {
     expect(programme.artworkUrl).toBe('https://static.tvmaze.com/y.jpg');
 
     // National rows skip the per-show premiere fan-out: originalAirdate is null,
-    // so isPremiere/isRepeat are honestly unknown (null), never guessed.
-    const row = buildAiringRow(m!, null);
+    // so isPremiere/isRepeat are honestly unknown (null), never guessed. The
+    // writer builds them station-scoped (see the syndication test below).
+    const row = buildAiringRow(m!, null, { stationScopedId: true });
     expect(row.stationKey).toBe('tvmaze-net:espn');
-    expect(row.providerAiringId).toBe('tvmaze:42:2026-08-01');
+    expect(row.providerAiringId).toBe('tvmaze:42:2026-08-01:tvmaze-net:espn');
     expect(row.isPremiere).toBeNull();
     expect(row.isRepeat).toBeNull();
+  });
+
+  it('station-scoped id keeps the SAME syndicated episode on two networks as two distinct rows', () => {
+    // The production failure: a movie airing the same day on two national
+    // networks shared `tvmaze:<id>:<date>` and collided on the
+    // (lineup_id, provider_airing_id) uniqueness index. Folding the station key
+    // into the id makes each network's airing distinct.
+    const onEspn = matchNationalDay([episode()], isMajorUsNetwork, networkSlug)[0]!;
+    const onTnt = matchNationalDay(
+      [episode({ show: { id: 900, name: 'A Major Network Show', type: 'Scripted', genres: ['Drama'], network: { name: 'TNT' } } })],
+      isMajorUsNetwork, networkSlug,
+    )[0]!;
+    const idEspn = buildAiringRow(onEspn, null, { stationScopedId: true }).providerAiringId;
+    const idTnt = buildAiringRow(onTnt, null, { stationScopedId: true }).providerAiringId;
+    expect(idEspn).toBe('tvmaze:42:2026-08-01:tvmaze-net:espn');
+    expect(idTnt).toBe('tvmaze:42:2026-08-01:tvmaze-net:tnt');
+    expect(idEspn).not.toBe(idTnt);
+    // And a national id is never equal to the curated (unscoped) id for the
+    // same episode, so the two ingests can never collide either.
+    expect(idEspn).not.toBe(buildAiringRow(onEspn, null).providerAiringId);
   });
 
   it('encodes the broadcast date into the id so a rerun on another day is a distinct row', () => {
     const [a] = matchNationalDay([episode()], isMajorUsNetwork, networkSlug);
     const [b] = matchNationalDay([episode({ airdate: '2026-09-01', airstamp: '2026-09-02T00:00:00+00:00' })], isMajorUsNetwork, networkSlug);
-    expect(buildAiringRow(a!, null).providerAiringId).toBe('tvmaze:42:2026-08-01');
-    expect(buildAiringRow(b!, null).providerAiringId).toBe('tvmaze:42:2026-09-01');
-    expect(buildAiringRow(a!, null).providerAiringId).not.toBe(buildAiringRow(b!, null).providerAiringId);
+    expect(buildAiringRow(a!, null, { stationScopedId: true }).providerAiringId).toBe('tvmaze:42:2026-08-01:tvmaze-net:espn');
+    expect(buildAiringRow(b!, null, { stationScopedId: true }).providerAiringId).toBe('tvmaze:42:2026-09-01:tvmaze-net:espn');
+    expect(buildAiringRow(a!, null, { stationScopedId: true }).providerAiringId).not.toBe(buildAiringRow(b!, null, { stationScopedId: true }).providerAiringId);
   });
 });
 
