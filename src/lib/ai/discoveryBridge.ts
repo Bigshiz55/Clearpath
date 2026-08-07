@@ -1,14 +1,13 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type FinderItem } from '@/lib/finder';
-import { resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
-import { resolveSource } from '@/lib/nlu/mediaOntology';
 import { askSimilarTo } from '@/lib/askJudge';
-import { searchKeywords, searchPeople, searchTitles, getTitle, getCredits } from '@/lib/tmdb/client';
+import { getCredits } from '@/lib/tmdb/client';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { interpretDiscoveryRequest, continueDiscoveryConversation } from './orchestrator';
 import { canonicalToQuery } from './canonicalToQuery';
 import { recordShadowComparison, type AiRoute } from './telemetry';
+import { searchBySubject, resolveKeywordIds, resolveProvider, referenceThemeKeywords, resolvePerson } from './tools';
 import type { AiTurn } from './types';
 import type { CanonicalDiscoveryRequest } from './schemas';
 
@@ -24,22 +23,6 @@ import type { CanonicalDiscoveryRequest } from './schemas';
  * This module is invoked ONLY when AI_DISCOVERY_MODE is shadow/anthropic — it is
  * dormant (never imported into a hot path) in the default legacy mode.
  */
-
-/** A reference title's own TMDB keywords, to bias a hard-filtered discovery
- *  toward its themes without abandoning the filters (mirrors the ask route). */
-async function referenceKeywordIds(referenceTitles: string[]): Promise<number[]> {
-  const out = new Set<number>();
-  for (const name of referenceTitles.slice(0, 2)) {
-    const hit = (await searchTitles(name).catch(() => []))[0];
-    if (!hit) continue;
-    const detail = await getTitle(hit.mediaType, hit.id).catch(() => null);
-    const kwNames = (detail?.keywords ?? []).slice(0, 6);
-    if (kwNames.length === 0) continue;
-    const ids = await searchKeywords(kwNames).catch(() => []);
-    ids.slice(0, 8).forEach((id) => out.add(id));
-  }
-  return [...out].slice(0, 12);
-}
 
 export type AiDiscoveryResult =
   | { kind: 'search'; query: FinderQuery; items: FinderItem[]; scoredFor: string; relaxed: string | null; interpretation: string[]; summary: string }
@@ -83,7 +66,7 @@ export async function resolveCanonicalToResult(
 
   // Excluded people, resolved against the real people catalog (unresolvable = no-op).
   const excludePersonIds = (
-    await Promise.all(pendingResolution.excludedPeople.map((n) => searchPeople(n).then((r) => r[0]?.id ?? null).catch(() => null)))
+    await Promise.all(pendingResolution.excludedPeople.map((n) => resolvePerson(n).then((r) => r?.id ?? null)))
   ).filter((x): x is number => x != null);
 
   const hasHard =
@@ -113,38 +96,39 @@ export async function resolveCanonicalToResult(
     }
   }
 
-  // Otherwise resolve every hard entity onto the finder query.
+  // Otherwise resolve every hard entity onto the finder query — ALL through the
+  // approved typed tool boundary (src/lib/ai/tools.ts), never raw catalog calls.
   if (pendingResolution.requiredSubjects.length > 0) {
-    const sr = await resolveSubjectRequirementForTerms(pendingResolution.requiredSubjects);
+    const sr = await searchBySubject(pendingResolution.requiredSubjects);
     if (sr) {
       query.subjectKeywordIds = sr.keywordIds;
-      query.subjectLexemes = sr.requirement.lexemes;
+      query.subjectLexemes = sr.lexemes;
       query.subjectStrict = true;
-      query.subjectLabel = sr.requirement.label;
-      query.subjectCanonical = sr.requirement.canonical;
+      query.subjectLabel = sr.label;
+      query.subjectCanonical = sr.canonical;
     }
   }
   if (pendingResolution.excludedSubjects.length > 0) {
-    const ids = await searchKeywords(pendingResolution.excludedSubjects).catch(() => []);
+    const ids = await resolveKeywordIds(pendingResolution.excludedSubjects);
     if (ids.length) query.excludeKeywordIds = [...new Set([...(query.excludeKeywordIds ?? []), ...ids])];
   }
   if (pendingResolution.requiredPeople.length > 0) {
     const pids = (
-      await Promise.all(pendingResolution.requiredPeople.map((p) => searchPeople(p).then((r) => r[0]?.id ?? null).catch(() => null)))
+      await Promise.all(pendingResolution.requiredPeople.map((p) => resolvePerson(p).then((r) => r?.id ?? null)))
     ).filter((x): x is number => x != null);
     if (pids.length) query.castIds = pids;
   }
   if (pendingResolution.requiredProviders.length > 0) {
     const ids: number[] = [];
     for (const name of pendingResolution.requiredProviders) {
-      const src = resolveSource(name);
+      const src = await resolveProvider(name);
       if (src?.providerId != null) ids.push(src.providerId);
     }
     if (ids.length) query.providerIds = ids;
   }
   // Reference themes bias a hard-filtered pool toward the requested feel.
   if (refs.length > 0) {
-    const refKws = await referenceKeywordIds(refs);
+    const refKws = await referenceThemeKeywords(refs);
     if (refKws.length) query.keywordIds = [...new Set([...(query.keywordIds ?? []), ...refKws])];
   }
 
