@@ -12,6 +12,7 @@ import { deleteAccount } from '@/lib/actions/account';
 import { useToast } from '@/components/Toast';
 import { STREAMING_SERVICES, LIVE_TV_PROVIDERS } from '@/lib/services';
 import { EnableNotifications } from '@/components/EnableNotifications';
+import { TrailerAutoplayToggle } from '@/components/trailer/TrailerAutoplayToggle';
 
 export interface ShareRow {
   token: string;
@@ -416,6 +417,18 @@ export function SettingsView(props: {
           room. It’s saved on this device and toggles off just as easily.
         </p>
         <div className="mt-4">
+        </div>
+      </section>
+
+      {/* Trailer previews */}
+      <section className="card p-5">
+        <h2 className="text-lg font-semibold text-white">Trailer previews</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          When Smart Trailer Preview is on, the card you’re looking at can preview its official trailer, muted, in the
+          same space as the poster — one at a time, never a wall of moving video. Saved on this device.
+        </p>
+        <div className="mt-4">
+          <TrailerAutoplayToggle />
         </div>
       </section>
 
