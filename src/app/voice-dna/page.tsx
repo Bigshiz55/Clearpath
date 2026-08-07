@@ -1,18 +1,36 @@
-import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { isFounderOrAdminEmail } from '@/lib/admin';
+import { VoiceInterview } from '@/components/voice/VoiceInterview';
 
 /**
- * RETIRED — the Taste Interview.
+ * VOICE DNA — the founder-only entry to the spoken taste interview.
  *
- * The interview is no longer part of the product. The route stays only so the
- * old URL does not 404 for anyone who bookmarked it: it redirects to the Viewer
- * DNA hub, carrying a marker so that page can explain where they landed. The
- * notice is shown only to people who actually arrived this way.
+ * Authorization is server-side and BEFORE the experience renders: identity is
+ * verified with `supabase.auth.getUser()` (never `getSession()`), and anyone who
+ * is not a configured founder/admin gets the same hidden 404 the other founder
+ * surfaces return — the route's existence is not disclosed.
  *
- * The taste-modelling code the interview was built on survives in
- * `src/lib/taste/` — it now serves imports and ordinary product feedback.
+ * The interview itself degrades safely: with no OpenAI key the client runs the
+ * keyless browser-speech path, so this page (and `next build`) need no secrets.
  */
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  title: 'Voice DNA · founder only',
+  robots: { index: false, follow: false, nocache: true },
+};
 
-export default function RetiredInterviewRoute() {
-  redirect('/app/dna?from=interview');
+export default async function VoiceDnaPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !isFounderOrAdminEmail(user.email)) notFound();
+
+  return (
+    <main className="min-h-screen bg-cinema-radial">
+      <VoiceInterview />
+    </main>
+  );
 }

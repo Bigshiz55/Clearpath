@@ -42,6 +42,30 @@ and what it unblocks.
   representative.
 
 ## Done
+- **Voice DNA Interview — Phase 3 (client + UI).** Built the whole browser
+  experience on top of the Phase-1 engine and Phase-2 server/Realtime route,
+  branch `claude/voice-interview`. Two interchangeable transports behind one
+  `VoiceClient` interface (`src/lib/voice/realtime/types.ts`): the OpenAI
+  Realtime **WebRTC** client (`realtime/client.ts` — mic + data channel + SDP
+  handshake with the ephemeral secret, `record_signal` tool → `TasteSignal`
+  with axes resolved via the engine's `categoriesFor`, mic-level analyser for
+  the waveform, fully try/caught so any failure falls back) and the KEYLESS
+  Web-Speech fallback (`realtime/fallback.ts` — `speechSynthesis` voice +
+  `SpeechRecognition`, degrading again to a typed box), whose spoken lines are
+  interpreted by the pure `realtime/deriveSignal.ts`. Orchestrator
+  `components/voice/VoiceInterview.tsx` wires signal→`recordInterviewTurn`→
+  directive→session-steering, serialized turn chain, resume-shows-transcript,
+  and realtime→fallback→typed recovery with no dead screen. Premium mobile-first
+  UI: `Waveform` (canvas, reduced-motion aware), `LiveCaptions` (ARIA live),
+  `ConfidenceMeter`, `DnaConstellation` (36-axis live radar), `InterestingBeat`,
+  `DnaReveal`. Rebuilt `/voice-dna` (founder-gated) + added `/voice-dna/audition`
+  (founder voice preview). 21 new tests (fallback derivation, tool-args parsing,
+  constellation nodes, render smoke tests for the meter + reveal). Updated
+  `src/lib/taste/retired.test.ts` to reflect the sanctioned un-retirement of the
+  `/voice-dna` route (dropped the "Voice DNA" name ban — the new feature's real
+  name — and repointed TEST 6 at the founder-gated render; all other pins on the
+  genuinely-removed OLD Taste Interview kept). Did NOT touch the scoring engine
+  or AI search. Gates: typecheck / lint / vitest (3115 passed) / build all exit 0.
 - **Voice DNA Interview — pure domain core.** Built the full pure, deterministic
   conversation engine under `src/lib/voice/interview/` conforming to the frozen
   `types.ts` contract (no changes to it): `categories.ts` (36-axis `CATEGORY_META`
