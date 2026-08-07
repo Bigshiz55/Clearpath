@@ -402,11 +402,29 @@ export async function runFinder(
     ),
   );
   const candMap = new Map<string, { id: number; mediaType: MediaType }>();
-  for (const pool of pools) {
-    for (const c of pool) {
-      const key = `${c.mediaType}-${c.id}`;
-      if (seen.has(key) || candMap.has(key)) continue;
-      candMap.set(key, { id: c.id, mediaType: c.mediaType });
+  if (dubLanguages) {
+    // The dubbed-"any" path fans MANY movie language pools before the first TV
+    // pool, so a pool-by-pool drain would fill the candidate cap with movies and
+    // drop every TV result. Round-robin across pools (one per pool per round) so
+    // each media type AND source language is represented before the cap. Applied
+    // only on the fan-out path — every other query keeps the original drain.
+    const maxLen = pools.reduce((m, p) => Math.max(m, p.length), 0);
+    for (let i = 0; i < maxLen; i++) {
+      for (const pool of pools) {
+        const c = pool[i];
+        if (!c) continue;
+        const key = `${c.mediaType}-${c.id}`;
+        if (seen.has(key) || candMap.has(key)) continue;
+        candMap.set(key, { id: c.id, mediaType: c.mediaType });
+      }
+    }
+  } else {
+    for (const pool of pools) {
+      for (const c of pool) {
+        const key = `${c.mediaType}-${c.id}`;
+        if (seen.has(key) || candMap.has(key)) continue;
+        candMap.set(key, { id: c.id, mediaType: c.mediaType });
+      }
     }
   }
   const candidates = Array.from(candMap.values()).slice(0, candidateTarget(limit));
