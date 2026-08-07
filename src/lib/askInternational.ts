@@ -21,7 +21,16 @@ export function augmentInternational(query: FinderQuery, text: string): FinderQu
   if (origin.languages.length && !(query.originalLanguages && query.originalLanguages.length)) {
     query.originalLanguages = origin.languages;
   }
-  if (audio.englishAudioRequired) query.englishAudioOnly = true;
+  // "English DUBBED" is stricter than "in English". It asks for a NON-English
+  // original that offers an English dub, so native-English titles must be
+  // EXCLUDED — the finder maps this to englishAvailability === 'available'
+  // ('native' is the English-original bucket, 'available' is the dub bucket).
+  // A plain "in English" stays the looser englishAudioOnly (native OR dub).
+  if (audio.englishDubRequired) {
+    query.englishDubOnly = true;
+  } else if (audio.englishAudioRequired) {
+    query.englishAudioOnly = true;
+  }
   // Runtime is a CEILING, so the tighter value must win. The parser's default
   // cap (~150) is not a user signal, and a worded "under two hours" (120) the
   // regex parser misses would otherwise be lost. Taking the min never loosens

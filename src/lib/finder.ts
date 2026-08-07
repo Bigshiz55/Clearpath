@@ -74,6 +74,10 @@ export interface FinderQuery {
   minAudience: number | null; // 0..100 — TMDB crowd score
   minImdb: number | null; // 0..10 — minimum IMDb rating
   englishAudioOnly: boolean;
+  /** "English DUBBED" — a NON-English original that offers an English dub.
+   *  Stricter than englishAudioOnly: native-English titles are excluded, so a
+   *  candidate qualifies only when englishAvailability === 'available'. */
+  englishDubOnly?: boolean;
   onMyServices: boolean;
   /** Explicit streaming provider ids to require (the on-home service checkboxes). */
   providerIds?: number[];
@@ -336,9 +340,25 @@ export async function runFinder(
   // needs a pool several times that size, because hard filters below kill
   // candidates AFTER hydration. Two fixed pages could never fill a grid.
   const pages = discoverPages(limit, types.length);
+  // When an English DUB is required with no explicit source language, bias
+  // discovery toward the languages most often dubbed into English. A bare
+  // popularity.desc pool is English-dominated, so post-filtering to a dub alone
+  // would starve the set; fanning the source language fills it. Guarded — only
+  // this intent fans languages; every other query keeps its single pass.
+  const DUB_SOURCE_LANGUAGES = ['ja', 'ko', 'es', 'fr', 'de', 'it', 'hi', 'zh', 'pt', 'ru'];
+  const dubLanguages =
+    q.englishDubOnly && !(q.originalLanguages && q.originalLanguages.length)
+      ? DUB_SOURCE_LANGUAGES
+      : null;
+  const languagePasses: (string | undefined)[] = dubLanguages ?? [q.originalLanguages?.[0]];
+  // Bound the request: one page per language when fanning the whole set.
+  const languagePages = dubLanguages ? pages.slice(0, 1) : pages;
+  const langPagePairs = languagePasses.flatMap((lang) =>
+    languagePages.map((page) => ({ lang, page })),
+  );
   const pools = await Promise.all(
     types.flatMap((mt) =>
-      pages.map((page) =>
+      langPagePairs.map(({ lang, page }) =>
         discoverTitles(mt, {
           genreIds: q.genreIds,
           providerIds:
@@ -372,7 +392,7 @@ export async function runFinder(
           // production origin / original language so "a Spanish film" never
           // surfaces a US-only blockbuster (TMDB with_original_language /
           // with_origin_country). First entry wins when several are named.
-          originalLanguage: q.originalLanguages?.[0],
+          originalLanguage: lang,
           originCountry: q.originCountries?.[0],
           monetization: q.monetization,
           sortBy: 'popularity.desc',
@@ -382,11 +402,29 @@ export async function runFinder(
     ),
   );
   const candMap = new Map<string, { id: number; mediaType: MediaType }>();
-  for (const pool of pools) {
-    for (const c of pool) {
-      const key = `${c.mediaType}-${c.id}`;
-      if (seen.has(key) || candMap.has(key)) continue;
-      candMap.set(key, { id: c.id, mediaType: c.mediaType });
+  if (dubLanguages) {
+    // The dubbed-"any" path fans MANY movie language pools before the first TV
+    // pool, so a pool-by-pool drain would fill the candidate cap with movies and
+    // drop every TV result. Round-robin across pools (one per pool per round) so
+    // each media type AND source language is represented before the cap. Applied
+    // only on the fan-out path — every other query keeps the original drain.
+    const maxLen = pools.reduce((m, p) => Math.max(m, p.length), 0);
+    for (let i = 0; i < maxLen; i++) {
+      for (const pool of pools) {
+        const c = pool[i];
+        if (!c) continue;
+        const key = `${c.mediaType}-${c.id}`;
+        if (seen.has(key) || candMap.has(key)) continue;
+        candMap.set(key, { id: c.id, mediaType: c.mediaType });
+      }
+    }
+  } else {
+    for (const pool of pools) {
+      for (const c of pool) {
+        const key = `${c.mediaType}-${c.id}`;
+        if (seen.has(key) || candMap.has(key)) continue;
+        candMap.set(key, { id: c.id, mediaType: c.mediaType });
+      }
     }
   }
   const candidates = Array.from(candMap.values()).slice(0, candidateTarget(limit));
@@ -447,6 +485,11 @@ export async function runFinder(
         return null;
       }
       if (q.englishAudioOnly) receipts.push('English audio');
+      // English DUB required — a NON-English original with an English dub.
+      // 'native' (English original) is excluded on purpose; only 'available'
+      // (an English track exists on a non-English original) qualifies.
+      if (q.englishDubOnly && meta.englishAvailability !== 'available') return null;
+      if (q.englishDubOnly) receipts.push('English dub');
       // On my services.
       const included = providers ? includedServiceNames(providers.options, services) : [];
       if (q.onMyServices) {
