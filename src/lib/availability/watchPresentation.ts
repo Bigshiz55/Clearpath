@@ -104,8 +104,19 @@ export type CtaKind =
   | 'notify_me';
 
 export interface WatchLine {
-  /** Primary text, e.g. "Included with Hulu" or "CBS". */
+  /** Primary text, e.g. "Included with Hulu" or "CBS". Always the full,
+   *  accessible label; the compact chip UI shows the logo/short name and keeps
+   *  this as the tooltip + screen-reader text. */
   text: string;
+  /** The bare service name ("Hulu", "Prime Video") for the compact chip label
+   *  when no logo is available. Streaming lines only. */
+  service?: string;
+  /** TMDB logo path for the provider, when we have one — lets the card show the
+   *  actual network icon instead of its spelled-out name. Null/absent → the
+   *  short service name is shown instead (never a guessed logo). */
+  logoPath?: string | null;
+  /** A one-word transaction marker for a chip ("Rent"/"Buy"), null for included. */
+  badge?: string | null;
   /** Secondary line, e.g. "WTVR · Channel 6" or "Tonight at 9:00 PM". */
   detail: string | null;
   /** "Last verified 3 days ago" — shown only where it changes the reading. */
@@ -343,6 +354,9 @@ export function resolveWatchPresentation(input: WatchPresentationInput): WatchPr
     lines.push({
       kind: 'streaming',
       text: streamingText(o),
+      service: o.service,
+      logoPath: o.logoPath ?? null,
+      badge: o.state === 'rent' ? 'Rent' : o.state === 'buy' ? 'Buy' : null,
       detail: null,
       verified: verifiedLabel(o.lastVerifiedAt, now),
       href: o.watchLink,
