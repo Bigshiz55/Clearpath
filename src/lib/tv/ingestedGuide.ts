@@ -1,6 +1,17 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Airing } from '@/lib/onTv';
+import { selectUpcomingAirings, usBroadcastDate, UPCOMING_TV_HORIZON_MS, type Airing } from '@/lib/onTv';
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * Below this many ingested rows a guide surface treats the canonical (ingested)
+ * source as too thin to trust and falls back to the live TVmaze fetch, so no
+ * surface is ever blank. Shared by every caller so the fallback threshold is
+ * defined in exactly one place.
+ */
+export const INGESTED_MIN = 3;
 
 /**
  * THE FULL GUIDE'S OWN CHANNELS — real listings from the TVmaze ingest tables
@@ -17,6 +28,14 @@ import type { Airing } from '@/lib/onTv';
  * already renders in this same `Airing` shape.
  */
 
+// F4 timezone seam: the ingest layer bakes an Eastern-anchored `time` string
+// into each Airing (see `localTimeParts` / `ingestedRowToAiring` below). This
+// is a FALLBACK ONLY — the client re-derives the display time from `airstamp`
+// (the authoritative ISO-UTC instant) in the viewer's own zone, exactly as it
+// does for the live-fetch path. Keeping the field Eastern-anchored matches the
+// live path's own "provider airtimes are Eastern" convention (see
+// `usBroadcastDate` in onTv.ts); it is intentionally NOT a naive-`Date` local
+// conversion, so no server-zone timezone bug can leak in here.
 const NETWORK_TZ = 'America/New_York';
 
 const PROGRAMME_TYPE_TO_SHOW_TYPE: Record<string, string> = {
@@ -197,4 +216,86 @@ export async function getIngestedGuideAirings(
       }),
     ];
   });
+}
+
+/**
+ * "Coming up on TV", read from the INGESTED tables instead of the live TVmaze
+ * fetch — the canonical guide source now that the ingest carries national
+ * breadth. Mirrors `getUpcomingTv`'s contract exactly: it reads the ingested
+ * airings over the horizon window and hands them to the SAME pure selector
+ * (`selectUpcomingAirings`) the live path uses, so the noise/genre/network/
+ * movie filters, rating rank, showId dedupe and time ordering are identical and
+ * the returned `Airing[]` is indistinguishable in shape from the live result.
+ *
+ * The ingested lineup is the US national grid, so this is a no-op (returns [])
+ * for any non-US region — callers fall back to the live `getUpcomingTv(region…)`
+ * path, which is region-aware. It never throws: a query failure degrades to []
+ * so the caller's never-blank fallback takes over.
+ */
+export async function getUpcomingTvIngested(
+  supabase: SupabaseClient,
+  region: string,
+  nowMs: number,
+  horizonMs: number = UPCOMING_TV_HORIZON_MS,
+  genre: string | null = null,
+  network: string | null = null,
+  movieOnly = false,
+): Promise<Airing[]> {
+  if (region !== 'US') return [];
+  const clampedHorizon = Math.max(HOUR_MS, Math.min(horizonMs, UPCOMING_TV_HORIZON_MS));
+  const airings = await getIngestedGuideAirings(supabase, nowMs, clampedHorizon).catch((e) => {
+    console.error('[ingestedGuide] getUpcomingTvIngested read failed', e instanceof Error ? e.message : e);
+    return [] as Airing[];
+  });
+  return selectUpcomingAirings(airings, nowMs, horizonMs, genre, network, movieOnly);
+}
+
+/**
+ * PURE: the airings on the SAME US-Eastern calendar day as `nowMs`, in
+ * time-of-day order — the exact contract `getOnTvToday` returns (a full day,
+ * every airing, not a curated/deduped subset), so `OnTvGuide` (which shows a
+ * `{count} airings` total and does its own now-&-next curation) behaves
+ * identically no matter which source fed it. `usBroadcastDate` is the same
+ * Eastern day key `getOnTvToday` uses, so the two sources agree on "today"
+ * (DST-safe: it is an Intl Eastern format, never `+24h` arithmetic).
+ */
+export function selectTodayAirings(airings: Airing[], nowMs: number): Airing[] {
+  const todayEastern = usBroadcastDate(nowMs);
+  return airings
+    .filter((a) => {
+      // Guard an unparseable airstamp: Date.parse → NaN, and usBroadcastDate
+      // would throw on `new Date(NaN)`. A row with no usable start is dropped,
+      // never crashes the guide (matches `toAiring`'s own no-airstamp guard).
+      const ms = Date.parse(a.airstamp);
+      return Number.isFinite(ms) && usBroadcastDate(ms) === todayEastern;
+    })
+    .sort((a, b) => a.minutes - b.minutes);
+}
+
+/**
+ * "On TV today", read from the INGESTED tables — the like-for-like ingested
+ * counterpart of the live `getOnTvToday(region, date)`. It reads a window that
+ * comfortably brackets the US-Eastern calendar day around `nowMs` (a day of
+ * lookback + a day ahead) and keeps only that day's airings, so a viewer late
+ * in the evening still sees the whole day and one early the next morning does
+ * not bleed into it. Returns the FULL day's set (no rank/dedupe/noise filter),
+ * matching `getOnTvToday`'s contract exactly.
+ *
+ * US-only (the ingested lineup is the US national grid) → non-US returns [] so
+ * the caller falls back to the region-aware live path. Never throws: a query
+ * failure degrades to [] and the caller's never-blank fallback takes over.
+ */
+export async function getOnTvTodayIngested(
+  supabase: SupabaseClient,
+  region: string,
+  nowMs: number,
+): Promise<Airing[]> {
+  if (region !== 'US') return [];
+  // Bracket the Eastern day: up to ~24h of it may already be in the past when
+  // it is late evening, and up to ~24h ahead when it is early morning.
+  const airings = await getIngestedGuideAirings(supabase, nowMs, DAY_MS, DAY_MS).catch((e) => {
+    console.error('[ingestedGuide] getOnTvTodayIngested read failed', e instanceof Error ? e.message : e);
+    return [] as Airing[];
+  });
+  return selectTodayAirings(airings, nowMs);
 }

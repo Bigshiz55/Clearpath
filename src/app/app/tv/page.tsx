@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfile, getPreferenceRules, regionFor } from '@/lib/profile';
 import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle, usBroadcastDate, type Airing } from '@/lib/onTv';
 import { scoreGuideAirings } from '@/lib/tv/scoreGuide';
-import { getIngestedGuideAirings } from '@/lib/tv/ingestedGuide';
+import { getIngestedGuideAirings, getOnTvTodayIngested, INGESTED_MIN } from '@/lib/tv/ingestedGuide';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
@@ -84,7 +84,19 @@ export default async function OnTvPage({
   // and the empty-state wording, so the two can never disagree.
   const gridConnected = hasFullGridProvider();
 
-  const airingsRaw = guideView ? [] : await getOnTvToday(region, date);
+  // HIGHLIGHTS SOURCE — the ingested national guide is canonical; the live
+  // TVmaze day-fetch is the never-blank fallback. `getOnTvTodayIngested` returns
+  // the SAME "today, every airing, time-ordered" contract as `getOnTvToday`, so
+  // this is a like-for-like source swap: `OnTvGuide` still gets a full day (its
+  // `{count} airings` total and now-&-next curation are unchanged), just from
+  // the canonical tables. Fall back to the live day-fetch only when ingested
+  // returns too few rows (empty/stale) or errors; when BOTH are empty the
+  // existing empty state renders (nothing crashes).
+  let airingsRaw: Airing[] = [];
+  if (!guideView) {
+    const ingestedToday = await getOnTvTodayIngested(supabase, region, now.getTime()).catch(() => [] as Airing[]);
+    airingsRaw = ingestedToday.length >= INGESTED_MIN ? ingestedToday : await getOnTvToday(region, date);
+  }
   // Add IMDb / Rotten Tomatoes / Metacritic to the placards (cached, bounded).
   const airings = await enrichAiringsWithCritics(airingsRaw).then((a) => enrichAiringsWithTmdb(a));
 
@@ -126,10 +138,14 @@ export default async function OnTvPage({
     guidePersonalized = (count ?? 0) >= DNA_PERSONAL_MIN;
   }
 
-  // COVERAGE HONESTY, FROM THE DATA — NOT FROM A CONFIG FLAG. `guideAirings`
-  // is always empty for now (see above), so this reduces to `gridConnected` —
-  // kept as its own value rather than inlined so the banner's condition still
-  // reads as "is there real grid data", not "is a specific provider's flag set".
+  // COVERAGE HONESTY, FROM THE DATA — NOT FROM A CONFIG FLAG. `gridLive` is
+  // data-driven: the ingested tables now carry real national breadth, so in the
+  // Full-guide view `guideAirings` holds actual rows and `gridProbe.length > 0`
+  // makes coverage read as live from the data itself (not from a provider flag).
+  // In the Highlights view `guideAirings` is [] (the guide read only runs under
+  // ?view=guide), so there `gridLive` still reduces to `gridConnected`. Kept as
+  // its own value rather than inlined so the banner's condition reads as "is
+  // there real grid data", not "is a specific provider's flag set".
   const gridProbe = guideAirings;
   const gridLive = gridConnected || gridProbe.length > 0;
 
