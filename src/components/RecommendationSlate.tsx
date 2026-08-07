@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { buildRecommendationSlate, recordRecommendationOutcome, type SlateItem } from '@/lib/actions/recommendations';
 import { WCheck } from '@/components/WCheck';
 import { AlgorithmScore } from '@/components/AlgorithmScore';
+import { TrailerMedia } from '@/components/trailer/TrailerMedia';
 
 /**
  * A refreshable, self-validating recommendation slate.
@@ -116,12 +117,14 @@ export function RecommendationSlate({
                     surface's own number (logged for accuracy tracking) and is
                     not the same thing as the Verd1ct below. */}
                 <WCheck tmdbId={it.id} mediaType={it.mediaType} title={it.title} year={it.year} posterUrl={it.posterUrl} />
-                {it.posterUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={it.posterUrl} alt={it.title} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full items-center justify-center p-2 text-center text-xs font-bold text-white">{it.title}</div>
-                )}
+                <TrailerMedia tmdbId={it.id} mediaType={it.mediaType} title={it.title}>
+                  {it.posterUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={it.posterUrl} alt={it.title} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center p-2 text-center text-xs font-bold text-white">{it.title}</div>
+                  )}
+                </TrailerMedia>
                 <span className="absolute left-1 top-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] font-black text-white" title="Predicted match for you">{it.predicted}</span>
               </div>
               <div className="p-2">
