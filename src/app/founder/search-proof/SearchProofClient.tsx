@@ -96,12 +96,38 @@ function centralityColor(centrality: string, eligible: boolean): string {
   return C.bad;
 }
 
+interface SelfTestFailure {
+  caseId: string;
+  subject: string;
+  request: string;
+  falsePositives: string[];
+  falseNegatives: string[];
+}
+interface SelfTestResult {
+  sha?: string;
+  mode: string;
+  seed: number | null;
+  cases: number;
+  passed: number;
+  passRate: number;
+  decoyLeaks: number;
+  falseNegativeCases: number;
+  failures: SelfTestFailure[];
+  reproduce: string;
+  allGreen: boolean;
+}
+
 export default function SearchProofClient({ pageSha }: { pageSha: string }) {
   const [version, setVersion] = useState<VersionInfo | null>(null);
   const [query, setQuery] = useState(DEFAULT_QUERY);
   const [resp, setResp] = useState<ProofResponse | null>(null);
   const [respSha, setRespSha] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Deterministic offline self-test (no keys needed).
+  const [selfTest, setSelfTest] = useState<SelfTestResult | null>(null);
+  const [selfTestBusy, setSelfTestBusy] = useState(false);
+  const [seed, setSeed] = useState('1337');
+  const [cases, setCases] = useState('300');
 
   useEffect(() => {
     fetch('/api/version')
@@ -128,6 +154,42 @@ export default function SearchProofClient({ pageSha }: { pageSha: string }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function runSelfTest(mode: 'regression' | 'random' | 'seed') {
+    setSelfTestBusy(true);
+    setSelfTest(null);
+    try {
+      const r = await fetch('/api/founder/semantic-selftest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          mode,
+          seed: mode === 'regression' ? undefined : Number(seed) || 1337,
+          cases: mode === 'regression' ? undefined : Number(cases) || 300,
+        }),
+      });
+      if (!r.ok) {
+        setSelfTest(null);
+        return;
+      }
+      setSelfTest((await r.json()) as SelfTestResult);
+    } catch {
+      setSelfTest(null);
+    } finally {
+      setSelfTestBusy(false);
+    }
+  }
+
+  function downloadSelfTest() {
+    if (!selfTest) return;
+    const blob = new Blob([JSON.stringify(selfTest, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `semantic-selftest-${selfTest.mode}-${selfTest.seed ?? 'frozen'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   function download() {
@@ -196,6 +258,79 @@ export default function SearchProofClient({ pageSha }: { pageSha: string }) {
         {shaMismatch && (
           <div style={{ color: C.bad, fontWeight: 600, marginTop: 6 }}>
             This page loaded an older build. Refresh before evaluating these results.
+          </div>
+        )}
+      </section>
+
+      <section
+        data-testid="semantic-selftest"
+        style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12, margin: '12px 0' }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Semantic self-test — deterministic, offline</div>
+        <p style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>
+          Runs the REAL centrality evaluator over a frozen corpus of central titles and controlled decoys (the
+          Snake-Eyes class). No TMDB or OpenAI key needed — it proves the rejection logic on this exact build. Green
+          means zero decoys were ever eligible and every central title passed.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', margin: '8px 0' }}>
+          <button
+            data-testid="selftest-regression"
+            onClick={() => runSelfTest('regression')}
+            disabled={selfTestBusy}
+            style={{ padding: '7px 12px', borderRadius: 6, background: C.good, color: '#02110a', fontWeight: 700, border: 0 }}
+          >
+            Run boxing regression
+          </button>
+          <button
+            data-testid="selftest-random"
+            onClick={() => runSelfTest('random')}
+            disabled={selfTestBusy}
+            style={{ padding: '7px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+          >
+            Run N random cases
+          </button>
+          <button
+            data-testid="selftest-seed"
+            onClick={() => runSelfTest('seed')}
+            disabled={selfTestBusy}
+            style={{ padding: '7px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+          >
+            Reproduce seed
+          </button>
+          <label style={{ fontSize: 12, color: C.dim }}>
+            seed{' '}
+            <input value={seed} onChange={(e) => setSeed(e.target.value)} size={7}
+              style={{ background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 4, padding: '3px 5px' }} />
+          </label>
+          <label style={{ fontSize: 12, color: C.dim }}>
+            cases{' '}
+            <input value={cases} onChange={(e) => setCases(e.target.value)} size={6}
+              style={{ background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 4, padding: '3px 5px' }} />
+          </label>
+          {selfTest && (
+            <button onClick={downloadSelfTest} style={{ padding: '7px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}>
+              Export
+            </button>
+          )}
+        </div>
+        {selfTestBusy && <div style={{ fontSize: 13, color: C.dim }}>Running…</div>}
+        {selfTest && (
+          <div data-testid="selftest-result" data-all-green={selfTest.allGreen ? '1' : '0'} style={{ marginTop: 4 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: selfTest.allGreen ? C.good : C.bad }}>
+              {selfTest.allGreen ? 'PASS' : 'FAIL'} — {selfTest.passed}/{selfTest.cases} cases · {selfTest.decoyLeaks} decoy leak{selfTest.decoyLeaks === 1 ? '' : 's'} · {(selfTest.passRate * 100).toFixed(1)}%
+            </div>
+            <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
+              mode={selfTest.mode} · {selfTest.reproduce} · build <code style={{ color: C.code }}>{selfTest.sha}</code>
+            </div>
+            {selfTest.failures.length > 0 && (
+              <ul style={{ fontSize: 12, color: C.bad, marginTop: 6 }}>
+                {selfTest.failures.map((f) => (
+                  <li key={f.caseId}>
+                    <code style={{ color: C.code }}>{f.caseId}</code> “{f.request}” — leaked: [{f.falsePositives.join(', ') || '—'}], missed: [{f.falseNegatives.join(', ') || '—'}]
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </section>
