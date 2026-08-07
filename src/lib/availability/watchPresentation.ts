@@ -356,7 +356,7 @@ export function resolveWatchPresentation(input: WatchPresentationInput): WatchPr
       text: streamingText(o),
       service: o.service,
       logoPath: o.logoPath ?? null,
-      badge: o.state === 'rent' ? 'Rent' : o.state === 'buy' ? 'Buy' : null,
+      badge: o.state === 'rent' ? 'Rent' : o.state === 'buy' ? 'Buy' : o.state === 'free_with_ads' ? 'Free' : null,
       detail: null,
       verified: verifiedLabel(o.lastVerifiedAt, now),
       href: o.watchLink,

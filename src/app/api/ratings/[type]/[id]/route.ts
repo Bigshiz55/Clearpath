@@ -75,6 +75,7 @@ export async function GET(_req: Request, { params }: { params: { type: string; i
             name: o.providerName,
             type: o.type as TmdbProviderType,
             link: o.link ?? null,
+            logo: o.logoPath ?? null,
           })),
           checkedAt: providers.checkedAt,
         }

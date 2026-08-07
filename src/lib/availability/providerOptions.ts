@@ -51,6 +51,9 @@ export interface TileProviderOption {
   type: TmdbProviderType;
   /** A real deep link when Watchmode enriched this row; null otherwise. */
   link: string | null;
+  /** TMDB logo path for the provider, so the card can show the network's own
+   *  icon instead of its spelled-out name. Null when TMDB gave us none. */
+  logo?: string | null;
 }
 
 export interface TileProviders {
@@ -114,6 +117,7 @@ export function optionsFromTileProviders(p: TileProviders | null | undefined): {
       price: null,
       watchLink: o.link,
       lastVerifiedAt: p.checkedAt,
+      logoPath: o.logo ?? null,
       provenance: 'tmdb',
     })),
   };
