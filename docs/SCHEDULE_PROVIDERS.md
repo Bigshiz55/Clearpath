@@ -219,40 +219,33 @@ wrapper key around the listings array, still not pinned down beyond
 Implement `ScheduleAdapter`, give it a priority, add it to `adapters()` in
 `src/lib/viewing/liveTv.ts`. That is the entire integration surface.
 
-## Cron scheduling constraint
+## Cron scheduling
 
-`/api/cron/tv-ingest` is deliberately **not** registered in `vercel.json`.
+`/api/cron/tv-ingest` is registered in `vercel.json` at an **hourly** cadence:
 
-Vercel's Hobby plan allows two cron jobs, and those two are already taken by
-`daily-scan` and `classify`. Registering a third fails the deployment outright —
-which is exactly what happened, and it silently blocked two commits from
-reaching production until the cause was traced.
+```json
+{ "path": "/api/cron/tv-ingest", "schedule": "0 * * * *" }
+```
 
-Hobby also restricts cron frequency to once per day, so the hourly schedule this
-route needs (each lineup runs at its own local 2 AM) is unavailable there
-regardless.
+Vercel now allows up to **100 cron jobs per project on every plan** (as of
+2026-01-20), so the earlier two-cron ceiling — which once forced this route off
+the schedule and pushed TV freshness onto a daily piggyback and an external
+GitHub Actions ping — no longer applies. The hourly Vercel cron is now the
+authoritative trigger.
 
-**The ingest is not orphaned, though.** `/api/cron/daily-scan` calls the same
-gating logic (`src/lib/viewing/ingest/scheduledIngest.ts`) once a day, right
-after its release-notes scan, so `tv_stations`/`tv_programmes`/`tv_airings`
-get kept warm without a third cron slot. That's enough to keep the full guide
-non-empty; it is not hourly freshness. To get closer to hourly:
+**`daily-scan` still calls the same ingest as a harmless fallback.**
+`/api/cron/daily-scan` calls the same gating logic
+(`src/lib/viewing/ingest/scheduledIngest.ts`) once a day, right after its
+release-notes scan, so `tv_stations`/`tv_programmes`/`tv_airings` stay warm
+even if an hourly tick is ever missed.
 
-* **On Vercel Pro** — add to `vercel.json` and redeploy:
-  ```json
-  { "path": "/api/cron/tv-ingest", "schedule": "0 * * * *" }
-  ```
-* **Staying on Hobby** — trigger `/api/cron/tv-ingest` hourly from an external
-  scheduler (GitHub Actions on a `schedule:` trigger, or Supabase's
-  `pg_cron`) with the `CRON_SECRET` bearer token. The route's auth check is
-  the same either way.
-
-Either path needs no code change. Both `daily-scan` and `tv-ingest` call the
-same shared gate: TVmaze runs at most once per UTC calendar day, TV Media at
-most once every two hours (see "Cost control" below). Both checks live in
-`tv_ingestion_runs`, so calling the gate from two different routes — or an
-hourly external ping on top of the daily one — is always a safe no-op in
-between either provider's own cadence, never a double-run.
+Both `daily-scan` and `tv-ingest` call the same shared gate: TVmaze runs at
+most once per UTC calendar day, TV Media at most once every two hours (see
+"Cost control" below). Both checks live in `tv_ingestion_runs`, so calling the
+gate from two different routes — or an hourly tick on top of the daily one — is
+always a safe no-op in between either provider's own cadence, never a
+double-run. An external scheduler (GitHub Actions `schedule:`, Supabase
+`pg_cron`) can still hit the route for finer control, but is no longer required.
 
 ## Full guide ingestion — how TV Media becomes the primary
 

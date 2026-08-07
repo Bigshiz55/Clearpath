@@ -1,9 +1,13 @@
 name: Refresh TV ingest
 
 # Hourly external trigger for the TVmaze + TV Media ingest into the 0032 tv_*
-# tables. Vercel's Hobby plan caps at two cron jobs, both already spent, and
-# Hobby cron only fires daily anyway — so an external hourly scheduler is the
-# documented way to run this (docs/SCHEDULE_PROVIDERS.md).
+# tables. As of 2026-01-20 Vercel allows up to 100 cron jobs per project on
+# every plan, so `/api/cron/tv-ingest` is now registered directly in
+# vercel.json at an hourly cadence and is the authoritative trigger. This
+# workflow stays as a redundant belt-and-suspenders external ping — harmless
+# because the ingest is idempotent and self-gated (see below) — and remains
+# useful for pointing at a staging deployment via SITE_URL
+# (docs/SCHEDULE_PROVIDERS.md).
 #
 # ── WHY THIS NO LONGER USES CRON_SECRET ───────────────────────────────────
 # It used to call /api/cron/tv-ingest with a bearer token that had to match
@@ -40,10 +44,11 @@ name: Refresh TV ingest
 # the reason. That is the switch working; check_tv_refresh.py treats it as a
 # notice, not a failure.
 #
-# Deleting this schedule would NOT have made TV Media safe — two other
-# triggers reach the same code (the daily Vercel cron and /api/cron/tv-ingest).
-# The gate covers all three, which is why the schedule can stay: TVmaze is
-# free and still worth refreshing hourly.
+# Deleting this schedule would NOT have made TV Media safe — the same code is
+# reached by the hourly Vercel cron (/api/cron/tv-ingest) and the daily Vercel
+# cron (/api/cron/daily-scan) as well. The gate covers every path, which is why
+# this schedule can stay as a harmless redundant ping: TVmaze is free, and an
+# extra hourly no-op costs nothing.
 
 on:
   schedule:
