@@ -21,8 +21,27 @@ describe('ask route international augmentation (live wiring)', () => {
     const q = augmentInternational(base(), 'A Korean thriller under two hours with an English dub.');
     expect(q.originCountries).toEqual(['KR']);
     expect(q.originalLanguages).toEqual(['ko']);
-    expect(q.englishAudioOnly).toBe(true);
+    // "English dub" is the STRICT dub-only signal (a non-English original with
+    // an English track), not the looser englishAudioOnly that also allows
+    // native-English titles.
+    expect(q.englishDubOnly).toBe(true);
+    expect(q.englishAudioOnly).toBe(false);
     expect(q.maxRuntime).toBe(120);
+  });
+
+  it('"English dubbed" with no named language is dub-only, not native English', () => {
+    // Regression for the reported query: this must exclude native-English
+    // titles (englishDubOnly), so the finder keeps only foreign originals that
+    // carry an English dub (englishAvailability === 'available').
+    const q = augmentInternational(base(), "movies where the primary language is not English, but it's English dubbed");
+    expect(q.englishDubOnly).toBe(true);
+    expect(q.englishAudioOnly).toBe(false);
+  });
+
+  it('plain "in English" stays the looser englishAudioOnly (native OR dub)', () => {
+    const q = augmentInternational(base(), 'a thriller in English');
+    expect(q.englishAudioOnly).toBe(true);
+    expect(q.englishDubOnly).toBeFalsy();
   });
 
   it('leaves a domestic request untouched', () => {

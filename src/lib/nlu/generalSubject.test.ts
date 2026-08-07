@@ -37,6 +37,15 @@ describe('detectGeneralSubject — arbitrary subjects from the user’s own word
     expect(detectGeneralSubject('a great movie')).toBeNull();
     expect(detectGeneralSubject('a good film under two hours')).toBeNull();
   });
+
+  it('does NOT treat a leading temporal/availability filler as a subject', () => {
+    // Regression: "Anytime movies where the primary language is not English…"
+    // made "anytime" a strict "Anytime" subject that no title is central to,
+    // clearing every result. A recency filler is never the content subject.
+    expect(detectGeneralSubject("Anytime movies where the primary language is not English, but it's English dubbed")).toBeNull();
+    expect(detectGeneralSubject('anytime movies on my services')).toBeNull();
+    expect(detectGeneralSubject('whenever films that are funny')).toBeNull();
+  });
 });
 
 describe('isSingularSubjectRequest — the requested-count = 1 signal', () => {
