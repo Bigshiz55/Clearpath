@@ -10,6 +10,8 @@ import { askSimilarTo, extractReference } from '@/lib/askJudge';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
 import { applyRequiredSubject } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
+import { serverEnv } from '@/lib/env';
+import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBridge';
 
 const BUILD_SHA = getBuildInfo().gitSha || 'unknown';
 
@@ -70,6 +72,32 @@ export async function POST(req: Request) {
     let limit = DEFAULT_RESULT_LIMIT;
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     const cls = text ? classifySearch(text) : null;
+
+    // AI ORCHESTRATOR (feature-flagged; default legacy = OFF). In ANTHROPIC mode
+    // Claude is the primary brain for semantic discovery/similarity — same
+    // interpretation layer as /api/ask, so both surfaces mean the same thing.
+    // Exact-title/person/live-TV defer to the deterministic path; any AI failure
+    // falls through to legacy. Nothing here runs until the owner enables it.
+    const aiMode = serverEnv.aiDiscoveryMode();
+    if (aiMode === 'anthropic' && text) {
+      const aiOut = await runAiDiscovery({ supabase, userId: user.id, text, route: 'finder', limit: parseRequestedCount(text) });
+      if (aiOut.kind === 'clarify') {
+        return finderJson({ route: '/api/finder', clarify: aiOut.question, options: aiOut.options, interpretation: aiOut.interpretation, query: { ...EMPTY_QUERY }, items: [] });
+      }
+      if (aiOut.kind === 'search') {
+        return finderJson({
+          route: '/api/finder',
+          brain: 'anthropic',
+          query: aiOut.query,
+          interpretation: aiOut.interpretation,
+          scoredFor: aiOut.scoredFor,
+          relaxed: aiOut.relaxed,
+          items: aiOut.items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+        });
+      }
+      // 'unavailable' → fall through to the legacy path below.
+    }
+
     const ai = text ? await parseAskWithAI(text) : null;
     if (ai) {
       query = ai.query;
@@ -208,6 +236,12 @@ export async function POST(req: Request) {
       stages: result.diagnostics,
       generic_filler_possible: false,
     };
+
+    // SHADOW MODE: legacy served the user; record a safe structural comparison.
+    // Metadata only, never awaited. No-op unless AI_DISCOVERY_MODE=shadow.
+    if (aiMode === 'shadow' && text) {
+      void recordShadowInterpretation({ text, route: 'finder', legacyResultCount: items.length });
+    }
 
     return finderJson({
       route: '/api/finder',

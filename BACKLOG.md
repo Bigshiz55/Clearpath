@@ -10,6 +10,21 @@ production and apply pending migrations with your `MIGRATE_SECRET` — see the
 and what it unblocks.
 
 ## Next
+- **Turn on the AI orchestrator (owner action).** The provider-independent
+  Claude discovery brain is built, tested, and shipped OFF (`AI_DISCOVERY_MODE`
+  defaults to `legacy`). To evaluate it: set `ANTHROPIC_API_KEY` (server-only)
+  and `AI_DISCOVERY_MODE=shadow`, watch the `ai_discovery_shadow` telemetry, then
+  flip to `anthropic` once it proves out. See `docs/AI_DATA_ARCHITECTURE.md`.
+- **Canonical TV data platform is shipped-dormant (owner-gated data work).**
+  Migration `0044` defines the correct provenance-complete `canon_*/dist_*/
+  linear_*` model, but it is fed only by fixtures and read by no production
+  surface — the guide runs on legacy `tv_*` + `watchmode_availability`. Wiring a
+  verified ingester into the canonical tables and bridging legacy → canonical is
+  blocked on a data-licensing/credential decision (TV Media / Watchmode /
+  Schedules Direct). Documented as the P1 sequence in `docs/AI_DATA_ARCHITECTURE.md`.
+- **Semantic reference similarity via embeddings/pgvector.** Reference "like X"
+  similarity is TMDB getSimilar + keyword/genre overlap today; `embed()` infra
+  exists (powers DNA) but isn't wired into reference similarity yet.
 - **Shared admin token gate across all `/admin` routes.** `/admin/content`
   and `/admin/feedback` each hand-roll the same `isAdminEmail()` +
   `notFound()` check independently — a shared gate (middleware or a small
@@ -27,6 +42,27 @@ and what it unblocks.
   representative.
 
 ## Done
+- **AI + data platform architecture audit + typed tool boundary.** Inspected
+  the real data layer (two Explore agents) and wrote `docs/AI_DATA_ARCHITECTURE.md`
+  — the 11-part audit (current/target maps, gap analysis, source matrix,
+  canonical-DB status, changes, preserve-list, migration/AI-cost/licensing risks,
+  sequence). Key finding: the data platform is already mature and largely
+  compliant (linear/streaming separation, provenance, freshness, DST-correct
+  time, egress control), and the canonical model (`0044`) is correct but
+  shipped-dormant. Structural change: formalized the AI's data access as a named,
+  bounded, telemetried **typed tool boundary** (`src/lib/ai/tools.ts`) — Claude
+  never sees SQL or a service-role key — and routed `discoveryBridge` through it.
+  Added §32 architectural-separation tests (TV fact paths import no LLM; the
+  Anthropic SDK is confined to its one adapter; the interpreter defers exact-
+  title/person/live-TV to deterministic handlers). Added the missing
+  `MDBLIST_API_KEY` to `.env.example`. Gates: typecheck, lint, 2948 tests, build
+  all green. (`feat(ai): architecture audit + typed tool boundary`)
+- **Provider-independent AI orchestrator foundation.** `src/lib/ai/` — Claude as
+  the interpreter behind a swappable `AiProvider` interface, `CanonicalDiscoveryRequest`
+  + strict validation (the trust boundary), QUALIFY-FIRST canonical→query mapping,
+  cost/usage telemetry (metadata only), safe degradation, `AI_DISCOVERY_MODE`
+  (legacy default = zero production change). (`feat(ai): provider-independent AI
+  orchestrator foundation`)
 - **Restored `/admin/migrations` and `/api/admin/migrate`.** Root-caused the
   Hallmark Universe Pack showing "Nothing ingested yet" / "No premieres in
   the next 6 weeks" with every section empty and no error banner: `feat(build):
