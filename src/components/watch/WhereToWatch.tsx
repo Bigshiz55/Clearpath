@@ -7,10 +7,12 @@ import type { MediaType } from '@/lib/types';
 import {
   resolveWatchPresentation,
   optionsFromCardAvailability,
+  type WatchLine,
   type WatchOption,
   type WatchPresentation,
 } from '@/lib/availability/watchPresentation';
 import { optionsFromTileProviders, mergeProviderOptions } from '@/lib/availability/providerOptions';
+import { tmdbImage } from '@/lib/tmdb/image';
 
 /**
  * THE ONE WHERE-TO-WATCH BLOCK. Every card on every surface renders this.
@@ -157,9 +159,16 @@ export function WhereToWatch({
     >
       <h4 className="text-[11px] font-black uppercase tracking-wide text-slate-300">Where to watch</h4>
 
-      {lines.map((l, i) => {
-        const body = (
-          <>
+      {/* LIVE AIRINGS stay full-width rows: the channel, station and time are
+          the whole point and must not be reduced to an icon. */}
+      {lines
+        .filter((l) => l.kind === 'live')
+        .map((l, i) => (
+          <div
+            key={`live|${l.text}|${i}`}
+            data-testid="where-to-watch-line"
+            className="rounded-md border border-white/10 bg-white/5 px-2 py-1"
+          >
             <span className={`text-[12px] font-semibold ${l.liveNow ? 'text-emerald-200' : 'text-slate-100'}`}>
               {l.liveNow && (
                 <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 align-middle" aria-hidden />
@@ -167,30 +176,15 @@ export function WhereToWatch({
               {l.text}
             </span>
             {l.detail && <span className="block text-[11px] text-slate-400">{l.detail}</span>}
-            {l.verified && <span className="block text-[10px] text-amber-200/70">{l.verified}</span>}
-          </>
-        );
-        return l.href ? (
-          <a
-            key={`${l.text}|${i}`}
-            href={l.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid="where-to-watch-line"
-            className="block rounded-md border border-white/10 bg-white/5 px-2 py-1 transition hover:border-brand-400/60 hover:bg-brand-500/15"
-          >
-            {body}
-          </a>
-        ) : (
-          <div
-            key={`${l.text}|${i}`}
-            data-testid="where-to-watch-line"
-            className="rounded-md border border-white/10 bg-white/5 px-2 py-1"
-          >
-            {body}
           </div>
-        );
-      })}
+        ))}
+
+      {/* STREAMING OPTIONS: a compact, wrapped row of small chips — the network
+          icon when we have its logo, the short service name otherwise — instead
+          of a tall stack of full-width "Included with …" sentences. The full
+          sentence stays as the tooltip + screen-reader label. */}
+      <StreamingChips lines={lines.filter((l) => l.kind === 'streaming')} />
+
 
       {/* SHORT, NOT A SENTENCE. "We haven't confirmed where this is currently
           available." is accurate but it is a paragraph on a card, repeated
@@ -263,5 +257,86 @@ export function WhereToWatch({
         />
       )}
     </section>
+  );
+}
+
+/** How many provider chips show before the rest collapse into a "+N" chip that
+ *  opens the full options panel via the section's own CTA. Keeps a long
+ *  provider list to one or two compact rows instead of a tall stack. */
+const MAX_CHIPS = 6;
+
+/**
+ * The compact provider strip. Each streaming option is a small chip: the actual
+ * network logo when TMDB gives us one, otherwise the short service name — never
+ * a full "Included with …" sentence and never a guessed logo. The full label
+ * stays as the title/aria text so nothing is lost to a screen reader.
+ */
+function StreamingChips({ lines }: { lines: WatchLine[] }) {
+  if (lines.length === 0) return null;
+  const shown = lines.slice(0, MAX_CHIPS);
+  const extra = lines.length - shown.length;
+
+  const chipClass =
+    'inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-1 ' +
+    'text-[11px] font-semibold text-slate-100 transition hover:border-brand-400/60 hover:bg-brand-500/15';
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" data-testid="where-to-watch-providers">
+      {shown.map((l, i) => {
+        const logo = l.logoPath ? tmdbImage(l.logoPath, 'w92') : null;
+        const label = l.service ?? l.text;
+        const inner = (
+          <>
+            {logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logo}
+                alt={label}
+                title={l.text}
+                width={20}
+                height={20}
+                loading="lazy"
+                className="h-5 w-5 rounded object-contain"
+              />
+            ) : (
+              <span className="max-w-[9rem] truncate">{label}</span>
+            )}
+            {l.badge && <span className="text-[10px] font-bold text-amber-200/80">{l.badge}</span>}
+          </>
+        );
+        return l.href ? (
+          <a
+            key={`${label}|${i}`}
+            href={l.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="where-to-watch-line"
+            title={l.text}
+            aria-label={l.text}
+            className={chipClass}
+          >
+            {inner}
+          </a>
+        ) : (
+          <span
+            key={`${label}|${i}`}
+            data-testid="where-to-watch-line"
+            title={l.text}
+            aria-label={l.text}
+            className={chipClass}
+          >
+            {inner}
+          </span>
+        );
+      })}
+      {extra > 0 && (
+        <span
+          className="inline-flex items-center rounded-md border border-white/10 bg-white/5 px-1.5 py-1 text-[11px] font-semibold text-slate-400"
+          title={`${extra} more option${extra === 1 ? '' : 's'} — see View options`}
+        >
+          +{extra}
+        </span>
+      )}
+    </div>
   );
 }
