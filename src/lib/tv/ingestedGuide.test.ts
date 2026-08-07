@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ingestedRowToAiring, type IngestedAiringRow } from './ingestedGuide';
+import { ingestedRowToAiring, selectTodayAirings, INGESTED_MIN, type IngestedAiringRow } from './ingestedGuide';
+import type { Airing } from '@/lib/onTv';
 
 function row(over: Partial<IngestedAiringRow>): IngestedAiringRow {
   return {
@@ -79,5 +80,56 @@ describe('ingestedRowToAiring', () => {
   it('falls back to a stable id when provider_airing_id is missing, without throwing', () => {
     const a = ingestedRowToAiring(row({ providerAiringId: null }));
     expect(Number.isInteger(a.id)).toBe(true);
+  });
+});
+
+// selectTodayAirings is the pure core of `getOnTvTodayIngested` — it keeps only
+// the airings on the SAME US-Eastern calendar day as `now` and orders them by
+// time of day, exactly matching the live `getOnTvToday` contract that OnTvGuide
+// (with its `{count} airings` total and now-&-next curation) depends on.
+function airing(over: Partial<Airing> = {}): Airing {
+  return {
+    id: 1, time: '20:00', minutes: 1200, airstamp: '2026-08-07T20:00:00-04:00',
+    runtime: 60, network: 'AMC', showName: 'Show', showId: 100, episodeName: null,
+    season: null, number: null, showType: 'Scripted', genres: [], rating: null,
+    image: null, summary: null, imdb: null,
+    ...over,
+  };
+}
+
+describe('selectTodayAirings — matches getOnTvToday (Eastern calendar day, all airings, time-ordered)', () => {
+  // 2026-08-07 18:00 US-Eastern (EDT, -04:00) → "today" is 2026-08-07.
+  const now = Date.parse('2026-08-07T18:00:00-04:00');
+
+  it('keeps every airing on the Eastern day and drops the next day’s early-morning airings', () => {
+    const rows = [
+      airing({ id: 1, airstamp: '2026-08-07T20:00:00-04:00', minutes: 1200 }), // 8pm ET today
+      airing({ id: 2, airstamp: '2026-08-07T01:00:00-04:00', minutes: 60 }),   // 1am ET today
+      airing({ id: 3, airstamp: '2026-08-08T02:00:00-04:00', minutes: 120 }),  // 2am ET tomorrow → drop
+    ];
+    const out = selectTodayAirings(rows, now);
+    expect(out.map((a) => a.id)).toEqual([2, 1]); // today only, time-ordered (1am before 8pm)
+  });
+
+  it('does NOT curate — it keeps news/talk and duplicate shows (unlike the upcoming selector)', () => {
+    const rows = [
+      airing({ id: 1, showType: 'News', airstamp: '2026-08-07T22:00:00-04:00', minutes: 1320 }),
+      airing({ id: 2, showId: 100, airstamp: '2026-08-07T21:00:00-04:00', minutes: 1260 }),
+      airing({ id: 3, showId: 100, airstamp: '2026-08-07T09:00:00-04:00', minutes: 540 }), // same show, kept
+    ];
+    const out = selectTodayAirings(rows, now);
+    expect(out.map((a) => a.id)).toEqual([3, 2, 1]); // all three, time-ordered — no dedupe, no noise filter
+  });
+
+  it('is empty-safe and drops an airing whose airstamp is unparseable', () => {
+    expect(selectTodayAirings([], now)).toEqual([]);
+    const out = selectTodayAirings([airing({ id: 9, airstamp: 'not-a-date' })], now);
+    expect(out).toEqual([]); // a NaN Eastern date never equals today's date string
+  });
+});
+
+describe('INGESTED_MIN', () => {
+  it('is the single shared fallback threshold both guide surfaces use', () => {
+    expect(INGESTED_MIN).toBe(3);
   });
 });
