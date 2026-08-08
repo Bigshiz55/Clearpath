@@ -1,5 +1,6 @@
 import 'server-only';
 import { serverEnv } from '@/lib/env';
+import { isActivePreviewTestFounder } from '@/lib/previewTestAuth';
 
 /**
  * Admin gating via an env allowlist (ADMIN_EMAILS), NOT a database flag — so
@@ -13,6 +14,10 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 
 /** True when the email matches one of the three configured founder accounts. */
 export function isFounderEmail(email: string | null | undefined): boolean {
+  // TEMPORARY (preview-only live verification): the synthetic Voice DNA test
+  // identity counts as a founder on preview deployments ONLY. No-op in
+  // production. Delete with src/lib/previewTestAuth.ts after the live matrix.
+  if (isActivePreviewTestFounder(email)) return true;
   if (!email) return false;
   const e = email.trim().toLowerCase();
   if (!e) return false;

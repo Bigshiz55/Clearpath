@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `f8e6f4e` · Branch: `claude/watch-verdict-app-wwbtbg`
+- Commit: `836232b` · Branch: `claude/voice-dna-live-verify-n3788j`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 
