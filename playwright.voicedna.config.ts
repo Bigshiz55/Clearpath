@@ -21,6 +21,21 @@ import { defineConfig } from '@playwright/test';
 
 const PREVIEW_URL = process.env.VOICE_DNA_PREVIEW_URL ?? '';
 
+/**
+ * Vercel Deployment Protection bypass, when the project has one configured.
+ * Without it every request to a protected preview is redirected to
+ * `vercel.com/login?next=/sso-api…` and no product assertion means anything.
+ * `x-vercel-set-bypass-cookie` makes the bypass stick for the subsequent
+ * page navigations Playwright performs, not just the first request.
+ */
+const BYPASS = process.env.VOICE_DNA_BYPASS ?? '';
+const bypassHeaders = BYPASS
+  ? {
+      'x-vercel-protection-bypass': BYPASS,
+      'x-vercel-set-bypass-cookie': 'samesitenone',
+    }
+  : undefined;
+
 /** Resolve the pre-installed Chromium without pinning a versioned dir name. */
 function chromiumExecutable(): string | undefined {
   try {
@@ -53,6 +68,7 @@ export default defineConfig({
     actionTimeout: 20_000,
     navigationTimeout: 30_000,
     screenshot: 'only-on-failure',
+    ...(bypassHeaders ? { extraHTTPHeaders: bypassHeaders } : {}),
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
   },
 });

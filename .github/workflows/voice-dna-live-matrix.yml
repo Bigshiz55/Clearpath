@@ -77,23 +77,58 @@ jobs:
           echo "::error::No successful Vercel preview deployment for $sha after 20 minutes."
           exit 1
 
-      # Tells a real gate failure apart from a platform auth wall. If Vercel
-      # Deployment Protection is on, EVERY path answers with the same SSO
-      # interstitial and no product assertion means anything. Booleans only for
-      # secrets — never a value.
+      # Run 2 proved this deployment sits behind Vercel Deployment Protection:
+      # every path 307s to vercel.com/login?next=/sso-api…, so all fourteen
+      # product rows were asserting against Vercel's login page. Vercel's
+      # supported answer is "Protection Bypass for Automation" — a secret sent
+      # as x-vercel-protection-bypass. Resolve one from a repository secret, or
+      # from the project itself via the Vercel API, and mask it either way.
+      - name: Resolve the Vercel protection bypass
+        id: bypass
+        env:
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          PROJECT_ID: prj_NiCdApPckvfwcU6mym7rjeeBXeP4
+          TEAM_ID: team_bYWI8KIn51g31NHNXpYWVEfl
+        run: |
+          set +e
+          echo "VERCEL_AUTOMATION_BYPASS_SECRET present : ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET != '' }}"
+          echo "VERCEL_TOKEN present                    : ${{ secrets.VERCEL_TOKEN != '' }}"
+          if [ -n "${BYPASS_SECRET:-}" ]; then
+            echo "::add-mask::$BYPASS_SECRET"
+            echo "value=$BYPASS_SECRET" >> "$GITHUB_OUTPUT"
+            echo "source: repository secret"
+            exit 0
+          fi
+          if [ -n "${VERCEL_TOKEN:-}" ]; then
+            secret=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v9/projects/$PROJECT_ID?teamId=$TEAM_ID" \
+              | jq -r '(.protectionBypass // {}) | keys[0] // empty')
+            if [ -n "$secret" ]; then
+              echo "::add-mask::$secret"
+              echo "value=$secret" >> "$GITHUB_OUTPUT"
+              echo "source: project protectionBypass via Vercel API"
+              exit 0
+            fi
+            echo "Vercel API reachable but the project has no protectionBypass secret configured."
+          fi
+          echo "No bypass available — the matrix will report a single PLATFORM CONFIG blocker."
+          exit 0
+
       - name: Diagnose the preview surface
         env:
           URL: ${{ steps.preview.outputs.url }}
+          BYPASS: ${{ steps.bypass.outputs.value }}
         run: |
           set +e
-          echo "VERCEL_TOKEN secret present             : ${{ secrets.VERCEL_TOKEN != '' }}"
-          echo "VERCEL_AUTOMATION_BYPASS_SECRET present : ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET != '' }}"
           for p in /api/health /voice-dna; do
             echo "─────────── GET $URL$p"
-            curl -sS -o /tmp/body -D /tmp/hdr -w 'status=%{http_code} final=%{url_effective}\n' -L "$URL$p"
-            grep -iE '^(x-vercel|location|content-type|set-cookie)' /tmp/hdr | head -8
-            echo "--- first 300 bytes of body ---"
-            head -c 300 /tmp/body; echo; echo
+            curl -sS -o /tmp/body -D /tmp/hdr \
+              ${BYPASS:+-H "x-vercel-protection-bypass: $BYPASS"} \
+              -w 'status=%{http_code} final=%{url_effective}\n' -L "$URL$p"
+            grep -iE '^(x-vercel|location|content-type)' /tmp/hdr | head -6
+            echo "--- first 200 bytes of body ---"
+            head -c 200 /tmp/body; echo; echo
           done
           exit 0
 
@@ -103,6 +138,7 @@ jobs:
       - name: Run the Voice DNA live matrix
         env:
           VOICE_DNA_PREVIEW_URL: ${{ steps.preview.outputs.url }}
+          VOICE_DNA_BYPASS: ${{ steps.bypass.outputs.value }}
         run: npx playwright test -c playwright.voicedna.config.ts
 
       - name: Upload matrix results

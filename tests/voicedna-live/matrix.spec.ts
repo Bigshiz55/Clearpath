@@ -1,4 +1,4 @@
-import { test, expect, type Page, type BrowserContext } from '@playwright/test';
+import { test, expect, request as apiRequest, type Page, type BrowserContext } from '@playwright/test';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -71,6 +71,49 @@ test.beforeAll(() => {
   expect(process.env.VOICE_DNA_PREVIEW_URL, 'VOICE_DNA_PREVIEW_URL must point at the preview deployment').toBeTruthy();
 });
 
+/**
+ * PLATFORM PRE-FLIGHT. If Vercel Deployment Protection guards this deployment,
+ * every request — page, API, and missing route alike — is redirected to
+ * `vercel.com/login?next=/sso-api…`, so a product assertion is really an
+ * assertion about Vercel's login page. The first run proved this the expensive
+ * way: ten rows failed and read like a broken founder gate.
+ *
+ * Detection is by REDIRECT TARGET, not by scraping the interstitial's copy — a
+ * marker list is a guess about wording that silently stops matching (the
+ * earlier `vercel.com/sso` guess passed straight through the real
+ * `vercel.com/login?next=%2Fsso-api` redirect and reported all-clear).
+ */
+let platformBlocker: string | null = null;
+
+test.beforeAll(async () => {
+  const baseURL = process.env.VOICE_DNA_PREVIEW_URL;
+  if (!baseURL) return;
+  const ctx = await apiRequest.newContext({ baseURL });
+  try {
+    const res = await ctx.get('/api/health', { maxRedirects: 0 });
+    const location = res.headers()['location'] ?? '';
+    const offSite = /^https?:\/\/(?!.*\.vercel\.app)/i.test(location) || /vercel\.com\//i.test(location);
+    if (res.status() >= 300 && res.status() < 400 && offSite) {
+      platformBlocker =
+        `Vercel Deployment Protection is enabled: GET /api/health returned ${res.status()} → ${location.slice(0, 140)}. ` +
+        `Every row below would assert against Vercel's login page. Fix: set a "Protection Bypass for Automation" ` +
+        `secret on the project and expose it as the VERCEL_AUTOMATION_BYPASS_SECRET repository secret, or disable ` +
+        `Deployment Protection for Preview. This is PLATFORM CONFIG — not a Voice DNA defect.`;
+    }
+  } catch {
+    // A transport error is not a protection verdict; let the rows report it.
+  } finally {
+    await ctx.dispose();
+  }
+});
+
+// Skip every product row when the platform is answering instead of the app, so
+// the run reports ONE unambiguous blocker rather than ten misleading failures.
+// A0 is exempt: it is the row whose job is to state the verdict.
+test.beforeEach(({}, testInfo) => {
+  test.skip(platformBlocker !== null && !testInfo.title.startsWith('A0'), platformBlocker ?? '');
+});
+
 /** Sign the browser context in as the synthetic founder-equivalent identity. */
 async function loginTestFounder(context: BrowserContext): Promise<void> {
   const res = await context.request.post(LOGIN_PATH, {
@@ -138,19 +181,16 @@ async function submitAnswer(page: Page, text: string): Promise<void> {
  * returned 200" would say nothing about the founder gate. This row separates
  * "the platform is answering" from "the app is answering".
  */
-test('A0 the preview is publicly reachable (no platform auth wall)', async ({ request }) => {
+test('A0 the app answers, not the platform (no Deployment Protection wall)', async ({ request }) => {
+  expect(platformBlocker, platformBlocker ?? 'no platform blocker detected').toBeNull();
+  // The app itself is answering — confirm it is genuinely the app.
   const res = await request.get('/api/health');
   const body = await res.text();
-  const wall =
-    /Authentication Required|vercel\.com\/sso|_vercel_sso_nonce/i.test(body) ||
-    res.status() === 401;
-  expect(
-    wall,
-    `the deployment is behind Vercel Deployment Protection — status ${res.status()}, body starts: ` +
-      `${body.slice(0, 200)}. No product assertion below is meaningful until protection is disabled ` +
-      `for preview, or a bypass secret is provided. This is a PLATFORM CONFIG blocker, not a defect.`,
-  ).toBe(false);
   expect(res.status(), `/api/health should answer 200, got ${res.status()}: ${body.slice(0, 200)}`).toBe(200);
+  expect(
+    body.trim().startsWith('{'),
+    `/api/health should return JSON from the app, got: ${body.slice(0, 200)}`,
+  ).toBe(true);
 });
 
 test('A1 anonymous /voice-dna is a hidden 404', async ({ page }) => {
