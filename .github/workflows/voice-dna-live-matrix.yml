@@ -1,0 +1,97 @@
+name: Voice DNA live matrix
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEMPORARY — runs the Voice DNA live-verification matrix against the Vercel
+# PREVIEW deployment for this branch. Deleted together with the preview-only
+# test auth (src/lib/previewTestAuth.ts) once verification is complete.
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Why a workflow at all: the agent environment driving this verification has an
+# egress policy that denies *.vercel.app, so it cannot reach the preview it just
+# deployed. A GitHub runner can. This is the same pattern ci.yml already uses
+# for `browser-routing` — Playwright on ubuntu-latest — pointed at a live URL
+# instead of a locally-booted server.
+#
+# It needs NO secrets. The preview URL is discovered from the GitHub Deployment
+# that Vercel itself creates for this commit, so nothing is hardcoded or guessed.
+# The test secret it uses lives in the (private) repo and is worthless off a
+# preview deployment.
+
+on:
+  push:
+    branches: [claude/voice-dna-live-verify-n3788j]
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: 'Override the preview URL (leave blank to auto-discover)'
+        required: false
+        default: ''
+
+# Read-only. The job needs `deployments: read` to discover the preview URL that
+# Vercel published for this commit; it writes nothing back to the repository.
+permissions:
+  contents: read
+  deployments: read
+
+jobs:
+  live-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Vercel publishes each preview as a GitHub Deployment whose status
+      # carries the environment_url. Polling that is exact — no URL-slug
+      # guessing, and it also tells us when the build is actually READY.
+      - name: Wait for the Vercel preview deployment
+        id: preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OVERRIDE: ${{ github.event.inputs.preview_url }}
+        run: |
+          set -euo pipefail
+          if [ -n "${OVERRIDE:-}" ]; then
+            echo "url=$OVERRIDE" >> "$GITHUB_OUTPUT"
+            echo "Using override: $OVERRIDE"
+            exit 0
+          fi
+          sha="${{ github.sha }}"
+          for i in $(seq 1 60); do
+            ids=$(gh api "repos/${{ github.repository }}/deployments?sha=$sha&per_page=100" --jq '.[].id' || echo "")
+            for id in $ids; do
+              url=$(gh api "repos/${{ github.repository }}/deployments/$id/statuses?per_page=100" \
+                --jq '[.[] | select(.state=="success") | .environment_url] | map(select(. != null and . != "")) | .[0]' 2>/dev/null || echo "")
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo "url=$url" >> "$GITHUB_OUTPUT"
+                echo "Preview READY: $url"
+                exit 0
+              fi
+            done
+            echo "attempt $i: preview not ready yet for $sha"
+            sleep 20
+          done
+          echo "::error::No successful Vercel preview deployment for $sha after 20 minutes."
+          exit 1
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Run the Voice DNA live matrix
+        env:
+          VOICE_DNA_PREVIEW_URL: ${{ steps.preview.outputs.url }}
+        run: npx playwright test -c playwright.voicedna.config.ts
+
+      - name: Upload matrix results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-dna-live-results
+          path: |
+            evaluation-results/voice-dna-live/
+            test-results/voicedna-live-artifacts/
+          if-no-files-found: warn
+          retention-days: 7
