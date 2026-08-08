@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { isFounderOrAdminEmail } from '@/lib/admin';
 import { voiceInterviewMode, openAiKey, realtimeModel, realtimeVoice } from '@/lib/voice/config';
 import { INTERVIEWER_SYSTEM_PROMPT, REALTIME_TOOLS } from '@/lib/voice/interview';
 
@@ -8,7 +6,7 @@ import { INTERVIEWER_SYSTEM_PROMPT, REALTIME_TOOLS } from '@/lib/voice/interview
  * VOICE INTERVIEW — mint an OpenAI Realtime EPHEMERAL session token for the
  * browser WebRTC client.
  *
- * FOUNDER-ONLY: anyone else gets the same hidden 404 the founder pages return.
+ * PUBLIC: open to everyone (no auth gate), like the rest of the interview.
  *
  * GRACEFUL BY DESIGN: this endpoint NEVER dead-ends the UI with a 5xx. When the
  * feature is not in realtime mode (no key / not enabled) it answers 200 with
@@ -26,21 +24,6 @@ export const maxDuration = 30;
 const NO_STORE = { 'cache-control': 'no-store' } as const;
 
 export async function POST() {
-  // Founder gate — identical hidden 404 to the founder pages.
-  let authorized = false;
-  try {
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user && isFounderOrAdminEmail(user.email)) authorized = true;
-  } catch {
-    // treat as unauthenticated
-  }
-  if (!authorized) {
-    return new NextResponse('Not Found', { status: 404, headers: NO_STORE });
-  }
-
   // No key / disabled → the keyless fallback. A 200, not an error.
   if (voiceInterviewMode() !== 'realtime') {
     return NextResponse.json({ mode: 'fallback' }, { status: 200, headers: NO_STORE });

@@ -75,14 +75,12 @@ describe('the interview is gone', () => {
     }
   });
 
-  it('TEST 6: the /voice-dna route is now the rebuilt founder-gated interview, not a redirect', () => {
+  it('TEST 6: the /voice-dna route is the rebuilt interview (now public), not a redirect', () => {
     // Phase 3 deliberately un-retired this route. It no longer redirects to the
-    // DNA hub; it verifies identity server-side and renders the interview, or
-    // returns the hidden 404 for anyone who is not a founder/admin.
+    // DNA hub; it renders the rebuilt Voice DNA interview. It has since been
+    // opened to everyone (no founder gate) at the owner's direction.
     const page = read('src/app/voice-dna/page.tsx');
     expect(page).not.toContain("redirect('/app/dna");
-    expect(page).toContain('isFounderOrAdminEmail');
-    expect(page).toContain('notFound()');
     expect(page).toContain('VoiceInterview');
   });
 

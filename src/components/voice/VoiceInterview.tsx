@@ -99,6 +99,11 @@ export function VoiceInterview() {
   const finishingRef = useRef(false);
   const mountedRef = useRef(true);
   const startingRef = useRef(false);
+  // Mirrors the latest committed engine state so the serialized turn chain can
+  // pass it to the server. Only used for anonymous (signed-out) interviews,
+  // where the state is carried by the client and never persisted; the server
+  // ignores it entirely for signed-in users (their DB row is authoritative).
+  const engineStateRef = useRef<InterviewState | null>(null);
 
   // ---- load or resume on mount ---------------------------------------------
   useEffect(() => {
@@ -113,6 +118,7 @@ export function VoiceInterview() {
       }
       interviewIdRef.current = res.state.id;
       directiveRef.current = res.directive;
+      engineStateRef.current = res.state;
       setEngineState(res.state);
       if (res.state.transcript.length > 0) {
         setCaptions(transcriptToCaptions(res.state.transcript));
@@ -137,7 +143,10 @@ export function VoiceInterview() {
     setStatus('completing');
     setBeat('wrap');
     setBeatNonce((n) => n + 1);
-    const res = await completeInterview({ interviewId: id });
+    const res = await completeInterview({
+      interviewId: id,
+      clientState: engineStateRef.current ?? undefined,
+    });
     intentionalCloseRef.current = true;
     clientRef.current?.disconnect();
     if (!mountedRef.current) return;
@@ -153,9 +162,14 @@ export function VoiceInterview() {
   async function processSignal(signal: TasteSignal): Promise<void> {
     const id = interviewIdRef.current;
     if (!id) return;
-    const res = await recordInterviewTurn({ interviewId: id, signals: [signal] });
+    const res = await recordInterviewTurn({
+      interviewId: id,
+      signals: [signal],
+      clientState: engineStateRef.current ?? undefined,
+    });
     if (!mountedRef.current || !res.ok || !res.state || !res.directive) return;
 
+    engineStateRef.current = res.state;
     setEngineState(res.state);
     directiveRef.current = res.directive;
 

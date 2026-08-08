@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 /**
  * THE SESSION ROUTE'S CONTRACTS, PINNED.
  *
- *  1. FOUNDER GATE — a non-founder (or unauthenticated) hit gets the hidden 404,
- *     and no OpenAI request is ever attempted.
+ *  1. PUBLIC — open to everyone (no auth gate); with no key configured any hit
+ *     answers a 200 fallback and no OpenAI request is attempted.
  *  2. GRACEFUL FALLBACK — with no key / not enabled the route answers 200
  *     `{ mode: 'fallback' }`, NOT an error, so the keyless browser-speech path
  *     can take over. An upstream OpenAI failure also degrades to a 200 fallback.
@@ -40,19 +40,21 @@ afterEach(() => {
   delete process.env[ENABLED];
 });
 
-describe('founder gate', () => {
-  it('unauthenticated → hidden 404, no OpenAI call', async () => {
+describe('public access (no auth gate)', () => {
+  it('unauthenticated + no key → 200 { mode: "fallback" }, no OpenAI call', async () => {
     h.user = null;
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const res = await POST();
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ mode: 'fallback' });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('signed-in non-founder → hidden 404', async () => {
+  it('any visitor (no key) → 200 fallback, never a 404', async () => {
     h.user = { id: 'u2', email: 'stranger@example.com' };
     const res = await POST();
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ mode: 'fallback' });
   });
 });
 

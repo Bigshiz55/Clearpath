@@ -3,7 +3,6 @@
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
-import { isFounderOrAdminEmail } from '@/lib/admin';
 import { recordEvents } from '@/lib/preference/store';
 import {
   advance,
@@ -27,13 +26,14 @@ import { voiceInterviewMode, type VoiceInterviewMode } from '@/lib/voice/config'
 /**
  * VOICE INTERVIEW — server actions (the SERVER + PERSISTENCE surface).
  *
- * Every action re-verifies identity with `supabase.auth.getUser()` and the
- * founder gate (this is founder-only for now), then drives the PURE engine
- * (`decide` / `advance` / `buildDnaReveal`) and persists through the fail-safe
- * store. The engine sanitizes its own input, so even garbage a live model emits
- * can never throw here; RLS plus an explicit `userId` scope on every read/write
- * means one user's interview can never leak into another's. Nothing throws to
- * the client — failures come back as `{ ok: false, error }`.
+ * PUBLIC: the interview is open to everyone. A SIGNED-IN user gets the full
+ * persisted experience — `supabase.auth.getUser()` gives the `userId`, and the
+ * PURE engine's state is loaded/saved through the fail-safe, RLS-scoped store so
+ * one user's interview can never leak into another's. An ANONYMOUS visitor gets
+ * an ephemeral, client-carried interview: the same PURE engine runs, but the
+ * state travels with the client (`clientState`) and NOTHING is persisted. The
+ * engine sanitizes its own input, so even garbage can never throw here. Nothing
+ * throws to the client — failures come back as `{ ok: false, error }`.
  */
 
 // A single signal, loosely validated at the boundary. The engine's `advance`
@@ -56,11 +56,18 @@ const signalSchema = z
   .passthrough();
 
 const interviewIdSchema = z.string().min(1).max(200);
+// For anonymous visitors the client carries the interview state between turns
+// (nothing is persisted). It is untrusted input, so it is only accepted as
+// `unknown` here and the garbage-safe engine is what actually reads it.
 const turnSchema = z.object({
   interviewId: interviewIdSchema,
   signals: z.array(signalSchema).max(MAX_SIGNALS),
+  clientState: z.unknown().optional(),
 });
-const idOnlySchema = z.object({ interviewId: interviewIdSchema });
+const idOnlySchema = z.object({
+  interviewId: interviewIdSchema,
+  clientState: z.unknown().optional(),
+});
 
 export interface StartResult {
   ok: boolean;
@@ -87,22 +94,31 @@ export interface AbandonResult {
 }
 
 type Gate =
-  | { ok: true; supabase: SupabaseClient; userId: string }
-  | { ok: false; error: string };
+  | { mode: 'user'; supabase: SupabaseClient; userId: string }
+  | { mode: 'anon' };
 
-/** Auth + founder gate, run at the top of every action. Never throws. */
+/**
+ * Identity resolution, run at the top of every action. Never throws and never
+ * rejects: a signed-in user gets the persisted `user` mode; everyone else
+ * (signed out, or auth unavailable) gets the ephemeral `anon` mode.
+ */
 async function gate(): Promise<Gate> {
   try {
     const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return { ok: false, error: 'You need to be signed in.' };
-    if (!isFounderOrAdminEmail(user.email)) return { ok: false, error: 'This feature is not available yet.' };
-    return { ok: true, supabase, userId: user.id };
+    if (user) return { mode: 'user', supabase, userId: user.id };
   } catch {
-    return { ok: false, error: 'Could not verify your session.' };
+    // fall through to anonymous
   }
+  return { mode: 'anon' };
+}
+
+/** Coerce untrusted client-carried state to InterviewState. The engine is
+ * garbage-safe, so this only narrows the type; a null means "nothing to run". */
+function asClientState(v: unknown): InterviewState | null {
+  return v && typeof v === 'object' ? (v as InterviewState) : null;
 }
 
 /**
@@ -113,14 +129,19 @@ async function gate(): Promise<Gate> {
  */
 export async function startOrResumeInterview(): Promise<StartResult> {
   const g = await gate();
-  if (!g.ok) return { ok: false, error: g.error };
-
   const mode = voiceInterviewMode();
-  let state = await loadActiveInterview(g.supabase, g.userId);
-  if (!state) {
-    state = createInterview(g.userId, Date.now());
-    await saveInterview(g.supabase, state);
+
+  if (g.mode === 'user') {
+    let state = await loadActiveInterview(g.supabase, g.userId);
+    if (!state) {
+      state = createInterview(g.userId, Date.now());
+      await saveInterview(g.supabase, state);
+    }
+    return { ok: true, state, directive: decide(state), mode };
   }
+
+  // Anonymous: an ephemeral interview carried by the client, never persisted.
+  const state = createInterview('anon', Date.now());
   return { ok: true, state, directive: decide(state), mode };
 }
 
@@ -133,23 +154,35 @@ export async function startOrResumeInterview(): Promise<StartResult> {
 export async function recordInterviewTurn(input: {
   interviewId: string;
   signals: TasteSignal[];
+  clientState?: InterviewState;
 }): Promise<TurnResult> {
   const parsed = turnSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'Invalid turn.' };
 
   const g = await gate();
-  if (!g.ok) return { ok: false, error: g.error };
-
-  const state = await getInterview(g.supabase, g.userId, parsed.data.interviewId);
-  if (!state) return { ok: false, error: 'Interview not found.' };
-
   // Loosely-typed at the boundary; `advance` coerces each into a valid signal.
   const incoming = parsed.data.signals as unknown as TasteSignal[];
-  const next = advance(state, incoming, Date.now());
-  await saveInterview(g.supabase, next);
 
-  const directive = decide(next);
-  return { ok: true, state: next, directive, done: directive.done };
+  if (g.mode === 'user') {
+    const state = await getInterview(g.supabase, g.userId, parsed.data.interviewId);
+    if (!state) return { ok: false, error: 'Interview not found.' };
+    const next = advance(state, incoming, Date.now());
+    await saveInterview(g.supabase, next);
+    const directive = decide(next);
+    return { ok: true, state: next, directive, done: directive.done };
+  }
+
+  // Anonymous: advance the client-carried state; nothing is persisted. The
+  // engine is garbage-safe, but wrap it so a hostile state can never throw.
+  const prior = asClientState(parsed.data.clientState);
+  if (!prior) return { ok: false, error: 'Interview not found.' };
+  try {
+    const next = advance(prior, incoming, Date.now());
+    const directive = decide(next);
+    return { ok: true, state: next, directive, done: directive.done };
+  } catch {
+    return { ok: false, error: 'Could not process that turn.' };
+  }
 }
 
 /**
@@ -160,45 +193,59 @@ export async function recordInterviewTurn(input: {
  * completing twice never double-writes, and the row is only re-marked complete
  * once.
  */
-export async function completeInterview(input: { interviewId: string }): Promise<CompleteResult> {
+export async function completeInterview(input: {
+  interviewId: string;
+  clientState?: InterviewState;
+}): Promise<CompleteResult> {
   const parsed = idOnlySchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'Invalid input.' };
 
   const g = await gate();
-  if (!g.ok) return { ok: false, error: g.error };
 
-  const state = await getInterview(g.supabase, g.userId, parsed.data.interviewId);
-  if (!state) return { ok: false, error: 'Interview not found.' };
+  if (g.mode === 'user') {
+    const state = await getInterview(g.supabase, g.userId, parsed.data.interviewId);
+    if (!state) return { ok: false, error: 'Interview not found.' };
 
-  const reveal = buildDnaReveal(state);
+    const reveal = buildDnaReveal(state);
 
-  // Persist the taste into the shared preference log. Dedup is by stable event
-  // id at the DB layer, so this is safe to run again on a re-complete.
-  const drafts = signalsToPreferenceEvents(state.signals);
-  if (drafts.length > 0) {
-    await recordEvents(g.supabase, g.userId, drafts);
+    // Persist the taste into the shared preference log. Dedup is by stable event
+    // id at the DB layer, so this is safe to run again on a re-complete.
+    const drafts = signalsToPreferenceEvents(state.signals);
+    if (drafts.length > 0) {
+      await recordEvents(g.supabase, g.userId, drafts);
+    }
+
+    if (state.status !== 'complete') {
+      await saveInterview(g.supabase, {
+        ...state,
+        status: 'complete',
+        phase: 'complete',
+        updatedAtMs: Date.now(),
+      });
+    }
+
+    return { ok: true, reveal };
   }
 
-  if (state.status !== 'complete') {
-    await saveInterview(g.supabase, {
-      ...state,
-      status: 'complete',
-      phase: 'complete',
-      updatedAtMs: Date.now(),
-    });
+  // Anonymous: build the reveal from the client-carried state; no persistence.
+  const prior = asClientState(parsed.data.clientState);
+  if (!prior) return { ok: false, error: 'Interview not found.' };
+  try {
+    return { ok: true, reveal: buildDnaReveal(prior) };
+  } catch {
+    return { ok: false, error: 'Could not assemble your DNA.' };
   }
-
-  return { ok: true, reveal };
 }
 
-/** Abandon the interview (scoped to the owner). */
+/** Abandon the interview (scoped to the owner). A no-op for anonymous visitors,
+ * whose interviews were never persisted. */
 export async function abandonInterview(input: { interviewId: string }): Promise<AbandonResult> {
   const parsed = idOnlySchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'Invalid input.' };
 
   const g = await gate();
-  if (!g.ok) return { ok: false, error: g.error };
-
-  await abandonInterviewRow(g.supabase, g.userId, parsed.data.interviewId);
+  if (g.mode === 'user') {
+    await abandonInterviewRow(g.supabase, g.userId, parsed.data.interviewId);
+  }
   return { ok: true };
 }

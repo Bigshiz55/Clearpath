@@ -66,18 +66,37 @@ afterEach(() => {
   delete process.env.ADMIN_EMAILS;
 });
 
-describe('founder gate', () => {
-  it('a non-founder is rejected before any work', async () => {
+describe('public access (no founder gate)', () => {
+  it('any signed-in user is treated as a normal user (persisted path)', async () => {
     h.user = { id: 'u2', email: 'stranger@example.com' };
     const res = await recordInterviewTurn({ interviewId: h.state!.id, signals: [] });
-    expect(res.ok).toBe(false);
-    expect(h.getInterview).not.toHaveBeenCalled();
+    expect(res.ok).toBe(true);
+    // Signed-in → the DB-backed path runs (state is loaded from the store).
+    expect(h.getInterview).toHaveBeenCalled();
   });
 
-  it('unauthenticated is rejected', async () => {
+  it('an anonymous visitor gets an ephemeral interview, never persisted', async () => {
     h.user = null;
     const res = await startOrResumeInterview();
-    expect(res.ok).toBe(false);
+    expect(res.ok).toBe(true);
+    expect(res.state).toBeTruthy();
+    // Anonymous → no DB reads or writes.
+    expect(h.loadActiveInterview).not.toHaveBeenCalled();
+    expect(h.saveInterview).not.toHaveBeenCalled();
+  });
+
+  it('an anonymous turn advances the client-carried state without persisting', async () => {
+    h.user = null;
+    const start = await startOrResumeInterview();
+    const res = await recordInterviewTurn({
+      interviewId: start.state!.id,
+      signals: [titleSignal()],
+      clientState: start.state,
+    });
+    expect(res.ok).toBe(true);
+    expect(res.state!.turn).toBe(start.state!.turn + 1);
+    expect(h.getInterview).not.toHaveBeenCalled();
+    expect(h.saveInterview).not.toHaveBeenCalled();
   });
 });
 
