@@ -1,5 +1,32 @@
 # Voice DNA — live verification report
 
+> **UPDATE — share-link support added; channel still requires a repo secret.**
+>
+> The harness now accepts a Vercel authenticated **share link** as an
+> alternative to a Protection-Bypass secret: `globalSetup` redeems a
+> `_vercel_share` token once into the `_vercel_jwt` cookie and every context
+> inherits it via `storageState`. The token is read only from
+> `VOICE_DNA_SHARE_TOKEN` or from a share URL passed as
+> `VOICE_DNA_PREVIEW_URL`, and is stripped from `baseURL` so it cannot reach a
+> reporter, trace, or failure message.
+>
+> **It still cannot be delivered to GitHub Actions without a repository
+> secret**, because `Bigshiz55/Clearpath` is a **PUBLIC** repository:
+> committed files, `workflow_dispatch` inputs (recorded in the run's event
+> payload and shown in the public Actions UI/API), and job logs are all
+> world-readable. A repository or environment secret is the only encrypted,
+> masked, non-public channel into a run.
+>
+> **Security fix in the same change.** `previewTestAuth.ts` previously
+> hard-coded the preview-test secret, justified by "the repo is private" —
+> which was false. That published a working credential. It is now read from
+> `PREVIEW_TEST_SECRET` in the deployment environment, the mechanism is off
+> when it is absent, and a test guards against a literal being reintroduced.
+> The old value is retired, not rotated in place: it remains in git history on
+> a public repo, so it must never be reused. This also makes the earlier
+> "disable Deployment Protection for previews" suggestion unsafe as written —
+> it was only that protection which kept the published secret unusable.
+
 **Status: BLOCKED on one owner action (Vercel Deployment Protection).**
 Everything that can be verified without reaching the deployed preview is done
 and green. No Voice DNA product defect has been observed, because no product
