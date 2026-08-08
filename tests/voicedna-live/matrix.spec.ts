@@ -1,4 +1,5 @@
 import { test, expect, request as apiRequest, type Page, type BrowserContext } from '@playwright/test';
+import { SHARE_STATE_PATH, previewBaseUrl } from './globalSetup';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -24,9 +25,15 @@ import { test, expect, request as apiRequest, type Page, type BrowserContext } f
  * reported as MIGRATION-BLOCKED rather than a code defect.
  */
 
-// Mirrors src/lib/previewTestAuth.ts (that module is `server-only` and cannot
-// be imported here). Worthless off preview deployments.
-const TEST_SECRET = process.env.PREVIEW_TEST_SECRET ?? '3df473affcb85ada9aff25464836b0dd949b367527e902e1';
+/**
+ * The preview-test secret comes from the ENVIRONMENT ONLY — there is
+ * deliberately no fallback literal here. An earlier revision hard-coded one,
+ * which published a working credential in a PUBLIC repository. The same value
+ * must be set as `PREVIEW_TEST_SECRET` on the preview deployment and in this
+ * runner's environment; when it is absent the auth rows say so plainly rather
+ * than silently testing a disabled mechanism.
+ */
+const TEST_SECRET = (process.env.PREVIEW_TEST_SECRET ?? '').trim();
 const LOGIN_PATH = '/api/preview-test/founder-login';
 
 /** Answers scripted against the engine's own lexicon: strong, diverse, and
@@ -86,9 +93,11 @@ test.beforeAll(() => {
 let platformBlocker: string | null = null;
 
 test.beforeAll(async () => {
-  const baseURL = process.env.VOICE_DNA_PREVIEW_URL;
+  const baseURL = previewBaseUrl();
   if (!baseURL) return;
-  const ctx = await apiRequest.newContext({ baseURL });
+  // Inherit whatever globalSetup redeemed (share cookie, or nothing), so the
+  // probe reflects the same access the rows will have.
+  const ctx = await apiRequest.newContext({ baseURL, storageState: SHARE_STATE_PATH });
   try {
     const res = await ctx.get('/api/health', { maxRedirects: 0 });
     const location = res.headers()['location'] ?? '';
@@ -116,6 +125,12 @@ test.beforeEach(({}, testInfo) => {
 
 /** Sign the browser context in as the synthetic founder-equivalent identity. */
 async function loginTestFounder(context: BrowserContext): Promise<void> {
+  expect(
+    TEST_SECRET.length,
+    'PREVIEW_TEST_SECRET is not set in this runner. It must match the value configured on the ' +
+      'preview deployment; without it the login route is disabled by design and no authed row ' +
+      'can run. This is CONFIGURATION, not a product defect.',
+  ).toBeGreaterThan(0);
   const res = await context.request.post(LOGIN_PATH, {
     headers: { 'x-preview-test-secret': TEST_SECRET },
   });

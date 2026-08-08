@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { secretEquals } from '@/lib/founder/gate';
 import {
   PREVIEW_TEST_EMAIL,
-  PREVIEW_TEST_SECRET,
+  previewTestSecret,
   isPreviewTestAuthActive,
 } from '@/lib/previewTestAuth';
 
@@ -38,9 +38,13 @@ function denied(): NextResponse {
 }
 
 function authorized(req: NextRequest): boolean {
+  // Fails closed on every axis: wrong environment, or no secret configured at
+  // all, and there is nothing to compare against in the first place.
   if (!isPreviewTestAuthActive()) return false;
+  const expected = previewTestSecret();
+  if (expected === null) return false;
   const presented = req.headers.get('x-preview-test-secret') ?? '';
-  return presented.length > 0 && secretEquals(presented, PREVIEW_TEST_SECRET);
+  return presented.length > 0 && secretEquals(presented, expected);
 }
 
 /** Locate the synthetic user's id by email, or null. Pages the admin list. */

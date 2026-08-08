@@ -94,6 +94,8 @@ jobs:
           set +e
           echo "VERCEL_AUTOMATION_BYPASS_SECRET present : ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET != '' }}"
           echo "VERCEL_TOKEN present                    : ${{ secrets.VERCEL_TOKEN != '' }}"
+          echo "VOICE_DNA_SHARE_TOKEN present           : ${{ secrets.VOICE_DNA_SHARE_TOKEN != '' }}"
+          echo "PREVIEW_TEST_SECRET present             : ${{ secrets.PREVIEW_TEST_SECRET != '' }}"
           if [ -n "${BYPASS_SECRET:-}" ]; then
             echo "::add-mask::$BYPASS_SECRET"
             echo "value=$BYPASS_SECRET" >> "$GITHUB_OUTPUT"
@@ -135,10 +137,20 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
 
+      # Three ways in, in order of preference. All arrive as SECRETS — never as
+      # workflow_dispatch inputs, which are recorded in the run's event payload
+      # and are world-readable on this PUBLIC repository.
+      #   VOICE_DNA_SHARE_TOKEN  — a Vercel authenticated share link's
+      #                            `_vercel_share` token (short-lived).
+      #   VERCEL_AUTOMATION_BYPASS_SECRET — a Protection Bypass secret.
+      #   PREVIEW_TEST_SECRET    — must match the value set on the preview
+      #                            deployment, or the login route stays off.
       - name: Run the Voice DNA live matrix
         env:
           VOICE_DNA_PREVIEW_URL: ${{ steps.preview.outputs.url }}
           VOICE_DNA_BYPASS: ${{ steps.bypass.outputs.value }}
+          VOICE_DNA_SHARE_TOKEN: ${{ secrets.VOICE_DNA_SHARE_TOKEN }}
+          PREVIEW_TEST_SECRET: ${{ secrets.PREVIEW_TEST_SECRET }}
         run: npx playwright test -c playwright.voicedna.config.ts
 
       - name: Upload matrix results

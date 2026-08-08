@@ -1,5 +1,6 @@
 import { readdirSync } from 'node:fs';
 import { defineConfig } from '@playwright/test';
+import { SHARE_STATE_PATH, splitShareUrl } from './tests/voicedna-live/globalSetup';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -19,15 +20,21 @@ import { defineConfig } from '@playwright/test';
  * interview is stateful on the server.
  */
 
-const PREVIEW_URL = process.env.VOICE_DNA_PREVIEW_URL ?? '';
-
 /**
- * Vercel Deployment Protection bypass, when the project has one configured.
- * Without it every request to a protected preview is redirected to
- * `vercel.com/login?next=/sso-api…` and no product assertion means anything.
- * `x-vercel-set-bypass-cookie` makes the bypass stick for the subsequent
- * page navigations Playwright performs, not just the first request.
+ * TWO INDEPENDENT WAYS PAST DEPLOYMENT PROTECTION, either of which is enough:
+ *
+ *  1. A SHARE LINK. `VOICE_DNA_PREVIEW_URL` may be pasted verbatim with its
+ *     `?_vercel_share=…` token; globalSetup redeems it once into a
+ *     `_vercel_jwt` cookie and every context inherits that via storageState.
+ *     The token is stripped from `baseURL` here so it cannot leak into a
+ *     reporter, a trace, or a failure message.
+ *  2. A PROTECTION BYPASS SECRET (`VOICE_DNA_BYPASS`), sent as a header.
+ *
+ * With neither, row A0 reports the wall as a single PLATFORM CONFIG verdict
+ * and the remaining rows skip.
  */
+const { baseURL: PREVIEW_URL } = splitShareUrl(process.env.VOICE_DNA_PREVIEW_URL ?? '');
+
 const BYPASS = process.env.VOICE_DNA_BYPASS ?? '';
 const bypassHeaders = BYPASS
   ? {
@@ -52,6 +59,7 @@ const executablePath = chromiumExecutable();
 export default defineConfig({
   testDir: './tests/voicedna-live',
   outputDir: './test-results/voicedna-live-artifacts',
+  globalSetup: './tests/voicedna-live/globalSetup.ts',
   fullyParallel: false,
   workers: 1,
   timeout: 180_000,
@@ -68,6 +76,9 @@ export default defineConfig({
     actionTimeout: 20_000,
     navigationTimeout: 30_000,
     screenshot: 'only-on-failure',
+    // Written by globalSetup on every run (empty when there is no share token),
+    // so this path always exists by the time a context is created.
+    storageState: SHARE_STATE_PATH,
     ...(bypassHeaders ? { extraHTTPHeaders: bypassHeaders } : {}),
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
   },
