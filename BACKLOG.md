@@ -42,6 +42,17 @@ and what it unblocks.
   representative.
 
 ## Done
+- **Voice DNA Interview made public (un-gated).** Dropped the founder gate and
+  hidden-404/noindex from `/voice-dna` and `/voice-dna/audition` and from
+  `POST /api/voice/session` (still degrades to the keyless fallback with no
+  realtime key). Added an anonymous interview path to the `voiceInterview`
+  server actions: signed-in users keep the full RLS-scoped, profile-persisted
+  experience; signed-out visitors get an ephemeral, client-carried interview
+  that persists nothing, with every anon engine call wrapped so hostile
+  client-supplied state can't throw. Gates: typecheck / lint / vitest (3127
+  passed, 24 skipped) / build all exit 0. Commit `c1c778f` on
+  `claude/watch-verdict-app-wwbtbg`. FOLLOW-UP: no nav entry links to
+  `/voice-dna` yet — it's reachable only by direct URL.
 - **Deploy-branch reconciliation and live-verification unblock.** Production had
   drifted to `main` at `350d874` while the Voice DNA release existed only on
   `claude/watch-verdict-app-wwbtbg` at `f731ab7`. Merged current `main` into the
