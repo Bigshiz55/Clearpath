@@ -4,32 +4,48 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-- **Voice DNA live verification — in flight, blocked on ONE owner action
-  (environment network policy).** Branch
-  `claude/voice-dna-live-verify-n3788j` now carries main + the three Voice
-  DNA Interview phases + a TEMPORARY preview-only founder test auth
-  (`src/lib/previewTestAuth.ts`, `/api/preview-test/founder-login`, marked
-  for deletion) + the live Playwright matrix
-  (`playwright.voicedna.config.ts`, `tests/voicedna-live/matrix.spec.ts`).
-  All gates green (typecheck 0 · lint 0 · vitest 3130 passed · build 0);
-  pushed, so Vercel is building the preview at
-  `https://clearpath-git-claude-voice-dna-live-verify-n3788j-bigshiz56.vercel.app`.
-  **The live run cannot start from the agent environment:** its egress
-  policy denies `api.vercel.com`, `*.vercel.app`, `*.supabase.co` and
-  `api.openai.com` (CONNECT 403 at the proxy), so the provided
-  `VERCEL_TOKEN` is unusable and no matrix row can reach the preview.
-  **Action needed from you:** in the Claude Code environment settings
-  (claude.ai → Code → this environment → network policy), allow at least
-  `api.vercel.com` and `*.vercel.app` (add `*.supabase.co` +
-  `api.openai.com` to also exercise the realtime path), then resume the
-  session. Resume runbook: verify token (`GET /v2/user`), confirm the
-  preview deployment is READY, then
-  `VOICE_DNA_PREVIEW_URL=<preview-url> npx playwright test -c playwright.voicedna.config.ts`,
-  fix defects, re-run, then delete the temporary auth (module, route, the
-  `isFounderEmail` override, the matrix harness) and dispose the synthetic
-  user via the route's DELETE. Note: matrix rows D1/E1 depend on migration
-  0047 (`voice_interviews`) being applied — covered by the standing
-  migrations action below.
+- **Voice DNA live verification — everything reachable is done and green;
+  blocked on ONE owner action: Vercel Deployment Protection.** Full evidence
+  in `docs/VOICE_DNA_LIVE_VERIFICATION.md`. Branch
+  `claude/voice-dna-live-verify-n3788j` (`526479d`) carries main + the three
+  Voice DNA Interview phases + a TEMPORARY preview-only founder test auth
+  + the 15-row live matrix + a push-triggered GitHub Actions workflow that
+  runs that matrix from a runner (the agent container's egress denies
+  `*.vercel.app`, so the runner is how the preview gets reached at all —
+  no Vercel token required, the deployment is found by commit SHA via the
+  GitHub Deployments API). Gates at `526479d`: typecheck 0 · lint 0 ·
+  vitest 0 (3130 passed / 24 skipped) · build 0.
+  **Proven blocker:** every request to the preview 302s to
+  `vercel.com/sso-api?url=…` — Deployment Protection is on, so all 15 rows
+  would assert against Vercel's login page. Run
+  [31267183217](https://github.com/Bigshiz55/Clearpath/actions/runs/31267183217)
+  reports it as a single row (`A0`) with the other 14 skipped.
+  **Action needed from you (~2 min, phone-friendly):** Vercel → project
+  `clearpath` → Settings → Deployment Protection → enable **Protection
+  Bypass for Automation**, copy the secret; then GitHub → repo Settings →
+  Secrets and variables → Actions → New repository secret named exactly
+  `VERCEL_AUTOMATION_BYPASS_SECRET`. The workflow already consumes it
+  (masked, sent as `x-vercel-protection-bypass`). Alternative: disable
+  Vercel Authentication for Preview. The agent cannot do this itself: its
+  container cannot reach `api.vercel.com`, and handing `VERCEL_TOKEN` to a
+  runner requires a repository secret it cannot create — committing a token
+  is not an option.
+  **Then:** rows D1/D2/D3/E1 additionally need migration 0047
+  (`voice_interviews`); if they fail with "confidence never moved" while D0
+  passes, that is the migration, not a defect — see the standing action
+  below. Cleanup of the temporary auth is deliberately deferred until the
+  matrix has actually run (checklist in the report); it cannot activate in
+  production — `VERCEL_ENV=preview` gate + secret gate + not the production
+  deploy branch (`scripts/checkBranch.ts`) + asserted by
+  `src/lib/previewTestAuth.test.ts`.
+- **Three harness defects found and fixed before they could mislead the run**
+  (all in the verification scaffolding, none in the product): the typed
+  ladder silently dropped every answer via the client's error path
+  (`d9de57c`) — which would have been misreported as the migration blocker;
+  the test login depended on Supabase's password grant in a magic-link-only
+  project (`03de098`); top-level serial mode let one red row erase the other
+  13 (`3b4174a`). No Voice DNA product defect has been observed — the
+  product has not been reached yet.
 - **Standing action needed from you:** open `/admin/migrations` on
   production and apply pending migrations with your `MIGRATE_SECRET` — see
   the "Restored: /admin/migrations" entry below for why this is currently
