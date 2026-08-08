@@ -4,10 +4,37 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-Nothing in flight. **Action needed from you:** open `/admin/migrations` on
-production and apply pending migrations with your `MIGRATE_SECRET` — see the
-"Restored: /admin/migrations" entry below for why this is currently required
-and what it unblocks.
+- **Voice DNA live verification — in flight, blocked on ONE owner action
+  (environment network policy).** Branch
+  `claude/voice-dna-live-verify-n3788j` now carries main + the three Voice
+  DNA Interview phases + a TEMPORARY preview-only founder test auth
+  (`src/lib/previewTestAuth.ts`, `/api/preview-test/founder-login`, marked
+  for deletion) + the live Playwright matrix
+  (`playwright.voicedna.config.ts`, `tests/voicedna-live/matrix.spec.ts`).
+  All gates green (typecheck 0 · lint 0 · vitest 3130 passed · build 0);
+  pushed, so Vercel is building the preview at
+  `https://clearpath-git-claude-voice-dna-live-verify-n3788j-bigshiz56.vercel.app`.
+  **The live run cannot start from the agent environment:** its egress
+  policy denies `api.vercel.com`, `*.vercel.app`, `*.supabase.co` and
+  `api.openai.com` (CONNECT 403 at the proxy), so the provided
+  `VERCEL_TOKEN` is unusable and no matrix row can reach the preview.
+  **Action needed from you:** in the Claude Code environment settings
+  (claude.ai → Code → this environment → network policy), allow at least
+  `api.vercel.com` and `*.vercel.app` (add `*.supabase.co` +
+  `api.openai.com` to also exercise the realtime path), then resume the
+  session. Resume runbook: verify token (`GET /v2/user`), confirm the
+  preview deployment is READY, then
+  `VOICE_DNA_PREVIEW_URL=<preview-url> npx playwright test -c playwright.voicedna.config.ts`,
+  fix defects, re-run, then delete the temporary auth (module, route, the
+  `isFounderEmail` override, the matrix harness) and dispose the synthetic
+  user via the route's DELETE. Note: matrix rows D1/E1 depend on migration
+  0047 (`voice_interviews`) being applied — covered by the standing
+  migrations action below.
+- **Standing action needed from you:** open `/admin/migrations` on
+  production and apply pending migrations with your `MIGRATE_SECRET` — see
+  the "Restored: /admin/migrations" entry below for why this is currently
+  required and what it unblocks. (Now also gates Voice DNA persistence and
+  resume: migration 0047.)
 
 ## Next
 - **Turn on the AI orchestrator (owner action).** The provider-independent
