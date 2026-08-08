@@ -187,6 +187,11 @@ const NON_SUBJECT = new Set<string>([
   'easy', 'dark', 'light', 'obscure', 'underrated', 'generic', 'real', 'actual', 'typical',
   'usual', 'standard', 'ordinary', 'certain', 'particular', 'amazing', 'awesome', 'incredible',
   'wonderful', 'beautiful', 'interesting', 'entertaining', 'quality', 'little', 'big', 'small',
+  // temporal / availability fillers that lead a request ("anytime movies …",
+  // "whenever films") — a recency qualifier, never the CONTENT subject. Without
+  // these, "anytime" became a strict "Anytime" subject that no title is
+  // "genuinely central" to, clearing every result.
+  'anytime', 'sometime', 'someday', 'whenever', 'always', 'ever', 'never', 'anymore',
   // providers / platforms
   'netflix', 'hulu', 'prime', 'max', 'hbo', 'disney', 'peacock', 'paramount', 'apple',
   'appletv', 'showtime', 'starz', 'britbox', 'acorn', 'amazon',

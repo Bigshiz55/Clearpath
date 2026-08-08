@@ -1,23 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { dayLabel, dayOffset, isSameLocalDay, localIsoDate, longDayLabel } from './localDay';
 
-/** The runtime's zone is UTC under vitest, so these read as UTC calendar days.
- *  The DST cases below construct the boundary explicitly rather than relying on
- *  the host zone, so they hold wherever the suite runs. */
-const at = (iso: string) => new Date(iso);
+/** Construct local wall-clock instants so these tests exercise the module's
+ *  documented viewer-local contract in every host timezone. */
+const localAt = (day: number, hour = 0, minute = 0) => new Date(2026, 6, day, hour, minute);
 
 describe('which calendar day is that', () => {
   it('same day is 0, tomorrow 1, yesterday -1', () => {
-    const now = at('2026-07-28T20:00:00Z');
-    expect(dayOffset(at('2026-07-28T00:05:00Z'), now)).toBe(0);
-    expect(dayOffset(at('2026-07-29T01:00:00Z'), now)).toBe(1);
-    expect(dayOffset(at('2026-07-27T23:59:00Z'), now)).toBe(-1);
+    const now = localAt(28, 20);
+    expect(dayOffset(localAt(28, 0, 5), now)).toBe(0);
+    expect(dayOffset(localAt(29, 1), now)).toBe(1);
+    expect(dayOffset(localAt(27, 23, 59), now)).toBe(-1);
   });
 
   it('isSameLocalDay agrees with a zero offset', () => {
-    const now = at('2026-07-28T20:00:00Z');
-    expect(isSameLocalDay(at('2026-07-28T00:00:00Z'), now)).toBe(true);
-    expect(isSameLocalDay(at('2026-07-29T00:00:00Z'), now)).toBe(false);
+    const now = localAt(28, 20);
+    expect(isSameLocalDay(localAt(28), now)).toBe(true);
+    expect(isSameLocalDay(localAt(29), now)).toBe(false);
   });
 });
 
@@ -49,17 +48,17 @@ describe('daylight saving cannot move the day', () => {
 });
 
 describe('the words a viewer reads', () => {
-  const now = at('2026-07-28T20:00:00Z').getTime();
+  const now = localAt(28, 20).getTime();
 
   it('names today, tomorrow and yesterday', () => {
-    expect(dayLabel('2026-07-28T22:00:00Z', now)).toBe('Today');
-    expect(dayLabel('2026-07-29T02:00:00Z', now)).toBe('Tomorrow');
-    expect(dayLabel('2026-07-27T22:00:00Z', now)).toBe('Yesterday');
+    expect(dayLabel(localAt(28, 22), now)).toBe('Today');
+    expect(dayLabel(localAt(29, 2), now)).toBe('Tomorrow');
+    expect(dayLabel(localAt(27, 22), now)).toBe('Yesterday');
   });
 
   it('uses a weekday inside the week and a date beyond it', () => {
-    expect(dayLabel('2026-07-31T20:00:00Z', now)).toMatch(/^[A-Z][a-z]{2}$/); // Fri
-    expect(dayLabel('2026-08-20T20:00:00Z', now)).toMatch(/Aug/);
+    expect(dayLabel(localAt(31, 20), now)).toMatch(/^[A-Z][a-z]{2}$/); // Fri
+    expect(dayLabel(new Date(2026, 7, 20, 20), now)).toMatch(/Aug/);
   });
 
   it('an unusable stamp prints nothing rather than "Invalid Date"', () => {
@@ -75,22 +74,22 @@ describe('the words a viewer reads', () => {
  * relative word AND the date, from the same function, so they are one answer.
  */
 describe('the long header form', () => {
-  const now = at('2026-07-28T20:00:00Z').getTime();
+  const now = localAt(28, 20).getTime();
 
   it('says Today AND the date, so the two can never contradict', () => {
-    const s = longDayLabel('2026-07-28T21:00:00Z', now);
+    const s = longDayLabel(localAt(28, 21), now);
     expect(s).toContain('Today');
     expect(s).toContain('Jul 28');
   });
 
   it('says Tomorrow and that date', () => {
-    const s = longDayLabel('2026-07-29T01:00:00Z', now);
+    const s = longDayLabel(localAt(29, 1), now);
     expect(s).toContain('Tomorrow');
     expect(s).toContain('Jul 29');
   });
 
   it('a further-out day is just the date, with no relative word to be wrong', () => {
-    const s = longDayLabel('2026-08-04T12:00:00Z', now);
+    const s = longDayLabel(new Date(2026, 7, 4, 12), now);
     expect(s).not.toContain('Today');
     expect(s).not.toContain('Tomorrow');
     expect(s).toContain('Aug 4');

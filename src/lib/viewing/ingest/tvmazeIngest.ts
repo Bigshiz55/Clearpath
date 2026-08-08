@@ -131,6 +131,63 @@ export function matchDay(episodes: TvmazeScheduleEpisode[]): MatchedAiring[] {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// National matching — the BROADER filter used by the national ingest.
+//
+// Where `matchDay` keeps only the ~11 curated Pack channels, this keeps every
+// airing whose network passes the shared `isMajorUsNetwork` allowlist (~80
+// networks), synthesizing a station key per distinct network. The synthesized
+// channel carries the SAME `{ key }` shape the row builders read, so
+// `buildProgrammeRow`/`buildAiringRow` are reused verbatim.
+//
+// TWO exclusions keep this DISJOINT from the curated ingest, which matters
+// because several curated Pack channels (Lifetime, Oxygen, Investigation
+// Discovery, Hallmark) also pass the national allowlist:
+//   1. It SKIPS any network the curated `matchChannel` already claims. Without
+//      this, that network would be ingested twice — once as a curated station
+//      and once as a `tvmaze-net:*` station — and appear twice in the guide.
+//   2. Its airing ids are station-scoped (see `buildAiringRow(..., {stationScopedId})`),
+//      so the same syndicated episode airing on two national networks the same
+//      day does not collide on `tv_airings (lineup_id, provider_airing_id)`.
+// ---------------------------------------------------------------------------
+
+/** A matched national airing — a synthesized channel (station key + display
+ *  name) plus the raw episode and show. Structurally compatible with the row
+ *  builders, which only read `channel.key`, `episode`, and `show`. */
+export interface NationalMatchedAiring {
+  channel: { key: string; displayName: string };
+  episode: TvmazeScheduleEpisode;
+  show: TvmazeShow;
+}
+
+/**
+ * Every major-US-network episode in one day's national schedule that is NOT
+ * already carried by a curated Pack channel, each tagged with a synthesized
+ * station key `tvmaze-net:<slug>`. `accept` is the network allowlist test and
+ * `slug` the stable id helper — both injected (from `nationalNetworks.ts`) so
+ * this stays pure and unit-testable without importing the live path. Networks
+ * the curated `matchChannel` claims are skipped so the two ingests never write
+ * the same physical airing (which would both duplicate it in the guide and
+ * collide on the airing-id uniqueness index).
+ */
+export function matchNationalDay(
+  episodes: TvmazeScheduleEpisode[],
+  accept: (name: string) => boolean,
+  slug: (name: string) => string,
+): NationalMatchedAiring[] {
+  const out: NationalMatchedAiring[] = [];
+  for (const ep of episodes) {
+    const show = ep.show;
+    if (!show) continue;
+    const networkName = show.network?.name ?? show.webChannel?.name ?? null;
+    if (!networkName || !accept(networkName)) continue;
+    // Curated-owned network → handled by the curated ingest; never double-write.
+    if (matchChannel(networkName, show.name ?? null)) continue;
+    out.push({ channel: { key: `tvmaze-net:${slug(networkName)}`, displayName: networkName }, episode: ep, show });
+  }
+  return out;
+}
+
 export interface ProgrammeRow {
   providerProgrammeId: string;
   title: string;
@@ -144,7 +201,16 @@ export interface ProgrammeRow {
   artworkUrl: string | null;
 }
 
-export function buildProgrammeRow(m: MatchedAiring): ProgrammeRow {
+/** The minimal shape the pure row builders read — a station key plus the raw
+ *  episode/show. Both `MatchedAiring` (curated) and `NationalMatchedAiring`
+ *  satisfy it, so the builders serve both ingests without duplication. */
+export interface RowBuildInput {
+  channel: { key: string };
+  episode: TvmazeScheduleEpisode;
+  show: TvmazeShow;
+}
+
+export function buildProgrammeRow(m: Pick<RowBuildInput, 'episode' | 'show'>): ProgrammeRow {
   return {
     providerProgrammeId: String(m.show.id),
     title: m.show.name,
@@ -186,8 +252,22 @@ export interface AiringRow {
  * `(lineup_id, provider_airing_id)` uniqueness the moment the same episode
  * airs twice in the ingested window — exactly the rerun case this ingest
  * must represent as two distinct rows, not one.
+ *
+ * `opts.stationScopedId` additionally folds the station key into the id. The
+ * curated ingest leaves it off (one channel per programme, its long-standing
+ * scheme); the NATIONAL ingest sets it, because a single episode id + airdate
+ * is NOT unique across ~80 networks — the same syndicated movie can air on two
+ * national networks the same day, and without the station key both rows would
+ * carry `tvmaze:<id>:<date>` and collide on the same uniqueness index. Folding
+ * in `channel.key` (`tvmaze-net:<slug>`) makes each network's airing distinct,
+ * and also keeps every national id disjoint from every curated id (curated ids
+ * have no `:tvmaze-net:` segment), so the two ingests never collide.
  */
-export function buildAiringRow(m: MatchedAiring, originalAirdate: string | null): AiringRow {
+export function buildAiringRow(
+  m: RowBuildInput,
+  originalAirdate: string | null,
+  opts: { stationScopedId?: boolean } = {},
+): AiringRow {
   const { episode } = m;
   const premiere = premiereStatusFor(episode.airdate, originalAirdate);
   const normalized = normalizeAiring(episode.airstamp, null, {
@@ -198,8 +278,9 @@ export function buildAiringRow(m: MatchedAiring, originalAirdate: string | null)
     airdate: episode.airdate, airtime: episode.airtime, airstamp: episode.airstamp,
     runtime: episode.runtime, showName: m.show.name, showId: m.show.id,
   });
+  const baseId = `tvmaze:${episode.id}:${episode.airdate ?? 'unknown'}`;
   return {
-    providerAiringId: `tvmaze:${episode.id}:${episode.airdate ?? 'unknown'}`,
+    providerAiringId: opts.stationScopedId ? `${baseId}:${m.channel.key}` : baseId,
     stationKey: m.channel.key,
     programmeProviderId: String(m.show.id),
     startAtUtc: normalized.startUtcMs != null ? new Date(normalized.startUtcMs).toISOString() : null,

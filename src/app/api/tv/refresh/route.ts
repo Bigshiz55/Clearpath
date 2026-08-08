@@ -45,7 +45,7 @@ export async function POST() {
     );
   }
 
-  const { tvmaze, tvmedia } = await runGatedTvIngest(admin);
+  const { tvmaze, tvmazeNational, tvmedia } = await runGatedTvIngest(admin);
 
   // Station -> Pack wiring lives HERE, not in a page render. It is idempotent
   // and covers every Pack in one pass, so the three Packs no longer each
@@ -60,5 +60,5 @@ export async function POST() {
     wiring = { error: e instanceof Error ? e.message : 'wiring failed' };
   }
 
-  return NextResponse.json({ tvmaze, tvmedia, wiring }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
+  return NextResponse.json({ tvmaze, tvmazeNational, tvmedia, wiring }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
 }

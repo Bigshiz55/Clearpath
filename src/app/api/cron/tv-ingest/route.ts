@@ -28,13 +28,14 @@ export const maxDuration = 300;
  * key exists, and if TV Media has never run the guide simply falls back to
  * whatever TVmaze already ingested (CHANGES §7 — never a blank page).
  *
- * NOT registered in vercel.json — Vercel Hobby caps at two cron jobs, both
- * already spent on daily-scan and classify. `/api/cron/daily-scan` calls the
- * same gated ingest once a day so the ingested tables are never permanently
- * empty; this route exists for whoever wants finer-than-daily freshness —
- * point an external scheduler at it (GitHub Actions `schedule:`, or Supabase
- * pg_cron) with the CRON_SECRET bearer token, or register it directly if a
- * cron slot frees up or the project moves to Pro.
+ * REGISTERED in vercel.json as an hourly cron (`0 * * * *`). Vercel now allows
+ * up to 100 cron jobs per project on every plan (as of 2026-01-20), so the
+ * earlier two-cron ceiling that kept this route off the schedule no longer
+ * applies. The route is idempotent under the hourly tick: TVmaze runs at most
+ * once per UTC day and TV Media at most once per two hours, each gated against
+ * `tv_ingestion_runs`, so the extra ticks are cheap no-ops. `/api/cron/daily-scan`
+ * still calls the same gated ingest once a day as a harmless belt-and-suspenders
+ * fallback, so the ingested tables stay warm even if an hourly tick is missed.
  *
  * The browser never reaches either provider: this is the only path that does.
  */
@@ -62,7 +63,7 @@ export async function GET(req: Request) {
     }, { status: 200 });
   }
 
-  const { tvmaze, tvmedia } = await runGatedTvIngest(admin);
+  const { tvmaze, tvmazeNational, tvmedia } = await runGatedTvIngest(admin);
   // 502 is reserved for a provider actually FAILING upstream. A missing or
   // unconfigured key is a configuration state — it now writes its own
   // 'skipped' run row with a machine-readable code (see tvMediaWriter), and
@@ -71,5 +72,5 @@ export async function GET(req: Request) {
   const tvmazeOk = (tvmaze as { ok?: boolean }).ok !== false;
   const tvmediaUpstreamFailure =
     tvmedia.ok === false && ['auth_failed', 'rate_limited', 'upstream_failed'].includes(tvmedia.status);
-  return NextResponse.json({ tvmaze, tvmedia }, { status: tvmazeOk && !tvmediaUpstreamFailure ? 200 : 502 });
+  return NextResponse.json({ tvmaze, tvmazeNational, tvmedia }, { status: tvmazeOk && !tvmediaUpstreamFailure ? 200 : 502 });
 }

@@ -1,18 +1,18 @@
 import 'server-only';
 import type { createAdminClient } from '@/lib/supabase/admin';
-import { runTvmazeIngest } from './tvmazeWriter';
+import { runTvmazeIngest, runTvmazeNationalIngest } from './tvmazeWriter';
 import { runTvMediaIngest } from './tvMediaWriter';
 import { mayCallUpstream, resolveDataMode } from '@/lib/tv/dataMode';
 
 /**
  * SHARED GATING — TV Media (primary) and TVmaze (fallback/supplement).
  *
- * Used by both `/api/cron/tv-ingest` (an hourly tick, for whoever ends up
- * triggering it — an external scheduler, or a future freed-up Vercel Cron
- * slot) and `/api/cron/daily-scan` (a guaranteed once-a-day tick, ridden here
- * because Vercel Hobby's two-cron cap is already spent on daily-scan and
- * classify). Same gating either way so running from a daily tick never
- * double-runs what an hourly tick would have already done:
+ * Used by both `/api/cron/tv-ingest` (the authoritative hourly Vercel Cron
+ * tick, registered in vercel.json) and `/api/cron/daily-scan` (a guaranteed
+ * once-a-day tick that also rides this gate as a harmless fallback, so the
+ * tables stay warm even if an hourly tick is missed). Same gating either way
+ * so running from a daily tick never double-runs what an hourly tick would
+ * have already done:
  *
  *  - TVmaze: once per UTC calendar day, checked against `tv_ingestion_runs`
  *    rather than a fixed hour — its single national feed has no per-market
@@ -136,15 +136,26 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
   const policy = resolveDataMode();
   if (!policy.configured) {
     const blocked = { ok: true, ran: false, status: 'egress_denied' as const, reason: `${policy.code}: ${policy.reason}` };
-    return { tvmaze: { ran: false, reason: `${policy.code}: ${policy.reason}` }, tvmedia: blocked };
+    return {
+      tvmaze: { ran: false, reason: `${policy.code}: ${policy.reason}` },
+      // The national ingest fails closed with the curated one — same policy gate.
+      tvmazeNational: { ran: false, reason: `${policy.code}: ${policy.reason}` },
+      tvmedia: blocked,
+    };
   }
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // The curated day-gate. Excludes national runs (`trigger: 'national'`) so the
+  // two ingests — both stamped provider_id 'tvmaze' — gate independently: the
+  // national run writing its own row must never make the curated run look like
+  // it "already ran today", and vice versa (the national gate below is the
+  // symmetric query).
   const { data: todaysRuns } = await admin
     .from('tv_ingestion_runs')
     .select('id, status, started_at')
     .eq('provider_id', 'tvmaze')
+    .neq('trigger', 'national')
     .gte('started_at', `${today}T00:00:00.000Z`)
     .order('started_at', { ascending: false })
     .limit(1);
@@ -169,6 +180,32 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
         ),
       );
 
+  // NATIONAL TVmaze ingest — broad, allowlist-driven (see runTvmazeNationalIngest).
+  // Runs ALONGSIDE the curated ingest under the same policy gate (already passed
+  // above; failing closed on an unconfigured deployment), once per UTC day, and
+  // isolated + leased on its OWN lock key ('tvmaze_national') so it neither
+  // blocks nor is blocked by the curated 'tvmaze' lock — both run once per tick.
+  // No metered egress check: like the curated TVmaze run, its only gate is
+  // `policy.configured` — TVmaze is free and unmetered.
+  const { data: todaysNationalRuns } = await admin
+    .from('tv_ingestion_runs')
+    .select('id, status')
+    .eq('provider_id', 'tvmaze')
+    .eq('trigger', 'national')
+    .gte('started_at', `${today}T00:00:00.000Z`)
+    .order('started_at', { ascending: false })
+    .limit(1);
+  const nationalAlreadyRanToday = (todaysNationalRuns ?? []).some((r) => r.status === 'success' || r.status === 'partial');
+  const tvmazeNational = nationalAlreadyRanToday
+    ? { ran: false, reason: `Already ran today (${today}, UTC).` }
+    : await isolateRun('tvmaze_national', () =>
+        withProviderLock(
+          admin, 'tvmaze_national', 600,
+          async () => ({ ran: true, ...(await runTvmazeNationalIngest(TVMAZE_INGEST_DAYS)) }),
+          () => ({ ran: false, reason: 'Another national TVmaze ingest is already running.' }),
+        ),
+      );
+
   // DATA-MODE GATE, ahead of everything TV Media related.
   //
   // `runTvMediaIngest` asks the same door itself — that is the backstop for
@@ -182,6 +219,7 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
   if (!tvMediaEgress.allowed) {
     return {
       tvmaze,
+      tvmazeNational,
       tvmedia: {
         ok: true, ran: false, status: 'egress_denied' as const,
         reason: `${tvMediaEgress.code}: ${tvMediaEgress.reason}`,
@@ -204,7 +242,7 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
       )
     : { ok: true, ran: false, status: 'success' as const, reason: `Ran within the last 2h (${lastTvMediaRun}).` };
 
-  return { tvmaze, tvmedia };
+  return { tvmaze, tvmazeNational, tvmedia };
 }
 
 /**

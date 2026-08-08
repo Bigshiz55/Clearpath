@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getCriticRatings } from '@/lib/omdb';
 import { findTmdbByImdb, searchTitles, type SearchResultItem } from '@/lib/tmdb/client';
+import { isMajorUsNetwork } from '@/lib/viewing/ingest/nationalNetworks';
 import type { MediaType } from '@/lib/types';
 
 /**
@@ -285,32 +286,6 @@ export async function getNextAiring(imdbId: string | null): Promise<NextAiring |
   }
 }
 
-// The major American TV networks carried on Xfinity / Verizon Fios — broadcast,
-// major cable entertainment, news, sports, and premium. We track these and skip
-// the long tail of tiny/regional channels, so the live guide stays useful.
-const MAJOR_US_NETWORKS = [
-  // Broadcast
-  'abc', 'cbs', 'nbc', 'fox', 'the cw', 'pbs', 'telemundo', 'univision', 'ion', 'mynetworktv',
-  // Cable entertainment
-  'amc', 'usa network', 'tnt', 'tbs', 'fx', 'fxx', 'bravo', 'e!', 'comedy central',
-  'paramount network', 'syfy', 'freeform', 'hallmark', 'hgtv', 'food network', 'discovery',
-  'tlc', 'history', 'a&e', 'lifetime', 'national geographic', 'nat geo', 'animal planet',
-  'bbc america', 'ifc', 'sundancetv', 'tcm', 'tv land', 'we tv', 'own', 'mtv', 'vh1', 'bet',
-  'cartoon network', 'nickelodeon', 'disney channel', 'adult swim', 'trutv', 'oxygen',
-  'investigation discovery', 'gsn', 'reelz', 'cooking channel', 'motortrend',
-  // News
-  'cnn', 'msnbc', 'fox news', 'cnbc', 'hln', 'newsmax',
-  // Sports
-  'espn', 'fs1', 'fs2', 'fox sports', 'nbc sports', 'nfl network', 'mlb network', 'nba tv',
-  'golf channel', 'tennis channel',
-  // Premium
-  'hbo', 'cinemax', 'showtime', 'starz', 'mgm+', 'epix',
-];
-function isMajorUsNetwork(name: string): boolean {
-  const n = name.toLowerCase().trim();
-  return MAJOR_US_NETWORKS.some((net) => n === net || n.startsWith(net + ' ') || n.startsWith(net));
-}
-
 /** Broadcast schedule, curated to the major American networks (Xfinity/Verizon). */
 async function fetchBroadcast(country: string, date: string): Promise<Airing[]> {
   const data = await fetchJson(`https://api.tvmaze.com/schedule?country=${encodeURIComponent(country)}&date=${date}`);
@@ -401,6 +376,47 @@ const HOUR_MS = 60 * 60 * 1000;
  * still fetch the full 48h span of dates so the daily cache keys stay identical
  * across horizons — only the final [now, now+horizon] filter changes.
  */
+/**
+ * The pure selection step behind `getUpcomingTv` — shared verbatim with the
+ * ingested-backed reader (`getUpcomingTvIngested`) so both sources apply the
+ * SAME horizon clamp, noise/genre/network/movie filters, rating rank, showId
+ * dedupe and time ordering. No I/O: it takes an already-fetched `Airing[]`
+ * (live-fetched days OR ingested rows) and returns the same contract. Keeping
+ * this one function is what lets the two guide sources be truly interchangeable.
+ */
+export function selectUpcomingAirings(
+  airings: Airing[],
+  nowMs: number,
+  horizonMs: number = UPCOMING_TV_HORIZON_MS,
+  genre: string | null = null,
+  network: string | null = null,
+  movieOnly = false,
+): Airing[] {
+  const clampedHorizon = Math.max(HOUR_MS, Math.min(horizonMs, UPCOMING_TV_HORIZON_MS));
+  const horizon = nowMs + clampedHorizon;
+  const wantGenre = genre ? genre.toLowerCase() : null;
+  const wantNet = network ? network.toLowerCase() : null;
+  const upcoming = airings.filter((a) => {
+    const ms = Date.parse(a.airstamp);
+    if (NOISE_TYPES.has(a.showType) || ms < nowMs || ms > horizon) return false;
+    // Honor a requested genre ("comedies coming on…") against the show's real
+    // TVmaze genre tags. No match on that genre → not shown.
+    if (wantGenre && !a.genres.some((g) => g.toLowerCase() === wantGenre)) return false;
+    // Requested network ("on Lifetime") — match the channel name.
+    if (wantNet && !a.network.toLowerCase().includes(wantNet)) return false;
+    // Requested movies only ("Lifetime movies") — TVmaze tags movies as 'Movie'.
+    if (movieOnly && a.showType !== 'Movie') return false;
+    return true;
+  });
+
+  // Rank by rating (unrated last), keep a healthy set, then show in time order.
+  const ranked = [...upcoming].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 30);
+  const seen = new Set<number>();
+  return ranked
+    .filter((a) => (seen.has(a.showId) ? false : (seen.add(a.showId), true)))
+    .sort((a, b) => Date.parse(a.airstamp) - Date.parse(b.airstamp));
+}
+
 export async function getUpcomingTv(
   country: string,
   nowMs: number,
@@ -409,38 +425,14 @@ export async function getUpcomingTv(
   network: string | null = null,
   movieOnly = false,
 ): Promise<Airing[]> {
-  const clampedHorizon = Math.max(HOUR_MS, Math.min(horizonMs, UPCOMING_TV_HORIZON_MS));
-  const horizon = nowMs + clampedHorizon;
   // Fetch every UTC date the full 48h window can touch (up to 3, depending on
   // the time of day) — cache keys stay stable regardless of the chosen horizon —
-  // then filter strictly to [now, now+horizon].
+  // then hand the whole set to the shared pure selector, which filters strictly
+  // to [now, now+horizon].
   const spanDays = Math.ceil(UPCOMING_TV_HORIZON_MS / DAY_MS) + 1;
   const dates = Array.from({ length: spanDays }, (_, i) => usBroadcastDate(nowMs + i * DAY_MS));
   const perDay = await Promise.all(dates.map((d) => getOnTvToday(country, d)));
-
-  const wantGenre = genre ? genre.toLowerCase() : null;
-  const wantNet = network ? network.toLowerCase() : null;
-  const upcoming = perDay
-    .flat()
-    .filter((a) => {
-      const ms = Date.parse(a.airstamp);
-      if (NOISE_TYPES.has(a.showType) || ms < nowMs || ms > horizon) return false;
-      // Honor a requested genre ("comedies coming on…") against the show's real
-      // TVmaze genre tags. No match on that genre → not shown.
-      if (wantGenre && !a.genres.some((g) => g.toLowerCase() === wantGenre)) return false;
-      // Requested network ("on Lifetime") — match the channel name.
-      if (wantNet && !a.network.toLowerCase().includes(wantNet)) return false;
-      // Requested movies only ("Lifetime movies") — TVmaze tags movies as 'Movie'.
-      if (movieOnly && a.showType !== 'Movie') return false;
-      return true;
-    });
-
-  // Rank by rating (unrated last), keep a healthy set, then show in time order.
-  const ranked = [...upcoming].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 30);
-  const seen = new Set<number>();
-  return ranked
-    .filter((a) => (seen.has(a.showId) ? false : (seen.add(a.showId), true)))
-    .sort((a, b) => Date.parse(a.airstamp) - Date.parse(b.airstamp));
+  return selectUpcomingAirings(perDay.flat(), nowMs, horizonMs, genre, network, movieOnly);
 }
 
 /** Cached daily streaming premieres (major services), keyed by date. */

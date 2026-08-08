@@ -42,6 +42,16 @@ and what it unblocks.
   representative.
 
 ## Done
+- **Deploy-branch reconciliation and live-verification unblock.** Production had
+  drifted to `main` at `350d874` while the Voice DNA release existed only on
+  `claude/watch-verdict-app-wwbtbg` at `f731ab7`. Merged current `main` into the
+  deploy branch (never the reverse), preserving the nine newer TV/search/card
+  commits and the branch's Voice/AI/trailer work. Resolved the ReleaseWall
+  overlap in favor of the newer non-nested trailer/QuickLook control structure,
+  retained provider branding, and made the viewer-local calendar tests portable
+  across UTC and non-UTC developer machines. Full typecheck, lint, 3,126 unit
+  tests, and production build pass. Live promotion and migration `0047` remain
+  deployment operations, not application-code changes.
 - **Voice DNA Interview — Phase 3 (client + UI).** Built the whole browser
   experience on top of the Phase-1 engine and Phase-2 server/Realtime route,
   branch `claude/voice-interview`. Two interchangeable transports behind one

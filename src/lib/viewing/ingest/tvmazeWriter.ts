@@ -2,10 +2,11 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { mapPool } from '@/lib/finderPool';
 import { TVMAZE_CHANNELS, type TvmazeChannelDef, type TvmazeChannelGroup } from './tvmazeChannels';
+import { isMajorUsNetwork, networkSlug } from './nationalNetworks';
 import {
-  fetchScheduleDay, fetchShowOriginalAirdates, matchDay,
+  fetchScheduleDay, fetchShowOriginalAirdates, matchDay, matchNationalDay,
   buildProgrammeRow, buildAiringRow, toFetchedAiring,
-  type MatchedAiring, type ProgrammeRow,
+  type MatchedAiring, type NationalMatchedAiring, type ProgrammeRow,
 } from './tvmazeIngest';
 import { reconcile, chunk, dedupeByAiringIdentity, type StoredAiring, type FetchedAiring } from './reconcile';
 
@@ -241,10 +242,20 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
   }
 
   // ---- read what's already stored in this window ---------------------------
+  // SCOPED to the curated stations only. The national ingest (see
+  // runTvmazeNationalIngest) writes its own synthesized `tvmaze-net:*` stations
+  // onto this same lineup; without this station filter the curated reconcile
+  // would sweep those national rows into `stored`, find them absent from the
+  // curated `fetched` set, and EXPIRE every one of them. Scoping the read to
+  // the curated station ids keeps this reconcile's behaviour toward curated
+  // rows byte-for-byte identical while making it structurally incapable of
+  // deleting a national row. (The national reconcile is scoped symmetrically.)
+  const curatedStationIds = [...stationIdByKey.values()];
   const { data: storedRaw } = await admin
     .from('tv_airings')
     .select('id, provider_airing_id, station_id, programme_id, start_at_utc, end_at_utc, raw_hash, last_seen_at')
     .eq('lineup_id', lineupId)
+    .in('station_id', curatedStationIds)
     .gte('start_at_utc', new Date(windowStartMs).toISOString())
     .lt('start_at_utc', new Date(windowEndMs).toISOString());
 
@@ -328,7 +339,13 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
     coverage_end_utc: new Date(windowEndMs).toISOString(),
   }).eq('id', lineupId);
 
-  await admin.from('tv_ingestion_runs').insert({
+  // The run row is the DURABLE record that this provider succeeded today; the
+  // ingest gate reads it to decide "already ran today". Swallowing an insert
+  // error here would make a run invisible to the gate and to /api/health/tv —
+  // the pipeline would silently re-ingest every tick and health would report a
+  // pipeline that just ran as stale. Surface it loudly, like every other write
+  // in this file.
+  const { error: runRowError } = await admin.from('tv_ingestion_runs').insert({
     provider_id: PROVIDER_ID, lineup_id: lineupId,
     started_at: nowIso, completed_at: new Date().toISOString(),
     status: fetchComplete ? 'success' : 'partial', trigger: 'cron',
@@ -342,6 +359,7 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
     records_unchanged: plan.stats.unchanged, records_expired: plan.stats.expired,
     errors: daysFailed.map((e) => ({ message: e })),
   });
+  if (runRowError) throw new Error(`tv_ingestion_runs insert failed: ${runRowError.message}`);
 
   return {
     ok: fetchComplete,
@@ -358,5 +376,248 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
     premiereUnreliable: [...premiereUnreliableByChannel.entries()].map(([channel, v]) => ({
       channel, count: v.count, sampleReasons: [...v.reasons],
     })),
+  };
+}
+
+// ===========================================================================
+// NATIONAL INGEST — the broad, allowlist-driven sibling of the curated run.
+//
+// Same provider, same `us-national` lineup, same reconcile/idempotency
+// machinery — but a BROADER filter (`isMajorUsNetwork`, ~80 networks) instead
+// of `matchChannel` (~11 curated Pack channels), synthesized stations
+// (`tvmaze-net:<slug>`), and NO per-show premiere fan-out (which would explode
+// call volume across a national day). It runs ALONGSIDE the curated ingest and
+// never touches the curated stations' rows — reconciliation is scoped to the
+// national station-set on both sides, so neither run can expire the other's
+// airings. This only BROADENS ingest; no read path changes here.
+// ===========================================================================
+
+/** The `tv_stations.provider_station_id` prefix that marks a synthesized
+ *  national station, distinguishing it from every curated channel key. Used to
+ *  scope the national reconcile's stored-read to national rows only. */
+const NATIONAL_STATION_PREFIX = 'tvmaze-net:';
+
+export interface NationalIngestRunResult {
+  ok: boolean;
+  lineupId: string | null;
+  windowStartUtc: string;
+  windowEndUtc: string;
+  daysRequested: number;
+  daysFetched: number;
+  daysFailed: string[];
+  networksIngested: number;
+  totalAiringsMatched: number;
+  inserted: number;
+  updated: number;
+  unchanged: number;
+  expired: number;
+  error?: string;
+}
+
+/** Synthesized national stations, BATCHED — mirrors `ensureStations`, but the
+ *  station set is discovered from the day's networks rather than a fixed
+ *  config. One station per distinct network, keyed `tvmaze-net:<slug>`. */
+async function ensureNationalStations(
+  admin: ReturnType<typeof createAdminClient>,
+  lineupId: string,
+  channels: { key: string; displayName: string }[],
+): Promise<Map<string, string>> {
+  const idByKey = new Map<string, string>();
+  if (channels.length === 0) return idByKey;
+
+  for (const batch of chunk(channels, WRITE_BATCH_SIZE)) {
+    const rows = batch.map((ch) => ({
+      provider_id: PROVIDER_ID, provider_station_id: ch.key,
+      name: ch.displayName, network: ch.displayName, call_sign: null,
+    }));
+    const { data, error } = await admin
+      .from('tv_stations')
+      .upsert(rows, { onConflict: 'provider_id,provider_station_id' })
+      .select('id, provider_station_id');
+    if (error || !data) throw new Error(`bulk upsert into tv_stations (national) failed: ${error?.message ?? 'no rows returned'}`);
+    for (const row of data) idByKey.set(row.provider_station_id as string, row.id as string);
+  }
+
+  for (const batch of chunk(channels, WRITE_BATCH_SIZE)) {
+    const rows = batch.map((ch) => ({
+      lineup_id: lineupId, station_id: idByKey.get(ch.key), provider_channel_id: ch.key,
+      channel_name: ch.displayName, enabled: true,
+    }));
+    const { error } = await admin
+      .from('tv_lineup_channels')
+      .upsert(rows, { onConflict: 'lineup_id,station_id,provider_channel_id' });
+    if (error) throw new Error(`bulk upsert into tv_lineup_channels (national) failed: ${error.message}`);
+  }
+
+  return idByKey;
+}
+
+/**
+ * Run the NATIONAL ingest for `days` days starting today (UTC).
+ *
+ * Idempotent by the same construction as `runTvmazeIngest`: `reconcile()`
+ * decides insert/update/unchanged/expire; a second run over unchanged upstream
+ * data nets zero inserts. Premiere/repeat are left null for every national row
+ * (honest unknown) — the per-show original-airdate fan-out is deliberately
+ * skipped here because a national day carries far more distinct shows than the
+ * curated set, and that fan-out is a curated-path nicety, not a correctness
+ * requirement.
+ */
+export async function runTvmazeNationalIngest(days = 3, nowMs = Date.now()): Promise<NationalIngestRunResult> {
+  const admin = createAdminClient();
+  const windowStartMs = Date.UTC(
+    new Date(nowMs).getUTCFullYear(), new Date(nowMs).getUTCMonth(), new Date(nowMs).getUTCDate(),
+  );
+  const windowEndMs = windowStartMs + days * 86_400_000;
+
+  const lineupId = await ensureProviderAndLineup(admin);
+
+  // ---- fetch every requested day (the SAME national feed as the curated run) -
+  const dates = Array.from({ length: days }, (_, i) => isoDate(windowStartMs + i * 86_400_000));
+  const daysFailed: string[] = [];
+  const allMatched: NationalMatchedAiring[] = [];
+  for (const date of dates) {
+    const res = await fetchScheduleDay(date, 'US');
+    if (!res.ok || !res.data) { daysFailed.push(`${date}: ${res.error ?? 'unknown error'}`); continue; }
+    // BROADER than matchChannel: keep every airing on a major US network.
+    allMatched.push(...matchNationalDay(res.data, isMajorUsNetwork, networkSlug));
+  }
+  const fetchComplete = daysFailed.length === 0;
+
+  // ---- synthesize one station per distinct network -------------------------
+  const channelByKey = new Map<string, { key: string; displayName: string }>();
+  for (const m of allMatched) if (!channelByKey.has(m.channel.key)) channelByKey.set(m.channel.key, m.channel);
+  const stationIdByKey = await ensureNationalStations(admin, lineupId, [...channelByKey.values()]);
+
+  // ---- shape rows, dedupe programmes (NO premiere fan-out) ------------------
+  const programmeRows = new Map<string, ProgrammeRow>();
+  const airingRows = allMatched.map((m) => {
+    programmeRows.set(String(m.show.id), buildProgrammeRow(m));
+    // originalAirdate = null → isPremiere/isRepeat null (honest unknown).
+    // stationScopedId: the national airing id folds in the station key so the
+    // same syndicated episode on two networks the same day stays two distinct
+    // rows and never collides on tv_airings (lineup_id, provider_airing_id).
+    return { m, row: buildAiringRow(m, null, { stationScopedId: true }) };
+  });
+  const programmeIdByProviderId = await ensureProgrammes(admin, programmeRows);
+
+  const fetched: FetchedAiring[] = [];
+  for (const { m, row } of airingRows) {
+    const stationId = stationIdByKey.get(m.channel.key);
+    const programmeId = programmeIdByProviderId.get(row.programmeProviderId);
+    if (!stationId || !programmeId) continue;
+    const fa = toFetchedAiring(row, stationId, programmeId);
+    if (fa) fetched.push(fa);
+  }
+
+  // ---- read stored, SCOPED to national stations only -----------------------
+  // The scoping that makes cross-deletion impossible: we read only rows on the
+  // synthesized `tvmaze-net:*` stations, so the curated stations' airings never
+  // enter this reconcile's `stored` and can never be expired by it. We resolve
+  // the FULL national station-set from tv_stations (not just this run's
+  // networks) so a network that has dropped off the schedule still has its
+  // now-stale rows reconciled/expired correctly.
+  const { data: nationalStationRows } = await admin
+    .from('tv_stations')
+    .select('id, provider_station_id')
+    .eq('provider_id', PROVIDER_ID)
+    .like('provider_station_id', `${NATIONAL_STATION_PREFIX}%`);
+  const nationalStationIds = (nationalStationRows ?? []).map((r) => r.id as string);
+
+  const stored: StoredAiring[] = [];
+  if (nationalStationIds.length > 0) {
+    const { data: storedRaw } = await admin
+      .from('tv_airings')
+      .select('id, provider_airing_id, station_id, programme_id, start_at_utc, end_at_utc, raw_hash, last_seen_at')
+      .eq('lineup_id', lineupId)
+      .in('station_id', nationalStationIds)
+      .gte('start_at_utc', new Date(windowStartMs).toISOString())
+      .lt('start_at_utc', new Date(windowEndMs).toISOString());
+    for (const r of storedRaw ?? []) {
+      stored.push({
+        id: r.id as string,
+        providerAiringId: r.provider_airing_id as string | null,
+        stationId: r.station_id as string,
+        programmeId: r.programme_id as string,
+        startAtUtc: r.start_at_utc as string,
+        endAtUtc: r.end_at_utc as string | null,
+        rawHash: r.raw_hash as string,
+        lastSeenAt: r.last_seen_at as string,
+      });
+    }
+  }
+
+  const plan = reconcile({
+    lineupId, fetched, stored,
+    windowStartUtcMs: windowStartMs, windowEndUtcMs: windowEndMs,
+    fetchComplete, nowMs,
+  });
+
+  // ---- apply the plan, BATCHED (identical machinery to the curated run) -----
+  const nowIso = new Date(nowMs).toISOString();
+  const dedupedInserts = dedupeByAiringIdentity(plan.insert);
+  for (const batch of chunk(dedupedInserts, WRITE_BATCH_SIZE)) {
+    const rows = batch.map((f) => ({
+      provider_airing_id: f.providerAiringId, lineup_id: lineupId,
+      station_id: f.stationId, programme_id: f.programmeId,
+      start_at_utc: f.startAtUtc, end_at_utc: f.endAtUtc,
+      is_complete: f.endAtUtc != null, is_premiere: f.isNew ?? null, is_repeat: f.isRepeat ?? null,
+      raw_hash: f.rawHash, source: 'provider',
+      fetched_at: nowIso, last_seen_at: nowIso,
+    }));
+    const { error } = await admin
+      .from('tv_airings')
+      .upsert(rows, { onConflict: 'lineup_id,station_id,start_at_utc,programme_id' });
+    if (error) throw new Error(`bulk insert into tv_airings (national) failed: ${error.message}`);
+  }
+  for (const batch of chunk(plan.update, WRITE_BATCH_SIZE)) {
+    const rows = batch.map((u) => ({
+      id: u.id,
+      start_at_utc: u.row.startAtUtc, end_at_utc: u.row.endAtUtc,
+      is_complete: u.row.endAtUtc != null, is_premiere: u.row.isNew ?? null, is_repeat: u.row.isRepeat ?? null,
+      raw_hash: u.row.rawHash, last_seen_at: nowIso,
+    }));
+    const { error } = await admin.from('tv_airings').upsert(rows, { onConflict: 'id' });
+    if (error) throw new Error(`bulk update of tv_airings (national) failed: ${error.message}`);
+  }
+  for (const batch of chunk(plan.unchanged, WRITE_BATCH_SIZE)) {
+    await admin.from('tv_airings').update({ last_seen_at: nowIso }).in('id', batch);
+  }
+  for (const batch of chunk(plan.expire, WRITE_BATCH_SIZE)) {
+    await admin.from('tv_airings').delete().in('id', batch);
+  }
+
+  // The durable run record. `trigger: 'national'` is the distinct marker that
+  // separates a national run from the curated 'cron' run in tv_ingestion_runs,
+  // so the two are individually observable. Surface an insert failure loudly,
+  // exactly like the curated run does.
+  const { error: runRowError } = await admin.from('tv_ingestion_runs').insert({
+    provider_id: PROVIDER_ID, lineup_id: lineupId,
+    started_at: nowIso, completed_at: new Date().toISOString(),
+    status: fetchComplete ? 'success' : 'partial', trigger: 'national',
+    requested_start_utc: new Date(windowStartMs).toISOString(),
+    requested_end_utc: new Date(windowEndMs).toISOString(),
+    channels_requested: channelByKey.size,
+    channels_returned: channelByKey.size,
+    channels_no_listings: 0,
+    calls_used: dates.length,
+    records_inserted: dedupedInserts.length, records_updated: plan.stats.updated,
+    records_unchanged: plan.stats.unchanged, records_expired: plan.stats.expired,
+    errors: daysFailed.map((e) => ({ message: e })),
+  });
+  if (runRowError) throw new Error(`tv_ingestion_runs insert (national) failed: ${runRowError.message}`);
+
+  return {
+    ok: fetchComplete,
+    lineupId,
+    windowStartUtc: new Date(windowStartMs).toISOString(),
+    windowEndUtc: new Date(windowEndMs).toISOString(),
+    daysRequested: days,
+    daysFetched: dates.length - daysFailed.length,
+    daysFailed,
+    networksIngested: channelByKey.size,
+    totalAiringsMatched: allMatched.length,
+    inserted: dedupedInserts.length, updated: plan.stats.updated,
+    unchanged: plan.stats.unchanged, expired: plan.stats.expired,
   };
 }

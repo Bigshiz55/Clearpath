@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile, regionFor } from '@/lib/profile';
 import { getUpcomingTv } from '@/lib/onTv';
+import { getUpcomingTvIngested, INGESTED_MIN } from '@/lib/tv/ingestedGuide';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -15,7 +16,12 @@ export async function GET() {
     } = await supabase.auth.getUser();
     const region = regionFor(user ? await getProfile(supabase, user.id) : null);
 
-    const airings = await getUpcomingTv(region, Date.now());
+    // Canonical source first: the ingested national guide. If it yields too few
+    // rows (or errors → []), fall back to the live TVmaze fetch so Easy Mode is
+    // never blank.
+    const now = Date.now();
+    const ingested = await getUpcomingTvIngested(supabase, region, now).catch(() => [] as Awaited<ReturnType<typeof getUpcomingTv>>);
+    const airings = ingested.length >= INGESTED_MIN ? ingested : await getUpcomingTv(region, now);
 
     // Which the user already has a reminder for (guarded pre-migration).
     let remindedIds: number[] = [];

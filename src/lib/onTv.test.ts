@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { usBroadcastDate } from './onTv';
+import { usBroadcastDate, selectUpcomingAirings, type Airing } from './onTv';
 
 /**
  * usBroadcastDate — the calendar-day key used to fetch TVmaze's US broadcast
@@ -60,5 +60,95 @@ describe('usBroadcastDate', () => {
     const afterFallBack = Date.parse('2026-11-01T07:30:00.000Z'); // 2:30 AM EST (still Nov 1)
     expect(usBroadcastDate(beforeFallBack)).toBe('2026-11-01');
     expect(usBroadcastDate(afterFallBack)).toBe('2026-11-01');
+  });
+});
+
+/**
+ * selectUpcomingAirings — the SHARED pure selector behind both `getUpcomingTv`
+ * (live TVmaze fetch) and `getUpcomingTvIngested` (the canonical ingested
+ * tables). These fixtures are in-memory `Airing[]` (no DB, no network), so they
+ * exercise exactly the filter/rank/dedupe/order behavior the ingested-backed
+ * reader inherits verbatim — genre, network, movieOnly, NOISE_TYPES exclusion,
+ * showId dedupe, and final time ordering.
+ */
+describe('selectUpcomingAirings (shared live + ingested reader)', () => {
+  const NOW = Date.parse('2026-08-04T18:00:00.000Z');
+  const H = 60 * 60 * 1000;
+
+  function airing(over: Partial<Airing>): Airing {
+    return {
+      id: Math.floor(Math.random() * 1e9),
+      time: '20:00',
+      minutes: 20 * 60,
+      airstamp: new Date(NOW + 1 * H).toISOString(),
+      runtime: 60,
+      network: 'AMC',
+      showName: 'A Show',
+      showId: Math.floor(Math.random() * 1e9),
+      episodeName: null,
+      season: null,
+      number: null,
+      showType: 'Scripted',
+      genres: ['Drama'],
+      rating: 8,
+      image: null,
+      summary: null,
+      imdb: null,
+      ...over,
+    };
+  }
+
+  it('excludes airings before now and beyond the horizon', () => {
+    const past = airing({ showId: 1, airstamp: new Date(NOW - 1 * H).toISOString() });
+    const soon = airing({ showId: 2, airstamp: new Date(NOW + 2 * H).toISOString() });
+    const tooFar = airing({ showId: 3, airstamp: new Date(NOW + 60 * H).toISOString() }); // past the 48h cap
+    const out = selectUpcomingAirings([past, soon, tooFar], NOW);
+    expect(out.map((a) => a.showId)).toEqual([2]);
+  });
+
+  it('drops News / Talk Show / Variety noise types', () => {
+    const news = airing({ showId: 1, showType: 'News' });
+    const talk = airing({ showId: 2, showType: 'Talk Show' });
+    const variety = airing({ showId: 3, showType: 'Variety' });
+    const scripted = airing({ showId: 4, showType: 'Scripted' });
+    const out = selectUpcomingAirings([news, talk, variety, scripted], NOW);
+    expect(out.map((a) => a.showId)).toEqual([4]);
+  });
+
+  it('filters by genre (case-insensitive, exact tag match)', () => {
+    const comedy = airing({ showId: 1, genres: ['Comedy'] });
+    const drama = airing({ showId: 2, genres: ['Drama'] });
+    const out = selectUpcomingAirings([comedy, drama], NOW, undefined, 'comedy');
+    expect(out.map((a) => a.showId)).toEqual([1]);
+  });
+
+  it('filters by network (case-insensitive substring)', () => {
+    const life = airing({ showId: 1, network: 'Lifetime' });
+    const amc = airing({ showId: 2, network: 'AMC' });
+    const out = selectUpcomingAirings([life, amc], NOW, undefined, null, 'lifetime');
+    expect(out.map((a) => a.showId)).toEqual([1]);
+  });
+
+  it('filters to movies only when movieOnly is set', () => {
+    const movie = airing({ showId: 1, showType: 'Movie' });
+    const series = airing({ showId: 2, showType: 'Scripted' });
+    const out = selectUpcomingAirings([movie, series], NOW, undefined, null, null, true);
+    expect(out.map((a) => a.showId)).toEqual([1]);
+  });
+
+  it('dedupes by showId, keeping the higher-rated instance', () => {
+    const lowRated = airing({ id: 100, showId: 42, rating: 5, airstamp: new Date(NOW + 1 * H).toISOString() });
+    const highRated = airing({ id: 200, showId: 42, rating: 9, airstamp: new Date(NOW + 3 * H).toISOString() });
+    const out = selectUpcomingAirings([lowRated, highRated], NOW);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.id).toBe(200); // the 9-rated instance survives the dedupe
+  });
+
+  it('returns the surviving set in ascending airstamp (time) order', () => {
+    const later = airing({ showId: 1, rating: 9, airstamp: new Date(NOW + 5 * H).toISOString() });
+    const earlier = airing({ showId: 2, rating: 6, airstamp: new Date(NOW + 1 * H).toISOString() });
+    const middle = airing({ showId: 3, rating: 7, airstamp: new Date(NOW + 3 * H).toISOString() });
+    const out = selectUpcomingAirings([later, earlier, middle], NOW);
+    expect(out.map((a) => a.showId)).toEqual([2, 3, 1]); // time order, not rating order
   });
 });
