@@ -59,8 +59,14 @@ const ANSWERS = [
   'I absolutely loved Saving Private Ryan',
 ];
 
-test.describe.configure({ mode: 'serial' });
-
+/**
+ * NOT serial at the top level. It was, and one early failure (A1) aborted the
+ * other 13 rows — a single red row erased the entire matrix's evidence, which
+ * is the opposite of what a diagnostic suite is for. Only the interview group
+ * genuinely shares state (one synthetic user, one server-side active
+ * interview), so only that group is serial; every other row stands alone and
+ * reports its own verdict.
+ */
 test.beforeAll(() => {
   expect(process.env.VOICE_DNA_PREVIEW_URL, 'VOICE_DNA_PREVIEW_URL must point at the preview deployment').toBeTruthy();
 });
@@ -125,9 +131,37 @@ async function submitAnswer(page: Page, text: string): Promise<void> {
 
 // ── A. The gate: strangers see nothing ──────────────────────────────────────
 
+/**
+ * A0 must pass before ANY other row means anything. If Vercel Deployment
+ * Protection guards this deployment, every path — product route, API, missing
+ * route alike — answers with the same SSO interstitial, so "/voice-dna
+ * returned 200" would say nothing about the founder gate. This row separates
+ * "the platform is answering" from "the app is answering".
+ */
+test('A0 the preview is publicly reachable (no platform auth wall)', async ({ request }) => {
+  const res = await request.get('/api/health');
+  const body = await res.text();
+  const wall =
+    /Authentication Required|vercel\.com\/sso|_vercel_sso_nonce/i.test(body) ||
+    res.status() === 401;
+  expect(
+    wall,
+    `the deployment is behind Vercel Deployment Protection — status ${res.status()}, body starts: ` +
+      `${body.slice(0, 200)}. No product assertion below is meaningful until protection is disabled ` +
+      `for preview, or a bypass secret is provided. This is a PLATFORM CONFIG blocker, not a defect.`,
+  ).toBe(false);
+  expect(res.status(), `/api/health should answer 200, got ${res.status()}: ${body.slice(0, 200)}`).toBe(200);
+});
+
 test('A1 anonymous /voice-dna is a hidden 404', async ({ page }) => {
   const resp = await page.goto('/voice-dna');
-  expect(resp?.status()).toBe(404);
+  const status = resp?.status();
+  const finalUrl = resp?.url() ?? '(none)';
+  const snippet = (await resp?.text().catch(() => ''))?.slice(0, 200) ?? '';
+  expect(
+    status,
+    `expected a hidden 404 for an anonymous visitor. Got ${status} at ${finalUrl}. Body starts: ${snippet}`,
+  ).toBe(404);
 });
 
 test('A2 anonymous /voice-dna/audition is a hidden 404', async ({ page }) => {
@@ -188,7 +222,13 @@ test('C3 authed /api/voice/session answers 200 with an honest mode', async ({ co
   test.info().annotations.push({ type: 'voice-mode', description: String(body.mode) });
 });
 
-// ── D. The interview, end to end on the typed ladder ────────────────────────
+// ── D/E. The interview, end to end on the typed ladder ─────────────────────
+//
+// SERIAL, and only this group: these rows share one synthetic identity and one
+// server-side active interview, so running them out of order (or continuing
+// after one has left the interview in an unexpected state) would produce
+// meaningless verdicts. Rows outside this block are independent by design.
+test.describe.serial('interview (shared identity + server state)', () => {
 
 /**
  * D0 isolates the CLIENT half of a turn from the SERVER half, so a failure
@@ -273,6 +313,8 @@ test('E1 a reload mid-interview resumes with the transcript', async ({ context, 
   ).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('voice-resume-transcript')).toContainText('Blade Runner');
 });
+
+}); // end serial interview group
 
 // ── F. Session-route hygiene ────────────────────────────────────────────────
 

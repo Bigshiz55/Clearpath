@@ -77,6 +77,26 @@ jobs:
           echo "::error::No successful Vercel preview deployment for $sha after 20 minutes."
           exit 1
 
+      # Tells a real gate failure apart from a platform auth wall. If Vercel
+      # Deployment Protection is on, EVERY path answers with the same SSO
+      # interstitial and no product assertion means anything. Booleans only for
+      # secrets — never a value.
+      - name: Diagnose the preview surface
+        env:
+          URL: ${{ steps.preview.outputs.url }}
+        run: |
+          set +e
+          echo "VERCEL_TOKEN secret present             : ${{ secrets.VERCEL_TOKEN != '' }}"
+          echo "VERCEL_AUTOMATION_BYPASS_SECRET present : ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET != '' }}"
+          for p in /api/health /voice-dna; do
+            echo "─────────── GET $URL$p"
+            curl -sS -o /tmp/body -D /tmp/hdr -w 'status=%{http_code} final=%{url_effective}\n' -L "$URL$p"
+            grep -iE '^(x-vercel|location|content-type|set-cookie)' /tmp/hdr | head -8
+            echo "--- first 300 bytes of body ---"
+            head -c 300 /tmp/body; echo; echo
+          done
+          exit 0
+
       - run: npm ci
       - run: npx playwright install --with-deps chromium
 

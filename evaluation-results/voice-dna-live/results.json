@@ -1,0 +1,394 @@
+{
+  "config": {
+    "argv": [
+      "/opt/node22/bin/node",
+      "/home/user/Clearpath/node_modules/.bin/playwright",
+      "test",
+      "-c",
+      "playwright.voicedna.config.ts",
+      "--list"
+    ],
+    "configFile": "/home/user/Clearpath/playwright.voicedna.config.ts",
+    "rootDir": "/home/user/Clearpath/tests/voicedna-live",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 1800000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/user/Clearpath/test-results/voicedna-live-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "",
+        "name": "",
+        "testDir": "/home/user/Clearpath/tests/voicedna-live",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 180000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "evaluation-results/voice-dna-live/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "matrix.spec.ts",
+      "file": "matrix.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "A0 the preview is publicly reachable (no platform auth wall)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7066e7f2e0ac7d296410-47dd598bf5bfa3768d7d",
+          "file": "matrix.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "A1 anonymous /voice-dna is a hidden 404",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7066e7f2e0ac7d296410-85c180282dc4da113a29",
+          "file": "matrix.spec.ts",
+          "line": 156,
+          "column": 5
+        },
+        {
+          "title": "A2 anonymous /voice-dna/audition is a hidden 404",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7066e7f2e0ac7d296410-86710e707e1f5da5edf1",
+          "file": "matrix.spec.ts",
+          "line": 167,
+          "column": 5
+        },
+        {
+          "title": "A3 anonymous POST /api/voice/session is a hidden 404",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7066e7f2e0ac7d296410-5ce24805851e07752a8a",
+          "file": "matrix.spec.ts",
+          "line": 172,
+          "column": 5
+        },
+        {
+          "title": "A4 test login without the secret is a hidden 404",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7066e7f2e0ac7d296410-232cedf837e97a27876e",
+          "file": "matrix.spec.ts",
+          "line": 177,
+          "column": 5
+        },
+        {
+          "title": "B1 preview test login signs in and sets Supabase auth cookies",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7066e7f2e0ac7d296410-4926cce62c144ff7341c",
+          "file": "matrix.spec.ts",
+          "line": 188,
+          "column": 5
+        },
+        {
+          "title": "C1 authed /voice-dna renders the interview idle screen",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7066e7f2e0ac7d296410-44d0a08356a0f7b8b065",
+          "file": "matrix.spec.ts",
+          "line": 200,
+          "column": 5
+        },
+        {
+          "title": "C2 authed /voice-dna/audition renders",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7066e7f2e0ac7d296410-e826cf9b8688452291e2",
+          "file": "matrix.spec.ts",
+          "line": 208,
+          "column": 5
+        },
+        {
+          "title": "C3 authed /api/voice/session answers 200 with an honest mode",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7066e7f2e0ac7d296410-ab82180194c63d9bc4d5",
+          "file": "matrix.spec.ts",
+          "line": 216,
+          "column": 5
+        },
+        {
+          "title": "F1 /api/voice/session is no-store and never leaks key material",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7066e7f2e0ac7d296410-558c7586900246abcdbd",
+          "file": "matrix.spec.ts",
+          "line": 321,
+          "column": 5
+        }
+      ],
+      "suites": [
+        {
+          "title": "interview (shared identity + server state)",
+          "file": "matrix.spec.ts",
+          "line": 231,
+          "column": 15,
+          "specs": [
+            {
+              "title": "D0 the typed transport is live and ingests locally",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7066e7f2e0ac7d296410-35008a072ae07d6573f6",
+              "file": "matrix.spec.ts",
+              "line": 240,
+              "column": 5
+            },
+            {
+              "title": "D1 typed ladder: signals advance confidence and captions grow",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7066e7f2e0ac7d296410-310e79624a1f54c78d45",
+              "file": "matrix.spec.ts",
+              "line": 253,
+              "column": 5
+            },
+            {
+              "title": "D2 the flagship contradiction is caught and surfaced",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7066e7f2e0ac7d296410-a85bd8c48f1fad7f5234",
+              "file": "matrix.spec.ts",
+              "line": 274,
+              "column": 5
+            },
+            {
+              "title": "D3 the interview completes and reveals DNA",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7066e7f2e0ac7d296410-cba5ebeb63d3fb7b5ede",
+              "file": "matrix.spec.ts",
+              "line": 284,
+              "column": 5
+            },
+            {
+              "title": "E1 a reload mid-interview resumes with the transcript",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7066e7f2e0ac7d296410-1a0ef4255609596ec54e",
+              "file": "matrix.spec.ts",
+              "line": 300,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-08-08T16:24:05.632Z",
+    "duration": 105.44899999999996,
+    "expected": 0,
+    "skipped": 15,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
