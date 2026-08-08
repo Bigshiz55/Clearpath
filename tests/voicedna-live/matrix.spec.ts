@@ -75,16 +75,29 @@ async function loginTestFounder(context: BrowserContext): Promise<void> {
   expect(body.ok).toBe(true);
 }
 
-/** Make speech deterministic in headless: no recognition (forces the typed
- *  ladder), no synthesis (interviewer lines land as captions immediately). */
+/**
+ * Force the deterministic TYPED ladder in headless Chromium.
+ *
+ * Only the recognition constructors are removed. That makes `connectFallback`
+ * report capability `'typed'`, which is the CAPABILITY path: the client is
+ * still constructed and `clientRef` is set, so `submitText()` actually ingests.
+ *
+ * `speechSynthesis` is deliberately left ALONE. Stubbing it as a getter
+ * returning undefined leaves `'speechSynthesis' in window` true, so
+ * `connectFallback` throws on `getVoices()` and the component falls through to
+ * its ERROR path — which also shows a typed box but with a null client, so
+ * every typed answer is silently dropped. Headless Chromium's real
+ * `speechSynthesis` reports zero voices, which the transport already handles.
+ */
 async function forceTypedLadder(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const w = window as unknown as Record<string, unknown>;
-    try { delete w.SpeechRecognition; } catch { /* ignore */ }
-    try { delete w.webkitSpeechRecognition; } catch { /* ignore */ }
-    try {
-      Object.defineProperty(window, 'speechSynthesis', { get: () => undefined, configurable: true });
-    } catch { /* ignore */ }
+    for (const name of ['SpeechRecognition', 'webkitSpeechRecognition']) {
+      try { delete w[name]; } catch { /* ignore */ }
+      try {
+        Object.defineProperty(window, name, { value: undefined, configurable: true });
+      } catch { /* ignore */ }
+    }
   });
 }
 
@@ -170,6 +183,26 @@ test('C3 authed /api/voice/session answers 200 with an honest mode', async ({ co
 
 // ── D. The interview, end to end on the typed ladder ────────────────────────
 
+/**
+ * D0 isolates the CLIENT half of a turn from the SERVER half, so a failure
+ * downstream can be attributed without guessing. The user caption is appended
+ * by the transport itself, before any server action runs — so if D0 passes and
+ * D1 fails, the client and transport are healthy and the loss is strictly
+ * server-side persistence (i.e. migration 0047), not a code defect.
+ */
+test('D0 the typed transport is live and ingests locally', async ({ context, page }) => {
+  await loginTestFounder(context);
+  await forceTypedLadder(page);
+  await startTypedInterview(page);
+
+  await submitAnswer(page, ANSWERS[0]!);
+  await expect(
+    page.getByTestId('live-captions'),
+    'the typed answer never reached the transport — the client fell through to its error path ' +
+      '(null client), which is a HARNESS/CLIENT defect and NOT the migration blocker',
+  ).toContainText('Breaking Bad');
+});
+
 test('D1 typed ladder: signals advance confidence and captions grow', async ({ context, page }) => {
   await loginTestFounder(context);
   await forceTypedLadder(page);
@@ -177,6 +210,7 @@ test('D1 typed ladder: signals advance confidence and captions grow', async ({ c
 
   await submitAnswer(page, ANSWERS[0]!);
   await submitAnswer(page, ANSWERS[1]!);
+  // Client-side proof first: if this fails the transport is broken, not the DB.
   await expect(page.getByTestId('live-captions')).toContainText('Breaking Bad');
 
   await submitAnswer(page, ANSWERS[4]!);
@@ -184,8 +218,9 @@ test('D1 typed ladder: signals advance confidence and captions grow', async ({ c
   const value = Number((await confidence.textContent())?.replace(/\D/g, '') ?? '0');
   expect(
     value,
-    'confidence did not move after three strong signals — if the server said "Interview not found.", ' +
-      'migration 0047 (voice_interviews) is not applied: MIGRATION-BLOCKED, not a code defect',
+    'captions grew (client OK) but confidence stayed at 0 after three strong signals — the server ' +
+      'turn did not persist. If D0 passed, this is MIGRATION-BLOCKED (0047 voice_interviews absent), ' +
+      'not a code defect',
   ).toBeGreaterThan(0);
 });
 
