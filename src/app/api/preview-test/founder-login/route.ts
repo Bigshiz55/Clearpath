@@ -99,20 +99,48 @@ export async function POST(req: NextRequest) {
   // Real sign-in through the SSR client so the auth cookies land on the
   // response — from here on the browser session is indistinguishable from a
   // normal signed-in user.
+  //
+  // TWO METHODS, because the project's auth configuration decides which works.
+  // Product sign-in here is magic-link only (`signInWithOtp`), and a Supabase
+  // project can have the password grant switched off entirely — in which case
+  // `signInWithPassword` fails for a CONFIGURATION reason that has nothing to
+  // do with the feature under test. So: try password, then fall back to an
+  // admin-generated magic link redeemed server-side via `verifyOtp`, which
+  // exercises exactly the grant the product itself uses. Report which method
+  // established the session so the evidence stays honest.
   const supabase = createClient();
-  const signIn = await supabase.auth.signInWithPassword({
+  let method: 'password' | 'magiclink' | null = null;
+
+  const byPassword = await supabase.auth.signInWithPassword({
     email: PREVIEW_TEST_EMAIL,
     password,
   });
-  if (signIn.error) {
-    return NextResponse.json(
-      { ok: false, error: 'sign_in_failed' },
-      { status: 500, headers: NO_STORE },
-    );
+  if (!byPassword.error) {
+    method = 'password';
+  } else {
+    const link = await admin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: PREVIEW_TEST_EMAIL,
+    });
+    const tokenHash = link.data?.properties?.hashed_token;
+    if (link.error || !tokenHash) {
+      return NextResponse.json(
+        { ok: false, error: 'link_generation_failed' },
+        { status: 500, headers: NO_STORE },
+      );
+    }
+    const byLink = await supabase.auth.verifyOtp({ type: 'magiclink', token_hash: tokenHash });
+    if (byLink.error) {
+      return NextResponse.json(
+        { ok: false, error: 'sign_in_failed' },
+        { status: 500, headers: NO_STORE },
+      );
+    }
+    method = 'magiclink';
   }
 
   return NextResponse.json(
-    { ok: true, email: PREVIEW_TEST_EMAIL, userId },
+    { ok: true, email: PREVIEW_TEST_EMAIL, userId, method },
     { status: 200, headers: NO_STORE },
   );
 }

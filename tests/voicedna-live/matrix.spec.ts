@@ -70,10 +70,16 @@ async function loginTestFounder(context: BrowserContext): Promise<void> {
   const res = await context.request.post(LOGIN_PATH, {
     headers: { 'x-preview-test-secret': TEST_SECRET },
   });
-  expect(res.status(), 'preview test login must succeed on a preview deployment').toBe(200);
-  const body = (await res.json()) as { ok: boolean };
-  expect(body.ok).toBe(true);
+  const raw = await res.text();
+  expect(res.status(), `preview test login must succeed on a preview deployment — body: ${raw}`).toBe(200);
+  const body = JSON.parse(raw) as { ok: boolean; method?: string };
+  expect(body.ok, `login rejected: ${raw}`).toBe(true);
+  lastLoginMethod = body.method ?? null;
 }
+
+/** Which grant established the session ('password' or 'magiclink') — recorded
+ *  as evidence, since the project's auth configuration decides which is used. */
+let lastLoginMethod: string | null = null;
 
 /**
  * Force the deterministic TYPED ladder in headless Chromium.
@@ -152,6 +158,7 @@ test('B1 preview test login signs in and sets Supabase auth cookies', async ({ c
     cookies.some((c) => c.name.startsWith('sb-')),
     `expected Supabase auth cookies, saw: ${cookies.map((c) => c.name).join(', ')}`,
   ).toBe(true);
+  test.info().annotations.push({ type: 'login-method', description: String(lastLoginMethod) });
 });
 
 // ── C. Authed surfaces ──────────────────────────────────────────────────────
