@@ -1,6 +1,6 @@
 # Independent Adversarial Semantic Suite
 
-- Commit `695f4e6` · 17/17 passed
+- Commit `2f9661c` · 17/17 passed
 - Expectations hand-authored here; oracle shares no code with the generator.
 
 ## contradiction

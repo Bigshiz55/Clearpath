@@ -162,18 +162,32 @@ regression 4, snapshot 3, clarify 5).
 
 ## L. Remaining weaknesses (critical)
 
+The three code-side items flagged in the first pass are now DONE and tested:
+- **Clarification is wired end-to-end** into the real `/api/ask` conversational
+  flow (`kind:'clarify'` + `clarifyOptions`), state-aware so it never re-asks a
+  resolved ambiguity, with selectable option chips in `AskTheJudge` that re-file
+  the case with the answer appended (resolving via the normal parser).
+- **The store warm process is implemented**: `warm.ts` (pure, bounded,
+  idempotent, version-gated) + `warmStore.runKnowledgeWarmJob` +
+  `/api/cron/knowledge-warm` (CRON_SECRET-gated, dormant without TMDB).
+- **Compiled tone is consumed in ranking** via a bounded (±4), reward-only,
+  eligibility-subordinate nudge applied only to already-eligible survivors.
+
+What genuinely remains:
 1. **Live proof pending.** All evidence is offline/unit. Real promotion of a
-   compiled MATERIAL fact in production needs the migration applied + a warm
-   store + `TMDB_API_KEY`; not verifiable in this sandbox.
-2. **Clarification is not yet surfaced in the response envelope.** The detector
-   is pure and tested but not yet wired to return a clarification payload from
-   `/api/ask`; that route wiring + UI remain.
-3. **Store warms opportunistically.** Only ambiguous-band facts are written on
-   demand; a dedicated batch/cron compile pass over the catalog is provided
-   (`compileTitle`) but not scheduled.
-4. **Header fields (tone/setting/anti-evidence)** are compiled by `batch.ts` but
-   not yet consumed by ranking/UI — they are provenance today, not yet signal.
-5. The searchrouting live test cannot run keyless in-sandbox (env, not code).
+   compiled MATERIAL fact, the warm cron writing rows, and the tone nudge
+   reordering live results need migration 0048 applied + `TMDB_API_KEY` +
+   (for tone) `AI_DISCOVERY_MODE=anthropic`; none are verifiable in this sandbox.
+2. **`setting` and `anti_evidence` header fields** are compiled and stored but
+   only `tone` is consumed in ranking so far; setting/anti-evidence remain
+   provenance, not yet signal.
+3. **Mobile result cards stay single-column-of-rows (approved design #70), not
+   literal 2-across tiles.** The card is a horizontal row (poster + facts +
+   synopsis) that already shows 3–4 informative titles per phone screen;
+   converting to ~170px 2-across tiles regresses the action row and synopsis
+   (documented in `globals.css`), so the shipped design was preserved, not
+   flipped. Passes no-3-across / no-overflow.
+4. The searchrouting live test cannot run keyless in-sandbox (env, not code).
 
 ## M. Production status
 
