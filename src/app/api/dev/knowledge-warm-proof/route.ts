@@ -46,17 +46,29 @@ export async function GET(request: Request): Promise<Response> {
   try {
     // (5) Internally call knowledge-warm WITH the Bearer header.
     // Primary: a real internal HTTP hop to ${origin}/api/cron/knowledge-warm.
-    // Fallback: if Vercel Deployment Protection challenges the internal hop
-    // (401/403 despite the correct Bearer — protection intercepts before the
-    // route runs), invoke the route handler in-process with the same authorized
-    // request. Both add the secret server-side and produce the identical warm
-    // result; the fallback keeps Deployment Protection ENABLED and untouched.
+    // Fallback: if Vercel Deployment Protection intercepts the internal hop,
+    // invoke the route handler in-process with the same authorized request.
+    //
+    // Protection interception is detected robustly (the earlier version only
+    // excluded 401/403 and so mistook the SSO page's HTTP 200 HTML for a real
+    // warm result, returning upstream:null). `redirect: 'manual'` stops fetch
+    // from silently following the SSO redirect to a 200 HTML page; a response is
+    // treated as INTERCEPTED when it is a redirect (301/302/303/307/308 or an
+    // opaque redirect), a 401/403, or has a non-JSON Content-Type. Only a real
+    // JSON response from knowledge-warm is trusted.
     let via = 'http';
     let status: number;
     let body: unknown = null;
 
-    const httpRes = await fetch(authedReq(), { cache: 'no-store' }).catch(() => null);
-    if (httpRes && httpRes.status !== 401 && httpRes.status !== 403) {
+    const httpRes = await fetch(authedReq(), { cache: 'no-store', redirect: 'manual' }).catch(() => null);
+    const contentType = (httpRes?.headers.get('content-type') ?? '').toLowerCase();
+    const intercepted =
+      !httpRes ||
+      httpRes.status === 0 || // opaqueredirect
+      [301, 302, 303, 307, 308, 401, 403].includes(httpRes.status) ||
+      !contentType.includes('application/json');
+
+    if (httpRes && !intercepted) {
       status = httpRes.status;
       body = await httpRes.json().catch(() => null);
     } else {
