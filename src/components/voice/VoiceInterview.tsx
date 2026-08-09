@@ -29,17 +29,16 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   startOrResumeInterview,
-  recordInterviewTurn,
+  recordScriptedTurn,
   completeInterview,
   abandonInterview,
 } from '@/lib/actions/voiceInterview';
 import {
-  buildTurnInstruction,
   type InterviewState,
   type Directive,
-  type TasteSignal,
   type DnaReveal as DnaRevealPayload,
   type TranscriptEntry,
+  type ScriptQuestion,
 } from '@/lib/voice/interview';
 import type { VoiceClient, VoiceClientCallbacks, VoiceTransport } from '@/lib/voice/realtime/types';
 import { Waveform } from './Waveform';
@@ -92,6 +91,9 @@ export function VoiceInterview() {
   const clientRef = useRef<VoiceClient | null>(null);
   const interviewIdRef = useRef<string | null>(null);
   const directiveRef = useRef<Directive | null>(null);
+  /** The rapid-fire question currently on the table. The server owns which one
+   *  it is; the client only voices it and reports back what it heard. */
+  const questionRef = useRef<ScriptQuestion | null>(null);
   const turnChain = useRef<Promise<void>>(Promise.resolve());
   const streamingRef = useRef('');
   const triedFallbackRef = useRef(false);
@@ -113,6 +115,7 @@ export function VoiceInterview() {
       }
       interviewIdRef.current = res.state.id;
       directiveRef.current = res.directive;
+      questionRef.current = res.question ?? null;
       setEngineState(res.state);
       if (res.state.transcript.length > 0) {
         setCaptions(transcriptToCaptions(res.state.transcript));
@@ -150,37 +153,45 @@ export function VoiceInterview() {
     }
   }
 
-  async function processSignal(signal: TasteSignal): Promise<void> {
+  /**
+   * ONE TURN OF THE RAPID-FIRE LOOP.
+   *
+   * The client sends the RAW UTTERANCE and the server decides what it meant and
+   * what comes next. Parsing "10, 7, 3" lives in one place that way, identical
+   * for speech, the typed fallback, and tests — the browser never has an opinion
+   * about the user's taste.
+   */
+  async function processUtterance(text: string): Promise<void> {
     const id = interviewIdRef.current;
-    if (!id) return;
-    const res = await recordInterviewTurn({ interviewId: id, signals: [signal] });
-    if (!mountedRef.current || !res.ok || !res.state || !res.directive) return;
+    if (!id || !text.trim()) return;
+    const res = await recordScriptedTurn({ interviewId: id, text });
+    if (!mountedRef.current || !res.ok || !res.state) return;
 
     setEngineState(res.state);
-    directiveRef.current = res.directive;
+    questionRef.current = res.question ?? null;
 
-    // A strong reaction earns an "Interesting…"; the engine's own tagged beats
-    // (challenge/theory/wrap) take precedence.
-    const actionBeat = BEAT_FOR_ACTION[res.directive.action];
-    const nextBeat: Beat | null = actionBeat ?? (signal.strength >= 0.8 ? 'insight' : null);
-    if (nextBeat) {
-      setBeat(nextBeat);
+    // A mixed-signal answer ("10 … 2") is the interesting moment worth marking.
+    if (!res.needsReask && res.ack === 'Strong opinions — good.') {
+      setBeat('insight');
       setBeatNonce((n) => n + 1);
     }
 
-    clientRef.current?.steer({
-      instruction: buildTurnInstruction(res.directive),
-      speakLine: res.directive.suggestedLine,
-      done: res.directive.done,
-    });
+    // Speak the short acknowledgement, then immediately the next question —
+    // no dead air between them, which is what makes it feel rapid-fire.
+    const nextPrompt = res.needsReask
+      ? (questionRef.current?.prompt ?? '')
+      : (res.question?.prompt ?? '');
+    const line = [res.ack, nextPrompt].filter(Boolean).join(' ');
+    if (line) clientRef.current?.steer({ instruction: line, speakLine: line, done: Boolean(res.done) });
 
-    if (res.directive.done) await finish();
+    if (res.done) await finish();
   }
 
-  // Serialize turns: `recordInterviewTurn` reads-then-writes the server state, so
-  // two overlapping turns would race the turn counter. Chain them.
-  function enqueueSignal(signal: TasteSignal): void {
-    turnChain.current = turnChain.current.then(() => processSignal(signal)).catch(() => undefined);
+  // Serialize turns: `recordScriptedTurn` reads-then-writes the server state, so
+  // two overlapping turns would race the turn counter AND could answer the same
+  // question twice. Chain them.
+  function enqueueUtterance(text: string): void {
+    turnChain.current = turnChain.current.then(() => processUtterance(text)).catch(() => undefined);
   }
 
   // ---- transport callbacks (shared by both transports) ---------------------
@@ -190,16 +201,12 @@ export function VoiceInterview() {
         if (!mountedRef.current) return;
         setStatus('live');
         setNotice(null);
-        // Steer toward the current directive (greet on a fresh run, the in-flight
-        // question on resume/reconnect). `kickoff` only matters to Realtime — it
-        // asks the model to speak first.
-        const d = directiveRef.current;
-        if (d) {
-          clientRef.current?.steer({
-            instruction: buildTurnInstruction(d),
-            speakLine: d.suggestedLine,
-            kickoff: true,
-          });
+        // Open on the question that is actually on the table — on a fresh run
+        // that is the stage-1 gut check; on resume it is whatever was next.
+        // `kickoff` only matters to Realtime: it asks the model to speak first.
+        const prompt = questionRef.current?.prompt;
+        if (prompt) {
+          clientRef.current?.steer({ instruction: prompt, speakLine: prompt, kickoff: true });
         }
       },
       onClose: () => {
@@ -220,9 +227,17 @@ export function VoiceInterview() {
         if (text) setCaptions((c) => [...c, { id: captionId(), role: 'interviewer', text }]);
       },
       onUserTranscript: (text) => {
-        if (text) setCaptions((c) => [...c, { id: captionId(), role: 'user', text }]);
+        if (!text) return;
+        setCaptions((c) => [...c, { id: captionId(), role: 'user', text }]);
+        // THE LOOP: every finished utterance is an answer to the question on the
+        // table. This is the only input path, so speech and typing behave the
+        // same and nothing can answer twice.
+        enqueueUtterance(text);
       },
-      onSignal: (signal) => enqueueSignal(signal),
+      // Deliberately ignored: in the scripted interview the SERVER interprets
+      // the utterance. Acting on model-emitted signals as well would score the
+      // same answer twice, from two different interpreters.
+      onSignal: () => undefined,
       onAudioLevel: (lvl) => setLevel(lvl),
       onSpeakingChange: (v) => setSpeaking(v),
     };

@@ -227,6 +227,21 @@ export interface InterviewState {
   /** An open follow-up we owe the user before moving on, if any. */
   pendingFollowUp: FollowUp | null;
   transcript: TranscriptEntry[];
+  /**
+   * RAPID-FIRE SCRIPT PROGRESS (stages 1–4). Optional, and structural rather
+   * than imported, so `script/*` can depend on this module without a cycle and
+   * so an interview row persisted before the scripted flow existed still loads.
+   * Everything about stage 2 is DERIVED from `genreScores` on demand, which is
+   * why so little is stored: there is no second source of truth to drift.
+   */
+  script?: {
+    /** Question ids already answered, in order. */
+    answeredIds: string[];
+    /** Stage-1 genre key → 1–10 score. Gates every drill-down. */
+    genreScores: Record<string, number>;
+    /** Titles named in stage 4. */
+    anchors: { title: string; polarity: 'positive' | 'negative' }[];
+  };
 }
 
 // ---------------------------------------------------------------------------

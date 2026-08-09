@@ -19,3 +19,10 @@ export * from './director';
 export * from './reveal';
 export * from './dnaUpdate';
 export * from './prompts';
+
+// The rapid-fire staged script (stages 1–4) that drives the product interview,
+// plus its mock transport. Feeds the same signals/confidence/DNA pipeline above.
+export * from './script/questionBank';
+export * from './script/numberParse';
+export * from './script/scriptedInterview';
+export * from './script/simulate';

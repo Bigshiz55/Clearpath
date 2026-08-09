@@ -22,6 +22,15 @@ import {
   getInterview,
   abandonInterview as abandonInterviewRow,
 } from '@/lib/voice/store';
+import {
+  answerScripted,
+  isScriptComplete,
+  meaningfulTurns,
+  nextQuestion,
+  withProgress,
+  acknowledgement,
+  type ScriptQuestion,
+} from '@/lib/voice/interview';
 import { voiceInterviewMode, type VoiceInterviewMode } from '@/lib/voice/config';
 
 /**
@@ -68,6 +77,28 @@ export interface StartResult {
   state?: InterviewState;
   directive?: Directive;
   mode?: VoiceInterviewMode;
+  /** The rapid-fire question to ask now (null once the script is finished). */
+  question?: ScriptQuestion | null;
+  /** How many scripted questions this user has already answered. */
+  answered?: number;
+}
+
+/**
+ * The result of one rapid-fire turn. The client needs the NEXT question and a
+ * short acknowledgement to voice; everything else it already has.
+ */
+export interface ScriptedTurnResult {
+  ok: boolean;
+  error?: string;
+  state?: InterviewState;
+  /** Very short line to say before the next question ("Got it."). */
+  ack?: string;
+  /** True when the answer could not be read and the SAME question stands. */
+  needsReask?: boolean;
+  /** The question to ask next, or null when the interview is finished. */
+  question?: ScriptQuestion | null;
+  /** True once every planned question has been answered. */
+  done?: boolean;
 }
 export interface TurnResult {
   ok: boolean;
@@ -121,7 +152,64 @@ export async function startOrResumeInterview(): Promise<StartResult> {
     state = createInterview(g.userId, Date.now());
     await saveInterview(g.supabase, state);
   }
-  return { ok: true, state, directive: decide(state), mode };
+  // The scripted question is derived from the stored answers, so a resumed
+  // interview lands on exactly the turn it left off on — no cursor to drift.
+  return {
+    ok: true,
+    state,
+    directive: decide(state),
+    mode,
+    question: nextQuestion(state),
+    answered: meaningfulTurns(state),
+  };
+}
+
+/**
+ * ONE RAPID-FIRE TURN: parse the user's utterance against the question that was
+ * actually asked, fold the resulting signals into the same engine the free-form
+ * interview uses, persist, and hand back the next question.
+ *
+ * The client sends the RAW UTTERANCE rather than pre-parsed signals, so the
+ * interpretation of "10, 7, 3" lives on the server, in one place, and is
+ * identical for spoken audio, the typed accessibility fallback, and tests.
+ *
+ * An unreadable answer does not consume the question: `needsReask` comes back
+ * true and the same question stands, because recording a score the user never
+ * said is worse than asking again.
+ */
+export async function recordScriptedTurn(input: {
+  interviewId: string;
+  text: string;
+}): Promise<ScriptedTurnResult> {
+  const parsed = z
+    .object({ interviewId: interviewIdSchema, text: z.string().max(4000) })
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'Invalid turn.' };
+
+  const g = await gate();
+  if (!g.ok) return { ok: false, error: g.error };
+
+  const state = await getInterview(g.supabase, g.userId, parsed.data.interviewId);
+  if (!state) return { ok: false, error: 'Interview not found.' };
+
+  const result = answerScripted(state, parsed.data.text, state.turn + 1);
+  if (!result) {
+    // Nothing left to ask — the script is already finished.
+    return { ok: true, state, question: null, done: true, ack: '' };
+  }
+
+  let next = advance(state, result.signals, Date.now());
+  if (!result.needsReask) next = withProgress(next, result.progress);
+  await saveInterview(g.supabase, next);
+
+  return {
+    ok: true,
+    state: next,
+    ack: acknowledgement(result),
+    needsReask: result.needsReask,
+    question: nextQuestion(next),
+    done: isScriptComplete(next),
+  };
 }
 
 /**
