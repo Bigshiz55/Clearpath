@@ -97,11 +97,20 @@ describe('the interview is gone', () => {
     expect(read('src/lib/supabase/middleware.ts')).toContain("'/voice-dna'");
   });
 
-  it('TEST 7+8: no entry point remains in navigation or the DNA hub', () => {
+  it('TEST 7+8: the RETIRED interview has no entry point — but Voice DNA does', () => {
+    // This assertion used to read `expect(nav).not.toContain('/voice-dna')`.
+    // That was right when `/voice-dna` was the retired Taste Interview. It
+    // became actively harmful once the route was rebuilt and un-gated: the
+    // guard meant to keep a dead feature buried was the reason a LIVE feature
+    // stayed invisible in the More menu. Inverted deliberately — see
+    // `src/components/nav/voiceDnaDiscoverable.test.ts` for the full contract.
     const nav = read('src/components/Nav.tsx');
-    expect(nav).not.toContain('/voice-dna');
+    expect(nav).toContain('/voice-dna');
+
+    // The genuinely retired surfaces stay retired.
     const dna = read('src/app/app/dna/page.tsx');
-    expect(dna).not.toContain('href="/voice-dna"');
+    expect(dna).not.toContain('/app/taste-interview');
+    expect(read('src/components/Nav.tsx')).not.toContain('/app/taste-interview');
   });
 
   it('TEST 22: no interview-only table can accumulate data', () => {
