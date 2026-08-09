@@ -30,7 +30,7 @@ async function startInterview(page: import('@playwright/test').Page) {
 
 /** Type one answer and submit it. */
 async function answer(page: import('@playwright/test').Page, text: string) {
-  const input = page.getByTestId('voice-typed-input');
+  const input = page.locator('#voice-typed-input');
   await input.fill(text);
   await input.press('Enter');
 }
