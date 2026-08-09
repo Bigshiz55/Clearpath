@@ -394,14 +394,19 @@ export interface AudioDetection {
   originalAudioPreferred: boolean;
 }
 
-/** Detect English-audio / dub / subtitle preferences. Conservative. */
+/** Detect English-audio / dub / subtitle preferences. Conservative, but robust
+ *  to the common surface forms of "dubbed in English" — dub / dubs / dubbing /
+ *  dubbed in|into English / English-dubbed — and to "so I don't have to read". */
 export function detectAudio(text: string): AudioDetection {
   const t = ` ${text.toLowerCase()} `;
-  const englishDubRequired = /\b(english dub|dubbed in english|english dubbed|english-language dub)\b/.test(t);
+  const englishDubRequired =
+    /\b(english[- ]?dub(?:bed|bing|s)?|dubbed (?:in|into) english|english[- ]language dub)\b/.test(t);
   const englishAudioRequired =
     englishDubRequired ||
     /\b(english audio|in english|english language|english-language|english spoken|spoken english)\b/.test(t) ||
-    /\bneeds? (?:to be )?(?:in )?english\b/.test(t);
+    /\bneeds? (?:to be )?(?:in )?english\b/.test(t) ||
+    /\b(?:don'?t|do not|dont) (?:have to|want to|wanna|need to) read\b/.test(t) ||
+    /\bwithout (?:having to )?read(?:ing)?\b/.test(t);
   const subtitlesNotAcceptable = /\b(no subtitles?|without subtitles?|don'?t want to read|hate subtitles?|not subtitled|no subs)\b/.test(t);
   const dubNotAcceptable = /\b(no dub|not dubbed|original audio only|subtitles? (?:are )?fine|prefer subtitles?)\b/.test(t);
   const originalAudioPreferred = /\b(original (?:language|audio)|subtitles? (?:are )?(?:fine|ok|okay|acceptable|preferred))\b/.test(t);

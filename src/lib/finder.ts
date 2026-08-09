@@ -78,6 +78,10 @@ export interface FinderQuery {
    *  Stricter than englishAudioOnly: native-English titles are excluded, so a
    *  candidate qualifies only when englishAvailability === 'available'. */
   englishDubOnly?: boolean;
+  /** "FOREIGN" — a NON-English original, regardless of dub. A title whose
+   *  original language is English is never a valid answer. Weaker than
+   *  englishDubOnly (which additionally requires a verified English track). */
+  nonEnglishOriginalOnly?: boolean;
   onMyServices: boolean;
   /** Explicit streaming provider ids to require (the on-home service checkboxes). */
   providerIds?: number[];
@@ -347,7 +351,7 @@ export async function runFinder(
   // this intent fans languages; every other query keeps its single pass.
   const DUB_SOURCE_LANGUAGES = ['ja', 'ko', 'es', 'fr', 'de', 'it', 'hi', 'zh', 'pt', 'ru'];
   const dubLanguages =
-    q.englishDubOnly && !(q.originalLanguages && q.originalLanguages.length)
+    (q.englishDubOnly || q.nonEnglishOriginalOnly) && !(q.originalLanguages && q.originalLanguages.length)
       ? DUB_SOURCE_LANGUAGES
       : null;
   const languagePasses: (string | undefined)[] = dubLanguages ?? [q.originalLanguages?.[0]];
@@ -490,6 +494,13 @@ export async function runFinder(
       // (an English track exists on a non-English original) qualifies.
       if (q.englishDubOnly && meta.englishAvailability !== 'available') return null;
       if (q.englishDubOnly) receipts.push('English dub');
+      // FOREIGN — a NON-English original. `englishAvailability === 'native'`
+      // means the original language IS English (see meta-helpers), so it is
+      // exactly what a "foreign" ask must exclude. Weaker than the dub filter:
+      // it does not require an English track, so "foreign, subtitles are fine"
+      // stays valid. Never satisfied by a native-English title, ever.
+      if (q.nonEnglishOriginalOnly && meta.englishAvailability === 'native') return null;
+      if (q.nonEnglishOriginalOnly && !q.englishDubOnly) receipts.push('non-English original');
       // On my services.
       const included = providers ? includedServiceNames(providers.options, services) : [];
       if (q.onMyServices) {

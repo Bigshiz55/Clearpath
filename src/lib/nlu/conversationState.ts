@@ -25,8 +25,19 @@ import { naiveParseQuery, parseTopicTerms, extractExcludedPerson } from '@/lib/f
 import { GENRE_IDS } from '@/lib/finderGenres';
 
 import { resolveSource } from '@/lib/nlu/mediaOntology';
+import { detectOrigin, detectAudio } from '@/lib/nlu/detectors';
 
 export type Monetization = 'flatrate' | 'free' | 'ads' | 'rent' | 'buy';
+
+/** Whether the ORIGINAL language must be English, non-English ("foreign"), or unconstrained. */
+export type OriginalLanguageClass = 'any' | 'english' | 'non_english';
+/**
+ * The audio the user needs. `english_dub` = a non-English original WITH a
+ * verified English track; `english_audio` = native OR dubbed English; `original_audio`
+ * = original language is fine (subtitles acceptable). These are the same
+ * semantics the single-turn `augmentInternational` path uses — one meaning, both paths.
+ */
+export type AudioRequirement = 'any' | 'english_audio' | 'english_dub' | 'original_audio';
 
 export interface CanonicalRequest {
   version: 1;
@@ -48,6 +59,10 @@ export interface CanonicalRequest {
   excludeDocumentaries: boolean;
   originCountries: string[];
   originalLanguages: string[];
+  /** "foreign" → non_english; carried durably so a follow-up never loses it. */
+  originalLanguageClass: OriginalLanguageClass;
+  /** "dubbed in English" → english_dub; a HARD audio constraint, verified by data. */
+  audioRequirement: AudioRequirement;
   /** Canonical provider names (resolved through the source ontology). */
   providers: string[];
   onMyServices: boolean;
@@ -78,6 +93,8 @@ export const EMPTY_REQUEST: CanonicalRequest = {
   excludeDocumentaries: false,
   originCountries: [],
   originalLanguages: [],
+  originalLanguageClass: 'any',
+  audioRequirement: 'any',
   providers: [],
   onMyServices: false,
   monetization: [],
@@ -215,6 +232,53 @@ export function applyTurn(prev: CanonicalRequest, rawText: string, ctx: TurnCont
     s.excludeDocumentaries = false;
     s.excludeGenreIds = s.excludeGenreIds.filter((g) => g !== GENRE_IDS.documentary);
     notes.push('documentaries allowed again');
+  }
+
+  // ── International: foreign / original language + audio (the SAME detectors
+  //    the single-turn path uses, so both paths carry one meaning). This is the
+  //    fix for "three foreign movies dubbed in English": the conversational
+  //    canonical state now preserves the full audio + origin-language semantics
+  //    across turns instead of dropping them. ─────────────────────────────────
+  const origin = detectOrigin(text);
+  const audio = detectAudio(text);
+  for (const c of origin.countries) addUnique(s.originCountries, c);
+  for (const l of origin.languages) addUnique(s.originalLanguages, l);
+  if (origin.languages.length > 0) {
+    s.originalLanguageClass = 'non_english';
+    notes.push(`original language: ${origin.languages.join(', ')}`);
+  } else if (origin.foreign) {
+    s.originalLanguageClass = 'non_english';
+    notes.push('foreign — non-English original');
+  }
+  if (audio.englishDubRequired) {
+    s.audioRequirement = 'english_dub';
+    // A dub only makes sense on a non-English original — imply it.
+    if (s.originalLanguageClass === 'any') s.originalLanguageClass = 'non_english';
+    notes.push('English dub — a non-English original with a verified English track');
+  } else if (audio.englishAudioRequired) {
+    s.audioRequirement = 'english_audio';
+    notes.push('English audio');
+  } else if (audio.dubNotAcceptable || audio.originalAudioPreferred) {
+    s.audioRequirement = 'original_audio';
+    notes.push('original audio is fine (subtitles acceptable)');
+  }
+  // §8 clarification — a bare "English" next to "foreign" is genuinely ambiguous:
+  // a foreign-MADE film originally in English, or a foreign-LANGUAGE film dubbed
+  // to English? Only ask when the audio was NOT stated explicitly (an explicit
+  // "English audio" / "dubbed" is unambiguous and never triggers a question).
+  const bareEnglishAmbiguous =
+    origin.foreign &&
+    / english\b/.test(t) &&
+    !audio.englishDubRequired &&
+    !audio.englishAudioRequired &&
+    origin.languages.length === 0;
+  if (bareEnglishAmbiguous) {
+    clarify =
+      'Do you mean a foreign-made movie originally in English, or a foreign-language movie with an English dub? Say "originally English" or "dubbed".';
+  } else if (/\boriginally english\b/.test(t)) {
+    s.originalLanguageClass = 'english';
+    s.audioRequirement = 'english_audio';
+    notes.push('originally English (English-language, foreign-made)');
   }
 
   // ── Providers: add / remove / only ───────────────────────────────────────
@@ -367,6 +431,11 @@ export function chipsFor(s: CanonicalRequest): Chip[] {
   for (const p of s.includePeople) chips.push({ id: `person:${p}`, label: p });
   for (const p of s.excludePeople) chips.push({ id: `xperson:${p}`, label: `not ${p}` });
   if (s.mediaType !== 'any') chips.push({ id: 'media', label: s.mediaType === 'movie' ? 'movies' : 'series' });
+  if (s.originalLanguageClass === 'non_english') chips.push({ id: 'origlang', label: 'non-English original' });
+  else if (s.originalLanguageClass === 'english') chips.push({ id: 'origlang', label: 'English original' });
+  if (s.audioRequirement === 'english_dub') chips.push({ id: 'audio', label: 'English dub' });
+  else if (s.audioRequirement === 'english_audio') chips.push({ id: 'audio', label: 'English audio' });
+  else if (s.audioRequirement === 'original_audio') chips.push({ id: 'audio', label: 'subtitles OK' });
   if (s.excludeDocumentaries) chips.push({ id: 'nodocs', label: 'no documentaries' });
   if (s.minYear != null && s.maxYear != null) chips.push({ id: 'years', label: `${s.minYear}–${s.maxYear}` });
   else if (s.minYear != null) chips.push({ id: 'years', label: `${s.minYear} or later` });
@@ -393,6 +462,12 @@ export function removeChip(prev: CanonicalRequest, chipId: string): CanonicalReq
     case 'person': s.includePeople = s.includePeople.filter((x) => x !== value); break;
     case 'xperson': s.excludePeople = s.excludePeople.filter((x) => x !== value); break;
     case 'media': s.mediaType = 'any'; break;
+    case 'origlang':
+      s.originalLanguageClass = 'any';
+      s.originalLanguages = [];
+      s.originCountries = [];
+      break;
+    case 'audio': s.audioRequirement = 'any'; break;
     case 'nodocs':
       s.excludeDocumentaries = false;
       s.excludeGenreIds = s.excludeGenreIds.filter((g) => g !== GENRE_IDS.documentary);
@@ -439,6 +514,12 @@ export function sanitizeRequestState(raw: unknown): CanonicalRequest {
     excludeDocumentaries: Boolean(r.excludeDocumentaries),
     originCountries: strs(r.originCountries, 4),
     originalLanguages: strs(r.originalLanguages, 4),
+    originalLanguageClass:
+      r.originalLanguageClass === 'english' || r.originalLanguageClass === 'non_english' ? r.originalLanguageClass : 'any',
+    audioRequirement:
+      r.audioRequirement === 'english_audio' || r.audioRequirement === 'english_dub' || r.audioRequirement === 'original_audio'
+        ? r.audioRequirement
+        : 'any',
     providers: strs(r.providers, 8),
     onMyServices: Boolean(r.onMyServices),
     monetization: Array.isArray(r.monetization)
@@ -495,6 +576,13 @@ export function stateToQuery(s: CanonicalRequest, now: Date = new Date()): Finde
   q.onMyServices = s.onMyServices;
   if (s.originCountries.length > 0) q.originCountries = [...s.originCountries];
   if (s.originalLanguages.length > 0) q.originalLanguages = [...s.originalLanguages];
+  // Audio + origin-language HARD constraints — the same FinderQuery fields the
+  // single-turn `augmentInternational` path sets. english_dub is the strictest
+  // (non-English original WITH a verified English track); english_audio accepts
+  // native-or-dubbed English; non_english requires a foreign original.
+  if (s.audioRequirement === 'english_dub') q.englishDubOnly = true;
+  else if (s.audioRequirement === 'english_audio') q.englishAudioOnly = true;
+  if (s.originalLanguageClass === 'non_english') q.nonEnglishOriginalOnly = true;
   if (s.minImdb != null) q.minImdb = s.minImdb;
   if (s.minAudience != null) q.minAudience = s.minAudience;
   if (s.referenceTitles.length > 0) q.similarTo = s.referenceTitles.join(' / ');
