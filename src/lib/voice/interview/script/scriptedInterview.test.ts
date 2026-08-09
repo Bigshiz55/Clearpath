@@ -30,6 +30,7 @@ const LOW_ANSWERS: Record<string, string> = {
   's1-a': '2, 3, 1',
   's1-b': '1, 2, 3',
   's1-c': '2, 1, 2',
+  's1-d': '3, 1, 2',
   's3-a': '3, 2, 1',
   's3-b': '2, 3, 2',
   's3-c': '1, 2, 3',
@@ -39,10 +40,12 @@ const LOW_ANSWERS: Record<string, string> = {
 };
 const lowAnswerSource: AnswerSource = (q) => LOW_ANSWERS[q.id] ?? '2, 2, 2';
 
+// A very different person: horror is the only thing they care about.
 const HORROR_ANSWERS: Record<string, string> = {
-  's1-a': '1, 2, 3',
-  's1-b': '10, 2, 1',
-  's1-c': '2, 1, 1',
+  's1-a': '1, 2, 3', // crime 1, drama 2, comedy 3
+  's1-b': '2, 1, 2', // romance 2, action 1, thriller 2
+  's1-c': '10, 2, 1', // horror 10, sci-fi 2, fantasy 1
+  's1-d': '1, 2, 1', // animation 1, documentaries 2, reality 1
 };
 const horrorAnswerSource: AnswerSource = (q) => HORROR_ANSWERS[q.id] ?? '2, 2, 2';
 
@@ -169,9 +172,10 @@ describe('earlier answers change later questions', () => {
   });
 
   it('drill-downs are ordered by how strongly the genre scored', () => {
-    // typical: sci-fi 10, crime 9, war 8 → that exact order.
+    // typical: thriller 10, crime 9, sci-fi 8 → that exact order. Action (7)
+    // and documentaries (7) also qualified but lost to stronger scores.
     const run = runInterview(typicalAnswerSource);
-    expect(run.drilledGenres).toEqual(['scifi', 'crime', 'war']);
+    expect(run.drilledGenres).toEqual(['thriller', 'crime', 'scifi']);
   });
 
   it('the plan is a pure function of the answers so far', () => {

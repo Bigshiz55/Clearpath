@@ -23,11 +23,19 @@ import { serverEnv } from '@/lib/env';
  * the key that the rest of the app shares.
  */
 
-/** A sensible current Realtime model; overridable via VOICE_INTERVIEW_MODEL. */
-export const DEFAULT_REALTIME_MODEL = 'gpt-4o-realtime-preview-2024-12-17';
+/**
+ * The current GA Realtime model. Was pinned to the long-superseded
+ * `gpt-4o-realtime-preview-2024-12-17` preview. Overridable via
+ * VOICE_INTERVIEW_MODEL.
+ */
+export const DEFAULT_REALTIME_MODEL = 'gpt-realtime';
 
-/** A warm default voice; overridable via VOICE_INTERVIEW_VOICE. */
-export const DEFAULT_REALTIME_VOICE = 'sage';
+/**
+ * The default interviewer voice for the live audition — warm and natural
+ * rather than the flatter legacy option. Overridable via VOICE_INTERVIEW_VOICE.
+ * NOT yet confirmed by ear; the audition exists to settle that.
+ */
+export const DEFAULT_REALTIME_VOICE = 'marin';
 
 /** The OpenAI key (shared with the rest of the app). May be undefined. */
 export function openAiKey(): string | undefined {

@@ -86,33 +86,48 @@ export const STAGE1_QUESTIONS: ScaleQuestion[] = [
     id: 's1-a',
     stage: 1,
     kind: 'scale',
-    prompt: 'Quick gut check, one to ten each — crime, comedy, sci-fi.',
+    prompt: 'Quick gut check — crime, drama, comedy. One to ten?',
     items: [
       { key: 'crime', label: 'crime', aliases: ['crime'], categories: ['crime'] },
+      // No literal `drama` axis exists; a drama score is really a statement
+      // about appetite for emotional weight, so it lands there.
+      { key: 'drama', label: 'drama', aliases: ['drama', 'dramas'], categories: ['emotionalIntensity', 'genres'] },
       { key: 'comedy', label: 'comedy', aliases: ['comedy', 'comedies'], categories: ['comedyTolerance'] },
-      { key: 'scifi', label: 'sci-fi', aliases: ['sci-fi', 'scifi', 'science fiction'], categories: ['sciFi'] },
     ],
   },
   {
     id: 's1-b',
     stage: 1,
     kind: 'scale',
-    prompt: 'Same again — horror, romance, documentaries.',
+    prompt: 'Romance, action, thriller?',
     items: [
-      { key: 'horror', label: 'horror', aliases: ['horror'], categories: ['horrorTolerance'] },
       { key: 'romance', label: 'romance', aliases: ['romance', 'romantic'], categories: ['romance'] },
-      { key: 'documentary', label: 'documentaries', aliases: ['documentary', 'documentaries', 'docs'], categories: ['documentaries'] },
+      // Action reads as pace plus tolerance for on-screen violence.
+      { key: 'action', label: 'action', aliases: ['action'], categories: ['pacing', 'violenceTolerance'] },
+      { key: 'thriller', label: 'thriller', aliases: ['thriller', 'thrillers'], categories: ['psychologicalThrillers', 'mystery'] },
     ],
   },
   {
     id: 's1-c',
     stage: 1,
     kind: 'scale',
-    prompt: 'Last three — fantasy, war stories, animation.',
+    prompt: 'Horror, sci-fi, fantasy?',
     items: [
+      { key: 'horror', label: 'horror', aliases: ['horror'], categories: ['horrorTolerance'] },
+      { key: 'scifi', label: 'sci-fi', aliases: ['sci-fi', 'scifi', 'science fiction'], categories: ['sciFi'] },
       { key: 'fantasy', label: 'fantasy', aliases: ['fantasy'], categories: ['fantasy'] },
-      { key: 'war', label: 'war stories', aliases: ['war', 'war stories'], categories: ['war'] },
+    ],
+  },
+  {
+    id: 's1-d',
+    stage: 1,
+    kind: 'scale',
+    prompt: 'Last three — animation, documentaries, reality TV.',
+    items: [
       { key: 'animation', label: 'animation', aliases: ['animation', 'animated', 'anime'], categories: ['animation'] },
+      { key: 'documentary', label: 'documentaries', aliases: ['documentary', 'documentaries', 'docs'], categories: ['documentaries'] },
+      // Reality is the clearest TV-over-film signal in the whole interview.
+      { key: 'reality', label: 'reality TV', aliases: ['reality tv', 'reality'], categories: ['tvVsMovies', 'genres'] },
     ],
   },
 ];
@@ -125,11 +140,23 @@ export const STAGE2_QUESTIONS: ScaleQuestion[] = [
     stage: 2,
     kind: 'scale',
     gatedByGenre: 'crime',
-    prompt: 'Crime scored high — serial killers, heists, courtroom?',
+    prompt: 'Crime is strong. Detective mysteries, psychological crime, true crime?',
     items: [
-      { key: 'serial-killers', label: 'serial killers', aliases: ['serial killers', 'serial killer', 'killers'], categories: ['crime', 'psychologicalThrillers'] },
-      { key: 'heists', label: 'heists', aliases: ['heists', 'heist'], categories: ['crime'] },
-      { key: 'courtroom', label: 'courtroom', aliases: ['courtroom', 'court', 'legal'], categories: ['crime', 'themes'] },
+      { key: 'detective-mysteries', label: 'detective mysteries', aliases: ['detective mysteries', 'detective', 'mysteries'], categories: ['crime', 'mystery'] },
+      { key: 'psychological-crime', label: 'psychological crime', aliases: ['psychological crime', 'psychological'], categories: ['crime', 'psychologicalThrillers'] },
+      { key: 'true-crime', label: 'true crime', aliases: ['true crime', 'true'], categories: ['crime', 'trueStory', 'documentaries'] },
+    ],
+  },
+  {
+    id: 's2-drama',
+    stage: 2,
+    kind: 'scale',
+    gatedByGenre: 'drama',
+    prompt: 'Drama scored high — character studies, family sagas, based on real events?',
+    items: [
+      { key: 'character-study', label: 'character studies', aliases: ['character studies', 'character study', 'character'], categories: ['emotionalIntensity', 'complexity'] },
+      { key: 'family-saga', label: 'family sagas', aliases: ['family sagas', 'family saga', 'family'], categories: ['emotionalIntensity', 'family'] },
+      { key: 'true-events-drama', label: 'based on real events', aliases: ['real events', 'true story', 'based on'], categories: ['trueStory'] },
     ],
   },
   {
@@ -145,15 +172,39 @@ export const STAGE2_QUESTIONS: ScaleQuestion[] = [
     ],
   },
   {
-    id: 's2-scifi',
+    id: 's2-romance',
     stage: 2,
     kind: 'scale',
-    gatedByGenre: 'scifi',
-    prompt: 'Sci-fi scored high — space opera, dystopia, time travel?',
+    gatedByGenre: 'romance',
+    prompt: 'Romance scored high — period romance, modern rom-com, tragic?',
     items: [
-      { key: 'space-opera', label: 'space opera', aliases: ['space opera', 'space'], categories: ['sciFi'] },
-      { key: 'dystopia', label: 'dystopia', aliases: ['dystopia', 'dystopian'], categories: ['sciFi', 'themes'] },
-      { key: 'time-travel', label: 'time travel', aliases: ['time travel'], categories: ['sciFi', 'complexity'] },
+      { key: 'period-romance', label: 'period romance', aliases: ['period romance', 'period'], categories: ['romance', 'timePeriods'] },
+      { key: 'modern-romcom', label: 'modern rom-com', aliases: ['modern rom-com', 'modern romcom', 'rom-com'], categories: ['romance', 'comedyTolerance'] },
+      { key: 'tragic-romance', label: 'tragic romance', aliases: ['tragic', 'tragedy'], categories: ['romance', 'darkEndings'] },
+    ],
+  },
+  {
+    id: 's2-action',
+    stage: 2,
+    kind: 'scale',
+    gatedByGenre: 'action',
+    prompt: 'Action scored high — heists, spy thrillers, martial arts?',
+    items: [
+      { key: 'heists', label: 'heists', aliases: ['heists', 'heist'], categories: ['crime', 'pacing'] },
+      { key: 'spy', label: 'spy thrillers', aliases: ['spy thrillers', 'spy', 'espionage'], categories: ['psychologicalThrillers', 'mystery'] },
+      { key: 'martial-arts', label: 'martial arts', aliases: ['martial arts', 'martial', 'kung fu'], categories: ['violenceTolerance', 'pacing'] },
+    ],
+  },
+  {
+    id: 's2-thriller',
+    stage: 2,
+    kind: 'scale',
+    gatedByGenre: 'thriller',
+    prompt: 'Thrillers scored high — slow-burn tension, twisty plots, courtroom?',
+    items: [
+      { key: 'slow-burn-thriller', label: 'slow-burn tension', aliases: ['slow-burn tension', 'slow burn', 'tension'], categories: ['pacing', 'psychologicalThrillers'] },
+      { key: 'twisty', label: 'twisty plots', aliases: ['twisty plots', 'twisty', 'twists'], categories: ['twistEndings', 'complexity'] },
+      { key: 'courtroom', label: 'courtroom', aliases: ['courtroom', 'court', 'legal'], categories: ['crime', 'themes'] },
     ],
   },
   {
@@ -169,27 +220,15 @@ export const STAGE2_QUESTIONS: ScaleQuestion[] = [
     ],
   },
   {
-    id: 's2-romance',
+    id: 's2-scifi',
     stage: 2,
     kind: 'scale',
-    gatedByGenre: 'romance',
-    prompt: 'Romance scored high — period romance, modern rom-com, tragic?',
+    gatedByGenre: 'scifi',
+    prompt: 'Sci-fi scored high — space opera, dystopia, time travel?',
     items: [
-      { key: 'period-romance', label: 'period romance', aliases: ['period romance', 'period'], categories: ['romance', 'timePeriods'] },
-      { key: 'modern-romcom', label: 'modern rom-com', aliases: ['modern rom-com', 'modern romcom', 'rom-com'], categories: ['romance', 'comedyTolerance'] },
-      { key: 'tragic-romance', label: 'tragic romance', aliases: ['tragic', 'tragedy'], categories: ['romance', 'darkEndings'] },
-    ],
-  },
-  {
-    id: 's2-documentary',
-    stage: 2,
-    kind: 'scale',
-    gatedByGenre: 'documentary',
-    prompt: 'Docs scored high — true crime, nature, music?',
-    items: [
-      { key: 'true-crime-doc', label: 'true crime', aliases: ['true crime'], categories: ['documentaries', 'crime', 'trueStory'] },
-      { key: 'nature-doc', label: 'nature', aliases: ['nature', 'wildlife'], categories: ['documentaries'] },
-      { key: 'music-doc', label: 'music', aliases: ['music'], categories: ['documentaries'] },
+      { key: 'space-opera', label: 'space opera', aliases: ['space opera', 'space'], categories: ['sciFi'] },
+      { key: 'dystopia', label: 'dystopia', aliases: ['dystopia', 'dystopian'], categories: ['sciFi', 'themes'] },
+      { key: 'time-travel', label: 'time travel', aliases: ['time travel'], categories: ['sciFi', 'complexity'] },
     ],
   },
   {
@@ -205,18 +244,6 @@ export const STAGE2_QUESTIONS: ScaleQuestion[] = [
     ],
   },
   {
-    id: 's2-war',
-    stage: 2,
-    kind: 'scale',
-    gatedByGenre: 'war',
-    prompt: 'War scored high — World War Two, modern conflict, war drama?',
-    items: [
-      { key: 'wwii', label: 'World War Two', aliases: ['world war two', 'wwii', 'ww2'], categories: ['war', 'timePeriods'] },
-      { key: 'modern-conflict', label: 'modern conflict', aliases: ['modern conflict', 'modern'], categories: ['war'] },
-      { key: 'war-drama', label: 'war drama', aliases: ['war drama', 'drama'], categories: ['war', 'emotionalIntensity'] },
-    ],
-  },
-  {
     id: 's2-animation',
     stage: 2,
     kind: 'scale',
@@ -226,6 +253,30 @@ export const STAGE2_QUESTIONS: ScaleQuestion[] = [
       { key: 'anime', label: 'anime', aliases: ['anime'], categories: ['animation', 'foreignFilms'] },
       { key: 'family-animation', label: 'family animation', aliases: ['family animation', 'family'], categories: ['animation', 'family'] },
       { key: 'adult-animation', label: 'adult animation', aliases: ['adult animation', 'adult'], categories: ['animation', 'comedyTolerance'] },
+    ],
+  },
+  {
+    id: 's2-documentary',
+    stage: 2,
+    kind: 'scale',
+    gatedByGenre: 'documentary',
+    prompt: 'Docs scored high — true crime, nature, music?',
+    items: [
+      { key: 'true-crime-doc', label: 'true crime', aliases: ['true crime'], categories: ['documentaries', 'crime', 'trueStory'] },
+      { key: 'nature-doc', label: 'nature', aliases: ['nature', 'wildlife'], categories: ['documentaries'] },
+      { key: 'music-doc', label: 'music', aliases: ['music'], categories: ['documentaries'] },
+    ],
+  },
+  {
+    id: 's2-reality',
+    stage: 2,
+    kind: 'scale',
+    gatedByGenre: 'reality',
+    prompt: 'Reality scored high — competition shows, dating shows, docu-soaps?',
+    items: [
+      { key: 'competition-reality', label: 'competition shows', aliases: ['competition shows', 'competition'], categories: ['tvVsMovies', 'sports'] },
+      { key: 'dating-reality', label: 'dating shows', aliases: ['dating shows', 'dating'], categories: ['tvVsMovies', 'romance'] },
+      { key: 'docusoap', label: 'docu-soaps', aliases: ['docu-soaps', 'docusoap', 'docu soaps'], categories: ['tvVsMovies', 'documentaries'] },
     ],
   },
 ];

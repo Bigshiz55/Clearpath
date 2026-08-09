@@ -16,7 +16,7 @@ revealed.
 
 | Stage | What it asks | Why here |
 | --- | --- | --- |
-| 1 | Three genres at a time, 1–10 each (9 genres over 3 turns) | Broad and fast, and it produces the numbers every later stage needs |
+| 1 | Three genres at a time, 1–10 each — **12 genres over 4 turns** | Broad and fast, and it produces the numbers every later stage needs |
 | 2 | Sub-genre drill-down — **only** into genres scored ≥ 7 | Drilling a genre someone scored 2 spends a turn re-asking something already answered |
 | 3 | Watching style: subtitles, slow burns, black-and-white, endings, length, bingeing | Hard preferences that gate titles regardless of genre |
 | 4 | Named title anchors — **last** | "I loved Prisoners" means something different from someone who scored crime 10 than from someone who scored it 2. Asking first throws that context away |
@@ -32,6 +32,39 @@ is produced.
 An unreadable answer does **not** consume the question. `needsReask` comes back
 true and the same question stands, because recording a score the user never said
 is worse than asking again.
+
+## Who runs the conversation
+
+**WatchVerd1ct's server is the interviewer. OpenAI Realtime is a voice and a
+pair of ears.** Nothing else.
+
+The Realtime session is configured with `turn_detection: { type: 'server_vad',
+create_response: false, interrupt_response: true }`. Server VAD still detects
+when the user starts and stops speaking — that is what gives barge-in — but
+`create_response: false` stops the model answering on its own the instant they
+stop. It must not: the order is
+
+```
+user stops → transcript completes → recordScriptedTurn(raw utterance)
+           → server decides the next question → client speaks that exact line
+```
+
+With OpenAI's default `create_response: true` the model races that round trip
+and improvises a question the director never chose. `interrupt_response: true`
+keeps barge-in: new speech cancels whatever is being spoken.
+
+The client then drives every turn — kickoff and all the rest — down the same
+path: put the director's line in the conversation, then `response.create` with
+instructions pinning the wording to exactly that line. The model is told, in
+both the session prompt and per response, that it is **not** the interviewer and
+may not reword a category list. That last rule is not fussiness: answers are
+parsed **positionally** against the words in the question, so "crime, drama,
+comedy" rephrased as "crime, drama, or something funny?" attaches three scores
+to labels the user never heard.
+
+**No tools are offered to the model.** `recordScriptedTurn` is the sole
+interpreter; leaving `record_signal` available would give one utterance two
+competing judges.
 
 ## No parallel taste model
 
@@ -72,23 +105,26 @@ only ever seen good input is untested.
 Produced by `runInterview(typicalAnswerSource)`; reproducible offline.
 
 ```
-interviewer: Quick gut check, one to ten each — crime, comedy, sci-fi.
-user: 9, 4, 10
+interviewer: Quick gut check — crime, drama, comedy. One to ten?
+user: 9, 6, 4
 interviewer: Love that.
-interviewer: Same again — horror, romance, documentaries.
-user: two, six, seven
-interviewer: Got it.
-interviewer: Last three — fantasy, war stories, animation.
+interviewer: Romance, action, thriller?
+user: two, seven, ten
+interviewer: Strong opinions — good.
+interviewer: Horror, sci-fi, fantasy?
 user: three, eight, five
 interviewer: Got it.
+interviewer: Last three — animation, documentaries, reality TV.
+user: 4, 7, 1
+interviewer: Got it.
+interviewer: Thrillers scored high — slow-burn tension, twisty plots, courtroom?
+user: slow-burn tension nine, twisty plots ten, courtroom four
+interviewer: Love that.
+interviewer: Crime is strong. Detective mysteries, psychological crime, true crime?
+user: detective mysteries ten, psychological crime nine, true crime six
+interviewer: Love that.
 interviewer: Sci-fi scored high — space opera, dystopia, time travel?
 user: 8, 9, 10
-interviewer: Love that.
-interviewer: Crime scored high — serial killers, heists, courtroom?
-user: serial killers ten, heists six, courtroom four
-interviewer: Love that.
-interviewer: War scored high — World War Two, modern conflict, war drama?
-user: nine, five, seven
 interviewer: Love that.
 interviewer: How you watch, one to ten — subtitles, slow burns, black-and-white.
 user: love it, 9, 2
@@ -107,17 +143,19 @@ user: Emily in Paris
 interviewer: Noted.
 ```
 
-- **11 meaningful turns**, 29 taste signals, spec audit clean (`[]`)
-- **Drilled:** sci-fi (10), crime (9), war (8) — in score order
-- **Skipped, correctly:** comedy (4), horror (2), romance (6), documentary (7 —
-  qualified but beaten by three stronger genres), fantasy (3), animation (5)
+- **12 meaningful turns**, 32 taste signals, spec audit clean (`[]`)
+- **Drilled:** thriller (10), crime (9), sci-fi (8) — in score order
+- **Skipped, correctly:** romance (2), horror (3), comedy (4), animation (4),
+  fantasy (5), drama (6), reality (1), and action (7) / documentaries (7) —
+  which qualified but lost to three stronger scores under the cap
 - **Preference events:** `voice:prisoners` → `seen_liked/loved`,
   `voice:emily-in-paris` → `seen_disliked/disliked`, both
   `source=voice_interview`
 
 The pathological user who rates everything low is also covered: they earn **no**
-drill-downs and still reach the 8-turn floor, via a third anchor rather than a
-drill-down they did not earn.
+drill-downs and still reach **9 turns** (four triples + three style + two
+anchors), comfortably past the 8-turn floor, without a single drill-down they
+did not earn.
 
 ## Answer parsing
 

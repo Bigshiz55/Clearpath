@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isFounderOrAdminEmail } from '@/lib/admin';
 import { voiceInterviewMode, openAiKey, realtimeModel, realtimeVoice } from '@/lib/voice/config';
-import { INTERVIEWER_SYSTEM_PROMPT, REALTIME_TOOLS } from '@/lib/voice/interview';
+import { INTERVIEWER_SYSTEM_PROMPT } from '@/lib/voice/interview';
 
 /**
  * VOICE INTERVIEW — mint an OpenAI Realtime EPHEMERAL session token for the
@@ -68,13 +68,28 @@ export async function POST() {
         model,
         voice: realtimeVoice(),
         instructions: INTERVIEWER_SYSTEM_PROMPT,
-        tools: REALTIME_TOOLS,
-        tool_choice: 'auto',
+        // NO TOOLS. `recordScriptedTurn` on our server is the sole interpreter
+        // of what the user said. Leaving `record_signal` available would give
+        // the model a second, competing interpretation of the same utterance —
+        // one answer scored twice, by two different judges.
         modalities: ['audio', 'text'],
-        // Transcribe both sides so the transcript + contradiction memory work.
+        // Transcribe both sides so the transcript and the scripted turn loop work.
         input_audio_transcription: { model: 'whisper-1' },
-        // Server VAD gives natural turn-taking + barge-in.
-        turn_detection: { type: 'server_vad' },
+        // TURN-ORDER CONTROL. Server VAD still detects when the user starts and
+        // stops speaking, which is what gives us barge-in — but
+        // `create_response: false` stops the model from ANSWERING on its own the
+        // instant they stop. It must not: WatchVerd1ct owns the conversation
+        // order (user stops → transcript completes → recordScriptedTurn decides
+        // the next question → the client tells the model to speak exactly that).
+        // With the default `create_response: true` the model races that round
+        // trip and improvises a question the director never chose.
+        // `interrupt_response: true` keeps barge-in working: new speech from the
+        // user cancels whatever is currently being spoken.
+        turn_detection: {
+          type: 'server_vad',
+          create_response: false,
+          interrupt_response: true,
+        },
       }),
     });
 

@@ -139,15 +139,20 @@ export function completed(result: SimResult): boolean {
  * person.
  */
 export const TYPICAL_ANSWERS: Record<string, string> = {
-  's1-a': '9, 4, 10',
-  's1-b': 'two, six, seven',
-  's1-c': 'three, eight, five',
-  's2-crime': 'serial killers ten, heists six, courtroom four',
+  // Stage 1 — the four approved genre triples.
+  's1-a': '9, 6, 4', // crime 9, drama 6, comedy 4
+  's1-b': 'two, seven, ten', // romance 2, action 7, thriller 10
+  's1-c': 'three, eight, five', // horror 3, sci-fi 8, fantasy 5
+  's1-d': '4, 7, 1', // animation 4, documentaries 7, reality 1
+  // Stage 2 — earned by thriller (10), crime (9), sci-fi (8), in that order.
+  's2-thriller': 'slow-burn tension nine, twisty plots ten, courtroom four',
+  's2-crime': 'detective mysteries ten, psychological crime nine, true crime six',
   's2-scifi': '8, 9, 10',
-  's2-war': 'nine, five, seven',
+  // Stage 3 — watching style.
   's3-a': 'love it, 9, 2',
   's3-b': '10, 7, 3',
   's3-c': '6, 9, 4',
+  // Stage 4 — anchors last.
   's4-love': 'Prisoners',
   's4-bail': 'Emily in Paris',
   's4-love-2': 'Breaking Bad',

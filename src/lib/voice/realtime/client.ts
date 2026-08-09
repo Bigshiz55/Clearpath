@@ -27,6 +27,21 @@ import type { VoiceClient, VoiceClientCallbacks, SteerInput } from './types';
 
 const REALTIME_URL = 'https://api.openai.com/v1/realtime';
 
+/**
+ * The constraint that keeps the Realtime model a VOICE, not a second
+ * interviewer. Exported so the regression tests assert the real string rather
+ * than a paraphrase of it.
+ *
+ * The failure this prevents is subtle and expensive: a model given a question
+ * and its own personality will "helpfully" rewrite the category list — "crime,
+ * drama, comedy" becomes "crime, drama, or maybe something funny?" — and the
+ * answer parser then aligns three scores to labels the user never heard.
+ */
+export const SPEAK_VERBATIM_PREFIX =
+  'Say the following line EXACTLY as written, word for word, and then stop. ' +
+  'Do not rephrase it, expand it, add a greeting, add commentary, change the ' +
+  'order of any list, or ask anything else. Speak only this line:';
+
 /** The ephemeral secret shape the session route returns (only `.value` is used). */
 export interface RealtimeClientSecret {
   value: string;
@@ -327,11 +342,23 @@ export async function connectRealtime(opts: ConnectRealtimeOptions): Promise<Voi
 
   const steer = (input: SteerInput): void => {
     if (closed) return;
-    // Inject the per-turn directive as a system-role guidance item WITHOUT
-    // replacing the base personality prompt the session already carries — the
-    // next server-VAD response reads it. For the opening turn we also ask for a
-    // response now, so the interviewer speaks first (VAD would otherwise wait for
-    // the user).
+
+    // THE DIRECTOR SPEAKS THROUGH THE MODEL, NOT WITH IT.
+    //
+    // This used to drop `speakLine` on the floor and only call
+    // `response.create` on the opening turn. Every later question therefore
+    // depended on the model deciding to answer by itself — which, with server
+    // VAD's default `create_response: true`, it did: it improvised its own next
+    // question the moment the user stopped talking, racing the round trip to
+    // `recordScriptedTurn` and asking something the director never chose. The
+    // session now sets `create_response: false`, so the model stays silent
+    // until told; this is what tells it.
+    //
+    // Every scripted turn — kickoff and all the rest — takes the SAME path:
+    // put the line in the conversation, then ask for a response whose
+    // instructions pin the wording to exactly that line.
+    const line = (input.speakLine ?? '').trim();
+
     if (input.instruction) {
       send({
         type: 'conversation.item.create',
@@ -342,6 +369,20 @@ export async function connectRealtime(opts: ConnectRealtimeOptions): Promise<Voi
         },
       });
     }
+
+    if (line) {
+      send({
+        type: 'response.create',
+        response: {
+          modalities: ['audio', 'text'],
+          instructions: `${SPEAK_VERBATIM_PREFIX}\n\n${line}`,
+        },
+      });
+      return;
+    }
+
+    // No line to voice. Only the opening turn may still ask the model to speak
+    // on its own; otherwise silence is correct — the director has not spoken.
     if (input.kickoff) send({ type: 'response.create' });
   };
 

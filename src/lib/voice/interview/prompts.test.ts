@@ -23,12 +23,29 @@ function directive(over: Partial<Directive>): Directive {
 }
 
 describe('the system prompt', () => {
-  it('carries the personality and the style exemplars', () => {
-    expect(INTERVIEWER_SYSTEM_PROMPT).toContain('BBC');
-    expect(INTERVIEWER_SYSTEM_PROMPT).toContain('Prisoners');
-    expect(INTERVIEWER_SYSTEM_PROMPT).toContain("Let's test a theory");
-    expect(INTERVIEWER_SYSTEM_PROMPT).toContain('record_signal');
+  it('casts the model as the VOICE, not the interviewer', () => {
+    // This test used to pin the opposite: a BBC-narrator persona that invented
+    // its own follow-ups and called `record_signal` itself. That was right when
+    // the model ran the conversation. Under the scripted architecture the
+    // server is the director and the model is voice + transcription, so the
+    // prompt must now REFUSE the interviewer role — otherwise it improvises
+    // questions the director never chose and rewords category lists that are
+    // scored positionally.
+    expect(INTERVIEWER_SYSTEM_PROMPT).toContain('You are NOT the interviewer');
+    expect(INTERVIEWER_SYSTEM_PROMPT).toMatch(/Say the line you are given, exactly/);
+    expect(INTERVIEWER_SYSTEM_PROMPT).toMatch(/NEVER change a list of categories/);
+    expect(INTERVIEWER_SYSTEM_PROMPT).toMatch(/Do not ask follow-ups of your own invention/);
+    // The model no longer records anything; our server is the sole interpreter.
+    expect(INTERVIEWER_SYSTEM_PROMPT).not.toContain('record_signal');
     expect(PROMPT_VERSION).toMatch(/^voice-interview-/);
+  });
+
+  it('specifies the intended delivery for the live audition', () => {
+    expect(INTERVIEWER_SYSTEM_PROMPT).toMatch(/British\/Australian/);
+    expect(INTERVIEWER_SYSTEM_PROMPT).toMatch(/BRISK/);
+    expect(INTERVIEWER_SYSTEM_PROMPT).toMatch(/no announcer voice/i);
+    expect(INTERVIEWER_SYSTEM_PROMPT).toMatch(/robotic cadence/);
+    expect(INTERVIEWER_SYSTEM_PROMPT).toMatch(/FEW WORDS at most/);
   });
 });
 
