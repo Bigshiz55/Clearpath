@@ -248,7 +248,11 @@ export function naiveParseQuery(input: string): FinderQuery {
     .replace(/\b(?:not|nothing(?:\s+from)?|no\s+titles?|none)\s+after\b/g, 'before');
   const between = ty.match(/\bbetween\s+((?:19|20)\d{2})\s+and\s+((?:19|20)\d{2})\b/);
   const afterYear = ty.match(/\b(?:after|since|from|later than|newer than|post[- ]?)\s*((?:19|20)\d{2})\b/);
-  const beforeYear = ty.match(/\b(?:before|prior to|earlier than|older than|up to|pre[- ]?)\s*((?:19|20)\d{2})\b/);
+  // "before/prior to/earlier than/older than/pre-1970" EXCLUDES the boundary year
+  // (before 1970 → 1969); "up to 1970" INCLUDES it. Kept as two matches so the
+  // exclusive forms don't wrongly admit the named year.
+  const beforeYear = ty.match(/\b(?:before|prior to|earlier than|older than|pre[- ]?)\s*((?:19|20)\d{2})\b/);
+  const upToYear = ty.match(/\bup to\s*((?:19|20)\d{2})\b/);
   const decade = ty.match(/\b(?:the\s+)?((?:19|20)\d0)s\b/) ?? ty.match(/\b(?:the\s+)?['’]?(\d0)s\b/);
   if (between) {
     const a = Number(between[1]);
@@ -257,7 +261,8 @@ export function naiveParseQuery(input: string): FinderQuery {
     q.maxYear = Math.max(a, b);
   }
   if (!between && afterYear) q.minYear = Number(afterYear[1]);
-  if (!between && beforeYear) q.maxYear = Number(beforeYear[1]);
+  if (!between && beforeYear) q.maxYear = Number(beforeYear[1]) - 1; // exclusive
+  else if (!between && upToYear) q.maxYear = Number(upToYear[1]); // inclusive
   if (!between && !afterYear && !beforeYear && decade) {
     const raw = Number(decade[1]);
     // "80s" means the 1980s; "20s" in a streaming request means the 2020s.

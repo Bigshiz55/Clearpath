@@ -164,7 +164,9 @@ describe('adversarial constraint pairs', () => {
   });
 
   it('before 2020 vs after 2020 vs not before 2020', () => {
-    expect(naiveParseQuery('movies before 2020').maxYear).toBe(2020);
+    // "before 2020" EXCLUDES 2020 (→ 2019); "up to 2020" would include it.
+    expect(naiveParseQuery('movies before 2020').maxYear).toBe(2019);
+    expect(naiveParseQuery('movies up to 2020').maxYear).toBe(2020);
     expect(naiveParseQuery('movies after 2020').minYear).toBe(2020);
     const notBefore = naiveParseQuery('movies not before 2020');
     expect(notBefore.minYear).toBe(2020);

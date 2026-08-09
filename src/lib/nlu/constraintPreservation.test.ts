@@ -159,9 +159,9 @@ describe('date and year constraints', () => {
     expect(naiveParseQuery('films newer than 2015').minYear).toBe(2015);
   });
 
-  it('before / prior to', () => {
-    expect(naiveParseQuery('movies before 1995').maxYear).toBe(1995);
-    expect(naiveParseQuery('films prior to 1980').maxYear).toBe(1980);
+  it('before / prior to are EXCLUSIVE (the named year is not included)', () => {
+    expect(naiveParseQuery('movies before 1995').maxYear).toBe(1994);
+    expect(naiveParseQuery('films prior to 1980').maxYear).toBe(1979);
   });
 
   it('decades become a closed window', () => {
