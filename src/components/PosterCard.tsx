@@ -133,16 +133,20 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           poster, facts, score and synopsis before you could act. On request
           the row is now the FIRST thing on every card — rule at the top, then
           drop down to the W on the artwork if it belongs on the docket. */}
-      {/* DESKTOP-ONLY: the FOR · AGAINST · SAVE decision bar. On the two-across
-          mobile card a full decision bar across a ~140px tile is exactly the
-          "squeezed FOR/AGAINST/SAVE row" to avoid — mobile gets a single clear
-          Save action in the body instead, and the full bar returns from `sm`. */}
+      {/* THE VERDICT/RULING LEADS THE CARD AT EVERY WIDTH. FOR · AGAINST is the
+          card's ruling — it stays on the two-across mobile tile (owner spec: the
+          verdict/score is tile item #2 and ruling a title is a primary action).
+          What the mobile tile does NOT carry is the crushed THREE-button bar:
+          SAVE joins this row only from `sm`; on a phone the ruling is FOR/AGAINST
+          alone (the `.wv-act-row` container query keeps the words intact and
+          drops the decorative icon before it ever cuts one), and Save sits as
+          its own clear action in the body below. */}
       {overlay !== null && saveId != null && (
-        <div className="wv-only-desktop">
-          <div className="wv-act-row border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
-            <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
-            {resolvedOverlay}
-          </div>
+        <div className="wv-act-row border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
+          <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+          {/* `contents` so SaveButton flexes as a peer of the ruling buttons on
+              desktop; hidden on the phone tile to avoid the three-button crush. */}
+          <div className="hidden sm:contents">{resolvedOverlay}</div>
         </div>
       )}
       <div className="wv-card">
