@@ -84,6 +84,17 @@ export function canonicalToQuery(req: CanonicalDiscoveryRequest): MappedQuery {
     subjectLexemes: h.requiredSubjects.length ? [...h.requiredSubjects] : undefined,
     subjectStrict: h.requiredSubjects.length ? true : undefined,
     subjectLabel: h.requiredSubjects.length ? h.requiredSubjects[0] : undefined,
+    // Origin-language + audio HARD constraints — the SAME FinderQuery flags the
+    // deterministic conversational path projects (one meaning, both brains).
+    // english_dub is strictest (non-English original WITH a verified English
+    // track); english_audio accepts native-or-dubbed; non_english bars English
+    // originals. Verified downstream by runFinder against englishAvailability.
+    englishDubOnly: h.audioRequirement === 'english_dub' ? true : undefined,
+    englishAudioOnly: h.audioRequirement === 'english_audio' ? true : false,
+    nonEnglishOriginalOnly:
+      h.originalLanguageClass === 'non_english' || h.audioRequirement === 'english_dub' ? true : undefined,
+    originalLanguages: h.originalLanguages.length ? [...h.originalLanguages] : undefined,
+    finalCount: h.resultCountMax ?? null,
   };
 
   return {

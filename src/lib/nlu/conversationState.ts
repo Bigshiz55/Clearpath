@@ -30,14 +30,16 @@ import { detectOrigin, detectAudio } from '@/lib/nlu/detectors';
 export type Monetization = 'flatrate' | 'free' | 'ads' | 'rent' | 'buy';
 
 /** Whether the ORIGINAL language must be English, non-English ("foreign"), or unconstrained. */
-export type OriginalLanguageClass = 'any' | 'english' | 'non_english';
+export const ORIGINAL_LANGUAGE_CLASSES = ['any', 'english', 'non_english'] as const;
+export type OriginalLanguageClass = (typeof ORIGINAL_LANGUAGE_CLASSES)[number];
 /**
  * The audio the user needs. `english_dub` = a non-English original WITH a
  * verified English track; `english_audio` = native OR dubbed English; `original_audio`
  * = original language is fine (subtitles acceptable). These are the same
  * semantics the single-turn `augmentInternational` path uses — one meaning, both paths.
  */
-export type AudioRequirement = 'any' | 'english_audio' | 'english_dub' | 'original_audio';
+export const AUDIO_REQUIREMENTS = ['any', 'english_audio', 'english_dub', 'original_audio'] as const;
+export type AudioRequirement = (typeof AUDIO_REQUIREMENTS)[number];
 
 export interface CanonicalRequest {
   version: 1;

@@ -70,6 +70,19 @@ export const GENRE_VOCAB = [
 /** Monetization asks the app enforces as hard constraints. */
 export const MONETIZATION_KINDS = ['flatrate', 'free', 'ads', 'rent', 'buy'] as const;
 
+/**
+ * ORIGINAL-LANGUAGE + AUDIO vocabulary — the SAME meanings the deterministic
+ * conversational path uses (`OriginalLanguageClass` / `AudioRequirement` in
+ * conversationState.ts), so the AI brain and the deterministic brain emit one
+ * canonical shape. `non_english` = a foreign original; `english_dub` = a
+ * non-English original WITH a verified English track; `english_audio` = native
+ * OR dubbed English; `original_audio` = original language is fine (subtitles ok).
+ * These are INTENT the model interprets — the app still VERIFIES the actual dub
+ * against real data (englishAvailability), never the model's say-so.
+ */
+export const ORIGINAL_LANGUAGE_CLASSES = ['any', 'english', 'non_english'] as const;
+export const AUDIO_REQUIREMENTS = ['any', 'english_audio', 'english_dub', 'original_audio'] as const;
+
 // ---- Bounds (single source of truth, also asserted by tests) -----------------
 
 export const LIMITS = {
@@ -138,6 +151,18 @@ const hardConstraints = z.strictObject({
     requiredPeople: z.array(boundedText).max(LIMITS.maxPeople).default([]),
     requiredProviders: z.array(boundedText).max(LIMITS.maxProviders).default([]),
     requiredMonetization: z.array(z.enum(MONETIZATION_KINDS)).max(MONETIZATION_KINDS.length).default([]),
+    /** "foreign" → non_english; "dubbed in English" → english_dub. HARD, and
+     *  VERIFIED downstream against real audio-availability data. */
+    originalLanguageClass: z.enum(ORIGINAL_LANGUAGE_CLASSES).default('any'),
+    audioRequirement: z.enum(AUDIO_REQUIREMENTS).default('any'),
+    /** Explicit original languages the user named (ISO-639-1, e.g. ['ko','ja']). */
+    originalLanguages: z
+      .array(z.string().regex(/^[a-z]{2,3}$/, 'ISO-639 language code'))
+      .max(8)
+      .default([]),
+    /** The exact result count the phrasing asked for ("three …"). A FINAL cap
+     *  only — never the discovery pool size; the app never pads a shortfall. */
+    resultCountMax: z.number().int().min(1).max(50).nullable().default(null),
   });
 
 const softPreferences = z.strictObject({
