@@ -354,17 +354,29 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
       )}
 
       {/* MANUAL ▶ Trailer affordance — always present (no flag) while not playing.
-          Bottom-RIGHT so it clears bottom-left card labels (release date, etc.). */}
+          Bottom-RIGHT so it clears bottom-left card labels (release date, etc.).
+
+          A 44px TARGET AROUND A SMALL PILL. The control was the pill itself:
+          68×25, which is a 25px tap target on the busiest surface in the app —
+          it was flagged at all twelve viewports the visual-QA suite walks, from
+          320 up to 1440, and it is the last sub-44px control in the grid.
+          Making the pill itself 44px tall would put a chunky lozenge over the
+          artwork on every card, so the BUTTON carries the height and the pill
+          is drawn inside it: same thing to look at, a target a thumb can
+          actually hit. `pt-*` keeps the extra height above the pill, so the
+          visible chip stays where it was in the corner. */}
       {!showIframe && (
         <button
           type="button"
           onClick={manualPlay}
           aria-label={`Play ${title} trailer`}
           data-testid="trailer-play"
-          className="absolute bottom-1 right-1 z-[2] flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80"
+          className="absolute bottom-0 right-0 z-[2] flex min-h-[44px] items-end justify-end p-1 pt-0 transition"
         >
-          <span aria-hidden>▶</span>
-          <span>{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
+          <span className="flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-bold text-white backdrop-blur transition group-hover:bg-black/80">
+            <span aria-hidden>▶</span>
+            <span>{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
+          </span>
         </button>
       )}
     </div>

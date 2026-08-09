@@ -100,8 +100,22 @@ async function ratingsMetrics(page: Page) {
   return row.evaluate((el) => ({ fontSize: parseFloat(getComputedStyle(el).fontSize) }));
 }
 
-test('the ratings row is bigger on an iPad than on a phone', async ({ page }) => {
-  await open(page, 390, 844);
+/**
+ * THE SMALL-SCREEN REFERENCE IS 768, NOT 390.
+ *
+ * The fix under test is the `lg` type step-up on `.wv-ratings-row`, and it is
+ * measured by comparing the row below that breakpoint with the row above it.
+ * 390 used to be the "below" sample; a two-across phone tile does not carry
+ * the row at all now (see `.wv-score-ratings` in globals.css), so the row
+ * resolved to a `display:none` node and `toBeVisible()` failed — the step-up
+ * itself was never in question.
+ *
+ * 768 is the narrowest width where a card draws the row, so it is now the
+ * "below" sample. Same breakpoint crossed, same assertion, a width where there
+ * is something to measure.
+ */
+test('the ratings row is bigger on an iPad than on a narrow card', async ({ page }) => {
+  await open(page, 768, 1024);
   const phone = await ratingsMetrics(page);
   await open(page, 1024, 1366);
   const ipad = await ratingsMetrics(page);

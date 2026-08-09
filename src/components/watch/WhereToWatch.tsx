@@ -143,20 +143,27 @@ export function WhereToWatch({
   // content arriving, not a hole being filled — but the common path no longer
   // moves at all. Measured on /dev/visual-qa at 320/390/1024/1366.
   if (!presentation) {
-    return <div className={`${RESERVE} ${className}`} aria-hidden data-testid="where-to-watch-loading" />;
+    return <div className={`wv-where ${RESERVE} ${className}`} aria-hidden data-testid="where-to-watch-loading" />;
   }
 
   const { status, lines, cta, note, historical, ariaLabel } = presentation;
 
   return (
     <section
-      className={`${RESERVE} space-y-1 ${className}`}
+      className={`wv-where ${RESERVE} space-y-1 ${className}`}
       aria-label={ariaLabel}
       data-testid="where-to-watch"
       data-status={status}
       data-cta={cta.kind}
     >
-      <h4 className="text-[11px] font-black uppercase tracking-wide text-slate-300">Where to watch</h4>
+      {/* THE HEADING STAYS ON EVERY CARD, INCLUDING A 138px ONE.
+          It is the cheapest line here (one 10–11px row) and it is the line that
+          keeps the block honest: on a two-across phone card this section sits
+          directly beneath the VERD1CT panel, and "Not yet confirmed" on its own
+          under a score reads as the SCORE being unconfirmed. It is availability
+          that is unconfirmed. See `.wv-where-head` in globals.css for the
+          narrow-card type step. */}
+      <h4 className="wv-where-head text-[11px] font-black uppercase tracking-wide text-slate-300">Where to watch</h4>
 
       {/* LIVE AIRINGS stay full-width rows: the channel, station and time are
           the whole point and must not be reduced to an icon. */}
@@ -190,7 +197,7 @@ export function WhereToWatch({
           twenty times down a grid. The label says the same thing in two words
           and the full sentence stays as the accessible description. */}
       {note && (
-        <p className="text-[12px] font-semibold text-slate-400" data-testid="where-to-watch-note" title={note}>
+        <p className="wv-where-note text-[12px] font-semibold text-slate-400" data-testid="where-to-watch-note" title={note}>
           {status === 'unknown' ? 'Not yet confirmed' : 'None found'}
         </p>
       )}
@@ -219,7 +226,7 @@ export function WhereToWatch({
             target="_blank"
             rel="noopener noreferrer"
             data-testid="where-to-watch-cta"
-            className="mt-0.5 inline-flex min-h-[44px] items-center rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[12px] font-bold text-brand-100 transition hover:bg-brand-500/25"
+            className="wv-where-cta mt-0.5 inline-flex min-h-[44px] items-center rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[12px] font-bold text-brand-100 transition hover:bg-brand-500/25"
           >
             {cta.label}
           </a>
@@ -229,7 +236,7 @@ export function WhereToWatch({
             onClick={() => setPanelOpen(true)}
             data-testid="where-to-watch-cta"
             data-refreshable={refreshable === null ? 'unknown' : String(refreshable)}
-            className="mt-0.5 inline-flex min-h-[44px] items-center rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[12px] font-bold text-brand-100 transition hover:bg-brand-500/25"
+            className="wv-where-cta mt-0.5 inline-flex min-h-[44px] items-center rounded-lg border border-brand-400/50 bg-brand-500/15 px-3 text-[12px] font-bold text-brand-100 transition hover:bg-brand-500/25"
           >
             {refreshable === false ? 'Notify me when confirmed' : cta.label}
           </button>

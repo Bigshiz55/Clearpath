@@ -69,15 +69,29 @@ for (const w of WIDTHS) {
       expect(clamp === 'none' || clamp === '' || clamp == null).toBe(true);
     });
 
-    test('the "no ratings" label is never cut mid-word', async ({ page }) => {
+    /**
+     * ON A PHONE THE LABEL CANNOT BE CUT, BECAUSE THE ROW IS NOT DRAWN.
+     *
+     * The defect was "Ratings not available yet" — 155px of text — clipped to
+     * "Ratings not available ye" inside a 151px `overflow-hidden` row on a
+     * phone card. A two-across tile gives that row ~102px, which is worse
+     * still, so the ratings row is `sm`-and-up on a card now (see
+     * `.wv-score-ratings` in globals.css) and there is nothing here to cut.
+     *
+     * This asserts exactly that, rather than skipping: a `display:none` node
+     * reports a zero rect, which the ancestor check reads as "clipped by
+     * .wv-card" — a false positive that would have hidden a real regression.
+     * The clipping assertions themselves are unchanged and now run at 768,
+     * where the label is drawn (see below).
+     */
+    test('the "no ratings" label is not drawn on a phone tile, so it cannot be cut', async ({ page }) => {
       await page.goto('/dev/verdict', { waitUntil: 'networkidle' });
       const none = page.getByTestId('ratings-none').first();
       if ((await none.count()) === 0) test.skip(true, 'this harness state has ratings');
-      const own = await clipping(page, 'ratings-none');
-      expect(own.clippedX, `label clipped by its own box at ${w}px`).toBe(false);
-      const anc = await clippedByAncestor(page, 'ratings-none');
-      expect(anc.clipped, `label clipped by ancestor "${anc.by}" at ${w}px`).toBe(false);
-      await expect(none).toContainText('Ratings not available yet');
+      await expect(none).toBeHidden();
+      // Nothing else on the tile is claiming a rating in its place.
+      const card = page.locator('.poster-grid > *').first();
+      expect(await card.innerText(), `a rating leaked onto the tile at ${w}px`).not.toMatch(/IMDb|🍅|🍿/);
     });
 
     test('the W coach mark escapes every clipping box', async ({ page }) => {
@@ -124,3 +138,28 @@ for (const w of WIDTHS) {
     });
   });
 }
+
+/**
+ * …AND THE SAME LABEL, AT THE WIDTH THAT DRAWS IT.
+ *
+ * The mid-word-clipping assertions from the phone loop, kept intact and moved
+ * to the narrowest width where a card actually carries the ratings row. This is
+ * the tightest honest case for the original defect: 768 gives the row ~308px,
+ * and "Ratings not available yet" must render whole inside it — not cut by its
+ * own `overflow-hidden` box and not cut by any ancestor.
+ */
+test.describe('@ 768px', () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+
+  test('the "no ratings" label is never cut mid-word', async ({ page }) => {
+    await page.goto('/dev/verdict', { waitUntil: 'networkidle' });
+    const none = page.getByTestId('ratings-none').first();
+    if ((await none.count()) === 0) test.skip(true, 'this harness state has ratings');
+    await expect(none).toBeVisible();
+    const own = await clipping(page, 'ratings-none');
+    expect(own.clippedX, 'label clipped by its own box at 768px').toBe(false);
+    const anc = await clippedByAncestor(page, 'ratings-none');
+    expect(anc.clipped, `label clipped by ancestor "${anc.by}" at 768px`).toBe(false);
+    await expect(none).toContainText('Ratings not available yet');
+  });
+});

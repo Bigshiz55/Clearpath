@@ -62,11 +62,11 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
 }
 
 export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen, rank, evidence }: PosterCardProps) {
-  // FROM `sm`, THE POSTER IS LETTERBOXED, NOT CROPPED. The tile itself is now a
-  // fixed, shorter box (see `.wv-card-art`) — `object-contain` keeps the whole
-  // poster visible inside it, centered, at its true proportions. `object-cover`
-  // on a phone row is untouched: that box IS exactly 2:3, so cover there never
-  // crops anything.
+  // FROM `sm`, THE POSTER IS LETTERBOXED, NOT CROPPED. The tile itself is a
+  // fixed, shorter box there (see `.wv-card-art`) — `object-contain` keeps the
+  // whole poster visible inside it, centered, at its true proportions.
+  // `object-cover` on a phone is untouched: that box IS exactly 2:3 and spans
+  // the cell, so cover there never crops anything.
   const poster = (
     <Poster posterUrl={posterUrl} title={title} className="transition duration-300 group-hover:scale-[1.04] sm:object-contain" />
   );
@@ -84,14 +84,20 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         : null;
   const heading = (
     <>
-      {/* Full-width cards on a phone mean the title has room to be read rather
-          than scanned, so it is sized for reading. */}
-      <div className="line-clamp-2 text-base font-semibold leading-snug text-white sm:text-sm">{title}</div>
-      <div className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-400 sm:text-xs">
+      {/* 13px on a two-across phone card, 14 from `sm`. The old 16px was sized
+          for a full-width card; in a 138px cell it fits about nine characters a
+          line, so every title but the shortest truncated. 13px black-on-white
+          at two lines is still comfortably readable and holds most titles. */}
+      <div className="line-clamp-2 text-[13px] font-semibold leading-snug text-white sm:text-sm">{title}</div>
+      {/* Type and year stay on the phone card — they are the two facts that
+          disambiguate a poster you half-recognise. `flex-wrap` because at 320px
+          "Movie · 2024 · Documentary" does not fit one 122px line, and a
+          wrapped second line is better than a clipped first one. */}
+      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-400 sm:text-xs">
         <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
           {mediaType === 'movie' ? 'Movie' : 'TV'}
         </span>
-        <span>
+        <span className="min-w-0 truncate">
           {year ?? '—'}
           {meta ? ` · ${meta}` : ''}
         </span>
@@ -107,18 +113,23 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   // break every one of them. The BORDER is what goes: the poster's own edge is
   // the boundary, depth comes from a shadow, and a page of results stops being
   // a grid of boxes.
-  // A ROW ON A PHONE, A COLUMN FROM `sm` UP.
+  // A COLUMN AT EVERY WIDTH — TWO ACROSS ON A PHONE (owner-approved).
   //
-  // Full-width column cards meant one poster filled a 956px screen on its own —
-  // 2:3 at 406px wide is 609px of artwork before the title even appears. You
-  // could see exactly one title at a time, and nothing telling you what it was
-  // about. Turning the card on its side fixes both at once: the poster drops to
-  // roughly a third of the width, three or four cards fit on a screen, and the
-  // space beside the artwork is exactly where a synopsis belongs.
+  // The card was full-width and vertical, then sideways-and-full-width, and is
+  // now vertical in a two-column grid. Each step was answering the same
+  // question: how many titles can a phone screen show without any of them
+  // becoming unreadable. Full-width vertical showed ONE (2:3 at 406px is 609px
+  // of artwork before the title). Sideways showed three, by giving the poster a
+  // third of the width and putting a synopsis beside it. Two-across shows six,
+  // by giving the poster the whole cell and moving the PROSE — synopsis, "why
+  // it fits", the taste sentence, the facts line and the rating chips — to `sm`
+  // and up, where there is a paragraph's width for it.
   //
-  // From `sm` the grid has real columns again, so the card goes back to being a
-  // column — a sideways card in a 250px cell would leave a thumbnail and a
-  // sliver.
+  // What never moved is the decision: the FOR/AGAINST ruling, Save, the VERD1CT
+  // score and where-to-watch are on the card at every width, in compact form.
+  // Browsing is a scanning task; the card only has to carry what you act on.
+  //
+  // From `sm` the grid auto-fills at 280px+ and the card carries everything.
   return (
     /* A PREMIUM NEAR-BLACK SURFACE WITH A VISIBLE EDGE.
        The hairline that replaced the old border went too far: a 7%-white ring
@@ -134,7 +145,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           the row is now the FIRST thing on every card — rule at the top, then
           drop down to the W on the artwork if it belongs on the docket. */}
       {overlay !== null && saveId != null && (
-        <div className="wv-act-row border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
+        <div className="wv-act-row border-b border-white/10 p-2 pb-1.5 sm:p-3 sm:pb-2.5">
           <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
           {resolvedOverlay}
         </div>
@@ -202,12 +213,14 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           heading
         )}
 
-        {/* THE COLUMN BESIDE THE POSTER WAS EMPTY, AND THE FACTS WERE MISSING.
-            A 2:3 poster is ~210px tall and a title is two lines, so every card
-            carried ~150px of black beside its artwork — while runtime,
-            certificate, genre and season count, all of which we already hydrate
-            to compute the score, appeared nowhere. Same fetch, no new request. */}
-        {saveId != null && <CardFacts mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+        {/* THE FACTS WE ALREADY HOLD. Runtime, certificate, genre and season
+            count are hydrated to compute the score and used to appear on no
+            card at all. Same fetch, no new request. */}
+        {/* `sm` AND UP. Runtime · certificate · genre is a three-part line that
+            needs ~200px; in a 138px cell it truncates to "1h 4…" on the first
+            fact and drops the other two, which is worse than not claiming to
+            list them. The title page carries the same facts in full. */}
+        {saveId != null && <CardFacts mediaType={mediaType} tmdbId={saveId} className="mt-1.5 hidden sm:block" />}
 
         {children}
 
@@ -225,18 +238,23 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
       </div>
       </div>
 
-      {/* THE FULL WIDTH OF THE CARD. Everything from here down was being drawn
-          in the narrow column beside the poster while the space under the
-          poster sat empty — which is why the two "why" sentences were cut. */}
+      {/* THE CARD'S LOWER HALF — availability, the evidence, and (from `sm`)
+          the prose. It is also the container the availability block sizes
+          itself against; see `.wv-card-foot` in globals.css. */}
       <div className="wv-card-foot">
+        {/* ── THE PROSE ZONE IS `sm` AND UP ──────────────────────────────────
+            Synopsis, "why it fits" and the taste sentence are the three blocks
+            that need a paragraph's worth of width. Two-across phone cards do
+            not have one — a 14px synopsis in a 122px text lane is four or five
+            words a line, and two lines of that ends mid-article rather than
+            mid-clause. They are not deleted, they are relocated: every one of
+            them is on the title page in full, one tap away, and all three come
+            back on the card from `sm` where the column is 280px+.
+            What stays on the phone card is what you ACT on — the score, the
+            ruling, Save and where to watch. */}
         {/* What it is about, straight from TMDB. Renders nothing when there is
             no synopsis rather than showing a placeholder. */}
-        {/* THREE lines, not two. "Would like more information about what it's
-            about" — two lines of a TMDB synopsis ends mid-clause on almost
-            every title ("…until Andy's…"), which tells you less than none. The
-            reserved height grows with it, so nothing moves when the text
-            lands. */}
-        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={2} className="mt-1" />}
+        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={2} className="mt-1 hidden sm:block" />}
 
         {/* WHY THIS TITLE IS HERE — the first of the card's two questions,
             answered before the second. Compact reasons, one or two shown, the
@@ -246,14 +264,14 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           <WhyThisTitle
             mediaType={mediaType}
             tmdbId={saveId}
-            className="mt-1.5"
+            className="mt-1.5 hidden sm:block"
           />
         )}
 
         {/* The one-sentence taste explanation, when the rated history supports
             one. Kept alongside the reason chips: the chips say WHAT matched,
             this says it in the user's own terms. */}
-        {saveId != null && <CardFit mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+        {saveId != null && <CardFit mediaType={mediaType} tmdbId={saveId} className="mt-1.5 hidden sm:block" />}
 
         {/* WHERE TO WATCH — the question of FACT, kept separate from the
             question of TASTE answered by the verdict panel above it.

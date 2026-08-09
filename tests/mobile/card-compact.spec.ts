@@ -12,6 +12,28 @@ import { test, expect, type Page } from '@playwright/test';
  * dashes, the reading order down the card, and the fact that nothing was
  * removed to achieve any of it.
  */
+/**
+ * THE WIDTH AT WHICH A CARD CARRIES ITS EVIDENCE.
+ *
+ * A phone result tile is TWO ACROSS now (owner-approved): 138px at 320 up to
+ * 193px at 430. What it carries is what you ACT on — the VERD1CT score, the
+ * FOR/AGAINST ruling, Save and where to watch. What it does NOT carry is the
+ * PROSE and the EVIDENCE: the three rating chips, the runtime/certificate/genre
+ * line, the synopsis and the taste sentence. Those are `sm`-and-up on the card
+ * (see PosterCard) and in full on the title page, because 122px of text lane
+ * renders "IMDb 6.8" as "IMDb 6" — a wrong number, confidently displayed.
+ *
+ * So the tests BELOW that measure those blocks are not phone tests any more.
+ * They are not weakened and they are not deleted: they run at the first width
+ * where the card actually carries the thing they assert. 768 rather than a
+ * desktop width because it is the narrowest full card — the tightest honest
+ * case for "does the evidence fit" — and it is one of the acceptance widths.
+ *
+ * Anything that measures the SCORE, the RULING, Save, availability or the
+ * card's own geometry still runs on the phone, where it belongs.
+ */
+const FULL_CARD = 768;
+
 const FULL = { standardScore: 81, tomatometer: 91, rtAudience: 78, imdb: 7.8 };
 const FACTS = { runtimeMinutes: 105, contentRating: 'PG-13', genres: ['Crime', 'Thriller', 'Mystery'] };
 const SYNOPSIS =
@@ -47,8 +69,9 @@ test.describe('the verdict panel', () => {
     expect(s.ring).toMatch(/255,\s*20,\s*147/);
   });
 
+  // The ratings chips are `sm`-and-up on a card — see FULL_CARD.
   test('holds the score, the call and the ratings without a wasted row', async ({ page }) => {
-    await open(page);
+    await open(page, FULL_CARD);
     const h = (await panel(page).boundingBox())!.height;
     // Two rows AT MOST — badge and call, then the ratings — inside the column
     // beside the poster. It was two stacked rows plus air, full-width, below.
@@ -60,13 +83,35 @@ test.describe('the verdict panel', () => {
     await expect(panel(page).locator('.wv-ratings-row > span')).toHaveCount(3);
   });
 
-  test('sits beside the artwork, where the eye already is', async ({ page }) => {
+  /**
+   * RETIRED ASSUMPTION: "beside the artwork".
+   *
+   * This measured `panel.x > art.x + art.width` — the panel in the text column
+   * of a SIDEWAYS card. There is no sideways card any more at any width: the
+   * phone tile is two-across and vertical, and from `sm` the tile was already a
+   * column. So the geometry it asserted cannot be true anywhere, and re-pointing
+   * it to another viewport would not save it.
+   *
+   * What it was actually protecting is kept, because that defect is still
+   * possible: the score was once drawn full-width at the BOTTOM of the card,
+   * below the synopsis and the availability block, which pushed the card ~75px
+   * taller and put the number nowhere near the thing it describes. So the
+   * assertion becomes the vertical form of the same rule — the panel follows the
+   * artwork immediately, separated only by the title and its meta line, and it
+   * comes BEFORE where-to-watch rather than after it.
+   */
+  test('follows the artwork immediately — the number is not stranded at the foot', async ({ page }) => {
     await open(page);
     const art = (await card(page).locator('.wv-card-art').boundingBox())!;
     const p = (await panel(page).boundingBox())!;
-    // Beside the poster, not under it: this is the space that was black.
-    expect(p.x, 'the panel is back under the poster').toBeGreaterThan(art.x + art.width - 1);
-    expect(p.y).toBeLessThan(art.y + art.height);
+    const where = (await card(page).getByTestId('where-to-watch').boundingBox())!;
+
+    expect(p.y, 'the panel is above the artwork').toBeGreaterThan(art.y);
+    // Only the title (two lines) and the type/year line separate them.
+    const gap = p.y - (art.y + art.height);
+    expect(gap, `${Math.round(gap)}px between the artwork and the score`).toBeLessThanOrEqual(70);
+    // …and the score still leads the availability answer, not the reverse.
+    expect(p.y, 'the score fell below where-to-watch').toBeLessThan(where.y);
   });
 
   test('the score and the call are the loudest things in it', async ({ page }) => {
@@ -83,9 +128,13 @@ test.describe('the verdict panel', () => {
   });
 });
 
+// The whole block is about the RATINGS ROW, which is `sm`-and-up on a card —
+// see FULL_CARD. The data-honesty rules it encodes (never a placeholder dash,
+// "not available" said once in words, one constant height) are unchanged; only
+// the width they are measured at moved to one where the row is on the card.
 test.describe('an unavailable rating is not drawn as a dash', () => {
   test('a source we do not hold simply is not there', async ({ page }) => {
-    await open(page, 390, { standardScore: 81, imdb: 7.8 });
+    await open(page, FULL_CARD, { standardScore: 81, imdb: 7.8 });
     const chips = card(page).locator('.wv-ratings-row > span');
     await expect(chips).toHaveCount(1);
     await expect(chips.first()).toContainText('7.8');
@@ -93,16 +142,16 @@ test.describe('an unavailable rating is not drawn as a dash', () => {
   });
 
   test('holding none of them is stated in words, once', async ({ page }) => {
-    await open(page, 390, { standardScore: 81 });
+    await open(page, FULL_CARD, { standardScore: 81 });
     await expect(card(page).getByTestId('ratings-none')).toBeVisible();
     await expect(card(page).getByTestId('ratings-none')).toContainText(/not available/i);
     expect(await card(page).innerText()).not.toContain('–');
   });
 
   test('and the row is the same height either way, so nothing moves', async ({ page }) => {
-    await open(page, 390, FULL);
+    await open(page, FULL_CARD, FULL);
     const full = (await card(page).locator('.wv-ratings-row').first().boundingBox())!.height;
-    await open(page, 390, { standardScore: 81 });
+    await open(page, FULL_CARD, { standardScore: 81 });
     const none = (await card(page).locator('.wv-ratings-row').first().boundingBox())!.height;
     expect(Math.round(none)).toBe(Math.round(full));
   });
@@ -117,8 +166,9 @@ test.describe('an unavailable rating is not drawn as a dash', () => {
  * This is the contract for the restored half: speak only when true.
  */
 test.describe('why you would like it', () => {
+  // The taste sentence is `sm`-and-up on a card — see FULL_CARD.
   test('speaks when the rated history genuinely supports it', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 1000 });
+    await page.setViewportSize({ width: FULL_CARD, height: 1000 });
     await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings: FULL, overview: SYNOPSIS, facts: FACTS } }));
     await page.route('**/api/dna/**', (r) =>
       r.fulfill({
@@ -141,8 +191,11 @@ test.describe('why you would like it', () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
+  // At FULL_CARD too: on a phone card the block is not rendered at all, so
+  // "silent" would pass for the wrong reason. This asserts it stays silent
+  // where it CAN speak.
   test('and is SILENT — not boilerplate — when there is nothing personal to say', async ({ page }) => {
-    await open(page); // dna mock: sampleSize 0, no fit
+    await open(page, FULL_CARD); // dna mock: sampleSize 0, no fit
     await expect(card(page).getByTestId('card-fit')).toHaveCount(0);
     const text = await card(page).innerText();
     expect(text).not.toMatch(/personalization status/i);
@@ -151,9 +204,10 @@ test.describe('why you would like it', () => {
   });
 });
 
+// The synopsis is `sm`-and-up on a card — see FULL_CARD.
 test.describe('the synopsis knows its place', () => {
   test('stops at three lines and offers the rest', async ({ page }) => {
-    await open(page);
+    await open(page, FULL_CARD);
     const syn = card(page).getByTestId('card-synopsis');
     const short = (await syn.boundingBox())!.height;
     expect(short).toBeLessThanOrEqual(70); // three lines at 13px/relaxed
@@ -167,7 +221,7 @@ test.describe('the synopsis knows its place', () => {
   });
 
   test('does not offer More when there is no more', async ({ page }) => {
-    await open(page, 390, FULL);
+    await open(page, FULL_CARD, FULL);
     await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings: FULL, overview: 'Short.' } }));
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForTimeout(400);
@@ -191,13 +245,30 @@ test.describe('the decision buttons', () => {
     // meant scrolling past everything before you could act.
     await open(page);
     const layout = await card(page).evaluate((el) => {
-      const row = el.querySelector('.wv-act-row')!.getBoundingClientRect();
+      const rowEl = el.querySelector('.wv-act-row')!;
+      const row = rowEl.getBoundingClientRect();
       const art = el.querySelector('.wv-card-art')!.getBoundingClientRect();
-      return { rowTop: Math.round(row.top), rowBottom: Math.round(row.bottom), artTop: Math.round(art.top) };
+      const buttons = [...rowEl.querySelectorAll('button, a')].map((b) => b.getBoundingClientRect().bottom);
+      return {
+        rowTop: Math.round(row.top),
+        rowBottom: Math.round(row.bottom),
+        artTop: Math.round(art.top),
+        buttonBottom: Math.round(Math.max(...buttons)),
+        rowBorder: getComputedStyle(rowEl).borderBottomWidth,
+      };
     });
     expect(layout.rowTop, 'the decision row is above the artwork').toBeLessThan(layout.artTop);
-    // And the artwork does not crowd it — the border under the row needs air.
-    expect(layout.artTop - layout.rowBottom, 'the row touches the artwork').toBeGreaterThanOrEqual(6);
+    // And the artwork does not crowd it. This used to measure the gap between
+    // the ROW BOX and the artwork, which worked only because the card carried
+    // 12px of padding around a rounded, inset poster. The poster is full-bleed
+    // now — it meets the row's bottom border by design, so that gap is 1px (the
+    // border) and measuring it says nothing about crowding.
+    // The air that matters is between the last BUTTON and the artwork, and it
+    // is still there: the row keeps its own bottom padding. Same defect
+    // guarded, measured where it now lives.
+    expect(layout.artTop - layout.buttonBottom, 'the buttons touch the artwork').toBeGreaterThanOrEqual(6);
+    // A visible separator, not just space.
+    expect(layout.rowBorder, 'the decision row lost its edge').not.toBe('0px');
   });
 });
 
@@ -210,9 +281,12 @@ test.describe('the decision buttons', () => {
  * season count, which the app already hydrates to score the title, were on no
  * card at all.
  */
+// The facts line is `sm`-and-up on a card — see FULL_CARD. (These passed at
+// 390 for the wrong reason: `toContainText` reads a `display:none` node's text
+// happily, so they were asserting the content of a block nobody could see.)
 test.describe('the space beside the poster', () => {
   test('carries the facts we already hold', async ({ page }) => {
-    await open(page);
+    await open(page, FULL_CARD);
     const facts = card(page).getByTestId('card-facts');
     await expect(facts).toContainText('1h 45m');
     await expect(facts).toContainText('PG-13');
@@ -221,25 +295,40 @@ test.describe('the space beside the poster', () => {
   });
 
   test('claims nothing when TMDB gave us nothing', async ({ page }) => {
-    await open(page, 390, FULL, null);
+    await open(page, FULL_CARD, FULL, null);
     await expect(card(page).getByTestId('card-facts')).toHaveCount(0);
   });
 
+  /**
+   * RETIRED ASSUMPTION: "the column beside the poster".
+   *
+   * This measured `art.bottom - body.lastChild.bottom` — how much of the text
+   * column ALONGSIDE a sideways poster was left black. A vertical card has no
+   * column beside the poster, so on the new tile the artwork's bottom is above
+   * the body entirely and the old expression is a large negative number that
+   * passes the `<= 24` check without measuring anything.
+   *
+   * The defect it existed for — a card that reserves space and then leaves it
+   * empty — is still worth guarding, so it is measured the way it now shows up:
+   * slack between the body's last child and the bottom of the body itself.
+   */
   test('is filled, not merely occupied', async ({ page }) => {
     await open(page);
     const slack = await card(page).evaluate((el) => {
-      const art = el.querySelector('.wv-card-art')!.getBoundingClientRect();
       const body = el.querySelector('.wv-card-body')!;
       const last = body.lastElementChild!.getBoundingClientRect();
-      return Math.round(art.bottom - last.bottom);
+      return Math.round(body.getBoundingClientRect().bottom - last.bottom);
     });
-    // The block beside the poster ends level with it, give or take a line.
-    expect(slack, `${slack}px of dead column beside the poster`).toBeLessThanOrEqual(24);
+    expect(slack, `${slack}px of dead space at the foot of the card body`).toBeLessThanOrEqual(24);
   });
 });
 
+// At FULL_CARD: the order runs through the facts line and the synopsis, and
+// both are `sm`-and-up on a card (see FULL_CARD). On a phone tile the order
+// that survives — ruling, then score, then availability — is asserted by
+// 'follows the artwork immediately' above.
 test('the reading order down the card is what a decision needs', async ({ page }) => {
-  await open(page);
+  await open(page, FULL_CARD);
   const order = await card(page).evaluate((el) => {
     const y = (s: string) => {
       const e = el.querySelector(s);

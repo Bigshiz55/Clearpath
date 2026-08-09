@@ -39,46 +39,50 @@ body {
   }
 
   /* The one poster-grid used across the app.
-     ONE COLUMN OF ROWS ON A PHONE. Two narrow columns is the wrong way to fit
-     more titles on a phone screen — at 390px each cell is ~170px, which is
-     where "NOT FOR ME" wraps onto three lines and titles truncate mid-word, and
-     there is nowhere at all to say what the thing is about. So the CARD turns
-     sideways instead (see PosterCard): poster on the left at about a third of
-     the width, facts and synopsis beside it. Three or four fit on a screen
-     where one used to, and each one tells you what it is.
-     From `sm` there is room for real columns, the card goes back to being a
-     column, and the grid auto-fills. */
+     TWO ACROSS ON A PHONE, VERTICAL CARDS (owner-approved).
+     The previous shape was one column of SIDEWAYS cards — a poster on the left
+     at ~38% with facts and a synopsis beside it. It read well one card at a
+     time, but a phone screen only ever held three of them, and browsing is a
+     scanning task: you recognise artwork, you do not read placards. Two columns
+     of true 2:3 posters put six titles on the same screen and let the poster do
+     the work it is actually good at.
+     What pays for the width is the PROSE, not the decision: the synopsis, the
+     "why this title" reasons and the fit sentence are `sm`-and-up only (see
+     PosterCard), while the score, the ruling, Save and availability — the four
+     things you act on — stay on the card at every width in compact form.
+     From `sm` there is room for real columns and the grid auto-fills. */
   .poster-grid {
-    /* 16px between tiles, not 12. An edge draws the boundary; the gap is what
-       makes two boundaries read as two objects rather than a seam. */
-    @apply grid gap-4;
-    grid-template-columns: minmax(0, 1fr);
+    /* 12px between tiles on a phone, not 16. At 320px the gap is competing with
+       the cards for the same 288px; 12 keeps two cells at 138 rather than 136
+       and still reads as two objects, because each tile has its own edge. */
+    @apply grid gap-3;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   @media (min-width: 640px) {
     .poster-grid {
+      /* 16px between tiles. An edge draws the boundary; the gap is what
+         makes two boundaries read as two objects rather than a seam. */
       @apply gap-4;
     }
   }
   /* ── The card shape, in ONE place ────────────────────────────────────────
-     A row on a phone, a column from `sm`. These live here rather than inline
-     because the shape was fixed on PosterCard and the New Releases wall — which
-     hand-rolls its own card — kept the old full-bleed poster and filled the
-     whole screen with one title. Two copies of a layout is how that happens, so
-     there is now one definition and every grid uses it. */
-  /* The upper half: poster beside the facts on a phone, stacked from `sm`.
-     `pb-0` because `.wv-card-foot` below carries the bottom padding now. */
+     A COLUMN AT EVERY WIDTH. These live here rather than inline because the
+     shape was fixed on PosterCard and the New Releases wall — which hand-rolls
+     its own card — kept the old full-bleed poster and filled the whole screen
+     with one title. Two copies of a layout is how that happens, so there is
+     now one definition and every grid uses it. */
+  /* The upper half: poster above the facts. It was `flex` (a sideways card)
+     below `sm`; two-across phone cards are ~138–193px wide, which is a column
+     by definition — a poster and a text lane inside 138px is two thumbnails. */
   .wv-card {
-    @apply flex gap-3 overflow-hidden p-3 pb-0 sm:block sm:gap-0 sm:p-0;
+    @apply block overflow-hidden;
   }
-  /* THE POSTER IS NEVER CROPPED — ON A PHONE ROW, TRUE 2:3.
-     It used to STRETCH to the card's height on a phone, to avoid "a dead gap
-     beneath it". With `object-cover` that meant the taller the card's text got,
-     the more of the artwork's sides were cut off — "Toy Story" rendered as
-     "OY / ORY", and the poster is the one thing on a card people recognise
-     before they read anything. A little unused column is a much smaller cost
-     than an unrecognisable placard, so the ratio is fixed and the art is
-     top-aligned. Slightly wider too (38%), because at 34% of a 358px card the
-     poster was 122px and titles on the artwork were unreadable.
+  /* THE POSTER IS NEVER CROPPED — ON A PHONE, A FULL-WIDTH TRUE 2:3.
+     It used to be a 38%-wide column inside a sideways card. Two-across cards
+     give the artwork the whole cell instead: 138px at 320 up to 193px at 430,
+     at the exact ratio posters are drawn in, so the art is never distorted and
+     never cut. This is the one element on the card that has to be recognisable
+     from across a scroll, and it is now the biggest thing on it.
 
      FROM `sm`, THE TILE IS SHORTER AND SQUARER. A full 2:3 poster at a 280px
      grid column is ~420px tall — before the title, the score, the ratings or
@@ -89,7 +93,7 @@ body {
      SAME height regardless of which title's key art is unusually tall, and
      puts the rest of the card back in view. */
   .wv-card-art {
-    @apply relative aspect-[2/3] w-[38%] max-w-[160px] flex-none self-start overflow-hidden rounded-lg sm:aspect-auto sm:h-[196px] sm:w-full sm:max-w-none sm:self-auto sm:rounded-none lg:h-[216px];
+    @apply relative aspect-[2/3] w-full flex-none overflow-hidden sm:aspect-auto sm:h-[196px] lg:h-[216px];
   }
   /* ONE ASPECT FOR TV-LISTING ARTWORK: 16:9 at every width, letterboxed.
      Broadcast art arrives as posters, banners and stills in every shape;
@@ -107,19 +111,22 @@ body {
     object-fit: contain !important;
   }
   .wv-card-body {
-    @apply flex min-w-0 flex-1 flex-col sm:p-3;
+    @apply flex min-w-0 flex-1 flex-col p-2 pb-0 sm:p-3;
   }
-  /* THE CARD'S FULL WIDTH, FOR THE THINGS THAT NEED IT.
-     A row card is a 2:3 poster beside a text column, and the poster is almost
-     always the shorter of the two — so everything below the synopsis was being
-     drawn in ~200px of the card's 334 while a 300×320 block under the poster
-     sat empty. The verdict panel was cramped and the two "why" sentences were
-     cut mid-word, in a card with a third of its area unused.
-     This zone starts under BOTH columns, so the verdict, the reasons and the
-     actions get the whole width. From `sm` the card is already a column and
-     this is simply its lower half, sharing the body's padding. */
+  /* THE CARD'S LOWER HALF — availability and the supporting evidence.
+     The card is a column at every width now, so this is simply what follows the
+     body, sharing its padding. It stays a separate zone rather than being
+     folded into `.wv-card-body` because the body is what sits level with the
+     poster on the `sm`-and-up tile; this is what hangs below it.
+
+     It is also the CONTAINER the availability block measures itself against —
+     `container-type: inline-size` here, not on the card, because inline-size
+     containment makes an element a containing block for fixed-position
+     descendants, and the card holds several (the trailer overlay, the DNA
+     burst). A plain content div holds none. */
   .wv-card-foot {
-    @apply mt-3 px-3 pb-3 sm:mt-0 sm:px-3 sm:pb-3 sm:pt-0;
+    @apply px-2 pb-2 sm:px-3 sm:pb-3 sm:pt-0;
+    container-type: inline-size;
   }
 
   /* The tray's status word shares one line with Clear and Deliver. Below 360px
@@ -129,14 +136,13 @@ body {
   @media (max-width: 359px) {
     .wv-tray-status { display: none; }
     /* THE 320px CARD, MEASURED.
-       At 320 the card is 288 wide; a 38% poster leaves the body 143 and the
-       ratings row 130 — 39px a chip, where "IMDb 6.8" needs 51. The result was
-       a rating that rendered as "IMDb 6", which is worse than none: it is a
-       wrong number, confidently displayed.
-       Two small concessions at this width only: the poster takes 30% instead of
-       38% (86px — still a recognisable placard), and the rating type drops a
-       step. Together that gives 51px a chip against a 44px need. */
-    .wv-card-art { width: 30%; }
+       At 320 the grid gives each cell 138px. The ratings row is not on the
+       phone card any more (it is `sm`-and-up with the rest of the evidence —
+       see PosterCard), but this type step still applies wherever a ratings row
+       appears at this width outside a result tile: the release wall, the
+       recommendation slate and the title page all draw it in ~130px, where
+       "IMDb 6.8" at the default size renders as "IMDb 6" — a wrong number,
+       confidently displayed. */
     .wv-ratings-row { font-size: 11px; }
     .wv-ratings-emoji { font-size: 10px; }
     .wv-ratings-tag { font-size: 7px; }
@@ -1123,6 +1129,26 @@ body {
     margin-left: auto;
   }
 }
+/* …AND BELOW 200px OF PANEL THE CHIPS GO ENTIRELY.
+   A two-across phone tile leaves this panel ~102px of content at 320 and ~157
+   at 430. Three chips need ~140 before they are crowded, so what fitted was
+   "🍅 9" — a tomatometer of nine. The row's own guard (`ratings-none`, the
+   `flex-nowrap` single line) protects the SHAPE of the row; it cannot protect a
+   number from being cut in half, and a wrong rating shown confidently is worse
+   than one not shown. The score above them is the blend of exactly these
+   sources, so the card still answers the question; the sources themselves are
+   on the title page, and on any card from ~200px up.
+
+   A container query, not `sm:` — same reason as the row above. This panel is
+   ~236px wide in a 280px desktop grid cell and ~102px in a 320px phone cell,
+   and it is the PANEL's width that decides whether a chip fits. Viewport width
+   gets this wrong in both directions: it would strip the chips from a narrow
+   card on a wide screen and keep them on a wide card on a small one. */
+@container (max-width: 200px) {
+  .wv-score-ratings {
+    display: none;
+  }
+}
 /* …but the chips are deliberately BIGGER from `lg` (they are the evidence
    under the score), so the same panel that holds them on one line at 390px
    cannot at 1366. Left to the 310px threshold the row fitted while the
@@ -1135,6 +1161,55 @@ body {
       flex-basis: 100%;
       margin-left: 0;
     }
+  }
+}
+
+/* ── WHERE TO WATCH, ON A TWO-ACROSS PHONE CARD ─────────────────────────────
+   The block was measured for a card 310px+ wide. In a 122px foot it drew a
+   left-aligned 12px CTA whose label ("Notify me when confirmed") broke over
+   THREE lines and pushed the button to 66px — the tallest thing on the card
+   after the poster, to say one thing.
+
+   Nothing is removed. The heading stays (it is what stops "Not yet confirmed"
+   reading as a comment on the score directly above it) and the CTA keeps its
+   44px tap target — that floor does not move at any width. What changes is the
+   shape: the button takes the full width of the foot and centres its label, so
+   the same words wrap over two balanced lines INSIDE the 44px box instead of
+   forcing the box taller. The reserved minimum comes down to match, and it
+   comes down for the loading placeholder and the resolved block together, so
+   the card still does not move when the answer lands.
+
+   Queried against `.wv-card-foot`, not the viewport: this block appears in
+   grids whose cells are 122px on a phone and 328px on a tablet at the SAME
+   breakpoint. */
+@container (max-width: 240px) {
+  /* 84px, MEASURED, NOT ROUNDED DOWN. This is the reserve the loading
+     placeholder holds before the availability answer arrives, and it has to
+     equal what the answer actually occupies or the card grows underneath a
+     thumb already reaching for it — `card-ruling.spec` measures exactly that.
+     The compact block resolves to heading 15 + note 17 + action 44 + 8 of gap
+     = 84 at every phone width from 320 to 430 (the wide default is 5.5rem/88,
+     which is what the same block measures from 640 up). A guess of 4.5rem was
+     11px short, and the suite caught it as an 11px jump on every tile. */
+  .wv-where {
+    min-height: 5.25rem;
+  }
+  .wv-where-head {
+    font-size: 10px;
+  }
+  /* "Not yet confirmed" is 105px of 12px type against a 120px foot at 320 —
+     it fitted the box and not the line, so it broke after "Not yet" and cost a
+     whole second row to hold one word. A point smaller is 92px and one line. */
+  .wv-where-note {
+    font-size: 11px;
+  }
+  .wv-where-cta {
+    width: 100%;
+    justify-content: center;
+    padding-inline: 0.5rem;
+    font-size: 11px;
+    line-height: 1.15;
+    text-align: center;
   }
 }
 

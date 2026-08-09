@@ -225,9 +225,22 @@ for (const w of [320, 360, 390, 414] as const) {
   });
 }
 
+/**
+ * WIDTHS MOVED, RULE UNCHANGED.
+ *
+ * This walked 320 / 390 / 1024. The three rating chips are `sm`-and-up on a
+ * result card now — a two-across phone tile gives this row ~102px, which fits
+ * "IMDb 6" and calls it a rating (see `.wv-score-ratings` in globals.css) — so
+ * at 320 and 390 there is no row to measure and `boundingBox()` returned null.
+ *
+ * The rule being tested is that the row NEVER WRAPS, so its height cannot vary
+ * with the card's width or with how many ratings a title happens to have. That
+ * needs two widths at the same type size plus one at the deliberate `lg`
+ * scale-up, which is exactly what 768 / 900 / 1024 are.
+ */
 test('the ratings row is one line at every width, so its height cannot vary', async ({ page }) => {
   const heights: number[] = [];
-  for (const [w, h] of [[320, 800], [390, 900], [1024, 1200]] as const) {
+  for (const [w, h] of [[768, 900], [900, 900], [1024, 1200]] as const) {
     await openWithLateData(page, w, h);
     await page.waitForTimeout(2000);
     const card = page.getByTestId('qa-grid').locator('> div').first();
@@ -238,7 +251,7 @@ test('the ratings row is one line at every width, so its height cannot vary', as
     // grid has to keep that guarantee without buying it with a variable height.
     expect(rowBox!.x + rowBox!.width, `ratings escape the card at ${w}px`).toBeLessThanOrEqual(cardBox!.x + cardBox!.width);
   }
-  // One line everywhere: 320 and 390 must agree, and only the deliberate
-  // large-screen scale-up may differ.
+  // One line everywhere: 768 and 900 must agree, and only the deliberate
+  // large-screen scale-up at `lg` may differ.
   expect(heights[0]).toBe(heights[1]);
 });

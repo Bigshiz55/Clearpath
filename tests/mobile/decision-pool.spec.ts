@@ -285,7 +285,36 @@ test('a very long title does not break the card or the pool list', async ({ page
  * THE RATINGS ROW IS REFERENCE, NOT AN ACTION — and it must never lie by
  * truncation. "🍅 5…" looks like a value we hold and cannot show.
  */
-for (const w of [320, 375, 390, 430, 768, 1024, 1440] as const) {
+/**
+ * THE PHONE WIDTHS ANSWER THIS RULE A DIFFERENT WAY NOW.
+ *
+ * 320 / 375 / 390 / 430 used to be in this loop. On a two-across phone tile the
+ * ratings row gets ~102px against the ~140px three chips need, and the only
+ * ways to fit are to cut a value ("6.8" as "6") or to drop below legible type.
+ * Both are the defect this test exists to prevent, so the row is not on the
+ * phone card at all (see `.wv-score-ratings`, globals.css) — the VERD1CT score
+ * above it is the blend of exactly those sources, and the sources themselves
+ * are on the title page.
+ *
+ * So the rule is unchanged and still asserted at every width; what differs is
+ * HOW it is satisfied. Below, the phone widths assert the row is absent rather
+ * than clipped — a truncated rating there would still fail. Above, the widths
+ * that do carry the row measure every chip as before.
+ */
+for (const w of [320, 375, 390, 430] as const) {
+  test(`no rating is clipped or truncated @ ${w} — the row is not on a phone tile`, async ({ page }) => {
+    await open(page, w, 900);
+    const card = page.getByTestId('qa-grid').locator('> div').first();
+    // Not rendered-and-clipped, and not shrunk to unreadable: not shown.
+    await expect(card.locator('.wv-ratings-row')).toBeHidden();
+    // And nothing in the card is claiming a rating in its place.
+    expect(await card.innerText(), 'a rating leaked onto the phone tile').not.toMatch(/IMDb|🍅|🍿/);
+    // The score the chips feed is still there — the card still answers.
+    await expect(card.getByTestId('verdict-panel')).toBeVisible();
+  });
+}
+
+for (const w of [768, 1024, 1440] as const) {
   test(`no rating is clipped or truncated @ ${w}`, async ({ page }) => {
     await open(page, w, 900);
     // INSIDE A CARD. The harness also renders a standalone full-width strip,
@@ -316,8 +345,11 @@ for (const w of [320, 375, 390, 430, 768, 1024, 1440] as const) {
   });
 }
 
+// At 768: the chips are `sm`-and-up on a card, and at 390 this measured a
+// `display:none` row — three heights of 0, which are trivially "consistent"
+// and trivially shorter than a button. It has to run where the row is drawn.
 test('the ratings do not look like the actions', async ({ page }) => {
-  await open(page);
+  await open(page, 768, 1024);
   const row = page.getByTestId('qa-grid').locator('.wv-ratings-row').first();
   const heights = await row.locator('> span').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
   // One consistent height across all three sources.
