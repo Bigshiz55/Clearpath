@@ -4,7 +4,7 @@ import type { MediaType } from '@/lib/types';
 import { COMPILER_VERSION, type CompiledSubjectFact, type FactCentrality, type DecidedBy } from './compile';
 
 /**
- * PERSISTENCE for the WatchVerdict Knowledge Layer.
+ * PERSISTENCE for the WatchVerd1ct Knowledge Layer.
  *
  * Reads/writes the durable `title_subject_facts` (and `title_knowledge`) content
  * caches through the service-role admin client — the same pattern
