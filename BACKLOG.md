@@ -42,6 +42,29 @@ and what it unblocks.
   representative.
 
 ## Done
+- **Master search + Full Guide + AI-schema + mobile-grid sweep (feature branch, not yet merged).**
+  All on `claude/watch-verdict-app-wwbtbg`; production stays `main`@350d874 until the branch merges.
+  - **Search (reported failure class):** the conversational path (the one the UI always uses) now
+    carries + projects the full foreign/dub/audio semantics — `originalLanguageClass` +
+    `audioRequirement` on `CanonicalRequest`, detected by the same `detectAudio`/`detectOrigin` as
+    the single-turn path, projected to finder HARD flags (`englishDubOnly`/`englishAudioOnly`/new
+    `nonEnglishOriginalOnly`). Dub availability stays a VERIFIED data signal. `103a067`.
+  - **AI canonical schema consolidated:** `CanonicalDiscoveryRequest` gained the SAME audio/origin
+    vocabulary (parity-tested against conversationState) + `canonicalToQuery` maps them to the same
+    finder flags; interpreter prompt rule 6a. `7a1a26b`.
+  - **Chaos/oracle harness:** 480 generated cases, oracle-first, real interpretation path, ZERO
+    hard-constraint violations; exposed + fixed a real "before <year>" off-by-one (exclusive). `e127d37`.
+  - **Full Guide (forensic + fix):** channel universe is now the canonical `GUIDE_CHANNEL_LINEUP`
+    (lineup-first), not airing-derived; every supported channel renders, "Schedule currently
+    unavailable" when no data, never deleted; representative networks pinned. `45c49b8`.
+  - **Mobile grid:** measured the real shared `.poster-grid` across 320/375/390/430/768/1200 —
+    1 column on phones (0 overflow), 2 at 768, 3 at 1200. No three-across, no overflow; 390×844
+    artifact captured. Current single-column-horizontal is the documented prior design; a 2-across
+    vertical redesign would reverse it → flagged for owner confirmation. `a95c7f9`.
+  - Gates: typecheck 0, lint 0, vitest 3171 passed / 24 skipped, build 0, searchrouting 21 passed.
+  - OPEN (owner decisions): (1) reverse the single-column mobile design to 2-across vertical? (2) make
+    AI the DEFAULT interpreter in production (overrides CLAUDE.md no-LLM-in-request-path + needs a
+    server key)? Then merge branch → main so the canonical URL serves it.
 - **Voice DNA — scripted staged interview + deterministic app-driven turn loop.**
   Two product fixes, at the architecture level. (1) Stage 1 is now rapid-fire
   grouped genre triples, preserving the full flow (genre triage → adaptive
