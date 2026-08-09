@@ -92,9 +92,11 @@ export function rankGuideForTaste(rows: readonly ChannelRow[], rules: readonly T
     return { ...r, affinity, forYou: affinity > 0, rankScore: guideRankScore({ ...r, affinity }) };
   });
   return ranked.sort((a, b) => {
-    const liveA = a.onNow ? 0 : 1;
-    const liveB = b.onNow ? 0 : 1;
-    if (liveA !== liveB) return liveA - liveB;
+    // on-now first, then channels with upcoming, then schedule-unavailable last.
+    const tier = (r: (typeof ranked)[number]) => (r.onNow ? 0 : r.scheduleUnavailable ? 2 : 1);
+    const ta = tier(a);
+    const tb = tier(b);
+    if (ta !== tb) return ta - tb;
     if (a.rankScore !== b.rankScore) return b.rankScore - a.rankScore;
     return a.network.localeCompare(b.network);
   });

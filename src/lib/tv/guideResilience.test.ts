@@ -72,7 +72,7 @@ describe('guide resilience — enrichment is never a prerequisite', () => {
       }
       const expected = new Set(airings.map((a) => a.network));
 
-      const rows = buildChannelGuide(airings, NOW);
+      const rows = buildChannelGuide(airings, NOW, false);
       const ranked = rankGuideForTaste(rows, []);
       const got = new Set(ranked.map((r) => r.network));
 
@@ -106,7 +106,7 @@ describe('guide resilience — enrichment is never a prerequisite', () => {
       match: null,
       posterPath: null,
     };
-    const rows = buildChannelGuide([bare], NOW);
+    const rows = buildChannelGuide([bare], NOW, false);
     const ranked = rankGuideForTaste(rows, []);
     expect(ranked.map((r) => r.network)).toContain('MTV');
   });

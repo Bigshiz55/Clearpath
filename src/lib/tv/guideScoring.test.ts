@@ -79,7 +79,7 @@ describe('spreading the scores back', () => {
 
 describe('one rank number per row', () => {
   it('a real programme score speaks for itself', () => {
-    const rows = buildChannelGuide([airing({ showName: 'NCIS', runtime: 120, match: 76 })], NOW);
+    const rows = buildChannelGuide([airing({ showName: 'NCIS', runtime: 120, match: 76 })], NOW, false);
     expect(guideRankScore(rows[0]!)).toBe(76);
   });
 
@@ -102,7 +102,7 @@ describe('the whole blend, end to end', () => {
       airing({ network: 'ESPN', showName: 'SportsCenter', runtime: 60 }),
     ];
     const rules = [{ trait: 'grounded_crime', weight: 12 }, { trait: 'serial_killer', weight: 12 }];
-    const ranked = rankGuideForTaste(buildChannelGuide(airings, NOW), rules);
+    const ranked = rankGuideForTaste(buildChannelGuide(airings, NOW, false), rules);
     // CMT's programme (84) > ID's identity (55+24=79) > ESPN neutral (55).
     expect(ranked.map((r) => r.network)).toEqual(['CMT', 'Investigation Discovery', 'ESPN']);
   });
@@ -112,7 +112,7 @@ describe('the whole blend, end to end', () => {
       airing({ network: 'Syfy', showName: 'Not Your Thing', runtime: 120, match: 31 }),
       airing({ network: 'ESPN', showName: 'SportsCenter', runtime: 60 }),
     ];
-    const ranked = rankGuideForTaste(buildChannelGuide(airings, NOW), []);
+    const ranked = rankGuideForTaste(buildChannelGuide(airings, NOW, false), []);
     expect(ranked.map((r) => r.network)).toEqual(['ESPN', 'Syfy']);
   });
 
@@ -121,7 +121,7 @@ describe('the whole blend, end to end', () => {
       airing({ network: 'B Channel', showName: 'b', runtime: 60 }),
       airing({ network: 'A Channel', showName: 'a', runtime: 60 }),
     ];
-    const ranked = rankGuideForTaste(buildChannelGuide(airings, NOW), []);
+    const ranked = rankGuideForTaste(buildChannelGuide(airings, NOW, false), []);
     expect(ranked.map((r) => r.network)).toEqual(['A Channel', 'B Channel']);
     expect(ranked.every((r) => r.rankScore === NEUTRAL)).toBe(true);
   });

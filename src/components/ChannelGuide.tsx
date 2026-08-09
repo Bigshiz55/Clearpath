@@ -320,6 +320,14 @@ export function ChannelGuide({
                     </span>
                   )}
                 </div>
+                {r.scheduleUnavailable && (
+                  <p
+                    className="mt-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2 py-2 text-[12px] text-slate-500"
+                    data-testid="guide-schedule-unavailable"
+                  >
+                    Schedule currently unavailable
+                  </p>
+                )}
 
                 {r.onNow && (
                   // THE MOST IMPORTANT LINE ON THE CARD. A quiet raised panel

@@ -38,7 +38,7 @@ describe('the on-now broadcast never repeats as a schedule row', () => {
     const onNow = airing({ id: 1, showName: 'Chicago Fire', airstamp: new Date(NOW - 20 * 60_000).toISOString(), runtime: 60 });
     const dupe = airing({ id: 2, showName: 'Chicago Fire', airstamp: new Date(NOW - 20 * 60_000 + 30_000).toISOString(), runtime: 60 });
     const later = airing({ id: 3, showName: 'Inogen Portable Oxygen - No More Tanks!', airstamp: new Date(NOW + 40 * 60_000).toISOString() });
-    const rows = buildChannelGuide([onNow, dupe, later], NOW);
+    const rows = buildChannelGuide([onNow, dupe, later], NOW, false);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.onNow?.showName).toBe('Chicago Fire');
     expect(rows[0]!.upNext.map((a) => a.showName)).toEqual(['Inogen Portable Oxygen - No More Tanks!']);
@@ -47,7 +47,7 @@ describe('the on-now broadcast never repeats as a schedule row', () => {
   it('keeps a genuine back-to-back later episode of the same show', () => {
     const onNow = airing({ id: 1, showName: 'Chicago Fire', airstamp: new Date(NOW - 20 * 60_000).toISOString(), runtime: 60 });
     const next = airing({ id: 2, showName: 'Chicago Fire', airstamp: new Date(NOW + 40 * 60_000).toISOString(), runtime: 60 });
-    const rows = buildChannelGuide([onNow, next], NOW);
+    const rows = buildChannelGuide([onNow, next], NOW, false);
     expect(rows[0]!.upNext.map((a) => a.showName)).toEqual(['Chicago Fire']);
   });
 });

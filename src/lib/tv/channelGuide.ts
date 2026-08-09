@@ -17,6 +17,8 @@
  * Pure. No I/O, no clock — `nowMs` comes in.
  */
 import type { Airing } from '@/lib/onTv';
+import { networkSlug } from '@/lib/viewing/ingest/nationalNetworks';
+import { GUIDE_CHANNEL_LINEUP } from './guideLineup';
 
 export interface ChannelRow {
   network: string;
@@ -26,6 +28,9 @@ export interface ChannelRow {
   progress: number | null;
   /** The next airings after `now`, soonest first. */
   upNext: Airing[];
+  /** A supported channel with NO schedule data in the window — rendered, not
+   *  deleted, as "Schedule currently unavailable". */
+  scheduleUnavailable?: boolean;
 }
 
 /** Up-next entries per channel — enough to plan the evening, not a data dump. */
@@ -58,16 +63,30 @@ export function onNowOf(airings: readonly Airing[], nowMs: number): Airing | nul
 }
 
 /**
- * Build the guide. Channels with something on now lead, then channels with
- * only upcoming listings; alphabetical inside each group. A channel whose
- * every airing has already ended is dropped — a guide row with nothing on it
- * and nothing coming is noise.
+ * Build the guide, LINEUP-FIRST. The channel universe is the canonical supported
+ * lineup (`GUIDE_CHANNEL_LINEUP`), not whichever airings happen to exist — so
+ * every supported channel gets a row, and one with no schedule data in the window
+ * renders "Schedule currently unavailable" rather than vanishing. Airings are
+ * left-joined onto that lineup by network slug; any airing-bearing channel NOT in
+ * the lineup is still included (we never lose real data). Ordering: on-now first,
+ * then upcoming-only, then schedule-unavailable; alphabetical within each group.
+ *
+ * `includeLineup` defaults on; pass false for the legacy "only channels with
+ * airings" behavior (used by the search filter, which shouldn't invent rows).
  */
-export function buildChannelGuide(airings: readonly Airing[], nowMs: number): ChannelRow[] {
+export function buildChannelGuide(
+  airings: readonly Airing[],
+  nowMs: number,
+  includeLineup = true,
+): ChannelRow[] {
+  // Group airings by channel display name (unchanged from the airing primitive),
+  // and record each channel's slug so the lineup join knows what already rendered.
   const byChannel = new Map<string, Airing[]>();
+  const rendered = new Set<string>();
   for (const a of airings) {
     const key = a.network.trim();
     if (!key) continue;
+    rendered.add(networkSlug(key));
     const list = byChannel.get(key);
     if (list) list.push(a);
     else byChannel.set(key, [a]);
@@ -107,10 +126,21 @@ export function buildChannelGuide(airings: readonly Airing[], nowMs: number): Ch
     rows.push({ network, onNow, progress, upNext });
   }
 
+  // LINEUP-FIRST: every supported channel that produced no row above still
+  // renders — as "Schedule currently unavailable", never deleted.
+  if (includeLineup) {
+    for (const ch of GUIDE_CHANNEL_LINEUP) {
+      if (rendered.has(ch.slug)) continue;
+      rows.push({ network: ch.name, onNow: null, progress: null, upNext: [], scheduleUnavailable: true });
+    }
+  }
+
   return rows.sort((a, b) => {
-    const liveA = a.onNow ? 0 : 1;
-    const liveB = b.onNow ? 0 : 1;
-    if (liveA !== liveB) return liveA - liveB;
+    // on-now first, then upcoming-only, then schedule-unavailable last.
+    const rank = (r: ChannelRow) => (r.onNow ? 0 : r.scheduleUnavailable ? 2 : 1);
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
     return a.network.localeCompare(b.network);
   });
 }

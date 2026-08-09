@@ -70,7 +70,7 @@ describe('building the guide', () => {
   ];
 
   it('one row per channel — now first, then what is next', () => {
-    const rows = buildChannelGuide(AIRINGS, NOW);
+    const rows = buildChannelGuide(AIRINGS, NOW, false);
     const hallmark = rows.find((r) => r.network === 'Hallmark')!;
     expect(hallmark.onNow?.showName).toBe('Autumn in the City');
     expect(hallmark.upNext.map((a) => a.showName)).toEqual(['A Second Chance', 'Third Up']);
@@ -78,24 +78,24 @@ describe('building the guide', () => {
   });
 
   it('channels showing something NOW lead, both groups alphabetical', () => {
-    const rows = buildChannelGuide(AIRINGS, NOW);
+    const rows = buildChannelGuide(AIRINGS, NOW, false);
     expect(rows.map((r) => r.network)).toEqual(['Hallmark', 'TCM', 'Lifetime']);
   });
 
   it('progress is a real fraction of the running airing', () => {
-    const rows = buildChannelGuide(AIRINGS, NOW);
+    const rows = buildChannelGuide(AIRINGS, NOW, false);
     const tcm = rows.find((r) => r.network === 'TCM')!;
     // Casablanca started 19:45, runs 90m; at 20:30 that is 45/90.
     expect(tcm.progress).toBeCloseTo(0.5, 2);
   });
 
   it('a channel with nothing on and nothing coming is dropped, not shown empty', () => {
-    const rows = buildChannelGuide(AIRINGS, NOW);
+    const rows = buildChannelGuide(AIRINGS, NOW, false);
     expect(rows.some((r) => r.network === 'Dead Channel')).toBe(false);
   });
 
   it('an empty grid builds an empty guide without throwing', () => {
-    expect(buildChannelGuide([], NOW)).toEqual([]);
+    expect(buildChannelGuide([], NOW, false)).toEqual([]);
   });
 
   it('east and west feeds of the same broadcast are ONE row entry, not two', () => {
@@ -108,6 +108,7 @@ describe('building the guide', () => {
         airing({ network: 'A&E', airstamp: '2026-07-28T21:30:00Z', showName: 'Neighborhood Wars' }),
       ],
       NOW,
+      false,
     );
     const ae = rows.find((r) => r.network === 'A&E')!;
     // The 21:00 dupe collapses; the genuinely different 21:30 showing stays.
@@ -124,6 +125,7 @@ describe('the header sentence', () => {
         airing({ network: 'CNN', airstamp: '2026-07-28T20:00:00Z', runtime: 60 }),
       ],
       NOW,
+      false,
     );
     expect(guideSummary(rows)).toEqual({ channels: 3, onNow: 2, movies: 2 });
   });
@@ -137,6 +139,7 @@ describe('finding a channel in three hundred', () => {
       airing({ network: 'ESPN', airstamp: '2026-07-28T20:00:00Z', runtime: 180, showName: 'Monday Night Football' }),
     ],
     NOW,
+    false,
   );
 
   it('matches by channel name', () => {
@@ -163,6 +166,7 @@ describe('the movie / show toggle', () => {
       airing({ network: 'ESPN', showName: 'SportsCenter', runtime: 120 }),
     ],
     NOW,
+    false,
   );
 
   it('Movies keeps every channel with a movie on now OR up next', () => {
@@ -192,6 +196,7 @@ describe('one-tap channel groups', () => {
       airing({ network: 'Food Network', showName: 'Chopped', runtime: 120 }),
     ],
     NOW,
+    false,
   );
 
   it('a channel is grouped only where its identity is defensible', () => {
