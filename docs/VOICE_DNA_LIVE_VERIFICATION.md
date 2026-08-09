@@ -108,7 +108,15 @@ makes every preview URL publicly reachable.
 
 ---
 
-## 3. Second, still-unverified blocker: migration 0047
+## 3. SUPERSEDED — migration 0047 is applied
+
+**Migration `0047` (`voice_interviews`) has been applied to the WatchVerd1ct
+Supabase project.** It is not remaining work, and it is not an owner action.
+Persistence and resume are now a verification step like any other. The section
+below is kept only because the D0-vs-D1 discriminator it describes is still the
+right way to attribute a persistence failure if one appears.
+
+### Original note (retained for the diagnostic technique)
 
 Not yet reached, so **not yet proven** — recorded here so it is not a surprise
 on the next run.

@@ -3,9 +3,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 /**
  * THE SESSION ROUTE'S CONTRACTS, PINNED.
  *
- *  1. FOUNDER GATE — a non-founder (or unauthenticated) hit gets the hidden 404,
- *     and no OpenAI request is ever attempted.
- *  2. GRACEFUL FALLBACK — with no key / not enabled the route answers 200
+ *  1. IDENTITY GATE — any session may mint a Realtime token, including the
+ *     anonymous guest; an UNAUTHENTICATED hit still gets the hidden 404 and no
+ *     OpenAI request is ever attempted, because a paid session needs someone to
+ *     attribute it to. Founder status is deliberately NOT required any more:
+ *     the interview is a normal product surface.
+ *  2. GRACEFUL FALLBACK — with no key the route answers 200
  *     `{ mode: 'fallback' }`, NOT an error, so the keyless browser-speech path
  *     can take over. An upstream OpenAI failure also degrades to a 200 fallback.
  *  3. NO SECRET LEAK — the realtime response returns only the ephemeral
@@ -40,7 +43,7 @@ afterEach(() => {
   delete process.env[ENABLED];
 });
 
-describe('founder gate', () => {
+describe('identity gate', () => {
   it('unauthenticated → hidden 404, no OpenAI call', async () => {
     h.user = null;
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
@@ -49,15 +52,24 @@ describe('founder gate', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('signed-in non-founder → hidden 404', async () => {
+  it('an ordinary signed-in user is admitted — no founder check', async () => {
     h.user = { id: 'u2', email: 'stranger@example.com' };
     const res = await POST();
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    expect((await res.json()).mode).toBe('fallback'); // no key configured here
+  });
+
+  it('an anonymous guest session is admitted too', async () => {
+    // Middleware mints these for "no account needed to explore"; they have an
+    // id and no email at all.
+    h.user = { id: 'guest-1', email: '' };
+    const res = await POST();
+    expect(res.status).toBe(200);
   });
 });
 
-describe('fallback (no key / disabled)', () => {
-  it('founder + no key → 200 { mode: "fallback" }, no OpenAI call', async () => {
+describe('fallback (no key, or voice switched off)', () => {
+  it('no key → 200 { mode: "fallback" }, no OpenAI call', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const res = await POST();
     expect(res.status).toBe(200);
@@ -65,18 +77,34 @@ describe('fallback (no key / disabled)', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('founder + key present but NOT enabled → fallback', async () => {
+  it('a key alone now means realtime — no second opt-in', async () => {
     process.env[KEY] = 'sk-secret';
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ client_secret: { value: 'ephem-1' } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    const res = await POST();
+    expect(res.status).toBe(200);
+    expect((await res.json()).mode).toBe('realtime');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('an explicit VOICE_INTERVIEW_ENABLED=0 still switches voice off', async () => {
+    process.env[KEY] = 'sk-secret';
+    process.env[ENABLED] = '0';
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const res = await POST();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ mode: 'fallback' });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 
-describe('realtime (key + enabled)', () => {
+describe('realtime (key present)', () => {
   beforeEach(() => {
     process.env[KEY] = 'sk-super-secret';
-    process.env[ENABLED] = '1';
   });
 
   it('mints an ephemeral secret and never leaks the server key', async () => {

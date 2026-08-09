@@ -8,7 +8,11 @@ import { INTERVIEWER_SYSTEM_PROMPT, REALTIME_TOOLS } from '@/lib/voice/interview
  * VOICE INTERVIEW — mint an OpenAI Realtime EPHEMERAL session token for the
  * browser WebRTC client.
  *
- * FOUNDER-ONLY: anyone else gets the same hidden 404 the founder pages return.
+ * ANY SIGNED-IN SESSION, including the anonymous guest middleware mints: the
+ * interview is a normal product surface on the Taste Quiz's session model. It
+ * is still not open to the unauthenticated — minting a paid Realtime session
+ * needs someone to attribute it to, so a request with no session gets the same
+ * hidden 404 it always did.
  *
  * GRACEFUL BY DESIGN: this endpoint NEVER dead-ends the UI with a 5xx. When the
  * feature is not in realtime mode (no key / not enabled) it answers 200 with
@@ -26,14 +30,14 @@ export const maxDuration = 30;
 const NO_STORE = { 'cache-control': 'no-store' } as const;
 
 export async function POST() {
-  // Founder gate — identical hidden 404 to the founder pages.
+  // Identity gate — a session is required, founder status is not.
   let authorized = false;
   try {
     const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (user && isFounderOrAdminEmail(user.email)) authorized = true;
+    if (user) authorized = true;
   } catch {
     // treat as unauthenticated
   }

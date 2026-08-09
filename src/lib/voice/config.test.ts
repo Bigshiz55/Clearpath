@@ -9,10 +9,12 @@ import {
 } from './config';
 
 /**
- * The gating contract, pinned: the Realtime path turns on ONLY when a key is
- * present AND the feature is explicitly enabled. Every other combination — no
- * key, disabled, both missing — degrades to the keyless fallback and never
- * throws. Model/voice are env-overridable with sane defaults.
+ * The gating contract, pinned: THE KEY IS THE SWITCH. A configured
+ * `OPENAI_API_KEY` means Realtime; no key means the keyless fallback.
+ * `VOICE_INTERVIEW_ENABLED` is now an explicit OFF switch only — it was
+ * previously a required second opt-in, which produced deployments that had
+ * every ingredient for real speech and silently served the degraded path.
+ * Nothing here ever throws: an absent key is a normal state, not an error.
  */
 
 const KEY = 'OPENAI_API_KEY';
@@ -29,40 +31,49 @@ function reset() {
 
 afterEach(reset);
 
-describe('voiceInterviewMode — the double gate', () => {
-  it('key present AND enabled → realtime', () => {
+describe('voiceInterviewMode — the key is the switch', () => {
+  it('a key alone is enough: no second opt-in required', () => {
+    process.env[KEY] = 'sk-test';
+    delete process.env[ENABLED];
+    expect(voiceInterviewMode()).toBe('realtime');
+  });
+
+  it('an explicit enable is still honoured', () => {
     process.env[KEY] = 'sk-test';
     process.env[ENABLED] = '1';
     expect(voiceInterviewMode()).toBe('realtime');
   });
 
-  it('key present but NOT enabled → fallback', () => {
-    process.env[KEY] = 'sk-test';
-    delete process.env[ENABLED];
-    expect(voiceInterviewMode()).toBe('fallback');
-  });
-
-  it('enabled but NO key → fallback', () => {
+  it('NO key → fallback, whatever the flag says', () => {
     delete process.env[KEY];
-    process.env[ENABLED] = '1';
-    expect(voiceInterviewMode()).toBe('fallback');
+    for (const v of ['1', 'true', '', '0']) {
+      process.env[ENABLED] = v;
+      expect(voiceInterviewMode()).toBe('fallback');
+    }
   });
 
-  it('neither → fallback, and never throws', () => {
+  it('nothing configured → fallback, and never throws', () => {
     reset();
     expect(() => voiceInterviewMode()).not.toThrow();
     expect(voiceInterviewMode()).toBe('fallback');
   });
 
-  it('ENABLED must be exactly "1" — "true"/"yes"/"0" do not enable', () => {
+  it('the flag can still switch voice OFF without pulling the shared key', () => {
     process.env[KEY] = 'sk-test';
-    for (const v of ['true', 'yes', '0', 'on', '']) {
+    for (const v of ['0', 'false', 'off', 'no', 'FALSE', 'Off']) {
       process.env[ENABLED] = v;
-      expect(voiceInterviewEnabled()).toBe(false);
+      expect(voiceInterviewEnabled(), `"${v}" should disable`).toBe(false);
       expect(voiceInterviewMode()).toBe('fallback');
     }
-    process.env[ENABLED] = '1';
-    expect(voiceInterviewEnabled()).toBe(true);
+  });
+
+  it('treats every other value — including blank — as ON', () => {
+    process.env[KEY] = 'sk-test';
+    for (const v of ['', '   ', '1', 'true', 'yes', 'on']) {
+      process.env[ENABLED] = v;
+      expect(voiceInterviewEnabled(), `"${v}" should not disable`).toBe(true);
+      expect(voiceInterviewMode()).toBe('realtime');
+    }
   });
 });
 

@@ -10,10 +10,17 @@ import { serverEnv } from '@/lib/env';
  * designed to degrade to a keyless browser-speech fallback, and this module is
  * the one place that decides which mode we are in.
  *
- * The feature is deliberately double-gated: it needs BOTH an OpenAI key AND an
- * explicit `VOICE_INTERVIEW_ENABLED=1` opt-in before the Realtime path turns
- * on, so an incidental key on the platform can never silently start spending on
- * live voice sessions.
+ * THE KEY IS THE SWITCH. This used to demand BOTH a key and an explicit
+ * `VOICE_INTERVIEW_ENABLED=1`, on the theory that an incidental platform key
+ * should not start spending on live voice. Under the current architecture the
+ * spoken interview IS the product, so requiring a second opt-in only produced a
+ * deployment that had every ingredient for real speech and silently served the
+ * degraded browser-speech path instead. A configured `OPENAI_API_KEY` now means
+ * Realtime, full stop.
+ *
+ * `VOICE_INTERVIEW_ENABLED` survives ONLY as an explicit OFF switch (`0` /
+ * `false` / `off`), so voice can still be killed on a deployment without pulling
+ * the key that the rest of the app shares.
  */
 
 /** A sensible current Realtime model; overridable via VOICE_INTERVIEW_MODEL. */
@@ -27,9 +34,14 @@ export function openAiKey(): string | undefined {
   return serverEnv.openaiKey();
 }
 
-/** True only when the owner has explicitly opted the feature in. */
+/**
+ * True unless the owner has explicitly switched voice OFF. Absent means ON —
+ * the key alone decides whether Realtime is possible.
+ */
 export function voiceInterviewEnabled(): boolean {
-  return (process.env.VOICE_INTERVIEW_ENABLED ?? '').trim() === '1';
+  const raw = (process.env.VOICE_INTERVIEW_ENABLED ?? '').trim().toLowerCase();
+  if (raw === '') return true;
+  return !(raw === '0' || raw === 'false' || raw === 'off' || raw === 'no');
 }
 
 /** The Realtime model id, env-overridable, with a safe default. */
@@ -48,12 +60,12 @@ export type VoiceInterviewMode = 'realtime' | 'fallback';
 
 /**
  * The mode the whole feature runs in this request:
- *   'realtime' — a key is present AND the feature is enabled → mint an OpenAI
- *                Realtime ephemeral session for the browser WebRTC client.
- *   'fallback' — anything else (no key, disabled) → the keyless browser-speech
+ *   'realtime' — a key is present and voice has not been switched off → mint an
+ *                OpenAI Realtime ephemeral session for the browser WebRTC client.
+ *   'fallback' — no key, or explicitly disabled → the keyless browser-speech
  *                path. NEVER throws; absence of a key is a normal state, not an
  *                error.
  */
 export function voiceInterviewMode(): VoiceInterviewMode {
-  return voiceInterviewEnabled() && openAiKey() ? 'realtime' : 'fallback';
+  return openAiKey() && voiceInterviewEnabled() ? 'realtime' : 'fallback';
 }

@@ -136,15 +136,35 @@ inverts the user's taste. When two or more labels are named, labels win over
 order. `se7en` is not read as a 7. Out-of-scale numbers clamp. A short answer
 reports which items are missing rather than inventing values.
 
+## Access model
+
+`/voice-dna` is a **normal product surface**, not a founder tool. It uses the
+same session model as the Taste Quiz: signed in, or the anonymous guest that
+middleware mints because `/voice-dna` is in `PROTECTED_PREFIXES` ("no account
+needed to explore"). A session is still required — the interview's answers have
+to be saved against someone — but founder status is not.
+
+Founder gating survives in exactly one place: `/voice-dna/audition`, the
+diagnostic that compares vendor voices.
+
+## Turning voice on
+
+**The key is the switch.** A configured `OPENAI_API_KEY` means Realtime; no key
+means the keyless browser-speech fallback. There is no second opt-in — requiring
+one only produced deployments that had every ingredient for real speech and
+silently served the degraded path. `VOICE_INTERVIEW_ENABLED` survives only as an
+explicit OFF switch (`0`/`false`/`off`), so voice can be killed on a deployment
+without pulling the key the rest of the app shares.
+
 ## What still needs live deployment
 
-Nothing above does. These do:
+Nothing above does. These four do:
 
-1. Real speech in and out (OpenAI Realtime, or the browser Web Speech fallback) —
-   needs a deployed origin and, for Realtime, `OPENAI_API_KEY` +
-   `VOICE_INTERVIEW_ENABLED=1`.
-2. Persistence and resume against real Postgres — needs migration `0047`
-   (`voice_interviews`) applied.
-3. Writing into real `preference_events` for a real signed-in user.
-4. The founder gate against real Supabase auth.
-5. Browser behaviour: mic permission, barge-in, no-dead-air timing.
+1. **Real speech in and out** — OpenAI Realtime over WebRTC, or the browser Web
+   Speech fallback. Needs a deployed origin.
+2. **Real persistence and `preference_events`** against a normal WatchVerd1ct
+   session. Migration `0047` (`voice_interviews`) is **already applied** to the
+   project, so this is a verification step, not a migration step.
+3. **Hands-free behaviour in a browser** — microphone permission, auto-advance
+   between questions, barge-in, and no-dead-air timing.
+4. **Voice-quality audition** — picking the interviewer voice on real audio.

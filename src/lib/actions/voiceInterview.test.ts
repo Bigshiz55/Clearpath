@@ -66,18 +66,32 @@ afterEach(() => {
   delete process.env.ADMIN_EMAILS;
 });
 
-describe('founder gate', () => {
-  it('a non-founder is rejected before any work', async () => {
+describe('identity gate', () => {
+  it('an ordinary signed-in user is admitted — the interview is not founder-only', async () => {
     h.user = { id: 'u2', email: 'stranger@example.com' };
     const res = await recordInterviewTurn({ interviewId: h.state!.id, signals: [] });
+    expect(res.ok).toBe(true);
+    expect(h.getInterview).toHaveBeenCalled();
+  });
+
+  it('an anonymous guest session is admitted (no email at all)', async () => {
+    h.user = { id: 'guest-1', email: '' };
+    const res = await startOrResumeInterview();
+    expect(res.ok).toBe(true);
+  });
+
+  it('unauthenticated is still rejected — writes need an owner', async () => {
+    h.user = null;
+    const res = await startOrResumeInterview();
     expect(res.ok).toBe(false);
     expect(h.getInterview).not.toHaveBeenCalled();
   });
 
-  it('unauthenticated is rejected', async () => {
-    h.user = null;
-    const res = await startOrResumeInterview();
-    expect(res.ok).toBe(false);
+  it('every read is scoped to the caller, so one user cannot reach another', async () => {
+    h.user = { id: 'u2', email: 'stranger@example.com' };
+    await recordInterviewTurn({ interviewId: h.state!.id, signals: [] });
+    // The store is always asked for THIS user's row, never a bare id lookup.
+    expect(h.getInterview).toHaveBeenCalledWith(expect.anything(), 'u2', h.state!.id);
   });
 });
 

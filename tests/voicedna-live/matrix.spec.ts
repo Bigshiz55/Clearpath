@@ -208,18 +208,35 @@ test('A0 the app answers, not the platform (no Deployment Protection wall)', asy
   ).toBe(true);
 });
 
-test('A1 anonymous /voice-dna is a hidden 404', async ({ page }) => {
+/**
+ * A1 changed with the product: /voice-dna is no longer founder-gated. It is a
+ * normal surface on the Taste Quiz's session model, so a first-time visitor
+ * must be able to START — either straight into the interview on the guest
+ * session middleware mints, or via login if anonymous sign-ins are switched off
+ * on the Supabase project. What it must NEVER be again is a hidden 404, which
+ * is what a stranger used to get.
+ */
+test('A1 anonymous /voice-dna admits a newcomer (guest session or login)', async ({ page }) => {
   const resp = await page.goto('/voice-dna');
   const status = resp?.status();
   const finalUrl = resp?.url() ?? '(none)';
-  const snippet = (await resp?.text().catch(() => ''))?.slice(0, 200) ?? '';
+  expect(status, `anonymous visitor got ${status} at ${finalUrl}`).toBe(200);
+
+  const onInterview = await page.getByTestId('voice-idle').isVisible().catch(() => false);
+  const onLogin = /\/login/.test(finalUrl);
   expect(
-    status,
-    `expected a hidden 404 for an anonymous visitor. Got ${status} at ${finalUrl}. Body starts: ${snippet}`,
-  ).toBe(404);
+    onInterview || onLogin,
+    `expected the interview (guest session) or the login page, but landed at ${finalUrl}`,
+  ).toBe(true);
+  test.info().annotations.push({
+    type: 'newcomer-path',
+    description: onInterview ? 'guest session → interview' : 'redirected to login',
+  });
 });
 
-test('A2 anonymous /voice-dna/audition is a hidden 404', async ({ page }) => {
+test('A2 anonymous /voice-dna/audition is still a hidden 404 (founder diagnostic)', async ({ page }) => {
+  // Founder gating survives here and only here: the audition compares vendor
+  // voices and is not a product surface.
   const resp = await page.goto('/voice-dna/audition');
   expect(resp?.status()).toBe(404);
 });

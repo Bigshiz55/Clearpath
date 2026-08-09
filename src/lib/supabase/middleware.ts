@@ -15,7 +15,13 @@ import { publicEnv } from '@/lib/env';
 // it need no session at all. Only the final apply does, and ImportTasteFlow
 // already handles exactly that case itself with a real `import-signin-required`
 // state that keeps the parsed rows and offers a way forward.
-const PROTECTED_PREFIXES = ['/app', '/lite'];
+//
+// `/voice-dna` is here because the spoken interview is a NORMAL product surface,
+// exactly like the Taste Quiz: it needs a session to write preferences against,
+// and "no account needed to explore" means that session may be an anonymous
+// guest. Listing it here is what mints one. (Its `/audition` child is founder-
+// only, but that gate lives on the page — it still wants a session first.)
+const PROTECTED_PREFIXES = ['/app', '/lite', '/voice-dna'];
 
 /**
  * Refreshes the Supabase session cookie on every request and guards protected

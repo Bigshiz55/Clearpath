@@ -121,7 +121,15 @@ type Gate =
   | { ok: true; supabase: SupabaseClient; userId: string }
   | { ok: false; error: string };
 
-/** Auth + founder gate, run at the top of every action. Never throws. */
+/**
+ * Auth gate, run at the top of every action. Never throws.
+ *
+ * IDENTITY ONLY — no founder check. The interview is a normal product surface
+ * now, on the same session model as the Taste Quiz, so any session qualifies
+ * including the anonymous guest middleware mints. What a session still buys is
+ * ISOLATION: every read and write below is scoped to this `userId`, on top of
+ * RLS, so one person's interview can never reach another's.
+ */
 async function gate(): Promise<Gate> {
   try {
     const supabase = createClient();
@@ -129,7 +137,6 @@ async function gate(): Promise<Gate> {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return { ok: false, error: 'You need to be signed in.' };
-    if (!isFounderOrAdminEmail(user.email)) return { ok: false, error: 'This feature is not available yet.' };
     return { ok: true, supabase, userId: user.id };
   } catch {
     return { ok: false, error: 'Could not verify your session.' };

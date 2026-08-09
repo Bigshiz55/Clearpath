@@ -75,15 +75,26 @@ describe('the interview is gone', () => {
     }
   });
 
-  it('TEST 6: the /voice-dna route is now the rebuilt founder-gated interview, not a redirect', () => {
-    // Phase 3 deliberately un-retired this route. It no longer redirects to the
-    // DNA hub; it verifies identity server-side and renders the interview, or
-    // returns the hidden 404 for anyone who is not a founder/admin.
+  it('TEST 6: /voice-dna is the rebuilt interview on the NORMAL session model, not a redirect', () => {
+    // Deliberately un-retired, and no longer founder-gated: the spoken
+    // interview is a normal product surface on the Taste Quiz's session model
+    // (signed in, or the anonymous guest middleware mints). It still verifies
+    // identity server-side, because its answers have to be saved against
+    // someone. Founder gating survives only on the audition diagnostic.
     const page = read('src/app/voice-dna/page.tsx');
     expect(page).not.toContain("redirect('/app/dna");
-    expect(page).toContain('isFounderOrAdminEmail');
-    expect(page).toContain('notFound()');
+    expect(page).not.toContain('isFounderOrAdminEmail');
+    expect(page).toContain('auth.getUser()');
     expect(page).toContain('VoiceInterview');
+
+    // The audition tool next door stays founder-only.
+    const audition = read('src/app/voice-dna/audition/page.tsx');
+    expect(audition).toContain('isFounderOrAdminEmail');
+    expect(audition).toContain('notFound()');
+
+    // And the route is in the protected prefixes, which is what mints the
+    // guest session — without that a first-time visitor has nowhere to save to.
+    expect(read('src/lib/supabase/middleware.ts')).toContain("'/voice-dna'");
   });
 
   it('TEST 7+8: no entry point remains in navigation or the DNA hub', () => {
