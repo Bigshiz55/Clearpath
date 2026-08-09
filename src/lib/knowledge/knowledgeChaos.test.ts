@@ -85,7 +85,7 @@ function evidenceFor(s: (typeof SUBJECTS)[number], truth: Truth, rnd: () => numb
   if (truth === 'central') {
     // Either a title hit or a sustained multi-sentence overview.
     if (rnd() < 0.5) {
-      return { title: `The ${w[0].toUpperCase()}${w.slice(1)}`, overview: `${filler} The ${w} runs through the whole film.`, genres: ['Drama'], keywords: [w] };
+      return { title: `The ${w.charAt(0).toUpperCase()}${w.slice(1)}`, overview: `${filler} The ${w} runs through the whole film.`, genres: ['Drama'], keywords: [w] };
     }
     return { title: 'Untitled Drama', overview: `A ${w} obsessive pursues greatness. The ${w} defines every choice they make.`, genres: ['Drama'], keywords: [w] };
   }
@@ -101,11 +101,11 @@ async function runSeed(seed: number, cases: number) {
   const rnd = mulberry32(seed);
   const failures: Array<{ seed: number; i: number; subject: string; truth: Truth; got: string; kind: string }> = [];
   for (let i = 0; i < cases; i++) {
-    const s = SUBJECTS[Math.floor(rnd() * SUBJECTS.length)];
-    const truth: Truth = (['central', 'incidental', 'absent'] as Truth[])[Math.floor(rnd() * 3)];
+    const s = SUBJECTS[Math.floor(rnd() * SUBJECTS.length)]!;
+    const truth: Truth = (['central', 'incidental', 'absent'] as Truth[])[Math.floor(rnd() * 3)]!;
     const ev = evidenceFor(s, truth, rnd);
     const out = await compileTitle(ev, [requirement(s)]);
-    const fact = out.facts[0];
+    const fact = out.facts[0]!;
 
     // INDEPENDENT ORACLE — invariants that must hold for every subject.
     if (truth === 'absent' && (fact.centrality === 'CENTRAL' || fact.centrality === 'MATERIAL')) {

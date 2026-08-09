@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { recordEvents } from '@/lib/preference/store';
+import { persistDnaSnapshot } from '@/lib/preference/snapshotStore';
 import {
   advance,
   planDirective,
@@ -213,6 +214,8 @@ export async function completeInterview(input: {
     const drafts = signalsToPreferenceEvents(state.signals);
     if (drafts.length > 0) {
       await recordEvents(g.supabase, g.userId, drafts);
+      // Append a derived-state snapshot (temporal taste memory) — best-effort.
+      void persistDnaSnapshot(g.supabase, g.userId).catch(() => {});
     }
 
     if (state.status !== 'complete') {

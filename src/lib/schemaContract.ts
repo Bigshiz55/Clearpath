@@ -152,6 +152,8 @@ export const SCHEMA_CONTRACT: SchemaRequirement[] = [
   { object: 'watchmode_title_map', migration: '0041_watchmode_availability' },
   { object: 'title_knowledge', migration: '0048_title_knowledge' },
   { object: 'title_subject_facts', migration: '0048_title_knowledge' },
+  { object: 'trait_confidence', migration: '0023_preference_dna' },
+  { object: 'dna_strength_history', migration: '0023_preference_dna' },
 ];
 
 /**

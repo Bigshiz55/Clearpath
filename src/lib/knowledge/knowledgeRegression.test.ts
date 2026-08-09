@@ -15,8 +15,8 @@ const ev = (o: Partial<CandidateEvidence>): CandidateEvidence => ({ title: '', o
 describe('§12 regression — subject centrality across domains', () => {
   it('boxing: a central boxing film compiles CENTRAL; an incidental one does not', async () => {
     const boxing = req('boxing', 'boxing', ['boxing', 'boxer', 'prizefight', 'ring']);
-    const central = (await compileTitle(ev({ title: 'Raging Bull', overview: 'A self-destructive boxer batters his way to the championship. His boxing consumes his family and his mind.', keywords: ['boxing'] }), [boxing])).facts[0];
-    const incidental = (await compileTitle(ev({ title: 'Snake Eyes', overview: 'A crooked cop witnesses an assassination at a boxing match and unravels a conspiracy.', genres: ['Thriller'], keywords: ['boxing', 'conspiracy'] }), [boxing])).facts[0];
+    const central = (await compileTitle(ev({ title: 'Raging Bull', overview: 'A self-destructive boxer batters his way to the championship. His boxing consumes his family and his mind.', keywords: ['boxing'] }), [boxing])).facts[0]!;
+    const incidental = (await compileTitle(ev({ title: 'Snake Eyes', overview: 'A crooked cop witnesses an assassination at a boxing match and unravels a conspiracy.', genres: ['Thriller'], keywords: ['boxing', 'conspiracy'] }), [boxing])).facts[0]!;
     expect(central.centrality).toBe('CENTRAL');
     expect(incidental.centrality).not.toBe('CENTRAL');
   });
@@ -40,14 +40,15 @@ describe('§12 regression — subject centrality across domains', () => {
       [req('courtroom', 'courtroom', ['courtroom', 'trial', 'verdict', 'testimony']), ev({ title: 'A Few Good Men', overview: 'Military lawyers build a courtroom defense. The trial and its testimony drive the whole film.', keywords: ['courtroom', 'trial'] }), 'CENTRAL'],
     ];
     for (const [r, evidence, expected] of cases) {
-      const fact = (await compileTitle(evidence, [r])).facts[0];
+      const fact = (await compileTitle(evidence, [r])).facts[0]!;
       if (expected === 'CENTRAL') expect(fact.centrality, r.canonical).toBe('CENTRAL');
       else expect(fact.centrality, r.canonical).not.toBe('CENTRAL');
     }
   });
 
   it('keyword presence NEVER equals centrality (RULE 1) — holds for any subject', async () => {
-    for (const [canonical, word] of [['ballet', 'ballet'], ['poker', 'poker'], ['sailing', 'sailing']]) {
+    const subjects: Array<[string, string]> = [['ballet', 'ballet'], ['poker', 'poker'], ['sailing', 'sailing']];
+    for (const [canonical, word] of subjects) {
       const r = req(canonical, word, [word]);
       // A bare tag with a light single mention, no title hit, no sustained overview.
       const fact = (await compileSubjectFact(r, ev({ title: 'Unrelated', overview: `The story briefly references ${word} once.`, keywords: [word] }))).fact;

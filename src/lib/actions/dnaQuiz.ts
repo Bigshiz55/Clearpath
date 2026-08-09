@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { recordEvents, undoEvent } from '@/lib/preference/store';
+import { persistDnaSnapshot } from '@/lib/preference/snapshotStore';
 import { getCachedDimensions } from '@/lib/titleDimensions';
 import { quizAnswerToEvent, legacyRatingFor, savesToWatchlist, type QuizAnswer } from '@/lib/preference/quizMap';
 import { rateQuizTitle } from '@/lib/actions/quiz';
@@ -67,6 +68,11 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
 
   // 1) The real engine (idempotent on eventId → duplicate taps write once).
   await recordEvents(supabase, user.id, [quizAnswerToEvent(answer)], { sessionId: a.sessionId });
+
+  // 1b) Append a derived-state snapshot (temporal taste memory) — best-effort,
+  //     off the search path, history appended not overwritten. Never a no-op
+  //     source of truth: the event log stays authoritative and re-derivable.
+  void persistDnaSnapshot(supabase, user.id, undefined, a.sessionId).catch(() => {});
 
   // 2) "Watchlist" saves the title (status: possible = wants to watch). Only the
   //    Watchlist intent writes here — "Looks good" is a taste signal only.
