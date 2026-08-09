@@ -1111,6 +1111,32 @@ body {
     display: none;
   }
 }
+/* …AND UNDER 200px, SAVE TAKES ITS OWN LINE.
+   Three buttons in a two-across phone tile is 145px of control in a 157px row
+   at 390. They all FIT — `.wv-act` guarantees that — but fitting is not the
+   bar: at that width AGAINST ends up with 1–3px either side of it, which reads
+   as a word jammed against its own border, and `on-tv-highlights.spec` holds
+   the standard at 4px from 390 up.
+
+   There is no way to buy those pixels on one line. The label already gives up
+   a point and some tracking below 414; another point is 9px type, and the
+   44px tap floor is not negotiable. So the row does what it was built to do
+   when three genuinely do not fit — it wraps — and the pair that has to be
+   read together stays together. FOR and AGAINST split the full row (75px each
+   against a 51px word), and SAVE becomes a full-width target underneath.
+
+   This is already what 320 did on its own, where the arithmetic forced it.
+   Making it the rule to 200px means every phone tile has the SAME decision
+   row instead of a layout that silently flips somewhere around 360. */
+@container (max-width: 200px) {
+  /* Scoped to `.wv-act` on purpose. The FOR/AGAINST pair is wrapped in a
+     `display: contents` node, so the only DIRECT `.wv-act` child of the row is
+     the Save button — and a surface that passes some other custom overlay is
+     left exactly as it was rather than being stretched across the row. */
+  .wv-act-row > .wv-act:last-child {
+    flex-basis: 100%;
+  }
+}
 /* SCORE · CALL · RATINGS ON ONE LINE, WHEN THE PANEL CAN HOLD ONE.
    The badge and the call need ~150px and the three rating chips ~140px, so
    below ~310px of panel the ratings take their own row instead of being
