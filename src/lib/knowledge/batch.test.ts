@@ -29,6 +29,25 @@ describe('knowledge batch compiler', () => {
     const b = await compileTitle(ev, [boxing]);
     expect(a.facts[0]).toEqual(b.facts[0]);
   });
+
+  it('compiles evidence-backed tone/setting into the header (real data, not empty)', async () => {
+    const ev: CandidateEvidence = {
+      title: 'The Verdict',
+      overview: 'A gritty courtroom drama: a washed-up lawyer takes one last case to trial.',
+      genres: ['Drama'],
+      keywords: ['trial', 'attorney'],
+    };
+    const out = await compileTitle(ev, [boxing]);
+    expect(out.header.setting).toContain('courtroom'); // "courtroom"/"trial"/"attorney"
+    expect(out.header.tone.length + out.header.setting.length).toBeGreaterThan(0);
+  });
+
+  it('leaves tone/setting empty when no cue is present (no fabrication)', async () => {
+    const ev: CandidateEvidence = { title: 'Untitled', overview: 'A story.', genres: [], keywords: [] };
+    const out = await compileTitle(ev, [boxing]);
+    expect(out.header.tone).toEqual([]);
+    expect(out.header.setting).toEqual([]);
+  });
 });
 
 describe('observability trace (§13)', () => {

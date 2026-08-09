@@ -4,6 +4,7 @@ import {
   type Adjudication,
   type CompiledSubjectFact,
 } from './compile';
+import { deriveHeaderTraits } from './headerTraits';
 import {
   evaluateSubjectCentrality,
   type SubjectRequirement,
@@ -31,6 +32,10 @@ export interface CompiledTitle {
   facts: CompiledSubjectFact[];
   header: {
     status: 'compiled' | 'insufficient';
+    /** Evidence-backed tone concepts (from the title's own evidence). */
+    tone: string[];
+    /** Evidence-backed setting concepts (from the title's own evidence). */
+    setting: string[];
     /** Subjects the title is provably NOT about (ABSENT with real evidence). */
     antiEvidence: Array<{ subject: string; reason: string }>;
     evidenceSources: string[];
@@ -59,6 +64,9 @@ export async function compileTitle(
     }
   }
 
+  // Evidence-backed tone/setting for the header (deterministic, no fabrication).
+  const traits = deriveHeaderTraits(ev);
+
   // A title with no corroborating evidence for ANY requested subject is recorded
   // as 'insufficient' rather than dressed up as understood.
   const anyReal = facts.some((f) => f.centrality === 'CENTRAL' || f.centrality === 'MATERIAL');
@@ -66,6 +74,8 @@ export async function compileTitle(
     facts,
     header: {
       status: anyReal ? 'compiled' : 'insufficient',
+      tone: traits.tone,
+      setting: traits.setting,
       antiEvidence,
       evidenceSources: Array.from(allSources),
     },

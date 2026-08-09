@@ -167,6 +167,41 @@ export async function readTitleKnowledge(
   return out;
 }
 
+/**
+ * Batched best-effort upsert of ALL of a title's compiled subject facts in ONE
+ * round trip (instead of one per fact). Never throws.
+ */
+export async function writeSubjectFacts(
+  tmdbId: number,
+  mediaType: MediaType,
+  facts: CompiledSubjectFact[],
+): Promise<void> {
+  if (!Number.isFinite(tmdbId) || facts.length === 0) return;
+  try {
+    const admin = createAdminClient();
+    const now = new Date().toISOString();
+    const rows = facts
+      .filter((f) => f?.subject)
+      .map((f) => ({
+        tmdb_id: tmdbId,
+        media_type: mediaType,
+        subject: f.subject,
+        centrality: f.centrality,
+        confidence: f.confidence,
+        source_count: f.sourceCount,
+        disputed: f.disputed,
+        decided_by: f.decidedBy,
+        evidence: f.evidence,
+        compiler_version: f.compilerVersion,
+        compiled_at: now,
+      }));
+    if (rows.length === 0) return;
+    await admin.from('title_subject_facts').upsert(rows, { onConflict: 'tmdb_id,media_type,subject' });
+  } catch {
+    /* safe-absent */
+  }
+}
+
 /** Header upsert (tone/setting/anti-evidence/provenance) for a compiled title. */
 export async function writeTitleKnowledge(
   tmdbId: number,

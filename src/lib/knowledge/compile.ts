@@ -39,7 +39,7 @@ import {
  * (recompiled) rather than trusted forever. Include the evaluator's own version
  * so a change there also invalidates compiled facts.
  */
-export const COMPILER_VERSION = 'kl-v1';
+export const COMPILER_VERSION = 'kl-v2';
 
 /** The durable centrality classes. Adds ABSENT/UNKNOWN to the finder's scale so
  *  "we looked and it is provably not about this" and "we cannot tell" are

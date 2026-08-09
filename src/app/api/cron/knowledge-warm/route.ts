@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { serverEnv } from '@/lib/env';
 import { getPopular, getTitle } from '@/lib/tmdb/client';
-import { runKnowledgeWarmJob } from '@/lib/knowledge/warmStore';
+import { runKnowledgeWarmJob, DEFAULT_WARM_DEADLINE_MS } from '@/lib/knowledge/warmStore';
+import { readTitleKnowledgeVersions } from '@/lib/knowledge/store';
+import { COMPILER_VERSION } from '@/lib/knowledge/compile';
 import type { WarmCandidate } from '@/lib/knowledge/warm';
 import type { MediaType } from '@/lib/types';
 
@@ -49,12 +51,24 @@ export async function GET(request: Request) {
         const k = `${d.mediaType}-${d.id}`;
         return seen.has(k) ? false : (seen.add(k), true);
       })
-      .slice(0, MAX_PER_RUN * 3); // hydrate a modest pool; the job caps compiles
+      .slice(0, MAX_PER_RUN * 3); // a modest pool; planning + the job cap compiles
+
+    // PLAN BEFORE HYDRATE. Read the stored compiler_version for the whole head
+    // pool in one round trip and drop titles already at COMPILER_VERSION, so the
+    // time budget is spent hydrating (getTitle round trips) only titles that
+    // actually need (re)compiling — not re-fetching already-warm titles every
+    // run. Cap the stale set at MAX_PER_RUN; the rest wait for the next tick.
+    const versions = await readTitleKnowledgeVersions(
+      heads.map((h) => ({ tmdbId: h.id, mediaType: h.mediaType as MediaType })),
+    );
+    const stale = heads
+      .filter((h) => versions.get(`${h.mediaType}-${h.id}`) !== COMPILER_VERSION)
+      .slice(0, MAX_PER_RUN);
 
     // Hydrate evidence (title/overview/genres/keywords) — the same shape the
-    // finder builds for eligibility.
+    // finder builds for eligibility — for the stale set only.
     const candidates: WarmCandidate[] = [];
-    for (const h of heads) {
+    for (const h of stale) {
       try {
         const meta = await getTitle(h.mediaType as MediaType, h.id, region);
         candidates.push({
@@ -67,7 +81,12 @@ export async function GET(request: Request) {
       }
     }
 
-    const report = await runKnowledgeWarmJob(candidates, { maxPerRun: MAX_PER_RUN });
+    // Pass the internal deadline so the job stops gracefully before Vercel's 60s
+    // FUNCTION_INVOCATION_TIMEOUT; remaining stale titles warm on the next tick.
+    const report = await runKnowledgeWarmJob(candidates, {
+      maxPerRun: MAX_PER_RUN,
+      deadlineMs: DEFAULT_WARM_DEADLINE_MS,
+    });
     return NextResponse.json({ ok: true, ...report });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Warm failed.' }, { status: 500 });
