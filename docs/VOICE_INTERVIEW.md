@@ -1,13 +1,45 @@
 # Voice DNA Interview — operations
 
-The Verd1ct Voice DNA Interview is a spoken, adaptive taste interview. A warm
-"interviewer" talks with the user, and everything it learns is folded into the
-**same** append-only `preference_events` log the Watch DNA quiz writes — there is
-exactly one model of the user.
+The Verd1ct Voice DNA Interview is a spoken taste interview on a deliberate,
+scripted spine. A warm "interviewer" talks with the user, and everything it
+learns is folded into the **same** append-only `preference_events` log the Watch
+DNA quiz writes — there is exactly one model of the user.
 
-It is **founder-gated** for now and **works without any key** by degrading to a
-keyless browser-speech fallback. Turning on the full OpenAI Realtime voice is a
+It is **public** (open to everyone) and **works without any key** by degrading to
+a keyless browser-speech fallback. Turning on the full OpenAI Realtime voice is a
 deliberate, double-gated owner action.
+
+## The scripted flow (Stage 1 → drill-down → prefs → anchors)
+
+The interview walks a fixed shape (`src/lib/voice/interview/stages.ts`,
+`planDirective`), while the pure engine still folds every answer into confidence
+and the DNA:
+
+1. **Genre triage** — rapid-fire grouped genre triples ("horror, comedy, or
+   crime?"). Four quick triples map the broad landscape in under a minute.
+2. **Adaptive drill-down** — reads what lit the user up in triage and digs into
+   that corner (crime → heists vs. detectives vs. serial-killers).
+3. **Viewing preferences** — pacing, tone, violence tolerance, subtitles.
+4. **Title anchors** — one they loved, one they couldn't finish.
+
+A live contradiction still preempts the script (the engine reconciles it), and
+the hard turn cap still guarantees termination.
+
+## Turn architecture (deterministic, race-free)
+
+The **app authors every line**; the Realtime model is only the voice. The session
+is minted with `turn_detection: { type: 'server_vad', create_response: false,
+interrupt_response: true }`, so the model **never** speaks on its own — it speaks
+only the exact scripted line the app hands it via `response.create`
+(`speakLinePayload`), then stops and listens. The user's speech is transcribed;
+the engine derives a taste signal from the transcript with the SAME pure
+`deriveSignal` the keyless fallback uses, and drives exactly one turn per
+utterance (`onUserTurn`) — an empty answer still advances to the next line, so the
+loop can never dead-end after one answer. `interrupt_response` allows barge-in.
+No tools are used in this path.
+
+Defaults: model `gpt-realtime`, voice `marin` (both env-overridable via
+`VOICE_INTERVIEW_MODEL` / `VOICE_INTERVIEW_VOICE`).
 
 ## What the owner sets in Vercel Production
 
@@ -15,8 +47,8 @@ deliberate, double-gated owner action.
 | --- | --- | --- |
 | `OPENAI_API_KEY` | for realtime voice | The server-only OpenAI key. Never `NEXT_PUBLIC_`, never returned to the browser. Absent → fallback. |
 | `VOICE_INTERVIEW_ENABLED` | for realtime voice | Set to exactly `1` to opt the Realtime path in. Anything else → fallback. |
-| `VOICE_INTERVIEW_VOICE` | optional | Realtime voice id. Default `sage` (warm). e.g. `alloy`, `verse`, `coral`. |
-| `VOICE_INTERVIEW_MODEL` | optional | Realtime model id. Default `gpt-4o-realtime-preview-2024-12-17`. |
+| `VOICE_INTERVIEW_VOICE` | optional | Realtime voice id. Default `marin` (warm). e.g. `cedar`, `alloy`, `verse`. |
+| `VOICE_INTERVIEW_MODEL` | optional | Realtime model id. Default `gpt-realtime`. |
 
 The feature enters **realtime** mode only when **both** `OPENAI_API_KEY` is
 present **and** `VOICE_INTERVIEW_ENABLED=1`. Either one missing → **fallback**.
@@ -27,28 +59,29 @@ Where to get the key: <https://platform.openai.com/api-keys>. It is the same
 `OPENAI_API_KEY` the rest of the app already reads — you do not need a second
 key. Never paste a real secret into this doc or any client-visible file.
 
-## Founder gate
+## Access
 
-Every server action (`src/lib/actions/voiceInterview.ts`) and the session route
-(`src/app/api/voice/session/route.ts`) re-verify the caller with
-`supabase.auth.getUser()` and `isFounderOrAdminEmail(user.email)`. A non-founder
-gets a hidden `404` from the route and an `ok: false` from the actions. The
-allowlist lives in env (`ADMIN_EMAILS`, `FOUNDER_*_EMAIL`) — there is no database
-flag a user could flip.
+The interview is **public**. A signed-in user gets the full persisted, RLS-scoped
+experience (state saved to `voice_interviews`); a signed-out visitor gets an
+ephemeral, client-carried interview that persists nothing. The server actions
+(`src/lib/actions/voiceInterview.ts`) resolve identity with
+`supabase.auth.getUser()` and never throw — auth-unavailable simply means the
+anonymous path.
 
 ## The two modes, end to end
 
 **realtime** (key present + enabled):
 1. Browser `POST`s `/api/voice/session`.
-2. The route founder-gates, then POSTs `https://api.openai.com/v1/realtime/sessions`
-   with the server key, the interviewer system prompt, the `record_signal` /
-   `acknowledge_contradiction` tools, input/output transcription, and server-VAD
-   turn detection (for barge-in).
+2. The route POSTs `https://api.openai.com/v1/realtime/sessions` with the server
+   key, the verbatim-delivery instructions, `tool_choice: 'none'`, user
+   transcription, and `server_vad` turn detection with `create_response: false` +
+   `interrupt_response: true` (the app drives every turn; barge-in on).
 3. The route returns only the short-lived `client_secret` + `model` +
    `mode: 'realtime'`. The browser opens a WebRTC session with that ephemeral
    secret. The server key never leaves the server.
-4. As the user talks, the model calls `record_signal`; the client forwards those
-   signals to `recordInterviewTurn`, which advances the engine and persists.
+4. The app speaks each scripted line via `response.create`; the user's transcript
+   is turned into a `TasteSignal` by the pure `deriveSignal`, and each utterance
+   advances exactly one turn through `recordInterviewTurn`.
 
 **fallback** (no key or not enabled — the keyless path):
 1. Browser `POST`s `/api/voice/session`; the route returns `200`

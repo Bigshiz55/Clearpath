@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { voiceInterviewMode, openAiKey, realtimeModel, realtimeVoice } from '@/lib/voice/config';
-import { INTERVIEWER_SYSTEM_PROMPT, REALTIME_TOOLS } from '@/lib/voice/interview';
+import { REALTIME_DELIVERY_INSTRUCTIONS } from '@/lib/voice/interview';
 
 /**
  * VOICE INTERVIEW — mint an OpenAI Realtime EPHEMERAL session token for the
@@ -46,14 +46,22 @@ export async function POST() {
       body: JSON.stringify({
         model,
         voice: realtimeVoice(),
-        instructions: INTERVIEWER_SYSTEM_PROMPT,
-        tools: REALTIME_TOOLS,
-        tool_choice: 'auto',
+        // The app authors every line; the model is only the voice. No tools —
+        // the engine derives taste signals from the user's transcript.
+        instructions: REALTIME_DELIVERY_INSTRUCTIONS,
+        tool_choice: 'none',
         modalities: ['audio', 'text'],
-        // Transcribe both sides so the transcript + contradiction memory work.
+        // Transcribe the user so the engine can derive signals from their words.
         input_audio_transcription: { model: 'whisper-1' },
-        // Server VAD gives natural turn-taking + barge-in.
-        turn_detection: { type: 'server_vad' },
+        // Server VAD detects the user's speech boundaries for transcription and
+        // barge-in, but NEVER auto-creates a response: the app decides when the
+        // interviewer speaks (create_response: false), which is what makes turn
+        // order deterministic. interrupt_response lets the user talk over a line.
+        turn_detection: {
+          type: 'server_vad',
+          create_response: false,
+          interrupt_response: true,
+        },
       }),
     });
 

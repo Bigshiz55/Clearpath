@@ -159,12 +159,14 @@ export function VoiceInterview() {
     }
   }
 
-  async function processSignal(signal: TasteSignal): Promise<void> {
+  async function processTurn(signal: TasteSignal | null): Promise<void> {
     const id = interviewIdRef.current;
     if (!id) return;
     const res = await recordInterviewTurn({
       interviewId: id,
-      signals: [signal],
+      // A null signal is a real turn with no taste content — advance anyway so
+      // the next scripted line is asked. This is what keeps the loop dead-end-free.
+      signals: signal ? [signal] : [],
       clientState: engineStateRef.current ?? undefined,
     });
     if (!mountedRef.current || !res.ok || !res.state || !res.directive) return;
@@ -176,7 +178,7 @@ export function VoiceInterview() {
     // A strong reaction earns an "Interesting…"; the engine's own tagged beats
     // (challenge/theory/wrap) take precedence.
     const actionBeat = BEAT_FOR_ACTION[res.directive.action];
-    const nextBeat: Beat | null = actionBeat ?? (signal.strength >= 0.8 ? 'insight' : null);
+    const nextBeat: Beat | null = actionBeat ?? (signal && signal.strength >= 0.8 ? 'insight' : null);
     if (nextBeat) {
       setBeat(nextBeat);
       setBeatNonce((n) => n + 1);
@@ -193,8 +195,8 @@ export function VoiceInterview() {
 
   // Serialize turns: `recordInterviewTurn` reads-then-writes the server state, so
   // two overlapping turns would race the turn counter. Chain them.
-  function enqueueSignal(signal: TasteSignal): void {
-    turnChain.current = turnChain.current.then(() => processSignal(signal)).catch(() => undefined);
+  function enqueueTurn(signal: TasteSignal | null): void {
+    turnChain.current = turnChain.current.then(() => processTurn(signal)).catch(() => undefined);
   }
 
   // ---- transport callbacks (shared by both transports) ---------------------
@@ -236,7 +238,7 @@ export function VoiceInterview() {
       onUserTranscript: (text) => {
         if (text) setCaptions((c) => [...c, { id: captionId(), role: 'user', text }]);
       },
-      onSignal: (signal) => enqueueSignal(signal),
+      onUserTurn: (signal) => enqueueTurn(signal),
       onAudioLevel: (lvl) => setLevel(lvl),
       onSpeakingChange: (v) => setSpeaking(v),
     };

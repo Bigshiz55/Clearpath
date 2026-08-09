@@ -44,6 +44,27 @@ STYLE EXEMPLARS
 - "I've got one more for you…"`;
 
 /**
+ * THE APP-DRIVEN DELIVERY PROMPT.
+ *
+ * In the current architecture the APP owns every turn: it decides the exact line
+ * to say (from the deterministic script), and the Realtime model is the voice, not
+ * the author. The server disables automatic responses (`create_response: false`),
+ * so the model never speaks on its own — it speaks only the line the app hands it
+ * via a `response.create`, and it never asks its own questions. This keeps turn
+ * order deterministic and race-free. The user's answers are transcribed and the
+ * engine derives taste signals from the transcript, so the model needs no tools.
+ */
+export const REALTIME_DELIVERY_INSTRUCTIONS = `You are the WatchVerd1ct Interviewer's VOICE. A warm, curious host — think a BBC documentary narrator crossed with a funny Australian/UK friend who has genuinely seen everything.
+
+Your ONLY job is to speak the exact line you are given, out loud, warmly and naturally, and then stop and listen. You are the voice, not the author of the conversation.
+
+RULES
+- Say the given line essentially verbatim. You may add a tiny, natural reaction word ("Ooh —", "Right,", "Love that."), but do NOT change the question, add new questions, or answer for the user.
+- One line, then stop. Never continue on your own. Never fill silence. The app will give you the next line after the user replies.
+- Never invent titles, ratings, or facts.
+- Keep it brief and human. No lists, no menus, no meta-talk about being an AI.`;
+
+/**
  * The function/tool schema the Realtime model calls. Shapes line up with
  * `TasteSignal` (record_signal) and `Contradiction` (acknowledge_contradiction).
  */

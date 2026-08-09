@@ -23,9 +23,28 @@
  * pull into an SSR/build graph; all access is inside the exported function.
  */
 import { categoriesFor, type TasteSignal, type SignalKind, type Sentiment } from '@/lib/voice/interview';
+import { deriveSignal } from './deriveSignal';
 import type { VoiceClient, VoiceClientCallbacks, SteerInput } from './types';
 
 const REALTIME_URL = 'https://api.openai.com/v1/realtime';
+
+/**
+ * The `response.create` payload that makes the model SPEAK one scripted line and
+ * then stop. Pure + exported so the turn contract is unit-testable without WebRTC:
+ * the app authors the line, the model is only the voice, and with the session's
+ * `create_response: false` this is the ONLY thing that ever makes it talk.
+ */
+export function speakLinePayload(line: string): {
+  type: 'response.create';
+  response: { instructions: string };
+} {
+  return {
+    type: 'response.create',
+    response: {
+      instructions: `Say this line to the user now — warmly, naturally, and essentially word-for-word — then stop and listen. Do not add a question of your own: "${line}"`,
+    },
+  };
+}
 
 /** The ephemeral secret shape the session route returns (only `.value` is used). */
 export interface RealtimeClientSecret {
@@ -240,6 +259,7 @@ export async function connectRealtime(opts: ConnectRealtimeOptions): Promise<Voi
   // ---- inbound event handling -----------------------------------------------
 
   let interviewerLine = '';
+  let userTurn = 0;
   let speaking = false;
   const setSpeaking = (v: boolean): void => {
     if (v === speaking) return;
@@ -278,28 +298,23 @@ export async function connectRealtime(opts: ConnectRealtimeOptions): Promise<Voi
         break;
       }
       case 'conversation.item.input_audio_transcription.completed': {
+        // The user finished an utterance — this IS the turn boundary. Emit the
+        // caption, then derive a taste signal from their words (the SAME pure
+        // interpreter the keyless fallback uses) and drive exactly one turn. A
+        // line with no taste content yields a null signal, and the app still
+        // advances to the next scripted line — so the loop never dead-ends.
         const text = typeof ev.transcript === 'string' ? ev.transcript.trim() : '';
-        if (text) opts.onUserTranscript?.(text);
+        if (!text) break;
+        opts.onUserTranscript?.(text);
+        userTurn += 1;
+        opts.onUserTurn?.(deriveSignal(text, userTurn));
         break;
       }
       case 'input_audio_buffer.speech_started': {
-        // Barge-in: the user started talking. Server VAD stops the model audio;
-        // we just reflect that the floor is theirs.
+        // Barge-in: the user started talking. `interrupt_response: true` makes
+        // the server cancel any in-flight model audio; we just reflect that the
+        // floor is theirs.
         setSpeaking(false);
-        break;
-      }
-      case 'response.function_call_arguments.done': {
-        const name = typeof ev.name === 'string' ? ev.name : '';
-        if (name !== 'record_signal') break;
-        const argStr = typeof ev.arguments === 'string' ? ev.arguments : '';
-        let parsed: unknown = null;
-        try {
-          parsed = argStr ? JSON.parse(argStr) : null;
-        } catch {
-          break;
-        }
-        const signal = signalFromToolArgs(parsed);
-        if (signal) opts.onSignal?.(signal);
         break;
       }
       case 'error': {
@@ -327,22 +342,14 @@ export async function connectRealtime(opts: ConnectRealtimeOptions): Promise<Voi
 
   const steer = (input: SteerInput): void => {
     if (closed) return;
-    // Inject the per-turn directive as a system-role guidance item WITHOUT
-    // replacing the base personality prompt the session already carries — the
-    // next server-VAD response reads it. For the opening turn we also ask for a
-    // response now, so the interviewer speaks first (VAD would otherwise wait for
-    // the user).
-    if (input.instruction) {
-      send({
-        type: 'conversation.item.create',
-        item: {
-          type: 'message',
-          role: 'system',
-          content: [{ type: 'input_text', text: `[DIRECTOR] ${input.instruction}` }],
-        },
-      });
+    // The app authors every line. Because the session has `create_response:
+    // false`, this `response.create` is the ONLY thing that makes the model
+    // speak — so there is no race between our turn and a VAD auto-response. We
+    // hand it the exact scripted line and it voices it, then stops and listens.
+    if (input.speakLine) {
+      setSpeaking(true);
+      send(speakLinePayload(input.speakLine));
     }
-    if (input.kickoff) send({ type: 'response.create' });
   };
 
   return {

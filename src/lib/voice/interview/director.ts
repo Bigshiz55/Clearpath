@@ -236,15 +236,22 @@ const BEAT_FOR_ACTION: Partial<Record<DirectiveAction, TranscriptEntry['beat']>>
  * confidence → mark the asked axis → recompute phase → append the transcript.
  * Never mutates the input; never throws.
  */
-export function advance(state: InterviewState, incoming: TasteSignal[], nowMs: number): InterviewState {
+export function advance(
+  state: InterviewState,
+  incoming: TasteSignal[],
+  nowMs: number,
+  usedDirective?: Directive,
+): InterviewState {
   const turn = state.turn + 1;
   const rawList = Array.isArray(incoming) ? incoming : [];
   const signals = rawList
     .map((s, i) => sanitizeSignal(s, turn, i))
     .filter((s): s is TasteSignal => s !== null);
 
-  // The question this turn answered — recorded as "asked" so we don't repeat it.
-  const directive = decide(state);
+  // The question this turn answered — recorded as "asked" so we don't repeat it,
+  // and so the transcript shows the line actually spoken. Defaults to the dynamic
+  // director's decision when the caller doesn't pass the scripted one it used.
+  const directive = usedDirective ?? decide(state);
 
   let confidence = state.confidence;
   let claims: Claim[] = state.claims;

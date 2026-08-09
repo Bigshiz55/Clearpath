@@ -141,8 +141,10 @@ export async function connectFallback(opts: ConnectFallbackOptions): Promise<Voi
     if (!clean) return;
     turn += 1;
     opts.onUserTranscript?.(clean);
-    const signal = deriveSignal(clean, turn);
-    if (signal) opts.onSignal?.(signal);
+    // Drive exactly one turn per utterance. `deriveSignal` may return null when
+    // the line says nothing about taste; the orchestrator still advances to the
+    // next scripted line, so the interview never dead-ends after one answer.
+    opts.onUserTurn?.(deriveSignal(clean, turn));
   };
 
   // Continuous recognition: emit a signal per FINAL result, keep listening.

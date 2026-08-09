@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { recordEvents } from '@/lib/preference/store';
 import {
   advance,
-  decide,
+  planDirective,
   createInterview,
   buildDnaReveal,
   signalsToPreferenceEvents,
@@ -137,12 +137,12 @@ export async function startOrResumeInterview(): Promise<StartResult> {
       state = createInterview(g.userId, Date.now());
       await saveInterview(g.supabase, state);
     }
-    return { ok: true, state, directive: decide(state), mode };
+    return { ok: true, state, directive: planDirective(state), mode };
   }
 
   // Anonymous: an ephemeral interview carried by the client, never persisted.
   const state = createInterview('anon', Date.now());
-  return { ok: true, state, directive: decide(state), mode };
+  return { ok: true, state, directive: planDirective(state), mode };
 }
 
 /**
@@ -166,9 +166,9 @@ export async function recordInterviewTurn(input: {
   if (g.mode === 'user') {
     const state = await getInterview(g.supabase, g.userId, parsed.data.interviewId);
     if (!state) return { ok: false, error: 'Interview not found.' };
-    const next = advance(state, incoming, Date.now());
+    const next = advance(state, incoming, Date.now(), planDirective(state));
     await saveInterview(g.supabase, next);
-    const directive = decide(next);
+    const directive = planDirective(next);
     return { ok: true, state: next, directive, done: directive.done };
   }
 
@@ -177,8 +177,8 @@ export async function recordInterviewTurn(input: {
   const prior = asClientState(parsed.data.clientState);
   if (!prior) return { ok: false, error: 'Interview not found.' };
   try {
-    const next = advance(prior, incoming, Date.now());
-    const directive = decide(next);
+    const next = advance(prior, incoming, Date.now(), planDirective(prior));
+    const directive = planDirective(next);
     return { ok: true, state: next, directive, done: directive.done };
   } catch {
     return { ok: false, error: 'Could not process that turn.' };

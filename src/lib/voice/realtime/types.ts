@@ -25,7 +25,19 @@ export interface VoiceClientCallbacks {
   onInterviewerDone?: (text: string) => void;
   /** The user's completed utterance, transcribed. */
   onUserTranscript?: (text: string) => void;
-  /** A structured taste observation the interviewer extracted. */
+  /**
+   * Exactly one per completed user utterance — the turn boundary. Carries the
+   * derived taste signal, or `null` when the line named nothing about taste. The
+   * orchestrator ADVANCES the interview on every one of these (an empty answer
+   * still moves to the next scripted line), which is what makes the loop
+   * dead-end-proof: one answer in, always one next question out.
+   */
+  onUserTurn?: (signal: TasteSignal | null) => void;
+  /**
+   * A structured taste observation. Legacy channel from the model's
+   * `record_signal` tool; the app-driven transport derives signals from the
+   * transcript and drives turns through `onUserTurn` instead.
+   */
   onSignal?: (signal: TasteSignal) => void;
   /** Mic input level, 0..1, for the waveform. */
   onAudioLevel?: (level: number) => void;

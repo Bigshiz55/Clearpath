@@ -16,11 +16,11 @@ import { serverEnv } from '@/lib/env';
  * live voice sessions.
  */
 
-/** A sensible current Realtime model; overridable via VOICE_INTERVIEW_MODEL. */
-export const DEFAULT_REALTIME_MODEL = 'gpt-4o-realtime-preview-2024-12-17';
+/** The current Realtime model; overridable via VOICE_INTERVIEW_MODEL. */
+export const DEFAULT_REALTIME_MODEL = 'gpt-realtime';
 
 /** A warm default voice; overridable via VOICE_INTERVIEW_VOICE. */
-export const DEFAULT_REALTIME_VOICE = 'sage';
+export const DEFAULT_REALTIME_VOICE = 'marin';
 
 /** The OpenAI key (shared with the rest of the app). May be undefined. */
 export function openAiKey(): string | undefined {

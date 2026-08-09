@@ -16,6 +16,7 @@ export * from './followup';
 export * from './planner';
 export * from './stateMachine';
 export * from './director';
+export * from './stages';
 export * from './reveal';
 export * from './dnaUpdate';
 export * from './prompts';

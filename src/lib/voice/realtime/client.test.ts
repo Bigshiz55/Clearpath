@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { signalFromToolArgs } from './client';
+import { signalFromToolArgs, speakLinePayload } from './client';
 
 /**
  * The Realtime client is browser-only, but the ONE pure seam — turning a
@@ -36,5 +36,23 @@ describe('signalFromToolArgs', () => {
     const s = signalFromToolArgs({ subject: 'slow burn', sentiment: 'like', strength: 0.5 });
     expect(s!.kind).toBe('element');
     expect(s!.categories).toContain('pacing');
+  });
+});
+
+/**
+ * The app-driven turn contract's one pure seam: the `response.create` payload
+ * that makes the model SPEAK exactly one scripted line and then stop. With the
+ * session's `create_response: false`, this is the only thing that ever makes the
+ * model talk, so it must always carry the line verbatim and never ask for a
+ * free-form response.
+ */
+describe('speakLinePayload', () => {
+  it('builds a response.create that carries the exact line', () => {
+    const line = 'horror, comedy, or crime?';
+    const p = speakLinePayload(line);
+    expect(p.type).toBe('response.create');
+    expect(p.response.instructions).toContain(line);
+    // It instructs the model to stop and listen, not to author a new question.
+    expect(p.response.instructions.toLowerCase()).toContain('word-for-word');
   });
 });
