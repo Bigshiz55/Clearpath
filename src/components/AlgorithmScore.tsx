@@ -19,6 +19,7 @@ export function AlgorithmScore({
   year,
   objectiveScore = null,
   compact = false,
+  badgeOnly = false,
   className = '',
 }: {
   mediaType: MediaType;
@@ -28,6 +29,10 @@ export function AlgorithmScore({
   objectiveScore?: number | null;
   /** Row cards are height-constrained: smaller badge, tighter box, one line. */
   compact?: boolean;
+  /** JUST the Verd1ct badge (no panel/label/ratings) — for a poster overlay on
+   *  the two-across mobile card, where the score rides ON the artwork and the
+   *  full panel is progressively disclosed on the detail view / wider layouts. */
+  badgeOnly?: boolean;
   className?: string;
 }) {
   const [dna, setDna] = useState<DnaClientResult | null>(null);
@@ -43,6 +48,20 @@ export function AlgorithmScore({
   const personal = isPersonalized(dna);
   const score = personal ? dna!.score : dna?.score ?? objectiveScore;
   const v = score != null ? scoreVerdict(score) : null;
+
+  // POSTER-OVERLAY BADGE for the two-across mobile card: only the Verd1ct badge
+  // (the 0–100 number in its verdict colour), riding on the artwork. The full
+  // panel — label, call, source ratings — is progressively disclosed on the
+  // wider layouts and the title detail page. Renders nothing until a score
+  // lands (an overlay must not reserve a placeholder box on the poster).
+  if (badgeOnly) {
+    if (score == null) return null;
+    return (
+      <span className={className} data-testid="verdict-badge">
+        <Verd1ctBadge score={score} px={compact ? 34 : 42} />
+      </span>
+    );
+  }
 
   return (
     <div

@@ -83,14 +83,22 @@ for (const { w, h } of PHONES) {
     }
     expect(perScreen, 'cards beginning within one screen of grid').toBeGreaterThanOrEqual(2);
 
-    // The poster is a column beside the facts, not the whole card.
+    // THE POSTER IS THE DOMINANT VISUAL — the full width of the two-across
+    // card, not a sliver beside a text column (the owner-approved mobile
+    // redesign). It leads the tile so a title is identifiable at a glance.
     const card = await cards.first().boundingBox();
     const poster = await cards.first().locator('.wv-card-art').first().boundingBox();
-    expect(poster!.width, 'poster width').toBeLessThan(card!.width * 0.5);
+    expect(poster!.width, 'poster spans the card').toBeGreaterThan(card!.width * 0.9);
 
-    // And every card carries its synopsis.
-    await expect(page.getByTestId('card-synopsis').first()).toBeVisible();
-    expect(await page.getByTestId('card-synopsis').count()).toBe(n);
+    // Each tile still says what it is — via the poster + a readable title,
+    // never microscopic text. The heavier detail (synopsis, why-it-fits) is
+    // PROGRESSIVELY DISCLOSED on the title page, not squeezed onto a ~140px
+    // grid card, so the collapsed tile does not render the synopsis line.
+    await expect(cards.first().locator('.wv-card-art').first()).toBeVisible();
+    const title = cards.first().locator('.line-clamp-2').first();
+    await expect(title).toBeVisible();
+    expect((await title.innerText()).trim().length, 'the tile names the title').toBeGreaterThan(0);
+    await expect(page.getByTestId('card-synopsis').first()).toBeHidden();
   });
 }
 

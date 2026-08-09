@@ -39,25 +39,23 @@ body {
   }
 
   /* The one poster-grid used across the app.
-     ONE COLUMN OF ROWS ON A PHONE. Two narrow columns is the wrong way to fit
-     more titles on a phone screen — at 390px each cell is ~170px, which is
-     where "NOT FOR ME" wraps onto three lines and titles truncate mid-word, and
-     there is nowhere at all to say what the thing is about. So the CARD turns
-     sideways instead (see PosterCard): poster on the left at about a third of
-     the width, facts and synopsis beside it. Three or four fit on a screen
-     where one used to, and each one tells you what it is.
-     From `sm` there is room for real columns, the card goes back to being a
-     column, and the grid auto-fills. */
+     TWO VERTICAL CARDS ACROSS ON A PHONE (owner-approved mobile redesign,
+     replacing the earlier single-column-of-rows). Fast visual scanning like a
+     world-class streaming product: a poster-dominant tile with the score ON the
+     artwork, then title / year / one action / compact availability, and the
+     heavier detail (synopsis, why-it-fits, for/against, full providers)
+     progressively disclosed on the title detail page — never squeezed into a
+     ~150px column. See PosterCard + `.wv-only-mobile` / `.wv-only-desktop`.
+     From `sm` the grid auto-fills into progressively more, wider columns. */
+  .wv-only-mobile { @apply sm:hidden; }
+  .wv-only-desktop { @apply hidden sm:block; }
   .poster-grid {
-    /* 16px between tiles, not 12. An edge draws the boundary; the gap is what
-       makes two boundaries read as two objects rather than a seam. */
-    @apply grid gap-4;
-    grid-template-columns: minmax(0, 1fr);
-  }
-  @media (min-width: 640px) {
-    .poster-grid {
-      @apply gap-4;
-    }
+    /* 12px gutters at phone widths: two cards + a 12px gap land exactly on
+       288px of content at 320px (each card ~138px), and 12px is real air —
+       the edge of each near-black tile draws the boundary, the gap keeps two
+       boundaries reading as two separate objects rather than a seam. */
+    @apply grid gap-3 sm:gap-4;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   /* ── The card shape, in ONE place ────────────────────────────────────────
      A row on a phone, a column from `sm`. These live here rather than inline
@@ -65,10 +63,12 @@ body {
      hand-rolls its own card — kept the old full-bleed poster and filled the
      whole screen with one title. Two copies of a layout is how that happens, so
      there is now one definition and every grid uses it. */
-  /* The upper half: poster beside the facts on a phone, stacked from `sm`.
-     `pb-0` because `.wv-card-foot` below carries the bottom padding now. */
+  /* A VERTICAL CARD AT EVERY WIDTH NOW. Two-across on a phone means the poster
+     leads and the text sits beneath it, same as the wider columns — the old
+     phone-only sideways row is gone. No padding here: the poster is flush to the
+     card's top and sides, and the body/foot carry their own insets. */
   .wv-card {
-    @apply flex gap-3 overflow-hidden p-3 pb-0 sm:block sm:gap-0 sm:p-0;
+    @apply block overflow-hidden;
   }
   /* THE POSTER IS NEVER CROPPED — ON A PHONE ROW, TRUE 2:3.
      It used to STRETCH to the card's height on a phone, to avoid "a dead gap
@@ -89,7 +89,11 @@ body {
      SAME height regardless of which title's key art is unusually tall, and
      puts the rest of the card back in view. */
   .wv-card-art {
-    @apply relative aspect-[2/3] w-[38%] max-w-[160px] flex-none self-start overflow-hidden rounded-lg sm:aspect-auto sm:h-[196px] sm:w-full sm:max-w-none sm:self-auto sm:rounded-none lg:h-[216px];
+    /* THE POSTER IS THE DOMINANT VISUAL, FULL CARD WIDTH, TRUE 2:3 ON A PHONE.
+       No cropping: the box IS 2:3, so `object-cover` never cuts the art. From
+       `sm` the tile becomes the fixed, shorter, squarer box (letterboxed via
+       `object-contain`) so a wall of desktop cards stays the same height. */
+    @apply relative aspect-[2/3] w-full overflow-hidden sm:aspect-auto sm:h-[196px] sm:w-full lg:h-[216px];
   }
   /* ONE ASPECT FOR TV-LISTING ARTWORK: 16:9 at every width, letterboxed.
      Broadcast art arrives as posters, banners and stills in every shape;
@@ -107,7 +111,9 @@ body {
     object-fit: contain !important;
   }
   .wv-card-body {
-    @apply flex min-w-0 flex-1 flex-col sm:p-3;
+    /* The card is vertical now, so the body carries its own phone padding
+       (the shell no longer pads a row). */
+    @apply flex min-w-0 flex-1 flex-col p-2.5 sm:p-3;
   }
   /* THE CARD'S FULL WIDTH, FOR THE THINGS THAT NEED IT.
      A row card is a 2:3 poster beside a text column, and the poster is almost
@@ -128,15 +134,12 @@ body {
      state. The accessible name on the toggle keeps it for screen readers. */
   @media (max-width: 359px) {
     .wv-tray-status { display: none; }
-    /* THE 320px CARD, MEASURED.
-       At 320 the card is 288 wide; a 38% poster leaves the body 143 and the
-       ratings row 130 — 39px a chip, where "IMDb 6.8" needs 51. The result was
-       a rating that rendered as "IMDb 6", which is worse than none: it is a
-       wrong number, confidently displayed.
-       Two small concessions at this width only: the poster takes 30% instead of
-       38% (86px — still a recognisable placard), and the rating type drops a
-       step. Together that gives 51px a chip against a 44px need. */
-    .wv-card-art { width: 30%; }
+    /* THE 320px TWO-ACROSS CARD, MEASURED.
+       At 320 the container is 288 wide; two 10px-gutter columns give each card
+       ~139px, and a full-width 2:3 poster inside it is ~208px tall — a
+       comfortably recognisable placard, not a thumbnail. The old sideways-poster
+       width concession is gone with the sideways card itself; the ratings-chip
+       sizing stays for the wider layouts where the ratings row still renders. */
     .wv-ratings-row { font-size: 11px; }
     .wv-ratings-emoji { font-size: 10px; }
     .wv-ratings-tag { font-size: 7px; }

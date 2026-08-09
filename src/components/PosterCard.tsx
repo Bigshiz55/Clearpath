@@ -133,10 +133,16 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           poster, facts, score and synopsis before you could act. On request
           the row is now the FIRST thing on every card — rule at the top, then
           drop down to the W on the artwork if it belongs on the docket. */}
+      {/* DESKTOP-ONLY: the FOR · AGAINST · SAVE decision bar. On the two-across
+          mobile card a full decision bar across a ~140px tile is exactly the
+          "squeezed FOR/AGAINST/SAVE row" to avoid — mobile gets a single clear
+          Save action in the body instead, and the full bar returns from `sm`. */}
       {overlay !== null && saveId != null && (
-        <div className="wv-act-row border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
-          <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
-          {resolvedOverlay}
+        <div className="wv-only-desktop">
+          <div className="wv-act-row border-b border-white/10 p-2.5 pb-2 sm:p-3 sm:pb-2.5">
+            <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+            {resolvedOverlay}
+          </div>
         </div>
       )}
       <div className="wv-card">
@@ -174,6 +180,22 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         {overlay !== null && saveId != null && (
           <WCheck tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterUrl={posterUrl ?? null} />
         )}
+        {/* MOBILE: the Verd1ct SCORE rides ON the poster (top-left, clear of the
+            W top-right and the rank bottom-left). This is the "score/verdict
+            treatment on the poster" the two-across card leads with; the full
+            score panel with source ratings is disclosed from `sm` and on the
+            title page. `pointer-events-none` so a tap still opens the poster. */}
+        {saveId != null && (
+          <AlgorithmScore
+            badgeOnly
+            compact
+            mediaType={mediaType}
+            tmdbId={saveId}
+            title={title}
+            year={year ?? null}
+            className="wv-only-mobile pointer-events-none absolute left-1.5 top-1.5 z-10 drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]"
+          />
+        )}
         {/* `relative` so the real poster paints ABOVE the absolutely-positioned
             matte behind it, regardless of DOM stacking specifics.
             TrailerMedia is a transparent passthrough by default (feature off /
@@ -202,25 +224,28 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           heading
         )}
 
-        {/* THE COLUMN BESIDE THE POSTER WAS EMPTY, AND THE FACTS WERE MISSING.
-            A 2:3 poster is ~210px tall and a title is two lines, so every card
-            carried ~150px of black beside its artwork — while runtime,
-            certificate, genre and season count, all of which we already hydrate
-            to compute the score, appeared nowhere. Same fetch, no new request. */}
-        {saveId != null && <CardFacts mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+        {/* DESKTOP-ONLY facts (runtime, certificate, genre, seasons). On the
+            mobile card these are progressively disclosed on the title page — the
+            collapsed tile stays poster + score + title + year + one action. */}
+        {saveId != null && <CardFacts mediaType={mediaType} tmdbId={saveId} className="mt-1.5 hidden sm:block" />}
 
         {children}
 
-        {/* THE NUMBER GOES NEXT TO THE ARTWORK, where the eye already is.
-            It was drawn full-width below the poster, which pushed the whole
-            card ~75px taller to say something that fits in the space that was
-            already sitting empty. Poster, title, facts and verdict now read as
-            one at-a-glance block; the detail follows underneath.
-            `mt-auto` pins it to the bottom of the column, so the block ends
-            level with the poster instead of leaving the gap it was put there
-            to fill. */}
+        {/* MOBILE: the single clear action — Save. The full FOR/AGAINST/SAVE bar
+            is disclosed from `sm`; here one comfortable tap target is enough,
+            and the poster itself opens the title (with its trailer). */}
+        {overlay !== null && saveId != null && (
+          <div className="wv-only-mobile mt-2">
+            <SaveButton wide tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+          </div>
+        )}
+
+        {/* DESKTOP-ONLY score panel beside the artwork. On mobile the score is
+            the badge ON the poster (above); the full panel with source ratings
+            is a `sm`-and-up / title-page treatment. `mt-auto` pins it to the
+            bottom of the column so the block ends level with the poster. */}
         {saveId != null && (
-          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-auto pt-2" />
+          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-auto hidden pt-2 sm:block" />
         )}
       </div>
       </div>
@@ -229,31 +254,30 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           in the narrow column beside the poster while the space under the
           poster sat empty — which is why the two "why" sentences were cut. */}
       <div className="wv-card-foot">
-        {/* What it is about, straight from TMDB. Renders nothing when there is
-            no synopsis rather than showing a placeholder. */}
-        {/* THREE lines, not two. "Would like more information about what it's
-            about" — two lines of a TMDB synopsis ends mid-clause on almost
-            every title ("…until Andy's…"), which tells you less than none. The
-            reserved height grows with it, so nothing moves when the text
-            lands. */}
-        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={2} className="mt-1" />}
+        {/* DESKTOP-ONLY DETAIL (progressive disclosure). Synopsis, why-it-fits
+            and the taste line are the "detailed information" the owner spec
+            moves off the collapsed two-across tile and onto the title page —
+            stuffing them into a ~140px card is exactly what destroys legibility.
+            From `sm` the card is wide enough to carry them, so they return. */}
+        <div className="hidden sm:block">
+          {/* What it is about, straight from TMDB. Renders nothing when there is
+              no synopsis rather than showing a placeholder. */}
+          {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={2} className="mt-1" />}
 
-        {/* WHY THIS TITLE IS HERE — the first of the card's two questions,
-            answered before the second. Compact reasons, one or two shown, the
-            rest behind "Why?". Renders nothing when nothing can be
-            substantiated; see src/lib/reasons/whyThisTitle.ts. */}
-        {saveId != null && (
-          <WhyThisTitle
-            mediaType={mediaType}
-            tmdbId={saveId}
-            className="mt-1.5"
-          />
-        )}
+          {/* WHY THIS TITLE IS HERE — the first of the card's two questions.
+              Compact reasons, one or two shown, the rest behind "Why?". */}
+          {saveId != null && (
+            <WhyThisTitle
+              mediaType={mediaType}
+              tmdbId={saveId}
+              className="mt-1.5"
+            />
+          )}
 
-        {/* The one-sentence taste explanation, when the rated history supports
-            one. Kept alongside the reason chips: the chips say WHAT matched,
-            this says it in the user's own terms. */}
-        {saveId != null && <CardFit mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+          {/* The one-sentence taste explanation, when the rated history supports
+              one. The chips say WHAT matched; this says it in the user's terms. */}
+          {saveId != null && <CardFit mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
+        </div>
 
         {/* WHERE TO WATCH — the question of FACT, kept separate from the
             question of TASTE answered by the verdict panel above it.
@@ -272,8 +296,9 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
           />}
 
         {/* Supporting evidence: the pills, the household verdict, and the
-            "Why this Verd1ct?" panel. */}
-        {evidence && <div className="space-y-2">{evidence}</div>}
+            "Why this Verd1ct?" panel — desktop-only detail, disclosed on the
+            title page from the mobile card. */}
+        {evidence && <div className="hidden space-y-2 sm:block">{evidence}</div>}
 
         {/* The FOR/AGAINST/SAVE row lives at the TOP of the card now — see the
             block above `.wv-card`. The foot ends on the evidence. */}

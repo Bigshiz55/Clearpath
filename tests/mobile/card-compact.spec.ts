@@ -1,23 +1,26 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * THE CARD, CLEANED UP — same information, less of it shouting.
+ * THE FULL CARD, CLEANED UP — same information, less of it shouting.
  *
  * "There is too much empty space inside it, and the score information feels
  * spread out… tone down the amount of pink… do not show rating source icons
  * with a dash when no score is available."
  *
- * Every assertion here is one of those, measured on the real card rather than
- * eyeballed: the panel's own height and fill, the absence of placeholder
- * dashes, the reading order down the card, and the fact that nothing was
- * removed to achieve any of it.
+ * Every assertion here is one of those, measured on the real card. Since the
+ * owner-approved two-across mobile redesign, the FULL card (verdict panel,
+ * facts, synopsis, FOR/AGAINST/SAVE bar) is the `sm`-and-up surface — on a
+ * phone those are progressively disclosed on the title page, and the collapsed
+ * two-across tile is guarded by cards.spec / search-grid instead. So these
+ * full-card invariants are measured at a desktop width, where the full card
+ * renders; the invariants themselves are unchanged.
  */
 const FULL = { standardScore: 81, tomatometer: 91, rtAudience: 78, imdb: 7.8 };
 const FACTS = { runtimeMinutes: 105, contentRating: 'PG-13', genres: ['Crime', 'Thriller', 'Mystery'] };
 const SYNOPSIS =
   'A weary detective returns to the coastal town he grew up in to investigate a disappearance everybody there would rather forget, and finds his own family at the centre of it.';
 
-async function open(page: Page, w = 390, ratings: Record<string, unknown> = FULL, facts: unknown = FACTS) {
+async function open(page: Page, w = 1024, ratings: Record<string, unknown> = FULL, facts: unknown = FACTS) {
   await page.setViewportSize({ width: w, height: 1000 });
   await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings, overview: SYNOPSIS, facts } }));
   await page.route('**/api/dna/**', (r) =>
@@ -60,13 +63,15 @@ test.describe('the verdict panel', () => {
     await expect(panel(page).locator('.wv-ratings-row > span')).toHaveCount(3);
   });
 
-  test('sits beside the artwork, where the eye already is', async ({ page }) => {
+  test('sits under the artwork in the card column, where the eye lands next', async ({ page }) => {
     await open(page);
     const art = (await card(page).locator('.wv-card-art').boundingBox())!;
     const p = (await panel(page).boundingBox())!;
-    // Beside the poster, not under it: this is the space that was black.
-    expect(p.x, 'the panel is back under the poster').toBeGreaterThan(art.x + art.width - 1);
-    expect(p.y).toBeLessThan(art.y + art.height);
+    // The card is a vertical column at every width now (the two-across mobile
+    // redesign made the phone card a column too), so the score panel reads
+    // DIRECTLY BELOW the poster — same column, not a strip beside it.
+    expect(p.y, 'the panel is below the poster').toBeGreaterThan(art.y + art.height / 2);
+    expect(p.x, 'the panel stays in the poster’s column, not offset to its right').toBeLessThan(art.x + art.width);
   });
 
   test('the score and the call are the loudest things in it', async ({ page }) => {
@@ -177,7 +182,7 @@ test.describe('the synopsis knows its place', () => {
 
 test.describe('the decision buttons', () => {
   test('keep the tap-target floor and lose the bulk above it', async ({ page }) => {
-    for (const w of [390, 1024, 1440]) {
+    for (const w of [768, 1024, 1440]) {
       await open(page, w);
       const h = (await card(page).getByTestId('card-verdict-for').first().boundingBox())!.height;
       expect(h, `FOR is ${Math.round(h)}px at ${w}`).toBeGreaterThanOrEqual(44);
