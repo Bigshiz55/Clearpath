@@ -7,7 +7,24 @@ Updated at the end of every work order per the Working Agreement in
 Nothing in flight. **Action needed from you:** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the
 "Restored: /admin/migrations" entry below for why this is currently required
-and what it unblocks.
+and what it unblocks. This now also applies **migration `0048_title_knowledge`**
+(the Knowledge Layer caches) — until applied, the compiled-knowledge store is a
+safe-absent no-op and search behaves exactly as before.
+
+### Knowledge Layer (compiled title intelligence) — shipped OFFLINE-VERIFIED
+A durable `title_knowledge` + `title_subject_facts` store now compiles subject
+centrality ONCE and reads it back beneath eligibility, so search stops
+re-adjudicating stable facts every request (works offline once warm). Temporal
+taste memory now persists derived state (`trait_confidence`,
+`dna_strength_history`). Confidence-aware clarification detector added. Six
+repo-local dev skills added. Full offline gates green (typecheck/lint/3207
+tests/build/migrations/schema); 800-case cross-domain generalization proof, 0
+false positives. See `docs/KNOWLEDGE-LAYER-REPORT.md`.
+**Live proof remaining (owner):** apply `0048`, warm the store, confirm a
+compiled MATERIAL fact promotes on the canonical URL with `TMDB_API_KEY`.
+**Next build-out (Claude can do):** surface the clarification payload from
+`/api/ask`; schedule a batch `compileTitle` warm pass; consume compiled
+tone/setting header fields in ranking/UI.
 
 ## Next
 - **Turn on the AI orchestrator (owner action).** The provider-independent
