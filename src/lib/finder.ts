@@ -32,6 +32,8 @@ import {
   type CandidateEvidence,
 } from '@/lib/nlu/semanticEligibility';
 import { adjudicateSubjectCentrality, type SubjectAdjudicator } from '@/lib/nlu/subjectAdjudicator';
+import { readSubjectFacts, writeSubjectFact, type StoredSubjectFact } from '@/lib/knowledge/store';
+import { resolveAmbiguousSubject } from '@/lib/knowledge/resolve';
 
 const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
 const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
@@ -183,8 +185,10 @@ export interface FinderItem {
     /** The deterministic verdict was borderline (a single tag + light mention):
      *  the semantic adjudicator arbitrates these before ranking. */
     ambiguous: boolean;
-    /** How the FINAL eligibility was decided — deterministic vs the model. */
-    decidedBy: 'deterministic' | 'adjudicator';
+    /** How the FINAL eligibility was decided — deterministic rules, a reused
+     *  COMPILED fact from the Knowledge Layer (no model call), or a live model
+     *  adjudication of the ambiguous band. */
+    decidedBy: 'deterministic' | 'knowledge' | 'adjudicator';
   };
 }
 
@@ -677,20 +681,46 @@ export async function runFinder(
       .filter((i) => i.subjectEvidence && i.subjectEvidence.satisfied === false && i.subjectEvidence.ambiguous)
       .sort((a, b) => b.matchScore - a.matchScore)
       .slice(0, ADJUDICATE_CAP);
+
+    // KNOWLEDGE LAYER — one batched read of the durable compiled facts for the
+    // whole ambiguous band. A fact we already compiled (e.g. "baseball is CENTRAL
+    // to Moneyball") resolves the candidate with NO model call and works with no
+    // API key at all, so a title we already understand is never re-adjudicated.
+    // Safe-absent: an unreachable store yields an empty map and the model path
+    // below runs exactly as it did before this layer existed.
+    const knownFacts = await readSubjectFacts(
+      requirement.canonical,
+      borderline.map((i) => ({ tmdbId: i.id, mediaType: i.mediaType })),
+    ).catch(() => new Map<string, StoredSubjectFact>());
+
     await Promise.all(
       borderline.map(async (item) => {
         const evidence = evidenceById.get(`${item.mediaType}-${item.id}`);
         if (!evidence || !item.subjectEvidence) return;
-        const verdict = await adjudicator(requirement, evidence).catch(() => null);
+
+        const known = knownFacts.get(`${item.mediaType}-${item.id}`);
+        // Reuse a durable compiled fact (no model call, offline) or adjudicate
+        // once and compile-on-demand. All the decision logic lives in the
+        // unit-tested resolver.
+        const { verdict, decidedVia, persist } = await resolveAmbiguousSubject(
+          requirement,
+          evidence,
+          known ?? null,
+          adjudicator,
+        );
+        // COMPILE-ON-DEMAND: persist a freshly-adjudicated fact (best-effort) so
+        // the next search for this subject reuses it instead of paying the model.
+        if (persist) void writeSubjectFact(item.id, item.mediaType, persist);
+
         if (!verdict) return; // reject-on-uncertainty: leave it ineligible
         const promote =
           verdict.centrality === 'CENTRAL' || (acceptSubstantial && verdict.centrality === 'MATERIAL');
-        // Map the adjudicator's classes onto the stored centrality (UNKNOWN,
-        // which the deterministic scale has no slot for, is recorded as
-        // UNSUPPORTED — it did not establish the subject).
+        // Map the classes onto the stored centrality (UNKNOWN, which the
+        // deterministic scale has no slot for, is recorded as UNSUPPORTED — it
+        // did not establish the subject).
         const storedCentrality: SubjectCentrality =
           verdict.centrality === 'UNKNOWN' ? 'UNSUPPORTED' : verdict.centrality;
-        item.subjectEvidence.decidedBy = 'adjudicator';
+        item.subjectEvidence.decidedBy = decidedVia;
         if (promote) {
           item.subjectEvidence.satisfied = true;
           item.subjectEvidence.status = 'PASS';

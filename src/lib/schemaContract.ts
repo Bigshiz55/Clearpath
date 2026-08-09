@@ -150,6 +150,8 @@ export const SCHEMA_CONTRACT: SchemaRequirement[] = [
   { object: 'watchmode_call_ledger', migration: '0041_watchmode_availability' },
   { object: 'watchmode_fetch_state', migration: '0041_watchmode_availability' },
   { object: 'watchmode_title_map', migration: '0041_watchmode_availability' },
+  { object: 'title_knowledge', migration: '0048_title_knowledge' },
+  { object: 'title_subject_facts', migration: '0048_title_knowledge' },
 ];
 
 /**
