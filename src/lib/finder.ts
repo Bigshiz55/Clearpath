@@ -34,7 +34,7 @@ import {
 import { adjudicateSubjectCentrality, type SubjectAdjudicator } from '@/lib/nlu/subjectAdjudicator';
 import { readSubjectFacts, writeSubjectFact, readTitleKnowledge, type StoredSubjectFact } from '@/lib/knowledge/store';
 import { resolveAmbiguousSubject } from '@/lib/knowledge/resolve';
-import { toneNudge } from '@/lib/knowledge/toneRank';
+import { applyHeaderRanking } from '@/lib/knowledge/toneRank';
 
 const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
 const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
@@ -135,10 +135,12 @@ export interface FinderQuery {
   /** Final user-facing result count the phrasing asked for (1 for "a boxing
    *  movie"). A FINAL-selection cap only — never the discovery pool size. */
   finalCount?: number | null;
-  /** Desired tones (softPreferences.tones on the AI-primary path). A compiled
-   *  title-knowledge tone match applies a small, bounded, eligibility-subordinate
-   *  ranking nudge — never a filter. Absent ⇒ the tone nudge is a no-op. */
+  /** Desired tones / settings (softPreferences.tones / .themes on the AI-primary
+   *  path). A compiled title-knowledge tone/setting match applies a small,
+   *  bounded, eligibility-subordinate ranking nudge — never a filter. Absent ⇒
+   *  the nudge is a no-op. */
   requestedTones?: string[];
+  requestedSettings?: string[];
   /** Keyword ids to EXCLUDE (`without_keywords`) — "a boxing movie, not wrestling". */
   excludeKeywordIds?: number[];
   /** Exact earliest release date (ISO yyyy-mm-dd) — "made within the last 20
@@ -751,27 +753,21 @@ export async function runFinder(
   const eligibleSurvivors = subjectRequired ? survivors.filter(isEligible) : survivors;
   const centralSubjectEligibleCount = subjectRequired ? eligibleSurvivors.length : deterministicEligibleCount;
 
-  // COMPILED TONE NUDGE (Knowledge Layer, bounded + subordinate). When the
-  // request expresses desired tones, a title whose COMPILED tone agrees gets a
-  // small rank bonus (±TONE_NUDGE_MAX, far below the Taste DNA scale). Applied
-  // ONLY to already-ELIGIBLE survivors — after every hard constraint and the
-  // subject gate — so it can reorder but never admit an ineligible title. A
-  // reward-only, safe-absent no-op when no tones are requested or nothing is
-  // compiled, so it adds nothing to the legacy path.
-  if (q.requestedTones && q.requestedTones.length > 0 && eligibleSurvivors.length > 0) {
-    const tones = q.requestedTones;
+  // COMPILED TONE + SETTING NUDGE (Knowledge Layer, bounded + subordinate). When
+  // the request expresses desired tones or settings, a title whose COMPILED
+  // header agrees gets a small rank bonus (≤ HEADER_NUDGE_MAX, far below the
+  // Taste DNA scale). Applied ONLY to already-ELIGIBLE survivors — after every
+  // hard constraint and the subject gate — so it can reorder but never admit or
+  // resurrect an ineligible title. Reward-only, reads only compiled/evidenced
+  // values, and a safe-absent no-op when nothing is requested or compiled, so it
+  // adds nothing to the legacy path.
+  const wantTones = q.requestedTones ?? [];
+  const wantSettings = q.requestedSettings ?? [];
+  if ((wantTones.length > 0 || wantSettings.length > 0) && eligibleSurvivors.length > 0) {
     const headers = await readTitleKnowledge(
       eligibleSurvivors.map((i) => ({ tmdbId: i.id, mediaType: i.mediaType })),
     ).catch(() => new Map<string, { tone: string[]; setting: string[] }>());
-    for (const item of eligibleSurvivors) {
-      const h = headers.get(`${item.mediaType}-${item.id}`);
-      if (!h) continue;
-      const bonus = toneNudge(h.tone, tones);
-      if (bonus > 0) {
-        item.matchScore = Math.min(100, item.matchScore + bonus);
-        item.receipts.unshift(`tone ✓ +${bonus}`);
-      }
-    }
+    applyHeaderRanking(eligibleSurvivors, headers, wantTones, wantSettings);
   }
 
   let items = eligibleSurvivors.sort((a, b) => b.matchScore - a.matchScore);
