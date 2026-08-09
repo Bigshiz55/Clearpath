@@ -86,7 +86,10 @@ export function runInterview(answerFor: AnswerSource, userId = 'sim-user', maxTu
     // Signals flow through the EXISTING reducer — same confidence model, same
     // claim memory, same contradiction detection as the free-form interview.
     state = advance(state, result.signals, nowMs);
-    if (!result.needsReask) state = withProgress(state, result.progress);
+    // ALWAYS persist progress, including on a re-ask: the attempt counter lives
+    // there, and dropping it means a question that cannot be parsed is asked
+    // forever instead of being given up on after `MAX_ATTEMPTS_PER_QUESTION`.
+    state = withProgress(state, result.progress);
 
     const ack = acknowledgement(result);
     if (ack) transcript.push(`interviewer: ${ack}`);

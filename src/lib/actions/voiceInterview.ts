@@ -205,8 +205,11 @@ export async function recordScriptedTurn(input: {
     return { ok: true, state, question: null, done: true, ack: '' };
   }
 
-  let next = advance(state, result.signals, Date.now());
-  if (!result.needsReask) next = withProgress(next, result.progress);
+  // ALWAYS persist progress, re-ask included: the per-question attempt counter
+  // lives there. Dropping it on a re-ask means an answer we cannot parse is
+  // asked again forever — the interview dead-ends on whatever question the user
+  // happened to mumble at, with no way out.
+  const next = withProgress(advance(state, result.signals, Date.now()), result.progress);
   await saveInterview(g.supabase, next);
 
   return {

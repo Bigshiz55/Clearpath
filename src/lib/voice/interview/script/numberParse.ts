@@ -74,6 +74,13 @@ interface Token {
   value: number;
   /** Character index in the normalized string, for label proximity. */
   at: number;
+  /**
+   * How the value was derived. A spoken NUMBER is an answer; a sentiment word
+   * is only an interpretation of one, and in a sentence like "I quite like the
+   * first one, maybe a seven" the word "like" is preamble rather than a score.
+   * Numbers therefore win whenever there are enough of them.
+   */
+  kind: 'number' | 'sentiment';
 }
 
 /**
@@ -94,26 +101,34 @@ export function extractValues(norm: string): Token[] {
   // 1) Digits. `10` before single digits, and never a digit inside a word.
   for (const m of norm.matchAll(/\b(10|[1-9])\b/g)) {
     const at = m.index ?? 0;
-    if (claim(at, at + m[0].length)) tokens.push({ value: Number(m[0]), at });
+    if (claim(at, at + m[0].length)) tokens.push({ value: Number(m[0]), at, kind: 'number' });
   }
 
-  // 2) Number words.
+  // 2) Number words — but "one" is usually a PRONOUN, not a score.
+  //
+  // "I quite like the first one, maybe a seven" contains two number words and
+  // only one of them is an answer. Reading "the first one" as a 1 silently
+  // scored a genre the user was only pointing at, and the mistake is invisible
+  // because the count still came out right.
+  const PRONOUN_ONE_BEFORE = /\b(the|this|that|which|first|second|third|last|next|other|another|each|every|any|no)\s+$/;
   for (const m of norm.matchAll(/\b([a-z]+)\b/g)) {
     const word = m[1] ?? '';
     const at = m.index ?? 0;
     const value = NUMBER_WORDS[word];
-    if (value !== undefined && claim(at, at + word.length)) tokens.push({ value, at });
+    if (value === undefined) continue;
+    if (word === 'one' && PRONOUN_ONE_BEFORE.test(norm.slice(0, at))) continue;
+    if (claim(at, at + word.length)) tokens.push({ value, at, kind: 'number' });
   }
 
   // 3) Sentiment shorthand over whatever is left.
   for (const rule of SENTIMENT_VALUES) {
     for (const m of norm.matchAll(new RegExp(rule.re.source, 'g'))) {
       const at = m.index ?? 0;
-      if (claim(at, at + m[0].length)) tokens.push({ value: rule.value, at });
+      if (claim(at, at + m[0].length)) tokens.push({ value: rule.value, at, kind: 'sentiment' });
     }
   }
 
-  return tokens.sort((a, b) => a.at - b.at).map((t) => ({ value: clampScale(t.value), at: t.at }));
+  return tokens.sort((a, b) => a.at - b.at).map((t) => ({ value: clampScale(t.value), at: t.at, kind: t.kind }));
 }
 
 /** Where each label appears in the answer, or -1. Longest alias wins. */
@@ -146,8 +161,17 @@ export function parseGroupedAnswer(text: string, labelAliases: string[][]): Pars
   };
   if (!norm || count === 0) return none;
 
-  const tokens = extractValues(norm);
-  if (tokens.length === 0) return none;
+  const all = extractValues(norm);
+  if (all.length === 0) return none;
+
+  // NUMBERS BEAT SENTIMENT when there are enough of them. "I quite like the
+  // first one, maybe a seven, ... so two, ... call it a nine" holds three real
+  // scores and one stray "like" that belongs to the preamble; counting the
+  // "like" pushed every answer one place left and mis-scored the whole group.
+  // Sentiment shorthand stays available for genuinely mixed answers such as
+  // "love it, six, absolutely not", where the numbers alone are not enough.
+  const numeric = all.filter((t) => t.kind === 'number');
+  const tokens = numeric.length >= count ? numeric : all;
 
   // ── Strategy 1: label-anchored ──────────────────────────────────────────
   const positions = labelPositions(norm, labelAliases);

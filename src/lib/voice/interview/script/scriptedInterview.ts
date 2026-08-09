@@ -49,9 +49,42 @@ export interface ScriptProgress {
   genreScores: Record<string, number>;
   /** Named titles captured in stage 4, with polarity. */
   anchors: { title: string; polarity: 'positive' | 'negative' }[];
+  /** Question id → how many times we failed to read an answer for it. */
+  reasks?: Record<string, number>;
 }
 
-export const EMPTY_PROGRESS: ScriptProgress = { answeredIds: [], genreScores: {}, anchors: [] };
+export const EMPTY_PROGRESS: ScriptProgress = { answeredIds: [], genreScores: {}, anchors: [], reasks: {} };
+
+/**
+ * How many times one question may be re-asked before the interview moves on.
+ *
+ * Without a cap, a user who answers "I dunno" twice is asked the SAME question
+ * forever: the interview dead-ends on question one and there is no way out of
+ * it. Moving on after a second failure keeps the conversation alive, and
+ * records NOTHING for that question — declining to answer is information we do
+ * not have, not a middling score we invent on their behalf.
+ */
+export const MAX_ATTEMPTS_PER_QUESTION = 2;
+
+/**
+ * Ways of saying "no answer". These must never become data: on a title anchor
+ * "I don't know" was previously captured as a film called "I don't know" and
+ * written into `preference_events` as something the user LOVED — a permanent,
+ * wrong entry in their real Watch DNA, produced by the most ordinary thing a
+ * person can say.
+ */
+const DECLINE_RE =
+  /^(i\s+)?(really\s+)?(dont|don't|do not)\s+know|^not\s+(sure|really)|^no\s+idea|^dunno|^unsure|^cant\s+think|^can'?t\s+think|^nothing( much| really)?$|^skip|^pass$|^next$|^none$|^n\/?a$|^h+m+$|^u+[hm]+$|^e+r+m*$/i;
+
+/** True when an utterance is a refusal or a shrug rather than an answer. */
+export function isDecline(text: string): boolean {
+  const t = (text ?? '').trim().replace(/[.!?,]+$/g, '');
+  if (!t) return true;
+  if (DECLINE_RE.test(t)) return true;
+  // "umm not sure really", "I guess I don't know" — a decline wrapped in filler.
+  const stripped = t.replace(/^(umm?|uh+|er+m?|well|so|i guess|honestly|maybe)\s+/gi, '').trim();
+  return stripped !== t && DECLINE_RE.test(stripped);
+}
 
 /** The script state on an interview, tolerating a row saved before it existed. */
 export function progressOf(state: InterviewState): ScriptProgress {
@@ -61,6 +94,7 @@ export function progressOf(state: InterviewState): ScriptProgress {
     answeredIds: Array.isArray(p.answeredIds) ? p.answeredIds : [],
     genreScores: p.genreScores && typeof p.genreScores === 'object' ? p.genreScores : {},
     anchors: Array.isArray(p.anchors) ? p.anchors : [],
+    reasks: p.reasks && typeof p.reasks === 'object' ? p.reasks : {},
   };
 }
 
@@ -154,7 +188,9 @@ function signalForItem(item: ScaleItem, score: number, turn: number, index: numb
 export function signalsForAnswer(question: ScriptQuestion, text: string, turn: number): TasteSignal[] {
   if (question.kind === 'anchor') {
     const title = text.trim();
-    if (!title) return [];
+    // A shrug is not a film. Recording it would put "I don't know" in their
+    // Watch DNA as something they loved.
+    if (!title || isDecline(title)) return [];
     const positive = question.polarity === 'positive';
     return [
       {
@@ -191,6 +227,8 @@ export interface ScriptedTurn {
   scores: Record<string, number>;
   /** True when the answer was unreadable and the question should be re-asked. */
   needsReask: boolean;
+  /** True when we gave up on this question and moved on, recording nothing. */
+  declined?: boolean;
   /** The next script progress. */
   progress: ScriptProgress;
 }
@@ -211,7 +249,23 @@ export function answerScripted(state: InterviewState, text: string, turn: number
   const signals = signalsForAnswer(question, text, turn);
 
   if (signals.length === 0) {
-    return { question, signals: [], scores: {}, needsReask: true, progress };
+    const attempts = (progress.reasks?.[question.id] ?? 0) + 1;
+    const reasks = { ...(progress.reasks ?? {}), [question.id]: attempts };
+
+    // Out of attempts: move on rather than asking the same thing forever.
+    // The question is consumed with NO signals — we learned nothing here, and
+    // inventing a score for someone who declined is worse than not knowing.
+    if (attempts >= MAX_ATTEMPTS_PER_QUESTION) {
+      return {
+        question,
+        signals: [],
+        scores: {},
+        needsReask: false,
+        declined: true,
+        progress: { ...progress, answeredIds: [...progress.answeredIds, question.id], reasks },
+      };
+    }
+    return { question, signals: [], scores: {}, needsReask: true, progress: { ...progress, reasks } };
   }
 
   const scores: Record<string, number> = {};
@@ -257,7 +311,11 @@ export function withProgress(state: InterviewState, progress: ScriptProgress): I
  * chosen deterministically from the answer itself rather than generated.
  */
 export function acknowledgement(turnResult: ScriptedTurn): string {
-  if (turnResult.needsReask) return 'Sorry — one to ten?';
+  // Gave up on this one — move on warmly, without making it awkward.
+  if (turnResult.declined) return 'No worries.';
+  if (turnResult.needsReask) {
+    return turnResult.question.kind === 'anchor' ? 'Anything come to mind?' : 'Sorry — one to ten?';
+  }
   if (turnResult.question.kind === 'anchor') {
     return turnResult.question.polarity === 'positive' ? 'Good one.' : 'Noted.';
   }

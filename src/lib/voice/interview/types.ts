@@ -241,6 +241,8 @@ export interface InterviewState {
     genreScores: Record<string, number>;
     /** Titles named in stage 4. */
     anchors: { title: string; polarity: 'positive' | 'negative' }[];
+    /** Question id → failed read attempts, so a question cannot loop forever. */
+    reasks?: Record<string, number>;
   };
 }
 

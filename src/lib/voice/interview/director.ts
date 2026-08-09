@@ -239,9 +239,21 @@ const BEAT_FOR_ACTION: Partial<Record<DirectiveAction, TranscriptEntry['beat']>>
 export function advance(state: InterviewState, incoming: TasteSignal[], nowMs: number): InterviewState {
   const turn = state.turn + 1;
   const rawList = Array.isArray(incoming) ? incoming : [];
+
+  // ONE UTTERANCE, SCORED ONCE.
+  //
+  // A signal id is stable for the turn that produced it, so a replayed turn —
+  // a retried server action, a double-submitted answer, a reconnect that
+  // re-sends the last batch — arrives carrying ids this state has already
+  // folded in. Without this guard the same sentence moves confidence twice and
+  // the user's profile quietly over-weights whatever they happened to say when
+  // the network hiccuped. Dropping already-seen ids makes `advance` idempotent
+  // per signal, which is the property the whole turn loop assumes it has.
+  const seen = new Set(state.signals.map((s) => s.id));
   const signals = rawList
     .map((s, i) => sanitizeSignal(s, turn, i))
-    .filter((s): s is TasteSignal => s !== null);
+    .filter((s): s is TasteSignal => s !== null)
+    .filter((s) => !seen.has(s.id));
 
   // The question this turn answered — recorded as "asked" so we don't repeat it.
   const directive = decide(state);
