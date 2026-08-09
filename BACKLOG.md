@@ -42,6 +42,25 @@ and what it unblocks.
   representative.
 
 ## Done
+- **Voice DNA — scripted staged interview + deterministic app-driven turn loop.**
+  Two product fixes, at the architecture level. (1) Stage 1 is now rapid-fire
+  grouped genre triples, preserving the full flow (genre triage → adaptive
+  drill-down → viewing preferences → title anchors) via a new pure
+  `planDirective` in `src/lib/voice/interview/stages.ts`; the deterministic engine
+  still folds every answer into confidence + DNA, a live contradiction still
+  preempts, and the hard turn cap still guarantees termination. (2) The Realtime
+  turn-order/race is gone: the app authors every line and the model is only the
+  voice — session minted with `server_vad` + `create_response:false` +
+  `interrupt_response:true`, `tool_choice:'none'`, model `gpt-realtime`, voice
+  `marin`. The app speaks each scripted line via `response.create`; the user's
+  transcript becomes a `TasteSignal` through the SAME pure `deriveSignal` the
+  keyless fallback uses, and every utterance advances exactly one turn
+  (`onUserTurn`) — an empty answer still asks the next line, so the loop never
+  dead-ends after one answer. Gates: typecheck / lint / vitest (3137 passed, 24
+  skipped) / build all exit 0; product-flow E2E (`tests/mobile/voice-interview.spec.ts`,
+  keyless/typed) proves the one-button flow drives Stage 1 → the DNA reveal with
+  no dead-end and no phone overflow. Commits `8a28d94`, `2ac983d` on
+  `claude/watch-verdict-app-wwbtbg`.
 - **Voice DNA Interview made public (un-gated).** Dropped the founder gate and
   hidden-404/noindex from `/voice-dna` and `/voice-dna/audition` and from
   `POST /api/voice/session` (still degrades to the keyless fallback with no
