@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from '@/lib/finder';
 import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY, parseTopicTerms, extractExcludedPerson } from '@/lib/finderParse';
+import { firstClarification, type AmbiguityKey } from '@/lib/nlu/clarify';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
@@ -138,6 +139,7 @@ export async function POST(req: Request) {
     let convState: CanonicalRequest | null = null;
     let convInterpretation: string[] = [];
     let convClarify: string | null = null;
+    let convClarifyOptions: string[] | undefined;
     let prevHadConstraints = false;
     if (conversational) {
       // CROSS-USER GUARD (server-enforced, not just client-trusted). The client
@@ -180,6 +182,7 @@ export async function POST(req: Request) {
             chips: chipsFor(convState),
             interpretation: convInterpretation,
             clarify: convClarify,
+            clarifyOptions: convClarifyOptions,
             userKey,
           }
         : payload;
@@ -278,6 +281,25 @@ export async function POST(req: Request) {
     // user can see as chips is exactly what runs.
     if (conversational && convState) {
       const s = convState;
+
+      // CONFIDENCE-AWARE CLARIFICATION (§7). If THIS turn introduced a material
+      // ambiguity the merged state has not resolved (e.g. "foreign" with no
+      // language/country pinned; "old" with no year bound), ask ONE concise
+      // question with selectable answers BEFORE spending a search. Anything the
+      // state already resolved is never re-asked, so it never becomes an
+      // interview. The answers are appendable phrases that resolve on re-submit.
+      if (text.trim()) {
+        const resolved: AmbiguityKey[] = [];
+        if (s.originalLanguageClass !== 'any' || s.originalLanguages.length > 0 || s.originCountries.length > 0) resolved.push('origin');
+        if (s.minYear != null || s.maxYear != null || s.releasedAfter != null) resolved.push('era');
+        const amb = firstClarification(text, resolved);
+        if (amb) {
+          convClarify = amb.question;
+          convClarifyOptions = amb.options;
+          return NextResponse.json(withConv({ kind: 'clarify', query: { ...EMPTY_QUERY }, items: [] }));
+        }
+      }
+
       const limitConv = text ? parseRequestedCount(text) : DEFAULT_RESULT_LIMIT;
       // Hard constraints that the similarity path cannot enforce.
       const stateHasHard =

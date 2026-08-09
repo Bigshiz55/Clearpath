@@ -40,6 +40,8 @@ interface Msg {
   text: string;
   items?: ResultItem[];
   verdict?: TitleVerdict; // a named title put on trial
+  clarifyOptions?: string[]; // selectable answers to a clarification question
+  clarifyBase?: string; // the text an answer is appended to on re-submit
 }
 
 const EXAMPLES = [
@@ -211,6 +213,24 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
         return;
       }
 
+      // CONFIDENCE-AWARE CLARIFICATION (§7). The server decided one material
+      // ambiguity is worth a single question before searching. Render it with
+      // selectable answers; picking one re-files the same case with the answer
+      // appended, which resolves the ambiguity through the normal parser.
+      if (data.kind === 'clarify' || (data.clarify && Array.isArray(data.clarifyOptions) && data.clarifyOptions.length > 0)) {
+        setMsgs((m) => [
+          ...m,
+          {
+            id: nextId.current++,
+            role: 'judge',
+            text: data.clarify ?? 'Could you tell me a little more about what you want?',
+            clarifyOptions: Array.isArray(data.clarifyOptions) ? data.clarifyOptions : [],
+            clarifyBase: text,
+          },
+        ]);
+        return;
+      }
+
       const items: ResultItem[] = data.items ?? [];
       // Prefer the server's read-back of what THIS TURN changed — it is the
       // actual interpretation, not a client-side guess.
@@ -327,6 +347,24 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
                     {m.verdict && (
                       <div className="mt-3">
                         <JudgeVerdictCard v={m.verdict} />
+                      </div>
+                    )}
+                    {m.clarifyOptions && m.clarifyOptions.length > 0 && (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5" data-testid="clarify-options">
+                        {m.clarifyOptions.map((opt) => (
+                          <button
+                            key={opt}
+                            type="button"
+                            disabled={loading}
+                            onClick={() => {
+                              const base = (m.clarifyBase ?? '').trim();
+                              void submit(base ? `${base} ${opt}` : opt);
+                            }}
+                            className="rounded-full border border-brand-400/40 bg-brand-500/15 px-3 py-1 text-xs text-brand-50 hover:bg-brand-500/25 disabled:opacity-50"
+                          >
+                            {opt}
+                          </button>
+                        ))}
                       </div>
                     )}
                     {m.items && m.items.length > 0 && (

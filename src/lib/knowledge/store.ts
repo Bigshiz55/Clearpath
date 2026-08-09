@@ -111,6 +111,62 @@ export async function writeSubjectFact(
   }
 }
 
+/**
+ * Batched read of the stored compiler_version for a set of titles, keyed
+ * `"{mediaType}-{tmdbId}"`. Used by the warm job to skip titles already
+ * compiled at the current version (idempotency). Empty Map on any failure.
+ */
+export async function readTitleKnowledgeVersions(
+  titles: Array<{ tmdbId: number; mediaType: MediaType }>,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (titles.length === 0) return out;
+  try {
+    const admin = createAdminClient();
+    const ids = Array.from(new Set(titles.map((t) => t.tmdbId)));
+    const { data, error } = await admin
+      .from('title_knowledge')
+      .select('tmdb_id, media_type, compiler_version')
+      .in('tmdb_id', ids);
+    if (error || !data) return out;
+    for (const row of data as Array<Record<string, unknown>>) {
+      out.set(keyOf(String(row.media_type) as MediaType, Number(row.tmdb_id)), String(row.compiler_version ?? ''));
+    }
+  } catch {
+    /* safe-absent */
+  }
+  return out;
+}
+
+/**
+ * Batched read of compiled headers (tone/setting) for a set of titles, keyed
+ * `"{mediaType}-{tmdbId}"`. Used by the ranking tone-nudge. Empty Map on failure.
+ */
+export async function readTitleKnowledge(
+  titles: Array<{ tmdbId: number; mediaType: MediaType }>,
+): Promise<Map<string, { tone: string[]; setting: string[] }>> {
+  const out = new Map<string, { tone: string[]; setting: string[] }>();
+  if (titles.length === 0) return out;
+  try {
+    const admin = createAdminClient();
+    const ids = Array.from(new Set(titles.map((t) => t.tmdbId)));
+    const { data, error } = await admin
+      .from('title_knowledge')
+      .select('tmdb_id, media_type, tone, setting')
+      .in('tmdb_id', ids);
+    if (error || !data) return out;
+    for (const row of data as Array<Record<string, unknown>>) {
+      out.set(keyOf(String(row.media_type) as MediaType, Number(row.tmdb_id)), {
+        tone: Array.isArray(row.tone) ? (row.tone as string[]) : [],
+        setting: Array.isArray(row.setting) ? (row.setting as string[]) : [],
+      });
+    }
+  } catch {
+    /* safe-absent */
+  }
+  return out;
+}
+
 /** Header upsert (tone/setting/anti-evidence/provenance) for a compiled title. */
 export async function writeTitleKnowledge(
   tmdbId: number,

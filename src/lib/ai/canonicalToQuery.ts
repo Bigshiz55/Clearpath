@@ -77,6 +77,9 @@ export function canonicalToQuery(req: CanonicalDiscoveryRequest): MappedQuery {
     maxYear: h.releaseDateMax ? Number(h.releaseDateMax.slice(0, 4)) : undefined,
     monetization: h.requiredMonetization.length ? h.requiredMonetization.join('|') : undefined,
     pace: paceFromTones(req.softPreferences.tones),
+    // Desired tones flow to a BOUNDED, eligibility-subordinate ranking nudge
+    // against compiled title-knowledge tone (never a filter).
+    requestedTones: req.softPreferences.tones.length ? [...req.softPreferences.tones] : undefined,
     similarTo: req.referenceTitles.length ? req.referenceTitles.map((r) => r.text).join(' / ') : undefined,
     // Required subjects become a HARD qualification gate. keyword ids are resolved
     // by the route (needs I/O); the lexemes + strict flag are set here so the
