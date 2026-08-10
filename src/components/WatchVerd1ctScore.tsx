@@ -38,6 +38,7 @@ export function WatchVerd1ctScore({
   layout = 'row',
   /** Reserve the block's height before a score arrives, so nothing shifts. */
   reserveWhenEmpty = false,
+  callTestId = 'wv-score-call',
   className = '',
 }: {
   score: number | null;
@@ -45,6 +46,9 @@ export function WatchVerd1ctScore({
   px?: number;
   layout?: 'row' | 'stack';
   reserveWhenEmpty?: boolean;
+  /** Overridable so a surface that already had a stable selector for the call
+   *  keeps it when it adopts this component. */
+  callTestId?: string;
   className?: string;
 }) {
   if (score == null) {
@@ -88,9 +92,13 @@ export function WatchVerd1ctScore({
           {personal ? (<>Your VERD<span style={{ color: '#ff1493' }}>1</span>CT</>) : 'WatchVerd1ct'}
         </div>
         <span
-          data-testid="wv-score-call"
+          data-testid={callTestId}
           className={`mt-0.5 inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-sm font-black tracking-tight ${v.visual.badge}`}
-          aria-label={`${label} is ${v.call}, scoring ${score} out of 100. Viewing availability is a separate question.`}
+          /* TWO CLAIMS, NAMED SEPARATELY. Without this a screen reader
+             announces a bare "STREAM IT", which is indistinguishable from an
+             availability instruction — and this panel has never had an
+             availability input. Wording is asserted by cardSeparation.test.ts. */
+          aria-label={`Your recommendation verdict is ${v.call}. Current viewing availability is not confirmed by this panel — see Where to watch.`}
         >
           {v.call}
         </span>

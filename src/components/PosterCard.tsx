@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { MoreInfoLink } from './MoreInfoLink';
 import type { MediaType } from '@/lib/types';
 import { AlgorithmScore } from './AlgorithmScore';
 import { SaveButton } from './SaveButton';
@@ -192,7 +193,24 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             sibling overlay — never nested inside the button/Link. */}
         <TrailerMedia tmdbId={saveId} mediaType={mediaType} title={title}>
           {onOpen ? (
-            <button type="button" onClick={onOpen} className="relative block h-full w-full text-left" aria-label={`Quick look at ${title}`}>{poster}</button>
+            <button type="button" onClick={onOpen} className="relative block h-full w-full text-left" aria-label={`Open more information for ${title}`}>{poster}</button>
+          ) : saveId != null ? (
+            /* CLICK = UNDERSTAND IT — More Info over the results, not a
+               navigation away from them. See MoreInfoLink. */
+            <MoreInfoLink
+              href={href}
+              target={{ id: saveId, mediaType, title, year: year ?? null, posterPath: posterPath ?? null }}
+              /* ABSOLUTE, NOT `h-full`. As a percentage height this resolved
+                 to the poster placeholder's own 32px inside the aspect-ratio
+                 box, so the largest thing on the card was a 32px tap target —
+                 invisible until the poster became a link, because the check
+                 only inspects anchors and buttons. Filling the box removes the
+                 dependency on percentage-height resolution entirely. */
+              className="absolute inset-0 block"
+              label={`Open more information for ${title}`}
+            >
+              {poster}
+            </MoreInfoLink>
           ) : href ? (
             <Link href={href} className="relative block h-full">{poster}</Link>
           ) : (
@@ -204,6 +222,21 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
       <div className="wv-card-body">
         {onOpen ? (
           <button type="button" onClick={onOpen} className="block w-full text-left">{heading}</button>
+        ) : saveId != null ? (
+          <MoreInfoLink
+            href={href}
+            target={{ id: saveId, mediaType, title, year: year ?? null, posterPath: posterPath ?? null }}
+            /* 44px FLOOR. A one-line title made this a 41px target — three
+               pixels under, and only on the cards with short titles, which is
+               exactly the kind of miss that never shows up in a screenshot.
+               The card's own alignment is unaffected: the action row is
+               anchored with `mt-auto`, so a taller heading eats slack above it
+               rather than moving the row. */
+            className="block min-h-[44px]"
+            label={`Open more information for ${title}`}
+          >
+            {heading}
+          </MoreInfoLink>
         ) : href ? (
           <Link href={href} className="block">{heading}</Link>
         ) : (

@@ -17,7 +17,17 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
  */
 
 const posterCard = read('src/components/PosterCard.tsx');
-const verdictPanel = read('src/components/AlgorithmScore.tsx');
+/**
+ * THE VERDICT MARK MOVED, THE CONTRACT DID NOT.
+ *
+ * These assertions used to read `AlgorithmScore.tsx`, which composed the
+ * badge, the label and the call inline. That inline copy is gone: the card,
+ * More Info and the ratings strip now all render the ONE shared
+ * `WatchVerd1ctScore`, so the label-before-call ordering and the
+ * disambiguating aria-label live there. Same guarantees, one file instead of
+ * three — which is the point of the change these tests are now reading.
+ */
+const verdictPanel = read('src/components/WatchVerd1ctScore.tsx');
 const whereToWatch = read('src/components/watch/WhereToWatch.tsx');
 const resolver = read('src/lib/availability/watchPresentation.ts');
 

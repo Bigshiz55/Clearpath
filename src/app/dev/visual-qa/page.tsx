@@ -46,7 +46,7 @@ export default function VisualQaHarness() {
 
         <section aria-label="poster grid" className="poster-grid" data-testid="qa-grid">
           {CARDS.map((c, i) => (
-            <PosterCard key={i} title={c.title} year={c.year} mediaType={c.mediaType} posterUrl={c.posterUrl} meta={c.meta ?? undefined} tmdbId={1000 + i} />
+            <PosterCard key={i} href={`/app/title/${c.mediaType}/${1000 + i}`} title={c.title} year={c.year} mediaType={c.mediaType} posterUrl={c.posterUrl} meta={c.meta ?? undefined} tmdbId={1000 + i} />
           ))}
         </section>
       </main>

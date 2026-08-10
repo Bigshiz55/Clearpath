@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
-import { scoreVerdict } from '@/lib/verdictVisual';
-import { Verd1ctBadge, verd1ctBadgeHeight } from './Verd1ctBadge';
+import { WatchVerd1ctScore } from './WatchVerd1ctScore';
 import { CardRatings } from './CardRatings';
 
 /**
@@ -42,7 +41,6 @@ export function AlgorithmScore({
 
   const personal = isPersonalized(dna);
   const score = personal ? dna!.score : dna?.score ?? objectiveScore;
-  const v = score != null ? scoreVerdict(score) : null;
 
   return (
     <div
@@ -65,48 +63,24 @@ export function AlgorithmScore({
           cards. Below ~310px of panel the ratings wrap underneath (see
           `.wv-score-ratings` in globals.css) rather than being squeezed. */}
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        {(() => {
-          const px = compact ? 38 : 42;
-          if (score != null) return <Verd1ctBadge score={score} px={px} />;
-          // THE PLACEHOLDER IS THE BADGE'S REAL HEIGHT, antennas and feet
-          // included — sized to `px` alone it is 17px short, and every card in
-          // the grid grew by that the moment a score landed.
-          return (
-            <span
-              className="grid flex-none place-items-center rounded-[24%] bg-white/10 text-xl font-black text-slate-400"
-              style={{ width: px, height: verd1ctBadgeHeight(px) }}
-            >
-              —
-            </span>
-          );
-        })()}
-        {/* THE LABEL GOES ABOVE THE CALL, NOT UNDER IT.
-            "STREAM IT" on its own is an instruction, and it sat directly above
-            "Availability not currently confirmed" — a card telling you to go
-            stream something while admitting it does not know whether you can.
-            The call is a TASTE verdict: it comes from `scoreVerdict(score)`,
-            which takes a number and nothing else and has never had an
-            availability input. Reading the label first ("YOUR VERD1CT") makes
-            that explicit, and the WHERE TO WATCH block immediately below
-            answers the separate question of fact. */}
-        <div className="min-w-0">
-          <div className="text-[10px] font-black uppercase leading-tight tracking-wide text-pink-200/80">
-            {personal ? (<>Your VERD<span style={{ color: '#ff1493' }}>1</span>CT</>) : 'WatchVerd1ct'}
-            {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 ? ' · learning' : ''}
-          </div>
-          {v && (
-            <span
-              className={`mt-0.5 inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-sm font-black tracking-tight ${v.visual.badge}`}
-              data-testid="verdict-call"
-              /* Screen readers get the distinction spelled out: without this,
-                 "STREAM IT" is announced as a bare imperative indistinguishable
-                 from the availability row beneath it. */
-              aria-label={`Your recommendation verdict is ${v.call}. Current viewing availability is not confirmed by this panel — see Where to watch.`}
-            >
-              {v.call}
-            </span>
-          )}
-        </div>
+        {/* THE ONE MARK — see WatchVerd1ctScore.
+            This used to compose the badge, the label and the call inline. That
+            inline copy was the reference identity the drawer and the strip had
+            drifted away from, so leaving it here would let them drift again
+            from the other direction. The card now renders the SAME component
+            as everything else; `callTestId` keeps the selector this surface
+            already had. `reserveWhenEmpty` holds the mark's true height before
+            a score lands, so the grid does not grow underneath a thumb. */}
+        <WatchVerd1ctScore
+          score={score ?? null}
+          personal={personal}
+          px={compact ? 38 : 42}
+          reserveWhenEmpty
+          callTestId="verdict-call"
+        />
+        {personal && dna!.sampleSize > 0 && dna!.confidence < 0.5 && (
+          <span className="text-[10px] font-black uppercase tracking-wide text-pink-200/60">· learning</span>
+        )}
 
         {/* The source ratings that feed the score. */}
         <CardRatings mediaType={mediaType} tmdbId={tmdbId} title={title} year={year} hideCall className="wv-score-ratings" />
