@@ -69,12 +69,25 @@ describe('Voice DNA is reachable from the production navigation', () => {
     expect(entry?.href).not.toContain('lab');
   });
 
-  it('the destination page exists and renders the real interview', () => {
+  it('the destination page exists and renders the real experience', () => {
+    // The onboarding experience is the 60-second calibration; the open-ended
+    // conversation moved one door in, to /voice-dna/deep. What this guard
+    // actually protects is unchanged: the menu entry must land on a working
+    // product surface, not a redirect, a stub or a 404.
     const page = read('src/app/voice-dna/page.tsx');
-    expect(page).toContain('VoiceInterview');
+    expect(page).toContain('RapidCalibration');
     // Not founder-gated: an ordinary user reaching it must not get a 404.
     expect(page).not.toContain('isFounderOrAdminEmail');
     expect(page).not.toContain('notFound()');
+  });
+
+  it('the deeper interview survives the move, reachable from the summary', () => {
+    const deep = read('src/app/voice-dna/deep/page.tsx');
+    expect(deep).toContain('VoiceInterview');
+    expect(deep).not.toContain('isFounderOrAdminEmail');
+    // "Fine-tune my DNA" is the only door to it — if that link goes, the
+    // conversational interview becomes unreachable exactly as /voice-dna once was.
+    expect(read('src/components/voice/calibration/RapidCalibration.tsx')).toContain('/voice-dna/deep');
   });
 
   it('the one menu list feeds BOTH the desktop dropdown and the mobile sheet', () => {

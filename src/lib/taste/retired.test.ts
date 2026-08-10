@@ -85,7 +85,11 @@ describe('the interview is gone', () => {
     expect(page).not.toContain("redirect('/app/dna");
     expect(page).not.toContain('isFounderOrAdminEmail');
     expect(page).toContain('auth.getUser()');
-    expect(page).toContain('VoiceInterview');
+    // The onboarding surface is the 60-second calibration. The open-ended
+    // interview it replaced still exists at /voice-dna/deep — this pins that
+    // /voice-dna is a real, un-gated experience, not which one it happens to be.
+    expect(page).toContain('RapidCalibration');
+    expect(read('src/app/voice-dna/deep/page.tsx')).toContain('VoiceInterview');
 
     // The audition tool next door stays founder-only.
     const audition = read('src/app/voice-dna/audition/page.tsx');

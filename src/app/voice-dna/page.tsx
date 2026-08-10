@@ -1,25 +1,27 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { VoiceInterview } from '@/components/voice/VoiceInterview';
+import { RapidCalibration } from '@/components/voice/calibration/RapidCalibration';
 
 /**
- * VOICE DNA — the spoken taste interview. A NORMAL product surface.
+ * VOICE DNA — the 60-second calibration. This is the onboarding experience.
  *
- * This was founder-gated behind a hidden 404 while the feature was being built.
- * It is not any more: the interview is the fastest way a new person can get a
- * usable Watch DNA, so it uses the same session model as the Taste Quiz —
- * signed in, or an anonymous guest minted by middleware ("no account needed to
- * explore"). Founder gating remains only on the diagnostic surface next door,
- * `/voice-dna/audition`, which exists to compare vendor voices.
+ * It replaced a conversational interview that asked open questions and talked
+ * back after every answer. That version worked and nobody wanted to use it: it
+ * took minutes, it explained itself, and it made the person do the talking.
+ * This one names fifteen kinds of show and asks for a number, which is the
+ * fastest honest way to learn a taste baseline.
  *
- * `/voice-dna` is in `PROTECTED_PREFIXES`, so by the time this renders a session
- * exists. The redirect below is the belt-and-braces case where anonymous
- * sign-ins are disabled on the Supabase project and middleware sent the user to
- * login instead — we send them the same way rather than rendering an interview
- * with nowhere to save its answers.
+ * The conversation still exists, one door further in, at `/voice-dna/deep` —
+ * reachable from "Fine-tune my DNA" at the end of a calibration. It is a depth
+ * option, not the front door.
  *
- * Still `noindex`: a half-finished interview is not a search result.
+ * Session model is unchanged: `/voice-dna` is in `PROTECTED_PREFIXES`, so
+ * middleware has already minted a guest session by the time this renders. The
+ * redirect below is the belt-and-braces case where anonymous sign-ins are
+ * disabled and there is nowhere to save answers to.
+ *
+ * Still `noindex`: an onboarding flow is not a search result.
  */
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -36,7 +38,7 @@ export default async function VoiceDnaPage() {
 
   return (
     <main className="min-h-screen bg-cinema-radial">
-      <VoiceInterview />
+      <RapidCalibration />
     </main>
   );
 }
