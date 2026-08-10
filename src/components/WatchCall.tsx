@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
-import { scoreVerdict } from '@/lib/verdictVisual';
+import { WatchVerd1ctScore } from './WatchVerd1ctScore';
 
 /**
  * The single headline Watchability rating — the 0–100 score that blends your DNA
@@ -43,17 +43,15 @@ export function WatchCall({
 
   if (score == null) return null;
 
-  const v = scoreVerdict(score);
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-black ${v.visual.badge} ${className}`}
-      title={
-        personal
-          ? `Watchability ${score}/100 — your DNA blended with every rating. This drives the ${v.call.toLowerCase()} call and the ranking order.`
-          : `Watchability ${score}/100 — every rating blended. Rate a few titles and your DNA starts weighting it. Drives the ranking order.`
-      }
-    >
-      {personal ? '🧬' : v.emoji} {score} · {v.call}
-    </span>
-  );
+  // ONE MARK EVERYWHERE — see WatchVerd1ctScore.
+  //
+  // This drew its own pill: an emoji, the number and the call as plain text
+  // ("🧬 84 · STREAM IT"). It carried the right INFORMATION and the wrong
+  // IDENTITY — the same score wore the pink Verd1ct television on a result
+  // card and a bare emoji here, so nothing taught a viewer they were the same
+  // proprietary metric. The distinction this component actually owns — whether
+  // the number is the user's own DNA-weighted score or the blend — survives as
+  // `personal`, which the shared mark renders as "Your VERD1CT" vs
+  // "WatchVerd1ct". Everything visual now comes from one place.
+  return <WatchVerd1ctScore score={score} personal={personal} px={34} className={className} />;
 }

@@ -1,6 +1,7 @@
 import type { TileRatings } from '@/lib/ratings';
 import type { MediaType } from '@/lib/types';
 import { WatchCall } from './WatchCall';
+import { WatchVerd1ctScore } from './WatchVerd1ctScore';
 
 function tomatoColor(pct: number): string {
   return pct >= 60 ? 'text-red-300' : 'text-emerald-300';
@@ -60,24 +61,24 @@ export function RatingsStrip({
   const verdict = ratings.standardScore == null ? 'na' : ratings.standardScore >= 55 ? 'stream' : 'skip';
   const popcorn = ratings.rtAudience ?? ratings.audience;
 
+  // ONE SCORE, ONE MARK — see WatchVerd1ctScore.
+  //
+  // This branch used to draw a GREEN pill with a checkmark ("✅ 84 · STREAM
+  // IT") whenever the surface had no mediaType/tmdbId to hand — which is every
+  // surface that shows the score OUTSIDE a result card: QuickLook, the detail
+  // view, the judge card. So the proprietary metric wore the app's brand mark
+  // on a card and a generic green tick everywhere else, and the one place it
+  // is supposed to be the hero was the one place it looked least like itself.
+  //
+  // Both branches now render the same pink mark. `WatchCall` still owns the
+  // live-hydrating case (it fetches the personal score), and it renders the
+  // shared component too — the only difference between the branches is where
+  // the NUMBER comes from, which is exactly the difference that should exist.
   const call =
     mediaType && tmdbId ? (
       <WatchCall mediaType={mediaType} tmdbId={tmdbId} objectiveScore={ratings.standardScore ?? null} />
     ) : (
-      <span
-        className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-black ${
-          verdict === 'stream'
-            ? 'bg-emerald-500/20 text-emerald-200'
-            : verdict === 'skip'
-              ? 'bg-red-500/20 text-red-200'
-              : 'bg-white/10 text-slate-300'
-        }`}
-        title="WatchVerd1ct's Watchability score (0–100) and the Stream It / Skip It call it produces"
-      >
-        {ratings.standardScore != null
-          ? `${verdict === 'stream' ? '✅' : '⛔'} ${ratings.standardScore} · ${verdict === 'stream' ? 'STREAM IT' : 'SKIP IT'}`
-          : 'STREAM/SKIP: NA'}
-      </span>
+      <WatchVerd1ctScore score={ratings.standardScore ?? null} px={34} />
     );
 
   return (
