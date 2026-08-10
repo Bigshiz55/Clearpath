@@ -60,9 +60,36 @@ import { EMPTY_QUERY } from '@/lib/finderParse';
 /** Fields whose neutral state is the value `EMPTY_QUERY` carries. */
 const NEUTRAL = EMPTY_QUERY as unknown as Record<string, unknown>;
 
+/**
+ * THE FIELD SET IS A UNION, NOT `EMPTY_QUERY`'s KEYS.
+ *
+ * `FinderQuery` has OPTIONAL members — `minYear`, `maxYear`, `excludeGenreIds`,
+ * `providerIds`, `originCountries`, `originalLanguages`, `englishDubOnly` — and
+ * `EMPTY_QUERY` does not list them, because "absent" is their neutral state.
+ * Walking `Object.keys(EMPTY_QUERY)` therefore skips them entirely.
+ *
+ * That is not a detail: those absent-by-default fields are precisely the ones
+ * the ask route used to rescue BY HAND (`if (det.minYear != null && …)`). A
+ * "general" rule that silently excluded them would have removed a working
+ * special case and replaced it with nothing — the randomized preservation test
+ * caught exactly that, by reporting that years and genre exclusions were never
+ * among the constraint types it could exercise.
+ *
+ * So the keys come from the union of the neutral shape and whatever the
+ * objects in play actually carry. A field cannot be protected unless it is
+ * looked at.
+ */
+function fieldsOf(...objs: (Record<string, unknown> | null)[]): string[] {
+  const keys = new Set<string>(Object.keys(NEUTRAL));
+  for (const o of objs) if (o) for (const k of Object.keys(o)) keys.add(k);
+  return [...keys];
+}
+
 function saidNothing(key: string, value: unknown): boolean {
   if (value == null) return true;
   if (Array.isArray(value)) return value.length === 0;
+  // Optional fields have no entry in NEUTRAL; `undefined` there means "absent
+  // is neutral", and any concrete value is a statement.
   return value === NEUTRAL[key];
 }
 
@@ -83,7 +110,7 @@ export function applyDeterministicFloor(
   const out = { ...merged } as unknown as Record<string, unknown>;
   const det = deterministic as unknown as Record<string, unknown>;
 
-  for (const key of Object.keys(NEUTRAL)) {
+  for (const key of fieldsOf(out, det)) {
     const detVal = det[key];
     // The deterministic parser had no opinion — nothing to protect.
     if (saidNothing(key, detVal)) continue;
@@ -111,7 +138,7 @@ export function overlayAi(base: FinderQuery, ai: FinderQuery | null): FinderQuer
   if (!ai) return base;
   const out = { ...base } as unknown as Record<string, unknown>;
   const src = ai as unknown as Record<string, unknown>;
-  for (const key of Object.keys(NEUTRAL)) {
+  for (const key of fieldsOf(out, src)) {
     if (!saidNothing(key, src[key])) out[key] = src[key];
   }
   return out as unknown as FinderQuery;
