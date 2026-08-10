@@ -162,6 +162,71 @@ test('rapid double-taps cannot double-count a decision', async ({ page }) => {
   ).toBeLessThanOrEqual(1);
 });
 
+test('the question is in the middle and the answers are in the circle', async ({ page }) => {
+  await page.goto(HARNESS);
+  await page.getByTestId('rush-start').click();
+
+  // The opening round is radial; if it ever is not, this test is meaningless.
+  await expect(page.getByTestId('rush-prompt')).toHaveAttribute('data-layout', 'wheel');
+
+  const wheel = (await page.getByTestId('rush-wheel').boundingBox())!;
+  const prompt = (await page.getByTestId('rush-prompt').boundingBox())!;
+  const cx = wheel.x + wheel.width / 2;
+  const cy = wheel.y + wheel.height / 2;
+
+  // IN THE MIDDLE, not above it: the question's centre sits inside the hub.
+  const px = prompt.x + prompt.width / 2;
+  const py = prompt.y + prompt.height / 2;
+  expect(Math.hypot(px - cx, py - cy), 'the question is not in the hub').toBeLessThan(
+    wheel.width * 0.12,
+  );
+
+  // IN THE CIRCLE: every answer is a wedge, and its centre is inside the wheel
+  // but outside the hub — which is what makes it a wedge rather than a card.
+  const slots = page.locator('[data-testid^="wheel-slot-"]');
+  const count = await slots.count();
+  expect(count).toBe(6);
+  for (let i = 0; i < count; i++) {
+    const box = (await slots.nth(i).boundingBox())!;
+    const r = Math.hypot(box.x + box.width / 2 - cx, box.y + box.height / 2 - cy);
+    expect(r, 'an answer sits on top of the question').toBeGreaterThan(wheel.width * 0.15);
+    expect(r, 'an answer is outside the wheel').toBeLessThan(wheel.width * 0.55);
+  }
+
+  // And nothing is stacked below the wheel pretending to be the answers.
+  expect(await page.locator('[data-testid^="rush-choice-"]').count()).toBe(0);
+});
+
+test('tapping a wedge scores, and the score climbs as you play', async ({ page }) => {
+  await page.goto(HARNESS);
+  await page.getByTestId('rush-start').click();
+  const score = page.getByTestId('rush-score');
+  expect(Number(await score.getAttribute('data-score'))).toBe(0);
+
+  await decide(page);
+  const first = Number(await score.getAttribute('data-score'));
+  expect(first, 'a decision paid nothing').toBeGreaterThan(0);
+
+  let previous = first;
+  for (let i = 0; i < 6; i++) {
+    await decide(page);
+    const now = Number(await score.getAttribute('data-score'));
+    expect(now, 'the score stopped climbing').toBeGreaterThan(previous);
+    previous = now;
+  }
+
+  // The payoff screen keeps the number rather than throwing it away.
+  for (let i = 0; i < 60; i++) {
+    if (await page.getByTestId('rush-families').isVisible().catch(() => false)) break;
+    if (!(await page.getByTestId('rush-prompt').isVisible().catch(() => false))) break;
+    await decide(page);
+  }
+  await expect(page.getByTestId('rush-families')).toBeVisible({ timeout: 15_000 });
+  expect(Number(await page.getByTestId('rush-final-score').getAttribute('data-score'))).toBeGreaterThan(
+    previous,
+  );
+});
+
 test('every choice is reachable by keyboard with a visible label', async ({ page }) => {
   await page.goto(HARNESS);
   await page.getByTestId('rush-start').click();

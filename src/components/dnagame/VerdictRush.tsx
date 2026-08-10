@@ -7,6 +7,12 @@
  * instructions to read. Everything on screen is something you might watch or a
  * reason you would switch it off, and choosing is what teaches the engine.
  *
+ * THE SHAPE OF A RADIAL ROUND: the question is in the middle of the wheel and
+ * the six answers are the wedges around it. Nothing to read above, nothing to
+ * scroll to below — the whole decision fits inside one circle, under one thumb.
+ * The other formats (a duel, four cards, one poster) keep the question above,
+ * because there is no hub to put it in.
+ *
  * ALL SEQUENCING LIVES IN THE PURE GAME (`lib/dnagame/game.ts`) — this file
  * renders whatever round it is handed and reports the decision back. That is
  * why nine formats do not mean nine screens: a round declares its layout, its
@@ -14,10 +20,12 @@
  * four layouts below cover all of them.
  *
  * The felt qualities are deliberate. Selection snaps and the next round arrives
- * inside ~180ms, because speed is most of the fun. The wheel is always visible
- * so the player can see themselves being learned. Micro-reactions fire rarely —
- * after a pattern, never after a tap — since a comment on every decision is the
- * thing that made the old interview unbearable.
+ * inside ~140ms, because speed is most of the fun. The score is the other half:
+ * it counts up in fives, pops the points it just paid, and rewards answering
+ * quickly — see `lib/dnagame/score.ts` for what it is actually measuring, which
+ * is information, never agreement. Micro-reactions fire rarely — after a
+ * pattern, never after a tap — since a comment on every decision is the thing
+ * that made the old interview unbearable.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -27,12 +35,14 @@ import {
   MIN_DECISIONS,
   choose,
   createGame,
+  lastPoints,
   meaningfulDecisions,
   reactToTitle,
   startGame,
   traitsCaptured,
   type GameState,
 } from '@/lib/dnagame/game';
+import { STREAK_VISIBLE, streakMultiplier } from '@/lib/dnagame/score';
 import type { Choice } from '@/lib/dnagame/rounds';
 import type { TraitProfile } from '@/lib/voice/quickdna/traits';
 import { Wheel, type WheelSlot } from './Wheel';
@@ -41,7 +51,10 @@ import { RushReveal } from './RushReveal';
 type Screen = 'ready' | 'playing' | 'reveal';
 
 /** Selection snap to next round. Fast enough to feel instant, slow enough to see. */
-const ADVANCE_MS = 180;
+const ADVANCE_MS = 140;
+
+/** How long the points pop stays up. Long enough to read, short enough to stack. */
+const POP_MS = 700;
 
 const RESUME_KEY = 'watchverdict:verdictrush:v1';
 
@@ -74,6 +87,8 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
   const [picked, setPicked] = useState<string[]>([]);
   const [reaction, setReaction] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  /** The "+N" that flies off the score. Keyed so identical scores still re-fire. */
+  const [pop, setPop] = useState<{ points: number; key: number } | null>(null);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -84,12 +99,21 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
   const round = state.current;
   const readings = useMemo(() => readAllFamilies(state.profile), [state.profile]);
   const known = useMemo(() => dnaKnown(state.profile), [state.profile]);
+  const score = state.score ?? 0;
+  const streak = state.streak ?? 0;
 
   const applyState = useCallback((next: GameState) => {
     stateRef.current = next;
     setState(next);
     setPicked([]);
     roundShownAt.current = Date.now();
+    const earned = lastPoints(next);
+    if (earned > 0) {
+      setPop({ points: earned, key: next.decisions.length });
+      window.setTimeout(() => {
+        setPop((p) => (p && p.key === next.decisions.length ? null : p));
+      }, POP_MS);
+    }
     const line = microReaction(next);
     if (line) {
       setReaction(line);
@@ -223,34 +247,96 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
 
   if (!round) return null;
   const multi = round.picks > 1;
+  const inWheel = round.layout === 'wheel';
+
+  /**
+   * One question, two homes. In the hub it is the whole screen's instruction and
+   * sits inside a 130-ish pixel circle; above a duel or a card grid it can
+   * breathe. Same element, same test hooks, so nothing downstream has to care
+   * which layout dealt.
+   */
+  const prompt = (
+    <h2
+      data-testid="rush-prompt"
+      data-round-type={round.type}
+      data-layout={round.layout}
+      data-picks={round.picks}
+      className={
+        inWheel
+          ? `text-balance px-1 text-[0.95rem] font-black uppercase leading-[1.1] tracking-tight sm:text-lg ${
+              round.negative ? 'text-rose-300' : 'text-white'
+            }`
+          : `text-center text-2xl font-black uppercase tracking-tight sm:text-3xl ${
+              round.negative ? 'text-rose-300' : 'text-white'
+            }`
+      }
+    >
+      {round.prompt}
+      {multi && (
+        <span
+          className={`block font-semibold text-slate-400 ${inWheel ? 'mt-1 text-[0.7rem]' : 'mt-1 text-sm'}`}
+        >
+          {picked.length}/{round.picks}
+        </span>
+      )}
+    </h2>
+  );
 
   return (
-    <div className="mx-auto flex min-h-[80vh] w-full max-w-lg flex-col gap-4 px-5 py-6">
-      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-slate-400">
-        <span data-testid="rush-known" data-known={Math.round(known * 100)}>
-          {Math.round(known * 100)}% known
-        </span>
-        <span data-testid="rush-decisions" data-count={state.decisions.length}>
-          {state.decisions.length} decisions
-        </span>
+    <div className="mx-auto flex min-h-[80vh] w-full max-w-lg flex-col gap-3 px-4 py-5">
+      <div className="flex items-end justify-between">
+        <div className="relative">
+          <span
+            data-testid="rush-score"
+            data-score={score}
+            className="block text-3xl font-black tabular-nums leading-none text-amber-300 sm:text-4xl"
+          >
+            {score.toLocaleString()}
+          </span>
+          <span className="text-[0.6rem] font-bold uppercase tracking-widest text-slate-500">
+            Points
+          </span>
+          {pop && (
+            <span
+              key={pop.key}
+              data-testid="rush-pop"
+              aria-hidden
+              // Beside the score, not above it: the score sits at the top of the
+              // viewport, so a pop that rises from above is clipped off-screen.
+              className="pointer-events-none absolute left-full top-0 ml-2 whitespace-nowrap text-lg font-black tabular-nums text-emerald-300 motion-safe:animate-rush-pop"
+            >
+              +{pop.points}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 text-right">
+          {streak >= STREAK_VISIBLE && (
+            <span
+              data-testid="rush-streak"
+              data-streak={streak}
+              className="rounded-full bg-amber-500/15 px-2 py-1 text-xs font-black tabular-nums text-amber-300"
+            >
+              🔥 ×{streakMultiplier(streak).toFixed(2).replace(/\.?0+$/, '')}
+            </span>
+          )}
+          <div className="flex flex-col text-[0.6rem] font-bold uppercase tracking-widest text-slate-500">
+            <span data-testid="rush-known" data-known={Math.round(known * 100)} className="text-slate-300">
+              {Math.round(known * 100)}% known
+            </span>
+            <span data-testid="rush-decisions" data-count={state.decisions.length}>
+              {state.decisions.length} decisions
+            </span>
+          </div>
+        </div>
       </div>
 
-      <h2
-        data-testid="rush-prompt"
-        data-round-type={round.type}
-        data-layout={round.layout}
-        data-picks={round.picks}
-        className={`text-center text-2xl font-black uppercase tracking-tight sm:text-3xl ${
-          round.negative ? 'text-rose-300' : 'text-white'
-        }`}
-      >
-        {round.prompt}
-        {multi && (
-          <span className="ml-2 align-middle text-sm font-semibold text-slate-400">
-            {picked.length}/{round.picks}
-          </span>
-        )}
-      </h2>
+      {/* Screen-reader announcement of the score, which is otherwise pure spectacle. */}
+      <span className="sr-only" aria-live="polite">
+        {score} points
+      </span>
+
+      {!inWheel && prompt}
 
       {reaction && (
         <p data-testid="rush-reaction" className="text-center text-sm font-semibold text-emerald-300">
@@ -258,18 +344,21 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
         </p>
       )}
 
-      {round.layout === 'wheel' && (
-        <Wheel
-          readings={readings}
-          known={known}
-          slots={round.choices.map<WheelSlot>((c) => ({
-            familyId: c.family,
-            label: c.label,
-            selected: picked.includes(c.id),
-            negative: round.negative,
-            onSelect: () => tap(c),
-          }))}
-        />
+      {inWheel && (
+        <div className="flex flex-1 items-center justify-center">
+          <Wheel
+            readings={readings}
+            known={known}
+            center={prompt}
+            slots={round.choices.map<WheelSlot>((c) => ({
+              familyId: c.family,
+              label: c.label,
+              selected: picked.includes(c.id),
+              negative: round.negative,
+              onSelect: () => tap(c),
+            }))}
+          />
+        </div>
       )}
 
       {round.layout === 'duel' && (

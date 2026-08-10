@@ -96,6 +96,23 @@ Updated at the end of every work order per the Working Agreement in
   representative.
 
 ## Done
+- **VERD1CT RUSH is now played inside the wheel, and it keeps score.** The
+  question moved from a heading above the circle into the hub, and the six
+  answers moved from a card grid below the circle into the wedges themselves —
+  one glance, one thumb, no scrolling between the question and the options.
+  Each wedge is a real `<button>` clipped to its own sector (`clip-path`) and
+  sized to that sector's bounding box, so the tap area is the whole wedge, a
+  neighbouring wedge can never steal a tap, and the element's centre lands
+  inside its own sector for pointer hit-testing. Labels, reading order,
+  keyboard focus and the focus ring survive intact — the ring is drawn on the
+  label because an outline on the button would be clipped away. New pure
+  scoring layer (`src/lib/dnagame/score.ts`, 20 unit tests): points reward the
+  UNCERTAINTY A DECISION RESOLVED — never a "right" answer — with bounded speed
+  and streak multipliers (best tap ≤ 7.5× the worst, so a 30-decision game is
+  not decided by two lucky moments) and a flat acknowledgement for "haven't
+  seen it". Score, streak and per-decision points live in `GameState`, so they
+  survive a reload and a resumed pre-scoring session reads as 0 rather than
+  NaN. Selection snap tightened 180ms → 140ms.
 - **Voice DNA Interview — Phase 3 (client + UI).** Built the whole browser
   experience on top of the Phase-1 engine and Phase-2 server/Realtime route,
   branch `claude/voice-interview`. Two interchangeable transports behind one

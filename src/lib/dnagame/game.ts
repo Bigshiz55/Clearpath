@@ -26,6 +26,7 @@
 import { TITLES, type DiagnosticTitle } from '@/lib/voice/quickdna/definition';
 import { observeAll, traitConfidence, traitUncertainty, type TraitKey, type TraitProfile } from '@/lib/voice/quickdna/traits';
 import { dnaKnown, FAMILIES } from './families';
+import { PASS_POINTS, awardPoints, nextStreak } from './score';
 import {
   CHOICES,
   CHOICES_BY_FAMILY,
@@ -52,6 +53,8 @@ export interface Decision {
   at: number;
   /** Milliseconds from the round appearing to the choice landing. */
   responseMs: number;
+  /** What this decision scored. See `score.ts` — it tracks information, not correctness. */
+  points: number;
   version: string;
 }
 
@@ -64,6 +67,10 @@ export interface GameState {
   usedTitleIds: string[];
   current: Round | null;
   startedAt: number;
+  /** Running total. Never feeds the profile — it is the reward, not the model. */
+  score: number;
+  /** Consecutive decisions made without stalling. Multiplies, never scores alone. */
+  streak: number;
   version: string;
 }
 
@@ -83,6 +90,8 @@ export function createGame(startedAt: number, seed: TraitProfile = {}): GameStat
     usedTitleIds: [],
     current: null,
     startedAt,
+    score: 0,
+    streak: 0,
     version: GAME_VERSION,
   };
 }
@@ -314,6 +323,12 @@ export function choose(
   const direction = round.negative ? -1 : 1;
   const chosen = round.choices.filter((x) => chosenIds.includes(x.id));
 
+  // Scored against the profile as it stood BEFORE the update, so points measure
+  // what was still unknown at the moment of the tap.
+  const info = chosen.reduce((sum, x) => sum + choiceValue(x, state.profile), 0);
+  const streak = nextStreak(state.streak ?? 0, responseMs);
+  const points = awardPoints(info, responseMs, streak);
+
   let profile = state.profile;
   for (const choice of chosen) {
     profile = observeAll(
@@ -336,6 +351,7 @@ export function choose(
     negative: round.negative,
     at: now,
     responseMs,
+    points,
     version: state.version,
   };
 
@@ -356,6 +372,8 @@ export function choose(
     usedChoiceIds: [...state.usedChoiceIds, ...chosen.filter((x) => !x.titleId).map((x) => x.id)],
     usedTitleIds: [...state.usedTitleIds, ...round.choices.filter((x) => x.titleId).map((x) => x.id)],
     current: null,
+    score: (state.score ?? 0) + points,
+    streak,
   };
   return { ...next, current: nextRound(next) };
 }
@@ -371,6 +389,14 @@ export function reactToTitle(
   if (!round || round.layout !== 'poster') return state;
   const choice = round.choices[0];
   if (!choice) return state;
+
+  // A pass keeps the rhythm — and the streak — but it taught us nothing, so it
+  // is paid a flat acknowledgement rather than an information score.
+  const streak = nextStreak(state.streak ?? 0, responseMs);
+  const points =
+    reaction === 'pass'
+      ? PASS_POINTS
+      : awardPoints(choiceValue(choice, state.profile), responseMs, streak);
 
   let profile = state.profile;
   if (reaction !== 'pass') {
@@ -400,6 +426,7 @@ export function reactToTitle(
         negative: false,
         at: now,
         responseMs,
+        points,
         version: state.version,
       },
     ],
@@ -407,8 +434,15 @@ export function reactToTitle(
     usedChoiceIds: state.usedChoiceIds,
     usedTitleIds: [...state.usedTitleIds, choice.id],
     current: null,
+    score: (state.score ?? 0) + points,
+    streak,
   };
   return { ...next, current: nextRound(next) };
+}
+
+/** What the most recent decision paid — the number that pops on screen. */
+export function lastPoints(state: GameState): number {
+  return state.decisions[state.decisions.length - 1]?.points ?? 0;
 }
 
 /** Decisions that produced evidence — a PASS teaches nothing. */

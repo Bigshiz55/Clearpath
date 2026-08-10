@@ -82,6 +82,16 @@ export function RushReveal({
           Your Verd1ct DNA
         </h1>
         <p
+          className="mt-2 text-4xl font-black tabular-nums leading-none text-amber-300 sm:text-5xl"
+          data-testid="rush-final-score"
+          data-score={state.score ?? 0}
+        >
+          {(state.score ?? 0).toLocaleString()}
+          <span className="ml-2 align-middle text-xs font-bold uppercase tracking-widest text-slate-500">
+            points
+          </span>
+        </p>
+        <p
           className="mt-1 text-sm text-slate-400"
           data-testid="rush-summary"
           data-ms={elapsedMs}

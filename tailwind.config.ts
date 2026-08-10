@@ -77,6 +77,12 @@ const config: Config = {
           '0%': { opacity: '0', transform: 'translateY(12px) scale(0.92)' },
           '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
         },
+        // The points a decision just paid, flying off the Verd1ct Rush score.
+        'rush-pop': {
+          '0%': { opacity: '0', transform: 'translateY(6px) scale(0.85)' },
+          '25%': { opacity: '1', transform: 'translateY(0) scale(1.1)' },
+          '100%': { opacity: '0', transform: 'translateY(-18px) scale(1)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 0.4s ease-out both',
@@ -84,6 +90,7 @@ const config: Config = {
         'seam-glow': 'seam-glow 2.2s ease-in-out infinite',
         'spot-breathe': 'spot-breathe 4.5s ease-in-out infinite',
         'reveal-in': 'reveal-in 0.55s ease-out both',
+        'rush-pop': 'rush-pop 0.7s ease-out forwards',
       },
     },
   },
