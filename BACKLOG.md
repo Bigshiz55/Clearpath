@@ -75,6 +75,21 @@ and what it unblocks.
   governed search surface, which under CLAUDE.md rule 9 requires a corpus run
   and a PASS→FAIL / FAIL→PASS delta against baseline `68a5a93`. That belongs
   in its own branch, not inside a card redesign. Owner decision.
+- **`title-grid.spec.ts:281` is load-flaky in a full serial run.** "the end
+  button writes everything picked across every round" failed once in the
+  44-minute mobile suite with `locator.click: Timeout 15000ms exceeded` waiting
+  for `grid-like-100` — the FIRST interaction in the test. It passes 22/22 with
+  the rest of its file and 5/5 with `--repeat-each`, at ~1.1s each; the
+  neighbouring specs in the failing run were themselves taking 15–16s, so the
+  box was saturated. The page snapshot at failure shows the grid holding
+  round-TWO titles, which points at `TitleGridCalibration.load()`: its
+  `fetchWithTimeout` retry loop re-deals with the already-seen ids excluded, so
+  one slow response turns "titles 1–12" into "titles 13–24" and the tile the
+  test clicks never exists. Not a product defect at normal speed, but the retry
+  path silently changes what is on screen, which is worth a look. NOT caused by
+  the card-interaction work: the timed-out click happens before
+  `RecommendationSlate` — the only thing in that import graph that mounts
+  `TrailerMedia` — is ever rendered.
 - **Score distribution audit.** The median appears compressed: four
   recommendations scored 79-91, all reading STREAM IT. Blocked on real title
   data existing in production — the local/dev catalog is synthetic fixture
