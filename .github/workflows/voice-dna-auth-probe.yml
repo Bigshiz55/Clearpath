@@ -128,6 +128,7 @@ jobs:
         run: |
           set +e
           python3 - <<'PY'
+          import html as html_mod
           import json, os, re, sys, time, urllib.parse, urllib.request
 
           SUPA = os.environ["SUPA"].rstrip("/")
@@ -211,42 +212,86 @@ jobs:
               sys.exit(0)
 
           # ---- 4. Read the link out of the delivered email.
-          link = None
-          for attempt in range(30):
-              time.sleep(5)
+          #
+          # The link is HTML, so its separators arrive as `&amp;`. Unescaping
+          # first is the difference between reading redirect_to and reading a
+          # parameter called `amp;redirect_to` — i.e. between a real proof and
+          # a substring match that only looks like one.
+          def read_link(seen_ids):
               st, msgs = http("https://api.mail.tm/messages",
                               headers={"Authorization": f"Bearer {bearer}"})
               try:
                   items = json.loads(msgs)["hydra:member"]
               except Exception:
-                  items = []
-              if not items:
-                  continue
-              st, msg = http(f"https://api.mail.tm/messages/{items[0]['id']}",
-                             headers={"Authorization": f"Bearer {bearer}"})
-              full = json.loads(msg)
-              text = " ".join(full.get("html") or []) + " " + (full.get("text") or "")
-              found = re.findall(r'https?://[^"\'\s<>]+', text)
-              link = next((u for u in found if "verify" in u or "token" in u or "confirm" in u), None)
+                  return None
+              for it in items:
+                  if it["id"] in seen_ids:
+                      continue
+                  st, msg = http(f"https://api.mail.tm/messages/{it['id']}",
+                                 headers={"Authorization": f"Bearer {bearer}"})
+                  full = json.loads(msg)
+                  text = " ".join(full.get("html") or []) + " " + (full.get("text") or "")
+                  text = html_mod.unescape(text)
+                  for u in re.findall(r'https?://[^"\'\s<>]+', text):
+                      if "/auth/v1/verify" in u or "token" in u:
+                          seen_ids.add(it["id"])
+                          return u
+              return None
+
+          def report(label, link, expected_host):
+              u = urllib.parse.urlparse(link)
+              q = urllib.parse.parse_qs(u.query)
+              landing = (q.get("redirect_to") or [""])[0]
+              print(f"\n══ {label} ══")
+              print(f"  link host   : {u.netloc}{u.path}")
+              print(f"  type        : {(q.get('type') or ['<none>'])[0]}")
+              print(f"  redirect_to : {landing or '<none>'}")
+              print("  (token deliberately not printed)")
+              ok = urllib.parse.urlparse(landing).netloc == expected_host
+              print(f"  VERDICT     : {'RETURNS TO ' + expected_host if ok else 'DOES NOT RETURN — lands on ' + (landing or '?')}")
+              return ok
+
+          seen = set()
+          link = None
+          for attempt in range(24):
+              time.sleep(5)
+              link = read_link(seen)
               if link:
                   break
-              print(f"attempt {attempt}: mail arrived but no link matched; hosts={set(urllib.parse.urlparse(u).netloc for u in found)}")
-
           if not link:
-              print("\nNo email arrived within 150s.")
+              print("\nNo email arrived within 120s.")
               sys.exit(0)
+          report("LINK REQUESTED FROM THE PREVIEW DEPLOYMENT", link,
+                 urllib.parse.urlparse(PREVIEW).netloc)
 
-          u = urllib.parse.urlparse(link)
-          q = urllib.parse.parse_qs(u.query)
-          print("\n══ THE LINK A REAL PERSON WOULD CLICK ══")
-          print(f"  host        : {u.netloc}")
-          print(f"  path        : {u.path}")
-          print(f"  type        : {q.get('type')}")
-          print(f"  redirect_to : {q.get('redirect_to')}")
-          print("  (token deliberately not printed)")
-          expected = urllib.parse.urlparse(PREVIEW).netloc
-          landing = q.get("redirect_to", [""])[0] or link
-          print(f"\n  VERDICT: {'RETURNS TO THE PREVIEW' if expected in landing else 'DOES NOT RETURN TO THE PREVIEW → ' + landing}")
+          # ---- 5. The SAME question for the stable branch alias — the host a
+          # human is actually going to be given, since it survives redeploys.
+          alias = "https://clearpath-git-claude-voice-dna-live-verify-n3788j-bigshiz56.vercel.app"
+          redirect_to = f"{alias}/auth/callback?next=%2Fvoice-dna"
+          st, resp = http(f"{SUPA}/auth/v1/otp?redirect_to={urllib.parse.quote(redirect_to, safe='')}",
+                          data=body, headers={"apikey": key, "Content-Type": "application/json"})
+          print(f"\nPOST /auth/v1/otp (alias) status={st} body={resp[:200]}")
+          if st in (200, 201):
+              link2 = None
+              for attempt in range(24):
+                  time.sleep(5)
+                  link2 = read_link(seen)
+                  if link2:
+                      break
+              if link2:
+                  report("LINK REQUESTED FROM THE BRANCH ALIAS", link2,
+                         urllib.parse.urlparse(alias).netloc)
+              else:
+                  print("No second email arrived within 120s (rate limit is the usual cause).")
+
+          # ---- 6. Does /voice-dna need a magic link at all? Middleware mints an
+          # anonymous guest; this is the same call it makes.
+          st, resp = http(f"{SUPA}/auth/v1/signup", data=json.dumps({}).encode(),
+                          headers={"apikey": key, "Content-Type": "application/json"})
+          enabled = st in (200, 201)
+          print(f"\nanonymous sign-in: POST /auth/v1/signup status={st} → {'ENABLED' if enabled else 'DISABLED'}")
+          if not enabled:
+              print(f"  {resp[:200]}")
           PY
           exit 0
 
