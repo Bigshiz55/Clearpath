@@ -111,11 +111,25 @@ export function parseAbAnswer(
   return { kind: 'ab', option: hitsA ? 'a' : 'b', confidence };
 }
 
+/**
+ * The movie grammar, which must NEVER be honoured on a numeric turn.
+ *
+ * `parseRating` reads a bare "yes" as a 7, which is a reasonable guess in
+ * isolation and wrong here for two reasons. The person has just been told to
+ * answer zero to ten, so "yes" is not the answer to the question asked — and
+ * the system's own lightning-round instruction contains the word `yes`, which
+ * makes it an echo the microphone can pick up and submit on their behalf.
+ * "Love it" and "hate it" stay: those are documented scale answers with an
+ * unambiguous position on the scale.
+ */
+const MOVIE_ONLY_RE = /^\s*(yes|yep|yeah|yup|no|nope|nah|pass|sure)\s*$/;
+
 /** An answer to a 0–10 probe. */
 export function parseScaleAnswer(heard: string, recognizerConfidence?: number): QuickAnswer {
   const norm = normalize(heard);
   if (!norm) return NONE;
   if (BACK_RE.test(norm)) return { kind: 'back' };
+  if (MOVIE_ONLY_RE.test(norm)) return NONE;
 
   const rated = parseRating(heard);
   if (rated.intent === 'back') return { kind: 'back' };

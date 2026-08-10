@@ -202,7 +202,8 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
     [applyRun, commit, seedProfile],
   );
 
-  const { capability, speak, cancelSpeech, startListening, stopListening } = useCalibrationSpeech(onHeard);
+  const { capability, listening, diagnostics, requestMic, speak, cancelSpeech, startListening, stopListening } =
+    useCalibrationSpeech(onHeard);
   speakRef.current = speak;
   cancelRef.current = cancelSpeech;
 
@@ -235,11 +236,13 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
     return () => window.clearInterval(id);
   }, [screen]);
 
-  const begin = useCallback(() => {
+  const begin = useCallback(async () => {
     setSaveError(null);
     setScreen('running');
     screenRef.current = 'running';
-    startListening();
+    // Permission BEFORE the first prompt, so the interface never shows
+    // "Listening…" over a permission dialog or after a refusal.
+    if (await requestMic()) startListening();
     const at = Date.now();
     setNow(at);
     const started = startRun(runRef.current, at);
@@ -252,7 +255,7 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
     const prompt = first ? (first.kind === 'probe' ? first.probe.prompt : `${first.title.title}?`) : '';
     const resumed = started.signals.length > 0;
     speak(resumed ? prompt : `${QUICK_DNA_INTRO} ${prompt}`);
-  }, [speak, startListening]);
+  }, [requestMic, speak, startListening]);
 
   useEffect(() => {
     if (screen === 'saving' || screen === 'summary') stopListening();
@@ -279,7 +282,7 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
         <p className="max-w-sm text-slate-300">
           About a minute. I ask, you answer, hands down.
         </p>
-        <button type="button" data-testid="quickdna-start" onClick={begin} className="btn-primary px-12 py-4 text-lg">
+        <button type="button" data-testid="quickdna-start" onClick={() => void begin()} className="btn-primary px-12 py-4 text-lg">
           Start
         </button>
         {!capability.asr && (
@@ -293,6 +296,9 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
 
   const asking = run.current;
   const secondsLeft = Math.ceil(remainingMs(run, now) / 1000);
+  /** The microphone is not going to work — say so instead of pretending. */
+  const micBroken =
+    !capability.asr || diagnostics.micState === 'denied' || diagnostics.micState === 'unavailable' || diagnostics.micState === 'error';
 
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-2xl flex-col justify-center gap-7 px-5">
@@ -300,8 +306,21 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
         <span data-testid="quickdna-progress">
           {signalCount(run)} signals · ~{secondsLeft}s left
         </span>
-        <span data-testid="quickdna-listening" className="text-emerald-300/80">
-          {flash ? <span data-testid="quickdna-flash">{flash}</span> : 'Listening…'}
+        <span
+          data-testid="quickdna-listening"
+          data-mic-state={diagnostics.micState}
+          data-transcripts={diagnostics.transcriptsReceived}
+          className={micBroken ? 'text-amber-300/90' : 'text-emerald-300/80'}
+        >
+          {flash ? (
+            <span data-testid="quickdna-flash">{flash}</span>
+          ) : listening && diagnostics.micState === 'listening' ? (
+            'Listening…'
+          ) : micBroken ? (
+            'Mic off — tap your answers'
+          ) : (
+            'Starting…'
+          )}
         </span>
       </div>
 

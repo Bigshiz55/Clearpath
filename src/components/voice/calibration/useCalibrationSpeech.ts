@@ -44,8 +44,37 @@ export interface HeardEvent {
 export interface SpeechCapability {
   /** Can we speak? */
   tts: boolean;
-  /** Can we listen? False means the run is tap-only, which is fully supported. */
+  /** Is a recogniser present at all? Absent means tap-only, fully supported. */
   asr: boolean;
+}
+
+/**
+ * WHAT THE MICROPHONE IS ACTUALLY DOING.
+ *
+ * The interface previously printed "Listening…" as a constant string while the
+ * recogniser had failed to start, which is the worst thing an interface can do:
+ * it told the user the system was hearing them when it was not, so they waited
+ * in silence and then blamed themselves. Every state below is observed, not
+ * assumed, and the UI is only allowed to claim it is listening when this says
+ * `listening`.
+ */
+export type MicState =
+  | 'idle'          // not started yet
+  | 'requesting'    // asking for permission
+  | 'listening'     // genuinely receiving audio
+  | 'denied'        // the user (or the browser) refused the microphone
+  | 'unavailable'   // no recogniser, or the engine refused to start
+  | 'error';        // started and then failed
+
+export interface SpeechDiagnostics {
+  micState: MicState;
+  /** Last recogniser error code, verbatim. */
+  lastError: string | null;
+  /** Utterances the recogniser has delivered — proves audio is arriving. */
+  transcriptsReceived: number;
+  /** Times the engine restarted itself after going quiet. */
+  restarts: number;
+  permission: 'unknown' | 'granted' | 'denied';
 }
 
 interface RecognitionAlternative {
@@ -112,6 +141,13 @@ export const INJECT_EVENT = 'voicedna:heard';
 export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
   const [capability, setCapability] = useState<SpeechCapability>({ tts: false, asr: false });
   const [listening, setListening] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<SpeechDiagnostics>({
+    micState: 'idle',
+    lastError: null,
+    transcriptsReceived: 0,
+    restarts: 0,
+    permission: 'unknown',
+  });
 
   const heardRef = useRef(onHeard);
   heardRef.current = onHeard;
@@ -119,6 +155,17 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const wantListeningRef = useRef(false);
   const lastRef = useRef<{ text: string; at: number }>({ text: '', at: 0 });
+  /**
+   * WHAT WE ARE SAYING RIGHT NOW.
+   *
+   * Recognition never pauses while we speak — that is what makes barge-in work
+   * — which means the microphone can hear the prompt itself. "Lightning round.
+   * Liked it: yes…" contains `yes`, and `Knives Out?` is a question the system
+   * would happily answer on the user's behalf. Anything that arrives while we
+   * are talking AND is contained in what we are saying is our own voice coming
+   * back, and is dropped.
+   */
+  const speakingRef = useRef<{ text: string; until: number } | null>(null);
   // `resultIndex` restarts whenever the engine does, so the session counter
   // keeps utterance ids unique across the restarts that `onend` performs.
   const sessionRef = useRef(0);
@@ -133,6 +180,37 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
     ) => {
       const trimmed = text.trim();
       if (!trimmed) return;
+
+      // ── THE ECHO GUARD ───────────────────────────────────────────────────
+      //
+      // Text matching CANNOT distinguish "the user said yes" from "the system
+      // said yes" — the strings are identical. A first version dropped anything
+      // contained in the current prompt, and promptly swallowed the user's own
+      // "yes" immediately after "Liked it: yes. Didn't like it: no." That is
+      // worse than the echo it was preventing: it breaks the answer.
+      //
+      // Worse still, the instruction CONTAINS every valid answer by
+      // construction — "Liked it: yes. Didn't like it: no. Haven't seen it:
+      // pass." A three-word threshold swallowed a genuine "haven't seen it",
+      // because that phrase is literally in the sentence teaching it.
+      //
+      // So the audio layer does the real work: `getUserMedia` runs with
+      // echoCancellation, which solves this before a transcript exists. What
+      // remains here is a deliberately BLUNT backstop for the one thing AEC
+      // misses — a long, verbatim run of our own sentence returning. Five words
+      // and twenty characters is comfortably longer than any answer a person
+      // gives, so a real answer can never be caught by it.
+      const speaking = speakingRef.current;
+      if (speaking && Date.now() < speaking.until) {
+        const heard = trimmed.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+        const said = speaking.text.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+        const longEnough = heard.split(/\s+/).length >= 5 && heard.length >= 20;
+        if (longEnough && said.includes(heard)) return;
+      }
+      if (source === 'voice') {
+        setDiagnostics((d) => ({ ...d, transcriptsReceived: d.transcriptsReceived + 1 }));
+      }
+
       if (utteranceId === undefined && source === 'voice') {
         // A microphone with no usable utterance identity — fall back to "same
         // words, just now". Injected answers are deliberate, never noisy, so
@@ -184,6 +262,7 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
 
   /** Stop talking THIS INSTANT. The first half of barge-in. */
   const cancelSpeech = useCallback(() => {
+    speakingRef.current = null;
     try {
       synth()?.cancel();
     } catch {
@@ -202,7 +281,12 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
       if (!s || !text) return;
       try {
         s.cancel(); // never queue: a stale prompt is worse than none
+        // ~14 characters a second at our rate, plus a margin: long enough to
+        // cover the utterance, short enough that a stuck flag cannot deafen us.
+        speakingRef.current = { text, until: Date.now() + 800 + text.length * 70 };
         const u = new SpeechSynthesisUtterance(text);
+        u.onend = () => { speakingRef.current = null; };
+        u.onerror = () => { speakingRef.current = null; };
         if (voiceRef.current) u.voice = voiceRef.current;
         u.rate = SPEECH_RATE;
         u.pitch = SPEECH_PITCH;
@@ -243,13 +327,28 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
         deliver(alt.transcript, alt.confidence, 'voice', `s${sessionRef.current}:${i}`);
       }
     };
-    rec.onerror = () => {
-      // `no-speech` / `aborted` are routine; onend restarts us.
+    rec.onerror = (e) => {
+      const code = e?.error ?? 'unknown';
+      // `no-speech` and `aborted` are routine — the engine goes quiet and we
+      // restart. `not-allowed` and `service-not-allowed` are FATAL: restarting
+      // forever would leave the interface claiming to listen while permission
+      // is refused, which is the exact lie this rewrite exists to remove.
+      const fatal = code === 'not-allowed' || code === 'service-not-allowed';
+      setDiagnostics((d) => ({
+        ...d,
+        lastError: code,
+        ...(fatal ? { micState: 'denied' as const, permission: 'denied' as const } : {}),
+      }));
+      if (fatal) {
+        wantListeningRef.current = false;
+        setListening(false);
+      }
     };
     rec.onend = () => {
       recRef.current = null;
       setListening(false);
       if (wantListeningRef.current) {
+        setDiagnostics((d) => ({ ...d, restarts: d.restarts + 1 }));
         // Chrome ends the session after a few seconds of quiet. Restart on the
         // next tick, or the user's next answer falls into a dead microphone.
         setTimeout(() => {
@@ -262,11 +361,56 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
       rec.start();
       recRef.current = rec;
       setListening(true);
-    } catch {
+      setDiagnostics((d) => ({ ...d, micState: 'listening', permission: 'granted' }));
+    } catch (e) {
       recRef.current = null;
       setListening(false);
+      setDiagnostics((d) => ({
+        ...d,
+        micState: 'unavailable',
+        lastError: e instanceof Error ? e.message : 'start failed',
+      }));
     }
   }, [deliver]);
+
+  /**
+   * Ask for the microphone BEFORE claiming to listen.
+   *
+   * `SpeechRecognition.start()` triggers its own permission prompt, but it
+   * resolves asynchronously and reports refusal through `onerror` — so the
+   * interface would show "Listening…" for the whole time the prompt was on
+   * screen, and keep showing it after a refusal. Asking first turns that into
+   * a state we can render honestly.
+   */
+  const requestMic = useCallback(async (): Promise<boolean> => {
+    if (!recognitionCtor()) {
+      setDiagnostics((d) => ({ ...d, micState: 'unavailable' }));
+      return false;
+    }
+    setDiagnostics((d) => ({ ...d, micState: 'requesting' }));
+    try {
+      const media = navigator?.mediaDevices;
+      if (media?.getUserMedia) {
+        // Echo cancellation is where the system-hearing-itself problem is
+        // actually solved — at the audio layer, before any transcript exists.
+        const stream = await media.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        // We only needed the permission; the recogniser opens its own stream.
+        stream.getTracks().forEach((t) => t.stop());
+      }
+      setDiagnostics((d) => ({ ...d, permission: 'granted' }));
+      return true;
+    } catch (e) {
+      setDiagnostics((d) => ({
+        ...d,
+        micState: 'denied',
+        permission: 'denied',
+        lastError: e instanceof Error ? e.name : 'permission denied',
+      }));
+      return false;
+    }
+  }, []);
 
   const stopListening = useCallback(() => {
     wantListeningRef.current = false;
@@ -296,5 +440,14 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
     };
   }, []);
 
-  return { capability, listening, speak, cancelSpeech, startListening, stopListening };
+  return {
+    capability,
+    listening,
+    diagnostics,
+    requestMic,
+    speak,
+    cancelSpeech,
+    startListening,
+    stopListening,
+  };
 }

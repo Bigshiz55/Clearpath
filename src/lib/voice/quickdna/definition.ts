@@ -203,7 +203,17 @@ export const TITLES_BY_ID = new Map(TITLES.map((x) => [x.id, x]));
 export const LIGHTNING_INTRO =
   "Lightning round. Liked it: yes. Didn't like it: no. Haven't seen it: pass.";
 
-/** Spoken once, at the very start. Five to seven seconds. */
+/**
+ * Spoken once, at the very start. Five to seven seconds.
+ *
+ * IT DESCRIBES THE PHASE IT OPENS, and nothing else. The first version listed
+ * every answer format the whole run would ever accept — "numbers, yes, no, or
+ * pass" — and then showed a 0–10 question. A person hearing "yes, no, or pass"
+ * in front of a numeric scale reasonably concludes the thing is broken, and
+ * they are right to: the system contradicted itself in its opening sentence.
+ * The yes/no/pass grammar is introduced by LIGHTNING_INTRO, at the exact moment
+ * it becomes the correct thing to say.
+ */
 export const QUICK_DNA_INTRO =
-  "Quick calibration. I'll fire through movies and shows. " +
-  'Just answer naturally — numbers, yes, no, or pass. Here we go.';
+  'Quick calibration. First, rate a few things zero to ten. ' +
+  'Ten means love it, zero means absolutely not.';

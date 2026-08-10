@@ -10,7 +10,18 @@ import { existsSync } from 'node:fs';
  * is really for: the same suite runs on a phone viewport with touch enabled.
  */
 const PINNED_CHROMIUM = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const launchOptions = existsSync(PINNED_CHROMIUM) ? { executablePath: PINNED_CHROMIUM } : {};
+/**
+ * Grant the microphone and provide a fake capture device. Without these,
+ * `getUserMedia` rejects in headless Chromium and every run reports a denied
+ * microphone — which would make the honest "Mic off" state the only state the
+ * suite could ever see, and hide whether the listening path works at all.
+ * This grants permission; it does not fake anything the app does.
+ */
+const MEDIA_ARGS = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-capture'];
+const launchOptions = {
+  ...(existsSync(PINNED_CHROMIUM) ? { executablePath: PINNED_CHROMIUM } : {}),
+  args: MEDIA_ARGS,
+};
 
 export default defineConfig({
   testDir: './tests/quickdna',
@@ -24,10 +35,14 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:3215',
     launchOptions,
+    // Grant the microphone through Playwright's supported API. Browser flags
+    // alone did not reach the context, so every run reported a denied mic and
+    // the honest "Mic off" state was the only one the suite could observe.
+    permissions: ['microphone'],
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], launchOptions } },
-    { name: 'mobile', use: { ...devices['Pixel 7'], launchOptions } },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], launchOptions, permissions: ['microphone'] } },
+    { name: 'mobile', use: { ...devices['Pixel 7'], launchOptions, permissions: ['microphone'] } },
   ],
   webServer: {
     command:

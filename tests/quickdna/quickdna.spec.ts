@@ -47,6 +47,14 @@ async function stubSpeech(page: Page, opts: { recognition?: boolean } = {}) {
     };
     Object.defineProperty(window, 'speechSynthesis', { value: synth, configurable: true });
 
+    // A granted microphone. Headless Chromium rejects getUserMedia even with
+    // the fake-device flags, so without this every run reports a denied mic and
+    // the suite could only ever observe the failure branch.
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: () => Promise.resolve({ getTracks: () => [] }) },
+    });
+
     if (!recognition) {
       delete w.SpeechRecognition;
       delete w.webkitSpeechRecognition;
@@ -300,4 +308,137 @@ test('the result is richer than a scoreboard', async ({ page }) => {
   // The comparative claims are the point — a list of numbers is not insight.
   expect(await page.getByTestId('dna-chip').count()).toBeGreaterThan(0);
   await expect(page.getByTestId('deep-dna')).toBeVisible();
+});
+
+/**
+ * THE TWO DEFECTS A REAL PERSON FOUND, pinned so they cannot come back.
+ *
+ * Both were invisible to every test that existed: the suite checked that the
+ * right question appeared and that a spoken answer advanced it, and never once
+ * asked whether the SPOKEN INSTRUCTIONS matched the question on screen, or
+ * whether "Listening…" meant anything at all.
+ */
+test.describe('what the voice says matches what the screen asks', () => {
+  test('the opening instruction describes the 0-10 phase, and only that', async ({ page }) => {
+    await begin(page);
+    const { spoken } = await probe(page);
+    const intro = spoken[0] ?? '';
+
+    // It must teach the scale…
+    expect(intro).toMatch(/zero to ten/i);
+    // …and must NOT offer the movie grammar while a numeric question is up.
+    expect(intro.toLowerCase()).not.toContain('yes, no, or pass');
+    expect(intro.toLowerCase()).not.toContain('pass');
+
+    await expect(page.getByTestId('quickdna-question')).toHaveAttribute('data-question-kind', 'scale');
+    await expect(page.getByTestId('rate-9')).toBeVisible();
+  });
+
+  test('yes/no/pass is introduced at the exact moment it becomes correct', async ({ page }) => {
+    await begin(page);
+    let sawLightningIntro = false;
+
+    for (let i = 0; i < 40; i++) {
+      const kind = await page.getByTestId('quickdna-question').getAttribute('data-question-kind').catch(() => null);
+      if (!kind) break;
+      const spokenSoFar = (await probe(page)).spoken.join(' ').toLowerCase();
+      const mentionsMovieGrammar = spokenSoFar.includes('liked it');
+
+      if (kind === 'title') {
+        // By the time a title is on screen, the grammar must have been taught.
+        expect(mentionsMovieGrammar, 'a movie was asked before the rules were given').toBe(true);
+        sawLightningIntro = true;
+        break;
+      }
+      // While a preference question is up, the movie grammar must NOT have been
+      // spoken yet — that is precisely the mismatch that was reported.
+      expect(mentionsMovieGrammar, `movie grammar spoken during a ${kind} question`).toBe(false);
+      await answerAsCrimeFan(page);
+    }
+    expect(sawLightningIntro, 'never reached the lightning round').toBe(true);
+  });
+
+  test('a spoken number is accepted on a scale question with no click', async ({ page }) => {
+    await begin(page);
+    await expect(page.getByTestId('quickdna-question')).toHaveAttribute('data-question-kind', 'scale');
+    const first = await page.getByTestId('quickdna-question').getAttribute('data-question-id');
+    await say(page, 'eight');
+    await expect(page.getByTestId('quickdna-flash')).toHaveText('8 ✓');
+    await expect(page.getByTestId('quickdna-question')).not.toHaveAttribute('data-question-id', first ?? '');
+  });
+
+  test('a movie parser never runs on a preference turn, and vice versa', async ({ page }) => {
+    await begin(page);
+    // "yes" is a movie answer. On a 0-10 question it must NOT advance the turn.
+    const first = await page.getByTestId('quickdna-question').getAttribute('data-question-id');
+    await say(page, 'yes');
+    await expect(page.getByTestId('quickdna-question')).toHaveAttribute('data-question-id', first ?? '');
+
+    // Reach a title, then prove a bare number is read as a reaction, not a rating.
+    for (let i = 0; i < 40; i++) {
+      const kind = await page.getByTestId('quickdna-question').getAttribute('data-question-kind').catch(() => null);
+      if (kind === 'title') break;
+      await answerAsCrimeFan(page);
+    }
+    await say(page, 'yes');
+    await expect(page.getByTestId('quickdna-flash')).toHaveText('YES ✓');
+  });
+});
+
+test.describe('the listening indicator tells the truth', () => {
+  test('it claims to listen only when the microphone is really live', async ({ page }) => {
+    await begin(page);
+    const indicator = page.getByTestId('quickdna-listening');
+    await expect(indicator).toHaveAttribute('data-mic-state', 'listening');
+    await expect(indicator).toHaveText(/Listening/);
+  });
+
+  test('a refused microphone says so instead of pretending', async ({ page }) => {
+    // The exact failure that was reported: the interface claimed to be
+    // listening while nothing could reach it.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: { getUserMedia: () => Promise.reject(new DOMException('Denied', 'NotAllowedError')) },
+      });
+    });
+    await page.goto(HARNESS);
+    await page.getByTestId('quickdna-start').click();
+    const indicator = page.getByTestId('quickdna-listening');
+    await expect(indicator).toHaveAttribute('data-mic-state', 'denied');
+    await expect(indicator).toHaveText(/Mic off/);
+    // …and the run is still completable by hand.
+    await page.getByTestId('rate-7').click();
+    await expect(page.getByTestId('quickdna-question')).toBeVisible();
+  });
+
+  test('a browser with no recogniser never shows a listening state', async ({ page }) => {
+    await stubSpeech(page, { recognition: false });
+    await page.goto(HARNESS);
+    await page.getByTestId('quickdna-start').click();
+    await expect(page.getByTestId('quickdna-listening')).not.toHaveText(/^Listening/);
+  });
+});
+
+test('the system cannot answer its own questions', async ({ page }) => {
+  // Recognition stays live while we speak, so the microphone hears the prompt.
+  // "Lightning round. Liked it: yes…" contains `yes`; without an echo guard the
+  // system would answer on the user's behalf before they opened their mouth.
+  await begin(page);
+  for (let i = 0; i < 40; i++) {
+    const kind = await page.getByTestId('quickdna-question').getAttribute('data-question-kind').catch(() => null);
+    if (kind === 'title') break;
+    await answerAsCrimeFan(page);
+  }
+  const before = await page.getByTestId('quickdna-question').getAttribute('data-question-id');
+  // Feed a MULTI-WORD span of the system's own sentence back immediately —
+  // which is when a real microphone would hear it. "Liked it: yes" would
+  // otherwise be submitted as the user answering YES before they spoke.
+  const spoken = (await probe(page)).spoken.at(-1) ?? '';
+  await say(page, spoken);
+  await expect(page.getByTestId('quickdna-question')).toHaveAttribute('data-question-id', before ?? '');
+
+  // …while a genuine one-word answer in the same window is NEVER swallowed.
+  await say(page, 'yes');
+  await expect(page.getByTestId('quickdna-question')).not.toHaveAttribute('data-question-id', before ?? '');
 });
