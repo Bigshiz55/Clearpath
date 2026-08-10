@@ -53,13 +53,54 @@ for (const vp of [{ name: 'desktop-1440x900', width: 1440, height: 900 }, { name
           requested.push(u.pathname + u.search.replace(/[?&]_rsc=[^&]*/, ''));
         });
         await page.goto('/dev/mobile-home', { waitUntil: 'domcontentloaded' });
-        const input = page.locator('input[placeholder="Search by title, actor, genre, or platform…"]');
+        const SEARCH_INPUT = 'input[placeholder="Search by title, actor, genre, or platform…"]';
+        const input = page.locator(SEARCH_INPUT);
         await expect(input).toBeVisible();
+        /* THE INPUT IS VISIBLE BEFORE IT IS ALIVE.
+           `domcontentloaded` returns with the server-rendered markup painted
+           and React not yet hydrated, so the box is on screen and its submit
+           handler is not attached — an Enter pressed then is swallowed with no
+           trace. That is not a slow navigation the assertion can wait out: the
+           keypress is simply gone, which is exactly what the failure showed
+           ("saw []" after polling a full 10s, on a fully mocked route).
+
+           React attaches its fiber/props keys to a DOM node when it hydrates
+           it, so their presence on THIS input is a direct signal that this
+           control — not merely the document — is interactive. Waiting on the
+           real precondition rather than on a longer sleep. */
+        await page.waitForFunction((sel) => {
+          const el = document.querySelector(sel);
+          return !!el && Object.keys(el).some((k) => k.startsWith('__react'));
+        }, SEARCH_INPUT, { timeout: 15_000 });
         await input.fill(q);
         requested.length = 0;
         await input.press('Enter');
-        await page.waitForTimeout(900);
-        const inApp = requested.filter((u) => !u.startsWith('/dev/mobile-home') && !u.startsWith('/login') && u !== '/app' && u !== '/app/');
+        /* WAIT FOR THE OUTCOME, NOT FOR A FIXED 900ms.
+           A blind sleep asserts on whatever has happened by the time it
+           expires, so the FIRST case in the run — which pays route compilation
+           and client warm-up that the other six do not — could be measured
+           before the navigation it is waiting for was ever issued. Observed:
+           `"Creed 2015"` failing alone on a cold run and passing on the next,
+           with nothing changed. Polling asserts the same claim and settles as
+           soon as it is true, so a warm run stays fast and a cold one is
+           correct instead of unlucky.
+
+           The negative case KEEPS the fixed dwell: "no navigation happened"
+           can only be established by giving one time to happen and observing
+           that it did not. */
+        const seen = () =>
+          requested.filter((u) => !u.startsWith('/dev/mobile-home') && !u.startsWith('/login') && u !== '/app' && u !== '/app/');
+        if (want !== null) {
+          await expect
+            .poll(() => seen().some((u) => want.test(u)), {
+              message: `wanted ${want} — saw ${JSON.stringify(seen())}`,
+              timeout: 10_000,
+            })
+            .toBe(true);
+        } else {
+          await page.waitForTimeout(900);
+        }
+        const inApp = seen();
         if (want === null) {
           // Link PREFETCH is not navigation: on the phone viewport the bottom
           // nav prefetches its four destinations in the background, so request
