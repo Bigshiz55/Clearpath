@@ -263,6 +263,85 @@ It cannot activate in production. Four independent reasons, any one sufficient:
 
 ---
 
+## 7b. Preview authentication — the localhost magic link
+
+A magic link requested on the preview was reported to land the user on
+`http://localhost:3000`. Three independent probes, all run from a GitHub
+runner (this agent's container answers `CONNECT` with 403 for `supabase.com`,
+`api.vercel.com` and `*.vercel.app`), say the current configuration cannot
+produce that.
+
+**Probe 1 — where does Supabase route a preview redirect?**
+`/auth/v1/verify` validates `redirect_to` against Site URL + Additional
+Redirect URLs *before* it looks at the token, so an invalid token is enough to
+read the routing without sending anything or creating a session.
+
+| asked for | Location came back as | verdict |
+| --- | --- | --- |
+| `https://clearpath-<id>-bigshiz56.vercel.app/auth/callback?next=/voice-dna` | the same URL | ALLOW-LISTED |
+| `https://clearpath-git-claude-voice-dna-live-verify-n3788j-bigshiz56.vercel.app/auth/callback?next=/voice-dna` | the same URL | ALLOW-LISTED |
+| `http://localhost:3000/auth/callback?next=/voice-dna` | `https://clearpath-pearl-chi.vercel.app` | REJECTED |
+
+So the project's Site URL is production, a wildcard already covers preview
+hostnames, and `http://localhost:3000` is not on the allow-list at all —
+Supabase has no route that sends anyone there.
+
+**Probe 2 — can the app produce it?** No. Every `emailRedirectTo` in the repo
+(`LoginForm`, `GuestSaveButton`) is built from `window.location.origin`;
+`/auth/callback` redirects using the request's own origin; and
+`next.config.mjs` self-heals `NEXT_PUBLIC_SITE_URL` from Vercel's system env
+on any real deployment, so a stale or wrong value cannot reach the browser.
+
+**Probe 3 — the email template.** This is the one thing probe 1 cannot see:
+the template is free text, and a hardcoded host in it would bypass redirect
+validation entirely. So a real magic link was sent to a disposable mailbox and
+read back. Run
+[31390039900](https://github.com/Bigshiz55/Clearpath/actions/runs/31390039900):
+
+```
+══ LINK REQUESTED FROM THE PREVIEW DEPLOYMENT ══
+  link host   : vajgviraxigkwlvysxfz.supabase.co/auth/v1/verify
+  type        : magiclink
+  redirect_to : https://clearpath-gwxngi7n0-bigshiz56.vercel.app/auth/callback?next=%2Fvoice-dna
+  VERDICT     : RETURNS TO clearpath-gwxngi7n0-bigshiz56.vercel.app
+```
+
+The DEFAULT template, and `redirect_to` is the preview that asked for it. The
+token is never printed — this repository is public and a live token is a
+working session. A second send aimed at the branch alias came back `429
+over_email_send_rate_limit` (Supabase allows one request per address per 60s);
+the alias is separately proven allow-listed by probe 1.
+
+**Probe 4 — is a magic link needed at all?** No. `POST /auth/v1/signup` with an
+empty body — the same call `src/lib/supabase/middleware.ts` makes — returns
+`200`, so **anonymous sign-ins are ENABLED** on this project. `/voice-dna` is in
+`PROTECTED_PREFIXES`, so opening it mints a guest session and drops straight
+into the interview. Email sign-in is only needed to attach the resulting DNA to
+a named account.
+
+**Conclusion.** The redirect is correct today. The most likely explanation for
+what was seen is a link from an older email, generated when the project's URL
+configuration differed; a magic link carries the `redirect_to` that was
+validated *at send time*, so an old email keeps sending you to an old place no
+matter what the dashboard says now. That is not provable after the fact and not
+fixable in code.
+
+**What was fixed anyway.** The failure mode was silent: Supabase substitutes
+the Site URL rather than returning an error, so a misconfigured deployment
+sends a link that works perfectly and lands the person somewhere else, with
+nothing in the UI to explain it. `/login` now runs the same question as a
+server-side preflight (`src/lib/auth/redirectCheck.ts`) and refuses to send a
+link it knows will strand someone, naming the destination instead. It fails
+OPEN on every ambiguous outcome — timeout, network error, no `Location`
+header, Supabase unconfigured — because a diagnostic that can lock a real
+person out is worse than the bug it was written for. Results are memoised per
+origin; a negative is held only 60s, so correcting an allow-list takes effect
+without a redeploy. `src/lib/auth/redirectCheck.test.ts` pins that asymmetry.
+
+**Residue.** The end-to-end proof created one disposable Supabase user
+(`wv-authprobe-*@emalupe.com`). It holds no data and cannot be removed without
+the service-role key.
+
 ## 8. Run history
 
 | Run | Commit | Deployment | Outcome |

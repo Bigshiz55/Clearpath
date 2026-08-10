@@ -4,48 +4,59 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-- **Voice DNA live verification — everything reachable is done and green;
-  blocked on ONE owner action: Vercel Deployment Protection.** Full evidence
-  in `docs/VOICE_DNA_LIVE_VERIFICATION.md`. Branch
-  `claude/voice-dna-live-verify-n3788j` (`526479d`) carries main + the three
-  Voice DNA Interview phases + a TEMPORARY preview-only founder test auth
-  + the 15-row live matrix + a push-triggered GitHub Actions workflow that
-  runs that matrix from a runner (the agent container's egress denies
-  `*.vercel.app`, so the runner is how the preview gets reached at all —
-  no Vercel token required, the deployment is found by commit SHA via the
-  GitHub Deployments API). Gates at `526479d`: typecheck 0 · lint 0 ·
-  vitest 0 (3130 passed / 24 skipped) · build 0.
-  **Proven blocker:** every request to the preview 302s to
-  `vercel.com/sso-api?url=…` — Deployment Protection is on, so all 15 rows
-  would assert against Vercel's login page. Run
-  [31267183217](https://github.com/Bigshiz55/Clearpath/actions/runs/31267183217)
-  reports it as a single row (`A0`) with the other 14 skipped.
-  **Action needed from you (~2 min, phone-friendly):** Vercel → project
-  `clearpath` → Settings → Deployment Protection → enable **Protection
-  Bypass for Automation**, copy the secret; then GitHub → repo Settings →
-  Secrets and variables → Actions → New repository secret named exactly
-  `VERCEL_AUTOMATION_BYPASS_SECRET`. The workflow already consumes it
-  (masked, sent as `x-vercel-protection-bypass`). Alternative: disable
-  Vercel Authentication for Preview. The agent cannot do this itself: its
-  container cannot reach `api.vercel.com`, and handing `VERCEL_TOKEN` to a
-  runner requires a repository secret it cannot create — committing a token
-  is not an option.
-  **Then:** rows D1/D2/D3/E1 additionally need migration 0047
-  (`voice_interviews`); if they fail with "confidence never moved" while D0
-  passes, that is the migration, not a defect — see the standing action
-  below. Cleanup of the temporary auth is deliberately deferred until the
-  matrix has actually run (checklist in the report); it cannot activate in
-  production — `VERCEL_ENV=preview` gate + secret gate + not the production
-  deploy branch (`scripts/checkBranch.ts`) + asserted by
-  `src/lib/previewTestAuth.test.ts`.
-- **Three harness defects found and fixed before they could mislead the run**
-  (all in the verification scaffolding, none in the product): the typed
-  ladder silently dropped every answer via the client's error path
-  (`d9de57c`) — which would have been misreported as the migration blocker;
-  the test login depended on Supabase's password grant in a magic-link-only
-  project (`03de098`); top-level serial mode let one red row erase the other
-  13 (`3b4174a`). No Voice DNA product defect has been observed — the
-  product has not been reached yet.
+- **Voice DNA preview authentication — diagnosed with live evidence; the
+  reported localhost redirect is NOT reproducible from the current
+  configuration.** A magic link requested on the preview was reported to land
+  on `http://localhost:3000`. Three independent probes from a GitHub runner
+  (this agent container has no egress — `CONNECT` 403 to `supabase.com`,
+  `api.vercel.com` and `*.vercel.app`) say that cannot happen today:
+  1. `/auth/v1/verify` validates `redirect_to` before it reads the token, so
+     an invalid token reveals the routing. The **preview deployment URL** and
+     the **branch alias** are both echoed back — allow-listed. **`http://localhost:3000`
+     is REJECTED** and falls back to Site URL `https://clearpath-pearl-chi.vercel.app`.
+     Supabase has no route that sends anyone to localhost.
+  2. No app code can produce it either: every `emailRedirectTo` in the repo
+     (`LoginForm`, `GuestSaveButton`) is built from `window.location.origin`,
+     `/auth/callback` redirects using the request origin, and
+     `next.config.mjs` self-heals `NEXT_PUBLIC_SITE_URL` from Vercel system
+     env on any real deployment.
+  3. A **real magic link** sent to a disposable mailbox arrives on the DEFAULT
+     Supabase template (`{{ .ConfirmationURL }}` → `/auth/v1/verify`), so the
+     template is not hardcoding a host — the one mechanism the redirect probe
+     cannot see. Runs
+     [31389040960](https://github.com/Bigshiz55/Clearpath/actions/runs/31389040960)
+     and [31389678546](https://github.com/Bigshiz55/Clearpath/actions/runs/31389678546).
+  Most likely explanation for what was seen: a link from an older email,
+  generated when the project's URL configuration differed. A magic link carries
+  the `redirect_to` validated **at send time**, so an old email keeps going to
+  an old place regardless of today's dashboard. Not provable after the fact,
+  and not fixable in code.
+- **`/voice-dna` needs no sign-in at all.** `POST /auth/v1/signup` with an empty
+  body returns 200, so anonymous sign-ins are ENABLED; middleware mints a guest
+  session on the way in. Email login is only for attaching the resulting DNA to
+  a named account.
+- **Shipped anyway, because the failure mode was silent:** `/login` now runs a
+  server-side preflight (`src/lib/auth/redirectCheck.ts`) asking Supabase where
+  a link from this exact origin would land, and refuses to send one that would
+  strand the person — naming the destination instead. Supabase substitutes the
+  Site URL rather than erroring, so without this the app cannot tell a good
+  deployment from a bad one. Fails OPEN on every ambiguous outcome; memoised
+  per origin; a negative is held 60s so correcting an allow-list needs no
+  redeploy. 11 unit tests pin the asymmetry.
+- **Still blocked on ONE owner action for automated live verification: Vercel
+  Deployment Protection.** Every path on both the preview URL and the branch
+  alias 302s to `vercel.com/sso-api`, so the 15-row matrix asserts against
+  Vercel's login page (row `A0`, other 14 skipped). Confirmed again on
+  [31389041030](https://github.com/Bigshiz55/Clearpath/actions/runs/31389041030).
+  No repository secrets exist (`VERCEL_TOKEN`, `VERCEL_AUTOMATION_BYPASS_SECRET`,
+  `VOICE_DNA_SHARE_TOKEN`, `PREVIEW_TEST_SECRET` all report `false`), and this
+  container holds a `VERCEL_TOKEN` it cannot use because it has no network.
+  A human signed into Vercel passes the wall in a browser and is unaffected.
+- **Cleanup owed:** one disposable Supabase user (`wv-authprobe-*@emalupe.com`)
+  was created by the end-to-end email proof and cannot be removed without the
+  service-role key. It holds no data. The temporary preview-test auth, the
+  matrix harness and both probe workflows are still pending removal — checklist
+  in `docs/VOICE_DNA_LIVE_VERIFICATION.md` §7.
 - **Standing action needed from you:** open `/admin/migrations` on
   production and apply pending migrations with your `MIGRATE_SECRET` — see
   the "Restored: /admin/migrations" entry below for why this is currently

@@ -120,7 +120,12 @@ jobs:
       #
       # Every failure here is reported, not fatal: a refused email is itself an
       # answer about how this project sends mail.
+      # OPT-IN. This step sends real email and creates a real (throwaway)
+      # Supabase user, which nothing can delete without the service-role key.
+      # Running it on every push would quietly accumulate accounts in the
+      # project's auth table, so it only runs when a commit asks for it by name.
       - name: End-to-end magic link (disposable inbox, token redacted)
+        if: contains(github.event.head_commit.message, '[probe-email]') || github.event_name == 'workflow_dispatch'
         env:
           SUPA: https://vajgviraxigkwlvysxfz.supabase.co
           PROD: https://clearpath-pearl-chi.vercel.app
