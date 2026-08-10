@@ -239,34 +239,47 @@ test.describe('the decision buttons', () => {
     }
   });
 
-  test('lead the card — rule first, then drop to the W on the artwork', async ({ page }) => {
-    // On request the FOR/AGAINST/SAVE row moved to the TOP of every card: on
-    // the shorter tiles it sat below poster, facts, score and synopsis, which
-    // meant scrolling past everything before you could act.
+  /**
+   * OWNER-DIRECTED REVERSAL: the row CLOSES the card, it does not lead it.
+   *
+   * It was moved to the top earlier so you could act without scrolling past
+   * the poster and the score. That solved reachability and left the real
+   * complaint standing: "FOR / AGAINST / SAVE do not stay vertically aligned
+   * across cards because card content heights vary." A row pinned to the top
+   * is at a constant offset from the top and says nothing about the card.
+   *
+   * The approved architecture is MEDIA → CONTENT → FLEXIBLE SPACE → ACTION
+   * ROW, anchored at the bottom, so spare space collects above the row and
+   * every card in a grid row shares one baseline. The baseline itself is
+   * proven in card-alignment.spec.ts (including a negative control: with
+   * `mt-auto` neutralised the same fixture goes 0px → 20px ragged).
+   *
+   * What this test still owns is the AIR: the buttons must not be crowded by
+   * whatever now sits above them, and the row must keep a visible edge.
+   */
+  test('close the card — anchored at the floor, with air above the buttons', async ({ page }) => {
     await open(page);
     const layout = await card(page).evaluate((el) => {
       const rowEl = el.querySelector('.wv-act-row')!;
       const row = rowEl.getBoundingClientRect();
       const art = el.querySelector('.wv-card-art')!.getBoundingClientRect();
       const buttons = [...rowEl.querySelectorAll('button, a')].map((b) => b.getBoundingClientRect().bottom);
+      const buttonTops = [...rowEl.querySelectorAll('button, a')].map((b) => b.getBoundingClientRect().top);
       return {
         rowTop: Math.round(row.top),
         rowBottom: Math.round(row.bottom),
-        artTop: Math.round(art.top),
-        buttonBottom: Math.round(Math.max(...buttons)),
-        rowBorder: getComputedStyle(rowEl).borderBottomWidth,
+        artBottom: Math.round(art.bottom),
+        buttonTop: Math.round(Math.min(...buttonTops)),
+        cardBottom: Math.round(el.getBoundingClientRect().bottom),
+        rowBorder: getComputedStyle(rowEl).borderTopWidth,
       };
     });
-    expect(layout.rowTop, 'the decision row is above the artwork').toBeLessThan(layout.artTop);
-    // And the artwork does not crowd it. This used to measure the gap between
-    // the ROW BOX and the artwork, which worked only because the card carried
-    // 12px of padding around a rounded, inset poster. The poster is full-bleed
-    // now — it meets the row's bottom border by design, so that gap is 1px (the
-    // border) and measuring it says nothing about crowding.
-    // The air that matters is between the last BUTTON and the artwork, and it
-    // is still there: the row keeps its own bottom padding. Same defect
-    // guarded, measured where it now lives.
-    expect(layout.artTop - layout.buttonBottom, 'the buttons touch the artwork').toBeGreaterThanOrEqual(6);
+    // The row is BELOW the artwork now, and sits on the floor of the card.
+    expect(layout.rowTop, 'the decision row is not below the artwork').toBeGreaterThan(layout.artBottom);
+    expect(layout.cardBottom - layout.rowBottom, 'the row is not anchored to the card floor').toBeLessThanOrEqual(2);
+    // Whatever sits above must not crowd the buttons — the row keeps its own
+    // top padding, same guarantee the old top-anchored version measured.
+    expect(layout.buttonTop - layout.rowTop, 'content touches the buttons').toBeGreaterThanOrEqual(6);
     // A visible separator, not just space.
     expect(layout.rowBorder, 'the decision row lost its edge').not.toBe('0px');
   });
@@ -341,10 +354,13 @@ test('the reading order down the card is what a decision needs', async ({ page }
       actions: y('.wv-act-row'),
     };
   });
-  // The decision row LEADS the card (moved to the top on request — rule
-  // first, then drop to the W). Below it the glance order is unchanged:
-  // what it costs you, how well it fits you, then what it is about.
-  expect(order.actions).toBeLessThan(order.facts);
+  // THE ORDER A DECISION IS MADE IN, top to bottom:
+  //   what it is (facts) → how well it fits you (score) → what it is about
+  //   (synopsis) → what you want to DO about it (actions).
+  // The actions moved from the top to the bottom on request; the glance order
+  // above them is unchanged, and the row is now the card's last word rather
+  // than its first. See card-alignment.spec.ts for why the position matters.
   expect(order.facts).toBeLessThan(order.score);
   expect(order.score).toBeLessThan(order.synopsis);
+  expect(order.synopsis, 'the decision row no longer closes the card').toBeLessThan(order.actions);
 });

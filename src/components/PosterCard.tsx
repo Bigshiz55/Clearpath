@@ -139,17 +139,14 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
        globals.css. The fill stays near-black so the poster is still the
        brightest thing on the card. */
     <div className="card wv-tile group flex flex-col bg-ink-950/85">
-      {/* THE DECISION ROW LEADS THE CARD. FOR · AGAINST · SAVE used to sit at
-          the very bottom, which on the new shorter tiles meant scrolling past
-          poster, facts, score and synopsis before you could act. On request
-          the row is now the FIRST thing on every card — rule at the top, then
-          drop down to the W on the artwork if it belongs on the docket. */}
-      {overlay !== null && saveId != null && (
-        <div className="wv-act-row border-b border-white/10 p-2 pb-1.5 sm:p-3 sm:pb-2.5">
-          <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
-          {resolvedOverlay}
-        </div>
-      )}
+      {/* The decision row now CLOSES the card — see the block after
+          `.wv-card-foot`. It sat here, first, for a while; that kept it at a
+          constant offset from the card's top but meant the row's position said
+          nothing about the card, and a grid of cards with different title
+          lengths still had nothing aligned at the bottom. Anchoring it at the
+          END is what makes FOR · AGAINST · SAVE line up across neighbours,
+          because the grid already stretches every card in a row to the same
+          height. */}
       <div className="wv-card">
       <div className="wv-card-art">
         {/* THE MATTE, FROM `sm` ONLY. A blurred, scaled-up copy of the SAME
@@ -293,9 +290,39 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             "Why this Verd1ct?" panel. */}
         {evidence && <div className="space-y-2">{evidence}</div>}
 
-        {/* The FOR/AGAINST/SAVE row lives at the TOP of the card now — see the
-            block above `.wv-card`. The foot ends on the evidence. */}
       </div>
+
+      {/* ── THE DECISION ROW CLOSES THE CARD, AND IT IS ANCHORED ────────────
+          FOR · AGAINST · SAVE must form ONE horizontal baseline across every
+          card in a grid row, whatever those cards happen to contain — a title
+          that wraps to two lines, a provider one of them does not have, three
+          rating chips instead of one, an extra badge.
+
+          This is structural, not a measured offset. Two facts do the work:
+
+            1. `.poster-grid` is a CSS grid and does not set `align-items`, so
+               the default `stretch` already makes every card in a row exactly
+               as tall as the tallest one. The cards were always the same
+               height; nothing inside them was pinned to the bottom.
+            2. The card is `flex flex-col`, so `mt-auto` on the LAST child
+               collects every spare pixel above it and pushes the row to the
+               floor of the card.
+
+          Together, differing content changes where the row STARTS inside each
+          card and never where it ENDS. No pixel constant can regress this,
+          because there is no pixel constant — remove `mt-auto` and the tests
+          in card-alignment.spec.ts fail immediately.
+
+          `border-t`, not `border-b`: the row now has content above it. */}
+      {overlay !== null && saveId != null && (
+        <div
+          className="wv-act-row mt-auto border-t border-white/10 p-2 pt-2 sm:p-3"
+          data-testid="card-action-row"
+        >
+          <CardVerdict tmdbId={saveId} mediaType={mediaType} title={title} year={year ?? null} posterPath={posterPath ?? null} />
+          {resolvedOverlay}
+        </div>
+      )}
     </div>
   );
 }
