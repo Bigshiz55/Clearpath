@@ -104,16 +104,165 @@ jobs:
           probe "localhost control"         "http://localhost:3000/auth/callback?next=/voice-dna"
           exit 0
 
+      # ── 2b. THE ONE THING THE REDIRECT PROBE CANNOT SEE: the email itself ──
+      #
+      # `/auth/v1/verify` proves what Supabase's redirect VALIDATION does. It
+      # says nothing about the magic-link email TEMPLATE, which is free text: a
+      # template that hardcodes a host (the Supabase quickstarts all show
+      # `http://localhost:3000` while you are developing) bypasses redirect
+      # validation entirely, because the URL never goes through it. That would
+      # produce exactly the reported symptom and leave no trace anywhere above.
+      #
+      # So: send ONE real magic link to a disposable mailbox and read where the
+      # link actually points. The token is NEVER printed — this repository is
+      # public and a live token is a working session. Only the host, the path,
+      # and `redirect_to` are logged, which is all the question needs.
+      #
+      # Every failure here is reported, not fatal: a refused email is itself an
+      # answer about how this project sends mail.
+      - name: End-to-end magic link (disposable inbox, token redacted)
+        env:
+          SUPA: https://vajgviraxigkwlvysxfz.supabase.co
+          PROD: https://clearpath-pearl-chi.vercel.app
+          PREVIEW: ${{ steps.preview.outputs.url }}
+        run: |
+          set +e
+          python3 - <<'PY'
+          import json, os, re, sys, time, urllib.parse, urllib.request
+
+          SUPA = os.environ["SUPA"].rstrip("/")
+          PROD = os.environ["PROD"].rstrip("/")
+          PREVIEW = os.environ["PREVIEW"].rstrip("/")
+
+          def http(url, data=None, headers=None, method=None):
+              req = urllib.request.Request(url, data=data, method=method)
+              for k, v in (headers or {}).items():
+                  req.add_header(k, v)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      return r.status, r.read().decode("utf-8", "replace")
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read().decode("utf-8", "replace")
+              except Exception as e:
+                  return 0, f"{type(e).__name__}: {e}"
+
+          # ---- 1. The publishable (anon) key, from the PUBLIC production bundle.
+          # It is shipped to every browser by design, so reading it here reveals
+          # nothing. It is still never printed.
+          status, html = http(PROD)
+          print(f"production page: status={status}")
+          chunks = re.findall(r'/_next/static/[^"\']+\.js', html)[:40]
+          key = None
+          pattern = re.compile(r'(sb_publishable_[A-Za-z0-9_\-]{20,}|eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,})')
+          for blob in [html] + [http(PROD + c)[1] for c in chunks]:
+              m = pattern.search(blob or "")
+              if m:
+                  key = m.group(1)
+                  break
+          print(f"publishable key found in the public bundle: {bool(key)}")
+          if not key:
+              print("Cannot query /auth/v1/settings or send an OTP without it. Stopping this step.")
+              sys.exit(0)
+          print(f"::add-mask::{key}")
+
+          # ---- 2. Auth settings: is a magic link even needed for /voice-dna?
+          status, body = http(f"{SUPA}/auth/v1/settings", headers={"apikey": key})
+          print(f"\n/auth/v1/settings status={status}")
+          try:
+              cfg = json.loads(body)
+              print("  anonymous sign-ins enabled :", cfg.get("external_anonymous_users_enabled"))
+              print("  email provider enabled     :", (cfg.get("external") or {}).get("email"))
+              print("  mailer autoconfirm         :", cfg.get("mailer_autoconfirm"))
+          except Exception:
+              print("  raw:", body[:400])
+
+          # ---- 3. A real magic link, to a mailbox nobody owns.
+          st, doms = http("https://api.mail.tm/domains")
+          try:
+              domain = json.loads(doms)["hydra:member"][0]["domain"]
+          except Exception:
+              print(f"\nDisposable inbox unavailable (domains status={st}); skipping the live send.")
+              sys.exit(0)
+
+          addr = f"wv-authprobe-{os.environ.get('GITHUB_RUN_ID','x')}@{domain}"
+          pw = "probe-" + os.environ.get("GITHUB_RUN_ID", "0") + "-Aa1!"
+          payload = json.dumps({"address": addr, "password": pw}).encode()
+          st, _ = http("https://api.mail.tm/accounts", data=payload,
+                       headers={"Content-Type": "application/json"})
+          print(f"\ndisposable mailbox {addr} → create status={st}")
+          st, tok = http("https://api.mail.tm/token", data=payload,
+                         headers={"Content-Type": "application/json"})
+          try:
+              bearer = json.loads(tok)["token"]
+          except Exception:
+              print(f"mailbox token failed (status={st}); skipping the live send.")
+              sys.exit(0)
+          print(f"::add-mask::{bearer}")
+
+          # Request the link exactly the way LoginForm does, from the PREVIEW.
+          redirect_to = f"{PREVIEW}/auth/callback?next=%2Fvoice-dna"
+          body = json.dumps({"email": addr, "create_user": True,
+                             "data": {}, "gotrue_meta_security": {}}).encode()
+          st, resp = http(f"{SUPA}/auth/v1/otp?redirect_to={urllib.parse.quote(redirect_to, safe='')}",
+                          data=body, headers={"apikey": key, "Content-Type": "application/json"})
+          print(f"POST /auth/v1/otp status={st} body={resp[:300]}")
+          if st not in (200, 201):
+              print("No email was sent — the status above is the answer about how this project mails.")
+              sys.exit(0)
+
+          # ---- 4. Read the link out of the delivered email.
+          link = None
+          for attempt in range(30):
+              time.sleep(5)
+              st, msgs = http("https://api.mail.tm/messages",
+                              headers={"Authorization": f"Bearer {bearer}"})
+              try:
+                  items = json.loads(msgs)["hydra:member"]
+              except Exception:
+                  items = []
+              if not items:
+                  continue
+              st, msg = http(f"https://api.mail.tm/messages/{items[0]['id']}",
+                             headers={"Authorization": f"Bearer {bearer}"})
+              full = json.loads(msg)
+              text = " ".join(full.get("html") or []) + " " + (full.get("text") or "")
+              found = re.findall(r'https?://[^"\'\s<>]+', text)
+              link = next((u for u in found if "verify" in u or "token" in u or "confirm" in u), None)
+              if link:
+                  break
+              print(f"attempt {attempt}: mail arrived but no link matched; hosts={set(urllib.parse.urlparse(u).netloc for u in found)}")
+
+          if not link:
+              print("\nNo email arrived within 150s.")
+              sys.exit(0)
+
+          u = urllib.parse.urlparse(link)
+          q = urllib.parse.parse_qs(u.query)
+          print("\n══ THE LINK A REAL PERSON WOULD CLICK ══")
+          print(f"  host        : {u.netloc}")
+          print(f"  path        : {u.path}")
+          print(f"  type        : {q.get('type')}")
+          print(f"  redirect_to : {q.get('redirect_to')}")
+          print("  (token deliberately not printed)")
+          expected = urllib.parse.urlparse(PREVIEW).netloc
+          landing = q.get("redirect_to", [""])[0] or link
+          print(f"\n  VERDICT: {'RETURNS TO THE PREVIEW' if expected in landing else 'DOES NOT RETURN TO THE PREVIEW → ' + landing}")
+          PY
+          exit 0
+
       # ── 3. Is the preview itself reachable by a human, or SSO-walled? ──────
       - name: Preview reachability
         env:
           PREVIEW: ${{ steps.preview.outputs.url }}
         run: |
           set +e
-          for p in /api/health /voice-dna /login; do
-            echo "─────────── GET $PREVIEW$p"
-            curl -sS -o /dev/null -D - "$PREVIEW$p" | tr -d '\r' \
-              | grep -iE '^(HTTP/|location:|x-vercel-|set-cookie:)' | head -8
-            echo
+          alias="https://clearpath-git-claude-voice-dna-live-verify-n3788j-bigshiz56.vercel.app"
+          for base in "$PREVIEW" "$alias"; do
+            for p in /api/health /voice-dna /login; do
+              echo "─────────── GET $base$p"
+              curl -sS -o /dev/null -D - "$base$p" | tr -d '\r' \
+                | grep -iE '^(HTTP/|location:|x-vercel-|set-cookie:)' | head -6
+              echo
+            done
           done
           exit 0
