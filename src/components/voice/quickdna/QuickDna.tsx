@@ -76,6 +76,8 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
   screenRef.current = screen;
   const flashTimer = useRef<number | null>(null);
   const lastUtterance = useRef<string | null>(null);
+  /** Consecutive unreadable answers for the CURRENT question. */
+  const repairCountRef = useRef(0);
   const phaseRef = useRef(run.phase);
 
   const speakRef = useRef<((t: string) => void) | null>(null);
@@ -113,6 +115,7 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
       runRef.current = next; // synchronous: the next event must not read stale state
       setRun(next);
       setRepair(false);
+      repairCountRef.current = 0;
       if (!next.current) void finish(next);
       else askCurrent(next);
     },
@@ -199,9 +202,18 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
       // microphone, so repairing on a partial guess ("t", "tan") closed the mic
       // while the person was still saying "ten" — the answer was lost and the
       // repair repeated forever. Waiting for them to finish is the whole fix.
+      //
+      // AND THE FIRST REPAIR IS SILENT. Speaking costs a microphone
+      // suspension, so saying "Number?" the instant one transcript fails talks
+      // over the person's second attempt and guarantees a third. The prompt
+      // appears on screen and the microphone stays open; only if a SECOND
+      // complete answer also fails to parse is it worth spending the mic to
+      // say it out loud.
       if (e.text.trim().length >= 2) {
+        const failures = repairCountRef.current + 1;
+        repairCountRef.current = failures;
         setRepair(true);
-        speakRef.current?.(asking.kind === 'title' ? 'Again?' : 'Number?');
+        if (failures >= 2) speakRef.current?.(asking.kind === 'title' ? 'Again?' : 'Number?');
       }
     },
     [applyRun, commit, seedProfile],

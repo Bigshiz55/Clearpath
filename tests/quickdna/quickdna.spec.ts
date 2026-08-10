@@ -235,11 +235,14 @@ test('"make that a seven" restates rather than rewinding', async ({ page }) => {
 
 test('an unreadable answer gets the shortest possible repair', async ({ page }) => {
   await begin(page);
+  // The FIRST failure is shown, not spoken — speaking suspends the microphone
+  // and would talk over the retry. The second earns a spoken repair, and it is
+  // a repair rather than a conversation.
   await say(page, 'seven or eight');
   await expect(page.getByTestId('quickdna-repair')).toBeVisible();
+  await say(page, 'three or four');
   const { spoken } = await probe(page);
   expect(spoken.at(-1)).toBe('Number?');
-  // …and it is a repair, not a conversation.
   expect(spoken.at(-1)!.length).toBeLessThan(12);
 });
 
@@ -534,5 +537,58 @@ test.describe('it waits until you have finished speaking', () => {
     const after = (await probe(page)).spoken;
     expect(after.length).toBe(before + 1);
     expect(after.at(-1)).not.toBe('Number?');
+  });
+});
+
+test.describe('one question, one answer, straight on', () => {
+  test('the recogniser is set to end on the first utterance', async ({ page }) => {
+    // Reported live: "I have to say the number a few times." With continuous
+    // sessions Chrome holds off committing a final transcript across silences,
+    // so a perfectly clear "ten" sat unprocessed. Ending on the first utterance
+    // makes the final arrive the moment the person stops talking.
+    await page.addInitScript(() => {
+      const w = window as unknown as Record<string, unknown>;
+      const created: unknown[] = [];
+      w.__recs = created;
+      class Recognition {
+        lang = ''; continuous = true; interimResults = true; maxAlternatives = 1;
+        onresult: unknown = null; onerror: unknown = null;
+        onend: (() => void) | null = null;
+        constructor() { created.push(this); }
+        start() {} stop() {} abort() { this.onend?.(); }
+      }
+      w.SpeechRecognition = Recognition;
+    });
+    await begin(page);
+    const shapes = await page.evaluate(() => {
+      const recs = (window as unknown as { __recs: { continuous: boolean; interimResults: boolean }[] }).__recs;
+      return recs.map((r) => ({ continuous: r.continuous, interim: r.interimResults }));
+    });
+    expect(shapes.length).toBeGreaterThan(0);
+    expect(shapes.every((r) => r.continuous === false), 'still listening across silences').toBe(true);
+    expect(shapes.every((r) => r.interim === false), 'still acting on partial guesses').toBe(true);
+  });
+
+  test('the first unreadable answer does not talk over the second attempt', async ({ page }) => {
+    // Speaking suspends the microphone. Saying "Number?" the instant one
+    // transcript fails lands on top of the person's retry and guarantees a
+    // third. The first repair is on screen only.
+    await begin(page);
+    const before = (await probe(page)).spoken.length;
+    await say(page, 'mmmph');
+    await expect(page.getByTestId('quickdna-repair')).toBeVisible();
+    expect((await probe(page)).spoken.length, 'spoke over the retry').toBe(before);
+
+    // A second failure earns a spoken repair.
+    await say(page, 'grmbl');
+    expect((await probe(page)).spoken.at(-1)).toBe('Number?');
+  });
+
+  test('a clear answer after a failed one is taken immediately', async ({ page }) => {
+    await begin(page);
+    await say(page, 'mmmph');
+    await expect(page.getByTestId('quickdna-repair')).toBeVisible();
+    await say(page, 'ten');
+    await expect(page.getByTestId('quickdna-flash')).toHaveText('10 ✓');
   });
 });

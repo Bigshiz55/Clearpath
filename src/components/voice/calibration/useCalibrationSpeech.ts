@@ -376,7 +376,16 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
       return;
     }
     rec.lang = 'en-US';
-    rec.continuous = true;
+    // ── ONE UTTERANCE PER TURN ───────────────────────────────────────────
+    //
+    // `continuous = true` keeps the session open across silences, and Chrome
+    // then waits a long time before committing a final transcript — which is
+    // why a spoken "ten" had to be repeated before anything happened. With
+    // continuous OFF, Chrome ends the session the moment you stop talking and
+    // emits the final immediately. That is exactly the shape of this product:
+    // one question, one answer, process it, next question. The session is
+    // reopened for the next turn by `onend`.
+    rec.continuous = false;
     // ── WAIT UNTIL THE PERSON HAS FINISHED SPEAKING ──────────────────────
     //
     // Interim results were on, to shave latency. What that actually bought was
