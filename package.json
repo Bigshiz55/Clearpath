@@ -20,6 +20,8 @@
     "test:watch": "vitest",
     "pretest:mobile": "node scripts/check-port-free.mjs 3211 && npm run build:harness",
     "test:mobile": "playwright test --config playwright.mobile.config.ts",
+    "pretest:desktop": "node scripts/check-port-free.mjs 3212 && npm run build:harness",
+    "test:desktop": "playwright test --config playwright.desktop.config.ts",
     "eval:selftest": "vitest run eval",
     "eval:watchverdict": "node eval/cli.mjs",
     "eval:watchverdict:smoke": "node eval/cli.mjs smoke",

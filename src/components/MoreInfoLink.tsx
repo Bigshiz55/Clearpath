@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { QuickLook, type QuickLookTarget } from './QuickLook';
+import { stopAllTrailerPlayback } from './trailer/TrailerMedia';
 
 /**
  * CLICK = UNDERSTAND IT.
@@ -50,7 +51,18 @@ export function MoreInfoLink({
 }) {
   const [open, setOpen] = useState(false);
 
-  const openMoreInfo = () => setOpen(true);
+  /**
+   * Opening More Info ends any hover preview underneath it.
+   *
+   * The dialog appears under a stationary cursor, and a cursor that does not
+   * move fires no boundary event — so the card's own pointer-leave cannot be
+   * relied on here. Without this, a muted trailer would keep playing behind
+   * the dialog it was covered by. Stated explicitly rather than inferred.
+   */
+  const openMoreInfo = () => {
+    stopAllTrailerPlayback();
+    setOpen(true);
+  };
 
   return (
     <>
@@ -65,7 +77,7 @@ export function MoreInfoLink({
           // plain primary click — new tab, new window, download modifiers.
           if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
           e.preventDefault();
-          setOpen(true);
+          openMoreInfo();
         }}
       >
         {children}
