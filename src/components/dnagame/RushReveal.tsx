@@ -31,19 +31,29 @@ import { traitBelief } from '@/lib/voice/quickdna/traits';
  * recommendations did not change.
  */
 function recommend(state: GameState, count = 3) {
-  const seen = new Set(state.usedTitleIds);
-  return [...TITLES]
-    .filter((t) => !seen.has(t.id))
-    .map((t) => {
+  // Only titles they actually REACTED to are excluded. Excluding everything
+  // merely shown emptied the pool after a full game and rendered no
+  // recommendations at all — the one screen that has to pay off, blank.
+  const reacted = new Set(
+    state.decisions
+      .filter((d) => d.roundType === 'movie-lightning')
+      .flatMap((d) => d.shown),
+  );
+  const rank = (list: typeof TITLES) =>
+    [...list].map((t) => {
       const fit = t.traits.reduce((sum, e) => {
         const pref = traitBelief(state.profile, e.key).pref;
         const wanted = e.invert ? 100 - pref : pref;
         return sum + ((wanted - 50) / 50) * e.strength;
       }, 0);
       return { title: t, fit };
-    })
-    .sort((a, b) => b.fit - a.fit)
-    .slice(0, count);
+    }).sort((a, b) => b.fit - a.fit);
+
+  const fresh = rank(TITLES.filter((t) => !reacted.has(t.id)));
+  if (fresh.length >= count) return fresh.slice(0, count);
+  // Last resort: top up from everything, so the payoff is never empty.
+  const topUp = rank(TITLES).filter((x) => !fresh.some((f) => f.title.id === x.title.id));
+  return [...fresh, ...topUp].slice(0, count);
 }
 
 export function RushReveal({

@@ -159,10 +159,17 @@ function dealTitles(profile: TraitProfile, used: Set<string>, count: number): Di
     .slice(0, count);
 }
 
-const titleChoice = (t: DiagnosticTitle): Choice => ({
+/**
+ * A title as a choice. The wedge is assigned by POSITION, not by content:
+ * six titles all landing on 'mystery' collapsed the radial round onto a single
+ * slot — six buttons sharing one key and one wedge — which broke the layout and
+ * made the six-movie round unplayable. A title's meaning lives in its trait
+ * vector; the wedge is only where it sits on screen.
+ */
+const titleChoice = (t: DiagnosticTitle, index = 0): Choice => ({
   id: t.id,
   label: t.title,
-  family: 'mystery',
+  family: FAMILIES[index % FAMILIES.length]!.id,
   titleId: t.id,
   effects: t.traits.map((x) => ({ key: x.key, pull: x.invert ? -x.strength : x.strength })),
 });
@@ -233,7 +240,7 @@ function dealRound(type: RoundType, profile: TraitProfile, state: GameState): Ro
       if (titles.length < 4) return null;
       return {
         ...base,
-        choices: titles.map(titleChoice),
+        choices: titles.map((t, i) => titleChoice(t, i)),
         picks: 1,
         negative: false,
         layout: 'wheel',
