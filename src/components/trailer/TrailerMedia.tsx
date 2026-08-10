@@ -499,44 +499,44 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
               that cannot be clicked (see pointer-events above) would be a lie. */}
           {!isHoverPreview && (
           <>
-          {/* Close (✕) — top-LEFT, restores the poster. (Top-right is where the
-              card's own W/docket badge lives, so ✕ goes left to avoid it.) */}
-          <button
-            type="button"
-            onClick={close}
-            aria-label={`Close ${title} trailer`}
-            data-testid="trailer-close"
-            className="absolute left-1 top-1 z-[3] grid h-8 w-8 place-items-center rounded-full bg-black/65 text-sm text-white backdrop-blur transition hover:bg-black/85"
-          >
-            ✕
-          </button>
-          {/* Minimal control overlay — mute / restart / fullscreen. */}
-          <div className="absolute bottom-1 right-1 flex gap-1">
+            {/* Close (✕) — top-LEFT, restores the poster. (Top-right is where the
+                card's own W/docket badge lives, so ✕ goes left to avoid it.) */}
             <button
               type="button"
-              onClick={toggleMute}
-              aria-label={muted ? `Unmute ${title} trailer` : `Mute ${title} trailer`}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
+              onClick={close}
+              aria-label={`Close ${title} trailer`}
+              data-testid="trailer-close"
+              className="absolute left-1 top-1 z-[3] grid h-8 w-8 place-items-center rounded-full bg-black/65 text-sm text-white backdrop-blur transition hover:bg-black/85"
             >
-              {muted ? '🔇' : '🔊'}
+              ✕
             </button>
-            <button
-              type="button"
-              onClick={restart}
-              aria-label={`Restart ${title} trailer`}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
-            >
-              ↺
-            </button>
-            <button
-              type="button"
-              onClick={fullscreen}
-              aria-label={`Play ${title} trailer fullscreen`}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
-            >
-              ⛶
-            </button>
-          </div>
+            {/* Minimal control overlay — mute / restart / fullscreen. */}
+            <div className="absolute bottom-1 right-1 flex gap-1">
+              <button
+                type="button"
+                onClick={toggleMute}
+                aria-label={muted ? `Unmute ${title} trailer` : `Mute ${title} trailer`}
+                className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
+              >
+                {muted ? '🔇' : '🔊'}
+              </button>
+              <button
+                type="button"
+                onClick={restart}
+                aria-label={`Restart ${title} trailer`}
+                className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
+              >
+                ↺
+              </button>
+              <button
+                type="button"
+                onClick={fullscreen}
+                aria-label={`Play ${title} trailer fullscreen`}
+                className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
+              >
+                ⛶
+              </button>
+            </div>
           </>
           )}
         </div>

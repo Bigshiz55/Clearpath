@@ -180,10 +180,15 @@ test.describe('ARTIFACT — hover preview', () => {
 
     await pointerTo(page, posterOf(page, 0));
     await expect(posterOf(page, 0)).toHaveAttribute('data-playing', '1');
+    // LET THE CROSSFADE FINISH (500ms). Shooting the instant the attribute
+    // flips catches the poster half-faded, and the artifact then shows neither
+    // state cleanly.
+    await page.waitForTimeout(700);
     await card(page, 0).screenshot({ path: `${SHOTS}/card-hover-preview-active.png` });
 
     await page.mouse.move(2, 2);
     await expect(posterOf(page, 0)).toHaveAttribute('data-playing', '0');
+    await page.waitForTimeout(300);
     await card(page, 0).screenshot({ path: `${SHOTS}/card-hover-preview-restored.png` });
   });
 });

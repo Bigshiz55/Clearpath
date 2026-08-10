@@ -224,14 +224,25 @@ export async function mountHarness(
     });
   });
 
-  // The embed host is unreachable from the test sandbox; a stub keeps the
-  // iframe from hanging the page while still exercising the real embed URL
-  // (which the specs assert on for `mute=1`).
+  /* THE EMBED HOST IS UNREACHABLE FROM THE TEST SANDBOX.
+     A stub keeps the iframe from hanging the page while the real embed URL is
+     still built and still asserted on (`mute=1`, `autoplay=1`).
+     It is deliberately a VISIBLE stub rather than a blank document: a blank
+     iframe over an artless fixture poster produces a screenshot in which
+     "preview running" and "poster restored" look identical, and an artifact
+     that cannot show its own subject is not proof of anything. This is
+     honestly labelled as a stand-in, so nobody mistakes the artifact for real
+     playback. */
+  const stub = (label: string) =>
+    `<!doctype html><title>${label}</title><body style="margin:0;height:100%;display:grid;place-items:center;` +
+    `background:linear-gradient(135deg,#1d1033,#3a1550);color:#fff;` +
+    `font:700 13px/1.4 system-ui,sans-serif;text-align:center">` +
+    `<div><div style="font-size:26px">▶</div>${label}</div></body>`;
   await page.route('https://www.youtube-nocookie.com/**', (route) =>
-    route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>stub</title>' }),
+    route.fulfill({ contentType: 'text/html', body: stub('TRAILER PLAYING (stubbed embed)') }),
   );
   await page.route('https://www.youtube.com/**', (route) =>
-    route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>stub</title>' }),
+    route.fulfill({ contentType: 'text/html', body: stub('TRAILER PLAYING (stubbed embed)') }),
   );
 
   return {
