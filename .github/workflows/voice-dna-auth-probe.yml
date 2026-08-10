@@ -1,0 +1,119 @@
+name: Voice DNA auth probe
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEMPORARY DIAGNOSTIC — answers one question with evidence instead of theory:
+# WHY does a magic link requested from the Vercel preview land the user on
+# http://localhost:3000 ?
+#
+# It changes nothing and needs NO secrets. Everything it touches is already
+# public: the Supabase project ref is in .env.example, and every endpoint it
+# calls is one an email client would call by clicking a link.
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# The probe rests on a documented GoTrue behaviour: `/auth/v1/verify` VALIDATES
+# `redirect_to` against Site URL + Additional Redirect URLs BEFORE it looks at
+# the token. So a deliberately invalid token still tells us where a REAL link
+# would have sent the user:
+#
+#   Location echoes our redirect_to  → that URL is allow-listed.
+#   Location is something else       → it was rejected, and what comes back IS
+#                                      the project's Site URL.
+#
+# No email is sent, no session is created, no state changes. The token is junk.
+
+on:
+  push:
+    branches: [claude/voice-dna-live-verify-n3788j]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Discover the Vercel preview for this commit
+        id: preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha="${{ github.sha }}"
+          for i in $(seq 1 45); do
+            ids=$(gh api "repos/${{ github.repository }}/deployments?sha=$sha&per_page=100" --jq '.[].id' || echo "")
+            for id in $ids; do
+              url=$(gh api "repos/${{ github.repository }}/deployments/$id/statuses?per_page=100" \
+                --jq '[.[] | select(.state=="success") | .environment_url] | map(select(. != null and . != "")) | .[0]' 2>/dev/null || echo "")
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo "url=$url" >> "$GITHUB_OUTPUT"
+                echo "Preview READY: $url"
+                exit 0
+              fi
+            done
+            echo "attempt $i: preview not ready yet for $sha"
+            sleep 20
+          done
+          echo "::error::No successful Vercel preview deployment for $sha."
+          exit 1
+
+      # ── 1. Is a Supabase session even needed? ──────────────────────────────
+      # /voice-dna is on the guest session model: middleware mints an anonymous
+      # user. If anonymous sign-ins are ON, nobody should ever see /login here
+      # and the magic link is beside the point.
+      - name: Supabase auth settings (is anonymous sign-in enabled?)
+        env:
+          SUPA: https://vajgviraxigkwlvysxfz.supabase.co
+        run: |
+          set +e
+          echo "─────────── GET $SUPA/auth/v1/settings"
+          curl -sS -w '\nstatus=%{http_code}\n' "$SUPA/auth/v1/settings"
+          exit 0
+
+      # ── 2. Where would a real magic link actually send the user? ───────────
+      - name: Redirect allow-list probe
+        env:
+          SUPA: https://vajgviraxigkwlvysxfz.supabase.co
+          PREVIEW: ${{ steps.preview.outputs.url }}
+        run: |
+          set +e
+          enc() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=""))' "$1"; }
+
+          branch_alias="https://clearpath-git-claude-voice-dna-live-verify-n3788j-bigshiz56.vercel.app"
+
+          probe() {
+            label="$1"; target="$2"
+            loc=$(curl -sS -o /dev/null -D - \
+              "$SUPA/auth/v1/verify?token=probe-invalid-token-no-side-effects&type=magiclink&redirect_to=$(enc "$target")" \
+              | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')
+            echo "── $label"
+            echo "   asked for : $target"
+            echo "   landed on : ${loc:-<none>}"
+            case "$loc" in
+              "$target"*) echo "   VERDICT   : ALLOW-LISTED";;
+              "")         echo "   VERDICT   : no Location header — read the raw response above";;
+              *)          echo "   VERDICT   : REJECTED → fell back to Site URL = ${loc%%\#*}";;
+            esac
+            echo
+          }
+
+          probe "this preview deployment"   "$PREVIEW/auth/callback?next=/voice-dna"
+          probe "branch alias"              "$branch_alias/auth/callback?next=/voice-dna"
+          probe "localhost control"         "http://localhost:3000/auth/callback?next=/voice-dna"
+          exit 0
+
+      # ── 3. Is the preview itself reachable by a human, or SSO-walled? ──────
+      - name: Preview reachability
+        env:
+          PREVIEW: ${{ steps.preview.outputs.url }}
+        run: |
+          set +e
+          for p in /api/health /voice-dna /login; do
+            echo "─────────── GET $PREVIEW$p"
+            curl -sS -o /dev/null -D - "$PREVIEW$p" | tr -d '\r' \
+              | grep -iE '^(HTTP/|location:|x-vercel-|set-cookie:)' | head -8
+            echo
+          done
+          exit 0
