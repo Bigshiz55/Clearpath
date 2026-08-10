@@ -490,3 +490,49 @@ test.describe('speaking suspends the microphone, briefly and visibly', () => {
     }
   });
 });
+
+test.describe('it waits until you have finished speaking', () => {
+  test('a partial guess never triggers a repair', async ({ page }) => {
+    // Reported live: "it asks serial killers, I say 10, and it just says
+    // Number?" Chrome streams partial guesses before the final word, the first
+    // unparseable fragment was treated as a failed answer, and the repair
+    // SUSPENDED the microphone while the person was still talking — so the real
+    // answer was lost and the loop repeated. Only complete utterances count.
+    await page.addInitScript(() => {
+      const w = window as unknown as Record<string, unknown>;
+      const created: unknown[] = [];
+      w.__recs = created;
+      class Recognition {
+        lang = ''; continuous = false; interimResults = true; maxAlternatives = 1;
+        onresult: ((e: unknown) => void) | null = null;
+        onerror: unknown = null;
+        onend: (() => void) | null = null;
+        constructor() { created.push(this); }
+        start() {} stop() {} abort() { this.onend?.(); }
+      }
+      w.SpeechRecognition = Recognition;
+    });
+    await begin(page);
+
+    // The engine must have been configured to ignore partial results.
+    const interim = await page.evaluate(() => {
+      const recs = (window as unknown as { __recs: { interimResults: boolean }[] }).__recs;
+      return recs.map((r) => r.interimResults);
+    });
+    expect(interim.length).toBeGreaterThan(0);
+    expect(interim.every((v) => v === false), 'partial results are still enabled').toBe(true);
+  });
+
+  test('a complete answer is taken, and no repair is spoken', async ({ page }) => {
+    await begin(page);
+    await expect(page.getByTestId('quickdna-question')).toHaveAttribute('data-question-kind', 'scale');
+    const before = (await probe(page)).spoken.length;
+    await say(page, 'ten');
+    await expect(page.getByTestId('quickdna-flash')).toHaveText('10 ✓');
+    await expect(page.getByTestId('quickdna-repair')).toHaveCount(0);
+    // What it said next is the NEXT question, not "Number?".
+    const after = (await probe(page)).spoken;
+    expect(after.length).toBe(before + 1);
+    expect(after.at(-1)).not.toBe('Number?');
+  });
+});

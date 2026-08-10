@@ -377,10 +377,20 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
     }
     rec.lang = 'en-US';
     rec.continuous = true;
-    // Interim results are what make an answer land in well under half a second;
-    // the parser refuses anything it cannot pin down, so a half-formed interim
-    // costs nothing.
-    rec.interimResults = true;
+    // ── WAIT UNTIL THE PERSON HAS FINISHED SPEAKING ──────────────────────
+    //
+    // Interim results were on, to shave latency. What that actually bought was
+    // a run that answered its own question wrongly: Chrome streams partial
+    // guesses — "t", "tan", "then" — before the final "ten", and the first
+    // unparseable fragment was treated as a failed answer. The system then said
+    // "Number?", and SPEAKING SUSPENDS THE MICROPHONE, so the real answer
+    // arrived at a closed mic. Every attempt looped.
+    //
+    // Only finals now. They land a few hundred milliseconds after speech stops,
+    // which is the correct place to act: ask, listen, wait until they are done,
+    // then process. Partial guesses about what someone is halfway through
+    // saying are not answers.
+    rec.interimResults = false;
     rec.maxAlternatives = 1;
 
     rec.onresult = (e) => {
@@ -388,6 +398,9 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
         const result = e.results[i];
         const alt = result?.[0];
         if (!alt?.transcript) continue;
+        // Belt and braces: even with `interimResults` off, some engines deliver
+        // a non-final result. A half-spoken word is never an answer.
+        if (result?.isFinal === false) continue;
         deliver(alt.transcript, alt.confidence, 'voice', `s${sessionRef.current}:${i}`);
       }
     };

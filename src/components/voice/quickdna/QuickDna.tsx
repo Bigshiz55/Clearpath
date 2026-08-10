@@ -192,8 +192,13 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
         else commit({ kind: 'title', reaction: parsed.reaction, strong: parsed.strong }, 'voice', parsed.confidence);
         return;
       }
-      // Heard something, could not use it. The shortest possible repair — not
-      // an explanation of recognition confidence.
+      // Heard a COMPLETE utterance and could not use it. The shortest possible
+      // repair — not an explanation of recognition confidence.
+      //
+      // This only ever runs on a final transcript. Speaking suspends the
+      // microphone, so repairing on a partial guess ("t", "tan") closed the mic
+      // while the person was still saying "ten" — the answer was lost and the
+      // repair repeated forever. Waiting for them to finish is the whole fix.
       if (e.text.trim().length >= 2) {
         setRepair(true);
         speakRef.current?.(asking.kind === 'title' ? 'Again?' : 'Number?');
