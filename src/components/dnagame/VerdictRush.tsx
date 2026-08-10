@@ -35,6 +35,7 @@ import {
   MIN_DECISIONS,
   choose,
   createGame,
+  everShown,
   lastPoints,
   meaningfulDecisions,
   reactToTitle,
@@ -43,6 +44,7 @@ import {
   type GameState,
 } from '@/lib/dnagame/game';
 import { STREAK_VISIBLE, streakMultiplier } from '@/lib/dnagame/score';
+import { EMPTY_DNA, loadDna, mergeDna, saveDna, type StoredDna } from '@/lib/dnagame/persist';
 import type { Choice } from '@/lib/dnagame/rounds';
 import type { TraitProfile } from '@/lib/voice/quickdna/traits';
 import { Wheel, type WheelSlot } from './Wheel';
@@ -89,12 +91,16 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
   const [elapsed, setElapsed] = useState(0);
   /** The "+N" that flies off the score. Keyed so identical scores still re-fire. */
   const [pop, setPop] = useState<{ points: number; key: number } | null>(null);
+  /** What every earlier play added up to. Seeds this run; grows when it ends. */
+  const [dna, setDna] = useState<StoredDna>(EMPTY_DNA);
 
   const stateRef = useRef(state);
   stateRef.current = state;
   const busy = useRef(false);
   const roundShownAt = useRef(0);
   const startedAt = useRef(0);
+  /** `applyState` is created once; this keeps it pointing at the live saver. */
+  const persistRef = useRef<(next: GameState) => void>(() => {});
 
   const round = state.current;
   const readings = useMemo(() => readAllFamilies(state.profile), [state.profile]);
@@ -121,6 +127,7 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
     }
     if (!next.current) {
       setElapsed(Date.now() - startedAt.current);
+      persistRef.current(next);
       setScreen('reveal');
     }
   }, []);
@@ -176,17 +183,58 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
     [applyState],
   );
 
-  // Resume rather than restart — nothing learned should be lost to a reload.
+  // Resume rather than restart — nothing learned should be lost to a reload —
+  // and failing that, pick up the DNA earlier plays built so this run adds to
+  // it instead of covering the same ground.
   useEffect(() => {
+    const stored = loadDna();
+    setDna(stored);
     try {
       const raw = sessionStorage.getItem(RESUME_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as GameState;
-      if (saved && Array.isArray(saved.decisions)) setState(saved);
+      if (raw) {
+        const saved = JSON.parse(raw) as GameState;
+        if (saved && Array.isArray(saved.decisions)) {
+          setState(saved);
+          return;
+        }
+      }
     } catch {
-      /* unreadable — start fresh */
+      /* unreadable — fall through to the stored DNA */
+    }
+    if (Object.keys(stored.profile).length > 0) {
+      setState(createGame(0, stored.profile, stored));
     }
   }, []);
+
+  /**
+   * Fold a finished run into the stored DNA — once, when it completes.
+   *
+   * Deliberately not on every decision: `mergeDna` adds this game's decision
+   * count to the running total, so calling it per tap would count the same
+   * decisions again and again. A game abandoned mid-way is still safe, because
+   * `sessionStorage` resumes it; what it loses is only the cross-session carry.
+   */
+  const persist = useCallback((next: GameState) => {
+    setDna((prior) => {
+      // EVERYTHING SHOWN, not merely everything consumed — see `everShown`.
+      // Persisting only the consumed ids let a later game re-ask an option this
+      // one had already put on screen.
+      const shown = everShown(next);
+      const merged = mergeDna(
+        prior,
+        {
+          profile: next.profile,
+          usedChoiceIds: shown.choiceIds,
+          usedTitleIds: shown.titleIds,
+          decisions: next.decisions.length,
+        },
+        true,
+      );
+      saveDna(merged);
+      return merged;
+    });
+  }, []);
+  persistRef.current = persist;
 
   useEffect(() => {
     if (screen !== 'playing') return;
@@ -219,7 +267,10 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
           } catch {
             /* ignore */
           }
-          setState(createGame(0, state.profile));
+          // Carries BOTH halves forward: what we learned, and what has already
+          // been asked. Playing again has to add to the picture, and it must
+          // never put the same option up a second time.
+          setState(createGame(0, dna.profile, dna));
           setScreen('ready');
         }}
       />
@@ -227,12 +278,17 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
   }
 
   if (screen === 'ready') {
-    const returning = Object.keys(seedProfile).length > 0 || state.decisions.length > 0;
+    const returning =
+      dna.plays > 0 || Object.keys(seedProfile).length > 0 || state.decisions.length > 0;
     return (
       <div className="mx-auto flex min-h-[80vh] w-full max-w-lg flex-col items-center justify-center gap-6 px-5 text-center">
         <Wheel readings={readings} known={known} compact />
         <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">Verd1ct Rush</h1>
-        <p className="text-slate-300">Can we figure out your taste in 90 seconds?</p>
+        <p className="text-slate-300">
+          {returning
+            ? 'Pick up where you left off — all new questions.'
+            : 'Can we figure out your taste in 90 seconds?'}
+        </p>
         <button
           type="button"
           data-testid="rush-start"
@@ -241,6 +297,12 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
         >
           {returning ? 'Level up my DNA' : 'Build my Verd1ct DNA'}
         </button>
+        {returning && (
+          <p data-testid="rush-carry" data-plays={dna.plays} data-decisions={dna.decisions} className="text-xs text-slate-500">
+            {dna.plays} {dna.plays === 1 ? 'round' : 'rounds'} · {dna.decisions} decisions ·{' '}
+            {Math.round(known * 100)}% known
+          </p>
+        )}
       </div>
     );
   }

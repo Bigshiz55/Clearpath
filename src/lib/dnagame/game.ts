@@ -81,13 +81,24 @@ export const MAX_DECISIONS = 35;
 /** Stop early once we genuinely know someone — not at a fixed question count. */
 export const STRONG_READ = 0.72;
 
-export function createGame(startedAt: number, seed: TraitProfile = {}): GameState {
+/**
+ * A new game, optionally carrying what earlier plays already covered.
+ *
+ * `seen` is what makes replaying worthwhile: the profile says what we know, and
+ * the seen-sets say what we have already asked, so a second run spends its
+ * rounds on new ground instead of putting the same six options up again.
+ */
+export function createGame(
+  startedAt: number,
+  seed: TraitProfile = {},
+  seen: { usedChoiceIds?: readonly string[]; usedTitleIds?: readonly string[] } = {},
+): GameState {
   return {
     profile: seed,
     decisions: [],
     recentTypes: [],
-    usedChoiceIds: [],
-    usedTitleIds: [],
+    usedChoiceIds: [...(seen.usedChoiceIds ?? [])],
+    usedTitleIds: [...(seen.usedTitleIds ?? [])],
     current: null,
     startedAt,
     score: 0,
@@ -296,10 +307,21 @@ export function nextRound(state: GameState): Round | null {
   return null;
 }
 
-/** Start, or resume, with the first round dealt. */
+/**
+ * Start, or resume, with the first round dealt.
+ *
+ * A returning player can arrive having already seen most of the bank, and a
+ * game that deals nothing would drop them straight onto the payoff screen
+ * having answered nothing at all. So an exhausted bank RECYCLES rather than
+ * ends: better to revisit an old option after several full plays than to hand
+ * someone an empty game.
+ */
 export function startGame(state: GameState, now: number): GameState {
   const withStart = { ...state, startedAt: now };
-  return { ...withStart, current: nextRound(withStart) };
+  const first = nextRound(withStart);
+  if (first) return { ...withStart, current: first };
+  const recycled = { ...withStart, usedChoiceIds: [], usedTitleIds: [] };
+  return { ...recycled, current: nextRound(recycled) };
 }
 
 /**
@@ -438,6 +460,28 @@ export function reactToTitle(
     streak,
   };
   return { ...next, current: nextRound(next) };
+}
+
+/**
+ * EVERYTHING THIS GAME PUT IN FRONT OF SOMEONE, chosen or not.
+ *
+ * Deliberately different from `usedChoiceIds`, which is what a run CONSUMED.
+ * Inside one run an option passed over is left in the bank on purpose — seeing
+ * "ghost story" beside a heist teaches something different from seeing it
+ * beside a serial-killer hunt, and retiring everything shown emptied the bank
+ * after eighteen decisions. ACROSS runs the opposite is true: being shown the
+ * same six options a second time is the clearest possible sign that a quiz was
+ * not listening. So this is what persistence folds in, and it is why replaying
+ * is all new ground.
+ */
+export function everShown(state: GameState): { choiceIds: string[]; titleIds: string[] } {
+  const fromTitles = new Set<RoundType>(['movie-lightning', 'six-movie']);
+  const choiceIds = [...state.usedChoiceIds];
+  const titleIds = [...state.usedTitleIds];
+  for (const d of state.decisions) {
+    (fromTitles.has(d.roundType) ? titleIds : choiceIds).push(...d.shown);
+  }
+  return { choiceIds: [...new Set(choiceIds)], titleIds: [...new Set(titleIds)] };
 }
 
 /** What the most recent decision paid — the number that pops on screen. */

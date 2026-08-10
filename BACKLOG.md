@@ -96,6 +96,25 @@ Updated at the end of every work order per the Working Agreement in
   representative.
 
 ## Done
+- **Verd1ct Rush is replayable, and a replay is all new ground.** The DNA a
+  play builds now outlives it (`src/lib/dnagame/persist.ts` — localStorage, so
+  it works for a guest; degrades to a fresh game on any failure). A later run
+  starts from the profile earlier runs learned and NEVER re-asks anything it
+  has already put on screen. That last part needed a distinction the engine did
+  not have: `usedChoiceIds` is what a run CONSUMED, and inside one run an option
+  passed over is deliberately left in the bank (retiring everything shown
+  emptied it after eighteen decisions). Across runs the opposite is right, so
+  `everShown` reports everything displayed and that is what persistence folds
+  in — a unit test proved options really did repeat before this. `startGame`
+  now recycles an exhausted bank rather than handing a returning player a game
+  with nothing in it. The ready screen tells a returning player what they are
+  carrying (rounds, decisions, % known).
+- **The Docket coach mark no longer covers the poster it is explaining.**
+  Reported from a phone. It hung off the W button's own rect, which put a 216px
+  panel over that poster and the next one along in a rail. It now docks to the
+  bottom of the viewport above the tab bar — measured from `[data-app-bottomnav]`
+  rather than assumed, since that bar's height moves with the safe-area inset —
+  and a browser test asserts it overlaps no poster on screen.
 - **Wheel buttons sat off their wedges whenever a round dealt fewer than six
   choices.** Reported live from a phone: five labels on a six-wedge wheel, two of
   them straddling a seam. The buttons were laid out across `slots.length` while

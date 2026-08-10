@@ -160,24 +160,32 @@ export function WCheck({
    * listeners below, and the clamp keeps all 216px on screen at 320px.
    */
   const btnRef = useRef<HTMLButtonElement | null>(null);
-  const [coachPos, setCoachPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [coachPos, setCoachPos] = useState<{ bottom: number; left: number; width: number } | null>(null);
   const coachOpen = mounted && coach.step !== 'none' && !refused;
 
+  /**
+   * DOCKED, NOT FLOATING.
+   *
+   * It used to hang off the button's own rect, which put a 216px panel directly
+   * on top of the poster it was talking about — and, in a rail, on the next one
+   * along too. A hint that obscures the thing it is explaining is worse than no
+   * hint. So it sits where transient guidance belongs: a strip across the bottom
+   * of the viewport, above the tab bar, covering no artwork at all.
+   *
+   * The bar's real position is MEASURED (`[data-app-bottomnav]`) rather than
+   * assumed, because its height changes with the safe-area inset and it is
+   * hidden entirely on large screens.
+   */
   const placeCoach = useCallback(() => {
-    const el = btnRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
+    if (!btnRef.current) return;
     const vw = document.documentElement.clientWidth;
     const vh = document.documentElement.clientHeight;
-    const width = Math.min(216, vw - 16);
-    // Grows leftward from the control, then clamped into the viewport.
-    const left = Math.max(8, Math.min(r.right - width, vw - width - 8));
-    // Below the control by default; above it only if there is no room below,
-    // so the panel never covers the thing it is pointing at.
-    const ESTIMATED_H = 112;
-    const below = r.bottom + 8;
-    const top = below + ESTIMATED_H > vh ? Math.max(8, r.top - ESTIMATED_H - 8) : below;
-    setCoachPos({ top, left, width });
+    const nav = document.querySelector('[data-app-bottomnav]');
+    const navTop = nav ? nav.getBoundingClientRect().top : vh;
+    const width = Math.min(400, vw - 24);
+    const left = Math.max(12, Math.round((vw - width) / 2));
+    const bottom = Math.max(12, Math.round(vh - navTop) + 12);
+    setCoachPos({ bottom, left, width });
   }, []);
 
   useEffect(() => {
@@ -303,9 +311,8 @@ export function WCheck({
           data-testid="w-coach"
           data-step={coach.step}
           /* FIXED, ON THE BODY. See placeCoach above: every ancestor that
-             could host this panel clips it. Position comes from the button's
-             own rect, clamped into the viewport, so it is fully visible and
-             fully tappable at 320px.
+             could host this panel clips it, and docking it to the bottom of
+             the viewport is what keeps it off the artwork it is explaining.
 
              AND IT NEVER EATS A TAP IT WAS NOT GIVEN. Floating free of the
              card, the panel can land over a search result or the next poster —
@@ -317,14 +324,14 @@ export function WCheck({
              the screen it was explaining. */
           style={{
             position: 'fixed',
-            top: coachPos.top,
+            bottom: coachPos.bottom,
             left: coachPos.left,
             width: coachPos.width,
             pointerEvents: 'none',
           }}
-          className="z-[60] rounded-xl border border-[#ff1493]/50 bg-ink-950 p-2.5 text-left shadow-[0_12px_36px_-8px_rgba(0,0,0,0.9)]"
+          className="z-[60] flex items-center gap-3 rounded-xl border border-[#ff1493]/50 bg-ink-950 px-3 py-2 text-left shadow-[0_12px_36px_-8px_rgba(0,0,0,0.9)]"
         >
-          <span className="block text-[11px] font-semibold leading-snug text-slate-100">{coach.text}</span>
+          <span className="block flex-1 text-[12px] font-semibold leading-snug text-slate-100">{coach.text}</span>
           <button
             type="button"
             onClick={(e) => {
@@ -341,7 +348,7 @@ export function WCheck({
             // visitor sees, so it was the smallest tap target in the product on
             // the exact screen where a first-time user is least sure what to do.
             // It was 43x28 and failed the 44px floor at every viewport.
-            className="mt-1.5 inline-flex min-h-[44px] items-center rounded-md px-2 text-[11px] font-bold text-slate-400 transition hover:text-white"
+            className="inline-flex min-h-[44px] shrink-0 items-center rounded-md px-3 text-[12px] font-bold text-slate-300 transition hover:text-white"
           >
             Got it
           </button>

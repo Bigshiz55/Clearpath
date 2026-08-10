@@ -115,6 +115,40 @@ test.describe('the W teaches itself, once', () => {
     await w.click();
     await expect(w).toHaveAttribute('aria-pressed', 'true');
   });
+
+  /**
+   * IT MUST NOT SIT ON THE CARD IT IS TEACHING. Hanging off the button's own
+   * rect put a panel straight over that poster, and over the next one along in
+   * a rail — reported from a phone as the hint "floating over the thing and
+   * blocking it".
+   *
+   * Note what is NOT asserted: that it covers no card at all. Nothing docked
+   * can promise that, because a poster grid fills the viewport and any bottom
+   * strip lands on whichever card is at the bottom of the scroll. The claim
+   * worth making is that it is a DOCKED strip rather than a floating popover,
+   * and that the card being explained is clear of it.
+   */
+  test('the coach is docked, not floating over the card it explains', async ({ page }) => {
+    await open(page);
+    const coach = (await page.getByTestId('w-coach').boundingBox())!;
+    const vh = page.viewportSize()!.height;
+
+    // Docked: its foot is near the bottom of the viewport, above the tab bar.
+    const footGap = vh - (coach.y + coach.height);
+    expect(footGap, 'the coach is floating mid-screen').toBeLessThan(160);
+    expect(footGap, 'the coach is off the bottom of the screen').toBeGreaterThanOrEqual(0);
+
+    // And the card whose W is being taught is completely clear of it.
+    const cards = page.locator('[data-testid="qa-grid"] > *');
+    expect(await cards.count(), 'no cards rendered to check against').toBeGreaterThan(2);
+    const first = (await cards.first().boundingBox())!;
+    const overlaps =
+      coach.x < first.x + first.width &&
+      coach.x + coach.width > first.x &&
+      coach.y < first.y + first.height &&
+      coach.y + coach.height > first.y;
+    expect(overlaps, 'the coach is sitting on the card it is explaining').toBe(false);
+  });
 });
 
 /**
