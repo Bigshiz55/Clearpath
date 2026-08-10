@@ -332,14 +332,22 @@ export function choose(
     version: state.version,
   };
 
-  const titleIds = chosen.filter((x) => x.titleId).map((x) => x.titleId!);
+  // ONLY WHAT WAS DECIDED IS CONSUMED.
+  //
+  // Retiring every option merely SHOWN burned six entries per wheel round and
+  // emptied the bank after eighteen decisions — the game ended early, having
+  // learned less than it should. An option the player passed over is not spent:
+  // seeing "ghost story" beside a heist teaches something different from seeing
+  // it beside a serial-killer hunt, and the router already avoids monotony on
+  // its own. Titles are the exception — asking about the same film twice is
+  // just a bug.
   const next: GameState = {
     ...state,
     profile,
     decisions: [...state.decisions, decision],
     recentTypes: [...state.recentTypes, round.type].slice(-5),
-    usedChoiceIds: [...state.usedChoiceIds, ...round.choices.filter((x) => !x.titleId).map((x) => x.id)],
-    usedTitleIds: [...state.usedTitleIds, ...round.choices.filter((x) => x.titleId).map((x) => x.id), ...titleIds],
+    usedChoiceIds: [...state.usedChoiceIds, ...chosen.filter((x) => !x.titleId).map((x) => x.id)],
+    usedTitleIds: [...state.usedTitleIds, ...round.choices.filter((x) => x.titleId).map((x) => x.id)],
     current: null,
   };
   return { ...next, current: nextRound(next) };
