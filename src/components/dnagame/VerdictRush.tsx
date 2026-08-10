@@ -251,7 +251,7 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
 
   /**
    * One question, two homes. In the hub it is the whole screen's instruction,
-   * set inside a circle a little under half the wheel across; above a duel or a
+   * set inside a circle about a third of the wheel across; above a duel or a
    * card grid it can breathe. Same element, same test hooks, so nothing
    * downstream has to care which layout dealt.
    */
@@ -263,17 +263,24 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
       data-picks={round.picks}
       className={
         inWheel
-          ? `text-balance px-1 text-[1.15rem] font-black uppercase leading-[1.05] tracking-tight sm:text-2xl ${
+          ? `text-balance font-black uppercase leading-[1.05] tracking-tight ${
               round.negative ? 'text-rose-300' : 'text-white'
             }`
           : `text-center text-2xl font-black uppercase tracking-tight sm:text-3xl ${
               round.negative ? 'text-rose-300' : 'text-white'
             }`
       }
+      // In the hub the question is sized against the WHEEL, not the viewport —
+      // the hub is a fixed fraction of it, so `cqw` is the only unit that keeps
+      // the question filling the circle without ever outgrowing it.
+      style={inWheel ? { fontSize: '4.4cqw' } : undefined}
     >
       {round.prompt}
       {multi && (
-        <span className="mt-1 block text-sm font-bold text-slate-400">
+        <span
+          className="mt-1 block text-sm font-bold text-slate-400"
+          style={inWheel ? { fontSize: '3cqw' } : undefined}
+        >
           {picked.length}/{round.picks}
         </span>
       )}

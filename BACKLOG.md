@@ -122,6 +122,9 @@ Updated at the end of every work order per the Working Agreement in
   breakpoint step cannot hold, because the desktop wheel is only a tenth wider
   than the phone's while an `sm:` bump that reads as a real increase is far
   more — which is how "documentary" became 92px of word in an 87px box.
+  The hub is deliberately small (37% of the wheel, not 45%): every unit it gives
+  back goes into the ring, which is where the game is actually played, and the
+  hub's own type scales in `cqw` so the question still fills the smaller circle.
   New pure scoring layer (`src/lib/dnagame/score.ts`, 20 unit tests): points reward the
   UNCERTAINTY A DECISION RESOLVED — never a "right" answer — with bounded speed
   and streak multipliers (best tap ≤ 7.5× the worst, so a 30-decision game is

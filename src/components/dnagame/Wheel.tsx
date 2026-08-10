@@ -57,17 +57,27 @@ export interface WheelSlot {
 const TAU = Math.PI * 2;
 const RAD = Math.PI / 180;
 
-/** Percent-of-box radii. The hub has to hold a question, so it is generous. */
-const INNER = 22.5;
-/** The painted wedge — the button face. */
-const PAINT_IN = 24;
-const PAINT_OUT = 46.5;
-/** The confidence meter, outside the button face so it cannot dim the label. */
-const METER_IN = 48;
-const METER_OUT = 50;
+/**
+ * Percent-of-box radii.
+ *
+ * THE HUB IS DELIBERATELY SMALL. Every unit it gives back goes straight into the
+ * ring, and the ring is where the game is played — a generous hub squeezed the
+ * six buttons into a narrow band and made them feel cramped. The question still
+ * has to fit inside it, so the hub's own type scales with it (see `VerdictRush`).
+ */
+const INNER = 18.5;
+/** The painted wedge — the button face. Deep enough to hold three lines. */
+const PAINT_IN = 20.5;
+const PAINT_OUT = 46;
+/**
+ * The confidence meter, outside the button face so it cannot dim the label, and
+ * standing clear of it rather than sitting against its edge.
+ */
+const METER_IN = 48.5;
+const METER_OUT = 50.5;
 
 /** Degrees trimmed from each side of a wedge. This is the cut between buttons. */
-const GAP_DEG = 2.2;
+const GAP_DEG = 3.2;
 
 /**
  * The HIT area runs from just inside the paint out past the rim, and takes the
@@ -76,21 +86,21 @@ const GAP_DEG = 2.2;
  * label is a child of the button — this clip is also what guarantees a label
  * can never spill outside its own colour.
  */
-const HIT_INNER = 23;
-const HIT_OUTER = 50.5;
+const HIT_INNER = 19.5;
+const HIT_OUTER = 51;
 
 /** Where a wedge's label sits — centred in the meat of the sector. */
-const LABEL_R = 34.5;
+const LABEL_R = 32.5;
 /**
  * Label box width, as a percentage of the wheel.
  *
  * This is the number the whole layout is pinned to. A horizontal box inside a
- * 56-degree sector is bounded by its CORNERS, not by the arc, and the four
+ * 54-degree sector is bounded by its CORNERS, not by the arc, and the four
  * diagonal wedges are far tighter than the top and bottom ones — at this radius
- * a 20% box is the widest whose corners all clear both the hub and the rim. The
+ * a 22% box is the widest whose corners all clear both the hub and the rim. The
  * same width is used on all six so the six buttons look like a set.
  */
-const LABEL_W = 20;
+const LABEL_W = 22;
 
 /**
  * Wedge `i` is CENTRED at twelve o'clock, two o'clock and so on, rather than
@@ -166,11 +176,11 @@ export function labelSize(label: string): string {
   // desktop wheel is about a tenth wider than the phone's, so any `sm:` step
   // that reads as a real increase outgrows the box it has to fit inside, which
   // is precisely how "documentary" came to be 92px of word in an 87px box.
-  // Measured against the bank's longest words, bold and tracking-tight:
-  // a character is ~0.61em, so 11 of them need the size to stay under 3cqw.
-  if (longest >= 11 || total >= 23) return '2.8cqw';
-  if (longest >= 9 || total >= 17) return '3.1cqw';
-  return '3.7cqw';
+  // Measured against the bank's longest words, bold and tracking-tight: a
+  // character is ~0.61em, so 11 of them have to stay inside the 22cqw box.
+  if (longest >= 11 || total >= 23) return '3.15cqw';
+  if (longest >= 9 || total >= 17) return '3.45cqw';
+  return '4.1cqw';
 }
 
 /**
@@ -274,7 +284,7 @@ export function Wheel({
           // A button face is a button face. Only the picture-mode wheel spends
           // its fill on confidence.
           const fill = playing ? 1 : 0.12 + r.confidence * 0.78;
-          const affinityR = PAINT_IN + (r.affinity / 100) * 11;
+          const affinityR = PAINT_IN + (r.affinity / 100) * 13;
           return (
             <g key={r.id}>
               <path
@@ -388,13 +398,19 @@ export function Wheel({
         className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-[#0b1020] text-center shadow-[0_0_28px_10px_rgba(11,16,32,0.95)]"
         style={{ width: `${INNER * 2}%`, height: `${INNER * 2}%` }}
       >
-        <div className="flex w-full flex-col items-center justify-center px-2">
+        <div className="flex w-full flex-col items-center justify-center px-[6%]">
           {center ?? (
             <>
-              <span className="text-xl font-black tabular-nums text-white sm:text-2xl">
+              <span
+                className="font-black tabular-nums text-white"
+                style={{ fontSize: '7cqw', lineHeight: 1 }}
+              >
                 {Math.round(known * 100)}%
               </span>
-              <span className="text-[0.55rem] font-bold uppercase tracking-widest text-slate-400">
+              <span
+                className="font-bold uppercase tracking-widest text-slate-400"
+                style={{ fontSize: '2.2cqw' }}
+              >
                 Known
               </span>
             </>
