@@ -4,6 +4,7 @@ import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from 
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
+import { applyDeterministicFloor, overlayAi } from '@/lib/search/deterministicFloor';
 import { augmentInternational } from '@/lib/askInternational';
 import { applyOverrides, sanitizeOverrides } from '@/lib/finderOverrides';
 import { askSimilarTo, extractReference } from '@/lib/askJudge';
@@ -98,14 +99,27 @@ export async function POST(req: Request) {
       // 'unavailable' → fall through to the legacy path below.
     }
 
+    // THE DETERMINISTIC PARSE ALWAYS RUNS, AND IS ALWAYS THE FLOOR.
+    //
+    // This was an either/or: `if (ai) query = ai.query; else query = …`. Both
+    // branches could lose a constraint the user stated in plain words — the AI
+    // branch because `ai.query` is a whole object with `null` in every field
+    // the model didn't fill, and the else branch because it preferred
+    // `body.query` and the client ALWAYS sends one, so `naiveParseQuery(text)`
+    // never actually ran here.
+    //
+    // Now: parse the text deterministically, layer AI on as enhancement (only
+    // where it has something to say), then put the deterministic parse back
+    // underneath as a floor. See src/lib/search/deterministicFloor.ts — the
+    // rule is by field shape, with no query vocabulary anywhere in it.
+    const deterministic = text ? naiveParseQuery(text) : null;
     const ai = text ? await parseAskWithAI(text) : null;
-    if (ai) {
-      query = ai.query;
-      limit = ai.limit;
-    } else {
-      query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
-      if (text) limit = parseRequestedCount(text);
-    }
+    const supplied = body.query ? coerceQuery(body.query) : (deterministic ?? { ...EMPTY_QUERY });
+    query = applyDeterministicFloor(overlayAi(supplied, ai?.query ?? null), deterministic);
+    // The COUNT keeps AI's reading when it produced one, and falls back to the
+    // deterministic count otherwise — same "enhance, never erase" shape.
+    if (ai) limit = ai.limit;
+    else if (text) limit = parseRequestedCount(text);
     // "SOMETHING LIKE TULSA KING" IS A DIFFERENT QUESTION.
     //
     // The Refine box posts here, but only the ask route knew how to answer a

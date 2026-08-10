@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from '@/lib/finder';
 import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY, parseTopicTerms, extractExcludedPerson } from '@/lib/finderParse';
+import { applyDeterministicFloor, overlayAi } from '@/lib/search/deterministicFloor';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
@@ -470,24 +471,30 @@ export async function POST(req: Request) {
       }
     }
 
-    if (ai) {
-      query = ai.query;
-      limit = ai.limit;
-    } else {
-      query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
-      if (text) limit = parseRequestedCount(text);
-    }
+    // THE DETERMINISTIC PARSE ALWAYS RUNS, AND IS ALWAYS THE FLOOR.
+    // Same correction as /api/finder — see src/lib/search/deterministicFloor.ts.
+    // `ai.query` is a COMPLETE query object with `null` in every field the model
+    // left alone, so assigning it wholesale erased whatever the deterministic
+    // parser had already understood; and the else branch preferred `body.query`,
+    // which the client always sends, so `naiveParseQuery(text)` never ran.
+    const deterministicQuery = text ? naiveParseQuery(text) : null;
+    query = applyDeterministicFloor(
+      overlayAi(body.query ? coerceQuery(body.query) : (deterministicQuery ?? { ...EMPTY_QUERY }), ai?.query ?? null),
+      deterministicQuery,
+    );
+    if (ai) limit = ai.limit;
+    else if (text) limit = parseRequestedCount(text);
     // Foreign-origin / English-audio / runtime augmentation (deterministic; the
     // parser paths don't extract these) — restricts the pool to the real origin.
     query = augmentInternational(query, text);
-    // DETERMINISTIC CONSTRAINT OVERLAY. Stated years and genre exclusions are
-    // facts of the sentence, not judgment calls — when the LLM parse dropped
-    // one ("after 2020" arriving with no year bound), the regex parser's
-    // reading fills the gap. Overlay only, never override.
+    // The per-field overlay that used to live here — minYear, maxYear and
+    // excludeGenreIds, each rescued by hand — is now the general rule applied
+    // above, so EVERY stated constraint is protected rather than the three
+    // somebody happened to notice. Excluded genres are the one field that
+    // genuinely UNIONS rather than fills (an exclusion the user stated and one
+    // the model inferred are both real), so that part stays explicit.
     if (text.trim()) {
       const det = naiveParseQuery(text);
-      if (det.minYear != null && query.minYear == null) query.minYear = det.minYear;
-      if (det.maxYear != null && query.maxYear == null) query.maxYear = det.maxYear;
       if (det.excludeGenreIds?.length) {
         query.excludeGenreIds = [...new Set([...(query.excludeGenreIds ?? []), ...det.excludeGenreIds])];
       }

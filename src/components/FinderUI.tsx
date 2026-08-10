@@ -4,6 +4,7 @@ import { dayLabel } from '@/lib/viewing/localDay';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
+import { applyDeterministicFloor } from '@/lib/search/deterministicFloor';
 import { canonicalQueryKey, activeFilterChips } from '@/lib/refineState';
 import { STREAMING_SERVICES } from '@/lib/services';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
@@ -288,7 +289,19 @@ export function FinderUI({
       for (const k of SLIDER_KEYS) {
         if (!touched.has(k as string)) cleaned[k as string] = null;
       }
-      effQuery = cleaned as unknown as FinderQuery;
+      // …BUT A CONSTRAINT THE USER TYPED IS NOT A STALE SLIDER.
+      //
+      // The reset above cannot tell "a value inherited from a previous run"
+      // from "a value this very sentence just asked for" — both arrive in `q`,
+      // because `q` IS `naiveParseQuery(text)`. So "under 100 minutes" parsed
+      // to maxRuntime 100 and was then nulled on its way out, for the crime of
+      // not having been dragged on a slider.
+      // The comment below used to say the server would re-read it from `text`.
+      // It does not: the server preferred `body.query`, which this always
+      // sends. Both halves are fixed — the server now always parses the text
+      // too (see /api/finder), and the floor is re-applied here so the request
+      // that leaves the browser is already correct.
+      effQuery = applyDeterministicFloor(cleaned as unknown as FinderQuery, naiveParseQuery(effText));
     }
     const runKey = canonicalQueryKey(effQuery, effText, ['You', ...selected.map((w) => w.name)].join('+'));
     const isRefinement = items != null;
