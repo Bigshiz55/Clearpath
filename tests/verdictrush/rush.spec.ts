@@ -197,6 +197,59 @@ test('the question is in the middle and the answers are in the circle', async ({
   expect(await page.locator('[data-testid^="rush-choice-"]').count()).toBe(0);
 });
 
+test('no answer is ever cut off by its own wedge', async ({ page }) => {
+  await page.goto(HARNESS);
+  await page.getByTestId('rush-start').click();
+  await expect(page.getByTestId('rush-prompt')).toBeVisible();
+
+  let checked = 0;
+  for (let round = 0; round < 30; round++) {
+    if (await page.getByTestId('rush-families').isVisible().catch(() => false)) break;
+    if (!(await page.getByTestId('rush-prompt').isVisible().catch(() => false))) break;
+
+    if ((await page.getByTestId('rush-prompt').getAttribute('data-layout')) === 'wheel') {
+      const wheel = (await page.getByTestId('rush-wheel').boundingBox())!;
+      const hub = (await page.getByTestId('rush-hub').boundingBox())!;
+      const cx = wheel.x + wheel.width / 2;
+      const cy = wheel.y + wheel.height / 2;
+      const rimR = wheel.width / 2;
+      const hubR = hub.width / 2;
+
+      const labels = page.getByTestId('wheel-label');
+      const count = await labels.count();
+      for (let i = 0; i < count; i++) {
+        const label = labels.nth(i);
+        const text = (await label.innerText()).trim();
+
+        // A word wider than its box overflows rather than wrapping, which is
+        // how a label ends up sliced down the middle by the wedge's clip.
+        const [scrollW, clientW] = await label.evaluate((el) => [el.scrollWidth, el.clientWidth]);
+        expect(scrollW, `"${text}" is wider than its wedge`).toBeLessThanOrEqual(clientW + 1);
+
+        // And it has to live in the coloured ring: never off the rim, never
+        // sitting on the question in the hub.
+        const box = (await label.boundingBox())!;
+        const corners: Array<[number, number]> = [
+          [box.x, box.y],
+          [box.x + box.width, box.y],
+          [box.x, box.y + box.height],
+          [box.x + box.width, box.y + box.height],
+        ];
+        for (const [x, y] of corners) {
+          expect(Math.hypot(x - cx, y - cy), `"${text}" runs past the rim`).toBeLessThanOrEqual(rimR);
+        }
+        const centreR = Math.hypot(box.x + box.width / 2 - cx, box.y + box.height / 2 - cy);
+        expect(centreR, `"${text}" sits on the question`).toBeGreaterThan(hubR);
+        checked++;
+      }
+    }
+    await decide(page);
+  }
+
+  // A run that never dealt a radial round would pass vacuously.
+  expect(checked, 'no wheel labels were measured').toBeGreaterThan(20);
+});
+
 test('tapping a wedge scores, and the score climbs as you play', async ({ page }) => {
   await page.goto(HARNESS);
   await page.getByTestId('rush-start').click();

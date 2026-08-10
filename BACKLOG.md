@@ -105,8 +105,24 @@ Updated at the end of every work order per the Working Agreement in
   neighbouring wedge can never steal a tap, and the element's centre lands
   inside its own sector for pointer hit-testing. Labels, reading order,
   keyboard focus and the focus ring survive intact — the ring is drawn on the
-  label because an outline on the button would be clipped away. New pure
-  scoring layer (`src/lib/dnagame/score.ts`, 20 unit tests): points reward the
+  label because an outline on the button would be clipped away. The six faces
+  are painted in full accent with a real angular gap and a dark seam between
+  them, and lettered in whichever ink clears WCAG contrast on that accent
+  (computed per wedge, not chosen by eye — white on amber and near-black on
+  purple are both about 2:1). That pushed CONFIDENCE off the fill and onto its
+  own arc around the rim: the rule is that affinity and confidence never share
+  a channel, and dimming an unknown wedge honoured it while making half the
+  buttons unreadable. The picture-mode wheel (opening screen, reveal) has no
+  buttons to keep legible, so there the fill still carries confidence across
+  its full range. Label type size steps down for long words and long labels,
+  because a fixed-width box inside a 56-degree sector is bounded by its corners
+  and a word wider than the box gets sliced by the clip rather than wrapped —
+  a browser test now measures every label against its own wedge so that cannot
+  regress silently. Label type is sized in `cqw` against the wheel itself: a
+  breakpoint step cannot hold, because the desktop wheel is only a tenth wider
+  than the phone's while an `sm:` bump that reads as a real increase is far
+  more — which is how "documentary" became 92px of word in an 87px box.
+  New pure scoring layer (`src/lib/dnagame/score.ts`, 20 unit tests): points reward the
   UNCERTAINTY A DECISION RESOLVED — never a "right" answer — with bounded speed
   and streak multipliers (best tap ≤ 7.5× the worst, so a 30-decision game is
   not decided by two lucky moments) and a flat acknowledgement for "haven't

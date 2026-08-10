@@ -250,10 +250,10 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
   const inWheel = round.layout === 'wheel';
 
   /**
-   * One question, two homes. In the hub it is the whole screen's instruction and
-   * sits inside a 130-ish pixel circle; above a duel or a card grid it can
-   * breathe. Same element, same test hooks, so nothing downstream has to care
-   * which layout dealt.
+   * One question, two homes. In the hub it is the whole screen's instruction,
+   * set inside a circle a little under half the wheel across; above a duel or a
+   * card grid it can breathe. Same element, same test hooks, so nothing
+   * downstream has to care which layout dealt.
    */
   const prompt = (
     <h2
@@ -263,7 +263,7 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
       data-picks={round.picks}
       className={
         inWheel
-          ? `text-balance px-1 text-[0.95rem] font-black uppercase leading-[1.1] tracking-tight sm:text-lg ${
+          ? `text-balance px-1 text-[1.15rem] font-black uppercase leading-[1.05] tracking-tight sm:text-2xl ${
               round.negative ? 'text-rose-300' : 'text-white'
             }`
           : `text-center text-2xl font-black uppercase tracking-tight sm:text-3xl ${
@@ -273,9 +273,7 @@ export function VerdictRush({ seedProfile = {} }: { seedProfile?: TraitProfile }
     >
       {round.prompt}
       {multi && (
-        <span
-          className={`block font-semibold text-slate-400 ${inWheel ? 'mt-1 text-[0.7rem]' : 'mt-1 text-sm'}`}
-        >
+        <span className="mt-1 block text-sm font-bold text-slate-400">
           {picked.length}/{round.picks}
         </span>
       )}
