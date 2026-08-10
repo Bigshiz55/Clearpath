@@ -77,9 +77,20 @@ test('an even wider desktop just gets more columns', async ({ page }) => {
   expect(card.width).toBeLessThan(400);
 });
 
-test('a phone is exactly what it was — one column, full width, no sideways scroll', async ({ page }) => {
+/**
+ * THE PHONE IS TWO COLUMNS NOW (owner-approved), NOT ONE.
+ *
+ * This asserted `columnsOf === 1` — the retired single-column-of-sideways-cards
+ * phone grid. The point of the test is unchanged and is about the WIDE end of
+ * the range: extra desktop width must become MORE columns at the same card
+ * size, and it must not reach down and disturb the phone. So the phone still
+ * gets its own assertion here; the number it is pinned to is the current
+ * approved one, and the two properties that actually guard the phone — the grid
+ * uses the full width, and nothing scrolls sideways — are untouched.
+ */
+test('a phone is exactly what it was — two columns, full width, no sideways scroll', async ({ page }) => {
   await openWithResults(page, 390, 844);
-  expect(await columnsOf(page)).toBe(1);
+  expect(await columnsOf(page)).toBe(2);
   const g = (await grid(page).boundingBox())!;
   expect(g.width).toBeGreaterThan(330); // the grid still uses the phone's width
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

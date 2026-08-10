@@ -249,8 +249,9 @@ export function ChannelGuide({
           {shown.map((r) => {
             // CHANNEL IDENTITY, not FCC paperwork. "KWPXDT" means nothing to a
             // viewer whose cable box says ION; the mapping names what it can
-            // prove and falls back to the call sign — never a guess. The chip
-            // is a stable monogram, not a hotlinked logo.
+            // prove and falls back to the call sign — never a guess. The row
+            // shows that name once, next to a stable colour mark — no logo is
+            // hotlinked and none is invented; see the mark below.
             const id = channelIdentity(r.network);
             // Paid programming gets the guide's floor, not its shine: the slot
             // is real (hiding it would fake the schedule) but it renders muted
@@ -294,13 +295,32 @@ export function ChannelGuide({
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <h3 className="flex min-w-0 items-center gap-2 truncate text-sm font-black uppercase tracking-wide text-white">
+                    {/* A COLOUR MARK, NOT A SECOND COPY OF THE NAME.
+                        This was a 36×24 chip carrying `id.monogram` — which
+                        `monogramFor()` derives FROM the name, so it could never
+                        say anything the name beside it wasn't already saying.
+                        On a real guide it read "OXY OXYGEN", "DIS DISCOVERY",
+                        "HIS HISTORY", and for the channels whose name IS an
+                        acronym it was the same word twice: "HBO HBO", "A&E A&E".
+                        Three glyphs of duplication in front of every row.
+
+                        The chip's only real contribution was its HUE — a stable
+                        per-channel colour is genuinely useful for finding a row
+                        again in a list of fifteen — so the hue stays and the
+                        letters go. Same anchor, same alignment gutter, no
+                        repetition.
+
+                        It is NOT a logo and does not pretend to be one. We hold
+                        no channel artwork: TMDB's `logo_path` covers streaming
+                        PROVIDERS, not broadcast networks, and TVmaze networks
+                        carry no image. The rule `ProviderLogos` already keeps —
+                        never invent a logo — applies here too. */}
                     <span
                       aria-hidden
-                      className="grid h-6 w-9 flex-none place-items-center rounded-md text-[9px] font-black tracking-wide"
-                      style={{ backgroundColor: `hsl(${channelHue(id.name)} 45% 22%)`, color: `hsl(${channelHue(id.name)} 80% 82%)` }}
-                    >
-                      {id.monogram}
-                    </span>
+                      data-testid="guide-channel-mark"
+                      className="h-2.5 w-2.5 flex-none rounded-full ring-1 ring-inset ring-white/20"
+                      style={{ backgroundColor: `hsl(${channelHue(id.name)} 65% 55%)` }}
+                    />
                     <span className="truncate" title={id.mapped ? `${id.name} (${r.network})` : id.name} data-testid="guide-channel-name">
                       {id.name}
                     </span>
