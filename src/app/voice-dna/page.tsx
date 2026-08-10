@@ -1,17 +1,19 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { QuickDna } from '@/components/voice/quickdna/QuickDna';
+import { VerdictRush } from '@/components/dnagame/VerdictRush';
 
 /**
- * VOICE DNA — Quick DNA. The primary onboarding experience.
+ * VERD1CT RUSH — the primary onboarding experience.
  *
- * Two products live under this route now, and only one of them is the front
- * door. QUICK DNA is here: press start once, put your hands down, answer out
- * loud for about a minute, and get a profile richer than any form could ask
- * for. DEEP DNA — the open-ended conversation — is at `/voice-dna/deep`,
- * reachable from "Fine-tune my DNA" at the end, for people who want to go
- * further. It is never forced during onboarding.
+ * Voice is retired as the front door. It was rebuilt twice and still asked
+ * people to talk to their phone, which is a worse trade than tapping: slower,
+ * less reliable, and impossible on a train. This is the replacement — a fast
+ * visual game that secretly builds the same profile, on the same trait engine
+ * the voice work produced. That engine was worth keeping; the interview was not.
+ *
+ * The spoken interview survives at `/voice-dna/deep` for anyone who wants it,
+ * and is never forced on anyone during onboarding.
  *
  * Session model unchanged: `/voice-dna` is in `PROTECTED_PREFIXES`, so
  * middleware has already minted a guest session by the time this renders. The
@@ -22,7 +24,7 @@ import { QuickDna } from '@/components/voice/quickdna/QuickDna';
  */
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'Quick DNA · WatchVerd1ct',
+  title: 'Verd1ct Rush · WatchVerd1ct',
   robots: { index: false, follow: false, nocache: true },
 };
 
@@ -35,7 +37,7 @@ export default async function VoiceDnaPage() {
 
   return (
     <main className="min-h-screen bg-cinema-radial">
-      <QuickDna />
+      <VerdictRush />
     </main>
   );
 }

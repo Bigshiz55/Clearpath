@@ -45,10 +45,14 @@ describe('Voice DNA is reachable from the production navigation', () => {
     ).toBeDefined();
   });
 
-  it('is labelled recognisably, with the mic', () => {
+  it('is labelled recognisably', () => {
+    // The label follows the product, not the route. The path stays /voice-dna
+    // so existing links keep working, but the thing behind it is Verd1ct Rush
+    // and the menu must say so — a menu entry naming a retired feature is its
+    // own kind of invisibility.
     const entry = secondaryEntries().find((e) => e.href === '/voice-dna');
-    expect(entry?.label).toContain('Voice DNA');
-    expect(entry?.label).toContain('🎙️');
+    expect(entry?.label).toContain('Verd1ct Rush');
+    expect(entry?.label).toContain('🎯');
   });
 
   it('sits directly under Your Watch DNA, because that is what it builds', () => {
@@ -70,12 +74,12 @@ describe('Voice DNA is reachable from the production navigation', () => {
   });
 
   it('the destination page exists and renders the real experience', () => {
-    // The onboarding experience is Quick DNA; the open-ended conversation lives
-    // one door in, at /voice-dna/deep. What this guard actually protects is
-    // unchanged across both rewrites: the menu entry must land on a working
-    // product surface, not a redirect, a stub or a 404.
+    // The onboarding experience is Verd1ct Rush now; the open-ended
+    // conversation lives one door in, at /voice-dna/deep. What this guard
+    // actually protects is unchanged across all three rewrites: the menu entry
+    // must land on a working product surface, not a redirect, stub or 404.
     const page = read('src/app/voice-dna/page.tsx');
-    expect(page).toContain('QuickDna');
+    expect(page).toContain('VerdictRush');
     // Not founder-gated: an ordinary user reaching it must not get a 404.
     expect(page).not.toContain('isFounderOrAdminEmail');
     expect(page).not.toContain('notFound()');
@@ -87,7 +91,7 @@ describe('Voice DNA is reachable from the production navigation', () => {
     expect(deep).not.toContain('isFounderOrAdminEmail');
     // "Fine-tune my DNA" is the only door to it — if that link goes, the
     // conversational interview becomes unreachable exactly as /voice-dna once was.
-    expect(read('src/components/voice/quickdna/QuickDna.tsx')).toContain('/voice-dna/deep');
+    expect(read('src/app/voice-dna/deep/page.tsx')).toContain('VoiceInterview');
   });
 
   it('the one menu list feeds BOTH the desktop dropdown and the mobile sheet', () => {

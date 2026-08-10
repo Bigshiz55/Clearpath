@@ -24,7 +24,7 @@ const SECONDARY: NavLink[] = [
   // Directly under Watch DNA because that is what it BUILDS. Voice DNA is a
   // way of creating and refining the same profile, not a separate feature —
   // grouping it with the quiz and Rapid Fire is what makes that legible.
-  { href: '/voice-dna', label: 'Voice DNA 🎙️' },
+  { href: '/voice-dna', label: 'Verd1ct Rush 🎯' },
   { href: '/app/taste-quiz', label: 'Quick Taste Quiz' },
   { href: '/app/rapid-fire', label: 'Rapid Fire ⚡️' },
   { href: '/import-taste', label: 'Bring your taste with you' },
