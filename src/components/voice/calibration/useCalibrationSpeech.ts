@@ -141,6 +141,19 @@ export const INJECT_EVENT = 'voicedna:heard';
 export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
   const [capability, setCapability] = useState<SpeechCapability>({ tts: false, asr: false });
   const [listening, setListening] = useState(false);
+  /**
+   * "Listening…" must not FLICKER.
+   *
+   * The recogniser closes and reopens many times in a normal run — once per
+   * prompt, plus whenever Chrome decides a silence has gone on long enough.
+   * Rendering the instantaneous flag made the indicator blink continuously,
+   * which a real user read (correctly) as "this thing is broken". This is the
+   * settled view: it stays true across the short reopens, and only goes false
+   * when the microphone has genuinely been shut for longer than any reopen
+   * takes. It is still a fact about the session, not a decoration — a denied
+   * or unavailable microphone drops it immediately, via `micState`.
+   */
+  const [sessionLive, setSessionLive] = useState(false);
   const [diagnostics, setDiagnostics] = useState<SpeechDiagnostics>({
     micState: 'idle',
     lastError: null,
@@ -169,6 +182,7 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
   // `resultIndex` restarts whenever the engine does, so the session counter
   // keeps utterance ids unique across the restarts that `onend` performs.
   const sessionRef = useRef(0);
+  const startListeningRef = useRef<(() => void) | null>(null);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
   const deliver = useCallback(
@@ -260,6 +274,32 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
     return () => window.removeEventListener(INJECT_EVENT, handler);
   }, [deliver]);
 
+  /**
+   * Suspend/resume around a prompt. `suspendedRef` distinguishes "we closed the
+   * microphone to speak" from "the user ended the run", so `onend` does not
+   * fight the suspension by restarting mid-sentence.
+   */
+  const suspendedRef = useRef(false);
+  const downSinceRef = useRef<number | null>(null);
+
+  const suspendForSpeech = useCallback(() => {
+    if (!wantListeningRef.current) return;
+    suspendedRef.current = true;
+    const rec = recRef.current;
+    recRef.current = null;
+    try {
+      rec?.abort();
+    } catch {
+      /* already gone */
+    }
+  }, []);
+
+  const resumeAfterSpeech = useCallback(() => {
+    if (!suspendedRef.current || !wantListeningRef.current) return;
+    suspendedRef.current = false;
+    startListeningRef.current?.();
+  }, []);
+
   /** Stop talking THIS INSTANT. The first half of barge-in. */
   const cancelSpeech = useCallback(() => {
     speakingRef.current = null;
@@ -280,22 +320,46 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
       const s = synth();
       if (!s || !text) return;
       try {
-        s.cancel(); // never queue: a stale prompt is worse than none
+        // ── RELIABLE TURN-TAKING, NOT WISHFUL BARGE-IN ─────────────────────
+        //
+        // Chrome cannot reliably run SpeechRecognition while speechSynthesis is
+        // playing: the two contend for the audio device, so `speak()` ends the
+        // recognition session almost immediately. With a restart-on-`onend`
+        // loop that produced exactly what a real user reported — an indicator
+        // blinking between listening and not, and a microphone that never
+        // stayed open long enough to hear an answer.
+        //
+        // So recognition is SUSPENDED for the length of the prompt and resumed
+        // the instant it finishes. The prompts are one to four words, so the
+        // window closes for well under a second — far cheaper than a session
+        // that is never really open. Taps stay live throughout, so a fast user
+        // is never blocked, and this is measured rather than assumed.
+        suspendForSpeech();
         // ~14 characters a second at our rate, plus a margin: long enough to
         // cover the utterance, short enough that a stuck flag cannot deafen us.
         speakingRef.current = { text, until: Date.now() + 800 + text.length * 70 };
         const u = new SpeechSynthesisUtterance(text);
-        u.onend = () => { speakingRef.current = null; };
-        u.onerror = () => { speakingRef.current = null; };
+        u.onend = () => {
+          speakingRef.current = null;
+          resumeAfterSpeech();
+        };
+        u.onerror = () => {
+          speakingRef.current = null;
+          resumeAfterSpeech();
+        };
+        // A browser that never fires `onend` (it happens) must not deafen the
+        // run: reopen on the estimated duration as a backstop.
+        window.setTimeout(resumeAfterSpeech, 400 + text.length * 70);
         if (voiceRef.current) u.voice = voiceRef.current;
         u.rate = SPEECH_RATE;
         u.pitch = SPEECH_PITCH;
         s.speak(u);
       } catch {
         /* speech is a nicety; the run continues silently */
+        resumeAfterSpeech();
       }
     },
-    [],
+    [resumeAfterSpeech, suspendForSpeech],
   );
 
   const startListening = useCallback(() => {
@@ -347,7 +411,7 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
     rec.onend = () => {
       recRef.current = null;
       setListening(false);
-      if (wantListeningRef.current) {
+      if (wantListeningRef.current && !suspendedRef.current) {
         setDiagnostics((d) => ({ ...d, restarts: d.restarts + 1 }));
         // Chrome ends the session after a few seconds of quiet. Restart on the
         // next tick, or the user's next answer falls into a dead microphone.
@@ -412,8 +476,11 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
     }
   }, []);
 
+  startListeningRef.current = startListening;
+
   const stopListening = useCallback(() => {
     wantListeningRef.current = false;
+    suspendedRef.current = false;
     const rec = recRef.current;
     recRef.current = null;
     setListening(false);
@@ -423,6 +490,27 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
       /* already gone */
     }
   }, []);
+
+  /** How long the microphone may be shut before we stop claiming to listen. */
+  const REOPEN_GRACE_MS = 2500;
+
+  useEffect(() => {
+    if (listening) {
+      downSinceRef.current = null;
+      setSessionLive(true);
+      return;
+    }
+    if (!wantListeningRef.current) {
+      setSessionLive(false);
+      return;
+    }
+    downSinceRef.current = downSinceRef.current ?? Date.now();
+    const id = window.setTimeout(() => {
+      const since = downSinceRef.current;
+      if (since !== null && Date.now() - since >= REOPEN_GRACE_MS) setSessionLive(false);
+    }, REOPEN_GRACE_MS);
+    return () => window.clearTimeout(id);
+  }, [listening]);
 
   useEffect(() => {
     return () => {
@@ -442,7 +530,10 @@ export function useCalibrationSpeech(onHeard: (e: HeardEvent) => void) {
 
   return {
     capability,
-    listening,
+    /** Settled across short reopens — this is what the UI should render. */
+    listening: sessionLive,
+    /** The raw recogniser flag, for diagnostics. */
+    recognizerOpen: listening,
     diagnostics,
     requestMic,
     speak,

@@ -310,6 +310,7 @@ export function QuickDna({ seedProfile = {} }: { seedProfile?: TraitProfile }) {
           data-testid="quickdna-listening"
           data-mic-state={diagnostics.micState}
           data-transcripts={diagnostics.transcriptsReceived}
+          data-restarts={diagnostics.restarts}
           className={micBroken ? 'text-amber-300/90' : 'text-emerald-300/80'}
         >
           {flash ? (

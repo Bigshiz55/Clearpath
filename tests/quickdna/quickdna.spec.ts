@@ -442,3 +442,51 @@ test('the system cannot answer its own questions', async ({ page }) => {
   await say(page, 'yes');
   await expect(page.getByTestId('quickdna-question')).not.toHaveAttribute('data-question-id', before ?? '');
 });
+
+/**
+ * TURN-TAKING, because simultaneous TTS + STT does not work in Chrome.
+ *
+ * Reported from the live preview: the indicator blinked continuously and the
+ * microphone never heard anything. Both come from the same cause — speaking
+ * while recognition is open ends the recognition session, the restart-on-`onend`
+ * loop reopens it, the next prompt kills it again, and it is never open long
+ * enough to catch an answer.
+ */
+test.describe('speaking suspends the microphone, briefly and visibly', () => {
+  test('recognition is torn down for the prompt and reopened after it', async ({ page }) => {
+    // The stub records aborts, so the suspension is observable rather than
+    // assumed. Each prompt must cost exactly one suspend/resume cycle.
+    await page.addInitScript(() => {
+      const w = window as unknown as Record<string, unknown>;
+      const log: string[] = [];
+      w.__recLog = log;
+      class Recognition {
+        lang = ''; continuous = false; interimResults = false; maxAlternatives = 1;
+        onresult: unknown = null; onerror: unknown = null;
+        onend: (() => void) | null = null;
+        start() { log.push('start'); }
+        stop() { log.push('stop'); }
+        abort() { log.push('abort'); this.onend?.(); }
+      }
+      w.SpeechRecognition = Recognition;
+    });
+    await begin(page);
+    const log = await page.evaluate(() => (window as unknown as { __recLog: string[] }).__recLog);
+    // It started, and speaking the opening prompt closed it again.
+    expect(log).toContain('start');
+    expect(log).toContain('abort');
+  });
+
+  test('the indicator does not blink across a reopen', async ({ page }) => {
+    await begin(page);
+    const indicator = page.getByTestId('quickdna-listening');
+    await expect(indicator).toHaveText(/Listening/);
+    // Sample repeatedly across the window where the recogniser closes and
+    // reopens for each prompt. It must never flip to a not-listening state.
+    for (let i = 0; i < 12; i++) {
+      await page.waitForTimeout(120);
+      const text = await indicator.textContent();
+      expect(text ?? '', 'the indicator blinked').not.toContain('Mic off');
+    }
+  });
+});
