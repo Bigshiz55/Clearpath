@@ -40,9 +40,33 @@ Re-pointed, not weakened: `card-compact` 'lead the card' → 'close the card'
 (still asserts air above the buttons + a visible `border-top`), and the
 reading-order test is now facts → score → synopsis → **actions**.
 
+### 3. More Info + 4. Personalization — `19ef372`
+`QuickLook` IS More Info. Poster/title/`MoreInfoLink` open it over the grid.
+`PersonalizedFit` renders WHY YOU'LL LIKE IT / WATCH OUT / FOR YOU / AGAINST
+YOU from `fit.agree`/`fit.clash` via `buildFitReasons` — the same composer
+`CardFit` uses, so card and drawer cannot disagree. Silent below
+`MIN_SAMPLES_FOR_FIT`. `AlgorithmScore` now renders the shared score too.
+
+Three defects fixed that only tests could see: the dialog was trapped under
+the header by `.card`'s `backdrop-blur` stacking context (now portalled to
+`document.body`); scroll was lost on close twice over (`overflow:hidden`
+clamping + an effect keyed on an unstable `onClose`, now a mount-only capture
+with a `position:fixed` lock); the poster was a 32px tap target because
+`h-full` resolved to the placeholder height (now `absolute inset-0`, title
+floored at 44px).
+
+`tests/mobile/more-info.spec.ts` — 14 cases at 390 and 1280: open from poster
+and title, Escape, close control, content, shared-mark identity, scroll
+restoration, vote/save/W/trailer isolation, modified-click passthrough.
+
+**Gotcha for the scroll test:** Playwright's `click()` scrolls its target into
+view first. Take the baseline AFTER `scrollIntoViewIfNeeded()` on the actual
+click target, or you compare two different scroll positions and fail a
+component that is correct (observed: page moved 1040 → 350 on the click).
+
 ## Remaining, in order
 
-### 3. More Info drawer/sheet
+### 3. More Info drawer/sheet — DONE, see above. Original notes kept for context:
 Foundation exists: **`src/components/QuickLook.tsx`**, and `PosterCard`
 already accepts an `onOpen` prop that suppresses `href` navigation
 (`BrowseCatalog.tsx` is the only current caller — use it as the reference).
