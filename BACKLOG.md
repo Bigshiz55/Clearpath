@@ -4,12 +4,31 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-Nothing in flight. **Action needed from you:** open `/admin/migrations` on
+- **Two-across phone tiles — awaiting live acceptance** on
+  `claude/watchverdict-mobile-tests-rj2zey`. Pushed, not merged, production
+  untouched. Mobile suite 1030/1032 with the one remaining failure documented
+  as pre-existing (see Blocked). **Action needed from you:** open the Vercel
+  preview for that branch and accept or reject the design — the agent
+  environment's network policy denies `*.vercel.app`, so no session here can
+  fetch a preview URL to confirm it is READY.
+
+**Action needed from you (unchanged):** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the
 "Restored: /admin/migrations" entry below for why this is currently required
 and what it unblocks.
 
 ## Next
+- **Licensed channel-logo source for the Full Guide.** Guide rows now show the
+  channel name once beside a stable colour mark; the old monogram chip was
+  derived from the name and read "OXY OXYGEN" / "HBO HBO". Real logos are not
+  possible with what we hold: TMDB's `logo_path` covers streaming PROVIDERS,
+  not broadcast networks, and TVmaze networks carry no image. Wiring real
+  channel artwork is a licensing/data decision, not a UI one.
+- **A phone tile is ~590px tall.** Two across is a large improvement on one
+  column of sideways cards, but the poster is only ~257px of that at 390 — the
+  action row, the score panel and the availability block carry the rest. If
+  browsing should show more than four titles a screen, the next lever is the
+  score panel (badge, label and call currently stack on a narrow card).
 - **Turn on the AI orchestrator (owner action).** The provider-independent
   Claude discovery brain is built, tested, and shipped OFF (`AI_DISCOVERY_MODE`
   defaults to `legacy`). To evaluate it: set `ANTHROPIC_API_KEY` (server-only)
@@ -35,6 +54,19 @@ and what it unblocks.
   scoping once the accounts/feedback loop above has real usage to learn from.
 
 ## Blocked
+- **`maxRuntime` never reaches the finder query from a typed ask.**
+  `wired-experience.spec.ts:238` asks for "a fast mystery movie under 100
+  minutes" and expects `query.maxRuntime === 100`; it gets `null`. Verified
+  PRE-EXISTING — it fails identically on `350d874` with no branch changes
+  applied — and it is the only failing test in the mobile suite. The
+  deterministic detector for that exact phrasing already exists
+  (`src/lib/nlu/detectors.ts:424`), so this is a WIRING gap: the finder's ask
+  path takes the AI parse (`askParse.ts`), which returns nothing without
+  `OPENAI_API_KEY`, and never falls back to the detector.
+  Deliberately NOT fixed on the two-across branch: it changes behaviour on a
+  governed search surface, which under CLAUDE.md rule 9 requires a corpus run
+  and a PASS→FAIL / FAIL→PASS delta against baseline `68a5a93`. That belongs
+  in its own branch, not inside a card redesign. Owner decision.
 - **Score distribution audit.** The median appears compressed: four
   recommendations scored 79-91, all reading STREAM IT. Blocked on real title
   data existing in production — the local/dev catalog is synthetic fixture
