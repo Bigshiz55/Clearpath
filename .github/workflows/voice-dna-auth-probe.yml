@@ -124,8 +124,14 @@ jobs:
       # Supabase user, which nothing can delete without the service-role key.
       # Running it on every push would quietly accumulate accounts in the
       # project's auth table, so it only runs when a commit asks for it by name.
+      #
+      # The gate is `startsWith`, on the SUBJECT, and not `contains` on the whole
+      # message: `github.event.head_commit.message` is subject AND body, so the
+      # first version fired on the very commit that introduced it — the body
+      # explained the marker and therefore contained it. A commit cannot
+      # accidentally start with this prefix while talking about it.
       - name: End-to-end magic link (disposable inbox, token redacted)
-        if: contains(github.event.head_commit.message, '[probe-email]') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.event.head_commit.message, 'probe-email:') || github.event_name == 'workflow_dispatch'
         env:
           SUPA: https://vajgviraxigkwlvysxfz.supabase.co
           PROD: https://clearpath-pearl-chi.vercel.app

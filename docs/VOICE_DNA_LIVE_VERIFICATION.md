@@ -338,9 +338,18 @@ person out is worse than the bug it was written for. Results are memoised per
 origin; a negative is held only 60s, so correcting an allow-list takes effect
 without a redeploy. `src/lib/auth/redirectCheck.test.ts` pins that asymmetry.
 
-**Residue.** The end-to-end proof created one disposable Supabase user
-(`wv-authprobe-*@emalupe.com`). It holds no data and cannot be removed without
-the service-role key.
+**Residue.** The end-to-end proof created THREE disposable Supabase users
+(`wv-authprobe-*@emalupe.com`). They hold no data and cannot be removed without
+the service-role key. The third was an accident worth recording: the step was
+gated `contains(head_commit.message, '[probe-email]')`, and
+`head_commit.message` is subject *and* body — so the commit that introduced the
+gate fired it, because its body explained the marker and therefore contained
+it. Now gated `startsWith(..., 'probe-email:')` on the subject, which prose
+cannot trip.
+
+That third run is not wasted evidence: it re-proved the redirect against the
+newest deployment (`redirect_to` → `clearpath-5qrg3mobo-bigshiz56.vercel.app`)
+and re-confirmed anonymous sign-in is enabled.
 
 ## 8. Run history
 
