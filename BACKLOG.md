@@ -4,14 +4,22 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-- **Card interaction model — awaiting live acceptance** on
-  `claude/card-interaction-model-m3ezx2`. All six milestones complete, gates
-  green, desktop 44/44 and the mobile suite re-run. **Action needed from you:**
-  open the Vercel preview for that branch and accept or reject the desktop
-  hover preview in particular — 380ms is a judgement call, and whether a
-  preview feels like a response or like a twitch is not something a test can
-  answer. The agent environment's network policy denies `*.vercel.app`, so no
-  session here can read a preview URL.
+- **Card interaction model — awaiting live acceptance.** Both
+  `claude/card-interaction-model-m3ezx2` and `claude/card-interaction-model`
+  now point at the SAME commit (the latter was fast-forwarded, nothing
+  rewritten) — they are synonyms, not alternatives. All six milestones
+  complete; desktop 44/44, search-routing 21/21, vitest 3010.
+  **Action needed from you:** accept or reject the desktop hover preview on a
+  real deploy — 380ms is a judgement call, and whether a preview reads as a
+  response or as a twitch is not something a test can answer.
+  **Preview URL could not be resolved from the container, and it is a
+  credentials gap, not a network one:** `*.vercel.app` and `api.vercel.com` are
+  both reachable (production returns 200), but there is no Vercel token in the
+  environment, `vercel login` needs a browser, no `.vercel/project.json` exists,
+  the repo records no team/scope slug, this session's GitHub access exposes no
+  deployments/statuses API, and the branch has no PR for the Vercel bot to
+  comment on. Opening a PR, or supplying `VERCEL_TOKEN` (or just the scope
+  slug), unblocks it in one step.
 - **Two-across phone tiles — awaiting live acceptance** on
   `claude/watchverdict-mobile-tests-rj2zey`. Pushed, not merged, production
   untouched. Mobile suite 1030/1032 with the one remaining failure documented
@@ -75,21 +83,30 @@ and what it unblocks.
   governed search surface, which under CLAUDE.md rule 9 requires a corpus run
   and a PASS→FAIL / FAIL→PASS delta against baseline `68a5a93`. That belongs
   in its own branch, not inside a card redesign. Owner decision.
-- **`title-grid.spec.ts:281` is load-flaky in a full serial run.** "the end
-  button writes everything picked across every round" failed once in the
-  44-minute mobile suite with `locator.click: Timeout 15000ms exceeded` waiting
-  for `grid-like-100` — the FIRST interaction in the test. It passes 22/22 with
-  the rest of its file and 5/5 with `--repeat-each`, at ~1.1s each; the
-  neighbouring specs in the failing run were themselves taking 15–16s, so the
-  box was saturated. The page snapshot at failure shows the grid holding
-  round-TWO titles, which points at `TitleGridCalibration.load()`: its
-  `fetchWithTimeout` retry loop re-deals with the already-seen ids excluded, so
-  one slow response turns "titles 1–12" into "titles 13–24" and the tile the
-  test clicks never exists. Not a product defect at normal speed, but the retry
-  path silently changes what is on screen, which is worth a look. NOT caused by
-  the card-interaction work: the timed-out click happens before
-  `RecommendationSlate` — the only thing in that import graph that mounts
-  `TrailerMedia` — is ever rendered.
+- **`title-grid.spec.ts` had an unnamed wait; fixed. One residual unexplained
+  observation, recorded rather than guessed at.** :281 failed once in a
+  44-minute serial mobile run with `locator.click: Timeout 15000ms exceeded`
+  waiting for `grid-like-100`.
+  - **Fixed (real defect, in the test):** `open()` returned as soon as
+    `data-testid="title-grid"` was visible — the CONTAINER, which renders while
+    `items` is still null. Every test in the file therefore began interacting
+    during the loading state and let the first click's actionability budget
+    absorb the first fetch. It now waits for the round itself.
+  - **Refuted (do not re-derive it):** the natural theory is that
+    `toHaveCount(12)` after shuffle is satisfied by the round being LEFT, so the
+    id read next is stale. A deterministic reproduction — delay only the second
+    calibration response — showed it is not: `load()` calls `setItems(null)`
+    first, so the old tiles are gone before the new ones land.
+  - **Still unexplained:** the failure snapshot showed round-TWO titles while
+    the test waited on a round-ONE id, which needs `seen` to be populated, which
+    needs a completed `load()`. Not reproduced in 93+ executions (22/22 file,
+    5/5 single, 66/66 at `--repeat-each=3` under 8-way CPU saturation, 88/88
+    after the fix). If it recurs, keep `test-results/mobile-artifacts/` and the
+    trace before doing anything else — that is what was missing this time.
+  - NOT caused by the card-interaction work: the timed-out click happens before
+    `RecommendationSlate` — the only thing in that import graph that mounts
+    `TrailerMedia` — is ever rendered, and no file the changeset touches is in
+    that page's import graph.
 - **Score distribution audit.** The median appears compressed: four
   recommendations scored 79-91, all reading STREAM IT. Blocked on real title
   data existing in production — the local/dev catalog is synthetic fixture
