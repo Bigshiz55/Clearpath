@@ -51,6 +51,20 @@ async function open(page: Page, w = 1280, h = 800, n = 20) {
   await page.setViewportSize({ width: w, height: h });
   await page.goto('/dev/title-grid', { waitUntil: 'networkidle' });
   await expect(page.getByTestId('title-grid')).toBeVisible();
+  /* THE CONTAINER IS NOT THE ROUND.
+     `data-testid="title-grid"` wraps the header and renders while `items` is
+     still null, so this helper used to hand back a page that had not been
+     dealt yet. Every test then began interacting during the loading state and
+     let the FIRST click's actionability budget absorb the first fetch — which
+     is a wait with no name, attributed to the wrong operation when it expires.
+     Waiting for the round the callers actually depend on puts the wait where
+     it belongs. Every `open()` caller expects a dealt round; the two specs
+     that assert the error and the ignore-exclude paths route themselves and do
+     not come through here.
+     The bound is the component's own contract, not an inflated number:
+     `TitleGridCalibration` gives up on a round at FETCH_TIMEOUT_MS (8s) and
+     renders an error, so "dealt or failed" is settled well inside this. */
+  await expect(page.locator('[data-testid^="grid-tile-"]').first()).toBeVisible({ timeout: 20_000 });
 }
 
 test('shows exactly twelve at a time, however many are available', async ({ page }) => {
@@ -291,6 +305,14 @@ test('the end button writes everything picked across every round', async ({ page
 
   const secondRoundId = (await page.locator('[data-testid^="grid-like-"]').first().getAttribute('data-testid'))!
     .replace('grid-like-', '');
+  /* THE ROUND ACTUALLY TURNED OVER.
+     Stated as its own assertion because it is the precondition every line
+     below depends on, and because of how it fails when it is only implied:
+     a stale round-one id gets clicked, and the report blames a 15s
+     actionability timeout on a tile id rather than naming the round that
+     never changed. `toHaveCount(12)` cannot carry this — the round being
+     left also has twelve. */
+  await expect(page.getByTestId('grid-like-100'), 'still on round one').toHaveCount(0);
   await page.getByTestId(`grid-like-${secondRoundId}`).click();
   expect(posts, 'nothing is written until the end button').toHaveLength(0);
 
