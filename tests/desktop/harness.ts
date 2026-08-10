@@ -234,15 +234,20 @@ export async function mountHarness(
      honestly labelled as a stand-in, so nobody mistakes the artifact for real
      playback. */
   const stub = (label: string) =>
-    `<!doctype html><title>${label}</title><body style="margin:0;height:100%;display:grid;place-items:center;` +
+    // `charset` is not optional here: without it the ▶ renders as `â-¶` in the
+    // artifact, which is how a screenshot ends up looking like a rendering bug
+    // that does not exist.
+    `<!doctype html><meta charset="utf-8"><title>${label}</title>` +
+    `<body style="margin:0;height:100vh;display:grid;place-items:center;padding:8px;box-sizing:border-box;` +
     `background:linear-gradient(135deg,#1d1033,#3a1550);color:#fff;` +
-    `font:700 13px/1.4 system-ui,sans-serif;text-align:center">` +
-    `<div><div style="font-size:26px">▶</div>${label}</div></body>`;
+    `font:700 11px/1.5 system-ui,sans-serif;text-align:center">` +
+    `<div><div style="font-size:30px">&#9654;</div>${label}</div></body>`;
+  const STUB_LABEL = 'TRAILER PLAYING<br>(stubbed embed)';
   await page.route('https://www.youtube-nocookie.com/**', (route) =>
-    route.fulfill({ contentType: 'text/html', body: stub('TRAILER PLAYING (stubbed embed)') }),
+    route.fulfill({ contentType: 'text/html; charset=utf-8', body: stub(STUB_LABEL) }),
   );
   await page.route('https://www.youtube.com/**', (route) =>
-    route.fulfill({ contentType: 'text/html', body: stub('TRAILER PLAYING (stubbed embed)') }),
+    route.fulfill({ contentType: 'text/html; charset=utf-8', body: stub(STUB_LABEL) }),
   );
 
   return {

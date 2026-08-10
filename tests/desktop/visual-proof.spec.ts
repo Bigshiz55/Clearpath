@@ -184,12 +184,27 @@ test.describe('ARTIFACT — hover preview', () => {
     // flips catches the poster half-faded, and the artifact then shows neither
     // state cleanly.
     await page.waitForTimeout(700);
-    await card(page, 0).screenshot({ path: `${SHOTS}/card-hover-preview-active.png` });
+
+    /* CLIP, NOT `locator.screenshot()`.
+       An element screenshot scrolls its target into view first — which moves
+       the card out from under the stationary pointer, fires pointerleave, and
+       ENDS the preview before the shutter. The artifact then showed a restored
+       poster while claiming to show a running preview: a green test producing a
+       false picture. Clipping the page leaves the layout, and the pointer,
+       exactly where they are. */
+    const box = (await card(page, 0).boundingBox())!;
+    await page.screenshot({ path: `${SHOTS}/card-hover-preview-active.png`, clip: box });
+    // AND THE SHUTTER DID NOT DISTURB IT. Without this the artifact can go
+    // wrong silently again.
+    await expect(
+      posterOf(page, 0),
+      'the preview stopped while it was being photographed — the artifact is a lie',
+    ).toHaveAttribute('data-playing', '1');
 
     await page.mouse.move(2, 2);
     await expect(posterOf(page, 0)).toHaveAttribute('data-playing', '0');
-    await page.waitForTimeout(300);
-    await card(page, 0).screenshot({ path: `${SHOTS}/card-hover-preview-restored.png` });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${SHOTS}/card-hover-preview-restored.png`, clip: box });
   });
 });
 
