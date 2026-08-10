@@ -13,12 +13,16 @@ import { expect, type Page, type Locator } from '@playwright/test';
  * asserts about BEHAVIOUR and never about what TMDB happened to return today.
  * The variation is deliberate and is itself part of the proof:
  *
- *   1000  Se7en (one-line)     trailer ✓   Netflix          84 · STREAM IT
- *   1001  the long title       trailer ✓   Hulu + Max       61 · MAYBE
- *   1002  "A" (one-line, TV)   trailer ✓   no provider      38 · SKIP
- *   1003  accented/CJK title   trailer ✓   Prime Video      72 · STREAM IT
- *   1004  no year, no meta     NO TRAILER  no provider      55 · MAYBE
- *   1005  two-line TV title    trailer ✓   Disney+          90 · STREAM IT
+ *   1000  Se7en (one-line)     trailer ✓   Netflix            84 · STREAM IT
+ *   1001  the long title       trailer ✓   Hulu + Max         61 · MAYBE
+ *   1002  "A" (one-line, TV)   trailer ✓   checked, none      22 · SKIP IT
+ *   1003  accented/CJK title   trailer ✓   Prime Video        72 · MAYBE
+ *   1004  no year, no meta     NO TRAILER  never checked      40 · TOSS-UP
+ *   1005  two-line TV title    trailer ✓   Disney+            90 · STREAM IT
+ *
+ * Four distinct verdicts, three availability states and two title lengths, so
+ * "the action rows still line up" is a claim about ragged input rather than
+ * about six identical cards.
  */
 
 export const HARNESS_IDS = [1000, 1001, 1002, 1003, 1004, 1005] as const;
@@ -49,8 +53,8 @@ const FIXTURES: Record<number, TitleFixture> = {
   // PROVIDER ABSENT, and absent as a RESULT (`providers: []`) — the card must
   // say so honestly rather than leaving a gap where a logo would be.
   1002: {
-    score: 38,
-    ratings: { standardScore: 38, audience: 31, tomatometer: 22, imdb: 4.4 },
+    score: 22,
+    ratings: { standardScore: 22, audience: 31, tomatometer: 22, imdb: 4.4 },
     providers: [],
   },
   1003: {
@@ -61,8 +65,8 @@ const FIXTURES: Record<number, TitleFixture> = {
   // NEVER LOOKED (`providers: null`) — the third availability state, and a
   // different sentence from "nothing streams this here".
   1004: {
-    score: 55,
-    ratings: { standardScore: 55, audience: null, tomatometer: null, imdb: 5.5 },
+    score: 40,
+    ratings: { standardScore: 40, audience: null, tomatometer: null, imdb: 5.5 },
     providers: null,
   },
   1005: {
@@ -98,6 +102,24 @@ export async function mountHarness(
 
   if (opts.reducedMotion) await page.emulateMedia({ reducedMotion: opts.reducedMotion });
 
+  /* SILENCE THE DOCKET COACH MARK.
+     It is a `position: fixed` panel portalled to the body, and on this fixture
+     it lands over the first card's artwork — right where the hover specs put
+     the pointer. It is already `pointer-events: none` (deliberately, see
+     WCheck), so it cannot intercept anything, but its own "Got it" button takes
+     clicks back and IS hit-testable, so a few pixels of drift in the layout
+     would turn a hover spec red for a reason that has nothing to do with
+     hovering. The coach has its own coverage in `device-polish.spec.ts` and
+     `onboarding-confidence.spec.ts`; here it is furniture, and it is dismissed
+     the same way a returning user dismisses it. */
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('wv.wcoach.dismissed.v1', '1');
+    } catch {
+      /* private mode — the coach simply shows, as it would for that user */
+    }
+  });
+
   // The per-title hydration every card component shares (ratings, facts,
   // synopsis, providers) — see src/lib/tileFacts.ts.
   await page.route('**/api/ratings/**', (route) => {
@@ -128,12 +150,19 @@ export async function mountHarness(
           tasteScore: f.score,
           available: true,
           sampleSize: 140,
+          /* THE NOTE SHAPES ARE THE PRODUCTION ONES.
+             `matchHighlights` emits an axis END for `agree` ("puzzle-forward")
+             and "you lean <end>" for `clash` — not a sentence. A fixture that
+             hands `buildFitReasons` a sentence instead produces "You rate you
+             rate these highly investigative mystery highly", which would then
+             be photographed as the product's copy. Caught by reading the
+             artifact; the shapes here now match `scoring/dimensions.ts`. */
           fit: {
             agree: [
-              { label: 'Investigative mystery', note: 'you rate these highly' },
-              { label: 'Bleak, rain-soaked cities', note: 'a look you keep coming back to' },
+              { label: 'Mystery complexity', note: 'puzzle-forward' },
+              { label: 'Tone', note: 'bleak, rain-soaked' },
             ],
-            clash: [{ label: 'Slow burn', note: 'you tend to bail early' }],
+            clash: [{ label: 'Pacing', note: 'you lean fast-moving' }],
           },
         },
       },
