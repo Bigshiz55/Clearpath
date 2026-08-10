@@ -250,6 +250,61 @@ test('no answer is ever cut off by its own wedge', async ({ page }) => {
   expect(checked, 'no wheel labels were measured').toBeGreaterThan(20);
 });
 
+test('every button lines up with the wedge it is painted on', async ({ page }) => {
+  await page.goto(HARNESS);
+  await page.getByTestId('rush-start').click();
+  await expect(page.getByTestId('rush-prompt')).toBeVisible();
+
+  /**
+   * The six wedges are centred at 60-degree intervals starting at twelve
+   * o'clock, so EVERY bisector is 30 degrees modulo 60 — whatever the palette
+   * or the family order does later. A round that deals fewer than six choices
+   * used to lay its buttons out across the choices it had (five at 72 degrees
+   * over a six-segment picture), and this is the assertion that catches it:
+   * those angles land on 42, 54, 6 and 18, not 30.
+   */
+  const seats = new Map<string, number>();
+  let checked = 0;
+
+  for (let round = 0; round < 30; round++) {
+    if (await page.getByTestId('rush-families').isVisible().catch(() => false)) break;
+    if (!(await page.getByTestId('rush-prompt').isVisible().catch(() => false))) break;
+
+    if ((await page.getByTestId('rush-prompt').getAttribute('data-layout')) === 'wheel') {
+      const wheel = (await page.getByTestId('rush-wheel').boundingBox())!;
+      const cx = wheel.x + wheel.width / 2;
+      const cy = wheel.y + wheel.height / 2;
+
+      const buttons = page.locator('[data-testid^="wheel-slot-"]');
+      const count = await buttons.count();
+      for (let i = 0; i < count; i++) {
+        const button = buttons.nth(i);
+        const family = (await button.getAttribute('data-family')) ?? '?';
+        // The label sits exactly on the wedge's bisector; the button's own box
+        // is the sector's bounding rectangle, whose centre is not.
+        const box = (await button.getByTestId('wheel-label').boundingBox())!;
+        const deg =
+          (Math.atan2(box.y + box.height / 2 - cy, box.x + box.width / 2 - cx) * 180) / Math.PI;
+        const offSeat = ((deg % 60) + 60) % 60;
+        expect(Math.abs(offSeat - 30), `"${family}" is not on a wedge bisector`).toBeLessThan(6);
+
+        // And a family keeps the same seat all game — the picture never moves.
+        const seen = seats.get(family);
+        const normalised = ((deg % 360) + 360) % 360;
+        if (seen === undefined) seats.set(family, normalised);
+        else {
+          expect(Math.abs(seen - normalised), `"${family}" moved seats`).toBeLessThan(6);
+        }
+        checked++;
+      }
+    }
+    await decide(page);
+  }
+
+  expect(checked, 'no wheel buttons were measured').toBeGreaterThan(20);
+  expect(seats.size, 'fewer than six families ever appeared').toBe(6);
+});
+
 test('tapping a wedge scores, and the score climbs as you play', async ({ page }) => {
   await page.goto(HARNESS);
   await page.getByTestId('rush-start').click();

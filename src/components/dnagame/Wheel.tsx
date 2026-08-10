@@ -282,8 +282,11 @@ export function Wheel({
           const a0 = start + gap;
           const a1 = end - gap;
           // A button face is a button face. Only the picture-mode wheel spends
-          // its fill on confidence.
-          const fill = playing ? 1 : 0.12 + r.confidence * 0.78;
+          // its fill on confidence. A wedge with nothing dealt to it this round
+          // is dimmed rather than painted: six full-strength colours would
+          // promise six buttons when only five are pressable.
+          const inert = playing && !slot;
+          const fill = !playing ? 0.12 + r.confidence * 0.78 : inert ? 0.17 : 1;
           const affinityR = PAINT_IN + (r.affinity / 100) * 13;
           return (
             <g key={r.id}>
@@ -345,7 +348,14 @@ export function Wheel({
         <ul className="absolute inset-0 list-none">
           {slots.map((slot, i) => {
             const reading = readings.find((r) => r.id === slot.familyId);
-            const geo = wedgeGeometry(i, slots.length);
+            // A SLOT SITS ON ITS OWN FAMILY'S WEDGE — never on its position in
+            // the array. A round does not always deal six choices (a family can
+            // run out of unused options, and four is a legal wheel round), and
+            // laying the buttons out across `slots.length` spaced five of them
+            // at 72 degrees over a six-segment picture: every button after the
+            // first drifted off its colour and two of them straddled a seam.
+            const seat = readings.findIndex((r) => r.id === slot.familyId);
+            const geo = wedgeGeometry(seat >= 0 ? seat : i, count);
             const accent = reading?.accent ?? '#ffffff';
             // Selection whitens the face, so the ink has to follow it.
             const ink = slot.selected && !slot.negative ? INK_DARK : inkFor(accent);

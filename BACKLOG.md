@@ -96,6 +96,18 @@ Updated at the end of every work order per the Working Agreement in
   representative.
 
 ## Done
+- **Wheel buttons sat off their wedges whenever a round dealt fewer than six
+  choices.** Reported live from a phone: five labels on a six-wedge wheel, two of
+  them straddling a seam. The buttons were laid out across `slots.length` while
+  the picture always draws six segments, so a five-choice round spaced them at
+  72° over a 60° wheel and everything after the first drifted. A round can
+  legally deal four or five (a family runs out of unused options), so a slot now
+  takes ITS OWN FAMILY'S seat rather than its position in the array, and a wedge
+  with nothing dealt to it is dimmed instead of painted at full strength — six
+  full-strength colours promised six buttons when only five were pressable. New
+  browser test pins the invariant without duplicating the family order: every
+  bisector is 30° modulo 60, and a family never changes seat mid-game. Verified
+  it FAILS on the old code ("thrill moved seats") before taking the fix.
 - **VERD1CT RUSH is now played inside the wheel, and it keeps score.** The
   question moved from a heading above the circle into the hub, and the six
   answers moved from a card grid below the circle into the wedges themselves —
