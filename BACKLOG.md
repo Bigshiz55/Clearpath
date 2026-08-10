@@ -4,6 +4,14 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **Card interaction model — awaiting live acceptance** on
+  `claude/card-interaction-model-m3ezx2`. All six milestones complete, gates
+  green, desktop 44/44 and the mobile suite re-run. **Action needed from you:**
+  open the Vercel preview for that branch and accept or reject the desktop
+  hover preview in particular — 380ms is a judgement call, and whether a
+  preview feels like a response or like a twitch is not something a test can
+  answer. The agent environment's network policy denies `*.vercel.app`, so no
+  session here can read a preview URL.
 - **Two-across phone tiles — awaiting live acceptance** on
   `claude/watchverdict-mobile-tests-rj2zey`. Pushed, not merged, production
   untouched. Mobile suite 1030/1032 with the one remaining failure documented
@@ -74,6 +82,29 @@ and what it unblocks.
   representative.
 
 ## Done
+- **Card interaction model — all six milestones, on
+  `claude/card-interaction-model-m3ezx2`.** HOVER = PREVIEW IT · CLICK =
+  UNDERSTAND IT · FULL VERDICT = ANALYZE IT is now the whole desktop contract,
+  and it is asserted as a contract rather than described in a doc. Milestones
+  1–4 (shared pink WatchVerd1ct mark, structurally anchored action rows, More
+  Info as a card expansion, evidence-only Why/Watch Out) landed earlier;
+  this pass added:
+  - **Hover-intent preview** (`src/lib/trailer/hoverIntent.ts` + a fourth play
+    SOURCE in `TrailerMedia`). Built on the existing single-active slot, not
+    beside it. 380ms dwell, lazy resolve, one preview grid-wide, muted, never
+    on touch, honours reduced-motion and the Autoplay pref. The hover overlay
+    is `pointer-events: none` so a running preview can never swallow the click
+    that opens More Info — measured: without it, More Info stops opening on the
+    card you are looking at.
+  - **A real desktop Playwright project** (`playwright.desktop.config.ts`, port
+    3212, `npm run test:desktop`) — 44 tests, plus screenshot artifacts in
+    `test-results/desktop/`. Deliberately a project, not a widened mobile
+    viewport: hover depends on `pointerType` and `(hover: hover)`, which a
+    resize cannot produce.
+  - Every guard has a measured negative control, and the suite carries two
+    anti-vacuity tests so "nothing happened" cannot pass against a dead fixture.
+  See `docs/CARD-INTERACTION-HANDOFF.md`. Pushed, not merged; production
+  untouched.
 - **National-breadth TVmaze ingest (broaden-only).** Extracted the
   `MAJOR_US_NETWORKS`/`isMajorUsNetwork` allowlist out of `onTv.ts` into a
   shared pure module `src/lib/viewing/ingest/nationalNetworks.ts` (plus a

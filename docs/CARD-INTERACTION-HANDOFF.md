@@ -64,7 +64,75 @@ view first. Take the baseline AFTER `scrollIntoViewIfNeeded()` on the actual
 click target, or you compare two different scroll positions and fail a
 component that is correct (observed: page moved 1040 → 350 on the click).
 
-## Remaining, in order
+### 5. Hover-intent trailer preview — `1a17cd2`
+`src/lib/trailer/hoverIntent.ts` is the dwell: `hoverPreviewAllowed` (a real
+mouse AND `(hover: hover) and (pointer: fine)` AND not reduced-motion AND the
+Autoplay pref on) plus `createHoverIntent` (380ms, injectable timers, refuses
+to re-arm while previewing). Pure, 15 unit tests, no browser.
+
+`TrailerMedia` gained a fourth play SOURCE — `'hover'` alongside manual/auto —
+and everything follows from that one distinction:
+
+- The hover overlay is **`pointer-events: none` and carries no controls**, so
+  the click still lands on the poster link underneath. Without it, hovering a
+  card DISABLES "click to understand it" on exactly the card you are looking
+  at. *(Negative control measured: the click is eaten, More Info never opens.)*
+- Hover **claims the single-active slot BEFORE the network call**, so card B
+  stops card A immediately and regardless of whether B has a trailer.
+  *(Negative control: without the claim, two players stay mounted.)*
+- `hoverClaim` is what makes pointer-leave the owner of a preview and NOT of a
+  manual player. Clicking ▶ Trailer during a preview PROMOTES it and drops the
+  claim, so moving the mouse away no longer stops it.
+- Jitter is handled twice: `pointerenter`/`pointerleave` (not over/out) so
+  drifting onto the card's own ▶ Trailer chip is not a new hover, and the
+  intent's own re-arm guard. *(Negative control: treating pointer-move as
+  leave-then-enter restarts the preview.)*
+- No trailer → the poster simply stays. No player, no toast: a hover asked for
+  nothing, it only paused.
+
+**Not behind `?trailers=1`, deliberately.** That flag gates scroll-dwell
+autoplay, which starts video at a card you never pointed at. A hover preview
+only ever happens where the user is already looking. It still cannot happen on
+touch.
+
+`MoreInfoLink` calls `stopAllTrailerPlayback()` on open: the dialog appears
+under a stationary cursor, and a stationary cursor fires no boundary event.
+
+### 6. Desktop E2E + visual proof — `28a4c49`
+`playwright.desktop.config.ts` (port 3212, a real `Desktop Chrome` descriptor).
+A widened mobile viewport cannot prove `pointerType` or `(hover: hover)`, which
+is the whole reason this is a project and not a viewport. 44 tests:
+`hover-trailer.spec.ts` (13), `card-interaction.spec.ts` (19),
+`visual-proof.spec.ts` (12). `npm run test:desktop` builds first, same
+convention as mobile.
+
+Artifacts land in `test-results/desktop/` (git-ignored — evidence is produced by
+a run, not committed): `grid-alignment-{1280,1440,1728}.png`,
+`card-provider-{present,absent}.png`, `card-never-checked.png`,
+`card-two-line-title.png`, `grid-verdict-variance.png`,
+`more-info-desktop{,-skip,-over-grid}.png`, `more-info-mobile-390.png`,
+`card-hover-preview-{active,restored}.png`.
+
+**Two anti-vacuity guards.** A `NEGATIVE CONTROL` test asserts the fixture *can*
+start a preview, and another asserts the titles render at *different* heights.
+Without them every "nothing happened" assertion would also hold against a
+fixture that had quietly stopped working.
+
+**The fixture defect the artifacts caught.** `buildFitReasons` takes an axis END
+for `agree` ("puzzle-forward") and `"you lean <end>"` for `clash`. Feeding it
+sentences produced *"You rate you rate these highly investigative mystery
+highly"* — which was about to be photographed as the product's own copy. Match
+`src/lib/scoring/dimensions.ts` when mocking `/api/dna`. Reading your own
+artifacts is part of the job.
+
+**The Docket coach mark is dismissed in the desktop fixture**
+(`wv.wcoach.dismissed.v1` via `addInitScript`). It is portalled `fixed` to the
+body and lands over the first card's artwork; it is already
+`pointer-events: none`, but its own "Got it" is hit-testable, so layout drift
+would redden a hover spec for a reason unrelated to hovering. It keeps its own
+coverage in `device-polish` and `onboarding-confidence`.
+
+## Original notes, kept for context
 
 ### 3. More Info drawer/sheet — DONE, see above. Original notes kept for context:
 Foundation exists: **`src/components/QuickLook.tsx`**, and `PosterCard`
@@ -99,23 +167,26 @@ Render nothing rather than something generic when evidence is absent — the
 codebase already does this (`WhyThisTitle` returns null when nothing is
 substantiated).
 
-### 5. Hover-intent trailer preview (desktop only)
-Reuse **`src/components/trailer/TrailerMedia.tsx`** — it already has the
-single-active store (`playing.claim/release`), dwell coordination
-(`activeTrailer.ts`), lazy `resolve()` on demand, reduced-motion and autoplay
-preference checks. Add a 300–500ms hover-intent timer; do not build a parallel
-system.
-- Hover = muted preview only. **Click must NOT start the trailer** — click is
-  More Info.
-- One preview at a time; lazy-load after intent; no restart on jitter.
-- No trailer → poster stays, no broken player.
-- No hover emulation on touch.
+### 5 and 6 — DONE, see above.
 
-### 6. E2E
-Desktop E2E does not exist yet — create it (a new Playwright project/config,
-or desktop viewports in the mobile config). Cover the 15 desktop flows and 7
-mobile flows in the assignment, plus visual proof of row alignment across
-one-line/two-line titles, provider/no-provider, differing ratings.
+## Where this leaves the model
+
+All six milestones are in. The desktop contract now holds end to end:
+
+| Gesture | Result |
+| --- | --- |
+| Poster hover (≥380ms, mouse only) | muted trailer preview |
+| Poster click | More Info |
+| Title click | More Info |
+| ▶ Trailer | deliberate playback, with controls |
+| FOR / AGAINST | vote only |
+| SAVE | save only |
+| W | docket only |
+
+Nothing left to do here. If you are picking this up to extend it, the two
+places most likely to need attention next are the hover threshold (380ms is a
+judgement, not a measurement — worth watching against real usage) and whether
+the preview should ever unmute on a deliberate second gesture.
 
 ## Conventions worth keeping
 
@@ -127,4 +198,13 @@ one-line/two-line titles, provider/no-provider, differing ratings.
 - `npx vitest run` rewrites `evaluation-results/*` SHA stamps; revert that
   churn, don't commit it.
 - Write a negative control for any layout guard. A test that cannot fail is
-  decoration.
+  decoration. Same for behaviour guards: break the fix, watch the test go red,
+  put it back. Every claim in the milestone 5 notes above was measured that way.
+- Desktop Playwright runs on **3212** (`npm run test:desktop`), mobile and
+  search-routing on **3211**. They cannot run at the same time on 3211.
+- `boundingBox()` is viewport-relative. Scroll a target into view BEFORE
+  measuring it or moving the pointer to it — the lower grid rows start below the
+  fold at 900px, and `mouse.move` to an off-screen coordinate is a silent no-op
+  that reads as "the component did nothing".
+- Look at the screenshots your suite produces. A green run photographed
+  malformed copy for two iterations before anyone opened the PNG.
