@@ -8,7 +8,8 @@ import { getIngestedGuideAirings, getOnTvTodayIngested, INGESTED_MIN } from '@/l
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
-import { hasLiveFullGridProvider, isTvMediaSupplyingListings } from '@/lib/viewing/liveTv';
+import { hasLiveFullGridProvider } from '@/lib/viewing/liveTv';
+import { tvMediaAttributionApplicable } from '@/lib/tv/providerRegistry';
 import { TvDetective } from '@/components/TvDetective';
 import { CoverageNote } from '@/components/tv/CoverageNote';
 import { Antenna, Film, Sparkles } from 'lucide-react';
@@ -352,7 +353,7 @@ export default async function OnTvPage({
           guessed one would be exactly the kind of fabrication this codebase
           avoids — a text credit is the compliant minimum until a real asset
           URL is confirmed. */}
-      {isTvMediaSupplyingListings() && (
+      {tvMediaAttributionApplicable() && (
         <p className="text-[11px] text-slate-500">
           Full channel listings from{' '}
           <a href="https://www.tvmedia.ca" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">
