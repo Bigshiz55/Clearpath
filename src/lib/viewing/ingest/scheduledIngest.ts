@@ -1,6 +1,6 @@
 import 'server-only';
 import type { createAdminClient } from '@/lib/supabase/admin';
-import { runTvmazeIngest, runTvmazeNationalIngest } from './tvmazeWriter';
+import { purgeUncarriedNationalStations, runTvmazeIngest, runTvmazeNationalIngest } from './tvmazeWriter';
 import { runTvMediaIngest } from './tvMediaWriter';
 import { mayCallUpstream, resolveDataMode } from '@/lib/tv/dataMode';
 
@@ -242,7 +242,18 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
       )
     : { ok: true, ran: false, status: 'success' as const, reason: `Ran within the last 2h (${lastTvMediaRun}).` };
 
-  return { tvmaze, tvmazeNational, tvmedia };
+  /* THE PURGE RUNS WHETHER OR NOT ANYTHING WAS FETCHED.
+     Deliberately outside every day-gate above. "We no longer carry this
+     station" is a policy change, and making it wait on a fetch cadence is
+     exactly what left three web feeds rendering as television channels for a
+     full day after the write-boundary fix shipped — the national ingest is
+     gated to once per UTC day and had already run.
+     It consults the registry, never a fetch, so a skipped, failed or empty run
+     cannot influence it and it cannot mass-delete a carried channel. Isolated
+     like every other step: a purge failure must not abort the ingest. */
+  const purge = await isolateRun('tvmaze-purge', () => purgeUncarriedNationalStations(admin));
+
+  return { tvmaze, tvmazeNational, tvmedia, purge };
 }
 
 /**
