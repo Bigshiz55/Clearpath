@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { TonightEvent } from '@/lib/tonight/analytics';
 import { answerOne, currentAct, openFresh, playToReveal } from './drive';
 
 /**
@@ -118,5 +119,58 @@ test.describe('honesty', () => {
         expect(((await hook.textContent()) ?? '').trim().length).toBeGreaterThan(3);
       },
     });
+  });
+});
+
+test.describe('analytics', () => {
+  test('a real session emits a complete, non-duplicated event stream', async ({ page }) => {
+    // Unit tests prove the event builders are right; this proves the component
+    // actually calls them, which is the part that rots silently. The dev
+    // harness installs a sink into window.__tonightEvents.
+    await openFresh(page);
+    await playToReveal(page);
+    await expect(page.getByTestId('tonight-reveal')).toBeVisible();
+
+    const events = await page.evaluate(() => window.__tonightEvents ?? []);
+
+    expect(events.length, 'no events were emitted at all').toBeGreaterThan(3);
+    expect(events[0]?.name).toBe('tonight_started');
+    expect(events.at(-1)?.name).toBe('tonight_completed');
+    expect(new Set(events.map((e) => e.sessionId)).size, 'the stream spans sessions').toBe(1);
+
+    // One id per answered interaction: a re-render or a StrictMode double-invoke
+    // must not look like the player answered twice.
+    const answered = events.filter(
+      (e) => e.name === 'tonight_move_answered' || e.name === 'tonight_shortlist_rejected',
+    );
+    const keys = answered.map((e) => `${e.move}:${e.subject}`);
+    expect(new Set(keys).size, `duplicate answers reported: ${keys.join(', ')}`).toBe(keys.length);
+
+    // The step counter must advance monotonically, or drop-off cannot be read.
+    const steps = answered.map((e) => e.step);
+    expect([...steps].sort((a, b) => a - b)).toEqual(steps);
+
+    // And the completeness the stream reports must match what the Reveal shows.
+    const shown = await page.getByTestId('tonight-reveal').getAttribute('data-known');
+    expect(events.at(-1)?.known).toBe(Number(shown));
+  });
+
+  test('leaving mid-session is reported, not lost', async ({ page }) => {
+    // A session abandoned in the third act is the most interesting thing that
+    // can happen and the easiest to never find out about.
+    await openFresh(page);
+    for (let i = 0; i < 3; i++) await answerOne(page, { index: i });
+
+    const before = await page.evaluate(() => (window.__tonightEvents ?? []).length);
+    expect(before).toBeGreaterThan(0);
+
+    // `pagehide` is what fires on mobile Safari, where `beforeunload` does not.
+    const left = await page.evaluate(() => {
+      window.dispatchEvent(new Event('pagehide'));
+      const events = window.__tonightEvents ?? [];
+      return events.filter((e) => e.name === 'tonight_left');
+    });
+    expect(left.length, 'leaving produced no event').toBe(1);
+    expect(left[0]?.step, 'the exit was reported at the wrong point').toBeGreaterThan(0);
   });
 });

@@ -175,6 +175,31 @@ writes to `test-results/tonight/`, one per act per viewport.
   block clipped rather than scrolled. It scrolls now, and gives way first: the
   changed attribute and the answers must survive any screen.
 
+## Analytics — built, wired, and verified in a browser
+
+`src/lib/tonight/analytics.ts`. Six events: started, move shown, move answered,
+shortlist rejected, completed, left.
+
+Two rules, both enforced by tests:
+
+- **Nothing is invented.** Every field is copied from state the engine already
+  computed. Events report the interaction the ENGINE RECORDED, not the tap — an
+  ignored retry produces no event, because otherwise answer counts inflate by
+  however impatient players are and that number then gets read as engagement.
+- **Nothing goes anywhere by default.** The sink is a no-op until something
+  installs one. Where a person's viewing taste is stored, and for how long, is
+  an owner decision — not something a module makes by quietly defaulting to an
+  endpoint. **No transport is wired. That is deliberate, and it is the one part
+  of this milestone still open.**
+
+The dev harness installs a sink into `window.__tonightEvents`, so a browser test
+asserts on the stream a real session produces: complete, single-session,
+monotonic, no duplicated answers, and a completeness figure that matches what
+the Reveal displays. Unit tests prove the builders; that test proves the
+wiring, which is the half that rots silently.
+
+**95 Playwright tests, five viewports, exit 0.**
+
 ## Remaining milestones
 
 1. Artwork: `posterPath` static data. **Root cause of the empty rectangles is
@@ -182,7 +207,7 @@ writes to `test-results/tonight/`, one per act per viewport.
    this environment has no `TMDB_API_KEY` with `api.themoviedb.org` returning
    `CONNECT 403`. Not a CSS, Next/Image or domain-config fault. The branded
    composition above is the current render path and is complete on its own.
-2. Analytics events.
+2. Choose an analytics destination and wire the sink (owner decision).
 3. Migration behind a flag; remove customer-facing Showdown last.
 4. PR into `main`, CI, preview verification, merge, production SHA check.
 
