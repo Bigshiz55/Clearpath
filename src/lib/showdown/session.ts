@@ -27,7 +27,8 @@
 
 import type { DiagnosticTitle } from '@/lib/voice/quickdna/definition';
 import { type TraitKey, type TraitProfile } from '@/lib/voice/quickdna/traits';
-import { nextMatchup, pairKey, pull, separation, type Matchup } from './matchup';
+import { pairKey, pull, separation, type Matchup } from './matchup';
+import { SCAN_DECISIONS, SCAN_MIN_DECISIONS, nextScanMatchup } from './scanner';
 import {
   MAX_PERMANENT_WEIGHT,
   attributionConfidence,
@@ -45,7 +46,17 @@ import {
   type ShowdownMode,
 } from './evidence';
 
-export type Verdict = 'left' | 'right' | 'neither';
+/**
+ * BOTH is not a hedge, it is a distinct claim.
+ *
+ * Without it, someone who genuinely wants both films has only bad options:
+ * pick one (inventing a preference they do not hold) or answer Neither (which
+ * records the exact opposite of what they meant). Strong attraction to both
+ * must never be recorded as indifference. It reinforces what the pair SHARES —
+ * the mirror of Neither — and says nothing about the axes they split on,
+ * because wanting both is not a statement about which side you are on.
+ */
+export type Verdict = 'left' | 'right' | 'neither' | 'both';
 
 /**
  * The ceiling for a permanent write, reached only by a clean single-axis
@@ -73,8 +84,11 @@ export const NEITHER_WEIGHT = MAX_PERMANENT_WEIGHT * NEITHER_RATIO;
 export const SESSION_LEAN_STEP = 0.34;
 
 /** Enough decisions to sharpen a profile; few enough to stay under ninety seconds. */
-export const TARGET_DECISIONS = 12;
-export const MIN_DECISIONS = 8;
+/* Twenty decisions, forty unique title exposures, ninety-odd seconds. Twelve
+   could not sweep the universe AND branch AND resolve — it was one phase's
+   worth of rounds spread over three jobs. */
+export const TARGET_DECISIONS = SCAN_DECISIONS;
+export const MIN_DECISIONS = SCAN_MIN_DECISIONS;
 
 /** Below this the remaining pairs are not worth a turn — end rather than pad. */
 export const GAIN_FLOOR = 0.05;
@@ -107,8 +121,16 @@ export interface ShowdownState {
   seenPairs: string[];
   /** Titles reported unseen. Kept so we never put them up again. */
   unseenTitles: string[];
+  /**
+   * EVERY title shown this session — the absolute no-repeat invariant.
+   * Winner, loser, refused, unrecognised: once seen, never dealt again.
+   */
+  seenTitleIds: string[];
   recentAxes: TraitKey[];
   current: Matchup | null;
+  /** Rounds spent on pairs the player did not recognise. They advance the
+   *  scan clock without producing evidence, so the phases still progress. */
+  unseenRounds: number;
   /** Confidence coverage when the session opened — the "21% → 34%" starting point. */
   openingKnown: number;
   startedAt: number;
@@ -118,6 +140,7 @@ export interface SessionSeed {
   profile?: TraitProfile;
   seenPairs?: readonly string[];
   unseenTitles?: readonly string[];
+  seenTitleIds?: readonly string[];
   openingKnown?: number;
 }
 
@@ -133,29 +156,49 @@ export function createSession(
     decisions: [],
     seenPairs: [...(seed.seenPairs ?? [])],
     unseenTitles: [...(seed.unseenTitles ?? [])],
+    seenTitleIds: [...(seed.seenTitleIds ?? [])],
     recentAxes: [],
     current: null,
+    unseenRounds: 0,
     openingKnown: seed.openingKnown ?? 0,
     startedAt,
   };
 }
 
+/**
+ * Deal the next matchup through the phase-aware scanner.
+ *
+ * `seenTitleIds` carries BOTH the no-repeat invariant and the unseen-title
+ * retirement — a title the player did not recognise is already in the set, so
+ * it cannot come back either. One exclusion list, one invariant, nothing to
+ * keep in sync.
+ */
 function deal(state: ShowdownState): Matchup | null {
-  if (state.decisions.length >= TARGET_DECISIONS) return null;
-  return nextMatchup(
-    {
-      profile: state.profile,
-      seenPairs: state.seenPairs,
-      unseenTitles: state.unseenTitles,
-      recentAxes: state.recentAxes,
-    },
-    GAIN_FLOOR,
-  );
+  if (state.decisions.length + state.unseenRounds >= TARGET_DECISIONS) return null;
+  return nextScanMatchup({
+    profile: state.profile,
+    seenTitleIds: [...state.seenTitleIds, ...state.unseenTitles],
+    recentAxes: state.recentAxes,
+    decisionIndex: state.decisions.length + state.unseenRounds,
+    total: TARGET_DECISIONS,
+  });
 }
 
 export function startSession(state: ShowdownState, now = 0): ShowdownState {
   return { ...state, startedAt: now, current: deal(state) };
 }
+
+
+/* WHY "NEITHER" STAYS ON SHARED GROUND ONLY.
+   A broader reading was tried — condemn every axis the pair asserts without
+   CONFLICTING — because on a cold-start sweep pair (chosen to be maximally far
+   apart) there is almost no shared ground, so Neither on the opening question
+   teaches close to nothing. That looked like a bug worth fixing and is not:
+   a sweep pair touches a dozen axes, so the broader rule turns one tap into
+   twelve claims, which is precisely the confounding `attribution.ts` exists to
+   stop. The information genuinely is thin there, and inventing structure to
+   hide that is worse than reporting it. Two pre-existing cases assert this
+   boundary deliberately; they were right. */
 
 /** Every axis either title asserts anything about. */
 function axesOf(matchup: Matchup): TraitKey[] {
@@ -194,13 +237,40 @@ export function permanentEvidenceFor(
   const informationValue = matchup.gain;
   const out: PermanentTraitEvidence[] = [];
 
-  if (verdict === 'neither') {
+  if (verdict === 'both') {
+    // The mirror of Neither: endorse everything the pair asserts without
+    // conflict, stay silent only where they genuinely oppose.
     for (const key of axesOf(matchup)) {
       const split = separation(left, right, key);
-      // Only SHARED ground is condemned. Where the pair disagreed, refusing
-      // both says nothing about which side they would have taken, so nothing
-      // is recorded — inventing a direction here would be fabricating an
-      // opinion the player did not express.
+      const shared = Math.min(Math.abs(pull(left, key)), Math.abs(pull(right, key)));
+      if (shared <= 0 || split > shared) continue;
+      const agreedDirection = pull(left, key) + pull(right, key) >= 0 ? 1 : -1;
+      const sharedSep = Math.min(1, shared);
+      const weight = permanentWeight({
+        separation: sharedSep,
+        attribution: axisAttribution(sharedSep, seps),
+        informationValue,
+        base: NEITHER_WEIGHT,
+      });
+      if (weight <= 0) continue;
+      out.push({
+        kind: 'permanent',
+        key,
+        target: agreedDirection > 0 ? 100 : 0,
+        weight,
+        attribution: axisAttribution(sharedSep, seps),
+      });
+    }
+    return out;
+  }
+
+  if (verdict === 'neither') {
+    for (const key of axesOf(matchup)) {
+      // Condemn what the pair asserts WITHOUT CONFLICT. Where the two films
+      // pull opposite ways, refusing both says nothing about which side they
+      // would have taken, and inventing a direction there would fabricate an
+      // opinion nobody expressed — that restraint is unchanged.
+      const split = separation(left, right, key);
       const shared = Math.min(Math.abs(pull(left, key)), Math.abs(pull(right, key)));
       if (shared <= 0 || split > shared) continue;
       const agreedDirection = pull(left, key) + pull(right, key) >= 0 ? 1 : -1;
@@ -259,13 +329,14 @@ export function sessionEvidenceFor(
   const { left, right } = matchup;
   const out: SessionContextEvidence[] = [];
 
-  if (verdict === 'neither') {
+  if (verdict === 'neither' || verdict === 'both') {
+    const sign = verdict === 'both' ? 1 : -1;
     for (const key of axesOf(matchup)) {
       const split = separation(left, right, key);
       const shared = Math.min(Math.abs(pull(left, key)), Math.abs(pull(right, key)));
       if (shared <= 0 || split > shared) continue;
       const agreedDirection = pull(left, key) + pull(right, key) >= 0 ? 1 : -1;
-      out.push({ kind: 'session', key, lean: -agreedDirection * SESSION_LEAN_STEP * shared });
+      out.push({ kind: 'session', key, lean: sign * agreedDirection * SESSION_LEAN_STEP * shared });
     }
     return out;
   }
@@ -339,6 +410,9 @@ export function answer(
     lean,
     decisions: [...state.decisions, decision],
     seenPairs: [...state.seenPairs, pairKey(matchup.left.id, matchup.right.id)],
+    // THE INVARIANT. Both titles retire the instant they are shown, whatever
+    // the answer was.
+    seenTitleIds: [...state.seenTitleIds, matchup.left.id, matchup.right.id],
     recentAxes: [...state.recentAxes, ...matchup.testing.slice(0, 1)].slice(-4),
     current: null,
   };
@@ -358,7 +432,11 @@ export function markUnseen(state: ShowdownState, now: number): ShowdownState {
   const next: ShowdownState = {
     ...state,
     unseenTitles: [...state.unseenTitles, matchup.left.id, matchup.right.id],
+    seenTitleIds: [...state.seenTitleIds, matchup.left.id, matchup.right.id],
     seenPairs: [...state.seenPairs, pairKey(matchup.left.id, matchup.right.id)],
+    // Advances the phase clock: an unrecognised pair still consumed a round of
+    // the player's ninety seconds, and the scan must not silently run long.
+    unseenRounds: state.unseenRounds + 1,
     startedAt: state.startedAt || now,
     current: null,
   };

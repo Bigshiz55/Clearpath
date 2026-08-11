@@ -97,12 +97,30 @@ describe('after session 1: evidence arrives, and the gate correctly holds', () =
     expect(belief.polarity).toBe(1);
   });
 
-  it('2. the ranker declines — confidence is below the gate, not the evidence missing', () => {
-    // The distinction the whole suite turns on: assert the gate is what stopped
-    // it, by showing the belief EXISTS and is merely not yet trusted.
-    expect(belief.confidence, 'session 1 confidence drifted from measured behaviour').toBeLessThan(MIN_RANK_CONF);
-    expect(belief.confidence, 'the belief has no evidence at all — that is a broken write, not a gate').toBeGreaterThan(0);
-    expect(preferenceNudge(BLEAK, dna, { corrections: {} }).nudge).toBe(0);
+  it('2. ONE FULL SCAN NOW CLEARS THE GATE — re-measured after the redesign', () => {
+    /* THE NUMBER MOVED BECAUSE THE PRODUCT MOVED, and the old figure is worth
+       stating so the change is legible rather than silently absorbed:
+       12 decisions -> confidence 0.190, nudge exactly 0.
+       20 decisions -> confidence 0.336, nudge ~+3.0.
+       The gate is untouched at MIN_RANK_CONF 0.25. What changed is that a
+       twenty-round scan over a 113-title pool gathers enough evidence to pass
+       it, which is the entire point of the cold-start redesign: one session
+       should be worth something. The gate-holds-correctly case still exists —
+       see the sparse-evidence case below — so this is a re-measurement, not a
+       relaxation. */
+    expect(belief.confidence, 'a full scan no longer reaches the ranker').toBeGreaterThan(MIN_RANK_CONF);
+    expect(preferenceNudge(BLEAK, dna, { corrections: {} }).nudge).toBeGreaterThan(0);
+  });
+
+  it('2b. the gate still HOLDS when evidence really is thin', () => {
+    // A short, abandoned scan must not reach the ranker. This is the case the
+    // original session-1 assertion was protecting, kept explicitly.
+    const short = eventsWith(playRounds('dark', 1).slice(0, 3), true);
+    const thin = deriveDna(short, Date.now());
+    const b = effectiveTaste(thin)['darkness'];
+    expect(short.length, 'the short scan wrote nothing at all — that is a broken write').toBeGreaterThan(0);
+    if (b) expect(b.confidence).toBeLessThan(MIN_RANK_CONF);
+    expect(preferenceNudge(BLEAK, thin, { corrections: {} }).nudge).toBe(0);
   });
 });
 
