@@ -8,7 +8,7 @@ import { getIngestedGuideAirings, getOnTvTodayIngested, INGESTED_MIN } from '@/l
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
-import { hasFullGridProvider, isTvMediaConfigured } from '@/lib/viewing/liveTv';
+import { hasFullGridProvider, isTvMediaSupplyingListings } from '@/lib/viewing/liveTv';
 import { TvDetective } from '@/components/TvDetective';
 import { CoverageNote } from '@/components/tv/CoverageNote';
 import { Antenna, Film, Sparkles } from 'lucide-react';
@@ -198,7 +198,7 @@ export default async function OnTvPage({
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h1 className="text-2xl font-bold text-white sm:text-3xl">
             {guideView
-              ? 'Full channel guide'
+              ? 'Live TV guide'
               : withinHours != null
                 ? genreEmpty
                   ? `${filterLabel ? `${titleCase(filterLabel)} ` : ''}on live TV`
@@ -211,7 +211,18 @@ export default async function OnTvPage({
             themselves (the reminder bell explains the reminder). */}
         <p className="mt-1 text-sm text-slate-400">
           {guideView
-            ? 'Every channel, next 6 hours — search by channel or by what’s playing.'
+            /* WHAT WE CAN ACTUALLY SHOW, NOT WHAT WE WISH WE COULD.
+               "Every channel" was a promise the source cannot keep: TVmaze is
+               an episode database, not an EPG, so a channel airing a movie or
+               a rerun produces no record at all and never appears. Measured on
+               2026-08-11: 133 airings nationwide across 29 networks in a FULL
+               DAY, with 55 of the 76 carried channels returning nothing —
+               so the shortfall is not the time of day, it is the source.
+               See scripts/tv/guideCoverageAudit.ts and
+               docs/tv-coverage/SOURCE_AND_CHANNEL_REPORT.md.
+               The wording is narrower and still confident: it says what is
+               here rather than apologising for what is not. */
+            ? 'Available channel listings for the next 6 hours — search by channel or by what’s playing.'
             : withinHours != null
               ? 'What’s on now and next — local times, ratings, and one-tap reminders.'
               : `What’s on live in ${region} — filter, sort by rating, set reminders.`}
@@ -330,13 +341,15 @@ export default async function OnTvPage({
       {!guideView && <TvDetective />}
 
       {/* TV Media attribution — required by their terms only while their data
-          is actually in use, so it's gated on isTvMediaConfigured() rather
-          than always shown. No logo: TV Media's brand-kit asset URL isn't
+          is actually in use — so it is gated on whether TV Media may actually
+          supply listings, NOT on whether a key happens to exist. The old
+          `isTvMediaConfigured()` gate credited them under a guide built
+          entirely from TVmaze while their adapter was switched off. No logo: TV Media's brand-kit asset URL isn't
           verified yet (see docs/SCHEDULE_PROVIDERS.md), and hotlinking a
           guessed one would be exactly the kind of fabrication this codebase
           avoids — a text credit is the compliant minimum until a real asset
           URL is confirmed. */}
-      {isTvMediaConfigured() && (
+      {isTvMediaSupplyingListings() && (
         <p className="text-[11px] text-slate-500">
           Full channel listings from{' '}
           <a href="https://www.tvmedia.ca" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">

@@ -148,3 +148,83 @@ outside the 12-channel allowlist.
 What it will not do is make the guide look like a cable EPG, and any channel
 listed with an empty grid must be labelled unavailable rather than shown as a
 blank schedule — the existing code comments already set that rule.
+
+---
+
+# ADDENDUM — 2026-08-11: channel identity, and a re-measurement
+
+Written while fixing the guide showing `NBC.COM`, `ABC NEWS LIVE` and
+`CBS NEWS` as if they were television channels. Every number below came from
+`scripts/tv/guideCoverageAudit.ts`, which asks TVmaze the same question the
+ingest asks and applies the same registry, so it can be re-run against evidence
+rather than trusted from memory.
+
+## 1. Three defects, only one of them about coverage
+
+**(a) Web feeds admitted as linear channels.** The ingest read
+`show.network?.name ?? show.webChannel?.name`, which destroys the distinction
+before anyone can ask for it, and `isMajorUsNetwork` matched by prefix
+(`n.startsWith(net)`), so `nbc.com` was NBC. Measured in the live 6-hour
+window: **3 of the 12 "channels" on screen were web feeds** — NBC.com,
+ABC News Live, CBS News. Fixed at the data boundary, twice over: kind is
+decided by which FIELD the source populated, and names match an explicit alias
+table exactly.
+
+**(b) A naming mismatch was hiding two real networks.** MSNBC rebranded to
+**MS NOW** and the allowlist still said `msnbc`; **NewsNation** was never
+listed. Those are the 2nd and 5th busiest US networks in the source —
+13 and 10 airings on the audited day — and both were rejected outright. They
+are carried now.
+
+**(c) Source poverty, which is not fixable by us.** See below.
+
+## 2. The re-measurement (2026-08-11, live)
+
+| Window | Source rows (national) | Distinct linear networks | Carried channels with listings | Carried channels with ZERO |
+|---|---|---|---|---|
+| next 6 h | 30 | 12 | 8 | 68 |
+| next 24 h | 133 | 29 | 21 | 55 |
+
+**Morning is not the explanation.** Over a FULL DAY the source returns 133
+airings for the entire United States, and 55 of the 76 carried channels return
+nothing at all — AMC, USA Network, TNT, TBS, FX, Hallmark, Lifetime, TCM, Syfy,
+Freeform, Comedy Central, Paramount Network, A&E, Nat Geo, Animal Planet,
+BBC America, IFC, SundanceTV among them. Cable news is 62% of everything
+returned (Fox News 15, CNN 13, MS NOW 13, Newsmax 12, NewsNation 10, CNBC 10,
+Fox Business 9). For scale: one real cable channel airs 20–48 slots a day on
+its own; TVmaze has 133 for the whole country.
+
+## 3. Is TVmaze the right source for a "Full Guide"? — No.
+
+Structurally, not incidentally. TVmaze indexes **episodes of series it tracks**;
+it does not model a channel's 24-hour grid, so a channel airing a movie, a
+rerun, or paid programming produces no record and cannot appear. That is
+exactly the programming the Hallmark/Lifetime/TCM-shaped product is built
+around, and it is why those channels are absent **entirely** rather than thinly.
+
+TVmaze remains a good source for what it is: first-run scripted, and
+best-in-class cable-news/talk coverage. It cannot be the source for a product
+that promises a television guide.
+
+What that means for the copy: the guide now says **"Live TV guide" /
+"Available channel listings for the next 6 hours"** and counts **"N channels
+with listings"**. That is a true statement about coverage. "Every channel" was
+not, and no amount of ingest work on this source will make it true — the
+decision is a licensed EPG (Schedules Direct at ~$35/yr is the cheapest
+credible path; see §1 and `SOURCE_RIGHTS_REGISTRY.md`) or a narrower promise.
+
+## 4. A governance finding, unrelated to the guide
+
+`CLAUDE.md` states production deploys from `claude/watch-verdict-app-wwbtbg`.
+Live `/api/version` says otherwise:
+
+```
+sha 350d87467a704b205c4c58fe739441d75e629fcd  branch main
+deployedAt 2026-08-07T17:53:31-04:00         vercelEnv production
+```
+
+Production serves **`main`**. This matters beyond bookkeeping: the "Full Guide
+channel universe is the canonical lineup" fix (`45c49b8`) — which renders every
+carried channel including those with no listings — exists only on
+`claude/watch-verdict-app-wwbtbg` and **is not deployed**. That is the second
+reason the live guide shows only channels that have data.

@@ -1,4 +1,5 @@
 import 'server-only';
+import { classifySourceChannel } from '@/lib/viewing/channels/channelIdentity';
 import { matchChannel, TVMAZE_CHANNELS, type TvmazeChannelDef } from './tvmazeChannels';
 import { normalizeAiring } from './normalizeTime';
 import { hashPayload, type FetchedAiring } from './reconcile';
@@ -124,7 +125,12 @@ export function matchDay(episodes: TvmazeScheduleEpisode[]): MatchedAiring[] {
   for (const ep of episodes) {
     const show = ep.show;
     if (!show) continue;
-    const networkName = show.network?.name ?? show.webChannel?.name ?? null;
+    /* LINEAR ONLY. This used to read
+         `show.network?.name ?? show.webChannel?.name`
+       which turns a streaming feed into a broadcaster by the time anyone can
+       ask. A curated Pack channel is a television channel; a web feed of the
+       same brand is not the same thing and must not fill its schedule. */
+    const networkName = show.network?.name ?? null;
     const channel = matchChannel(networkName, show.name ?? null);
     if (channel) out.push({ channel, episode: ep, show });
   }
@@ -179,11 +185,28 @@ export function matchNationalDay(
   for (const ep of episodes) {
     const show = ep.show;
     if (!show) continue;
-    const networkName = show.network?.name ?? show.webChannel?.name ?? null;
-    if (!networkName || !accept(networkName)) continue;
+    /* THE DATA BOUNDARY.
+       `classifySourceChannel` decides linear-vs-web from WHICH FIELD the source
+       populated, so a row that only has a `webChannel` can never become a
+       channel here — not even one named exactly "NBC". A row naming a linear
+       network we do not carry resolves to null and is skipped; it is never
+       downgraded into a web feed to keep it. */
+    const resolved = classifySourceChannel({
+      networkName: show.network?.name ?? null,
+      webChannelName: show.webChannel?.name ?? null,
+    });
+    if (resolved?.kind !== 'linear') continue;
+    // `accept` stays injected so the caller still owns the policy; it is now a
+    // second, redundant guard rather than the only one.
+    if (!accept(resolved.name)) continue;
     // Curated-owned network → handled by the curated ingest; never double-write.
-    if (matchChannel(networkName, show.name ?? null)) continue;
-    out.push({ channel: { key: `tvmaze-net:${slug(networkName)}`, displayName: networkName }, episode: ep, show });
+    if (matchChannel(resolved.name, show.name ?? null)) continue;
+    /* KEYED BY CANONICAL IDENTITY, NOT BY SPELLING. "Fox News" and "Fox News
+       Channel" are one broadcaster; keying on the source string gave them two
+       stations and two rows in the guide. `slug` is still injected and still
+       used for anything the registry does not carry. */
+    const key = `tvmaze-net:${resolved.id || slug(resolved.name)}`;
+    out.push({ channel: { key, displayName: resolved.name }, episode: ep, show });
   }
   return out;
 }

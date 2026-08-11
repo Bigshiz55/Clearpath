@@ -1,4 +1,5 @@
 import 'server-only';
+import { mayCallUpstream } from '@/lib/tv/dataMode';
 import { resolveSchedule } from './registry';
 import { TvMediaAdapter, TVMEDIA_CAPABILITIES } from './adapters/tvMedia';
 import { SchedulesDirectAdapter } from './adapters/schedulesDirect';
@@ -159,6 +160,28 @@ export function activeProviderId(): string | null {
  *  use (CHANGES §5). */
 export function isTvMediaConfigured(): boolean {
   return new TvMediaAdapter().isConfigured();
+}
+
+/**
+ * Is TV Media ACTUALLY supplying the listings on screen?
+ *
+ * `isTvMediaConfigured()` answers a different question — "does a key exist" —
+ * and the attribution was gated on it. In production that key exists while the
+ * adapter is switched off (`TVMEDIA_ENABLED` unset, so egress is denied) and
+ * its last run failed days ago, which put "Full channel listings from TV
+ * Media" under a guide built entirely from TVmaze. Crediting a source for data
+ * it did not provide is the same class of error as inventing a listing: it
+ * describes the product as something it is not.
+ *
+ * A metered adapter that may not call upstream stops contributing within the
+ * guide's own coverage window (days, not weeks), so "permitted to supply"
+ * tracks "is supplying" closely enough to be honest — and errs toward dropping
+ * a credit rather than showing a false one. If TV Media is ever re-enabled the
+ * credit returns on its own.
+ */
+export function isTvMediaSupplyingListings(): boolean {
+  if (!isTvMediaConfigured()) return false;
+  return mayCallUpstream({ adapterId: 'tv_media', cost: 'metered' }).allowed;
 }
 
 /**

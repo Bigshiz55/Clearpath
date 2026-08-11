@@ -30,13 +30,28 @@ describe('isMajorUsNetwork', () => {
     }
   });
 
-  it('matches a prefixed variant (feed drift) but rejects an obscure regional net', () => {
-    expect(isMajorUsNetwork('ABC News')).toBe(true); // startsWith 'abc'
+  /* DELIBERATELY INVERTED — this test used to assert the defect.
+     It read `expect(isMajorUsNetwork('ABC News')).toBe(true); // startsWith
+     'abc'`, describing prefix matching as tolerance for "feed drift". That
+     same rule is what put NBC.COM, ABC NEWS LIVE and CBS NEWS on the guide as
+     television channels. A name we have not deliberately claimed is not a
+     channel we carry; drift is handled by adding an alias to the registry,
+     which is a decision someone makes rather than a string coincidence. */
+  it('does NOT admit a longer name just because it starts with a carried one', () => {
+    expect(isMajorUsNetwork('ABC News')).toBe(false);
+    expect(isMajorUsNetwork('NBC.com')).toBe(false);
+    expect(isMajorUsNetwork('Foxtel')).toBe(false);
     expect(isMajorUsNetwork('WKRP Cincinnati 12')).toBe(false);
     expect(isMajorUsNetwork('NestFlix Regional')).toBe(false);
   });
 
-  it('is driven by the shared allowlist, not a private copy', () => {
+  it('still accepts the real spellings the source sends, via explicit aliases', () => {
+    for (const name of ['Fox News Channel', 'Fox Business Network', 'MS NOW', 'NewsNation', 'NFL Network']) {
+      expect(isMajorUsNetwork(name), name).toBe(true);
+    }
+  });
+
+  it('is driven by the shared registry, not a private copy', () => {
     expect(MAJOR_US_NETWORKS).toContain('espn');
     expect(MAJOR_US_NETWORKS).toContain('abc');
   });
@@ -75,11 +90,45 @@ describe('matchNationalDay', () => {
     expect(out).toHaveLength(0);
   });
 
-  it('falls back to webChannel name, and skips rows with no show or no network', () => {
-    const web = matchNationalDay([episode({ show: { id: 3, name: 'Streamed', webChannel: { name: 'HBO' } } })], isMajorUsNetwork, networkSlug);
-    expect(web[0]!.channel.key).toBe('tvmaze-net:hbo');
+  /* DELIBERATELY INVERTED — this asserted the collapse that caused the bug.
+     It required a show whose only channel is the WEB feed "HBO" to become the
+     linear station `tvmaze-net:hbo`, i.e. a streaming feed filling a
+     television channel's schedule. That is precisely how NBC.COM reached the
+     guide. A web feed is now refused as a channel however it is named. */
+  it('NEVER promotes a webChannel to a linear station, and skips rows with no network', () => {
+    const web = matchNationalDay(
+      [episode({ show: { id: 3, name: 'Streamed', webChannel: { name: 'HBO' } } })],
+      isMajorUsNetwork,
+      networkSlug,
+    );
+    expect(web, 'a web feed became a linear channel').toEqual([]);
+
+    for (const name of ['NBC.com', 'ABC News Live', 'CBS News']) {
+      const rows = matchNationalDay(
+        [episode({ show: { id: 9, name: 'Streamed', webChannel: { name } } })],
+        isMajorUsNetwork,
+        networkSlug,
+      );
+      expect(rows, `${name} became a channel`).toEqual([]);
+    }
+
     expect(matchNationalDay([episode({ show: null })], isMajorUsNetwork, networkSlug)).toEqual([]);
     expect(matchNationalDay([episode({ show: { id: 4, name: 'No Net' } })], isMajorUsNetwork, networkSlug)).toEqual([]);
+  });
+
+  it('one broadcaster under two spellings produces ONE station, not two', () => {
+    const a = matchNationalDay(
+      [episode({ show: { id: 11, name: 'News', network: { name: 'Fox News' } } })],
+      isMajorUsNetwork,
+      networkSlug,
+    )[0]!;
+    const b = matchNationalDay(
+      [episode({ show: { id: 12, name: 'News', network: { name: 'Fox News Channel' } } })],
+      isMajorUsNetwork,
+      networkSlug,
+    )[0]!;
+    expect(a.channel.key).toBe(b.channel.key);
+    expect(a.channel.displayName).toBe(b.channel.displayName);
   });
 
   it('SKIPS a network the curated Pack ingest already owns (no double-write / no id collision)', () => {

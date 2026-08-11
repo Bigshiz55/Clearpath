@@ -158,9 +158,16 @@ export function ChannelGuide({
           data-testid="guide-search"
           className="min-h-[44px] w-full flex-1 rounded-xl border border-white/15 bg-ink-950/70 px-3.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/40 sm:max-w-md"
         />
-        {/* The header sentence is computed from the SAME rows it describes. */}
+        {/* The header sentence is computed from the SAME rows it describes.
+            "N channels" read as the size of the dial — it is not; it is how
+            many channels had anything to show in this window. Naming that
+            makes a small number honest instead of alarming: 12 channels with
+            listings is a true statement about coverage, where "12 channels"
+            under a heading that said "every channel" was a contradiction the
+            user was left to resolve. */}
         <p className="text-xs text-slate-400" data-testid="guide-stats">
-          <b className="text-slate-200">{stats.channels}</b> channels
+          <b className="text-slate-200">{stats.channels}</b>{' '}
+          {stats.channels === 1 ? 'channel' : 'channels'} with listings
           {stats.movies > 0 && <> · <b className="text-slate-200">{stats.movies}</b> movies</>}
         </p>
       </div>
