@@ -39,7 +39,8 @@
 
 import { TITLES, type DiagnosticTitle } from '@/lib/voice/quickdna/definition';
 import { traitUncertainty, type TraitKey, type TraitProfile } from '@/lib/voice/quickdna/traits';
-import { attributionConfidence, isTwist } from './attribution';
+import { attributionConfidence, axisAttribution, isTwist } from './attribution';
+import { coverageNeed } from './coverage';
 
 export interface Matchup {
   left: DiagnosticTitle;
@@ -68,29 +69,25 @@ export interface Matchup {
 }
 
 /**
- * How much a clean question is preferred over a confounded one of equal gain.
+ * THE OBJECTIVE.
  *
- * A Twist is worth more than its raw information gain suggests, because gain
- * measures how much UNCERTAINTY the answer removes while attribution measures
- * how much of the answer we can BELIEVE. A four-axis pair may look informative
- * and still produce four hedged writes; a single-axis pair produces one clean
- * one. Multiplying by attribution makes the planner prefer the second at equal
- * gain, without ever hard-coding "ask a Twist every N rounds" — which would be
- * a scripted sequence rather than a planner.
+ *   effectiveGain = baseInformationGain x attributionConfidence x coverageNeed
  *
- * Bounded well below 1 so it tilts rather than dominates: a Twist on an axis we
- * already know must never beat a broad question on one we do not.
+ * Three factors answering three different questions, and the planner was only
+ * ever asking the first:
  *
- * MEASURED, NOT CHOSEN. At 0.45 this broke the property the planner exists for:
- * two simulated people with opposite taste were dealt all twelve matchups
- * identically, because attribution is a property of the PAIR and a very clean
- * pair then won for everybody regardless of profile — the same "ranking barely
- * moves as beliefs change" failure `SECONDARY` was introduced to fix. The
- * divergence case in `intelligence.test.ts` caught it. At 0.15 the cleanliness
- * boost spans 0.85..1.0, which reorders pairs of near-equal gain without ever
- * outvoting uncertainty.
+ *   baseInformationGain   how much uncertainty would this answer remove?
+ *   attributionConfidence how much of the answer could we BELIEVE?
+ *   coverageNeed          is the dimension it resolves one we have neglected?
+ *
+ * An earlier revision used a hand-blended `ATTRIBUTION_PREFERENCE` knob here
+ * instead of attribution itself. It was swept across 0, 0.05, 0.15 and 0.30 and
+ * moved the divergence overlap only from 11 to 10 of 12 — because it addressed
+ * cleanliness while the actual failure was COVERAGE: a pure entropy objective
+ * keeps mining whichever region yields most, so two players with opposite taste
+ * walked the same seam. The knob is gone; the factor it approximated is now in
+ * the formula properly, and the missing third term does the work it could not.
  */
-export const ATTRIBUTION_PREFERENCE = 0.15;
 
 /** How much a title asserts about an axis, signed. Inverted effects push down. */
 export function pull(title: DiagnosticTitle, key: TraitKey): number {
@@ -233,12 +230,17 @@ export function nextMatchup(ctx: MatchupContext, floor = 0.05): Matchup | null {
          argmax as everything else — just with a preference for cleanliness
          folded in. There is no Twist queue, no "every third round", and no
          second generator to keep in sync. */
-      const seps = axesOf(a, b)
-        .map((k) => Math.min(1, separation(a, b, k)))
-        .filter((s) => s > 0);
+      const split = axesOf(a, b).map((k) => ({ key: k, sep: Math.min(1, separation(a, b, k)) }));
+      const seps = split.map((s) => s.sep).filter((s) => s > 0);
       const attribution = attributionConfidence(seps);
-      const clean = 1 - ATTRIBUTION_PREFERENCE + ATTRIBUTION_PREFERENCE * attribution;
-      const score = gain * stale(testing, ctx.recentAxes) * clean;
+      /* Coverage is asked of the axes THIS PAIR CAN ACTUALLY RESOLVE, weighted
+         by how cleanly it resolves each. A pair that merely brushes a starved
+         axis gets almost none of that axis's boost. */
+      const need = coverageNeed(
+        ctx.profile,
+        split.map((s) => ({ key: s.key, attribution: axisAttribution(s.sep, seps) })),
+      );
+      const score = gain * attribution * need * stale(testing, ctx.recentAxes);
       if (score > bestScore) {
         bestScore = score;
         best = { left: a, right: b, testing, gain, attribution, twist: isTwist(seps) };
