@@ -26,24 +26,51 @@
  */
 
 import type { DiagnosticTitle } from '@/lib/voice/quickdna/definition';
-import { observeAll, type TraitKey, type TraitProfile } from '@/lib/voice/quickdna/traits';
+import { type TraitKey, type TraitProfile } from '@/lib/voice/quickdna/traits';
 import { nextMatchup, pairKey, pull, separation, type Matchup } from './matchup';
+import {
+  MAX_PERMANENT_WEIGHT,
+  attributionConfidence,
+  axisAttribution,
+  permanentWeight,
+} from './attribution';
+import {
+  NO_EVIDENCE,
+  accumulateSession,
+  applyPermanent,
+  type DecisionEvidence,
+  type PermanentTraitEvidence,
+  type SessionContextEvidence,
+  type SessionLean,
+  type ShowdownMode,
+} from './evidence';
 
 export type Verdict = 'left' | 'right' | 'neither';
 
 /**
- * How strongly an explicit head-to-head moves a belief.
- *
- * Deliberately the heaviest evidence the product collects. A person choosing
- * between two named films they can see is the least ambiguous signal available
- * — far stronger than a behavioural inference, and stronger than a scale
- * answer, which is why the ladder in the docblock at the top of `traits.ts`
- * puts it here.
+ * The ceiling for a permanent write, reached only by a clean single-axis
+ * comparison. See `attribution.ts` — the flat 0.34 that used to sit here paid a
+ * four-axis guess the same as a one-axis certainty, and that was the defect.
  */
-export const SHOWDOWN_WEIGHT = 0.34;
+export const SHOWDOWN_WEIGHT = MAX_PERMANENT_WEIGHT;
 
-/** A refusal of both speaks about shared ground, and speaks a little softer. */
-export const NEITHER_WEIGHT = 0.22;
+/**
+ * A refusal of both speaks about shared ground, and speaks a little softer.
+ *
+ * EXPRESSED AS A RATIO, not an absolute. It was 0.22 against a ceiling of 0.34
+ * — 65% — and when the ceiling was re-anchored to the canonical attraction
+ * ladder, leaving 0.22 stranded silently made "Neither" four times weaker
+ * relative to a pick than it had ever been. That is not a tuning detail: in the
+ * two-opposite-people simulation, `Neither` is the only answer whose evidence
+ * SET differs between players (a pick moves the same axes whichever side is
+ * chosen; a refusal moves only what the pair shares), so quietly demoting it
+ * collapsed the divergence the planner exists to produce.
+ */
+export const NEITHER_RATIO = 0.65;
+export const NEITHER_WEIGHT = MAX_PERMANENT_WEIGHT * NEITHER_RATIO;
+
+/** How far one tonight-answer tilts an axis it selected for. */
+export const SESSION_LEAN_STEP = 0.34;
 
 /** Enough decisions to sharpen a profile; few enough to stay under ninety seconds. */
 export const TARGET_DECISIONS = 12;
@@ -65,7 +92,17 @@ export interface ShowdownDecision {
 }
 
 export interface ShowdownState {
+  /** Which question this run is asking. Decides which ledger fills. */
+  mode: ShowdownMode;
+  /**
+   * PERMANENT identity. In `tonight` mode this is seeded from what is already
+   * known (so the planner can still target open axes) and is NEVER written —
+   * `answer` reassigns it by reference, and `sessionOnlyLeavesProfileIntact` in
+   * the test suite pins that.
+   */
   profile: TraitProfile;
+  /** TONIGHT only. Empty in `dna` mode. Discarded when the session ends. */
+  lean: SessionLean;
   decisions: ShowdownDecision[];
   seenPairs: string[];
   /** Titles reported unseen. Kept so we never put them up again. */
@@ -84,9 +121,15 @@ export interface SessionSeed {
   openingKnown?: number;
 }
 
-export function createSession(seed: SessionSeed = {}, startedAt = 0): ShowdownState {
+export function createSession(
+  seed: SessionSeed = {},
+  startedAt = 0,
+  mode: ShowdownMode = 'dna',
+): ShowdownState {
   return {
+    mode,
     profile: seed.profile ?? {},
+    lean: {},
     decisions: [],
     seenPairs: [...(seed.seenPairs ?? [])],
     unseenTitles: [...(seed.unseenTitles ?? [])],
@@ -114,25 +157,45 @@ export function startSession(state: ShowdownState, now = 0): ShowdownState {
   return { ...state, startedAt: now, current: deal(state) };
 }
 
+/** Every axis either title asserts anything about. */
+function axesOf(matchup: Matchup): TraitKey[] {
+  const axes = new Set<TraitKey>();
+  for (const e of matchup.left.traits) axes.add(e.key);
+  for (const e of matchup.right.traits) axes.add(e.key);
+  return [...axes];
+}
+
 /**
- * The evidence a verdict produces, per axis.
- *
- * Exported because it is the claim worth testing directly: given two titles and
- * an answer, exactly which beliefs move and in which direction.
+ * How hard this pair splits on each axis it touches — the input to attribution.
+ * Exported because "how confounded is this matchup" is a claim worth asserting
+ * directly in tests rather than inferring from a resulting weight.
  */
-export function evidenceFor(
+export function separations(matchup: Matchup): number[] {
+  return axesOf(matchup)
+    .map((key) => Math.min(1, separation(matchup.left, matchup.right, key)))
+    .filter((s) => s > 0);
+}
+
+/**
+ * PERMANENT evidence from a verdict — `dna` mode only.
+ *
+ * Every axis the pair genuinely split on moves toward the chosen film, scaled
+ * by that split, by how cleanly the matchup isolates anything at all, and by
+ * how much the question was worth asking. Axes the two films agreed on do not
+ * move: the choice said nothing about them.
+ */
+export function permanentEvidenceFor(
   matchup: Matchup,
   verdict: Verdict,
-): Array<{ key: TraitKey; target: number; weight: number }> {
+): PermanentTraitEvidence[] {
   const { left, right } = matchup;
-  const axes = new Set<TraitKey>();
-  for (const e of left.traits) axes.add(e.key);
-  for (const e of right.traits) axes.add(e.key);
-
-  const out: Array<{ key: TraitKey; target: number; weight: number }> = [];
+  const seps = separations(matchup);
+  const attribution = attributionConfidence(seps);
+  const informationValue = matchup.gain;
+  const out: PermanentTraitEvidence[] = [];
 
   if (verdict === 'neither') {
-    for (const key of axes) {
+    for (const key of axesOf(matchup)) {
       const split = separation(left, right, key);
       // Only SHARED ground is condemned. Where the pair disagreed, refusing
       // both says nothing about which side they would have taken, so nothing
@@ -141,11 +204,21 @@ export function evidenceFor(
       const shared = Math.min(Math.abs(pull(left, key)), Math.abs(pull(right, key)));
       if (shared <= 0 || split > shared) continue;
       const agreedDirection = pull(left, key) + pull(right, key) >= 0 ? 1 : -1;
+      const sharedSep = Math.min(1, shared);
+      const weight = permanentWeight({
+        separation: sharedSep,
+        attribution: axisAttribution(sharedSep, seps),
+        informationValue,
+        base: NEITHER_WEIGHT,
+      });
+      if (weight <= 0) continue;
       out.push({
+        kind: 'permanent',
         key,
         // Push AWAY from whatever both films were offering.
         target: agreedDirection > 0 ? 0 : 100,
-        weight: NEITHER_WEIGHT * shared,
+        weight,
+        attribution: axisAttribution(sharedSep, seps),
       });
     }
     return out;
@@ -154,20 +227,82 @@ export function evidenceFor(
   const winner = verdict === 'left' ? left : right;
   const loser = verdict === 'left' ? right : left;
 
-  for (const key of axes) {
+  for (const key of axesOf(matchup)) {
     const split = separation(left, right, key);
     if (split <= 0) continue; // They agreed here — the choice says nothing about it.
     const towardWinner = pull(winner, key) - pull(loser, key);
     if (towardWinner === 0) continue;
+    const sep = Math.min(1, split);
+    const axisAttr = axisAttribution(sep, seps);
+    const weight = permanentWeight({ separation: sep, attribution: axisAttr, informationValue });
+    if (weight <= 0) continue;
+    out.push({ kind: 'permanent', key, target: towardWinner > 0 ? 100 : 0, weight, attribution: axisAttr });
+  }
+  return out;
+}
+
+/**
+ * SESSION evidence from a verdict — `tonight` mode only.
+ *
+ * NOTE THE SIGNATURE. It does not take a `TraitProfile` and it does not return
+ * one; there is no argument it could be given that would let it reach permanent
+ * state. That is the enforcement — not the comment, the signature.
+ *
+ * A tonight answer is a tilt, not a belief, so it carries no evidence weight and
+ * no confidence. Refusing both films tilts away from their shared ground for
+ * tonight, on the same restraint the permanent path uses.
+ */
+export function sessionEvidenceFor(
+  matchup: Matchup,
+  verdict: Verdict,
+): SessionContextEvidence[] {
+  const { left, right } = matchup;
+  const out: SessionContextEvidence[] = [];
+
+  if (verdict === 'neither') {
+    for (const key of axesOf(matchup)) {
+      const split = separation(left, right, key);
+      const shared = Math.min(Math.abs(pull(left, key)), Math.abs(pull(right, key)));
+      if (shared <= 0 || split > shared) continue;
+      const agreedDirection = pull(left, key) + pull(right, key) >= 0 ? 1 : -1;
+      out.push({ kind: 'session', key, lean: -agreedDirection * SESSION_LEAN_STEP * shared });
+    }
+    return out;
+  }
+
+  const winner = verdict === 'left' ? left : right;
+  const loser = verdict === 'left' ? right : left;
+  for (const key of axesOf(matchup)) {
+    const split = separation(left, right, key);
+    if (split <= 0) continue;
+    const towardWinner = pull(winner, key) - pull(loser, key);
+    if (towardWinner === 0) continue;
     out.push({
+      kind: 'session',
       key,
-      target: towardWinner > 0 ? 100 : 0,
-      // Proportional to how hard they disagreed: a decisive split is decisive
-      // evidence, a marginal one is marginal.
-      weight: SHOWDOWN_WEIGHT * Math.min(1, split),
+      lean: Math.sign(towardWinner) * SESSION_LEAN_STEP * Math.min(1, split),
     });
   }
   return out;
+}
+
+/**
+ * What one decision produced, routed by MODE.
+ *
+ * The two ledgers are never both populated. A mode is a question, and a
+ * question has one meaning: "which is better for you" is about the person,
+ * "which tonight" is about the night. Producing both from one tap would be
+ * asserting the player answered two questions when they answered one.
+ */
+export function evidenceFor(
+  matchup: Matchup,
+  verdict: Verdict,
+  mode: ShowdownMode,
+): DecisionEvidence {
+  if (mode === 'tonight') {
+    return { permanent: [], session: sessionEvidenceFor(matchup, verdict) };
+  }
+  return { permanent: permanentEvidenceFor(matchup, verdict), session: [] };
 }
 
 /** Record a verdict, update the profile, deal the next matchup. */
@@ -180,7 +315,13 @@ export function answer(
   const matchup = state.current;
   if (!matchup) return state;
 
-  const profile = observeAll(state.profile, evidenceFor(matchup, verdict));
+  /* THE ONLY PLACE EITHER LEDGER IS WRITTEN, and each is written by the
+     function that owns it. In `tonight` mode `evidence.permanent` is `[]` by
+     construction, so `applyPermanent` folds nothing and `profile` comes back
+     the same object — not a copy that happens to be equal, the same reference. */
+  const evidence = evidenceFor(matchup, verdict, state.mode);
+  const profile = applyPermanent(state.profile, evidence.permanent);
+  const lean = accumulateSession(state.lean, evidence.session);
 
   const decision: ShowdownDecision = {
     leftId: matchup.left.id,
@@ -195,6 +336,7 @@ export function answer(
   const next: ShowdownState = {
     ...state,
     profile,
+    lean,
     decisions: [...state.decisions, decision],
     seenPairs: [...state.seenPairs, pairKey(matchup.left.id, matchup.right.id)],
     recentAxes: [...state.recentAxes, ...matchup.testing.slice(0, 1)].slice(-4),

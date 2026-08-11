@@ -8,7 +8,7 @@ import {
   TARGET_DECISIONS,
   answer,
   createSession,
-  evidenceFor,
+  permanentEvidenceFor,
   isComplete,
   markUnseen,
   startSession,
@@ -27,23 +27,31 @@ const byId = (id: string) => TITLES.find((t) => t.id === id)!;
 /** A pair that splits hard on darkness and agrees on investigation. */
 const dark = byId('se7en');
 const light = byId('knives-out');
-const matchup = { left: dark, right: light, testing: ['darkness' as TraitKey], gain: 1 };
+/* Attribution/twist are computed by the planner; this literal supplies them
+   explicitly so these cases test the EVIDENCE rules in isolation rather than
+   re-testing the planner. `attribution: 1` keeps the old expectations exact:
+   with a clean pair the new weighting reduces to separation x base, which is
+   what these assertions were written against. */
+const matchup = {
+  left: dark, right: light, testing: ['darkness' as TraitKey], gain: 1,
+  attribution: 1, twist: false,
+};
 
-const find = (ev: ReturnType<typeof evidenceFor>, key: TraitKey) => ev.find((e) => e.key === key);
+const find = (ev: ReturnType<typeof permanentEvidenceFor>, key: TraitKey) => ev.find((e) => e.key === key);
 
 describe('choosing a side is comparative, not absolute', () => {
   it('moves the contested axis toward the winner', () => {
-    const left = find(evidenceFor(matchup, 'left'), 'darkness')!;
+    const left = find(permanentEvidenceFor(matchup, 'left'), 'darkness')!;
     expect(left.target, 'picking the dark film did not push darkness up').toBe(100);
 
-    const right = find(evidenceFor(matchup, 'right'), 'darkness')!;
+    const right = find(permanentEvidenceFor(matchup, 'right'), 'darkness')!;
     expect(right.target, 'picking the light film did not push darkness down').toBe(0);
   });
 
   it('says nothing about an axis the two films agree on', () => {
     // Both are investigations, so choosing between them is no evidence at all
     // about whether this person likes investigations.
-    const ev = evidenceFor(matchup, 'left');
+    const ev = permanentEvidenceFor(matchup, 'left');
     const shared = find(ev, 'investigation');
     if (shared) {
       // If it appears at all it must be because they genuinely differ in
@@ -53,7 +61,7 @@ describe('choosing a side is comparative, not absolute', () => {
   });
 
   it('weights a decisive split more heavily than a marginal one', () => {
-    const ev = evidenceFor(matchup, 'left');
+    const ev = permanentEvidenceFor(matchup, 'left');
     const darkness = find(ev, 'darkness')!;
     const weaker = ev.filter((e) => e.key !== 'darkness');
     for (const w of weaker) {
@@ -63,7 +71,7 @@ describe('choosing a side is comparative, not absolute', () => {
 
   it('never exceeds the ceiling for a single decision', () => {
     for (const v of ['left', 'right', 'neither'] as const) {
-      for (const e of evidenceFor(matchup, v)) {
+      for (const e of permanentEvidenceFor(matchup, v)) {
         expect(e.weight).toBeLessThanOrEqual(SHOWDOWN_WEIGHT);
       }
     }
@@ -71,7 +79,7 @@ describe('choosing a side is comparative, not absolute', () => {
 });
 
 describe('“Neither” is evidence, not a skip', () => {
-  const ev = evidenceFor(matchup, 'neither');
+  const ev = permanentEvidenceFor(matchup, 'neither');
 
   it('produces evidence at all', () => {
     expect(ev.length, 'Neither was treated as a skip').toBeGreaterThan(0);

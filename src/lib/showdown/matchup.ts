@@ -39,6 +39,7 @@
 
 import { TITLES, type DiagnosticTitle } from '@/lib/voice/quickdna/definition';
 import { traitUncertainty, type TraitKey, type TraitProfile } from '@/lib/voice/quickdna/traits';
+import { attributionConfidence, isTwist } from './attribution';
 
 export interface Matchup {
   left: DiagnosticTitle;
@@ -50,7 +51,46 @@ export interface Matchup {
   testing: TraitKey[];
   /** Expected information gain at the moment it was dealt. */
   gain: number;
+  /**
+   * How cleanly this pair isolates a single axis, 0..1. 1 is a Twist.
+   *
+   * Computed here rather than at write time because it is a property of the
+   * PAIR — the planner needs it to prefer clean questions, and the evidence
+   * layer needs the identical number to weight the answer. One source.
+   */
+  attribution: number;
+  /**
+   * A near-single-axis comparison. Internal vocabulary only: the player is
+   * never shown the word, because on screen it is two films and a tap like
+   * every other round.
+   */
+  twist: boolean;
 }
+
+/**
+ * How much a clean question is preferred over a confounded one of equal gain.
+ *
+ * A Twist is worth more than its raw information gain suggests, because gain
+ * measures how much UNCERTAINTY the answer removes while attribution measures
+ * how much of the answer we can BELIEVE. A four-axis pair may look informative
+ * and still produce four hedged writes; a single-axis pair produces one clean
+ * one. Multiplying by attribution makes the planner prefer the second at equal
+ * gain, without ever hard-coding "ask a Twist every N rounds" — which would be
+ * a scripted sequence rather than a planner.
+ *
+ * Bounded well below 1 so it tilts rather than dominates: a Twist on an axis we
+ * already know must never beat a broad question on one we do not.
+ *
+ * MEASURED, NOT CHOSEN. At 0.45 this broke the property the planner exists for:
+ * two simulated people with opposite taste were dealt all twelve matchups
+ * identically, because attribution is a property of the PAIR and a very clean
+ * pair then won for everybody regardless of profile — the same "ranking barely
+ * moves as beliefs change" failure `SECONDARY` was introduced to fix. The
+ * divergence case in `intelligence.test.ts` caught it. At 0.15 the cleanliness
+ * boost spans 0.85..1.0, which reorders pairs of near-equal gain without ever
+ * outvoting uncertainty.
+ */
+export const ATTRIBUTION_PREFERENCE = 0.15;
 
 /** How much a title asserts about an axis, signed. Inverted effects push down. */
 export function pull(title: DiagnosticTitle, key: TraitKey): number {
@@ -188,10 +228,20 @@ export function nextMatchup(ctx: MatchupContext, floor = 0.05): Matchup | null {
 
       const { gain, testing } = informationGain(a, b, ctx.profile);
       if (gain <= 0) continue;
-      const score = gain * stale(testing, ctx.recentAxes);
+      /* TWIST SELECTION IS NOT A SEPARATE CODE PATH. A Twist is simply a pair
+         whose separations concentrate on one axis, so it is scored by the same
+         argmax as everything else — just with a preference for cleanliness
+         folded in. There is no Twist queue, no "every third round", and no
+         second generator to keep in sync. */
+      const seps = axesOf(a, b)
+        .map((k) => Math.min(1, separation(a, b, k)))
+        .filter((s) => s > 0);
+      const attribution = attributionConfidence(seps);
+      const clean = 1 - ATTRIBUTION_PREFERENCE + ATTRIBUTION_PREFERENCE * attribution;
+      const score = gain * stale(testing, ctx.recentAxes) * clean;
       if (score > bestScore) {
         bestScore = score;
-        best = { left: a, right: b, testing, gain };
+        best = { left: a, right: b, testing, gain, attribution, twist: isTwist(seps) };
       }
     }
   }
