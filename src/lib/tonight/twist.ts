@@ -53,6 +53,15 @@ export interface Twist {
   axis: TraitKey;
   /** Shown to the player, referring to the title they just chose. */
   prompt: (title: DiagnosticTitle) => string;
+  /**
+   * The changed attribute on its own, with no sentence around it.
+   *
+   * The surface shows the experiment rather than describing it: the anchor
+   * title is rendered as held-constant and this is stamped on top as the single
+   * thing that moved. Keeping it as its own field means the UI cannot get the
+   * variable wrong by parsing the prompt for it.
+   */
+  change: string;
   /** Saying yes means they tolerate the changed attribute. */
   stillYes: string;
   stillNo: string;
@@ -65,6 +74,7 @@ export const TWISTS: readonly Twist[] = [
     id: 'subtitled',
     axis: 'subtitles',
     prompt: (t) => `Same as ${t.title} — but it’s subtitled.`,
+    change: 'It’s subtitled',
     stillYes: 'Still watching',
     stillNo: 'Not tonight',
     yesMeans: 'higher',
@@ -73,6 +83,7 @@ export const TWISTS: readonly Twist[] = [
     id: 'slow-open',
     axis: 'patience',
     prompt: (t) => `Same as ${t.title} — but the first twenty minutes are slow.`,
+    change: 'The first twenty minutes are slow',
     stillYes: 'I’ll wait for it',
     stillNo: 'Lost me',
     yesMeans: 'higher',
@@ -81,6 +92,7 @@ export const TWISTS: readonly Twist[] = [
     id: 'unknown-cast',
     axis: 'international',
     prompt: (t) => `Same as ${t.title} — but nobody in it is famous.`,
+    change: 'Nobody in it is famous',
     stillYes: 'Fine by me',
     stillNo: 'I’d rather not',
     yesMeans: 'higher',
@@ -89,6 +101,7 @@ export const TWISTS: readonly Twist[] = [
     id: 'darker',
     axis: 'darkness',
     prompt: (t) => `Same as ${t.title} — but genuinely bleak.`,
+    change: 'It’s genuinely bleak',
     stillYes: 'Bring it',
     stillNo: 'Too much',
     yesMeans: 'higher',
@@ -97,6 +110,7 @@ export const TWISTS: readonly Twist[] = [
     id: 'supernatural',
     axis: 'supernatural',
     prompt: (t) => `Same as ${t.title} — but the explanation turns out to be supernatural.`,
+    change: 'The explanation is supernatural',
     stillYes: 'Still in',
     stillNo: 'Ruins it',
     yesMeans: 'higher',
@@ -105,6 +119,7 @@ export const TWISTS: readonly Twist[] = [
     id: 'complex',
     axis: 'complexity',
     prompt: (t) => `Same as ${t.title} — but you have to concentrate the whole way.`,
+    change: 'You concentrate the whole way',
     stillYes: 'Good',
     stillNo: 'Not tonight',
     yesMeans: 'higher',
@@ -113,6 +128,7 @@ export const TWISTS: readonly Twist[] = [
     id: 'vintage',
     axis: 'vintage',
     prompt: (t) => `Same as ${t.title} — but made in 1974.`,
+    change: 'It was made in 1974',
     stillYes: 'Still watching',
     stillNo: 'I’d skip it',
     yesMeans: 'higher',
@@ -121,6 +137,7 @@ export const TWISTS: readonly Twist[] = [
     id: 'funny',
     axis: 'comedy',
     prompt: (t) => `Same as ${t.title} — but it’s played for laughs.`,
+    change: 'It’s played for laughs',
     stillYes: 'Better, actually',
     stillNo: 'Spoils it',
     yesMeans: 'higher',

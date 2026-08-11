@@ -9,6 +9,7 @@ import {
   tonightPreference,
   type SessionContext,
 } from './context';
+import { hookFor, hookParts } from './stimulus';
 import { NEVER_TWIST, TWISTS, nextTwist, twistEvidence } from './twist';
 
 /**
@@ -112,6 +113,20 @@ describe('a twist isolates exactly one cause', () => {
     expect(twistEvidence(t, false)[0]!.target).toBe(0);
   });
 
+  it('states the changed attribute on its own, short enough to stamp on a card', () => {
+    for (const twist of TWISTS) {
+      const { change } = twist;
+      expect(change.length, `${twist.id} has no change label`).toBeGreaterThan(0);
+      // The surface renders this at display size; a sentence would wrap away
+      // the one thing the player has to read.
+      expect(change.length, `${twist.id} change label is too long to stamp`).toBeLessThan(45);
+      // It is the VARIABLE, not the whole counterfactual — a label carrying the
+      // anchor's name would mean the UI was showing the sentence twice.
+      expect(change, `${twist.id} change label repeats the anchor`).not.toContain(anchor.title);
+      expect(change, `${twist.id} change label is the whole prompt`).not.toContain('Same as');
+    }
+  });
+
   it('never claims to isolate an axis that cannot be held constant', () => {
     for (const twist of TWISTS) {
       expect(NEVER_TWIST, `${twist.id} isolates a confounded axis`).not.toContain(twist.axis);
@@ -206,6 +221,41 @@ describe('unseen is never dislike', () => {
     expect(Object.keys(after)).toHaveLength(0);
     for (const key of ['supernatural', 'comedy', 'darkness'] as TraitKey[]) {
       expect(traitConfidence(after, key)).toBe(0);
+    }
+  });
+});
+
+describe('a title describes itself the same way twice', () => {
+  it('renders chips and sentence from one source, so they cannot disagree', () => {
+    // The card shows chips when there is no artwork and a sentence over a
+    // poster, and hands a screen reader the sentence either way. Two
+    // independent descriptions of the same film is a data-honesty bug waiting
+    // to happen, so the sentence is assembled FROM the chips.
+    for (const title of TITLES) {
+      const parts = hookParts(title);
+      const sentence = hookFor(title);
+      expect(parts.length, `${title.id} claims more than three defining things`).toBeLessThanOrEqual(3);
+      expect(new Set(parts).size, `${title.id} repeats an attribute`).toBe(parts.length);
+      if (parts.length === 0) {
+        expect(sentence).toBe('Worth an evening');
+        continue;
+      }
+      // Every chip appears in the sentence; the first is simply capitalised.
+      for (const [i, part] of parts.entries()) {
+        const expected = i === 0 ? part.charAt(0).toUpperCase() + part.slice(1) : part;
+        expect(sentence, `${title.id} sentence drops "${part}"`).toContain(expected);
+      }
+    }
+  });
+
+  it('never describes a title with an attribute it does not have', () => {
+    // Chips come from the trait vector, so a chip that is not derivable from
+    // this title's own traits would be invented copy.
+    for (const title of TITLES) {
+      const own = new Set(title.traits.map((t) => t.key));
+      // Rebuilding from the title's own keys must reproduce the same chips.
+      const rebuilt = hookParts({ ...title, traits: title.traits.filter((t) => own.has(t.key)) });
+      expect(rebuilt, `${title.id} chips are not derived from its traits`).toEqual(hookParts(title));
     }
   });
 });

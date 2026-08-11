@@ -1,7 +1,8 @@
 # THE TONIGHT MACHINE — execution state
 
 **Branch:** `claude/tonight-machine`, cut from `origin/main` @ `ef50e76`.
-**Status:** core intelligence built and green. UI not built.
+**Status:** intelligence + all five acts built, green, and visually verified in
+a real browser at phone and desktop.
 
 ---
 
@@ -88,21 +89,44 @@ synthesis}`, `tastedna/{families,persist}`.
 
 ---
 
+## Surface — built and visually verified
+
+All five acts render from the orchestrator; there is no screen sequence in the
+component. Verified in Chromium at Pixel 7 and Desktop Chrome: every act
+reached, **no console errors and no failed first-party requests**.
+
+Three defects were found by LOOKING at the screenshots, not by assertions —
+each one passed its DOM test while being wrong on screen:
+
+- **The Twist was a void.** One sentence pinned to the top of a tall phone, and
+  the most valuable interaction in the product on the emptiest screen in it. It
+  is now `TwistCard`: the anchor rendered as HELD with its attributes listed,
+  and the single changed attribute stamped below a rule. The experiment is
+  visible instead of described. The variable comes from `twist.change`, never
+  from parsing the prompt, so the card cannot misreport which axis moved.
+- **The no-art card was a poster with the picture missing.** Reserving poster
+  space and filling it with gradient reads as a broken image however deliberate
+  the colour is. With no artwork the card is now a different, complete
+  composition — title large, attributes as chips — rather than a hole. The
+  chips are `hookParts`, the same fragments the sentence is built from, so the
+  visual and the screen-reader label cannot describe different films.
+- **Global chrome ate the primary control.** The feedback FAB is fixed
+  bottom-left and landed on top of "That, tonight". Fixed generically:
+  a surface sets `body[data-wv-immersive]`, anything marked `data-wv-chrome`
+  steps aside. No route list, no screen name in the chrome component.
+
 ## Remaining milestones
 
-1. Stimulus model — title + diagnostic hook + four reactions.
-2. Reel planner — information gain over stimuli, fatigue, diversity.
-3. Final Cut + Reveal — three finalists with differing reasons; honest reveal.
-4. UI for all five acts; mobile-first, keyboard, reduced motion, 200% zoom.
-5. Artwork: `posterPath` static data. **Root cause of the empty rectangles is
+1. Artwork: `posterPath` static data. **Root cause of the empty rectangles is
    established** — the diagnostic titles carry `tmdbId` but no poster path, and
    this environment has no `TMDB_API_KEY` with `api.themoviedb.org` returning
-   `CONNECT 403`. Not a CSS, Next/Image or domain-config fault. Branded
-   fallback with title + year is built and is the current render path.
-6. Deterministic user matrix (A–E).
-7. Playwright journeys + visual proof.
-8. Analytics events.
-9. Migration behind a flag; remove customer-facing Showdown last.
+   `CONNECT 403`. Not a CSS, Next/Image or domain-config fault. The branded
+   composition above is the current render path and is complete on its own.
+2. Playwright journeys: 320px, 390px, tablet, desktop, 200% zoom, keyboard
+   only, reduced motion, refresh/resume, reject-all recovery, broken artwork.
+3. Analytics events.
+4. Migration behind a flag; remove customer-facing Showdown last.
+5. PR into `main`, CI, preview verification, merge, production SHA check.
 
 ## Known risks
 

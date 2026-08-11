@@ -87,7 +87,7 @@ const FRAGMENT: Partial<Record<TraitKey, { pos: string; neg?: string }>> = {
  * Capped at three because a longer line stops being readable in the second or
  * two a player gives it.
  */
-export function hookFor(title: DiagnosticTitle): string {
+export function hookParts(title: DiagnosticTitle, max = 3): string[] {
   const parts: string[] = [];
   for (const e of [...title.traits].sort((a, b) => b.strength - a.strength)) {
     const frag = FRAGMENT[e.key];
@@ -96,8 +96,19 @@ export function hookFor(title: DiagnosticTitle): string {
     if (!text) continue;
     if (parts.includes(text)) continue;
     parts.push(text);
-    if (parts.length === 3) break;
+    if (parts.length === max) break;
   }
+  return parts;
+}
+
+/**
+ * The same fragments as one sentence.
+ *
+ * Built on `hookParts` rather than beside it, so the sentence a screen reader
+ * hears and the chips a sighted player sees can never describe different films.
+ */
+export function hookFor(title: DiagnosticTitle): string {
+  const parts = hookParts(title);
   if (parts.length === 0) return 'Worth an evening';
   const head = parts[0]!;
   return (head.charAt(0).toUpperCase() + head.slice(1)) + (parts.length > 1 ? `, ${parts.slice(1).join(', ')}` : '');
