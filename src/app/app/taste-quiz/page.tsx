@@ -1,35 +1,32 @@
-import type { Metadata } from 'next';
-import { TitleGridCalibration } from '@/components/TitleGridCalibration';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Taste Quiz · WatchVerd1ct' };
 
 /**
- * THE TASTE QUIZ — real titles.
+ * RETIRED — the title-grid calibration.
  *
- * This page used to offer two lanes behind a chooser: a 12-statement
- * questionnaire ("I would rather laugh than be put through something") and a
- * grid of real titles to react to. The statements lane is gone.
+ * `/app/taste-quiz` was the canonical way to build a Taste DNA. The DNA Showdown
+ * replaces it: it asks the same engine the same kind of question, but a forced
+ * comparison separates two titles on a specific axis, where a grid of twelve
+ * independent ratings mostly re-learns what popularity already told us.
  *
- * The titles grid is the stronger instrument and always was. A reaction to an
- * actual film is evidence; agreeing with a sentence about yourself is a guess
- * about your own taste, and people are famously bad at that — the statements
- * had to be translated into attribute claims before they could move anything,
- * while a rating on a title is already the thing the engine wants.
+ * A REDIRECT RATHER THAN A SECOND FLOW, deliberately. This route is linked from
+ * the nav, the DNA hub, the landing page and outreach links, so it cannot simply
+ * 404. But keeping it ALIVE alongside the Showdown is the mistake that produced
+ * this file's predecessor: `/app/quiz` and `/app/taste-quiz` were two
+ * independently maintained "rate titles to build your DNA" flows that drifted
+ * apart until one had to be retired to a redirect stub. Two permanent
+ * calibration systems is one too many, and the count does not improve by adding
+ * a third.
  *
- * Recognition is the scarce resource here, which is why the grid shows twelve
- * at once: tap what you know, ignore what you do not, and ignoring costs
- * nothing.
+ * `TitleGridCalibration` and its server action are untouched and still used by
+ * the onboarding grid; what is retired is this route as a rival entry point.
  */
-export default async function TasteQuizPage({
+export default function RetiredTasteQuizRoute({
   searchParams,
 }: {
   searchParams?: { session?: string };
 }) {
-  const sessionId = searchParams?.session || undefined;
-  return (
-    <div className="mx-auto w-full max-w-5xl space-y-5">
-      <TitleGridCalibration sessionId={sessionId} />
-    </div>
-  );
+  const session = searchParams?.session;
+  redirect(session ? `/app/showdown?session=${encodeURIComponent(session)}` : '/app/showdown');
 }

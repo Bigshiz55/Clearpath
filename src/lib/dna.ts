@@ -14,6 +14,7 @@ import { rerankNudge } from '@/lib/scoring/reranker';
 import { RERANK_MODEL } from '@/lib/scoring/rerankerWeights';
 import { loadPreference } from '@/lib/preference/store';
 import { preferenceNudge, hasPreferenceSignal } from '@/lib/preference/rank';
+import { applyLean, isNeutral, type SessionLean } from '@/lib/showdown/session';
 
 /** TMDB genre names → the slug vocabulary the preference model stores. */
 function genreSlug(name: string): string {
@@ -163,6 +164,15 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
   userId: string,
   items: T[],
   cap = 24,
+  opts: {
+    /**
+     * TONIGHT, not taste. A session lean bends the axes this ranking is scored
+     * against, for this request only. It is applied to a COPY of the learned
+     * preferences and is never written anywhere, so a mood can change what is
+     * recommended without ever changing who the model thinks someone is.
+     */
+    lean?: SessionLean;
+  } = {},
 ): Promise<{ items: Array<T & { dnaFit: number | null }>; personalized: boolean }> {
   const pool = items.slice(0, cap);
   const now = Date.now();
@@ -189,6 +199,13 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
     getCachedDimensions(pool.map((i) => ({ tmdb_id: i.id, media_type: i.mediaType }))),
   ]);
   const useDims = dimProfile.samples > 0;
+  // Bend the learned preferences by tonight's intent, on a copy. `dimProfile`
+  // is memoised and shared across a grid, so mutating it would leak one
+  // request's mood into every other reader of that cache entry.
+  const rankProfile =
+    opts.lean && !isNeutral(opts.lean)
+      ? { ...dimProfile, pref: applyLean(dimProfile.pref, opts.lean) }
+      : dimProfile;
 
   // Rank by the full Watchability score — the user's DNA blended with the
   // objective ratings (the same 0–100 shown at the top of every card), so the
@@ -208,7 +225,7 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
       const base = dna.liked && vector ? dnaScore(vector, dna, objective).score : objective;
 
       const dims = dimsMap.get(`${i.mediaType}-${i.id}`);
-      const match = useDims && dims ? dimensionMatch(dims, dimProfile) : null;
+      const match = useDims && dims ? dimensionMatch(dims, rankProfile) : null;
       // Heuristic dimension nudge + the learned re-ranker nudge (a no-op until a
       // model is promoted into rerankerWeights.ts). Both bounded.
       const dimN = match != null ? Math.max(-DIM_NUDGE_MAX, Math.min(DIM_NUDGE_MAX, (match - 50) * DIM_NUDGE_SLOPE)) : 0;

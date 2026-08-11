@@ -2,7 +2,7 @@
   "name": "watchverdict",
   "version": "1.0.0",
   "private": true,
-  "description": "WatchVerdict — a personalized movie & TV recommendation app with deterministic scoring, watchlists, and shareable verdicts.",
+  "description": "WatchVerdict \u2014 a personalized movie & TV recommendation app with deterministic scoring, watchlists, and shareable verdicts.",
   "engines": {
     "node": ">=18.18.0"
   },
@@ -35,7 +35,9 @@
     "check:schema": "tsx scripts/checkSchemaContract.ts",
     "verify:schema": "tsx scripts/verifyProductionSchema.ts",
     "prove:migration": "tsx scripts/proveMigration.ts",
-    "gates": "bash scripts/gates.sh"
+    "gates": "bash scripts/gates.sh",
+    "pretest:showdown": "node scripts/check-port-free.mjs 3222 && npm run build",
+    "test:showdown": "playwright test --config playwright.showdown.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

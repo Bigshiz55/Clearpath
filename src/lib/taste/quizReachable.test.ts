@@ -30,10 +30,40 @@ const gone = (p: string) => !existsSync(join(ROOT, p));
 const QUIZ_HREF = '/app/taste-quiz';
 
 describe('entry points', () => {
-  it('the route exists and renders the title grid', () => {
+  it('the legacy quiz route redirects to the Showdown rather than dangling', () => {
+    /*
+     * THE CANONICAL CALIBRATION IS NOW THE SHOWDOWN.
+     *
+     * This route used to render the title grid. It is a redirect now, because
+     * two independently maintained "rate titles to build your DNA" flows is
+     * exactly how `/app/quiz` and `/app/taste-quiz` drifted apart — and the fix
+     * for that was a redirect too, so adding a third instrument beside them
+     * would have been repeating a mistake this file already documents.
+     *
+     * The invariant this test has always defended is unchanged and is what is
+     * checked here: every entry point lands somewhere real. It cannot 404,
+     * because the nav, the DNA hub, the landing page and outreach links all
+     * point at it.
+     */
     const page = read('src/app/app/taste-quiz/page.tsx');
-    expect(page).toContain('TitleGridCalibration');
-    expect(page).toContain("title: 'Taste Quiz");
+    expect(page).toContain('redirect(');
+    expect(page).toContain('/app/showdown');
+    // A founder session must survive the hop, or isolated calibration breaks.
+    expect(page).toContain('session');
+    // And the destination is real, not another stub.
+    const showdown = read('src/app/app/showdown/page.tsx');
+    expect(showdown).toContain('Showdown');
+    expect(showdown).toContain("title: 'DNA Showdown");
+  });
+
+  it('the Showdown writes through the one preference log, not a store of its own', () => {
+    // The whole point of the rebuild: a calibration flow that learns into a
+    // private profile changes nothing about what anyone is recommended.
+    const action = read('src/lib/actions/showdown.ts');
+    expect(action).toContain('recordEvents');
+    expect(action).toContain('preference/store');
+    // No second model: the rules live in the shared pure bridge.
+    expect(action).toContain('showdown/verdict');
   });
 
   it('the landing hero makes ONE ceremonial entrance — the DNA quiz and import history are visible but secondary', () => {
@@ -174,6 +204,13 @@ describe('the statements quiz is gone, not hidden', () => {
     const page = read('src/app/app/taste-quiz/page.tsx');
     expect(page).not.toContain("mode: QuizMode");
     expect(page).not.toContain("'statements'");
+  });
+
+  it('the retired grid route does not also try to render a grid', () => {
+    // A redirect that still imports the component it replaced is the
+    // half-removed state this file exists to prevent.
+    const page = read('src/app/app/taste-quiz/page.tsx');
+    expect(page).not.toContain('<TitleGridCalibration');
   });
 
   it('but a founder session still survives the legacy hop', () => {

@@ -1234,3 +1234,20 @@ body {
 @media (min-width: 1280px) {
   .wv-ratings .wv-ratings-row { font-size: 1.125rem; }
 }
+
+/*
+ * IMMERSIVE SURFACES
+ *
+ * A few screens own the whole viewport and put their primary control on the
+ * bottom edge — the Showdown's Neither / Haven't-seen row, for one. Global
+ * chrome fixed to a corner lands on top of that control and steals the tap,
+ * which is a real defect and not a cosmetic one.
+ *
+ * A surface opts in by setting `data-wv-immersive` on <body> while it is
+ * mounted; anything marked `data-wv-chrome` steps aside for its duration. The
+ * flag is generic on purpose: no route list here, and no screen name in the
+ * chrome components.
+ */
+body[data-wv-immersive='true'] [data-wv-chrome] {
+  display: none;
+}
