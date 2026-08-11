@@ -75,9 +75,12 @@ critic/audience average.
   never be revived.
 - **`catalog_titles` is synthetic fixture data**, not real content — don't
   treat query results against it as production-representative.
-- **Production deploys from `claude/watch-verdict-app-wwbtbg`.** The `main`
-  branch line is separate and does not deploy; `scripts/checkBranch.ts` fails
-  a production build from any other branch (warns only on preview deploys).
+- **Production deploys from `main`.** Verified against the live deployment on
+  2026-08-11: `/api/version` reports `branch: main`, `sha: 350d874`. This entry
+  previously named `claude/watch-verdict-app-wwbtbg`, which is stale — that
+  branch is ahead of production and its work is NOT deployed. Branch new work
+  from `main`, and confirm with `/api/version` rather than this file if the two
+  ever disagree again: the deployment is the fact, this is a description of it.
 
 ## Data honesty
 Never fabricate ratings, provider availability, cast, or content-guide counts.

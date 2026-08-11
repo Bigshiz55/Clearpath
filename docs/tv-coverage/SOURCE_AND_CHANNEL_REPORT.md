@@ -133,9 +133,16 @@ Channel, Hallmark Mystery, Hallmark Family, LMN, Great American Family, TCM,
 and the movie blocks on Lifetime. These are structurally absent from every
 free source, and they are the channels your three Packs depend on.
 
-Schedules Direct (~$35/yr, non-profit, licenses Gracenote) is the cheapest
+~~Schedules Direct (~$35/yr, non-profit, licenses Gracenote) is the cheapest
 path to real 24-hour grids with movie-level detail. **Not activated — your
-call.**
+call.**~~
+
+> **REJECTED — owner decision, 2026-08-11.** Not a cost decision. Schedules
+> Direct restricts listings to personal use with noncommercial software and
+> memberships to natural persons; WatchVerdict is a public, distributable
+> product. Do not build an integration, trial, proof of concept, schema,
+> dependency, credential request or fallback around it without written
+> authorization for this exact use. See `SOURCE_RIGHTS_REGISTRY.md`.
 
 ## 6. What is worth building for free anyway
 
@@ -210,8 +217,14 @@ What that means for the copy: the guide now says **"Live TV guide" /
 "Available channel listings for the next 6 hours"** and counts **"N channels
 with listings"**. That is a true statement about coverage. "Every channel" was
 not, and no amount of ingest work on this source will make it true — the
-decision is a licensed EPG (Schedules Direct at ~$35/yr is the cheapest
-credible path; see §1 and `SOURCE_RIGHTS_REGISTRY.md`) or a narrower promise.
+decision is a licensed EPG or a narrower promise.
+
+> **CORRECTION — owner decision, 2026-08-11.** An earlier draft of this
+> sentence named Schedules Direct as "the cheapest credible path". WITHDRAWN.
+> Its terms restrict listings to personal use with noncommercial software and
+> memberships to natural persons, which does not fit this product. It is
+> rejected on LICENCE, not on cost, and must not be proposed again — see
+> `SOURCE_RIGHTS_REGISTRY.md`.
 
 ## 4. A governance finding, unrelated to the guide
 

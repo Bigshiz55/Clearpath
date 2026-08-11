@@ -8,7 +8,7 @@ import { getIngestedGuideAirings, getOnTvTodayIngested, INGESTED_MIN } from '@/l
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
-import { hasFullGridProvider, isTvMediaSupplyingListings } from '@/lib/viewing/liveTv';
+import { hasLiveFullGridProvider, isTvMediaSupplyingListings } from '@/lib/viewing/liveTv';
 import { TvDetective } from '@/components/TvDetective';
 import { CoverageNote } from '@/components/tv/CoverageNote';
 import { Antenna, Film, Sparkles } from 'lucide-react';
@@ -82,7 +82,7 @@ export default async function OnTvPage({
   const official = officialScheduleFor(network);
   // Whether a full listings grid is connected. Drives both the coverage banner
   // and the empty-state wording, so the two can never disagree.
-  const gridConnected = hasFullGridProvider();
+  const gridConnected = hasLiveFullGridProvider();
 
   // HIGHLIGHTS SOURCE — the ingested national guide is canonical; the live
   // TVmaze day-fetch is the never-blank fallback. `getOnTvTodayIngested` returns
@@ -138,16 +138,19 @@ export default async function OnTvPage({
     guidePersonalized = (count ?? 0) >= DNA_PERSONAL_MIN;
   }
 
-  // COVERAGE HONESTY, FROM THE DATA — NOT FROM A CONFIG FLAG. `gridLive` is
-  // data-driven: the ingested tables now carry real national breadth, so in the
-  // Full-guide view `guideAirings` holds actual rows and `gridProbe.length > 0`
-  // makes coverage read as live from the data itself (not from a provider flag).
-  // In the Highlights view `guideAirings` is [] (the guide read only runs under
-  // ?view=guide), so there `gridLive` still reduces to `gridConnected`. Kept as
-  // its own value rather than inlined so the banner's condition reads as "is
-  // there real grid data", not "is a specific provider's flag set".
-  const gridProbe = guideAirings;
-  const gridLive = gridConnected || gridProbe.length > 0;
+  /* COVERAGE HONESTY — "IS THERE A LICENSED GRID", NOT "ARE THERE ANY ROWS".
+     This read `gridConnected || guideAirings.length > 0`, so any rows at all
+     made coverage read as live. Measured on production: TV Media configured but
+     switched off with a failed last run, TVmaze returning 12 channels out of
+     76 — and the notice suppressed, because 12 is more than zero. That is the
+     one moment it needed to be on screen.
+     A premiere feed is not a grid however many rows it returns, so the notice
+     is now driven by whether a LICENSED full-grid provider is actually
+     supplying. One concise line beside the heading (see CoverageNote); the
+     carried-channel inventory and per-channel gaps stay in diagnostics
+     (`/api/health/tv`, `scripts/tv/guideCoverageAudit.ts`) rather than becoming
+     dozens of empty customer-facing rows. */
+  const gridLive = gridConnected;
 
   // When asked for a specific window ("Lifetime movies coming on tonight"), build
   // the real time/genre/network/type-filtered set and enrich it the same way.

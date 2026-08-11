@@ -46,9 +46,29 @@ WatchVerd1ct.
 | Oxygen site | **C** | robots.txt permits schedule paths (disallows are Drupal admin/user only). Not yet content-verified. |
 | TCM (`tcm.com`) | **C** | robots.txt blocks `/search*` only. Sitemap returns 403. |
 | Great American Family (`gactv.com`) | **C** | `Allow: /` plus `llms.txt` granting retrieval, `Disallow-Training: /`. We do not train — honour that. |
-| Schedules Direct | **E** | Not licensed for our commercial use (product owner). Do not purchase. |
+| Schedules Direct | **E — REJECTED, DO NOT RE-PROPOSE** | Owner decision, 2026-08-11. Their published terms restrict listings to PERSONAL use with NONCOMMERCIAL software, and memberships to NATURAL PERSONS — none of which fits WatchVerdict's public, distributable product. Do not create an integration, trial, proof of concept, schema, dependency, credential request, or fallback around it. The ~$35/yr price has made it look like an easy answer more than once; it is not an answer at this price or any other without written authorization for this exact use. |
 | iptv-org / community XMLTV grabbers | **E** | Operate by scraping sites whose terms forbid it. |
 | Pluto / Samsung TV Plus / Plex / Tubi internal EPG endpoints | **E** | Undocumented internal APIs, no grant of automated access. |
+
+## Standing rejections — do not re-recommend these
+
+Written out because each has been proposed at least once by someone reading
+only the price or the robots.txt:
+
+- **Schedules Direct — rejected on licence, not on cost.** See the table. An
+  earlier report in this directory recommended it as "the cheapest credible
+  path"; that recommendation is WITHDRAWN and the report carries a correction.
+  Cheap and unlicensed is not a path.
+- **Scraping TVGuide, Zap2it, TitanTV, or any channel website** in violation of
+  its terms. Includes doing it indirectly through an aggregator: laundering a
+  prohibited scrape through a third party does not change what it is.
+- **Community XMLTV grabbers and internal FAST-service EPG endpoints**, for the
+  same reason.
+
+A source moves off this list only by written authorization for WatchVerdict's
+actual public/distributable use — not by a permissive robots.txt, not by an
+administrator approving an extraction after the fact, and not by the absence of
+an explicit prohibition.
 
 ## Two rules this file exists to enforce
 

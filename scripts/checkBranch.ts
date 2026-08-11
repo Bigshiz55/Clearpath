@@ -6,7 +6,16 @@
  * expected to differ). A local `next build` has no VERCEL_ENV at all, so it
  * is a no-op there.
  */
-const EXPECTED_PRODUCTION_BRANCH = 'claude/watch-verdict-app-wwbtbg';
+/* Verified against the live deployment on 2026-08-11: `/api/version` reports
+   `branch: main`, `sha: 350d874`. The previous value —
+   'claude/watch-verdict-app-wwbtbg' — was stale, and this guard would have
+   FAILED every production build had it been reachable.
+   It is not currently reachable: `vercel.json` builds with
+   `npm run check:schema && next build`, which never invokes `check:branch`.
+   So the guard is dormant, not passing. Wiring it into the build command is a
+   deploy-behaviour change and is deliberately left to the owner rather than
+   slipped in with a constant fix. */
+const EXPECTED_PRODUCTION_BRANCH = 'main';
 
 function main(): void {
   const vercelEnv = process.env.VERCEL_ENV || '';

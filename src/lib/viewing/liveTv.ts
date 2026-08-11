@@ -150,6 +150,35 @@ export function hasFullGridProvider(): boolean {
     || new MockScheduleAdapter().isConfigured();
 }
 
+/**
+ * Is a licensed full-grid provider ACTUALLY supplying the schedule right now?
+ *
+ * `hasFullGridProvider()` answers "is one configured", and the coverage notice
+ * was derived from that OR from "some rows exist". Both are wrong in the same
+ * direction: production has TV Media configured but switched off
+ * (`TVMEDIA_ENABLED` unset, egress denied) and its last run failed, while the
+ * guide still had TVmaze rows — so "some rows exist" read as "we have a live
+ * grid" and the honesty notice was suppressed exactly when coverage was at its
+ * thinnest. A premiere feed is not a television grid, however many rows it
+ * happens to return.
+ *
+ * The mock counts only when explicitly enabled for a harness run, which is why
+ * it is checked for configuration rather than egress — it never calls upstream.
+ */
+export function hasLiveFullGridProvider(): boolean {
+  if (new MockScheduleAdapter().isConfigured()) return true;
+  const tvMedia = new TvMediaAdapter();
+  if (tvMedia.isConfigured() && mayCallUpstream({ adapterId: tvMedia.providerId, cost: 'metered' }).allowed) {
+    return true;
+  }
+  /* Schedules Direct is deliberately NOT consulted here.
+     It is licensing-rejected for this product — personal use, noncommercial
+     software, memberships to natural persons — so it must never be able to
+     make the guide claim full coverage. See
+     docs/tv-coverage/SOURCE_RIGHTS_REGISTRY.md. */
+  return false;
+}
+
 /** The active primary's id, for display. Null when none is configured. */
 export function activeProviderId(): string | null {
   return providerCapabilities().find((p) => p.configured && p.role !== 'supplement')?.providerId ?? null;
