@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { mapPool } from '@/lib/finderPool';
 import { TVMAZE_CHANNELS, type TvmazeChannelDef, type TvmazeChannelGroup } from './tvmazeChannels';
 import { isMajorUsNetwork, networkSlug } from './nationalNetworks';
+import { isCarriedStationKey } from './uncarriedStations';
 import {
   fetchScheduleDay, fetchShowOriginalAirdates, matchDay, matchNationalDay,
   buildProgrammeRow, buildAiringRow, toFetchedAiring,
@@ -395,7 +396,9 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
 /** The `tv_stations.provider_station_id` prefix that marks a synthesized
  *  national station, distinguishing it from every curated channel key. Used to
  *  scope the national reconcile's stored-read to national rows only. */
-const NATIONAL_STATION_PREFIX = 'tvmaze-net:';
+// Re-exported from uncarriedStations so the purge and the reconcile can never
+// disagree about what a national station key looks like.
+import { NATIONAL_STATION_PREFIX } from './uncarriedStations';
 
 export interface NationalIngestRunResult {
   ok: boolean;
@@ -619,5 +622,62 @@ export async function runTvmazeNationalIngest(days = 3, nowMs = Date.now()): Pro
     totalAiringsMatched: allMatched.length,
     inserted: dedupedInserts.length, updated: plan.stats.updated,
     unchanged: plan.stats.unchanged, expired: plan.stats.expired,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// PURGING STATIONS WE NO LONGER CARRY — fetch-independent, and deliberately so.
+// ---------------------------------------------------------------------------
+
+/**
+ * Delete national stations whose key is no longer a channel we carry, and the
+ * airings hanging off them.
+ *
+ * WHY THIS IS NOT PART OF THE RECONCILE. The reconcile answers "what changed in
+ * the window we just fetched", so it must never expire anything after a failed
+ * or partial fetch — an empty fetch is indistinguishable from "everything was
+ * cancelled". That makes it the wrong instrument for a POLICY change: when we
+ * stop carrying a station, the removal should not wait on a fetch cadence. The
+ * national ingest is gated to once per UTC day, so three web feeds that were
+ * already stored kept rendering as television channels for a full day after the
+ * write-boundary fix shipped.
+ *
+ * This asks the REGISTRY, not the network: "is this station key still one of
+ * ours?" It cannot mass-delete a carried channel under any fetch outcome
+ * because it never sees one — see `uncarriedStations.ts` for the keep/purge
+ * rule and the tests that pin similarly-named channels (CBS survives, CBS News
+ * does not).
+ *
+ * Airings first, then the station: a station row with no airings renders
+ * nothing, so the intermediate state is invisible rather than broken.
+ */
+export async function purgeUncarriedNationalStations(
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<{ ran: true; stationsPurged: string[]; airingsDeleted: number } | { ran: false; reason: string }> {
+  const { data: rows, error } = await admin
+    .from('tv_stations')
+    .select('id, provider_station_id')
+    .eq('provider_id', PROVIDER_ID)
+    .like('provider_station_id', `${NATIONAL_STATION_PREFIX}%`);
+  if (error) return { ran: false, reason: `station read failed: ${error.message}` };
+
+  const stale = (rows ?? []).filter((r) => !isCarriedStationKey(r.provider_station_id as string));
+  if (stale.length === 0) return { ran: true, stationsPurged: [], airingsDeleted: 0 };
+
+  const ids = stale.map((r) => r.id as string);
+  const { count, error: delErr } = await admin
+    .from('tv_airings')
+    .delete({ count: 'exact' })
+    .in('station_id', ids);
+  if (delErr) return { ran: false, reason: `airing delete failed: ${delErr.message}` };
+
+  // Only once its airings are gone — a station row that outlives a failed
+  // airing delete is harmless; the reverse would orphan rows.
+  await admin.from('tv_stations').delete().in('id', ids);
+
+  return {
+    ran: true,
+    stationsPurged: stale.map((r) => r.provider_station_id as string),
+    airingsDeleted: count ?? 0,
   };
 }
