@@ -1,4 +1,5 @@
 import 'server-only';
+import { mayCallUpstream } from '@/lib/tv/dataMode';
 import { resolveSchedule } from './registry';
 import { TvMediaAdapter, TVMEDIA_CAPABILITIES } from './adapters/tvMedia';
 import { SchedulesDirectAdapter } from './adapters/schedulesDirect';
@@ -149,6 +150,35 @@ export function hasFullGridProvider(): boolean {
     || new MockScheduleAdapter().isConfigured();
 }
 
+/**
+ * Is a licensed full-grid provider ACTUALLY supplying the schedule right now?
+ *
+ * `hasFullGridProvider()` answers "is one configured", and the coverage notice
+ * was derived from that OR from "some rows exist". Both are wrong in the same
+ * direction: production has TV Media configured but switched off
+ * (`TVMEDIA_ENABLED` unset, egress denied) and its last run failed, while the
+ * guide still had TVmaze rows — so "some rows exist" read as "we have a live
+ * grid" and the honesty notice was suppressed exactly when coverage was at its
+ * thinnest. A premiere feed is not a television grid, however many rows it
+ * happens to return.
+ *
+ * The mock counts only when explicitly enabled for a harness run, which is why
+ * it is checked for configuration rather than egress — it never calls upstream.
+ */
+export function hasLiveFullGridProvider(): boolean {
+  if (new MockScheduleAdapter().isConfigured()) return true;
+  const tvMedia = new TvMediaAdapter();
+  if (tvMedia.isConfigured() && mayCallUpstream({ adapterId: tvMedia.providerId, cost: 'metered' }).allowed) {
+    return true;
+  }
+  /* Schedules Direct is deliberately NOT consulted here.
+     It is licensing-rejected for this product — personal use, noncommercial
+     software, memberships to natural persons — so it must never be able to
+     make the guide claim full coverage. See
+     docs/tv-coverage/SOURCE_RIGHTS_REGISTRY.md. */
+  return false;
+}
+
 /** The active primary's id, for display. Null when none is configured. */
 export function activeProviderId(): string | null {
   return providerCapabilities().find((p) => p.configured && p.role !== 'supplement')?.providerId ?? null;
@@ -159,6 +189,28 @@ export function activeProviderId(): string | null {
  *  use (CHANGES §5). */
 export function isTvMediaConfigured(): boolean {
   return new TvMediaAdapter().isConfigured();
+}
+
+/**
+ * Is TV Media ACTUALLY supplying the listings on screen?
+ *
+ * `isTvMediaConfigured()` answers a different question — "does a key exist" —
+ * and the attribution was gated on it. In production that key exists while the
+ * adapter is switched off (`TVMEDIA_ENABLED` unset, so egress is denied) and
+ * its last run failed days ago, which put "Full channel listings from TV
+ * Media" under a guide built entirely from TVmaze. Crediting a source for data
+ * it did not provide is the same class of error as inventing a listing: it
+ * describes the product as something it is not.
+ *
+ * A metered adapter that may not call upstream stops contributing within the
+ * guide's own coverage window (days, not weeks), so "permitted to supply"
+ * tracks "is supplying" closely enough to be honest — and errs toward dropping
+ * a credit rather than showing a false one. If TV Media is ever re-enabled the
+ * credit returns on its own.
+ */
+export function isTvMediaSupplyingListings(): boolean {
+  if (!isTvMediaConfigured()) return false;
+  return mayCallUpstream({ adapterId: 'tv_media', cost: 'metered' }).allowed;
 }
 
 /**

@@ -264,3 +264,50 @@ for (const w of [320, 390, 768, 1440]) {
     expect(over, `overflow at ${w}`).toBeLessThanOrEqual(1);
   });
 }
+
+/**
+ * CHANNEL IDENTITY ON SCREEN.
+ *
+ * The guide shipped with three rows that are not television channels —
+ * NBC.COM, ABC NEWS LIVE, CBS NEWS — because the ingest collapsed TVmaze's
+ * `network` and `webChannel` into one string and matched it by prefix. That
+ * rejection is enforced at the data boundary and proved there
+ * (`src/lib/viewing/channels/channelIdentity.test.ts`), which is the layer that
+ * can actually make the guarantee; a UI assertion would only prove the fixture
+ * has no web feeds in it.
+ *
+ * What the rendered guide CAN prove, and these do:
+ *   • the count in the header is the count of channels actually on screen, so
+ *     it can never advertise coverage the page does not have; and
+ *   • one channel is one row — a duplicate identity would show as two.
+ */
+test.describe('channel identity — what the rendered guide guarantees', () => {
+  test('the header count equals the channels actually rendered', async ({ page }) => {
+    await open(page);
+    const rendered = await channels(page).count();
+    const stats = (await page.getByTestId('guide-stats').innerText()).trim();
+    expect(stats, `header said "${stats}" for ${rendered} rendered rows`).toMatch(
+      new RegExp(`\\b${rendered}\\b\\s+channels?\\s+with\\s+listings`, 'i'),
+    );
+  });
+
+  test('the count is labelled as coverage, not as the size of the dial', async ({ page }) => {
+    await open(page);
+    // "N channels" read as "this is every channel"; it never was.
+    await expect(page.getByTestId('guide-stats')).toContainText(/channels? with listings/i);
+  });
+
+  test('one channel is one row — no duplicate identities', async ({ page }) => {
+    await open(page);
+    const shown = await names(page);
+    expect(shown.length).toBeGreaterThan(0);
+    expect(new Set(shown).size, `duplicate channel rows: ${shown.join(', ')}`).toBe(shown.length);
+  });
+
+  test('every rendered row names a channel, never a website', async ({ page }) => {
+    await open(page);
+    for (const n of await names(page)) {
+      expect(n, `"${n}" looks like a web property, not a channel`).not.toMatch(/\.(com|net|org)\b/);
+    }
+  });
+});
