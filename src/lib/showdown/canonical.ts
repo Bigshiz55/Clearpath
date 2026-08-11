@@ -66,8 +66,22 @@ export interface CanonicalTitleRef {
  *
  * HAVEN'T SEEN yields nothing at all.
  */
+/**
+ * The parts of a decision this crossing actually needs.
+ *
+ * Narrower than `ShowdownDecision` on purpose: the planner's `testing` and
+ * `gain` are provenance for the SESSION and say nothing to the canonical
+ * engine, so requiring them would force every caller — including a server
+ * action reconstructing a decision from a validated payload — to invent or cast
+ * them. A cast there would have been a lie the compiler correctly refused.
+ */
+export type CanonicalDecision = Pick<
+  ShowdownDecision,
+  'leftId' | 'rightId' | 'verdict' | 'at' | 'responseMs'
+>;
+
 export function decisionToEvents(
-  decision: ShowdownDecision,
+  decision: CanonicalDecision,
   refs: { left: CanonicalTitleRef | null; right: CanonicalTitleRef | null },
   attribution: number,
 ): PreferenceEvent[] {
@@ -116,10 +130,10 @@ export function decisionToEvents(
  * overwritten by a Tuesday mood".
  */
 export function sessionToEvents(
-  decisions: readonly ShowdownDecision[],
+  decisions: readonly CanonicalDecision[],
   mode: 'dna' | 'tonight',
   resolve: (titleId: string) => CanonicalTitleRef | null,
-  attributionFor: (decision: ShowdownDecision) => number,
+  attributionFor: (decision: CanonicalDecision) => number,
 ): PreferenceEvent[] {
   if (mode !== 'dna') return [];
   const out: PreferenceEvent[] = [];
