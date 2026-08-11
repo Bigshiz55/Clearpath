@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { dnaKnown } from '@/lib/tastedna/families';
 import { loadDna, saveDna, type StoredDna } from '@/lib/tastedna/persist';
+import type { ShowdownMode } from '@/lib/showdown/evidence';
 import {
   TARGET_DECISIONS,
   answer as applyAnswer,
@@ -49,7 +50,28 @@ const RESUME_KEY = 'watchverdict:showdown:v1';
 
 type Screen = 'playing' | 'results';
 
-export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
+/**
+ * THE PROMPT IS THE ARCHITECTURE, VISIBLE.
+ *
+ * The old screen asked "Tonight — which one are you watching?" and wrote the
+ * answer into permanent Taste DNA. That single line was the defect: it elicits
+ * a MOOD and the engine booked it as an IDENTITY. The two questions are now
+ * separate modes writing separate ledgers, and the wording is what tells the
+ * player which one they are answering.
+ *
+ * The two runs are otherwise identical — same posters, same four controls, same
+ * planner, same 160ms advance — because the game is good and only the
+ * bookkeeping was wrong.
+ */
+const PROMPT: Record<ShowdownMode, string> = {
+  // Stable and mood-independent. "Rather watch" beats "is better" — it is how
+  // people actually talk, and asking which film is objectively better invites a
+  // critic's answer rather than a personal one.
+  dna: 'Which would you rather watch?',
+  tonight: 'Tonight — which one are you watching?',
+};
+
+export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mode?: ShowdownMode }) {
   const router = useRouter();
   const [dna, setDna] = useState<StoredDna>(() => ({
     profile: seed?.profile ?? {},
@@ -59,7 +81,7 @@ export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
     decisions: seed?.decisions ?? 0,
   }));
   const [state, setState] = useState<ShowdownState>(() =>
-    startSession(createSession({ profile: seed?.profile ?? {} }), 0),
+    startSession(createSession({ profile: seed?.profile ?? {} }, 0, mode), 0),
   );
   const [screen, setScreen] = useState<Screen>('playing');
   const [picked, setPicked] = useState<string | null>(null);
@@ -69,6 +91,22 @@ export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
   const startedAt = useRef(0);
 
   const known = useMemo(() => dnaKnown(state.profile), [state.profile]);
+
+  /* POSTERS, RESOLVED SERVER-SIDE AND ONCE.
+     The catalogue is fixed, so the endpoint is cached for a day and shared by
+     every player. Failure is silent by design: `posters` stays empty, every
+     tile renders the typographic treatment it renders today, and the game is
+     still fully playable. Artwork is worth a fetch; it is not worth a blocking
+     one. */
+  const [posters, setPosters] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let live = true;
+    fetch('/api/showdown/posters')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (live && d?.posters) setPosters(d.posters as Record<string, string>); })
+      .catch(() => { /* typographic tiles — see above */ });
+    return () => { live = false; };
+  }, []);
   const opening = state.openingKnown;
 
   /**
@@ -101,11 +139,14 @@ export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
         createSession({
           profile: stored.profile,
           openingKnown: dnaKnown(stored.profile),
-        }),
+        }, now, mode),
         now,
       ),
     );
-  }, []);
+    /* `mode` is a route-level prop and never changes for a mounted game, so
+       this still runs exactly once — it is declared because the effect reads
+       it, and an undeclared read is how a stale-closure bug hides. */
+  }, [mode]);
 
   // Persist the in-flight session every time it moves, so a refresh, a phone
   // call or a dead battery cannot cost a decision already made.
@@ -127,6 +168,14 @@ export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
    * bad, but losing the session in front of the player would be worse.
    */
   const persist = useCallback((next: ShowdownState, completed: boolean) => {
+    /* TONIGHT CARRIES NOTHING FORWARD.
+       The engine already guarantees `next.profile` is unchanged in tonight
+       mode, so writing it would be harmless today — and that is exactly the
+       kind of reasoning that rots. Refusing the write here means the stored
+       DNA is untouched even if some future edit to the engine started letting
+       a tonight answer through. Play counters are also left alone: a mood run
+       is not a calibration and must not read as one. */
+    if (next.mode !== 'dna') return;
     setDna((prior) => {
       const merged: StoredDna = {
         ...prior,
@@ -206,6 +255,7 @@ export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
       <ShowdownResults
         state={state}
         openingKnown={opening}
+        mode={mode}
         onPlayAgain={() => {
           const now = Date.now();
           startedAt.current = now;
@@ -254,7 +304,7 @@ export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
         </div>
         <div className="text-right">
           <p className="text-[0.6rem] font-bold uppercase tracking-widest text-slate-500">
-            Taste DNA
+            {mode === 'dna' ? 'Taste DNA' : 'Tonight'}
           </p>
           <p className="text-lg font-black tabular-nums leading-none text-amber-300">
             {Math.round(opening * 100)}% → {pct}%
@@ -266,11 +316,12 @@ export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
         data-testid="showdown-prompt"
         className="text-center text-lg font-black uppercase tracking-tight text-white sm:text-2xl"
       >
-        Tonight — which one are you watching?
+        {PROMPT[mode]}
       </h2>
 
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-3 sm:gap-5">
         <PosterTile
+          posterPath={posters[matchup.left.id] ?? null}
           title={matchup.left}
           hotkey="1"
           picked={picked === matchup.left.id}
@@ -279,6 +330,7 @@ export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
           onPick={() => decide('left')}
         />
         <PosterTile
+          posterPath={posters[matchup.right.id] ?? null}
           title={matchup.right}
           hotkey="2"
           picked={picked === matchup.right.id}

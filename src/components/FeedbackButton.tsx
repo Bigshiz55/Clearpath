@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { isImmersiveRoute } from '@/lib/ui/immersiveRoutes';
 import { submitFeedbackReport } from '@/lib/actions/feedbackReport';
 
 type Severity = 'low' | 'medium' | 'high';
@@ -61,6 +62,9 @@ export function FeedbackButton() {
   // Hooks above run unconditionally; the route check is the only thing that
   // decides whether this renders anything at all.
   if (pathname === '/') return null;
+  /* Full-bleed surfaces own their screen: a fixed button lands on top of the
+     content the player has to read. See lib/ui/immersiveRoutes.ts. */
+  if (isImmersiveRoute(pathname)) return null;
 
   return (
     <>

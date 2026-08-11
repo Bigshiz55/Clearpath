@@ -18,6 +18,7 @@
 import { useState } from 'react';
 import type { DiagnosticTitle } from '@/lib/voice/quickdna/definition';
 import { posterFor } from '@/lib/showdown/poster';
+import { tmdbImage } from '@/lib/tmdb/image';
 
 /** Deterministic accent per title, so a fallback tile still looks composed. */
 const ACCENTS = ['#38bdf8', '#f59e0b', '#a855f7', '#22c55e', '#ec4899', '#14b8a6'] as const;
@@ -34,8 +35,11 @@ export function PosterTile({
   dimmed,
   hotkey,
   disabled,
+  posterPath = null,
 }: {
   title: DiagnosticTitle;
+  /** Resolved live from TMDB; null falls back to the committed map. */
+  posterPath?: string | null;
   onPick: () => void;
   picked: boolean;
   dimmed: boolean;
@@ -43,7 +47,12 @@ export function PosterTile({
   hotkey: string;
   disabled: boolean;
 }) {
-  const art = posterFor(title.id, 'w500');
+  /* A path resolved live by /api/showdown/posters wins; the committed map is
+     the fallback. Both go through the same `tmdbImage` sizing helper, so a
+     phone still fetches the size it asked for. */
+  const art = posterPath
+    ? { url: tmdbImage(posterPath, 'w500'), reason: null }
+    : posterFor(title.id, 'w500');
   const [failed, setFailed] = useState(false);
   const showArt = art.url !== null && !failed;
   const accent = accentFor(title.id);

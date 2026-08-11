@@ -17,6 +17,7 @@
  */
 
 import { useMemo } from 'react';
+import type { ShowdownMode } from '@/lib/showdown/evidence';
 import { dnaKnown } from '@/lib/tastedna/families';
 import { insightChips } from '@/lib/voice/quickdna/synthesis';
 import { TITLES } from '@/lib/voice/quickdna/definition';
@@ -55,11 +56,14 @@ export function ShowdownResults({
   openingKnown,
   onPlayAgain,
   onContinue,
+  mode = 'dna',
 }: {
   state: ShowdownState;
   openingKnown: number;
   onPlayAgain: () => void;
   onContinue: () => void;
+  /** Which run this was. Decides what the screen may honestly claim. */
+  mode?: ShowdownMode;
 }) {
   const known = useMemo(() => dnaKnown(state.profile), [state.profile]);
   const chips = useMemo(() => insightChips(state.profile, 3), [state.profile]);
@@ -79,7 +83,11 @@ export function ShowdownResults({
           data-opening={Math.round(openingKnown * 100)}
           className="text-3xl font-black uppercase tracking-tight text-white sm:text-4xl"
         >
-          {learnedNothing ? 'Nothing learned yet' : 'Your DNA just got sharper'}
+          {learnedNothing
+            ? 'Nothing learned yet'
+            : mode === 'tonight'
+              ? 'Tonight’s picks'
+              : 'Your DNA just got sharper'}
         </h1>
 
         {learnedNothing ? (
@@ -89,6 +97,19 @@ export function ShowdownResults({
           <p className="mt-2 text-sm text-slate-400">
             You hadn&rsquo;t seen either film in any of those matchups, so nothing changed. Play
             again and we&rsquo;ll pick from titles you&rsquo;re more likely to know.
+          </p>
+        ) : mode === 'tonight' ? (
+          /* NO DNA METER, BECAUSE PERMANENT DNA DID NOT MOVE.
+             Showing "0% → 0%" would be technically true and still a lie by
+             implication — it invites the reading that the run was worthless,
+             when in fact it did exactly what it promised and shaped tonight.
+             Showing any INCREASE would be a straight falsehood. The honest
+             thing is to report what this run actually changed: the list below,
+             for this session only. */
+          <p className="mt-2 text-sm text-slate-400">
+            {decisions} {decisions === 1 ? 'pick' : 'picks'} · shaping{' '}
+            <span className="font-bold text-amber-300">tonight only</span> — your Taste DNA is
+            unchanged.
           </p>
         ) : (
           <p className="mt-2 text-sm text-slate-400">
@@ -104,7 +125,7 @@ export function ShowdownResults({
       {chips.length > 0 && (
         <div>
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">
-            What that told us
+            {mode === 'tonight' ? 'What you’re in the mood for' : 'What that told us'}
           </h2>
           <ul className="mt-2 flex flex-col gap-2" data-testid="showdown-insights">
             {chips.map((c) => (

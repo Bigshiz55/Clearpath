@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { isImmersiveRoute } from '@/lib/ui/immersiveRoutes';
 
 /**
  * The tiny "build <sha> · <branch>" deploy marker shown at the bottom of every
@@ -11,7 +12,7 @@ import { usePathname } from 'next/navigation';
  */
 export function BuildBadge({ sha, branch }: { sha: string; branch: string }) {
   const pathname = usePathname();
-  if (pathname === '/app/taste-quiz') return null;
+  if (isImmersiveRoute(pathname)) return null;
   return (
     <div className="mt-10 text-center text-[10px] tracking-wide text-slate-600">
       build {sha}{branch ? ` · ${branch.replace(/^.*\//, '')}` : ''}
