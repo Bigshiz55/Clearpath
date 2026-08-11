@@ -42,6 +42,58 @@ and what it unblocks.
   representative.
 
 ## Done
+- **The three false channels are gone from production (`bcb1974`).**
+  `NBC.com`, `ABC News Live` and `CBS News` — streaming feeds rendered as
+  television channels — are removed from the data and the rendered guide.
+  Measured, not asserted: rendered `/app/tv`, uncached, `network=` entries went
+  2/4/1 → 0/0/0 while NBC 6→6, ABC 6→6, CBS 5→5 were untouched, and the station
+  read returns `matched: 0`. One `CBS News` string survives in the HTML and is
+  correct — it is inside the *summary* of "CBS Evening News" on the real CBS.
+  - **Root cause was reachability, not identity.** The write-boundary fix (#41)
+    and the purge (#43, #45) were both correct and both shipped; the purge sat
+    above the LAST `return` of `runGatedTvIngest`, and two guard clauses return
+    before it. Production sits permanently in the second one (`DATA_MODE=
+    free_live`, tv_media metered → `paid_adapter_needs_paid_mode`), so the purge
+    never executed in the only environment with rows to purge. The absent
+    `purge` key in `/api/tv/refresh` was the symptom, misread twice as a
+    deployment and then a caching problem. Fixed in #46: every exit routes
+    through `withPurge`, so a future guard clause cannot skip it by being added
+    above. `purgeReachability.test.ts` covers all three exits and fails 6/7
+    against the old code.
+  - **Stored identities (measured, previously assumed):** all three were
+    `provider_id=tvmaze`, keys `tvmaze-net:{nbc-com,abc-news-live,cbs-news}`,
+    all `carried: false`. Purge result: 3 stations, 37 airings deleted;
+    `stationsConsidered` 120 → 117.
+  - **Zero paid calls.** tv_media stayed `enabled: false`,
+    `egressPermitted: false`, `egress_denied` throughout. Licensing still
+    `unconfirmed`; Schedules Direct still `rejected`. Coverage copy still reads
+    "Partial listings".
+- **Column-level schema gate (`src/lib/schemaColumns.test.ts`).**
+  `schemaContract.ts` reconciles "code needs this TABLE" with "the database has
+  it"; nothing did the same for COLUMNS, because a `.select('a, b, c')` is a
+  string that typecheck, lint, build and tests are all blind to. Written after
+  the station diagnostic shipped selecting `tv_stations.lineup_id`, which does
+  not exist — PostgREST rejects the whole select, so the endpoint built to stop
+  the guessing returned an error and answered nothing, costing a deploy. Parses
+  the migrations (incl. multi-column ALTER, DROP and RENAME) and checks every
+  `.from().select()` in `src/`. Conservative by construction: only tables it
+  parsed, only plain column lists, skipping `*` and embedded-resource syntax.
+- **`getEpisodesWaiting` was silently returning nothing for every user.**
+  Found by the gate above. It selected AND ordered by
+  `watchlist_items.updated_at`, a column that has never existed (the table has
+  `added_at`/`watched_at`), so the query errored, `data` was null, `rows` fell
+  back to `[]`, and "episodes waiting" looked exactly like an empty watchlist.
+  Now ordered by `added_at`. **Worth a second look:** `added_at` preserves the
+  evident intent (most recently added first), but if the list was meant to
+  track activity rather than addition, the right fix is an `updated_at` column
+  with a touch trigger rather than a different ordering — that is a product
+  call, not a mechanical one.
+- **Temporary station diagnostic added and removed (#47, #49).** Existed only
+  to read the real stored identities and prove the purge landed; removed once
+  it had, and its route now 404s in production. Kept ungated for the incident
+  because `/api/tv/coverage/channels` — the equivalent whole-table endpoint —
+  is founder-gated and unusable without credentials; leaving a second, ungated
+  one beside it permanently would have quietly undone that decision.
 - **National-breadth TVmaze ingest (broaden-only).** Extracted the
   `MAJOR_US_NETWORKS`/`isMajorUsNetwork` allowlist out of `onTv.ts` into a
   shared pure module `src/lib/viewing/ingest/nationalNetworks.ts` (plus a
