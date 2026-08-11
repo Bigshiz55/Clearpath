@@ -66,7 +66,10 @@ export function PosterTile({
         picked ? 'ring-2 ring-white scale-[0.98]' : '',
         dimmed ? 'opacity-40' : '',
       ].join(' ')}
-      style={{ aspectRatio: '2 / 3' }}
+      // Fills the space it is given rather than forcing a 2:3 box — a fixed
+      // ratio left a dead band down the middle of a tall phone, which is
+      // exactly the empty-area failure the design brief rules out.
+      style={{ minHeight: '0' }}
     >
       {showArt ? (
         // eslint-disable-next-line @next/next/no-img-element

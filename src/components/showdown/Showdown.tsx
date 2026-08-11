@@ -269,7 +269,7 @@ export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
         Tonight — which one are you watching?
       </h2>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-5">
+      <div className="grid min-h-0 flex-1 grid-cols-2 gap-3 sm:gap-5">
         <PosterTile
           title={matchup.left}
           hotkey="1"
@@ -293,7 +293,7 @@ export function Showdown({ seed }: { seed?: Partial<StoredDna> }) {
         engine; "Haven't seen either" is about recognition and teaches it
         nothing. A single ambiguous "skip" would silently corrupt the profile.
       */}
-      <div className="mt-auto grid grid-cols-2 gap-3 pt-2">
+      <div className="grid shrink-0 grid-cols-2 gap-3 pt-1">
         <button
           type="button"
           data-testid="showdown-neither"
