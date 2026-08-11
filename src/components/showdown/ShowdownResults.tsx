@@ -87,7 +87,7 @@ export function ShowdownResults({
             ? 'Nothing learned yet'
             : mode === 'tonight'
               ? 'Tonight’s picks'
-              : 'Your DNA just got sharper'}
+              : 'You just taught us something real'}
         </h1>
 
         {learnedNothing ? (
@@ -112,13 +112,31 @@ export function ShowdownResults({
             unchanged.
           </p>
         ) : (
-          <p className="mt-2 text-sm text-slate-400">
-            {decisions} {decisions === 1 ? 'decision' : 'decisions'} ·{' '}
-            <span className="font-bold text-amber-300 tabular-nums">
-              {Math.round(openingKnown * 100)}% → {Math.round(known * 100)}%
-            </span>{' '}
-            known{gained > 0 ? ` (+${gained})` : ''}
-          </p>
+          /* WHAT THIS SCREEN MAY HONESTLY CLAIM.
+             One 12-decision run moves the belief but reaches confidence 0.190
+             against the ranker's floor of 0.25 — so it produces a ranking nudge
+             of exactly zero. "Your recommendations are now personalised" would
+             therefore be false, and the old "your DNA just got sharper" over a
+             rising percentage implied it. What IS true is that something real
+             was learned and that another run is what makes it count, so that is
+             what it says. The percentage stays because it is a measured
+             coverage figure; the raw confidence decimal does not, because it is
+             a diagnostic number and belongs at /api/health/showdown. */
+          <>
+            <p className="mt-2 text-sm text-slate-400">
+              {decisions} {decisions === 1 ? 'decision' : 'decisions'} ·{' '}
+              <span className="font-bold text-amber-300 tabular-nums">
+                {Math.round(openingKnown * 100)}% → {Math.round(known * 100)}%
+              </span>{' '}
+              of your taste mapped{gained > 0 ? ` (+${gained})` : ''}
+            </p>
+            <p className="mt-3 text-sm text-slate-300" data-testid="showdown-progression">
+              Your Taste DNA sharpens every time you play.{' '}
+              <span className="font-semibold text-white">
+                One more Showdown and we can start shaping what we recommend.
+              </span>
+            </p>
+          </>
         )}
       </div>
 

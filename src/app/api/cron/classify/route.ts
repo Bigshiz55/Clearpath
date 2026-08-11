@@ -3,6 +3,7 @@ import { serverEnv } from '@/lib/env';
 import { getPopular, getTitle } from '@/lib/tmdb/client';
 import { getCachedDimensions, getTitleDimensions } from '@/lib/titleDimensions';
 import type { MediaType } from '@/lib/types';
+import { assessCoverage, diagnosticDimensionKeys } from '@/lib/showdown/dimensionCoverage';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -50,8 +51,25 @@ export async function GET(request: Request) {
         return seen.has(k) ? false : (seen.add(k), true);
       });
 
-    const have = await getCachedDimensions(candidates.map((c) => ({ tmdb_id: c.id, media_type: c.mediaType as MediaType })));
-    const todo = candidates.filter((c) => !have.has(`${c.mediaType}-${c.id}`)).slice(0, MAX_PER_RUN);
+    /* THE DIAGNOSTIC CATALOGUE JUMPS THE QUEUE.
+       Popularity backfill widens coverage across the whole catalogue over days,
+       which is right for browsing — but Showdown depends on a FIXED set of 46
+       titles, and until those carry fingerprints a completed calibration
+       contributes nothing to ranking while looking like a success. Forty-six
+       titles is a one-off cost of roughly two runs, after which this is a no-op
+       forever. Same generator, same cache, same cron: no second pipeline. */
+    const diagnostic = diagnosticDimensionKeys().map((k) => ({ id: k.tmdb_id, mediaType: k.media_type }));
+    const merged = [
+      ...diagnostic,
+      ...candidates.map((c) => ({ id: c.id, mediaType: c.mediaType as MediaType })),
+    ].filter((c) => {
+      const k = `${c.mediaType}-${c.id}`;
+      return seen.has(`dedup-${k}`) ? false : (seen.add(`dedup-${k}`), true);
+    });
+
+    const have = await getCachedDimensions(merged.map((c) => ({ tmdb_id: c.id, media_type: c.mediaType })));
+    const coverage = assessCoverage(have);
+    const todo = merged.filter((c) => !have.has(`${c.mediaType}-${c.id}`)).slice(0, MAX_PER_RUN);
 
     let classified = 0;
     for (let i = 0; i < todo.length; i += CONCURRENCY) {
@@ -69,7 +87,21 @@ export async function GET(request: Request) {
       classified += res.reduce<number>((a, b) => a + b, 0);
     }
 
-    return NextResponse.json({ ok: true, scanned: candidates.length, pending: todo.length, classified });
+    /* Coverage is reported EVERY run, classified or not, so an operator can
+       answer "is Showdown live?" from the cron's own output instead of
+       inferring it from a ranking that quietly does nothing. */
+    return NextResponse.json({
+      ok: true,
+      scanned: merged.length,
+      pending: todo.length,
+      classified,
+      showdownCoverage: {
+        covered: coverage.covered,
+        total: coverage.total,
+        usable: coverage.usable,
+        missing: coverage.missing,
+      },
+    });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Backfill failed.' }, { status: 500 });
   }

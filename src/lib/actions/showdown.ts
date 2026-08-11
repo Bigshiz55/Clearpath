@@ -7,6 +7,7 @@ import { getCachedDimensions } from '@/lib/titleDimensions';
 import { TITLES } from '@/lib/voice/quickdna/definition';
 import { canonicalTitleId, mediaTypeFor } from '@/lib/showdown/mediaType';
 import { decisionToEvents } from '@/lib/showdown/canonical';
+import { writeCoverage, type WriteCoverage } from '@/lib/showdown/dimensionCoverage';
 
 /**
  * THE ONE WRITE PATH FROM SHOWDOWN INTO PERMANENT TASTE DNA.
@@ -40,7 +41,13 @@ const schema = z.object({
 
 export async function recordShowdownSession(
   input: z.infer<typeof schema>,
-): Promise<{ ok: boolean; recorded?: number; error?: string }> {
+): Promise<{
+  ok: boolean;
+  recorded?: number;
+  error?: string;
+  /** What the ranker can actually act on. See lib/showdown/dimensionCoverage.ts. */
+  coverage?: WriteCoverage;
+}> {
   const parsed = schema.safeParse(input);
   // A `tonight` payload fails `z.literal('dna')` here and is refused with the
   // same message as malformed input — there is no branch that accepts it.
@@ -88,5 +95,19 @@ export async function recordShowdownSession(
   }
 
   await recordEvents(supabase, user.id, events, { sessionId: parsed.data.sessionId });
-  return { ok: true, recorded: events.length };
+
+  /* REPORTED, NOT SWALLOWED. An event with no fingerprint records perfectly and
+     then contributes nothing to ranking, so "recorded: 12" on its own is a
+     number that can be entirely true and entirely misleading. The caller gets
+     both figures and the offending titles; the server log carries it too,
+     because the operator who has to run the backfill is not the person holding
+     the return value. */
+  const coverage = writeCoverage(events);
+  if (coverage.withoutDims > 0) {
+    console.warn(
+      `[showdown] ${coverage.withoutDims}/${coverage.events} events have no fingerprint and cannot affect ranking. ` +
+        `Run the classify backfill for: ${coverage.unfingerprinted.join(', ')}`,
+    );
+  }
+  return { ok: true, recorded: events.length, coverage };
 }

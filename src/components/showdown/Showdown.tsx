@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { dnaKnown } from '@/lib/tastedna/families';
 import { loadDna, saveDna, type StoredDna } from '@/lib/tastedna/persist';
+import { saveTonight } from '@/lib/showdown/handoff';
 import type { ShowdownMode } from '@/lib/showdown/evidence';
 import {
   TARGET_DECISIONS,
@@ -273,7 +274,17 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
           );
           setScreen('playing');
         }}
-        onContinue={() => router.push('/app')}
+        onContinue={() => {
+          /* THE HANDOFF. A tonight run carries its lean forward so the next
+             screen is actually shaped by what was just answered; a dna run
+             carries nothing here because its evidence is already in the
+             durable stores (localStorage for a guest, preference_events for a
+             signed-in user) and the destination reads those, not the URL. */
+          if (mode === 'tonight' && state.decisions.length > 0) {
+            saveTonight({ lean: state.lean, at: Date.now(), decisions: state.decisions.length });
+          }
+          router.push(mode === 'tonight' ? '/app/watch' : '/app');
+        }}
       />
     );
   }
