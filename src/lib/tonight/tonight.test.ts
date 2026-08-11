@@ -9,6 +9,13 @@ import {
   tonightPreference,
   type SessionContext,
 } from './context';
+import {
+  answerMove,
+  chosenTitle,
+  createTonight,
+  startTonight,
+  type TonightState,
+} from './orchestrator';
 import { hookFor, hookParts } from './stimulus';
 import { NEVER_TWIST, TWISTS, nextTwist, twistEvidence } from './twist';
 
@@ -257,5 +264,104 @@ describe('a title describes itself the same way twice', () => {
       const rebuilt = hookParts({ ...title, traits: title.traits.filter((t) => own.has(t.key)) });
       expect(rebuilt, `${title.id} chips are not derived from its traits`).toEqual(hookParts(title));
     }
+  });
+});
+
+describe('the Final Cut can always be answered', () => {
+  /** Play a session with a chosen policy, reporting whether it ever stalls. */
+  function play(
+    decide: (m: NonNullable<TonightState['current']>) => { subject: string; value: string } | null,
+    max = 60,
+  ) {
+    let state = startTonight(createTonight(), 0);
+    for (let n = 1; n <= max; n++) {
+      const move = state.current;
+      if (!move || move.kind === 'done') return { state, stalled: false };
+      const answer = decide(move);
+      if (!answer) return { state, stalled: false };
+      const before = state;
+      state = answerMove(state, answer, n);
+      // An answer the engine silently discarded leaves the player tapping a
+      // button that does nothing — indistinguishable from a frozen app.
+      if (state === before) return { state, stalled: true };
+    }
+    return { state, stalled: true };
+  }
+
+  const routine = (m: NonNullable<TonightState['current']>) => {
+    if (m.kind === 'context') return { subject: m.field, value: m.intents?.[0]?.id ?? 'alone' };
+    if (m.kind === 'stimulus') return { subject: m.stimulus.title.id, value: 'pull' };
+    if (m.kind === 'twist') return { subject: m.twist.id, value: 'stayed' };
+    return null;
+  };
+
+  it('rejecting a shortlist does not pin the session to it forever', () => {
+    // REGRESSION. Every finalcut answer used to carry the subject 'finalcut',
+    // so "None of these" and the next pick produced the same idempotency key —
+    // the pick was dropped as a duplicate and the session could never end. The
+    // player tapped a live button that did nothing, indefinitely.
+    let rejected = false;
+    const { state, stalled } = play((m) => {
+      if (m.kind !== 'finalcut') return routine(m);
+      if (!rejected) {
+        rejected = true;
+        return { subject: 'reject-all', value: 'reject-all' };
+      }
+      return { subject: m.finalists[0]!.title.id, value: m.finalists[0]!.title.id };
+    });
+    expect(rejected, 'the run never reached a Final Cut').toBe(true);
+    expect(stalled, 'the session stalled after a rejection').toBe(false);
+    expect(state.current?.kind).toBe('done');
+  });
+
+  it('a rejection buys a real move, not the same shortlist again', () => {
+    // "None of these" means the shortlist was wrong. Answering it with an
+    // identical shortlist — nothing new having been learned — is the engine
+    // repeating itself at the player.
+    let state = startTonight(createTonight(), 0);
+    for (let n = 1; n <= 60; n++) {
+      const move = state.current;
+      if (!move || move.kind === 'done') break;
+      if (move.kind === 'finalcut') {
+        const next = answerMove(state, { subject: 'reject-all', value: 'reject-all' }, n);
+        expect(next.current?.kind, 'a rejection was answered with another shortlist').not.toBe('finalcut');
+        return;
+      }
+      state = answerMove(state, routine(move)!, n);
+    }
+    throw new Error('never reached a Final Cut');
+  });
+
+  it('reports the chosen film, never its internal id', () => {
+    // REGRESSION. The Reveal printed the raw interaction subject, so a player
+    // who picked *Dark* saw "dark" as the headline result of the session.
+    const { state } = play((m) =>
+      m.kind === 'finalcut'
+        ? { subject: m.finalists[0]!.title.id, value: m.finalists[0]!.title.id }
+        : routine(m),
+    );
+    const chosen = chosenTitle(state);
+    expect(chosen, 'no chosen title was resolvable').toBeDefined();
+    expect(chosen!.title).not.toBe(chosen!.id);
+    expect(chosen!.year).toBeGreaterThan(1900);
+  });
+
+  it('choosing the same finalist twice counts once', () => {
+    let state = startTonight(createTonight(), 0);
+    for (let n = 1; n <= 60; n++) {
+      const move = state.current;
+      if (!move || move.kind === 'done') break;
+      if (move.kind === 'finalcut') {
+        const pick = { subject: move.finalists[0]!.title.id, value: move.finalists[0]!.title.id };
+        const once = answerMove(state, pick, n);
+        const twice = answerMove(once, pick, n + 1);
+        expect(twice.interactions.length, 'a retried pick was counted twice').toBe(
+          once.interactions.length,
+        );
+        return;
+      }
+      state = answerMove(state, routine(move)!, n);
+    }
+    throw new Error('never reached a Final Cut');
   });
 });

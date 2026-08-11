@@ -115,6 +115,23 @@ each one passed its DOM test while being wrong on screen:
   a surface sets `body[data-wv-immersive]`, anything marked `data-wv-chrome`
   steps aside. No route list, no screen name in the chrome component.
 
+## The Final Cut could not be answered — two defects, both found by looking
+
+Both passed every test that existed and were visible the moment a real session
+was played to the end.
+
+- **A rejection pinned the session forever.** Every finalcut answer arrived with
+  the literal subject `'finalcut'`, so "None of these" and the following pick
+  produced the same idempotency key — the pick was discarded as a duplicate and
+  the player tapped a live button that did nothing, indefinitely. The subject of
+  a finalcut answer is now the CHOICE, which is unique and is also the honest
+  description of what was answered. A rejection now also forces a real learning
+  move before finalists may be shown again, and ends the session honestly when
+  there is nothing left to learn, rather than re-offering the same three.
+- **The Reveal printed a slug.** A player who chose *Dark* was shown "dark" as
+  the headline result of the session. `chosenTitle()` resolves through the
+  catalogue, so the surface cannot leak an internal id again.
+
 ## Remaining milestones
 
 1. Artwork: `posterPath` static data. **Root cause of the empty rectangles is

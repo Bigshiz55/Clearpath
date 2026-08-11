@@ -22,6 +22,7 @@ import { loadDna, saveDna, type StoredDna } from '@/lib/tastedna/persist';
 import { traitBelief, traitConfidence } from '@/lib/voice/quickdna/traits';
 import {
   answerMove,
+  chosenTitle,
   createTonight,
   evidencedCount,
   learnedNothing,
@@ -130,7 +131,7 @@ export function TonightMachine() {
   // ── ACT 5: THE REVEAL ────────────────────────────────────────────────────
   if (move.kind === 'done') {
     const nothing = learnedNothing(state);
-    const chosen = state.interactions.find((i) => i.kind === 'finalcut' && i.answer !== 'reject-all');
+    const chosen = chosenTitle(state);
     const permanent = state.interactions.filter((i) => i.scope === 'permanent' && i.applied.length > 0);
     const tonightOnly = state.interactions.filter((i) => i.scope === 'session');
     // Only claim a trait we are actually confident about.
@@ -195,7 +196,8 @@ export function TonightMachine() {
           <div>
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">Tonight</h2>
             <p className="mt-1 text-lg font-bold text-white" data-testid="tonight-choice">
-              {chosen.subject === 'finalcut' ? chosen.answer : chosen.subject}
+              {chosen.title}{' '}
+              <span className="text-sm font-normal text-slate-400">({chosen.year})</span>
             </p>
           </div>
         )}
@@ -377,7 +379,7 @@ export function TonightMachine() {
             <button
               type="button"
               data-testid={`tonight-final-${f.title.id}`}
-              onClick={() => answer('finalcut', f.title.id)}
+              onClick={() => answer(f.title.id, f.title.id)}
               className="w-full rounded-2xl bg-white/[0.07] p-4 text-left ring-1 ring-white/10 transition active:bg-white/20 hover:bg-white/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               <span className="block text-lg font-black text-white">
@@ -396,7 +398,7 @@ export function TonightMachine() {
         onClick={() => {
           // Not a restart: one targeted recovery, then fresh candidates.
           setFlash('Right — let’s aim somewhere else.');
-          answer('finalcut', 'reject-all');
+          answer('reject-all', 'reject-all');
         }}
         className="min-h-[52px] shrink-0 rounded-xl text-sm font-semibold text-slate-400 ring-1 ring-white/10 transition active:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
       >

@@ -1,6 +1,6 @@
 # Difficult-Search Inspection (offline)
 
-- Commit `f8e6f4e` · 12 queries
+- Commit `1d25842` · 12 queries
 - Parse-level fields are verified here; candidate counts / final titles / per-constraint metadata evidence are **LIVE-only** and require a TMDB key (see eval/live/audit.mjs).
 
 ## A Spanish film with English audio similar to A Christmas Story
@@ -43,7 +43,7 @@
 - **Parsed intent:** personalized_content_discovery
 - **Reference title:** — · resolved title id: _live only_
 - **Hard constraints:** media_type=movie (parse), platform=Prime Video (live_tmdb)
-- **Soft preferences:** —
+- **Soft preferences:** genre_id=9648, genre_id=35
 - **Confidence:** intent 85% · metadata 100% · provider 90% · audio 100% · overall 89%
 - **Follow-up:** none needed
 - **Candidate funnel:** before — → after — (Live candidate retrieval requires TMDB_API_KEY (not configured).)
@@ -93,7 +93,7 @@
 - **Parsed intent:** similar_to
 - **Reference title:** Conjuring · resolved title id: _live only_
 - **Hard constraints:** —
-- **Soft preferences:** genre_id=53
+- **Soft preferences:** genre_id=14, genre_id=53
 - **Confidence:** intent 85% · metadata 100% · provider 100% · audio 100% · overall 91%
 - **Follow-up:** none needed
 - **Candidate funnel:** before — → after — (Live candidate retrieval requires TMDB_API_KEY (not configured).)
@@ -123,7 +123,7 @@
 - **Parsed intent:** personalized_content_discovery
 - **Reference title:** — · resolved title id: _live only_
 - **Hard constraints:** media_type=tv (parse), origin_country=GB (parse), platform=BritBox (live_tmdb), runtime_max=60m (live_tmdb)
-- **Soft preferences:** —
+- **Soft preferences:** genre_id=9648
 - **Confidence:** intent 85% · metadata 100% · provider 90% · audio 100% · overall 89%
 - **Follow-up:** none needed
 - **Candidate funnel:** before — → after — (Live candidate retrieval requires TMDB_API_KEY (not configured).)

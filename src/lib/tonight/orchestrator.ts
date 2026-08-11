@@ -232,7 +232,21 @@ function reasonFor(title: DiagnosticTitle, state: TonightState, lead: TraitKey |
  * worth more per answer than another confounded reaction.
  */
 export function nextMove(state: TonightState): Move {
-  if (state.interactions.length >= MAX_INTERACTIONS) return { kind: 'finalcut', finalists: finalists(state) };
+  /*
+   * A REJECTION MUST CHANGE SOMETHING.
+   *
+   * "None of these" is the player saying the shortlist is wrong. Re-offering a
+   * Final Cut straight away — with nothing new learned, so very likely the same
+   * three — answers that by repeating itself. So a rejection forces at least
+   * one real learning move before finalists may be shown again, which is what
+   * `rejectedAll` was always meant to drive.
+   */
+  const justRejected =
+    state.interactions[state.interactions.length - 1]?.kind === 'finalcut';
+
+  if (state.interactions.length >= MAX_INTERACTIONS && !justRejected) {
+    return { kind: 'finalcut', finalists: finalists(state) };
+  }
 
   const ctx = contextMove(state);
   if (ctx) return ctx;
@@ -263,8 +277,12 @@ export function nextMove(state: TonightState): Move {
 
   const evidenced = state.interactions.filter((i) => i.scope === 'permanent' && i.applied.length > 0).length;
   // Nothing left worth asking, or enough to choose well: go to the Final Cut.
-  if (!stimulus) return { kind: 'finalcut', finalists: finalists(state) };
-  if (evidenced >= MIN_FOR_FINAL && stimulus.gain < STIMULUS_FLOOR * 2.5) {
+  if (!stimulus) {
+    // Unless they just rejected a shortlist and there is nothing left to learn
+    // — then a second shortlist would be the same one. End honestly instead.
+    return justRejected ? { kind: 'done' } : { kind: 'finalcut', finalists: finalists(state) };
+  }
+  if (!justRejected && evidenced >= MIN_FOR_FINAL && stimulus.gain < STIMULUS_FLOOR * 2.5) {
     return { kind: 'finalcut', finalists: finalists(state) };
   }
   return { kind: 'stimulus', stimulus };
@@ -284,6 +302,15 @@ export function startTonight(state: TonightState, now = 0): TonightState {
  * function exists to prevent. Subjects are unique within a session by
  * construction (a stimulus, twist or context field is offered once), so
  * kind+subject is both stable across retries and unique within the session.
+ *
+ * THE FINAL CUT IS THE ONE PLACE THAT ASSUMPTION HAD TO BE EARNED. Every
+ * finalcut answer used to arrive with the literal subject `'finalcut'`, so
+ * rejecting a shortlist and then choosing from the next one produced the same
+ * id — and the second answer was discarded as a duplicate. The session pinned
+ * itself to the Final Cut with no way out: every tap did nothing, forever. The
+ * subject of a finalcut answer is now the CHOICE (a title id, or `reject-all`),
+ * which is genuinely unique and is also the honest description of what was
+ * shown and answered.
  */
 export function interactionId(kind: Interaction['kind'], subject: string): string {
   return `${kind}:${subject}`;
@@ -405,6 +432,21 @@ export function answerMove(
     return { ...next, current: { kind: 'done' } };
   }
   return { ...next, current: nextMove(next) };
+}
+
+/**
+ * The title they actually chose, or undefined if the session ended without one.
+ *
+ * The Reveal used to print the raw interaction subject, which is a slug — a
+ * player who picked *Dark* was shown "dark" as the headline result of the whole
+ * session. Resolving through the catalogue here means the surface cannot leak
+ * an internal id again, and gets the year for free.
+ */
+export function chosenTitle(state: TonightState): DiagnosticTitle | undefined {
+  const pick = [...state.interactions]
+    .reverse()
+    .find((i) => i.kind === 'finalcut' && i.answer !== 'reject-all');
+  return pick ? byId(pick.answer) : undefined;
 }
 
 /** Interactions that produced real permanent evidence. */
