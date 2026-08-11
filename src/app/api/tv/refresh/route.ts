@@ -45,7 +45,12 @@ export async function POST() {
     );
   }
 
-  const { tvmaze, tvmazeNational, tvmedia } = await runGatedTvIngest(admin);
+  /* `purge` IS PART OF THE RESULT, NOT A SIDE EFFECT.
+     It was computed and then dropped by this destructure, so the one step that
+     removes stations we no longer carry was the only step whose outcome nobody
+     could see — including whether it had run at all. A cleanup you cannot
+     observe is a cleanup you cannot trust. */
+  const { tvmaze, tvmazeNational, tvmedia, purge } = await runGatedTvIngest(admin);
 
   // Station -> Pack wiring lives HERE, not in a page render. It is idempotent
   // and covers every Pack in one pass, so the three Packs no longer each
@@ -60,5 +65,5 @@ export async function POST() {
     wiring = { error: e instanceof Error ? e.message : 'wiring failed' };
   }
 
-  return NextResponse.json({ tvmaze, tvmazeNational, tvmedia, wiring }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
+  return NextResponse.json({ tvmaze, tvmazeNational, tvmedia, purge, wiring }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
 }
