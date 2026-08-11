@@ -1,6 +1,6 @@
 # Search Validation Campaign
 
-- Commit `1d25842` · Branch `claude/tonight-machine` · Seed 7
+- Commit `f8e6f4e` · Branch `claude/watch-verdict-app-wwbtbg` · Seed 7
 - **Total searches: 2000 · Passed 2000 (100.0%) · Failed 0 (0.0%)**
 
 ## Per-dimension pass rate (of cases naming that dimension)

@@ -200,6 +200,34 @@ wiring, which is the half that rots silently.
 
 **95 Playwright tests, five viewports, exit 0.**
 
+## Migration — the route exists and ships dark
+
+`/app/tonight` renders the machine under `/app`, so `src/middleware.ts` has
+already refreshed and gated the session; there is no second auth check here to
+get subtly wrong. It `notFound()`s unless `TONIGHT_MACHINE` is set.
+
+**A server variable, not `NEXT_PUBLIC_`.** A `NEXT_PUBLIC_` flag is inlined into
+the client bundle at build time, so changing it needs a rebuild and a redeploy
+— the wrong property for the switch you reach for when something is going
+wrong. This one is read per request (`force-dynamic`), so it can be turned OFF
+from the hosting environment without shipping anything.
+
+Off is the default everywhere, including preview. Verified: unset, empty, `0`,
+`false`, `off`, `no` all read as off; only `1`/`true`/`on`/`yes` enable it. The
+page's own gate is tested directly — off throws `notFound()`, on renders.
+
+Unauthenticated, both flag states return 307 to login, so the route leaks
+nothing about whether the feature exists.
+
+**There is no Showdown on this branch to remove** — it was never merged to
+`main`, and this branch was cut from `main`. The flow this will eventually
+replace is `/app/taste-quiz`, which is untouched and still canonical.
+
+**Deliberately NOT done here:** no nav entry, and `taste-quiz` still points at
+itself. Surfacing the machine in navigation and retiring the old flow change
+what every user sees on their next visit, and belong with the decision to turn
+the flag on — not smuggled in ahead of it.
+
 ## Remaining milestones
 
 1. Artwork: `posterPath` static data. **Root cause of the empty rectangles is
@@ -208,7 +236,7 @@ wiring, which is the half that rots silently.
    `CONNECT 403`. Not a CSS, Next/Image or domain-config fault. The branded
    composition above is the current render path and is complete on its own.
 2. Choose an analytics destination and wire the sink (owner decision).
-3. Migration behind a flag; remove customer-facing Showdown last.
+3. Turn the flag on: nav entry, retire `/app/taste-quiz`, owner sign-off.
 4. PR into `main`, CI, preview verification, merge, production SHA check.
 
 ## Known risks
