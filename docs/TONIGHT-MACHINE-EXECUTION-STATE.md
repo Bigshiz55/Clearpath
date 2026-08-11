@@ -132,6 +132,49 @@ was played to the end.
   the headline result of the session. `chosenTitle()` resolves through the
   catalogue, so the surface cannot leak an internal id again.
 
+## Browser suite — 85 tests, five viewports
+
+`npm run test:tonight` (config `playwright.tonight.config.ts`, port 3220) drives
+`/dev/tonight` across 320px, 390px, an iPad shape, desktop, and a 640x400
+viewport standing in for 200% zoom. **85 passed, exit 0.**
+
+Nothing asserts which act comes when: the driver asks what is on screen and
+answers it, because a test that hard-codes a screen order is testing a script
+the product does not have.
+
+Covered: the session completes without stalling · no horizontal overflow · every
+control >=44px and inside the viewport · the primary control is not covered by
+global chrome (verified with `elementFromPoint`, since a covered button passes
+every visibility assertion) · refresh loses and duplicates nothing · a resumed
+session finishes · "None of these" recovers · the Reveal names the film rather
+than its id · an all-unseen session claims nothing was learned · every image
+request aborted and the session still completes · keyboard-only completion ·
+visible focus · reduced motion · headings and accessible names.
+
+**A numeric "is this screen empty" check was written and then deleted rather
+than tuned.** The app paints a full-bleed background gradient, so every screen
+counted as fully painted and the check could never fire — it passed for the
+wrong reason. A threshold strict enough to fire would have failed the
+no-artwork card, which is a known gap awaiting poster data, not a regression to
+freeze into a green test. Emptiness is judged from the 25 screenshots the suite
+writes to `test-results/tonight/`, one per act per viewport.
+
+### What the browser found that the tests had not
+
+- **The answers were below the fold at 200% zoom.** `min-h-[100dvh]` lets a
+  container grow past the viewport, so on a 400px-tall screen the Final Cut's
+  "None of these" and the Twist's answers were simply off the bottom. Acts are
+  now exactly `h-[100dvh]` with a compressible middle and pinned answers.
+- **Centred content inside a scroll container is unreachable.** With
+  `justify-center`/`content-center`, overflow spills equally in both directions
+  and the start edge cannot be scrolled back to. At 640x400 a finalist card's
+  centre landed in that dead region, so the act container — not the card —
+  received the tap, and the session could not be completed at all. Centring is
+  now done with auto margins, which collapse to zero when space runs out.
+- **A half-sliced chip reads as a rendering fault.** The Twist's held-constant
+  block clipped rather than scrolled. It scrolls now, and gives way first: the
+  changed attribute and the answers must survive any screen.
+
 ## Remaining milestones
 
 1. Artwork: `posterPath` static data. **Root cause of the empty rectangles is
@@ -139,11 +182,9 @@ was played to the end.
    this environment has no `TMDB_API_KEY` with `api.themoviedb.org` returning
    `CONNECT 403`. Not a CSS, Next/Image or domain-config fault. The branded
    composition above is the current render path and is complete on its own.
-2. Playwright journeys: 320px, 390px, tablet, desktop, 200% zoom, keyboard
-   only, reduced motion, refresh/resume, reject-all recovery, broken artwork.
-3. Analytics events.
-4. Migration behind a flag; remove customer-facing Showdown last.
-5. PR into `main`, CI, preview verification, merge, production SHA check.
+2. Analytics events.
+3. Migration behind a flag; remove customer-facing Showdown last.
+4. PR into `main`, CI, preview verification, merge, production SHA check.
 
 ## Known risks
 

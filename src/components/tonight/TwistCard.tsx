@@ -43,8 +43,19 @@ export function TwistCard({ twist, anchor }: { twist: Twist; anchor: DiagnosticT
       {/* HELD CONSTANT — the film they already said yes to, unchanged. The
           attributes are listed rather than summarised because "everything else
           stays the same" is a claim, and a player is entitled to see what it
-          covers before answering. */}
-      <div className="relative flex min-h-0 flex-1 flex-col justify-center p-5">
+          covers before answering.
+
+          This is also the block that gives first on a short screen: the variable
+          below and the answers under the card must survive, so this one scrolls.
+          It clipped instead, at first, which sliced a chip in half and read as a
+          rendering fault rather than as truncation.
+
+          Centred by auto margin rather than `justify-center`, for the same
+          reason as the option and finalist lists: centred alignment in a scroll
+          container puts the overflow past the start edge, where scrolling
+          cannot reach it. */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto p-5">
+        <div className="my-auto shrink-0">
         <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-slate-400">
           Everything stays the same
         </p>
@@ -62,11 +73,12 @@ export function TwistCard({ twist, anchor }: { twist: Twist; anchor: DiagnosticT
             </li>
           ))}
         </ul>
+        </div>
       </div>
 
       {/* THE ONE VARIABLE. Visually separated because that separation IS the
           mechanism — a reader who cannot tell what moved cannot answer it. */}
-      <div className="relative border-t border-amber-300/25 bg-amber-400/10 p-5">
+      <div className="relative shrink-0 border-t border-amber-300/25 bg-amber-400/10 p-5">
         <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-amber-300">
           Except one thing
         </p>

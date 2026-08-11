@@ -63,7 +63,9 @@ export function StimulusCard({ stimulus, artUrl }: { stimulus: Stimulus; artUrl?
         />
       )}
 
-      <div className="relative p-5">
+      {/* Scrolls within the card on a short screen rather than growing the page
+          and pushing the answers below the fold. */}
+      <div className="relative min-h-0 overflow-y-auto p-5">
         <h2 className="text-balance text-3xl font-black leading-[1.05] tracking-tight text-white sm:text-5xl">
           {stimulus.title.title}
         </h2>

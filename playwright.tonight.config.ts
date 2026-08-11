@@ -33,7 +33,18 @@ export default defineConfig({
     // The narrowest phone still in real use. Everything must fit here.
     { name: 'phone-320', use: { ...devices['Pixel 7'], viewport: { width: 320, height: 640 } } },
     { name: 'phone-390', use: { ...devices['Pixel 7'] } },
-    { name: 'tablet', use: { ...devices['iPad (gen 7)'] } },
+    // iPad shape on Chromium. The stock `iPad (gen 7)` descriptor defaults to
+    // WebKit, which is not installed here, so it fails at launch rather than
+    // testing anything — the tablet LAYOUT is what this project is for.
+    {
+      name: 'tablet',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 810, height: 1080 },
+        isMobile: false,
+        hasTouch: true,
+      },
+    },
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
     // 200% zoom on a 1280px desktop presents as a 640px CSS viewport with a
     // desktop UA — the combination a `sm:` breakpoint gets wrong most often.
