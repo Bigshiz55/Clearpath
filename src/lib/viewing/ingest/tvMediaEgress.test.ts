@@ -57,9 +57,15 @@ function makeAdmin() {
 
 const tvmazeIngest = vi.fn();
 const tvmazeNationalIngest = vi.fn();
+// The purge runs on every exit path, including the denied ones this suite
+// exercises, so the mock has to carry it — and it must stay a no-op here: this
+// file is about egress, and a purge that touched the fake admin client would
+// blur what these assertions are actually proving.
+const purge = vi.fn();
 vi.mock('./tvmazeWriter', () => ({
   runTvmazeIngest: (...a: unknown[]) => tvmazeIngest(...a),
   runTvmazeNationalIngest: (...a: unknown[]) => tvmazeNationalIngest(...a),
+  purgeUncarriedNationalStations: (...a: unknown[]) => purge(...a),
 }));
 
 import { runTvMediaIngest } from './tvMediaWriter';
@@ -86,6 +92,7 @@ beforeEach(() => {
   selectedTables.length = 0;
   tvmazeIngest.mockReset().mockResolvedValue({ inserted: 0, updated: 0 });
   tvmazeNationalIngest.mockReset().mockResolvedValue({ inserted: 0, updated: 0 });
+  purge.mockReset().mockResolvedValue({ ran: true, stationsPurged: [], airingsDeleted: 0 });
   for (const k of ENV_KEYS) {
     saved[k] = process.env[k];
     delete process.env[k];

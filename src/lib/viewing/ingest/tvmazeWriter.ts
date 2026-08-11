@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { mapPool } from '@/lib/finderPool';
 import { TVMAZE_CHANNELS, type TvmazeChannelDef, type TvmazeChannelGroup } from './tvmazeChannels';
 import { isMajorUsNetwork, networkSlug } from './nationalNetworks';
-import { isCarriedStationKey } from './uncarriedStations';
+import { isCarriedStationKey } from '@/lib/viewing/channels/carriedStations';
 import {
   fetchScheduleDay, fetchShowOriginalAirdates, matchDay, matchNationalDay,
   buildProgrammeRow, buildAiringRow, toFetchedAiring,
@@ -396,9 +396,9 @@ export async function runTvmazeIngest(days = 7, nowMs = Date.now()): Promise<Ing
 /** The `tv_stations.provider_station_id` prefix that marks a synthesized
  *  national station, distinguishing it from every curated channel key. Used to
  *  scope the national reconcile's stored-read to national rows only. */
-// Re-exported from uncarriedStations so the purge and the reconcile can never
+// Re-exported from carriedStations so the purge and the reconcile can never
 // disagree about what a national station key looks like.
-import { NATIONAL_STATION_PREFIX } from './uncarriedStations';
+import { NATIONAL_STATION_PREFIX } from '@/lib/viewing/channels/carriedStations';
 
 export interface NationalIngestRunResult {
   ok: boolean;
@@ -644,7 +644,7 @@ export async function runTvmazeNationalIngest(days = 3, nowMs = Date.now()): Pro
  *
  * This asks the REGISTRY, not the network: "is this station key still one of
  * ours?" It cannot mass-delete a carried channel under any fetch outcome
- * because it never sees one — see `uncarriedStations.ts` for the keep/purge
+ * because it never sees one — see `carriedStations.ts` for the keep/purge
  * rule and the tests that pin similarly-named channels (CBS survives, CBS News
  * does not).
  *
