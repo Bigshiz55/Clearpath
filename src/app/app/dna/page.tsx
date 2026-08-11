@@ -55,6 +55,20 @@ export default async function WatchDnaPage() {
       <section data-testid="dna-build">
         <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Build your Watch DNA</h2>
         <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {/* SHOWDOWN SITS UNDER "Build your Watch DNA", with the other
+              calibration mechanisms, because that is what it is. The copy names
+              the relationship rather than promising an outcome: it says the
+              picks teach the recommender, not that they personalise it — one
+              run reaches confidence 0.190 against the ranker's 0.25 floor. */}
+          <Link href="/app/showdown" className="card p-4 transition hover:bg-white/10" data-testid="link-showdown">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>⚔️</span> Showdown
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              Two films, one tap, twelve times. The quickest way to teach us what you actually
+              reach for — and it gets sharper every time you play.
+            </p>
+          </Link>
           <Link href="/app/taste-quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-taste-quiz">
             <div className="flex items-center gap-2 text-base font-bold text-white">
               <span aria-hidden>🎬</span> Taste Quiz

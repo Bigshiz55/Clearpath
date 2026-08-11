@@ -21,6 +21,12 @@ const SECONDARY: NavLink[] = [
   { href: '/packs', label: 'Packs' },
   { href: '/app/verdict', label: 'The Verd1ct 🔨' },
   { href: '/app/dna', label: 'Your Watch DNA' },
+  /* SECONDARY, DIRECTLY UNDER Your Watch DNA, and deliberately not PRIMARY.
+     Showdown is a calibration mechanism that feeds the recommender, not a
+     destination competing with Watch Now — putting it inline would advertise it
+     as somewhere to spend an evening. The label names the relationship so the
+     entry explains itself: this is how the DNA above it gets better. */
+  { href: '/app/showdown', label: 'Showdown — train my taste' },
   { href: '/app/taste-quiz', label: 'Quick Taste Quiz' },
   { href: '/app/rapid-fire', label: 'Rapid Fire ⚡️' },
   { href: '/import-taste', label: 'Bring your taste with you' },
