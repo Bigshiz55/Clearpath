@@ -10,6 +10,18 @@ production and apply pending migrations with your `MIGRATE_SECRET` — see the
 and what it unblocks.
 
 ## Next
+- **Turn on the Tonight Machine (owner action).** Built, tested, and shipped
+  DARK behind `TONIGHT_MACHINE` (server variable, read per request, so it can
+  be turned off without a redeploy). `/app/tonight` 404s until it is set. See
+  PR #48 and `docs/TONIGHT-MACHINE-EXECUTION-STATE.md`. Turning it on is a
+  three-part decision, deliberately left together: set the variable, add a nav
+  entry, and decide what happens to `/app/taste-quiz` — the flow it is
+  eventually meant to replace, currently untouched and still canonical.
+- **Choose an analytics destination for the Tonight Machine (owner action).**
+  Six events are emitted and verified end-to-end in a browser, but the sink is
+  a no-op until something installs one. Where a person's viewing taste is
+  stored and for how long is not a decision a module should make by defaulting
+  to an endpoint.
 - **Turn on the AI orchestrator (owner action).** The provider-independent
   Claude discovery brain is built, tested, and shipped OFF (`AI_DISCOVERY_MODE`
   defaults to `legacy`). To evaluate it: set `ANTHROPIC_API_KEY` (server-only)
@@ -35,6 +47,15 @@ and what it unblocks.
   scoping once the accounts/feedback loop above has real usage to learn from.
 
 ## Blocked
+- **Poster artwork for the Tonight Machine's diagnostic titles.** The titles
+  carry `tmdbId` but no poster path, and no environment reachable from a
+  session has a `TMDB_API_KEY` (`api.themoviedb.org` returns `CONNECT 403`).
+  Root cause established — not a CSS, Next/Image or domain-config fault. The
+  game is fully playable without it: the no-artwork card is a complete
+  composition (title large, attributes as chips drawn from the same trait
+  vector the hook is built from) rather than a poster with the picture missing.
+  Unblocks on TMDB access; the resolved paths should be stored as static data,
+  never fetched in a customer request path.
 - **Score distribution audit.** The median appears compressed: four
   recommendations scored 79-91, all reading STREAM IT. Blocked on real title
   data existing in production — the local/dev catalog is synthetic fixture
@@ -42,6 +63,23 @@ and what it unblocks.
   representative.
 
 ## Done
+- **The Tonight Machine (PR #48, shipped dark).** An adaptive session that
+  learns taste from reactions and controlled counterfactuals, then recommends
+  something for tonight. Two mechanisms carry it: tonight is kept separate from
+  taste by TYPES (a context answer has no path to permanent DNA, and a whole
+  night of them leaves the profile byte-identical), and the Twist varies exactly
+  one attribute of a film the player kept, so its answer is attributable rather
+  than confounded. "Haven't seen it" carries no evidence by construction.
+  Session length is not fixed — it ends when the best remaining move is worth
+  less than the cost of asking. 95 Playwright tests across 320px, 390px,
+  tablet, desktop and 200% zoom; screenshots of every act at every viewport in
+  `test-results/tonight/`. Five defects were found by playing it and looking at
+  it, each having passed every assertion that existed: the Final Cut could not
+  be answered after a rejection (colliding idempotency keys pinned the session
+  forever), the Reveal printed a slug instead of a film, the answers sat below
+  the fold at 200% zoom, centred content inside a scroll container was
+  unreachable, and the global feedback FAB covered the primary button (fixed
+  generically via `body[data-wv-immersive]`, which any surface can now use).
 - **National-breadth TVmaze ingest (broaden-only).** Extracted the
   `MAJOR_US_NETWORKS`/`isMajorUsNetwork` allowlist out of `onTv.ts` into a
   shared pure module `src/lib/viewing/ingest/nationalNetworks.ts` (plus a
