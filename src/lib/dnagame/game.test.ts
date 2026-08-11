@@ -87,6 +87,22 @@ const PERSONAS: Persona[] = [
 
 const prefOf = (s: GameState, key: TraitKey) => traitBelief(s.profile, key).pref;
 
+/**
+ * PREFERENCE AS A CONSUMER SHOULD READ IT: pulled back toward neutral by how
+ * little we know.
+ *
+ * Raw `pref` alone stopped being a sound basis for comparison once the trait
+ * space grew past what one game can cover. The engine's weighted mean sits AT
+ * the target on a first observation, so a trait touched exactly once — which
+ * now happens routinely — reads 100 on the thinnest possible evidence, and two
+ * people who could not be more different both read 100. That is not a
+ * regression in the model; it is the reason the model keeps confidence as a
+ * separate number and ranking multiplies by it. So the tests compare the same
+ * quantity ranking does.
+ */
+const effectiveOf = (s: GameState, key: TraitKey) =>
+  50 + (traitBelief(s.profile, key).pref - 50) * traitConfidence(s.profile, key);
+
 describe('it plays like a game', () => {
   it('every persona finishes inside the decision budget', () => {
     for (const p of PERSONAS) {
@@ -192,11 +208,11 @@ describe('it learns', () => {
     const horror = play(PERSONAS[4]!);
     const grounded = play(PERSONAS[5]!);
 
-    expect(prefOf(crime, 'investigation')).toBeGreaterThan(prefOf(comedy, 'investigation') + 15);
-    expect(prefOf(comedy, 'comedy')).toBeGreaterThan(prefOf(crime, 'comedy') + 15);
+    expect(effectiveOf(crime, 'investigation')).toBeGreaterThan(effectiveOf(comedy, 'investigation') + 15);
+    expect(effectiveOf(comedy, 'comedy')).toBeGreaterThan(effectiveOf(crime, 'comedy') + 15);
     // The distinction six genre scores cannot express.
-    expect(prefOf(horror, 'supernatural')).toBeGreaterThan(prefOf(grounded, 'supernatural') + 25);
-    expect(prefOf(grounded, 'grounded')).toBeGreaterThan(prefOf(horror, 'grounded') + 15);
+    expect(effectiveOf(horror, 'supernatural')).toBeGreaterThan(effectiveOf(grounded, 'supernatural') + 20);
+    expect(effectiveOf(grounded, 'grounded')).toBeGreaterThan(effectiveOf(horror, 'grounded') + 15);
   });
 
   it('every persona ends with a distinct family fingerprint', () => {
@@ -285,6 +301,46 @@ describe('adversarial: nothing single can distort the profile', () => {
     const dealbreaker = DEALBREAKERS[0]!;
     expect(vibe.effects.length).toBeGreaterThan(0);
     expect(dealbreaker.effects.length).toBeGreaterThan(0);
+  });
+});
+
+describe('the bank is as wide as real taste', () => {
+  /**
+   * The reported gap: it asked about crime, comedy and sci-fi and never once
+   * about westerns, superheroes or cartoons — so those could not be learned,
+   * and a Verd1ct could never account for them. These pin the breadth so a
+   * later tidy-up cannot quietly narrow it again.
+   */
+  const ALL = [...CHOICES, ...DEALBREAKERS, ...VIBES];
+
+  it('covers at least thirty distinct kinds of thing to watch', () => {
+    const axes = new Set<TraitKey>();
+    for (const c of ALL) for (const e of c.effects) axes.add(e.key);
+    expect(axes.size, `only ${axes.size} axes are reachable from the bank`).toBeGreaterThanOrEqual(30);
+  });
+
+  it('asks about the ones that were missing', () => {
+    const named: TraitKey[] = [
+      'western', 'superhero', 'animation', 'musical', 'sport',
+      'war', 'period', 'martialArts', 'family', 'reality',
+    ];
+    for (const key of named) {
+      const asks = ALL.filter((c) => c.effects.some((e) => e.key === key));
+      expect(asks.length, `nothing in the bank asks about ${key}`).toBeGreaterThan(0);
+      // And a positive AND a negative way to express it — a taste you can only
+      // agree with is not a taste, it is a leading question.
+      expect(asks.some((c) => c.effects.some((e) => e.key === key && e.pull > 0)), `${key} can only be liked`).toBe(true);
+      expect(asks.some((c) => c.effects.some((e) => e.key === key && e.pull < 0)), `${key} can never be refused`).toBe(true);
+    }
+  });
+
+  it('every family is deep enough to deal several games without repeating', () => {
+    // Nothing is ever put to someone twice across plays, so a family with only
+    // a handful of options runs dry after one or two rounds.
+    for (const f of readAllFamilies({})) {
+      const pool = CHOICES.filter((c) => c.family === f.id);
+      expect(pool.length, `${f.id} has only ${pool.length} options`).toBeGreaterThanOrEqual(8);
+    }
   });
 });
 

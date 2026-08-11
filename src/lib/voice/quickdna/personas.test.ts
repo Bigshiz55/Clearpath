@@ -17,7 +17,7 @@ import {
   start,
   type QuickRun,
 } from './run';
-import { traitBelief, type TraitKey, type TraitProfile } from './traits';
+import { traitBelief, traitConfidence, type TraitKey, type TraitProfile } from './traits';
 import { dnaBars, insightChips } from './synthesis';
 
 /**
@@ -269,8 +269,15 @@ describe('adversarial: nothing single can dominate', () => {
 
     // It moves the belief…
     expect(after.pref).toBeGreaterThan(before);
-    // …but one film is never a settled fact about a person.
-    expect(after.pref).toBeLessThan(95);
+    // …but one film is never a SETTLED fact about a person, and the number
+    // that carries that is the evidence, not the preference. The weighted mean
+    // sits at the target on a first observation by design — a trait nobody has
+    // told us anything about lands wherever the one signal points — so the
+    // protection is that it stays low-confidence and gets discounted
+    // everywhere it is used. Asserting `pref < 95` only ever held while every
+    // diagnostic happened to touch an already-probed trait; with a wider trait
+    // space it tested the arithmetic of `accumulate`, not the safeguard.
+    expect(traitConfidence(run.profile, touched), 'one film became a settled fact').toBeLessThan(0.5);
   });
 
   it('a movie reaction outweighs a generic genre rating, per trait touched', () => {

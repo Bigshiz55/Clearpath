@@ -96,6 +96,27 @@ Updated at the end of every work order per the Working Agreement in
   representative.
 
 ## Done
+- **The quiz now covers thirty axes, not twenty — westerns, superheroes,
+  cartoons and the rest.** Reported: it asked about crime, comedy and sci-fi and
+  never about the things half a real watchlist is made of, so those tastes were
+  unaskable, unlearnable, and absent from every Verd1ct. Ten axes added to
+  `QUICK_TRAITS` (animation, superhero, western, musical, sport, war, period,
+  martialArts, family, reality) — chosen because NO combination of the existing
+  twenty can express them: "loves cartoons" is not comedy plus fantasy. The
+  decision bank roughly triples (25 → 60 choices, 8 → 21 dealbreakers, 6 → 10
+  vibes) and 16 diagnostic titles cover the new ground. Three tests pin it:
+  ≥30 axes reachable from the bank, every new axis has both a way to want it
+  and a way to refuse it (a taste you can only agree with is a leading
+  question — this caught `martialArts` having no "no"), and every family holds
+  ≥8 options so replays do not run dry.
+  **Trade-off, stated plainly:** thirty axes over 25–35 decisions is thinner
+  per axis than twenty was, so one play reads broader but less deep — which is
+  what the replay accumulation above is for. Three existing tests broke and all
+  three were measuring the wrong quantity once a trait can be touched exactly
+  once: the weighted mean sits AT the target on a first observation by design,
+  so persona separation now compares confidence-weighted preference (what
+  ranking actually multiplies by) and "one film is not a settled fact" now
+  asserts confidence rather than preference.
 - **Verd1ct Rush is replayable, and a replay is all new ground.** The DNA a
   play builds now outlives it (`src/lib/dnagame/persist.ts` — localStorage, so
   it works for a guest; degrades to a fresh game on any failure). A later run

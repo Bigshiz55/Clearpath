@@ -195,6 +195,32 @@ export const TITLES: readonly DiagnosticTitle[] = [
   t('casablanca', 'Casablanca', 1942, 289, 0.7, [e('vintage', 1), e('romance', 0.7)]),
   t('true-detective', 'True Detective', 2014, 46648, 0.6, [e('investigation', 1), e('darkness', 0.9), e('patience', 0.8), e('psychological', 0.7)]),
   t('deadpool', 'Deadpool', 2016, 293660, 0.85, [e('comedy', 0.9), e('action', 0.9)]),
+
+  /*
+   * TITLES FOR THE TEN NEW AXES.
+   *
+   * A reaction to a film someone has actually seen is the strongest evidence
+   * this engine collects, so an axis with no title behind it can only ever be
+   * learned from the weaker formats. These are chosen for RECOGNITION first —
+   * a diagnostic nobody has seen returns "haven't seen it" and teaches
+   * nothing — and each carries its new axis clearly rather than subtly.
+   */
+  t('toy-story', 'Toy Story', 1995, 862, 0.95, [e('animation', 1), e('family', 0.9), e('comedy', 0.6)]),
+  t('spirited-away', 'Spirited Away', 2001, 129, 0.7, [e('animation', 1), e('international', 0.9), e('fantasy', 0.8), e('subtitles', 0.5)]),
+  t('spider-verse', 'Spider-Man: Into the Spider-Verse', 2018, 324857, 0.8, [e('animation', 0.9), e('superhero', 1), e('action', 0.6)]),
+  t('avengers', 'The Avengers', 2012, 24428, 0.9, [e('superhero', 1), e('action', 0.9), e('grounded', 0.6, true)]),
+  t('dark-knight', 'The Dark Knight', 2008, 155, 0.9, [e('superhero', 0.9), e('darkness', 0.8), e('crime', 0.6), e('action', 0.7)]),
+  t('django', 'Django Unchained', 2012, 68718, 0.8, [e('western', 1), e('period', 0.8), e('darkness', 0.7)]),
+  t('true-grit', 'True Grit', 2010, 44264, 0.6, [e('western', 1), e('period', 0.8), e('patience', 0.5)]),
+  t('la-la-land', 'La La Land', 2016, 313369, 0.85, [e('musical', 1), e('romance', 0.8)]),
+  t('bohemian', 'Bohemian Rhapsody', 2018, 424694, 0.8, [e('musical', 1), e('documentary', 0.3), e('grounded', 0.6)]),
+  t('rocky', 'Rocky', 1976, 1366, 0.8, [e('sport', 1), e('vintage', 0.7), e('grounded', 0.7)]),
+  t('last-dance', 'The Last Dance', 2020, 97183, 0.6, [e('sport', 1), e('documentary', 1)]),
+  t('saving-private-ryan', 'Saving Private Ryan', 1998, 857, 0.85, [e('war', 1), e('period', 0.7), e('darkness', 0.7), e('grounded', 0.8)]),
+  t('1917', '1917', 2019, 530915, 0.7, [e('war', 1), e('period', 0.8), e('patience', 0.5)]),
+  t('crouching-tiger', 'Crouching Tiger, Hidden Dragon', 2000, 146, 0.65, [e('martialArts', 1), e('international', 0.9), e('subtitles', 0.8), e('period', 0.6)]),
+  t('bridgerton', 'Bridgerton', 2020, 63247, 0.7, [e('period', 1), e('romance', 0.9)]),
+  t('great-british-bake-off', 'The Great British Bake Off', 2010, 45965, 0.6, [e('reality', 1), e('family', 0.7), e('darkness', 0.8, true)]),
 ] as const;
 
 export const TITLES_BY_ID = new Map(TITLES.map((x) => [x.id, x]));

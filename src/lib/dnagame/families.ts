@@ -53,7 +53,10 @@ export const FAMILIES: readonly Family[] = [
     accent: '#f59e0b',
     traits: [
       { key: 'action', weight: 1 },
+      { key: 'superhero', weight: 0.6 },
+      { key: 'martialArts', weight: 0.5 },
       { key: 'psychological', weight: 0.4 },
+      { key: 'war', weight: 0.4 },
       { key: 'complexity', weight: 0.2 },
     ],
   },
@@ -72,7 +75,12 @@ export const FAMILIES: readonly Family[] = [
     id: 'laugh',
     label: 'Laugh',
     accent: '#22c55e',
-    traits: [{ key: 'comedy', weight: 1 }],
+    traits: [
+      { key: 'comedy', weight: 1 },
+      { key: 'animation', weight: 0.6 },
+      { key: 'family', weight: 0.5 },
+      { key: 'reality', weight: 0.3 },
+    ],
   },
   {
     id: 'heart',
@@ -80,6 +88,8 @@ export const FAMILIES: readonly Family[] = [
     accent: '#ec4899',
     traits: [
       { key: 'romance', weight: 1 },
+      { key: 'musical', weight: 0.5 },
+      { key: 'sport', weight: 0.4 },
       { key: 'grounded', weight: 0.3 },
     ],
   },
@@ -90,6 +100,8 @@ export const FAMILIES: readonly Family[] = [
     traits: [
       { key: 'scifi', weight: 1 },
       { key: 'fantasy', weight: 0.9 },
+      { key: 'western', weight: 0.5 },
+      { key: 'period', weight: 0.5 },
       { key: 'international', weight: 0.4 },
       { key: 'vintage', weight: 0.3 },
     ],

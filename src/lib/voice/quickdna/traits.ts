@@ -49,6 +49,31 @@ export const QUICK_TRAITS = {
   international: 'Non-English-language titles',
   subtitles: 'Willingness to read subtitles',
   vintage: 'Older films',
+
+  /*
+   * FORMS AND WORLDS THE FIRST TWENTY COULD NOT EXPRESS.
+   *
+   * Everything above is an interpretable AXIS, and most genres are a
+   * combination of them — a heist is action plus complexity, a slasher is
+   * horror plus darkness. These ten are here because no combination of the
+   * others can say them. "Loves cartoons" is not comedy plus fantasy; plenty
+   * of people adore animation and hate both. "Loves westerns" is not vintage
+   * plus grounded. Each one below is a real split that decides whether a
+   * recommendation lands, and each is independently observable from a single
+   * reaction.
+   */
+  animation: 'Animation & cartoons',
+  superhero: 'Superheroes & comic-book worlds',
+  western: 'Westerns & the frontier',
+  musical: 'Music, musicals & performance',
+  sport: 'Sport & competition',
+  war: 'War & the military',
+  /** The story is SET in the past. Distinct from `vintage`, which is the film's own age. */
+  period: 'Stories set in the past',
+  martialArts: 'Martial arts & eastern action',
+  /** Watchable with children in the room — a scheduling constraint, not a taste. */
+  family: 'Something the whole room can watch',
+  reality: 'Unscripted & competition shows',
 } as const;
 
 export type TraitKey = keyof typeof QUICK_TRAITS;

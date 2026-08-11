@@ -11,6 +11,12 @@ import {
   streakMultiplier,
 } from './score';
 import { choose, createGame, reactToTitle, startGame, type GameState } from './game';
+import { traitUncertainty, type TraitProfile } from '@/lib/voice/quickdna/traits';
+import type { Choice } from './rounds';
+
+/** The uncertainty a choice would resolve — the same quantity `choose` scores. */
+const infoOf = (c: Choice, profile: TraitProfile) =>
+  c.effects.reduce((sum, e) => sum + Math.abs(e.pull) * traitUncertainty(profile, e.key), 0);
 
 /**
  * WHAT THE SCORE IS ALLOWED TO MEAN.
@@ -100,11 +106,34 @@ describe('the running score in a real game', () => {
     expect(play(800).score).toBeGreaterThan(play(9000).score);
   });
 
-  it('pays less for the same kind of decision once the traits are settled', () => {
-    const s = play(900);
-    const early = s.decisions.slice(0, 5).reduce((a, d) => a + d.points, 0) / 5;
-    const late = s.decisions.slice(-5).reduce((a, d) => a + d.points, 0) / 5;
-    expect(late, 'a settled trait is still paying full price').toBeLessThan(early);
+  it('pays less for the SAME decision once its traits are settled', () => {
+    // Measured on one fixed choice against a cold profile and then a warm one.
+    //
+    // This used to compare the first five decisions of a game with the last
+    // five, which held only while the trait space was small enough for a
+    // single game to saturate it. With thirty axes the late rounds are off
+    // exploring genuinely new ground — westerns, animation, sport — so they
+    // legitimately pay MORE, and the old shape of the test punished exactly
+    // the behaviour that makes a wider bank worth having. The claim that
+    // actually matters is unchanged and is asserted directly.
+    let s = startGame(createGame(0), 0);
+    const first = s.current!;
+    const cold = awardPoints(
+      first.choices.slice(0, first.picks).reduce((sum, c) => sum + infoOf(c, s.profile), 0),
+      900,
+      1,
+    );
+    for (let i = 0; i < 20 && s.current; i++) {
+      s = s.current.layout === 'poster'
+        ? reactToTitle(s, 'yes', 1000 + i, 900)
+        : choose(s, s.current.choices.slice(0, s.current.picks).map((c) => c.id), 1000 + i, 900);
+    }
+    const warm = awardPoints(
+      first.choices.slice(0, first.picks).reduce((sum, c) => sum + infoOf(c, s.profile), 0),
+      900,
+      1,
+    );
+    expect(warm, 'a settled trait is still paying full price').toBeLessThan(cold);
   });
 
   it('a stalled decision resets the streak mid-game', () => {
