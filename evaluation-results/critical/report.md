@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `f8e6f4e` · Branch: `claude/watch-verdict-app-wwbtbg`
+- Commit: `80ca7f2` · Branch: `claude/dna-showdown-complete`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 
