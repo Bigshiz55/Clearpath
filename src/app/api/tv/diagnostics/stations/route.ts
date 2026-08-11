@@ -27,9 +27,16 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET() {
   const admin = createAdminClient();
+  // The columns `tv_stations` ACTUALLY has (migration 0032). An earlier
+  // revision of this file asked for `lineup_id`, which does not exist on this
+  // table, and PostgREST rejected the whole select — so the endpoint built to
+  // stop the guessing shipped a guess of its own and returned nothing but an
+  // error. `call_sign` and `network` are included because they are the other
+  // two identity fields a station carries, and "what does the database think
+  // this channel is" is not answerable while any of them are hidden.
   const { data, error } = await admin
     .from('tv_stations')
-    .select('id, provider_id, provider_station_id, name, lineup_id')
+    .select('id, provider_id, provider_station_id, name, call_sign, network')
     .order('name');
 
   if (error) {
@@ -41,19 +48,27 @@ export async function GET() {
     providerId: r.provider_id as string,
     providerStationId: r.provider_station_id as string,
     name: r.name as string,
-    lineupId: r.lineup_id as string | null,
+    callSign: (r.call_sign as string | null) ?? null,
+    network: (r.network as string | null) ?? null,
     // The cleanup's verdict on this exact key — so a mismatch between what the
     // purge believes and what is stored is visible instead of inferred.
     carried: isCarriedStationKey(r.provider_station_id as string),
   }));
 
-  // The three that started this, called out by name so the answer is one read.
-  const SUSPECT = ['NBC.com', 'ABC News Live', 'CBS News'];
+  /* The three that started this — matched on SUBSTRING, not equality.
+     Equality assumes the stored `name` is exactly the string the guide renders,
+     which is the same class of assumption that produced `lineup_id`. A row
+     stored as "NBC.com (US)" or "CBS News Streaming" is precisely the case this
+     endpoint exists to surface, and an equality filter would report it absent. */
+  const SUSPECT = ['nbc.com', 'abc news live', 'cbs news'];
   return NextResponse.json(
     {
       generatedAt: new Date().toISOString(),
       total: rows.length,
-      suspects: rows.filter((r) => SUSPECT.some((s) => r.name.toLowerCase() === s.toLowerCase())),
+      suspects: rows.filter((r) => {
+        const hay = `${r.name} ${r.providerStationId} ${r.callSign ?? ''} ${r.network ?? ''}`.toLowerCase();
+        return SUSPECT.some((s) => hay.includes(s));
+      }),
       wouldPurge: rows.filter((r) => !r.carried),
       stations: rows,
     },

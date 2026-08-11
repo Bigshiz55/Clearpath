@@ -202,13 +202,23 @@ export async function getEpisodesWaiting(
   userId: string,
   todayMs: number,
 ): Promise<WaitingShow[]> {
+  /* ORDERED BY `added_at`, NOT `updated_at`.
+     `watchlist_items` has never had an `updated_at` column (0001_init: it has
+     added_at and watched_at). PostgREST rejects the request when a select or
+     an order names an unknown column, so this query returned an error, `data`
+     was null, and "episodes waiting" has been silently empty for every user
+     since it shipped — a broken feature that looked exactly like an empty
+     watchlist. Found by `schemaColumns.test.ts`, which was written after the
+     same mistake (`tv_stations.lineup_id`) cost a production deploy.
+     `added_at` is the recency this table actually records; `watched_at` is
+     null for precisely the unwatched shows this list is about. */
   const { data } = await supabase
     .from('watchlist_items')
-    .select('tmdb_id, title, poster_path, status, updated_at')
+    .select('tmdb_id, title, poster_path, status, added_at')
     .eq('user_id', userId)
     .eq('media_type', 'tv')
     .in('status', ['watching', 'strict', 'possible', 'paused'])
-    .order('updated_at', { ascending: false })
+    .order('added_at', { ascending: false })
     .limit(16);
 
   const rows = data ?? [];
