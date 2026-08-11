@@ -86,6 +86,33 @@ export function normalizeChannelName(raw: string): string {
     .replace(/\s+/g, ' ');
 }
 
+/**
+ * The LEGACY station-key spelling of a network name: lowercased, trimmed, every
+ * run of non-alphanumerics collapsed to a single hyphen, stripped at the ends.
+ * "USA Network" → "usa-network", "A&E" → "a-e", "E!" → "e".
+ *
+ * UNCHANGED ON PURPOSE — it is baked into `tv_stations.provider_station_id`
+ * values that already exist in the database, so its output is a storage
+ * contract, not an implementation detail. New code wanting a stable per-channel
+ * key should use a canonical `id` instead; this exists so the cleanup can still
+ * recognise stations written under the old scheme.
+ *
+ * Defined HERE rather than in `ingest/nationalNetworks.ts`, where it used to
+ * live and from which it is still re-exported for its existing callers. It is
+ * pure naming with no ingest dependency, and leaving it under `ingest/` meant
+ * `carriedStations.ts` — pure identity code — had to import from the ingest
+ * layer to build its legacy-key set, giving `channels/ → ingest/ → channels/`.
+ * A cycle between layers is the kind of thing that is free to fix now and
+ * expensive to fix once something else depends on it.
+ */
+export function networkSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 interface CanonicalDef {
   id: string;
   name: string;

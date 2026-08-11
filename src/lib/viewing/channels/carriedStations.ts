@@ -29,10 +29,22 @@
  * under their old key. Being generous about keeping and strict about removing
  * is the right asymmetry when the cost of a wrong removal is a blank guide.
  *
- * Pure: no I/O. The writer half lives in `tvmazeWriter.ts`.
+ * Pure: no I/O. The writer half lives in `ingest/tvmazeWriter.ts`.
+ *
+ * WHY IT LIVES IN `channels/` AND NOT `ingest/`. It used to sit next to the
+ * writer, which read naturally — the purge is an ingest step — but the question
+ * it answers is "is this station one of the channels we carry", which is
+ * channel IDENTITY, the same subject as `channelIdentity.ts` next door. The
+ * distinction stopped being cosmetic the moment a read-only diagnostic needed
+ * this predicate: `userSessionEgress.test.ts` forbids any route importing from
+ * `viewing/ingest/`, on the sound principle that a user-facing surface has no
+ * business reaching the ingest layer. Filing a pure predicate under `ingest/`
+ * made that guard fire on a route that cannot make a network call, and the
+ * cheap way out would have been an allowlist exemption — which weakens the
+ * guard permanently to fix a filing error once. Correct classification costs
+ * nothing and leaves the rule sharp.
  */
-import { LINEAR_CHANNELS, resolveLinearChannel } from '@/lib/viewing/channels/channelIdentity';
-import { networkSlug } from './nationalNetworks';
+import { LINEAR_CHANNELS, networkSlug, resolveLinearChannel } from './channelIdentity';
 
 /** The `tvmaze-net:` prefix the national ingest synthesises its stations with. */
 export const NATIONAL_STATION_PREFIX = 'tvmaze-net:';

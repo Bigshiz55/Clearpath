@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isCarriedStationKey, uncarriedStationKeys, NATIONAL_STATION_PREFIX } from './uncarriedStations';
+import { isCarriedStationKey, uncarriedStationKeys, NATIONAL_STATION_PREFIX } from './carriedStations';
 
 /**
  * The stale-row condition, reproduced.

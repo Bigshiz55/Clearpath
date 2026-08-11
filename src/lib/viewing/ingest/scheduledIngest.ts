@@ -123,6 +123,36 @@ async function withProviderLock<T, S>(
   }
 }
 
+/**
+ * THE PURGE, ATTACHED TO EVERY EXIT.
+ *
+ * The purge used to sit as a plain statement above the final `return`, under a
+ * comment promising it "runs whether or not anything was fetched". It did not.
+ * Two guard clauses return before reaching it — the unconfigured-deployment
+ * gate and the TV Media egress gate — and production sits permanently in the
+ * second one (`TVMEDIA_ENABLED` unset, so `egress_denied` on every tick). The
+ * step therefore never executed in production even once, which is why three
+ * web feeds kept rendering as television channels after a fix that unit tests
+ * said had removed them, and why `/api/tv/refresh` returned no `purge` key: it
+ * was not that the purge found nothing, it was that the purge never ran.
+ *
+ * Routing every exit through here makes that unrepresentable. A future guard
+ * clause cannot skip the purge by being added above it, because there is no
+ * "above it" any more — the key is attached on the way out, and its presence
+ * in the response is the proof the step happened.
+ *
+ * Safe on the denied paths precisely because the purge never touches upstream:
+ * it asks the channel registry a question about rows we already store. An
+ * unconfigured or egress-denied deployment must not FETCH; that is not a reason
+ * for it to keep serving channels that do not exist.
+ */
+async function withPurge<T extends object>(
+  admin: ReturnType<typeof createAdminClient>, result: T,
+) {
+  const purge = await isolateRun('tvmaze-purge', () => purgeUncarriedNationalStations(admin));
+  return { ...result, purge };
+}
+
 export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClient>) {
   // PRODUCTION FAILS CLOSED. An unconfigured production deployment disables
   // EVERY ingestion adapter — free ones included. This is deliberately above
@@ -136,12 +166,12 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
   const policy = resolveDataMode();
   if (!policy.configured) {
     const blocked = { ok: true, ran: false, status: 'egress_denied' as const, reason: `${policy.code}: ${policy.reason}` };
-    return {
+    return withPurge(admin, {
       tvmaze: { ran: false, reason: `${policy.code}: ${policy.reason}` },
       // The national ingest fails closed with the curated one — same policy gate.
       tvmazeNational: { ran: false, reason: `${policy.code}: ${policy.reason}` },
       tvmedia: blocked,
-    };
+    });
   }
 
   const today = new Date().toISOString().slice(0, 10);
@@ -217,14 +247,14 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
   // refreshing" stays answerable without reading rows.
   const tvMediaEgress = mayCallUpstream({ adapterId: 'tv_media', cost: 'metered' });
   if (!tvMediaEgress.allowed) {
-    return {
+    return withPurge(admin, {
       tvmaze,
       tvmazeNational,
       tvmedia: {
         ok: true, ran: false, status: 'egress_denied' as const,
         reason: `${tvMediaEgress.code}: ${tvMediaEgress.reason}`,
       },
-    };
+    });
   }
 
   const lastTvMediaRun = await lastRunAt(admin, 'tv_media');
@@ -242,18 +272,13 @@ export async function runGatedTvIngest(admin: ReturnType<typeof createAdminClien
       )
     : { ok: true, ran: false, status: 'success' as const, reason: `Ran within the last 2h (${lastTvMediaRun}).` };
 
-  /* THE PURGE RUNS WHETHER OR NOT ANYTHING WAS FETCHED.
-     Deliberately outside every day-gate above. "We no longer carry this
-     station" is a policy change, and making it wait on a fetch cadence is
-     exactly what left three web feeds rendering as television channels for a
-     full day after the write-boundary fix shipped — the national ingest is
-     gated to once per UTC day and had already run.
-     It consults the registry, never a fetch, so a skipped, failed or empty run
-     cannot influence it and it cannot mass-delete a carried channel. Isolated
-     like every other step: a purge failure must not abort the ingest. */
-  const purge = await isolateRun('tvmaze-purge', () => purgeUncarriedNationalStations(admin));
-
-  return { tvmaze, tvmazeNational, tvmedia, purge };
+  /* THE PURGE RUNS WHETHER OR NOT ANYTHING WAS FETCHED — see `withPurge`,
+     which is what actually makes that true on every exit and not just this
+     one. "We no longer carry this station" is a policy change, and making it
+     wait on a fetch cadence is exactly what left three web feeds rendering as
+     television channels: the national ingest is gated to once per UTC day and
+     had already run. */
+  return withPurge(admin, { tvmaze, tvmazeNational, tvmedia });
 }
 
 /**

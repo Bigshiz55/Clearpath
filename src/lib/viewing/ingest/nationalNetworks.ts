@@ -19,7 +19,7 @@
  *
  * Pure: no I/O, no `server-only`.
  */
-import { LINEAR_CHANNELS, resolveLinearChannel } from '@/lib/viewing/channels/channelIdentity';
+import { LINEAR_CHANNELS, networkSlug, resolveLinearChannel } from '@/lib/viewing/channels/channelIdentity';
 
 /**
  * The carried networks, as lowercased display names.
@@ -42,24 +42,20 @@ export function isMajorUsNetwork(name: string): boolean {
 }
 
 /**
- * Stable station id fragment for a network name: lowercased, trimmed, with every
- * run of non-alphanumerics collapsed to a single hyphen and stripped at the
- * ends. "USA Network" -> "usa-network", "A&E" -> "a-e", "E!" -> "e".
+ * Stable station id fragment for a network name — the legacy storage key.
  *
- * UNCHANGED ON PURPOSE — it is baked into `tv_stations.provider_station_id`
- * values that already exist in the database, so its output is a storage
- * contract rather than an implementation detail. New code that wants a stable
- * per-channel key should use the registry's canonical `id` instead (see
- * `canonicalStationSlug`), which is what actually collapses two spellings of
- * one channel into one station.
+ * MOVED, NOT CHANGED. The implementation now lives beside the rest of the
+ * naming rules in `channels/channelIdentity.ts`; it is re-exported here because
+ * this module's job is to keep its historical surface working for the ingest
+ * paths that already import it. Behaviour is byte-identical, which is what
+ * matters: its output is baked into `tv_stations.provider_station_id` values
+ * that already exist in the database.
+ *
+ * New code that wants a stable per-channel key should use the registry's
+ * canonical `id` instead (see `canonicalStationSlug`), which is what actually
+ * collapses two spellings of one channel into one station.
  */
-export function networkSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
+export { networkSlug };
 
 /**
  * The station slug for a source network name, canonicalised.
