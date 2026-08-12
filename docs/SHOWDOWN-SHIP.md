@@ -6,8 +6,15 @@ re-audit completed gates; do not restate accepted work.
 
 CURRENT SHA: (see git log — updated each commit)
 CURRENT PREVIEW: https://clearpath-git-claude-showdown-flagship-bigshiz56.vercel.app (Vercel SSO-gated)
-NEXT ACTION: finish G3. Dump all three `deriveDna` channels (experience / attraction / discovery) for the dark and light users in `divergence.test.ts` and identify why the light profile nudges 0 — hypotheses (a) polarity===0 and (b) dark-skewed catalogue are written up under G3 below. Then either un-skip the order-swap test or, if (b) holds, record it as a catalogue-balance product finding and re-scope G3's order-swap requirement with the owner.
-
+NEXT ACTION: implement the C fix. Add the comparative signal
+`dims[axis] = 50 + (winner - loser)/2` over separating axes only to
+`src/lib/taste/crossing.ts`, emitted alongside the existing absolute winner
+event, with weight capped BELOW an explicit absolute rating. Then: (1) assert a
+mature absolute profile is not overpowered by comparative events, (2) re-run
+`divergence.test.ts`, (3) un-skip the order-swap test and delete the `it.todo`,
+(4) if light still fails, address B by widening low-darkness representation in
+the diagnostic pool via the coverage mechanism — never by hand-picking
+convenient light titles. Do NOT change MIN_RANK_CONF (0.25).
 ---
 
 ## SHOWDOWN SHIP GATES
@@ -62,35 +69,62 @@ NEXT ACTION: finish G3. Dump all three `deriveDna` channels (experience / attrac
 - **Failures:** none
 
 ### G3 — downstream ranking divergence
-- **Status:** IN PROGRESS — divergence PROVED, order-swap NOT yet proved
-- **Proof so far:** `src/lib/showdown/divergence.test.ts` (5 passed, 1 skipped,
-  1 todo). Both users start from identical (empty) permanent DNA, play the same
-  planner with a legitimate strategy (prefer the darker / lighter title of each
-  pair, never "always left"), and are ranked over the same candidates by the
-  real `preferenceNudge`. `MIN_RANK_CONF` is imported and pinned at 0.25.
-  - PROVED: the same candidate scores differently for the two users
-    (bleak thriller: dark **+6.23**, light **0**), and the causal trait is
-    `darkness` — the dark profile prefers bleak over sunny (+6.23 vs -5.81).
-  - PROVED: an empty profile nudges 0 (control).
-- **THE BLOCKER, measured:** the LIGHT-preferring profile yields
-  `preferenceNudge` of exactly **0** on both candidates. Scaled legitimate play
-  to 4 / 8 / 16 / 30 sessions: dark scales +4.63 -> +6.23 -> +6.97 -> +7.07,
-  light stays **0 at every level**. So this is STRUCTURAL, not a threshold more
-  play would clear, and lowering `MIN_RANK_CONF` is both forbidden and the
-  wrong fix.
-- **NEXT DIAGNOSTIC STEP (do this first):** find which channel actually carries
-  the signal. `deriveDna` returns experience/attraction/discovery channels; a
-  probe of `experience.dims.darkness` showed `{pref:50, evidence:0}` for BOTH
-  users even though dark ranks +6.23, so the darkness belief lives in another
-  channel and the probe read the wrong one. Dump all three channels for both
-  users and compare. Two live hypotheses:
-  (a) the light user's belief lands near neutral so `polarity === 0` and
-      `preferenceNudge` skips it at `rank.ts:104/124`;
-  (b) the 113-title diagnostic catalogue is skewed dark, so "the lighter of the
-      pair" is still above 50 darkness and a light-preferring player cannot
-      develop a rankable light preference — which would be a real PRODUCT
-      finding about catalogue balance, not a test problem.
-- **Files:** `src/lib/showdown/divergence.test.ts` (new)
+- **Status:** IN PROGRESS — DIAGNOSIS COMPLETE, fix not yet implemented
+- **Verdict: HYPOTHESIS C (root cause) COMPOUNDED BY HYPOTHESIS B. A is FALSE.**
+
+**A — neutral polarity: FALSE.** Both users have `polarity: 1`. The light user
+is not being skipped for neutrality; it is being skipped for CONFIDENCE.
+
+| | pref | evidence | confidence | polarity | tier |
+|---|---|---|---|---|---|
+| DARK  `effectiveTaste.darkness`  | 89.28 | 2.128 | **0.183** | 1 | weak |
+| LIGHT `effectiveTaste.darkness`  | 56.67 | 0.756 | **0.012** | 1 | learning |
+
+`experience.darkness` and `discovery.darkness` are `{pref:50, evidence:0}` for
+BOTH users — all Showdown signal lands in the **attraction** channel
+(DARK 89.28/3.04, LIGHT 56.67/1.08). `MIN_RANK_CONF` is 0.25, so light at 0.012
+is nowhere near it.
+
+**C — COMPARATIVE INFORMATION IS DISCARDED. This is the root cause.**
+Measured: 20 decisions produce exactly **20 events**, all action
+`unseen_interested`, one per decision, on the WINNER only, carrying the winner's
+**absolute** fingerprint. The loser emits nothing (correct — no fabricated
+dislike) but the comparison itself is not recorded anywhere.
+
+Worked example from the real dump:
+`Titanic(50) vs The Silence of the Lambs(95) -> Titanic(50)`
+A strong statement of preferring less darkness is recorded as *"positive
+attraction to a title whose darkness is 50"* — a NEUTRAL absolute. Seventeen
+such events average to 56.67 → confidence 0.012 → invisible to the ranker.
+Opposite comparative behaviour cannot produce opposite canonical DNA.
+
+**B — CATALOGUE SKEW. Real, and it compounds C.** Full 113-title darkness
+distribution: min 10, max 100, mean 57.79, median 50, q1 50, q3 50 —
+`<35: 5` · `<50: 5` · `50–64: 82` · `>=65: 26` · `>80: 24`.
+**26 dark titles vs 5 light ones — a 5.2x skew**, with 82 titles asserting no
+darkness at all. Chosen-title darkness: LIGHT mean 49.5 (17 of 20 exactly 50,
+only 2 below 50); DARK mean 65.75 (8 of 20 at >=65). A light-preferring player
+can rarely even be OFFERED a low-darkness title to like.
+
+**FIX DESIGNED (not yet built).** Add a bounded comparative signal to the
+canonical engine — not Showdown-only state:
+
+    dims[axis] = 50 + (winner[axis] - loser[axis]) / 2   // separating axes only
+
+  - Titanic(50) over Silence(95) -> 27.5 ("leans lighter") ✅
+  - Silence(95) over Titanic(50) -> 72.5 ("leans darker") ✅
+  - 50 vs 50 -> 50, contributes nothing ✅
+
+Satisfies every stated requirement: bounded; only touches axes the pair
+meaningfully separated; preserves actual separation magnitude; asserts nothing
+about the loser; append-only and re-derivable; belongs in
+`src/lib/taste/crossing.ts` (already the axis-level crossing module) so the
+canonical engine owns it. Must carry LOWER authority than an explicit absolute
+rating — cap its weight below the absolute-rating weight and assert that a
+mature absolute profile is not overpowered by comparative events.
+
+**Files:** `src/lib/showdown/divergence.test.ts` (5 passed, 1 skipped, 1 todo)
+- **Failures:** order-swap still skipped, by design, until C is fixed.
 
 ### G4 — render a real discovery
 - **Status:** not started
