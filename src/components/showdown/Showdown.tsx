@@ -496,26 +496,34 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
        the remainder as one dead band at the bottom is the same mistake wearing
        different trousers. The whole stack centres instead, so the leftover
        height becomes symmetric breathing room around a composed screen. */
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center gap-4 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:max-w-5xl lg:gap-6">
+    /* THE PAIR IS THE PAGE. Measured at 390x844 the poster row occupied 259px of
+       844 — 31% of the viewport — because the stack centred itself and let the
+       row shrink to whatever the meters and buttons left over. `justify-center`
+       is what did it: a centred column distributes slack around everything
+       instead of giving it to the one element that matters. Now the column
+       fills the height and the pair is the only thing allowed to grow. */
+    <div className="mx-auto flex h-[100dvh] w-full max-w-md flex-col gap-3 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:max-w-5xl lg:gap-4">
       {/* HEADER — a rail, not a percentage. The old "38% → 38%" told the player
           their answers had achieved nothing; a rail says how far through they
           are, which is the only thing a counter can honestly claim. */}
-      <header className="flex shrink-0 items-center gap-3">
-        <p className="text-[0.6rem] font-black uppercase tracking-[0.25em] text-slate-500">
-          Showdown
-        </p>
-        <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
+      {/* THE PROGRESS CUE, SUBORDINATED.
+          It was a label, a rail and a "0/12" counter across the top — three
+          pieces of chrome competing with the decision for the player's first
+          glance, and the counter in particular reads as a test with a number of
+          questions left rather than a game with rounds in it. What survives is
+          the rail alone, hairline, edge to edge, carrying no digits. The count
+          stays on the element as data so tests and the E2E can still assert
+          progress without it being shown to anybody. */}
+      <header className="shrink-0" aria-label={`Round ${done + 1} of ${TARGET_DECISIONS}`}>
+        <div className="h-[3px] w-full overflow-hidden rounded-full bg-white/[0.07]">
           <div
             data-testid="showdown-progress"
             data-decisions={done}
-            className="h-full rounded-full bg-white/50 transition-all duration-500"
+            data-total={TARGET_DECISIONS}
+            className="h-full rounded-full bg-amber-300/80 transition-all duration-500"
             style={{ width: `${Math.max(2, progress * 100)}%` }}
           />
         </div>
-        <p className="text-xs font-black tabular-nums text-slate-400">
-          {done}
-          <span className="text-slate-600">/{TARGET_DECISIONS}</span>
-        </p>
       </header>
 
       {calibration ? (
@@ -603,13 +611,19 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
             </RoundStage>
           )}
 
-          {/* THE LEARNING, DIRECTLY UNDER THE FILMS. It is feedback on the tap
-              that was just made, so it belongs where the eye already is — in
-              the header it read as chrome, and in the footer it read as a
-              status bar. */}
-          <div className="shrink-0">
-            <LearningStrip profile={state.profile} />
-          </div>
+          {/* THE LEARNING, DIRECTLY UNDER THE FILMS — but not always.
+              It is feedback on the tap that was just made, so it belongs where
+              the eye already is. Two cases where it was making the screen worse:
+              on round one there is nothing to report and a row of empty meters
+              is the single most diagnostic-looking thing in the game, and during
+              the burst it competes with a countdown for the same attention while
+              stealing height from posters that are supposed to be arriving fast.
+              Shown when it has something to say, absent when it does not. */}
+          {done > 0 && round.phase !== 'rapid' && (
+            <div className="shrink-0">
+              <LearningStrip profile={state.profile} />
+            </div>
+          )}
 
           {followUp?.kind === 'why' ? (
             /* CHIPS BUILT FROM THIS PAIR, never a fixed list. Every one names an

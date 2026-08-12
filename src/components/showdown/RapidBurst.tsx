@@ -176,5 +176,5 @@ export function RoundStage({
       </RapidBurst>
     );
   }
-  return <div className="flex min-h-0 flex-1 items-center justify-center">{children}</div>;
+  return <div className="flex min-h-0 flex-1 items-stretch justify-center">{children}</div>;
 }
