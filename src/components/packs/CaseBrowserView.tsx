@@ -3,7 +3,8 @@ import { listStationsForPack } from '@/lib/packs/stations';
 import type { Pack } from '@/lib/packs/types';
 import { CaseList, type CaseSummary, type UnmatchedProgramme } from './CaseList';
 import { PackEmptyState } from './PackEmptyState';
-import { partitionEligible, shapeForPack } from '@/lib/packs/eligibility';
+import { partitionEligible } from '@/lib/packs/eligibility';
+import { shapeForPack } from '@/lib/packs/identity';
 
 interface ProgrammeRow {
   id: string;
@@ -11,6 +12,9 @@ interface ProgrammeRow {
   artwork_url: string | null;
   genres?: string[] | null;
   tmdb_media_type?: 'movie' | 'tv' | null;
+  programme_type?: string | null;
+  season_number?: number | null;
+  episode_number?: number | null;
 }
 
 /**
@@ -49,7 +53,10 @@ export async function CaseBrowserView({ pack, userId }: { pack: Pack; userId: st
 
   const [{ data: linkRows }, { data: programmeRows }, { data: stationRows }, { data: seenRows }] = await Promise.all([
     supabase.from('case_programmes').select('case_id, programme_id').in('programme_id', programmeIds),
-    supabase.from('tv_programmes').select('id, title, artwork_url, genres, tmdb_media_type').in('id', programmeIds),
+    supabase
+      .from('tv_programmes')
+      .select('id, title, artwork_url, genres, tmdb_media_type, programme_type, season_number, episode_number')
+      .in('id', programmeIds),
     supabase.from('tv_stations').select('id, name').in('id', stationIdsUsed),
     userId
       ? supabase.from('user_seen_programmes').select('programme_id').in('programme_id', programmeIds).eq('user_id', userId)
@@ -143,6 +150,9 @@ export async function CaseBrowserView({ pack, userId }: { pack: Pack; userId: st
           id: pid,
           title: p?.title ?? '',
           mediaType: p?.tmdb_media_type ?? null,
+          programmeType: p?.programme_type ?? null,
+          seasonNumber: p?.season_number ?? null,
+          episodeNumber: p?.episode_number ?? null,
           genres: p?.genres ?? [],
         };
       }),

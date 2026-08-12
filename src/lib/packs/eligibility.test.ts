@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isEligible, partitionEligible, shapeForPack, type ProgrammeFacts } from './eligibility';
+import { isEligible, partitionEligible, type ProgrammeFacts } from './eligibility';
 
 /**
  * THE CONTAMINATION THAT SHIPPED, TURNED INTO TESTS.
@@ -131,13 +131,55 @@ describe('rejections are reported, not silently dropped', () => {
   });
 });
 
-describe('pack shape is data, not a branch on a slug', () => {
-  it('maps the known packs and defaults to open', () => {
-    // CLAUDE.md forbids switching on a Pack slug in shared logic; this is a
-    // lookup table the shared path reads, like `packChannelMap` does for channels.
-    expect(shapeForPack('lifetime-movie-vault')).toBe('movie-vault');
-    expect(shapeForPack('crime-case-files')).toBe('crime-cases');
-    expect(shapeForPack('hallmark')).toBe('seasonal-movies');
-    expect(shapeForPack('some-future-pack')).toBe('open');
+/* Slug -> shape now lives in `identity.ts` and is tested in `identity.test.ts`.
+   It was here, in a `Record<string, PackShape>` naming slugs that do not exist,
+   which is how `lifetime-vault` came to match nothing. */
+
+describe('the Vault reads the evidence the provider already sent', () => {
+  const vault = (f: ProgrammeFacts) => isEligible('movie-vault', f);
+
+  it('KEEPS a film the provider declared, with no TMDB match at all', () => {
+    /* THE MEASUREMENT THIS ANSWERS. 18 of 20 programmes on the real Lifetime
+       stations have a null `tmdb_media_type`, because the only writer of that
+       column runs on-demand for one title at a time. Asking `tmdb_media_type`
+       and nothing else rejected 90% of the Pack — not because those rows are
+       series, but because nothing had ever looked them up. `programme_type` is
+       written by both ingest writers on every row and says so directly. */
+    const v = vault({
+      title: 'Stalked by My Doctor',
+      mediaType: null,
+      programmeType: 'movie',
+      runtimeMinutes: 88,
+    });
+    expect(v.eligible, v.reason).toBe(true);
+  });
+
+  it('drops a numbered episode the provider did not otherwise classify', () => {
+    const v = vault({ title: 'Some Daytime Strip', mediaType: null, programmeType: 'other', seasonNumber: 6, episodeNumber: 14 });
+    expect(v.eligible).toBe(false);
+    expect(v.reason).toContain('movie vault');
+  });
+
+  it('still drops a row nothing describes', () => {
+    // Fail closed. 'special'/'other' is the value a writer emits when it could
+    // not classify the row, and a shrug is not evidence of a film.
+    const v = vault({ title: 'Some Unmatched Airing', mediaType: null, programmeType: 'special' });
+    expect(v.eligible).toBe(false);
+    expect(v.reason).toContain('unmatched');
+  });
+
+  it('drops a row whose two explicit claims disagree', () => {
+    /* The false-positive direction: a title-search TMDB id saying 'movie' over
+       a provider that said 'series'. Neither is trustworthy once they conflict,
+       so the Vault takes neither. */
+    const v = vault({ title: 'Ambiguous Thing', mediaType: 'movie', programmeType: 'series' });
+    expect(v.eligible).toBe(false);
+    expect(v.reason).toContain('conflicting evidence');
+  });
+
+  it('never treats "aired on Lifetime" as evidence of anything', () => {
+    // There is no shape-level shortcut: the row itself has to carry the claim.
+    const bare: ProgrammeFacts = { title: 'A Title With No Metadata At All' };
+    expect(vault(bare).eligible).toBe(false);
   });
 });

@@ -4,6 +4,23 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+**Lifetime Movie Vault — code fixed, ONE production measurement outstanding.**
+Four defects found and fixed (pack identity, an unselected column, a matcher
+that used popularity as evidence, and a batch enrichment job that never
+existed). The BEFORE numbers are the owner's production measurement; the AFTER
+numbers cannot be produced from a dev container.
+
+**Action needed from you:** run the diagnostic against production and paste the
+result. It is read-only, admin-gated, and now reports the evidence mix rather
+than just a survivor count:
+
+    GET /api/admin/packs/eligibility?pack=lifetime-vault
+
+Read `evidence.mediaKind` and `evidence.decidedBy`. If `film` is still ~0 after
+`/api/cron/pack-enrich` has run a few ticks, the Vault's ceiling is set by
+ingest breadth (20 distinct programmes on 3 stations), not by the filter — which
+is a different problem with a different fix, and stop condition 5 stands.
+
 **Showdown V3 phase 2 is on `claude/showdown-cold-start-scanner`, not merged.**
 The evidence grammar, cross-session exposure memory, the `Both` control and the
 canonical write path are done and gated (typecheck/lint/3300 tests/build/mobile
@@ -15,6 +32,20 @@ pending migrations with your `MIGRATE_SECRET` — see the "Restored:
 unblocks.
 
 ## Next
+- **Lifetime: ingest breadth, not eligibility.** The Pack has 3 stations and
+  459 recent airings collapsing to 20 distinct programmes. Even perfect
+  classification cannot make 20 rows a browsable film library. Widening the
+  Lifetime station set (LMN is mapped but may not be in the measured lineup) and
+  deepening the airing window are the levers; the filter is not.
+- **`release_year` is never written by either ingest writer.** `tvmazeWriter`
+  and `tvMediaWriter` both omit it, so it is null on every ingested programme.
+  That removes the single best disambiguator from title matching and forces
+  `pickMatch` onto its strict uniqueness branch. Both providers carry a year;
+  wiring it through would raise match rates across every Pack at once.
+- **Crime Case Files gets no genres from TV Media.** The adapter sets
+  `genres: []` because the documented contract has no genre field, and the
+  `crime-cases` shape requires a genre to confirm. So TV Media rows can never
+  qualify as cases. Needs a genre source, not a looser rule.
 - **BLOCKER 1 — the 44-axis fingerprint still cannot reach the ranker.**
   Showdown reasons in 44 `TraitKey` axes; the ranker reasons in 15
   `DIMENSION_KEYS`. There is no bridge (`grep -rn "TraitKey" src/lib/preference/
@@ -71,6 +102,37 @@ unblocks.
   representative.
 
 ## Done
+- **Lifetime Movie Vault: four defects, one canonical resolver
+  (`claude/card-interaction-model-m3ezx2`).** The Pack was showing Castle, The
+  Rookie and Joyce Meyer. Four independent causes, each of which alone was
+  enough:
+  (1) **Identity.** `eligibility.ts` kept its own `Record<string, PackShape>`
+  naming `lifetime-movie-vault` and `lifetime` — neither is a real slug. The
+  production slug `lifetime-vault` was already declared in `PackSlug` in
+  `packChannelMap.ts`; the untyped second table silently opted out of that
+  union, so the Pack resolved to `open` and no filter ran. Now one resolver
+  (`src/lib/packs/identity.ts`) keyed `Record<PackSlug, PackShape>`, so a Pack
+  without a shape is a compile error and an invented slug cannot be written.
+  (2) **An unselected column.** Browse declared `tmdb_media_type` OPTIONAL on
+  its row interface and never selected it, so it read null on every row
+  forever — the Vault would have rejected 100% of its programmes even in a
+  perfectly matched database, and the admin diagnostic (which DID select it)
+  was describing a different question than the page.
+  (3) **No batch enrichment.** `tmdb_media_type` had exactly one writer,
+  reachable only from `/api/packs/similar` when a user opens one title. 18 of
+  20 programmes were null because nothing had ever asked. `/api/cron/pack-enrich`
+  now backfills Pack programmes hourly.
+  (4) **Popularity used as identity.** `resolveProgrammeTmdbId` fell back to
+  `results[0]` whenever `release_year` was null — which is every ingested row —
+  and wrote that as the programme's permanent identity. `pickMatch` now requires
+  an exact normalized title and an unambiguous winner, narrowed by the
+  provider's declared type.
+  The general mechanism is `resolveMediaKind`: it reads
+  `tv_programmes.programme_type`, written by BOTH ingest writers on every row
+  since migration 0032 and never once consulted, plus season/episode numbering.
+  No whitelist, no title-name vibes, no "Lifetime means movie" shortcut —
+  unknown and conflicting evidence are both ineligible. And a filtered-empty
+  Pack now says so instead of claiming the listings feed carried nothing.
 - **Showdown: the evidence grammar (`claude/showdown-cold-start-scanner`).**
   The game collected one kind of evidence — which of two — which is confounded
   (several axes move at once) and is not an appetite (winning a comparison is

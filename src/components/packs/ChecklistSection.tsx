@@ -14,20 +14,35 @@ import { PackEmptyState } from './PackEmptyState';
 /** BROWSE — every title the Pack's channels carry. Impersonal. */
 export async function PackBrowseSection({ pack, userId }: { pack: Pack; userId: string | null }) {
   const supabase = createClient();
-  const [items, stationIds, listStorage] = await Promise.all([
+  const [browse, stationIds, listStorage] = await Promise.all([
     listPackBrowse(supabase, pack, userId),
     listStationsForPack(supabase, pack.id).catch(() => [] as string[]),
     packListStorageAvailable(supabase).catch(() => false),
   ]);
+  const { items, examined, rejected } = browse;
 
   if (items.length === 0) {
-    // Three different causes, three different sentences. Collapsing them into
+    // Four different causes, four different sentences. Collapsing them into
     // one line is what made every one of them undiagnosable.
     if (stationIds.length === 0) {
       return (
         <PackEmptyState
           title="This Pack's channels aren't wired up"
           detail="No TV stations are linked to this Pack yet — a wiring problem on our side, not an empty catalog. It heals automatically on the next listings refresh."
+        />
+      );
+    }
+    /* THE CAUSE THAT USED TO BE INVISIBLE. When eligibility removes everything,
+       the listings feed did its job and we could not confirm any of what it
+       carried. Saying "the feed hasn't carried any programmes" over 20 real
+       airings would be a false statement about our own data — the exact class
+       of claim this codebase forbids. So it says what actually happened, with
+       the count, and does not fall back to showing the rejected rows. */
+    if (examined > 0 && rejected >= examined) {
+      return (
+        <PackEmptyState
+          title="Nothing here we can vouch for yet"
+          detail={`This Pack's channels carried ${examined} programme${examined === 1 ? '' : 's'} recently, and none of them could be confirmed as what this Pack is for — mostly syndicated series and paid programming, plus titles we haven't identified yet. We'd rather show you nothing than pad this out with things that merely aired on the same channel.`}
         />
       );
     }

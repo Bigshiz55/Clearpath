@@ -48,11 +48,63 @@ export async function getPackDnaScores(
   return out;
 }
 
+/** Every column the matcher needs to be honest about what it is matching. */
+export const PROGRAMME_MATCH_COLUMNS =
+  'id, tmdb_id, tmdb_media_type, title, release_year, programme_type, season_number, episode_number';
+
+export interface ProgrammeMatchRow {
+  id: string;
+  tmdb_id: number | null;
+  tmdb_media_type: 'movie' | 'tv' | null;
+  title: string;
+  release_year: number | null;
+  programme_type: string | null;
+  season_number: number | null;
+  episode_number: number | null;
+}
+
 /**
- * Best-effort resolution of a Pack programme to a real TMDB id, by title +
- * year search — imperfect (no exact-id source exists for TVmaze schedule
- * content), cached once resolved so it's a one-time cost per programme.
- * Returns null (never guesses) when nothing plausible matches.
+ * Resolve one programme row to a real TMDB id, or refuse.
+ *
+ * ── WHAT THIS USED TO DO ──────────────────────────────────────────────────
+ * `const best = year ? results.find(...) : results[0]` — and since neither
+ * ingest writer populates `release_year`, the `results[0]` branch is the only
+ * one that ever ran. Every match was TMDB's popularity ordering for a title
+ * string, written permanently onto the row as `tmdb_id` and `tmdb_media_type`.
+ * A wrong media type is worse than a missing one: the Vault's null check fails
+ * closed, and a wrong 'movie' fails open.
+ *
+ * Now the candidate list goes through `pickMatch`, which requires an exact
+ * normalized title and an unambiguous winner, and the provider's own
+ * `programme_type` narrows the search to the right kind before ranking. It
+ * returns null far more often, which is the point.
+ */
+export async function matchProgrammeRow(
+  row: ProgrammeMatchRow,
+): Promise<{ tmdbId: number; mediaType: MediaType; basis: string } | null> {
+  const { searchTitles } = await import('@/lib/tmdb/client');
+  const { pickMatch } = await import('./tmdbMatch');
+  const { expectedTmdbMediaType } = await import('./mediaKind');
+
+  const expected = expectedTmdbMediaType({
+    programmeType: row.programme_type,
+    seasonNumber: row.season_number,
+    episodeNumber: row.episode_number,
+  });
+
+  const results = await searchTitles(row.title, { year: row.release_year }).catch(() => []);
+  const match = pickMatch(
+    { title: row.title, releaseYear: row.release_year, expectedMediaType: expected },
+    results.map((r) => ({ id: r.id, mediaType: r.mediaType, title: r.title, year: r.year })),
+  );
+  if (!match) return null;
+  return { tmdbId: match.id, mediaType: match.mediaType, basis: match.basis };
+}
+
+/**
+ * The on-demand path: resolve a single programme, persisting the result so it
+ * is a one-time cost. Returns null (never guesses) when nothing matches
+ * unambiguously.
  */
 export async function resolveProgrammeTmdbId(
   supabase: SupabaseClient,
@@ -60,24 +112,23 @@ export async function resolveProgrammeTmdbId(
 ): Promise<{ tmdbId: number; mediaType: MediaType } | null> {
   const { data: existing } = await supabase
     .from('tv_programmes')
-    .select('tmdb_id, tmdb_media_type, title, release_year')
+    .select(PROGRAMME_MATCH_COLUMNS)
     .eq('id', programmeId)
     .maybeSingle();
   if (!existing) return null;
-  if (existing.tmdb_id && existing.tmdb_media_type) {
-    return { tmdbId: existing.tmdb_id as number, mediaType: existing.tmdb_media_type as MediaType };
+  const row = existing as unknown as ProgrammeMatchRow;
+  if (row.tmdb_id && row.tmdb_media_type) {
+    return { tmdbId: row.tmdb_id, mediaType: row.tmdb_media_type as MediaType };
   }
 
-  const { searchTitles } = await import('@/lib/tmdb/client');
-  const results = await searchTitles(existing.title as string).catch(() => []);
-  const year = existing.release_year as number | null;
-  const best = year
-    ? results.find((r) => r.year === year) ?? results.find((r) => r.year != null && Math.abs(r.year - year) <= 1)
-    : results[0];
-  if (!best) return null;
+  const match = await matchProgrammeRow(row);
+  if (!match) return null;
 
   const admin = createAdminClient();
-  await admin.from('tv_programmes').update({ tmdb_id: best.id, tmdb_media_type: best.mediaType }).eq('id', programmeId);
+  await admin
+    .from('tv_programmes')
+    .update({ tmdb_id: match.tmdbId, tmdb_media_type: match.mediaType })
+    .eq('id', programmeId);
 
-  return { tmdbId: best.id, mediaType: best.mediaType };
+  return { tmdbId: match.tmdbId, mediaType: match.mediaType };
 }

@@ -40,21 +40,25 @@
  * PURE. No I/O.
  */
 
-/** What a Pack is editorially FOR. */
-export type PackShape =
-  /** Movies only, from this network's own catalogue. The Lifetime Vault. */
-  | 'movie-vault'
-  /** True-crime and crime documentary. Crime Case Files. */
-  | 'crime-cases'
-  /** Movies and specials, series allowed. The Hallmark Universe. */
-  | 'seasonal-movies'
-  /** No editorial claim — everything the channels carry. */
-  | 'open';
+import { resolveMediaKind } from './mediaKind';
+import type { PackShape } from './identity';
+
+/* PACK SHAPE LIVES IN `identity.ts` — one table, keyed by the real `PackSlug`
+   union, so a Pack cannot exist without an editorial shape and a slug nobody
+   uses cannot be given one. This file had its OWN untyped copy of that table,
+   which is how `lifetime-vault` came to match nothing. Re-exported as a type so
+   the rules below still read in terms of shape. */
+export type { PackShape };
 
 export interface ProgrammeFacts {
   title: string;
   /** TMDB media type once matched. Null when the programme was never matched. */
   mediaType?: 'movie' | 'tv' | null;
+  /** `tv_programmes.programme_type` — the provider's own declaration. */
+  programmeType?: string | null;
+  /** Set by the provider when the row is an instalment of a run. */
+  seasonNumber?: number | null;
+  episodeNumber?: number | null;
   genres?: readonly string[] | null;
   releaseYear?: number | null;
   /** Episode count, when known. A 100-episode run is a series whatever it says. */
@@ -151,9 +155,27 @@ export function isEligible(shape: PackShape, f: ProgrammeFacts): Eligibility {
     case 'movie-vault': {
       /* MOVIE-CENTRIC BY DEFINITION. The Vault's promise is "every thriller,
          true story, sequel and remake before they start blending together" —
-         a promise about a film library. Castle airing at 2pm is not part of it. */
-      if (f.mediaType === 'tv') return no('series, and this Pack is a movie vault');
-      if (f.mediaType == null) return no('unmatched — cannot confirm it is a film');
+         a promise about a film library. Castle airing at 2pm is not part of it.
+
+         THE QUESTION USED TO BE `f.mediaType === 'movie'` AND NOTHING ELSE,
+         which meant the Vault could only admit a row that some user had already
+         caused to be TMDB-matched by opening its title page. Measured on the
+         real Lifetime stations, that was 2 rows in 20. `resolveMediaKind` reads
+         the provider's own `programme_type` as well — written on every row by
+         both ingest writers since 0032, and never once consulted — so the
+         answer no longer depends on a lookup nothing schedules. It still fails
+         closed: unknown, and conflicting, are both ineligible. */
+      const kind = resolveMediaKind({
+        tmdbMediaType: f.mediaType ?? null,
+        programmeType: f.programmeType ?? null,
+        seasonNumber: f.seasonNumber ?? null,
+        episodeNumber: f.episodeNumber ?? null,
+      });
+      if (kind.kind === 'not-film') return no('series, and this Pack is a movie vault');
+      if (kind.source === 'conflict') {
+        return no('unmatched — conflicting evidence, cannot confirm it is a film');
+      }
+      if (kind.kind === 'unknown') return no('unmatched — cannot confirm it is a film');
       if (looksSerial(f)) return no('runtime/episode count indicates an episode, not a film');
       if (genres.some((g) => REALITY_GENRES.has(g))) return no('reality or talk format');
       return OK;
@@ -192,25 +214,4 @@ export function partitionEligible<T extends ProgrammeFacts>(
     else rejected.push({ row, reason: verdict.reason });
   }
   return { kept, rejected };
-}
-
-/**
- * Each Pack's editorial shape.
- *
- * Keyed by slug rather than branched on inside the Pack code, because CLAUDE.md
- * forbids switching on a Pack slug in shared logic — this is DATA that the
- * shared path reads, which is the same discipline `packChannelMap` already uses
- * for channels.
- */
-export const PACK_SHAPES: Readonly<Record<string, PackShape>> = {
-  'lifetime-movie-vault': 'movie-vault',
-  'lifetime': 'movie-vault',
-  'crime-case-files': 'crime-cases',
-  'true-crime': 'crime-cases',
-  'hallmark': 'seasonal-movies',
-  'hallmark-universe': 'seasonal-movies',
-};
-
-export function shapeForPack(slug: string): PackShape {
-  return PACK_SHAPES[slug] ?? 'open';
 }
