@@ -4,12 +4,41 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-Nothing in flight. **Action needed from you:** open `/admin/migrations` on
-production and apply pending migrations with your `MIGRATE_SECRET` — see the
-"Restored: /admin/migrations" entry below for why this is currently required
-and what it unblocks.
+**Showdown V3 phase 2 is on `claude/showdown-cold-start-scanner`, not merged.**
+The evidence grammar, cross-session exposure memory, the `Both` control and the
+canonical write path are done and gated (typecheck/lint/3300 tests/build/mobile
+all green). What remains from the V3 brief is in **Next** below.
+
+**Action needed from you:** open `/admin/migrations` on production and apply
+pending migrations with your `MIGRATE_SECRET` — see the "Restored:
+/admin/migrations" entry below for why this is currently required and what it
+unblocks.
 
 ## Next
+- **BLOCKER 1 — the 44-axis fingerprint still cannot reach the ranker.**
+  Showdown reasons in 44 `TraitKey` axes; the ranker reasons in 15
+  `DIMENSION_KEYS`. There is no bridge (`grep -rn "TraitKey" src/lib/preference/
+  src/lib/dna.ts` → 0 matches), so `weirdness`, `ambiguity`, `characterFocus`,
+  `sentimentality`, `cynicism`, `episodic` and `subtitles` are invisible
+  downstream. Everything Showdown learns crosses as an attraction grade on a
+  title and nothing else. Two options, both real work: (a) a verified
+  `TraitKey → DIMENSION_KEYS` projection carrying per-axis confidence, or
+  (b) extend `title_dimensions` to carry the texture axes and classify against
+  them. (b) is correct and expensive; (a) is tractable and lossy. Inventing an
+  unverified mapping is how the `lineup_id` class of defect happens.
+- **BLOCKER 2 — the results screen ranks the diagnostic pool, not the catalogue.**
+  `ShowdownResults.tsx` scores the 113 diagnostic titles with Showdown's private
+  model instead of calling `rankByDna`. Now labelled honestly ("Closest matches
+  in the game's catalogue") rather than presented as recommendations, but the
+  real payoff needs an endpoint that ranks the actual catalogue against the
+  freshly-written profile.
+- **Pool expansion to 250–300 titles, with classification started first.**
+  113 today at 67% `title_dimensions` coverage. `/api/cron/classify` runs 20
+  titles per invocation, so a 300-title pool is ~15 cron runs of lead time
+  before the chain is live — that has to start before the titles land, not
+  after. Measured consequence of the current size: the exposure reserve keeps
+  half the catalogue dealable, so sessions 1 and 2 never repeat but session 3
+  can re-meet ~23 titles from session 1.
 - **Turn on the AI orchestrator (owner action).** The provider-independent
   Claude discovery brain is built, tested, and shipped OFF (`AI_DISCOVERY_MODE`
   defaults to `legacy`). To evaluate it: set `ANTHROPIC_API_KEY` (server-only)
@@ -42,6 +71,44 @@ and what it unblocks.
   representative.
 
 ## Done
+- **Showdown: the evidence grammar (`claude/showdown-cold-start-scanner`).**
+  The game collected one kind of evidence — which of two — which is confounded
+  (several axes move at once) and is not an appetite (winning a comparison is
+  not wanting something). Two follow-ups now recover exactly what a pick cannot
+  carry, on a six-of-twenty interruption budget, never back to back:
+  **why** names one axis from chips generated off the actual pair difference,
+  and **how much** states an appetite for the winner. They are complementary by
+  construction rather than by tuning — a reason TOPS UP the named axis to what a
+  clean single-axis matchup would have paid and no further, and an appetite
+  records only on the axes the pair AGREED on, which are precisely the ones the
+  comparison was silent about. Negative-controlled: making the reason additive
+  instead of a top-up fails 2 tests.
+- **Showdown: "why do I keep seeing the same films?" — answered and fixed.**
+  `StoredDna.usedTitleIds` was declared, initialised to `[]`, and never written
+  or read; `seenTitleIds` was session-scoped. Measured with the memory disabled:
+  **38 of 40 titles in session 2 were repeats from session 1.** Exposure is now
+  a queue, not a set — the newest exposures are suppressed and the oldest
+  released once suppression would leave less than half the pool dealable, so
+  nothing repeats between consecutive sessions and the pool never starves.
+- **Showdown: the canonical write path had no caller.**
+  `recordShowdownSession` — the validated server action that writes
+  `preference_events` — was referenced only by a doc comment and a test. A
+  signed-in player's calibration reached localStorage and stopped there; the
+  whole pure chain from a tap to a rank delta was proved in `downstream.test.ts`
+  and never actually run. Now fired on a completed `dna` run.
+- **Showdown: `Both` shipped as a control, and the defect that was waiting for it.**
+  The verdict existed in the engine since the ledger split but had no button.
+  Its canonical crossing had no branch either — it fell through
+  `verdict === 'left' ? left : right` and filed "I want both of these" as a vote
+  for whichever poster was on the right, discarding half the answer. The server
+  action's zod schema also rejected `both` outright, which would have failed
+  `safeParse` and discarded the entire session, not just that decision.
+- **Showdown: `carriedTitleIds` separates carried-in from shown.**
+  Found by a failing exposure test: `seenTitleIds` holds both the suppression
+  list a run was seeded with and the titles it actually showed. Writing the
+  whole thing back would re-stamp every avoided title as freshly seen, so the
+  oldest exposures could never age out and the release policy would silently
+  never release.
 - **The three false channels are gone from production (`bcb1974`).**
   `NBC.com`, `ABC News Live` and `CBS News` — streaming feeds rendered as
   television channels — are removed from the data and the rendered guide.

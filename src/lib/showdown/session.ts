@@ -25,7 +25,7 @@
  * PURE. Time is passed in, never read.
  */
 
-import type { DiagnosticTitle } from '@/lib/voice/quickdna/definition';
+import { TITLES, type DiagnosticTitle } from '@/lib/voice/quickdna/definition';
 import { type TraitKey, type TraitProfile } from '@/lib/voice/quickdna/traits';
 import { pairKey, pull, separation, type Matchup } from './matchup';
 import { SCAN_DECISIONS, SCAN_MIN_DECISIONS, nextScanMatchup } from './scanner';
@@ -45,6 +45,18 @@ import {
   type SessionLean,
   type ShowdownMode,
 } from './evidence';
+import {
+  chooseFollowUp,
+  intensityEvidence,
+  intensityLean,
+  reasonEvidence,
+  reasonLean,
+  writtenOn,
+  type FollowUp,
+  type Intensity,
+  type Pair,
+} from './followup';
+import { GUT_CALL, type ReasonChip } from './reasons';
 
 /**
  * BOTH is not a hedge, it is a distinct claim.
@@ -103,6 +115,14 @@ export interface ShowdownDecision {
   gain: number;
   at: number;
   responseMs: number;
+  /**
+   * The reason chip the player named, when they were asked and answered.
+   * `'gut'` is a real answer meaning "no single axis" — distinct from absent,
+   * which means the question was never put.
+   */
+  reason?: string;
+  /** Stated appetite for the winner, when asked. Absent means never asked. */
+  intensity?: Intensity;
 }
 
 export interface ShowdownState {
@@ -128,9 +148,30 @@ export interface ShowdownState {
   seenTitleIds: string[];
   recentAxes: TraitKey[];
   current: Matchup | null;
+  /**
+   * Follow-up questions already spent — the interruption budget.
+   *
+   * ON THE STATE, NOT DERIVED FROM `decisions`, because a follow-up that was
+   * OFFERED and dismissed costs the player the same second as one they
+   * answered. Counting only the answered ones would let a player who keeps
+   * tapping "gut call" be interrupted on every round.
+   */
+  followups: number;
+  /** Decision index (1-based) of the last follow-up offered. 0 = none yet. */
+  lastFollowupRound: number;
   /** Rounds spent on pairs the player did not recognise. They advance the
    *  scan clock without producing evidence, so the phases still progress. */
   unseenRounds: number;
+  /**
+   * How many of `seenTitleIds` were CARRIED IN rather than shown.
+   *
+   * Without this the two are indistinguishable, and the durable exposure
+   * history would treat every carried-in id as freshly seen — re-stamping the
+   * whole suppression list as brand new at the end of every run, so the oldest
+   * exposures could never age out and the release policy would silently never
+   * release. `exposedThisSession` is the only correct thing to write back.
+   */
+  carriedTitleIds: number;
   /** Confidence coverage when the session opened — the "21% → 34%" starting point. */
   openingKnown: number;
   startedAt: number;
@@ -159,6 +200,9 @@ export function createSession(
     seenTitleIds: [...(seed.seenTitleIds ?? [])],
     recentAxes: [],
     current: null,
+    followups: 0,
+    lastFollowupRound: 0,
+    carriedTitleIds: (seed.seenTitleIds ?? []).length,
     unseenRounds: 0,
     openingKnown: seed.openingKnown ?? 0,
     startedAt,
@@ -200,8 +244,16 @@ export function startSession(state: ShowdownState, now = 0): ShowdownState {
    hide that is worse than reporting it. Two pre-existing cases assert this
    boundary deliberately; they were right. */
 
+/**
+ * What the evidence layer needs from a matchup: the two films and how much the
+ * question was worth. Structurally narrower than `Matchup` so a decision can be
+ * re-priced later from its recorded ids and gain, without inventing the
+ * planner's `testing` and `attribution` to satisfy a type.
+ */
+export type EvidencePair = Pair & { gain: number };
+
 /** Every axis either title asserts anything about. */
-function axesOf(matchup: Matchup): TraitKey[] {
+function axesOf(matchup: Pair): TraitKey[] {
   const axes = new Set<TraitKey>();
   for (const e of matchup.left.traits) axes.add(e.key);
   for (const e of matchup.right.traits) axes.add(e.key);
@@ -213,7 +265,7 @@ function axesOf(matchup: Matchup): TraitKey[] {
  * Exported because "how confounded is this matchup" is a claim worth asserting
  * directly in tests rather than inferring from a resulting weight.
  */
-export function separations(matchup: Matchup): number[] {
+export function separations(matchup: Pair): number[] {
   return axesOf(matchup)
     .map((key) => Math.min(1, separation(matchup.left, matchup.right, key)))
     .filter((s) => s > 0);
@@ -228,7 +280,7 @@ export function separations(matchup: Matchup): number[] {
  * move: the choice said nothing about them.
  */
 export function permanentEvidenceFor(
-  matchup: Matchup,
+  matchup: EvidencePair,
   verdict: Verdict,
 ): PermanentTraitEvidence[] {
   const { left, right } = matchup;
@@ -323,7 +375,7 @@ export function permanentEvidenceFor(
  * tonight, on the same restraint the permanent path uses.
  */
 export function sessionEvidenceFor(
-  matchup: Matchup,
+  matchup: Pair,
   verdict: Verdict,
 ): SessionContextEvidence[] {
   const { left, right } = matchup;
@@ -366,7 +418,7 @@ export function sessionEvidenceFor(
  * asserting the player answered two questions when they answered one.
  */
 export function evidenceFor(
-  matchup: Matchup,
+  matchup: EvidencePair,
   verdict: Verdict,
   mode: ShowdownMode,
 ): DecisionEvidence {
@@ -419,6 +471,140 @@ export function answer(
   return { ...next, current: deal(next) };
 }
 
+/* ------------------------------------------------------------------ *
+ * FOLLOW-UPS — the second and third things a round can ask.
+ *
+ * They act on the decision ALREADY RECORDED, which is why `answer` does not
+ * wait for them: the pick stands on its own, and the follow-up refines it. A
+ * player who closes the tab mid-question loses the refinement and keeps the
+ * pick, which is the right way round.
+ * ------------------------------------------------------------------ */
+
+/** Rebuild the pair a recorded decision was about, or null if it cannot be. */
+export function pairForDecision(decision: ShowdownDecision): EvidencePair | null {
+  const left = TITLES.find((t) => t.id === decision.leftId);
+  const right = TITLES.find((t) => t.id === decision.rightId);
+  return left && right ? { left, right, gain: decision.gain } : null;
+}
+
+function winnerOf(pair: EvidencePair, verdict: Verdict): DiagnosticTitle | null {
+  if (verdict === 'left') return pair.left;
+  if (verdict === 'right') return pair.right;
+  return null;
+}
+
+/**
+ * The follow-up worth putting to the player right now, or null.
+ *
+ * Called AFTER `answer`, about the decision it just recorded. Returns null on
+ * the great majority of rounds — that is the design, not a fallback.
+ */
+export function followUpFor(state: ShowdownState): FollowUp {
+  const decision = state.decisions[state.decisions.length - 1];
+  if (!decision) return null;
+  if (decision.reason !== undefined || decision.intensity !== undefined) return null;
+  const pair = pairForDecision(decision);
+  if (!pair) return null;
+  const index = state.decisions.length;
+  return chooseFollowUp({
+    pair,
+    winner: winnerOf(pair, decision.verdict),
+    attribution: attributionConfidence(separations(pair)),
+    decisionIndex: index,
+    spent: state.followups,
+    backToBack: state.lastFollowupRound === index - 1,
+  });
+}
+
+/**
+ * Fold extra evidence into the run and re-deal.
+ *
+ * RE-DEALING IS THE POINT of asking mid-game rather than at the end. The next
+ * matchup was chosen against the profile as it stood a moment ago; a stated
+ * reason is the sharpest single observation the game collects, so the very next
+ * question should already reflect it. Re-dealing cannot repeat a title — the
+ * pending pair was never added to `seenTitleIds`, which only fills on `answer`.
+ */
+function withFollowUp(
+  state: ShowdownState,
+  permanent: readonly PermanentTraitEvidence[],
+  session: readonly SessionContextEvidence[],
+  annotate: (d: ShowdownDecision) => ShowdownDecision,
+): ShowdownState {
+  const last = state.decisions.length - 1;
+  if (last < 0) return state;
+  const decisions = state.decisions.map((d, i) => (i === last ? annotate(d) : d));
+  const next: ShowdownState = {
+    ...state,
+    decisions,
+    profile: state.mode === 'dna' ? applyPermanent(state.profile, permanent) : state.profile,
+    lean: state.mode === 'tonight' ? accumulateSession(state.lean, session) : state.lean,
+    followups: state.followups + 1,
+    lastFollowupRound: state.decisions.length,
+    current: null,
+  };
+  return { ...next, current: deal(next) };
+}
+
+/** "Why did you pick that one?" — answered. */
+export function addReason(state: ShowdownState, chip: ReasonChip): ShowdownState {
+  const decision = state.decisions[state.decisions.length - 1];
+  if (!decision) return state;
+  const pair = pairForDecision(decision);
+  if (!pair) return state;
+  /* The top-up is measured against what THIS decision already wrote on the
+     named axis, recomputed from the recorded pair rather than remembered — one
+     source of truth for what a pick is worth, and no stored intermediate to
+     drift out of step with `permanentEvidenceFor`. */
+  const already = writtenOn(permanentEvidenceFor(pair, decision.verdict), chip.key);
+  return withFollowUp(
+    state,
+    reasonEvidence(chip, already),
+    reasonLean(chip, SESSION_LEAN_STEP),
+    (d) => ({ ...d, reason: chip.id }),
+  );
+}
+
+/** "How much do you want it?" — answered. */
+export function addIntensity(state: ShowdownState, intensity: Intensity): ShowdownState {
+  const decision = state.decisions[state.decisions.length - 1];
+  if (!decision) return state;
+  const pair = pairForDecision(decision);
+  if (!pair) return state;
+  const winner = winnerOf(pair, decision.verdict);
+  if (!winner) return state;
+  return withFollowUp(
+    state,
+    intensityEvidence(pair, winner, intensity),
+    intensityLean(pair, winner, intensity, SESSION_LEAN_STEP),
+    (d) => ({ ...d, intensity }),
+  );
+}
+
+/**
+ * The follow-up was shown and waved away.
+ *
+ * SPENDS THE BUDGET ANYWAY. Dismissing costs the player the same beat as
+ * answering, and a budget that only counts answers would interrupt a player who
+ * never wants to elaborate on every single round. It records no evidence and
+ * annotates nothing: not answering is not an answer.
+ */
+export function skipFollowUp(state: ShowdownState): ShowdownState {
+  if (state.decisions.length === 0) return state;
+  return {
+    ...state,
+    followups: state.followups + 1,
+    lastFollowupRound: state.decisions.length,
+  };
+}
+
+/** How many follow-ups this session actually got an answer to. */
+export function answeredFollowUps(state: ShowdownState): number {
+  return state.decisions.filter(
+    (d) => (d.reason !== undefined && d.reason !== GUT_CALL.id) || d.intensity !== undefined,
+  ).length;
+}
+
 /**
  * "I haven't seen either of these."
  *
@@ -441,6 +627,28 @@ export function markUnseen(state: ShowdownState, now: number): ShowdownState {
     current: null,
   };
   return { ...next, current: deal(next) };
+}
+
+/**
+ * How cleanly a recorded decision isolated an axis.
+ *
+ * Recomputed from the pair rather than remembered, so a session restored from
+ * `sessionStorage` — where the planner's transient `Matchup` did not survive —
+ * prices its decisions identically to one still in memory.
+ */
+export function attributionOf(decision: ShowdownDecision): number {
+  const pair = pairForDecision(decision);
+  return pair ? attributionConfidence(separations(pair)) : 0;
+}
+
+/**
+ * The titles this run actually put in front of the player, oldest first.
+ *
+ * What the durable exposure history must be fed — never `seenTitleIds`, which
+ * also contains everything the run was told to avoid.
+ */
+export function exposedThisSession(state: ShowdownState): string[] {
+  return state.seenTitleIds.slice(state.carriedTitleIds);
 }
 
 export function isComplete(state: ShowdownState): boolean {

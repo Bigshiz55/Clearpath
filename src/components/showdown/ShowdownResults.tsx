@@ -4,11 +4,16 @@
  * THE PAYOFF.
  *
  * Every number here is computed from the session that just happened. The
- * before/after is real `dnaKnown()`, the insights come from the synthesis layer
- * that only makes a comparative claim when both sides are confident enough to
- * mean it, and the recommendations are ranked from the UPDATED profile. Nothing
- * on this screen is a fixed demo list, and nothing claims precision the
- * evidence does not support.
+ * before/after is real `dnaKnown()`, and the readout is ranked by
+ * DISTINCTIVENESS rather than confidence — see `dnaSummary.ts` for why that
+ * distinction is the difference between a portrait and a horoscope. Nothing on
+ * this screen is a fixed demo list, and nothing claims precision the evidence
+ * does not support.
+ *
+ * WHAT IT WILL NOT DO IS PAD. Three statements, six cluster meters, three
+ * films. A results screen that lists thirty axes is a data dump that says "we
+ * measured a lot" instead of "here is who you are", and the axes at the bottom
+ * of such a list are exactly the ones the scan is least sure about.
  *
  * THE HONEST-FAILURE CASE MATTERS MOST. Someone who answered "haven't seen
  * either" throughout has taught the engine nothing, and the screen has to say
@@ -19,17 +24,20 @@
 import { useMemo } from 'react';
 import type { ShowdownMode } from '@/lib/showdown/evidence';
 import { dnaKnown } from '@/lib/tastedna/families';
-import { insightChips } from '@/lib/voice/quickdna/synthesis';
+import { clusterReadout, dnaSummary } from '@/lib/showdown/dnaSummary';
+import { answeredFollowUps, type ShowdownState } from '@/lib/showdown/session';
 import { TITLES } from '@/lib/voice/quickdna/definition';
 import { traitBelief, traitConfidence } from '@/lib/voice/quickdna/traits';
-import type { ShowdownState } from '@/lib/showdown/session';
 
 /**
- * Rank the catalogue against the profile this session just produced.
+ * Rank the diagnostic catalogue against the profile this session produced.
  *
- * Weighted by confidence, so a trait we barely know barely counts — the same
- * shape the recommender uses, rather than a parallel scoring rule that could
- * drift away from what the rest of the product does.
+ * DELIBERATELY LABELLED FOR WHAT IT IS. This is the 113-title diagnostic pool
+ * scored by Showdown's own model — not the product's ranking pipeline, which
+ * lives behind `rankByDna` and needs the server. Calling these "your
+ * recommendations" would be the overclaim the whole rebuild is against; they
+ * are the best matches among the films the game knows, and the button below is
+ * what takes the player to the real thing.
  */
 function recommend(state: ShowdownState, count = 3) {
   const reacted = new Set(state.decisions.flatMap((d) => [d.leftId, d.rightId]));
@@ -66,28 +74,31 @@ export function ShowdownResults({
   mode?: ShowdownMode;
 }) {
   const known = useMemo(() => dnaKnown(state.profile), [state.profile]);
-  const chips = useMemo(() => insightChips(state.profile, 3), [state.profile]);
+  const summary = useMemo(() => dnaSummary(state.profile, 3), [state.profile]);
+  const clusters = useMemo(() => clusterReadout(state.profile), [state.profile]);
   const picks = useMemo(() => recommend(state), [state]);
 
   const decisions = state.decisions.length;
+  const elaborated = answeredFollowUps(state);
   const gained = Math.round(known * 100) - Math.round(openingKnown * 100);
   const learnedNothing = decisions === 0;
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-lg flex-col gap-6 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-8">
+    <div className="mx-auto flex min-h-[100dvh] w-full max-w-lg flex-col gap-5 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-8">
       <div>
         <h1
           data-testid="showdown-results"
           data-decisions={decisions}
           data-known={Math.round(known * 100)}
           data-opening={Math.round(openingKnown * 100)}
+          data-elaborated={elaborated}
           className="text-3xl font-black uppercase tracking-tight text-white sm:text-4xl"
         >
           {learnedNothing
             ? 'Nothing learned yet'
             : mode === 'tonight'
               ? 'Tonight’s picks'
-              : 'You just taught us something real'}
+              : 'Here’s what you watch'}
         </h1>
 
         {learnedNothing ? (
@@ -103,9 +114,7 @@ export function ShowdownResults({
              Showing "0% → 0%" would be technically true and still a lie by
              implication — it invites the reading that the run was worthless,
              when in fact it did exactly what it promised and shaped tonight.
-             Showing any INCREASE would be a straight falsehood. The honest
-             thing is to report what this run actually changed: the list below,
-             for this session only. */
+             Showing any INCREASE would be a straight falsehood. */
           <p className="mt-2 text-sm text-slate-400">
             {decisions} {decisions === 1 ? 'pick' : 'picks'} · shaping{' '}
             <span className="font-bold text-amber-300">tonight only</span> — your Taste DNA is
@@ -113,46 +122,77 @@ export function ShowdownResults({
           </p>
         ) : (
           /* WHAT THIS SCREEN MAY HONESTLY CLAIM.
-             One 12-decision run moves the belief but reaches confidence 0.190
-             against the ranker's floor of 0.25 — so it produces a ranking nudge
-             of exactly zero. "Your recommendations are now personalised" would
-             therefore be false, and the old "your DNA just got sharper" over a
-             rising percentage implied it. What IS true is that something real
-             was learned and that another run is what makes it count, so that is
-             what it says. The percentage stays because it is a measured
-             coverage figure; the raw confidence decimal does not, because it is
-             a diagnostic number and belongs at /api/health/showdown. */
-          <>
-            <p className="mt-2 text-sm text-slate-400">
-              {decisions} {decisions === 1 ? 'decision' : 'decisions'} ·{' '}
-              <span className="font-bold text-amber-300 tabular-nums">
-                {Math.round(openingKnown * 100)}% → {Math.round(known * 100)}%
-              </span>{' '}
-              of your taste mapped{gained > 0 ? ` (+${gained})` : ''}
-            </p>
-            <p className="mt-3 text-sm text-slate-300" data-testid="showdown-progression">
-              Your Taste DNA sharpens every time you play.{' '}
-              <span className="font-semibold text-white">
-                One more Showdown and we can start shaping what we recommend.
-              </span>
-            </p>
-          </>
+             One run moves the belief but lands near the ranker's confidence
+             floor, so it does not yet reliably reorder anything. "Your
+             recommendations are now personalised" would therefore be false.
+             What IS true is that something real was learned and that another
+             run is what makes it count, so that is what it says. */
+          <p className="mt-2 text-sm text-slate-400">
+            {decisions} {decisions === 1 ? 'decision' : 'decisions'}
+            {elaborated > 0 ? `, ${elaborated} explained` : ''} ·{' '}
+            <span className="font-bold text-amber-300 tabular-nums">
+              {Math.round(openingKnown * 100)}% → {Math.round(known * 100)}%
+            </span>{' '}
+            of your taste mapped{gained > 0 ? ` (+${gained})` : ''}
+          </p>
         )}
       </div>
 
-      {chips.length > 0 && (
+      {/*
+        LAYER ONE — THREE SENTENCES.
+        Ranked by distinctiveness, so what leads is what makes this person
+        different, not what most players happen to share. An axis the scan did
+        not resolve is absent rather than softened.
+      */}
+      {summary.length > 0 && (
+        <ul className="flex flex-col gap-2" data-testid="showdown-summary">
+          {summary.map((line) => (
+            <li
+              key={line}
+              data-testid="showdown-summary-line"
+              className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm font-semibold leading-snug text-emerald-100"
+            >
+              {line}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/*
+        LAYER TWO — WHAT WAS AND WAS NOT RESOLVED.
+        The meter is coverage, not preference: it says how much of each cluster
+        the scan actually settled. Reporting the gaps is the point — ninety
+        seconds cannot know everything about a person, and a readout that
+        implies otherwise is the failure mode this rebuild is against.
+      */}
+      {!learnedNothing && (
         <div>
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">
-            {mode === 'tonight' ? 'What you’re in the mood for' : 'What that told us'}
+            What we mapped
           </h2>
-          <ul className="mt-2 flex flex-col gap-2" data-testid="showdown-insights">
-            {chips.map((c) => (
+          <ul className="mt-2 grid grid-cols-2 gap-2" data-testid="showdown-clusters">
+            {clusters.map((c) => (
               <li
                 key={c.id}
-                data-testid="showdown-insight"
-                className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100"
+                data-testid="showdown-cluster"
+                data-cluster={c.id}
+                data-resolved={Math.round(c.resolved * 100)}
+                className="rounded-xl bg-white/5 px-3 py-2"
               >
-                {c.text}
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-300">
+                    {c.label}
+                  </span>
+                  <span className="text-[0.65rem] font-black tabular-nums text-slate-500">
+                    {Math.round(c.resolved * 100)}%
+                  </span>
+                </div>
+                <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-amber-300"
+                    style={{ width: `${Math.round(c.resolved * 100)}%` }}
+                  />
+                </div>
               </li>
             ))}
           </ul>
@@ -162,7 +202,7 @@ export function ShowdownResults({
       {!learnedNothing && (
         <div>
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">
-            What you&rsquo;d watch tonight
+            Closest matches in the game&rsquo;s catalogue
           </h2>
           <ul className="mt-2 flex flex-col gap-2" data-testid="showdown-picks">
             {picks.map(({ title }) => (
@@ -180,7 +220,7 @@ export function ShowdownResults({
         </div>
       )}
 
-      <div className="mt-auto flex flex-col gap-3">
+      <div className="mt-auto flex flex-col gap-3 pt-2">
         <button
           type="button"
           data-testid="showdown-continue"

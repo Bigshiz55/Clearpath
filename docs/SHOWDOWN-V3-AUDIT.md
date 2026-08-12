@@ -123,3 +123,71 @@ Different from the brief's, because Phase 1 changed what the dependencies are:
 Building the UI first would produce a beautiful surface over a model that
 cannot express itself to the recommender — which is §24's *"visual polish hides
 shallow evidence"*.
+
+---
+
+# Phase 2 — what was built, and what it measured
+
+Blocker 3 and both secondaries are done. Blocker 1 and Blocker 2 are not, and
+are the top two items in `BACKLOG.md`'s **Next**.
+
+| | before | after |
+|---|---|---|
+| Evidence types captured | 1 of 8 | **3** (choice · reason · appetite) |
+| Interaction types on screen | 1 | **3** + a fourth verdict (`Both`) |
+| Cross-session exposure memory | none | queue with release |
+| Repeats in session 2 (measured) | **38 / 40** | **0 / 40** |
+| Canonical write path callers | **0** | 1 (completed `dna` runs) |
+| Verdicts the server action accepts | 3 of 4 | 4 of 4 |
+
+## Three defects found while building, none of them the thing being built
+
+**The canonical write path had no caller.** `recordShowdownSession` is a
+validated server action that writes `preference_events`, and `grep` found it
+referenced only by a doc comment and a test. Every claim about Showdown
+reaching the ranker was true of the pure chain and false of the running app.
+
+**`both` was unrepresentable end to end.** The verdict has existed in the engine
+since the ledger split. `decisionToEvents` had no branch for it — it fell
+through `verdict === 'left' ? left : right` and filed "I want both of these" as
+a vote for whichever poster happened to be on the right. The server action's zod
+enum omitted it too, so a single `both` in a run would have failed `safeParse`
+and discarded **every** decision in that session. Both are invisible for exactly
+as long as no control can produce the verdict, which is why adding the button is
+what would have shipped them.
+
+**`seenTitleIds` conflated two different things.** It holds both the suppression
+list a session is seeded with and the titles it actually showed. Feeding the
+whole thing back to the durable history re-stamps every *avoided* title as
+freshly seen, so the oldest exposures could never age out and the release policy
+would silently never release. Found by a failing test, fixed with
+`carriedTitleIds` in the engine rather than by adjusting the test.
+
+## The two invariants worth stating
+
+**A reason tops up; it does not add.** A confounded pick plus a stated reason
+equals exactly what a clean single-axis matchup would have paid on that axis —
+`already + topUp === REASON_CEILING`. Adding full strength on top would let a
+four-axis guess plus one tap outweigh a genuinely clean comparison, inverting
+the ordering `attribution.ts` exists to produce. Negative control: making it
+additive fails two tests.
+
+**An appetite lands only on the agreed axes.** The comparison already spoke for
+every axis the pair split on; the appetite records only where they agreed. The
+two evidence types cannot double-count because their domains are disjoint by
+construction, not because a weight was tuned.
+
+## Costs stated plainly
+
+- Six of twenty rounds may be interrupted, never two running. Follow-ups are the
+  highest-quality evidence per second, and asking always would take the run past
+  three minutes — evidence from a session nobody finishes is worth nothing.
+- The exposure reserve keeps half the catalogue dealable. With 113 titles and 40
+  exposures per session that means sessions 1 and 2 never repeat, and session 3
+  can re-meet ~23 titles from session 1. Total suppression would fix the repeat
+  and empty the pool during session 3; the reserve is the trade, and pool
+  expansion is what actually removes it.
+- A stated reason moves the canonical grade by one rung
+  (`maybe_interested → interested`) and never to `must_watch`. It removes the
+  confounding penalty, which is what it earns; only the player saying "I'm
+  watching that tonight" reaches the top rung.

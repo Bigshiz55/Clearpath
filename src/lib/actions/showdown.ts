@@ -25,11 +25,19 @@ import { writeCoverage, type WriteCoverage } from '@/lib/showdown/dimensionCover
 const decisionSchema = z.object({
   leftId: z.string().min(1).max(64),
   rightId: z.string().min(1).max(64),
-  verdict: z.enum(['left', 'right', 'neither']),
+  /* `both` IS ACCEPTED HERE OR THE WHOLE SESSION IS REJECTED. The verdict has
+     existed in the engine since the ledger split; the moment a control produces
+     it, a schema that omits it fails `safeParse` and discards every decision in
+     the run — not the one answer it did not recognise. */
+  verdict: z.enum(['left', 'right', 'neither', 'both']),
   at: z.number().int().nonnegative(),
   responseMs: z.number().int().min(0).max(600_000),
   /** How cleanly the matchup isolated an axis — decides the attraction grade. */
   attribution: z.number().min(0).max(1),
+  /** Reason chip id, when the player was asked why and answered. */
+  reason: z.string().max(64).optional(),
+  /** Stated appetite for the winner, when asked. Outranks the inferred grade. */
+  intensity: z.enum(['must', 'keen', 'relative']).optional(),
 });
 
 const schema = z.object({
