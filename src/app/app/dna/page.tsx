@@ -62,29 +62,11 @@ export default async function WatchDnaPage() {
               run reaches confidence 0.190 against the ranker's 0.25 floor. */}
           <Link href="/app/showdown" className="card p-4 transition hover:bg-white/10" data-testid="link-showdown">
             <div className="flex items-center gap-2 text-base font-bold text-white">
-              <span aria-hidden>⚔️</span> Showdown
+              <span aria-hidden>⚔️</span> The Taste Game
             </div>
             <p className="mt-1 text-sm text-slate-400">
-              Two films, one tap, twelve times. The quickest way to teach us what you actually
-              reach for — and it gets sharper every time you play.
-            </p>
-          </Link>
-          <Link href="/app/taste-quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-taste-quiz">
-            <div className="flex items-center gap-2 text-base font-bold text-white">
-              <span aria-hidden>🎬</span> Taste Quiz
-            </div>
-            <p className="mt-1 text-sm text-slate-400">
-              Tap the real titles you recognise — good or not — and say what you thought of the ones
-              you have already seen. Ignoring one costs nothing.
-            </p>
-          </Link>
-          <Link href="/app/rapid-fire" className="card p-4 transition hover:bg-white/10" data-testid="link-rapid-fire">
-            <div className="flex items-center gap-2 text-base font-bold text-white">
-              <span aria-hidden>⚡️</span> Rapid Fire
-            </div>
-            <p className="mt-1 text-sm text-slate-400">
-              Import your history, then rate it at a tap a title. Turns &ldquo;you pressed play&rdquo; into
-              something worth ranking on. Try it on sample data first.
+              Two films, one tap. Instinct rounds, a rapid-fire burst, and the odd question
+              only you can answer — then we tell you what you actually reach for, and why.
             </p>
           </Link>
           <Link href="/import-taste" className="card p-4 transition hover:bg-white/10" data-testid="link-import-taste">

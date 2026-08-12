@@ -817,3 +817,43 @@ export function answerCalibration(
 export function skipCalibration(state: ShowdownState, question: CalibrationQuestion): ShowdownState {
   return { ...state, calibrated: [...state.calibrated, question.key] };
 }
+
+/**
+ * A RAPID ROUND RAN OUT OF TIME.
+ *
+ * The most important function in the burst, and the one easiest to get wrong.
+ * A countdown creates enormous pressure to treat silence as an answer —
+ * "they didn't want either" is right there, and `neither` already exists. It
+ * is wrong. A player who looked away, whose thumb was somewhere else, or who
+ * simply could not decide in five seconds has told us NOTHING, and recording
+ * a rejection of two films because of it is how a timed mechanic quietly
+ * poisons a profile.
+ *
+ * So this writes no decision and folds no evidence. Structurally it cannot:
+ * there is no call to `evidenceFor` or `applyPermanent` anywhere in it, so
+ * "timeout contributes nothing" is a property of the code rather than a
+ * promise in a comment.
+ *
+ * It differs from `markUnseen` in one way that matters — the titles are NOT
+ * added to `unseenTitles`. Running out of time says nothing about whether the
+ * player recognises a film, and claiming it does would corrupt the recognition
+ * signal to save a round. Both titles still retire from the deal, because the
+ * no-repeat invariant is about what has been SHOWN.
+ */
+export function timeoutRound(state: ShowdownState, now: number): ShowdownState {
+  const matchup = state.current;
+  if (!matchup) return state;
+  const next: ShowdownState = {
+    ...state,
+    seenTitleIds: [...state.seenTitleIds, matchup.left.id, matchup.right.id],
+    seenPairs: [...state.seenPairs, pairKey(matchup.left.id, matchup.right.id)],
+    /* THE CLOCK ADVANCES. Unlike an unrecognised pair — which is a fact about
+       the catalogue and so the catalogue pays for it — a timeout is a round the
+       player genuinely spent. Not advancing would let somebody wait out the
+       burst and still be asked twelve scored questions. */
+    unseenRounds: state.unseenRounds + 1,
+    startedAt: state.startedAt || now,
+    current: null,
+  };
+  return { ...next, current: deal(next) };
+}

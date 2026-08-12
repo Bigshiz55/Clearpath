@@ -129,11 +129,16 @@ describe('what was deliberately kept', () => {
     expect(read('src/app/app/dna/page.tsx')).toContain('/import-taste');
   });
 
-  it('TEST 8: Build Your Watch DNA offers exactly the quiz and the import', () => {
+  it('TEST 8: Build Your Watch DNA offers exactly the Taste Game and the import', () => {
+    /* WAS "exactly the quiz and the import" (A1). The standalone quiz is no
+       longer promoted as a primary way to build Taste DNA: Showdown does that
+       job better and does it as a game. Import survives because it does a job
+       Showdown cannot — bringing in history the player already has. */
     const dna = read('src/app/app/dna/page.tsx');
-    expect(dna).toContain('link-taste-quiz');
+    expect(dna).toContain('link-showdown');
     expect(dna).toContain('link-import-taste');
     expect(dna).not.toContain('link-voice-dna');
+    expect(dna).not.toContain('link-taste-quiz');
     // ...and says DNA keeps growing on its own, so neither is a gate.
     expect(dna).toContain('dna-grows');
   });

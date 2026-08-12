@@ -73,9 +73,10 @@ import {
   type ShowdownState,
   type Verdict,
 } from '@/lib/showdown/session';
-import { calibrationFor, answerCalibration, skipCalibration } from '@/lib/showdown/session';
+import { calibrationFor, answerCalibration, skipCalibration, timeoutRound } from '@/lib/showdown/session';
 import { planRound } from '@/lib/showdown/arc';
 import { ColdOpen } from './ColdOpen';
+import { RoundStage } from './RapidBurst';
 import { CalibrationCard } from './CalibrationCard';
 import { PosterTile } from './PosterTile';
 import { ShowdownResults } from './ShowdownResults';
@@ -568,8 +569,12 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
                screen read as a form with pictures on it. Capping the ratio and
                centring the row gives the space back to the parts of the screen
                that are actually saying something. */
-            <div className="flex min-h-0 flex-1 items-center justify-center">
-              <div className="grid h-full w-full grid-cols-2 items-stretch gap-3 lg:gap-8">
+            <RoundStage
+              round={round}
+              roundKey={String(done)}
+              onExpire={() => setState((prev) => (prev ? timeoutRound(prev, Date.now()) : prev))}
+            >
+              <div className="grid h-full w-full grid-cols-2 items-stretch gap-3 lg:gap-8" data-testid="showdown-pair">
                 <PosterTile
                   posterPath={posters[shown.left.id] ?? null}
                   title={shown.left}
@@ -595,7 +600,7 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
                     onPick={() => decide('right')}
                   />
               </div>
-            </div>
+            </RoundStage>
           )}
 
           {/* THE LEARNING, DIRECTLY UNDER THE FILMS. It is feedback on the tap

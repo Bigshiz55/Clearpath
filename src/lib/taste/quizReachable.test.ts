@@ -92,11 +92,28 @@ describe('entry points', () => {
     }
   });
 
-  it('the DNA hub offers three ways in', () => {
+  it('the DNA hub leads with ONE Taste Game, and import as a separate job', () => {
+    /* THE PRODUCT CONTRACT CHANGED, DELIBERATELY (A1).
+       This used to assert "three ways in" — Showdown, the standalone quiz and
+       Rapid Fire, presented as equivalent ways to build Taste DNA. Three
+       equivalent options is not a choice, it is a decision the player has no
+       information to make, and it is why none of them felt like the product.
+
+       The new contract: Showdown is THE calibration game. Import is a
+       different job — ingesting history you already have — so it stays, plainly
+       labelled as that rather than as a third way to play. */
     const hub = read('src/app/app/dna/page.tsx');
-    expect(hub).toContain('data-testid="link-taste-quiz"');
+    expect(hub).toContain('data-testid="link-showdown"');
     expect(hub).toContain('data-testid="link-import-taste"');
-    expect(hub).toContain(QUIZ_HREF);
+  });
+
+  it('does not promote a second calibration GAME beside Showdown', () => {
+    /* The routes may still exist — /app/taste-quiz is reachable and
+       /app/rapid-fire still triages imported history. What must not come back
+       is a hub that advertises them as equivalent primary ways to build taste. */
+    const hub = read('src/app/app/dna/page.tsx');
+    expect(hub).not.toContain('data-testid="link-taste-quiz"');
+    expect(hub).not.toContain('data-testid="link-rapid-fire"');
   });
 
   it('/app/quiz redirects to the one canonical quiz, /app/taste-quiz, forwarding the founder session', () => {
