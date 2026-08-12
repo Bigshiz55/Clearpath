@@ -40,8 +40,19 @@ for (const [name, vp] of [['desktop', { width: 1440, height: 900 }], ['mobile', 
         await page.waitForTimeout(1100);
         continue;
       }
+      const disc = await page.getByTestId('showdown-discovery').isVisible().catch(() => false);
+      if (disc) {
+        await page.screenshot({ path: `${OUT}/${name}-7-discovery.png` });
+        console.log(`[${name}] discovery evidence:`, await page.getByTestId('showdown-discovery-evidence').textContent().catch(() => 'none'));
+        await page.locator('[data-testid="showdown-discovery"] button').first().click();
+        await page.waitForTimeout(300); continue;
+      }
       const why = await page.getByTestId('showdown-why').isVisible().catch(() => false);
-      if (why) { await page.getByTestId('showdown-why-gut').click(); await page.waitForTimeout(250); continue; }
+      if (why) {
+        await page.screenshot({ path: `${OUT}/${name}-6-followup.png` });
+        console.log(`[${name}] follow-up lead:`, await page.getByTestId('showdown-why-lead').textContent().catch(() => 'none'));
+        await page.getByTestId('showdown-why-gut').click(); await page.waitForTimeout(250); continue;
+      }
       const intensity = await page.getByTestId('showdown-intensity').isVisible().catch(() => false);
       if (intensity) { await page.getByTestId('showdown-intensity-relative').click(); await page.waitForTimeout(250); continue; }
       const tiles = page.locator('[data-testid^="showdown-pick-"]');

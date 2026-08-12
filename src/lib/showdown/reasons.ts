@@ -213,3 +213,81 @@ export function shouldAskWhy(attribution: number, chips: readonly ReasonChip[]):
  * rather than being told.
  */
 export const REASON_ATTRIBUTION = 1;
+
+/**
+ * THE FOLLOW-UP, AS A SENTENCE ABOUT THESE TWO FILMS.
+ *
+ * ── WHAT WAS WRONG WITH IT ────────────────────────────────────────────────
+ * The evidence side of this mechanic was already right: chips are built from
+ * the axes THESE two titles actually diverge on, the question only fires when
+ * attribution is genuinely ambiguous, and "gut call" is a real answer. What
+ * shipped on top of it was a taxonomy form —
+ *
+ *     What tipped it?
+ *     [ More realistic ] [ Less heavy ] [ Darker ] [ No romance needed ]
+ *
+ * — which reads as a survey interrupting a game, because nothing on screen
+ * refers to the decision the player just made. The same chips asked as
+ *
+ *     You went with Prisoners.
+ *     Was it that the danger felt more real?
+ *
+ * are the same observation, and one of them is a conversation.
+ *
+ * ── WHY THE LEADING CHIP GETS THE SENTENCE ────────────────────────────────
+ * `rankChipsByValue` has already decided which axis is worth the interruption.
+ * Promoting that one into the question — and leaving the rest as the ways to
+ * disagree — makes the game commit to a guess, which is both more human and
+ * more informative: "no, something else" about a NAMED hypothesis is a
+ * different and better observation than declining to pick from a list.
+ *
+ * PURE. Copy only; it moves no belief and invents no axis.
+ */
+
+/** How the leading hypothesis is put, per axis. Falls back to the chip label. */
+const HYPOTHESIS: Partial<Record<TraitKey, { high: string; low: string }>> = {
+  grounded: { high: 'the danger felt more real?', low: 'you wanted it further from reality?' },
+  horrorTolerance: { high: 'you wanted to be scared?', low: 'you did not fancy being scared?' },
+  darkness: { high: 'you wanted the darker one?', low: 'you wanted the lighter one?' },
+  psychological: { high: 'you wanted the tension?', low: 'you had had enough tension?' },
+  emotion: { high: 'you wanted to feel something?', low: 'you did not want to be wrung out?' },
+  romance: { high: 'the love story mattered?', low: 'you could do without the romance?' },
+  comedy: { high: 'you wanted to laugh?', low: 'you were not after jokes?' },
+  action: { high: 'you wanted the momentum?', low: 'you wanted something quieter?' },
+  complexity: { high: 'you wanted to work for it?', low: 'you did not want homework?' },
+  patience: { high: 'you were happy to let it build?', low: 'you wanted it to get going?' },
+  supernatural: { high: 'the unexplained appealed?', low: 'ghosts were not it?' },
+  spectacle: { high: 'you wanted the scale?', low: 'scale was not the draw?' },
+  mainstream: { high: 'you wanted the crowd-pleaser?', low: 'you wanted the less obvious one?' },
+  vintage: { high: 'the older one appealed?', low: 'you wanted something more recent?' },
+  subtitles: { high: 'reading it was no obstacle?', low: 'you did not fancy subtitles?' },
+  investigation: { high: 'you wanted a puzzle?', low: 'you did not want to work a case?' },
+  trueCrime: { high: 'it being real mattered?', low: 'you wanted it invented?' },
+  sentimentality: { high: 'you wanted the heart?', low: 'you wanted less sentiment?' },
+};
+
+export interface FollowUpPrompt {
+  /** "You went with Prisoners." — states the decision back. */
+  lead: string;
+  /** The named hypothesis, as a question. */
+  question: string;
+  /** The chip the question is asking about, so a Yes maps to real evidence. */
+  hypothesis: ReasonChip | null;
+}
+
+export function followUpPrompt(
+  winnerTitle: string | null,
+  chips: readonly ReasonChip[],
+): FollowUpPrompt {
+  const top = chips[0] ?? null;
+  const lead = winnerTitle ? `You went with ${winnerTitle}.` : 'Interesting one.';
+  if (!top) return { lead, question: 'What tipped it?', hypothesis: null };
+  const phrasing = HYPOTHESIS[top.key];
+  /* "Was it you did not want to work a case?" is what the naive join produced.
+     A phrase that opens with a pronoun needs the complementiser; one that opens
+     with a noun phrase does not ("Was it the danger felt more real?" is fine). */
+  const phrase = phrasing ? (top.high ? phrasing.high : phrasing.low) : `${top.label.toLowerCase()}?`;
+  const needsThat = /^(you|it|they|we|reading|ghosts|scale|capes)\b/i.test(phrase);
+  const question = `Was it ${needsThat ? 'that ' : ''}${phrase}`;
+  return { lead, question, hypothesis: top };
+}

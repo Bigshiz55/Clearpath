@@ -21,10 +21,17 @@ import type { Discovery } from '@/lib/showdown/discovery';
 
 export function DiscoveryCard({
   discovery,
+  evidence,
   onConfirm,
   onCorrect,
 }: {
   discovery: Discovery;
+  /**
+   * The counted receipt — "3 times you chose it that way." NULL when fewer than
+   * two decisions support the claim, and then nothing is shown rather than a
+   * rounded-up number on the one screen whose entire job is credibility.
+   */
+  evidence?: string | null;
   onConfirm: () => void;
   onCorrect: () => void;
 }) {
@@ -44,6 +51,14 @@ export function DiscoveryCard({
         >
           {discovery.text}
         </p>
+        {evidence && (
+          <p
+            data-testid="showdown-discovery-evidence"
+            className="mt-3 text-sm font-bold text-slate-400"
+          >
+            {evidence}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">

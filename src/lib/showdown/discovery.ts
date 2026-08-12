@@ -37,6 +37,7 @@ import {
 } from '@/lib/voice/quickdna/traits';
 import { MAX_PERMANENT_WEIGHT } from './attribution';
 import type { PermanentTraitEvidence } from './evidence';
+import type { DiagnosticTitle } from '@/lib/voice/quickdna/definition';
 
 /** Below this confidence an axis may not appear in a claim at all. */
 export const CLAIM_CONFIDENCE = 0.34;
@@ -257,4 +258,60 @@ export function discoveryDue(
   if (shown >= max) return false;
   if (decisionCount < DISCOVERY_EARLIEST) return false;
   return decisionCount - lastDiscoveryRound >= DISCOVERY_SPACING;
+}
+
+/**
+ * THE RECEIPT — "three times you passed on supernatural danger for something
+ * grounded".
+ *
+ * ── WHY A CLAIM NEEDS ONE ─────────────────────────────────────────────────
+ * The trigger was already sound: named two-axis patterns, gated on confidence
+ * and lean, spaced so they stay events, deduped so none repeats. What the card
+ * showed was the claim alone — and a claim alone is indistinguishable from a
+ * horoscope, because the player has no way to tell whether it came from their
+ * answers or from a list. The count is what converts "we think you like X" into
+ * "we watched you do this, here is when".
+ *
+ * ── IT IS COUNTED, NOT ESTIMATED ──────────────────────────────────────────
+ * Every one is a real decision replayed: the winner sat on the claimed pole of
+ * the axis and the loser did not. If fewer than two decisions support it this
+ * returns NULL and the card shows the claim bare — a fabricated or rounded-up
+ * number on the one screen whose whole job is credibility would be the worst
+ * possible place to guess.
+ */
+const MIN_CITED = 2;
+
+export function discoveryEvidenceLine(
+  discovery: Discovery,
+  decisions: readonly { leftId: string; rightId: string; verdict: string }[],
+  titles: readonly DiagnosticTitle[],
+): string | null {
+  const byId = new Map(titles.map((t) => [t.id, t]));
+  const lean = (t: DiagnosticTitle | undefined, key: TraitKey): number => {
+    if (!t) return 0;
+    let v = 0;
+    for (const e of t.traits) if (e.key === key) v += e.invert ? -e.strength : e.strength;
+    return v;
+  };
+
+  let cited = 0;
+  for (const d of decisions) {
+    if (d.verdict !== 'left' && d.verdict !== 'right') continue;
+    const winner = byId.get(d.verdict === 'left' ? d.leftId : d.rightId);
+    const loser = byId.get(d.verdict === 'left' ? d.rightId : d.leftId);
+    // Supports the claim when the winner leans the claimed way on EVERY axis
+    // the discovery rests on, and the loser leans the other way on at least one.
+    const winnerAgrees = discovery.axes.every((a) => {
+      const l = lean(winner, a.key);
+      return a.high ? l > 0 : l < 0;
+    });
+    const loserDiffers = discovery.axes.some((a) => {
+      const l = lean(loser, a.key);
+      return a.high ? l < 0 : l > 0;
+    });
+    if (winnerAgrees && loserDiffers) cited += 1;
+  }
+
+  if (cited < MIN_CITED) return null;
+  return `${cited} times you chose it that way.`;
 }

@@ -59,6 +59,7 @@ import {
 import { GUT_CALL, type ReasonChip } from './reasons';
 import {
   calibrationEvidence,
+  contestedAxes,
   selectCalibration,
   type AxisObservation,
   type CalibrationQuestion,
@@ -245,12 +246,19 @@ export function createSession(
  */
 function deal(state: ShowdownState): Matchup | null {
   if (state.decisions.length + state.unseenRounds >= TARGET_DECISIONS) return null;
+  /* THE PLANNER NOW SEES THE ARGUMENTS. Built from the decision list rather
+     than the profile, because a fold cannot represent a contradiction — see
+     `ScanContext.contested`. Same definition the 1-10 question uses. */
+  const contested = new Map<TraitKey, number>();
+  for (const c of contestedAxes(calibrationObservations(state))) contested.set(c.key, c.contested);
+
   return nextScanMatchup({
     profile: state.profile,
     seenTitleIds: [...state.seenTitleIds, ...state.unseenTitles],
     recentAxes: state.recentAxes,
     decisionIndex: state.decisions.length + state.unseenRounds,
     total: TARGET_DECISIONS,
+    contested,
   });
 }
 

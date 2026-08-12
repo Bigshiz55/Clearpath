@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `b70b463` · Branch: `claude/showdown-flagship`
+- Commit: `dbfb7e2` · Branch: `claude/showdown-flagship`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 

@@ -52,9 +52,9 @@ import { dnaKnown } from '@/lib/tastedna/families';
 import { recordExposure, suppressedTitles, trimHistory } from '@/lib/showdown/exposure';
 import { poolExclusions } from '@/lib/showdown/identity';
 import type { FollowUp, Intensity } from '@/lib/showdown/followup';
-import { GUT_CALL, type ReasonChip } from '@/lib/showdown/reasons';
+import { GUT_CALL, followUpPrompt, type ReasonChip } from '@/lib/showdown/reasons';
 import { momentFor } from '@/lib/showdown/moments';
-import type { Discovery } from '@/lib/showdown/discovery';
+import { discoveryEvidenceLine, type Discovery } from '@/lib/showdown/discovery';
 import {
   TARGET_DECISIONS,
   addIntensity,
@@ -538,6 +538,7 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
       ) : discovery ? (
         <DiscoveryCard
           discovery={discovery}
+          evidence={discoveryEvidenceLine(discovery, state.decisions, TITLES)}
           onConfirm={() => resolveDiscovery('confirm')}
           onCorrect={() => resolveDiscovery('correct')}
         />
@@ -546,6 +547,14 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
           {/* MOMENT + PROMPT share one line-height so the layout never jumps
               between a labelled round and a plain one. */}
           <div className="flex shrink-0 flex-col items-center gap-1">
+            {followUp?.kind === 'why' && (
+              /* THE DECISION, STATED BACK. Nothing on the old screen referred to
+                 the choice the player had just made, which is what made it read
+                 as a survey interrupting a game rather than a reaction to it. */
+              <p data-testid="showdown-why-lead" className="text-sm font-bold text-amber-300">
+                {followUpPrompt(shown?.[picked === shown?.left.id ? 'left' : 'right']?.title ?? null, followUp.chips).lead}
+              </p>
+            )}
             <p
               data-testid="showdown-moment"
               data-moment={moment?.kind ?? ''}
@@ -561,7 +570,7 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
               className="text-balance text-center text-lg font-black uppercase tracking-tight text-white sm:text-2xl"
             >
               {followUp?.kind === 'why'
-                ? 'What tipped it?'
+                ? followUpPrompt(shown?.[picked === shown?.left.id ? 'left' : 'right']?.title ?? null, followUp.chips).question
                 : followUp?.kind === 'intensity'
                   ? `How much do you want ${followUp.title.title}?`
                   : PROMPT[mode]}
@@ -578,7 +587,12 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
                centring the row gives the space back to the parts of the screen
                that are actually saying something. */
             <RoundStage
-              round={round}
+              /* THE CLOCK STOPS FOR A QUESTION. A follow-up rendered inside a
+                 rapid round left the drained ring sitting above it at zero —
+                 urgency chrome attached to a prompt that has no time limit, and
+                 the one moment in the burst where the player is meant to think.
+                 The pair stays put; only the frame drops back to cinematic. */
+              round={followUp ? { phase: 'cinematic' as const, timeLimitMs: null, entering: false } : round}
               roundKey={String(done)}
               onExpire={() => setState((prev) => (prev ? timeoutRound(prev, Date.now()) : prev))}
             >
@@ -631,19 +645,38 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
                winner's direction — so a tap is a single-axis observation rather
                than a click on whichever generic word looked closest. */
             <div className="shrink-0" data-testid="showdown-why">
-              <div className="grid grid-cols-2 gap-2">
-                {followUp.chips.map((chip) => (
+              {/* YES TO THE NAMED GUESS, then the ways to disagree. "No,
+                  something else" about a stated hypothesis is a better
+                  observation than declining to pick from a list — the game has
+                  committed to a guess and the player is correcting it. */}
+              <div className="flex flex-col gap-2">
+                {followUp.chips[0] && (
                   <button
-                    key={chip.id}
                     type="button"
                     data-testid="showdown-why-chip"
-                    data-chip={chip.id}
-                    onClick={() => answerWhy(chip)}
-                    className="min-h-[46px] rounded-xl bg-amber-400/15 px-2 text-sm font-bold text-amber-100 ring-1 ring-amber-300/30 transition active:scale-[0.98] active:bg-amber-400/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                    data-chip={followUp.chips[0].id}
+                    onClick={() => answerWhy(followUp.chips[0]!)}
+                    className="min-h-[52px] rounded-xl bg-amber-300 px-3 text-base font-black text-ink-900 transition active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
                   >
-                    {chip.label}
+                    Yes, that was it
                   </button>
-                ))}
+                )}
+                {followUp.chips.length > 1 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {followUp.chips.slice(1).map((chip) => (
+                      <button
+                        key={chip.id}
+                        type="button"
+                        data-testid="showdown-why-chip"
+                        data-chip={chip.id}
+                        onClick={() => answerWhy(chip)}
+                        className="min-h-[46px] rounded-xl bg-white/[0.07] px-2 text-sm font-bold text-white ring-1 ring-white/10 transition active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                      >
+                        No — {chip.label.toLowerCase()}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <button
                 type="button"

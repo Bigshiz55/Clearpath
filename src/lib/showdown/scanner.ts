@@ -97,6 +97,27 @@ export interface ScanContext {
   decisionIndex: number;
   total?: number;
   pool?: readonly DiagnosticTitle[];
+  /**
+   * AXES THIS SESSION HAS ARGUED WITH ITSELF ABOUT, keyed to contested mass.
+   *
+   * ── THE GAP THIS CLOSES ─────────────────────────────────────────────────
+   * Every uncertainty term in this planner reads `traitUncertainty(profile,
+   * key)`, and a profile is a FOLD. An axis pushed to 90 and then to 10 lands
+   * near 50 carrying the evidence of both — so it looks like a CONFIDENT
+   * "no strong opinion", and the planner stops asking about it. That is exactly
+   * backwards: an axis somebody has contradicted themselves on is the single
+   * most valuable thing left to resolve, and it is invisible to a fold.
+   *
+   * Only the individual observations still carry the argument, which is why
+   * this arrives as a separate signal computed from the decision list rather
+   * than being read off the profile. Same definition of "contested" the 1-10
+   * question and the results reveal use, so the game cannot chase an axis here
+   * and then claim it was sure about it there.
+   *
+   * OPTIONAL. Absent, the planner behaves exactly as before — the persona
+   * simulations and every existing caller are unaffected.
+   */
+  contested?: ReadonlyMap<TraitKey, number>;
 }
 
 /** Signed trait vector, for distance work. */
@@ -233,6 +254,35 @@ function shortlist(
 }
 
 /** The next matchup, or null when the scan is done. */
+/**
+ * How much this pair would help settle an argument the player is having with
+ * themselves.
+ *
+ * MULTIPLICATIVE AND BOUNDED. It re-ranks among pairs the existing terms
+ * already consider good rather than overriding them — a contested axis is a
+ * reason to prefer one informative pair over another, never a reason to deal
+ * an unanswerable one. A pair that separates NO contested axis scores exactly
+ * 1, so the planner is unchanged for a player who has been consistent.
+ *
+ * Weighted by SEPARATION, so a pair that barely touches the contested axis does
+ * not collect the boost for mentioning it.
+ */
+const CONTESTED_BOOST = 0.8;
+
+export function contestedBoost(
+  split: ReadonlyArray<{ key: TraitKey; sep: number }>,
+  contested: ReadonlyMap<TraitKey, number> | undefined,
+): number {
+  if (!contested || contested.size === 0) return 1;
+  let best = 0;
+  for (const { key, sep } of split) {
+    const mass = contested.get(key);
+    if (mass == null || mass <= 0) continue;
+    best = Math.max(best, Math.min(1, mass) * sep);
+  }
+  return 1 + CONTESTED_BOOST * best;
+}
+
 export function nextScanMatchup(ctx: ScanContext): Matchup | null {
   const total = ctx.total ?? SCAN_DECISIONS;
   if (ctx.decisionIndex >= total) return null;
@@ -295,7 +345,9 @@ export function nextScanMatchup(ctx: ScanContext): Matchup | null {
            hypotheses actually form did not. */
         const balance =
           1 - Math.abs(predictedAppeal(a, ctx.profile) - predictedAppeal(b, ctx.profile));
-        score = gain * attribution * need * stale(testing, ctx.recentAxes) * (0.35 + 0.65 * balance);
+        score =
+          gain * attribution * need * stale(testing, ctx.recentAxes) * (0.35 + 0.65 * balance) *
+          contestedBoost(split, ctx.contested);
       } else {
         /* RESOLVE: closeness. `1 - |Δpredicted|` peaks when the model rates the
            two titles identically — the question it genuinely cannot call, which
@@ -303,7 +355,9 @@ export function nextScanMatchup(ctx: ScanContext): Matchup | null {
            (a close pair that differs on six axes teaches little) and so does
            recognition. */
         const balance = 1 - Math.abs(predictedAppeal(a, ctx.profile) - predictedAppeal(b, ctx.profile));
-        score = balance * attribution * answerable * (0.5 + 0.5 * Math.min(1, gain));
+        score =
+          balance * attribution * answerable * (0.5 + 0.5 * Math.min(1, gain)) *
+          contestedBoost(split, ctx.contested);
       }
 
       if (score > bestScore) {
