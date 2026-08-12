@@ -1,6 +1,6 @@
 {
-  "sha": "18de532",
-  "branch": "claude/dna-showdown-rebased",
+  "sha": "99ecb1b",
+  "branch": "claude/showdown-cold-start-scanner",
   "total": 23,
   "passed": 23,
   "categories": {}
