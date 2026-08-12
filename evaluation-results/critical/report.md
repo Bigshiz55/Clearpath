@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `d60677f` · Branch: `claude/showdown-cold-start-scanner`
+- Commit: `fd9baea` · Branch: `claude/showdown-cold-start-scanner`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 
