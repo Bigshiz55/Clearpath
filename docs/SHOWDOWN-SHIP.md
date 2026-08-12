@@ -4,16 +4,16 @@ Authoritative continuation state for the flagship Showdown rebuild. A new
 session starts by reading this file and executing **NEXT ACTION**. Do not
 re-audit completed gates; do not restate accepted work.
 
-CURRENT SHA: 5145a5b
+CURRENT SHA: (see git log — updated each commit)
 CURRENT PREVIEW: https://clearpath-git-claude-showdown-flagship-bigshiz56.vercel.app (Vercel SSO-gated)
-NEXT ACTION: G2 — consolidate mechanic evidence integrity (A4 named-axis-only + bounded weight; A6 YES/NO/GUT attribution; Rapid answer vs timeout) into one production-path proof.
+NEXT ACTION: G3 — two-profile downstream ranking divergence. Build two identical starting profiles, run legitimately different Showdown sessions through `sessionToEvents -> deriveDna`, rank the SAME candidate set with `preferenceNudge`, and name one candidate whose order changes plus the trait that caused it. No mocks, no lowered MIN_RANK_CONF; add legitimate repeated sessions until the real threshold clears. Pattern to copy: `src/lib/showdown/persistence.test.ts` (note `canonicalTitleId` takes an ID STRING).
 
 ---
 
 ## SHOWDOWN SHIP GATES
 
 - [x] **G1** A9 permanent-vs-session evidence proof — COMPLETE
-- [ ] **G2** A4 / A6 / Rapid Fire evidence-integrity proof
+- [x] **G2** A4 / A6 / Rapid Fire evidence-integrity proof — COMPLETE
 - [ ] **G3** two-profile downstream ranking divergence
 - [ ] **G4** deterministic real-state-machine A7 discovery render
 - [ ] **G5** complete desktop E2E
@@ -44,14 +44,22 @@ NEXT ACTION: G2 — consolidate mechanic evidence integrity (A4 named-axis-only 
 - **Failures:** none
 
 ### G2 — mechanic evidence integrity
-- **Status:** not started
-- **Proof:** partial coverage already exists (`timeout.test.ts` proves rapid
-  timeout folds no evidence and never borrows the recognition signal;
-  `calibration.test.ts` proves the 1-10 weight cap and single-axis targeting;
-  `arc.test.ts` proves the burst never lands on opening or final-two rounds).
-  Gate requires these consolidated and the A6 YES / NO / GUT paths pinned.
-- **Files:** —
-- **Failures:** —
+- **Status:** COMPLETE (17/17 green)
+- **Proof:** `src/lib/showdown/mechanicIntegrity.test.ts` — drives the real state
+  machine and diffs profiles before/after.
+  - A4 moves EXACTLY one axis (`movedAxes()` returns `['horrorTolerance']`), a
+    low answer moves it down, and 40 units of accumulated evidence are not
+    erased by one tap (weight capped)
+  - A6 YES persists the named reason; GUT is recorded as a real answer distinct
+    from ABSENT and leaves the profile byte-identical; SKIP converts no
+    uncertainty into certainty but still spends the interruption budget
+  - Rapid ANSWER is ordinary evidence; TIMEOUT changes nothing, adds no
+    decision, does not touch `unseenTitles`, and does not appear in
+    `calibrationObservations` (so it cannot steer the planner either)
+  - clock never on opening rounds, never on the final two, burst contiguous and
+    a minority of the run, and the timer stops for an untimed follow-up
+- **Files:** `src/lib/showdown/mechanicIntegrity.test.ts` (new)
+- **Failures:** none
 
 ### G3 — downstream ranking divergence
 - **Status:** not started

@@ -69,7 +69,12 @@ function fixtureDims(titleId: string): Record<string, number> | undefined {
 }
 
 function eventsOf(s: ShowdownState, mode: 'dna' | 'tonight' = 'dna'): PreferenceEvent[] {
-  const events = sessionToEvents(s.decisions, mode, resolve, attributionOf);
+  /* `attributionOf` recomputes from the PAIR (see its docblock), so the
+     planner-only fields a `CanonicalDecision` lacks are genuinely unused —
+     supplying inert values is accurate rather than a cast that hides a gap. */
+  const events = sessionToEvents(s.decisions, mode, resolve, (d) =>
+    attributionOf({ ...d, testing: [], gain: 0 }),
+  );
   for (const e of events) {
     const catalogueId = TITLES.find((t) => canonicalTitleId(t.id) === e.titleId)?.id;
     const dims = catalogueId ? fixtureDims(catalogueId) : undefined;
