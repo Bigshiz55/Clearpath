@@ -168,11 +168,17 @@ describe('the session behaves like a session', () => {
     expect(markUnseen(empty, 0)).toEqual(empty);
   });
 
-  it('resumes from a seed without re-asking what was already asked', () => {
+  it('resumes from a seed without re-showing a title already shown', () => {
+    /* STRENGTHENED WITH THE INVARIANT, not relaxed. This used to seed a
+       `seenPairs` key and assert only that the same PAIRING did not recur —
+       which permitted both films to come straight back beside new partners.
+       The scan now retires titles, so the seed is the two title ids and the
+       assertion is that neither reappears at all. */
     const first = startSession(createSession(), 0);
-    const askedKey = pairKey(first.current!.left.id, first.current!.right.id);
-    const resumed = startSession(createSession({ seenPairs: [askedKey] }), 0);
-    expect(pairKey(resumed.current!.left.id, resumed.current!.right.id)).not.toBe(askedKey);
+    const shown = [first.current!.left.id, first.current!.right.id];
+    const resumed = startSession(createSession({ seenTitleIds: shown }), 0);
+    expect(shown).not.toContain(resumed.current!.left.id);
+    expect(shown).not.toContain(resumed.current!.right.id);
   });
 
   it('a decision already recorded survives the next deal failing', () => {

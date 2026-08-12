@@ -9,7 +9,7 @@
  * a bounded nudge and a confidence. The same function powers the before/after
  * ranking report, so the report reflects the real production math.
  */
-import { DIMENSION_KEYS } from '@/lib/scoring/dimensions';
+import { TASTE_AXIS_KEYS } from '@/lib/taste/axes';
 import type { TitleDimensions } from '@/lib/scoring/dimensions';
 import type { DnaState, TraitConfidence } from './types';
 import { resolveConfidence } from './confidence';
@@ -93,7 +93,12 @@ export function preferenceNudge(
   let dimWeight = 0;
   let dimCount = 0;
   if (title.dims) {
-    for (const k of DIMENSION_KEYS) {
+    /* THE LINE THAT MADE `weirdness` INVISIBLE. Everything upstream could carry
+       it — the event, the fold, the belief — and this loop decided the ranker
+       would never look. Iterating the canonical registry is the whole bridge;
+       there is no separate rich vector to blend, because the rich axes live in
+       the same map under their own keys. */
+    for (const k of TASTE_AXIS_KEYS) {
       const pref = taste[k];
       const v = title.dims[k];
       if (!pref || typeof v !== 'number' || pref.polarity === 0 || pref.confidence < MIN_RANK_CONF) continue;

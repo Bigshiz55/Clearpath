@@ -25,9 +25,10 @@
  * PURE. Time is passed in, never read.
  */
 
-import type { DiagnosticTitle } from '@/lib/voice/quickdna/definition';
+import { TITLES, type DiagnosticTitle } from '@/lib/voice/quickdna/definition';
 import { type TraitKey, type TraitProfile } from '@/lib/voice/quickdna/traits';
-import { nextMatchup, pairKey, pull, separation, type Matchup } from './matchup';
+import { pairKey, pull, separation, type Matchup } from './matchup';
+import { SCAN_DECISIONS, SCAN_MIN_DECISIONS, nextScanMatchup } from './scanner';
 import {
   MAX_PERMANENT_WEIGHT,
   attributionConfidence,
@@ -44,8 +45,36 @@ import {
   type SessionLean,
   type ShowdownMode,
 } from './evidence';
+import {
+  chooseFollowUp,
+  intensityEvidence,
+  intensityLean,
+  reasonEvidence,
+  reasonLean,
+  writtenOn,
+  type FollowUp,
+  type Intensity,
+  type Pair,
+} from './followup';
+import { GUT_CALL, type ReasonChip } from './reasons';
+import {
+  discoveriesFor,
+  discoveryDue,
+  discoveryEvidence,
+  type Discovery,
+} from './discovery';
 
-export type Verdict = 'left' | 'right' | 'neither';
+/**
+ * BOTH is not a hedge, it is a distinct claim.
+ *
+ * Without it, someone who genuinely wants both films has only bad options:
+ * pick one (inventing a preference they do not hold) or answer Neither (which
+ * records the exact opposite of what they meant). Strong attraction to both
+ * must never be recorded as indifference. It reinforces what the pair SHARES —
+ * the mirror of Neither — and says nothing about the axes they split on,
+ * because wanting both is not a statement about which side you are on.
+ */
+export type Verdict = 'left' | 'right' | 'neither' | 'both';
 
 /**
  * The ceiling for a permanent write, reached only by a clean single-axis
@@ -73,8 +102,11 @@ export const NEITHER_WEIGHT = MAX_PERMANENT_WEIGHT * NEITHER_RATIO;
 export const SESSION_LEAN_STEP = 0.34;
 
 /** Enough decisions to sharpen a profile; few enough to stay under ninety seconds. */
-export const TARGET_DECISIONS = 12;
-export const MIN_DECISIONS = 8;
+/* Twenty decisions, forty unique title exposures, ninety-odd seconds. Twelve
+   could not sweep the universe AND branch AND resolve — it was one phase's
+   worth of rounds spread over three jobs. */
+export const TARGET_DECISIONS = SCAN_DECISIONS;
+export const MIN_DECISIONS = SCAN_MIN_DECISIONS;
 
 /** Below this the remaining pairs are not worth a turn — end rather than pad. */
 export const GAIN_FLOOR = 0.05;
@@ -89,6 +121,14 @@ export interface ShowdownDecision {
   gain: number;
   at: number;
   responseMs: number;
+  /**
+   * The reason chip the player named, when they were asked and answered.
+   * `'gut'` is a real answer meaning "no single axis" — distinct from absent,
+   * which means the question was never put.
+   */
+  reason?: string;
+  /** Stated appetite for the winner, when asked. Absent means never asked. */
+  intensity?: Intensity;
 }
 
 export interface ShowdownState {
@@ -107,8 +147,41 @@ export interface ShowdownState {
   seenPairs: string[];
   /** Titles reported unseen. Kept so we never put them up again. */
   unseenTitles: string[];
+  /**
+   * EVERY title shown this session — the absolute no-repeat invariant.
+   * Winner, loser, refused, unrecognised: once seen, never dealt again.
+   */
+  seenTitleIds: string[];
   recentAxes: TraitKey[];
   current: Matchup | null;
+  /**
+   * Follow-up questions already spent — the interruption budget.
+   *
+   * ON THE STATE, NOT DERIVED FROM `decisions`, because a follow-up that was
+   * OFFERED and dismissed costs the player the same second as one they
+   * answered. Counting only the answered ones would let a player who keeps
+   * tapping "gut call" be interrupted on every round.
+   */
+  followups: number;
+  /** Decision index (1-based) of the last follow-up offered. 0 = none yet. */
+  lastFollowupRound: number;
+  /** Discovery ids already put to this player. A moment repeated is a screensaver. */
+  shownDiscoveries: string[];
+  /** Decision count when the last discovery was surfaced. */
+  lastDiscoveryRound: number;
+  /** Rounds spent on pairs the player did not recognise. They advance the
+   *  scan clock without producing evidence, so the phases still progress. */
+  unseenRounds: number;
+  /**
+   * How many of `seenTitleIds` were CARRIED IN rather than shown.
+   *
+   * Without this the two are indistinguishable, and the durable exposure
+   * history would treat every carried-in id as freshly seen — re-stamping the
+   * whole suppression list as brand new at the end of every run, so the oldest
+   * exposures could never age out and the release policy would silently never
+   * release. `exposedThisSession` is the only correct thing to write back.
+   */
+  carriedTitleIds: number;
   /** Confidence coverage when the session opened — the "21% → 34%" starting point. */
   openingKnown: number;
   startedAt: number;
@@ -118,6 +191,7 @@ export interface SessionSeed {
   profile?: TraitProfile;
   seenPairs?: readonly string[];
   unseenTitles?: readonly string[];
+  seenTitleIds?: readonly string[];
   openingKnown?: number;
 }
 
@@ -133,32 +207,65 @@ export function createSession(
     decisions: [],
     seenPairs: [...(seed.seenPairs ?? [])],
     unseenTitles: [...(seed.unseenTitles ?? [])],
+    seenTitleIds: [...(seed.seenTitleIds ?? [])],
     recentAxes: [],
     current: null,
+    followups: 0,
+    lastFollowupRound: 0,
+    shownDiscoveries: [],
+    lastDiscoveryRound: 0,
+    carriedTitleIds: (seed.seenTitleIds ?? []).length,
+    unseenRounds: 0,
     openingKnown: seed.openingKnown ?? 0,
     startedAt,
   };
 }
 
+/**
+ * Deal the next matchup through the phase-aware scanner.
+ *
+ * `seenTitleIds` carries BOTH the no-repeat invariant and the unseen-title
+ * retirement — a title the player did not recognise is already in the set, so
+ * it cannot come back either. One exclusion list, one invariant, nothing to
+ * keep in sync.
+ */
 function deal(state: ShowdownState): Matchup | null {
-  if (state.decisions.length >= TARGET_DECISIONS) return null;
-  return nextMatchup(
-    {
-      profile: state.profile,
-      seenPairs: state.seenPairs,
-      unseenTitles: state.unseenTitles,
-      recentAxes: state.recentAxes,
-    },
-    GAIN_FLOOR,
-  );
+  if (state.decisions.length + state.unseenRounds >= TARGET_DECISIONS) return null;
+  return nextScanMatchup({
+    profile: state.profile,
+    seenTitleIds: [...state.seenTitleIds, ...state.unseenTitles],
+    recentAxes: state.recentAxes,
+    decisionIndex: state.decisions.length + state.unseenRounds,
+    total: TARGET_DECISIONS,
+  });
 }
 
 export function startSession(state: ShowdownState, now = 0): ShowdownState {
   return { ...state, startedAt: now, current: deal(state) };
 }
 
+
+/* WHY "NEITHER" STAYS ON SHARED GROUND ONLY.
+   A broader reading was tried — condemn every axis the pair asserts without
+   CONFLICTING — because on a cold-start sweep pair (chosen to be maximally far
+   apart) there is almost no shared ground, so Neither on the opening question
+   teaches close to nothing. That looked like a bug worth fixing and is not:
+   a sweep pair touches a dozen axes, so the broader rule turns one tap into
+   twelve claims, which is precisely the confounding `attribution.ts` exists to
+   stop. The information genuinely is thin there, and inventing structure to
+   hide that is worse than reporting it. Two pre-existing cases assert this
+   boundary deliberately; they were right. */
+
+/**
+ * What the evidence layer needs from a matchup: the two films and how much the
+ * question was worth. Structurally narrower than `Matchup` so a decision can be
+ * re-priced later from its recorded ids and gain, without inventing the
+ * planner's `testing` and `attribution` to satisfy a type.
+ */
+export type EvidencePair = Pair & { gain: number };
+
 /** Every axis either title asserts anything about. */
-function axesOf(matchup: Matchup): TraitKey[] {
+function axesOf(matchup: Pair): TraitKey[] {
   const axes = new Set<TraitKey>();
   for (const e of matchup.left.traits) axes.add(e.key);
   for (const e of matchup.right.traits) axes.add(e.key);
@@ -170,7 +277,7 @@ function axesOf(matchup: Matchup): TraitKey[] {
  * Exported because "how confounded is this matchup" is a claim worth asserting
  * directly in tests rather than inferring from a resulting weight.
  */
-export function separations(matchup: Matchup): number[] {
+export function separations(matchup: Pair): number[] {
   return axesOf(matchup)
     .map((key) => Math.min(1, separation(matchup.left, matchup.right, key)))
     .filter((s) => s > 0);
@@ -185,7 +292,7 @@ export function separations(matchup: Matchup): number[] {
  * move: the choice said nothing about them.
  */
 export function permanentEvidenceFor(
-  matchup: Matchup,
+  matchup: EvidencePair,
   verdict: Verdict,
 ): PermanentTraitEvidence[] {
   const { left, right } = matchup;
@@ -194,13 +301,40 @@ export function permanentEvidenceFor(
   const informationValue = matchup.gain;
   const out: PermanentTraitEvidence[] = [];
 
-  if (verdict === 'neither') {
+  if (verdict === 'both') {
+    // The mirror of Neither: endorse everything the pair asserts without
+    // conflict, stay silent only where they genuinely oppose.
     for (const key of axesOf(matchup)) {
       const split = separation(left, right, key);
-      // Only SHARED ground is condemned. Where the pair disagreed, refusing
-      // both says nothing about which side they would have taken, so nothing
-      // is recorded — inventing a direction here would be fabricating an
-      // opinion the player did not express.
+      const shared = Math.min(Math.abs(pull(left, key)), Math.abs(pull(right, key)));
+      if (shared <= 0 || split > shared) continue;
+      const agreedDirection = pull(left, key) + pull(right, key) >= 0 ? 1 : -1;
+      const sharedSep = Math.min(1, shared);
+      const weight = permanentWeight({
+        separation: sharedSep,
+        attribution: axisAttribution(sharedSep, seps),
+        informationValue,
+        base: NEITHER_WEIGHT,
+      });
+      if (weight <= 0) continue;
+      out.push({
+        kind: 'permanent',
+        key,
+        target: agreedDirection > 0 ? 100 : 0,
+        weight,
+        attribution: axisAttribution(sharedSep, seps),
+      });
+    }
+    return out;
+  }
+
+  if (verdict === 'neither') {
+    for (const key of axesOf(matchup)) {
+      // Condemn what the pair asserts WITHOUT CONFLICT. Where the two films
+      // pull opposite ways, refusing both says nothing about which side they
+      // would have taken, and inventing a direction there would fabricate an
+      // opinion nobody expressed — that restraint is unchanged.
+      const split = separation(left, right, key);
       const shared = Math.min(Math.abs(pull(left, key)), Math.abs(pull(right, key)));
       if (shared <= 0 || split > shared) continue;
       const agreedDirection = pull(left, key) + pull(right, key) >= 0 ? 1 : -1;
@@ -253,19 +387,20 @@ export function permanentEvidenceFor(
  * tonight, on the same restraint the permanent path uses.
  */
 export function sessionEvidenceFor(
-  matchup: Matchup,
+  matchup: Pair,
   verdict: Verdict,
 ): SessionContextEvidence[] {
   const { left, right } = matchup;
   const out: SessionContextEvidence[] = [];
 
-  if (verdict === 'neither') {
+  if (verdict === 'neither' || verdict === 'both') {
+    const sign = verdict === 'both' ? 1 : -1;
     for (const key of axesOf(matchup)) {
       const split = separation(left, right, key);
       const shared = Math.min(Math.abs(pull(left, key)), Math.abs(pull(right, key)));
       if (shared <= 0 || split > shared) continue;
       const agreedDirection = pull(left, key) + pull(right, key) >= 0 ? 1 : -1;
-      out.push({ kind: 'session', key, lean: -agreedDirection * SESSION_LEAN_STEP * shared });
+      out.push({ kind: 'session', key, lean: sign * agreedDirection * SESSION_LEAN_STEP * shared });
     }
     return out;
   }
@@ -295,7 +430,7 @@ export function sessionEvidenceFor(
  * asserting the player answered two questions when they answered one.
  */
 export function evidenceFor(
-  matchup: Matchup,
+  matchup: EvidencePair,
   verdict: Verdict,
   mode: ShowdownMode,
 ): DecisionEvidence {
@@ -339,10 +474,150 @@ export function answer(
     lean,
     decisions: [...state.decisions, decision],
     seenPairs: [...state.seenPairs, pairKey(matchup.left.id, matchup.right.id)],
+    // THE INVARIANT. Both titles retire the instant they are shown, whatever
+    // the answer was.
+    seenTitleIds: [...state.seenTitleIds, matchup.left.id, matchup.right.id],
     recentAxes: [...state.recentAxes, ...matchup.testing.slice(0, 1)].slice(-4),
     current: null,
   };
   return { ...next, current: deal(next) };
+}
+
+/* ------------------------------------------------------------------ *
+ * FOLLOW-UPS — the second and third things a round can ask.
+ *
+ * They act on the decision ALREADY RECORDED, which is why `answer` does not
+ * wait for them: the pick stands on its own, and the follow-up refines it. A
+ * player who closes the tab mid-question loses the refinement and keeps the
+ * pick, which is the right way round.
+ * ------------------------------------------------------------------ */
+
+/** Rebuild the pair a recorded decision was about, or null if it cannot be. */
+export function pairForDecision(decision: ShowdownDecision): EvidencePair | null {
+  const left = TITLES.find((t) => t.id === decision.leftId);
+  const right = TITLES.find((t) => t.id === decision.rightId);
+  return left && right ? { left, right, gain: decision.gain } : null;
+}
+
+function winnerOf(pair: EvidencePair, verdict: Verdict): DiagnosticTitle | null {
+  if (verdict === 'left') return pair.left;
+  if (verdict === 'right') return pair.right;
+  return null;
+}
+
+/**
+ * The follow-up worth putting to the player right now, or null.
+ *
+ * Called AFTER `answer`, about the decision it just recorded. Returns null on
+ * the great majority of rounds — that is the design, not a fallback.
+ */
+export function followUpFor(state: ShowdownState): FollowUp {
+  const decision = state.decisions[state.decisions.length - 1];
+  if (!decision) return null;
+  if (decision.reason !== undefined || decision.intensity !== undefined) return null;
+  const pair = pairForDecision(decision);
+  if (!pair) return null;
+  const index = state.decisions.length;
+  return chooseFollowUp({
+    pair,
+    winner: winnerOf(pair, decision.verdict),
+    attribution: attributionConfidence(separations(pair)),
+    decisionIndex: index,
+    spent: state.followups,
+    backToBack: state.lastFollowupRound === index - 1,
+    // What is already believed decides which chips are worth a second — see
+    // `rankChipsByValue`. Without it the budget gets spent confirming.
+    profile: state.profile,
+  });
+}
+
+/**
+ * Fold extra evidence into the run and re-deal.
+ *
+ * RE-DEALING IS THE POINT of asking mid-game rather than at the end. The next
+ * matchup was chosen against the profile as it stood a moment ago; a stated
+ * reason is the sharpest single observation the game collects, so the very next
+ * question should already reflect it. Re-dealing cannot repeat a title — the
+ * pending pair was never added to `seenTitleIds`, which only fills on `answer`.
+ */
+function withFollowUp(
+  state: ShowdownState,
+  permanent: readonly PermanentTraitEvidence[],
+  session: readonly SessionContextEvidence[],
+  annotate: (d: ShowdownDecision) => ShowdownDecision,
+): ShowdownState {
+  const last = state.decisions.length - 1;
+  if (last < 0) return state;
+  const decisions = state.decisions.map((d, i) => (i === last ? annotate(d) : d));
+  const next: ShowdownState = {
+    ...state,
+    decisions,
+    profile: state.mode === 'dna' ? applyPermanent(state.profile, permanent) : state.profile,
+    lean: state.mode === 'tonight' ? accumulateSession(state.lean, session) : state.lean,
+    followups: state.followups + 1,
+    lastFollowupRound: state.decisions.length,
+    current: null,
+  };
+  return { ...next, current: deal(next) };
+}
+
+/** "Why did you pick that one?" — answered. */
+export function addReason(state: ShowdownState, chip: ReasonChip): ShowdownState {
+  const decision = state.decisions[state.decisions.length - 1];
+  if (!decision) return state;
+  const pair = pairForDecision(decision);
+  if (!pair) return state;
+  /* The top-up is measured against what THIS decision already wrote on the
+     named axis, recomputed from the recorded pair rather than remembered — one
+     source of truth for what a pick is worth, and no stored intermediate to
+     drift out of step with `permanentEvidenceFor`. */
+  const already = writtenOn(permanentEvidenceFor(pair, decision.verdict), chip.key);
+  return withFollowUp(
+    state,
+    reasonEvidence(chip, already),
+    reasonLean(chip, SESSION_LEAN_STEP),
+    (d) => ({ ...d, reason: chip.id }),
+  );
+}
+
+/** "How much do you want it?" — answered. */
+export function addIntensity(state: ShowdownState, intensity: Intensity): ShowdownState {
+  const decision = state.decisions[state.decisions.length - 1];
+  if (!decision) return state;
+  const pair = pairForDecision(decision);
+  if (!pair) return state;
+  const winner = winnerOf(pair, decision.verdict);
+  if (!winner) return state;
+  return withFollowUp(
+    state,
+    intensityEvidence(pair, winner, intensity),
+    intensityLean(pair, winner, intensity, SESSION_LEAN_STEP),
+    (d) => ({ ...d, intensity }),
+  );
+}
+
+/**
+ * The follow-up was shown and waved away.
+ *
+ * SPENDS THE BUDGET ANYWAY. Dismissing costs the player the same beat as
+ * answering, and a budget that only counts answers would interrupt a player who
+ * never wants to elaborate on every single round. It records no evidence and
+ * annotates nothing: not answering is not an answer.
+ */
+export function skipFollowUp(state: ShowdownState): ShowdownState {
+  if (state.decisions.length === 0) return state;
+  return {
+    ...state,
+    followups: state.followups + 1,
+    lastFollowupRound: state.decisions.length,
+  };
+}
+
+/** How many follow-ups this session actually got an answer to. */
+export function answeredFollowUps(state: ShowdownState): number {
+  return state.decisions.filter(
+    (d) => (d.reason !== undefined && d.reason !== GUT_CALL.id) || d.intensity !== undefined,
+  ).length;
 }
 
 /**
@@ -358,11 +633,87 @@ export function markUnseen(state: ShowdownState, now: number): ShowdownState {
   const next: ShowdownState = {
     ...state,
     unseenTitles: [...state.unseenTitles, matchup.left.id, matchup.right.id],
+    seenTitleIds: [...state.seenTitleIds, matchup.left.id, matchup.right.id],
     seenPairs: [...state.seenPairs, pairKey(matchup.left.id, matchup.right.id)],
+    /* AN UNRECOGNISED PAIR IS NOT A QUESTION, SO IT DOES NOT COST ONE.
+       This used to advance the scan clock on the reasoning that the round
+       consumed the player's time. It does — but the alternative is worse: a
+       player who has not seen four pairs finishes with sixteen answers' worth
+       of profile and a results screen that has to explain why it learned less.
+       The pair is retired, both titles are withheld from every future deal, and
+       a fresh high-information matchup takes its place immediately. Recognition
+       is a fact about the CATALOGUE, and the catalogue should pay for it. */
+    unseenRounds: state.unseenRounds,
     startedAt: state.startedAt || now,
     current: null,
   };
   return { ...next, current: deal(next) };
+}
+
+/**
+ * How cleanly a recorded decision isolated an axis.
+ *
+ * Recomputed from the pair rather than remembered, so a session restored from
+ * `sessionStorage` — where the planner's transient `Matchup` did not survive —
+ * prices its decisions identically to one still in memory.
+ */
+export function attributionOf(decision: ShowdownDecision): number {
+  const pair = pairForDecision(decision);
+  return pair ? attributionConfidence(separations(pair)) : 0;
+}
+
+/**
+ * The discovery worth surfacing right now, or null.
+ *
+ * Asked between rounds, never during one. It is the only interruption in the
+ * game that is not a question about films — it is the game telling the player
+ * what it thinks it has worked out and inviting them to disagree.
+ */
+export function discoveryFor(state: ShowdownState): Discovery | null {
+  if (state.mode !== 'dna') return null;
+  if (!discoveryDue(state.decisions.length, state.lastDiscoveryRound, state.shownDiscoveries.length))
+    return null;
+  return discoveriesFor(state.profile, state.shownDiscoveries)[0] ?? null;
+}
+
+/**
+ * Record the player's verdict on a discovery.
+ *
+ * "Not quite" is the highest-value tap in the game — a single-axis correction
+ * from the person themselves, contradicting something the engine had already
+ * become confident about. It is recorded as evidence, never as a dismissal.
+ */
+export function answerDiscovery(
+  state: ShowdownState,
+  discovery: Discovery,
+  verdict: 'confirm' | 'correct',
+): ShowdownState {
+  const profile = applyPermanent(state.profile, discoveryEvidence(discovery, verdict));
+  return {
+    ...state,
+    profile,
+    shownDiscoveries: [...state.shownDiscoveries, discovery.id],
+    lastDiscoveryRound: state.decisions.length,
+  };
+}
+
+/** Dismissed without answering — spends the slot, records nothing. */
+export function skipDiscovery(state: ShowdownState, discovery: Discovery): ShowdownState {
+  return {
+    ...state,
+    shownDiscoveries: [...state.shownDiscoveries, discovery.id],
+    lastDiscoveryRound: state.decisions.length,
+  };
+}
+
+/**
+ * The titles this run actually put in front of the player, oldest first.
+ *
+ * What the durable exposure history must be fed — never `seenTitleIds`, which
+ * also contains everything the run was told to avoid.
+ */
+export function exposedThisSession(state: ShowdownState): string[] {
+  return state.seenTitleIds.slice(state.carriedTitleIds);
 }
 
 export function isComplete(state: ShowdownState): boolean {
