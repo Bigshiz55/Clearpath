@@ -34,7 +34,7 @@
  */
 
 import type { DiagnosticTitle } from '@/lib/voice/quickdna/definition';
-import type { TraitKey } from '@/lib/voice/quickdna/traits';
+import { traitUncertainty, type TraitKey, type TraitProfile } from '@/lib/voice/quickdna/traits';
 import {
   MAX_PERMANENT_WEIGHT,
   attributionConfidence,
@@ -249,7 +249,46 @@ export interface FollowUpContext {
   spent: number;
   /** Was the previous round interrupted? Two in a row reads as an interrogation. */
   backToBack: boolean;
+  /** What is already believed. Decides which chips are worth offering. */
+  profile?: TraitProfile;
 }
+
+/**
+ * ASK ABOUT WHAT WE DO NOT KNOW.
+ *
+ * Chips were ordered by how hard the pair split an axis, which is a property of
+ * the two films and says nothing about whether the answer would teach us
+ * anything. The consequence was measurable: with six follow-ups per session
+ * spread across whichever axes happened to separate, `ambiguity` reached
+ * confidence 0.41 while `weirdness` sat at 0.11 and `character` at 0.09 — not
+ * because those questions were never askable, but because the ones already
+ * answered kept winning the slot.
+ *
+ * A stated reason is the single most valuable observation the game collects, and
+ * there are only six of them per run. Spending one on an axis already settled is
+ * the most expensive mistake available. So the ordering is separation × HOW MUCH
+ * IS STILL UNKNOWN: a chip that would resolve an open axis outranks a chip that
+ * splits harder but confirms something we are already sure of.
+ */
+export function rankChipsByValue(chips: readonly ReasonChip[], profile?: TraitProfile): ReasonChip[] {
+  if (!profile) return [...chips];
+  return [...chips]
+    .map((chip, i) => ({
+      chip,
+      // Order within `chips` already encodes separation strength, so the index
+      // stands in for it and the two factors multiply rather than one being
+      // recomputed differently here.
+      value: traitUncertainty(profile, chip.key) * (1 - i * 0.1),
+    }))
+    .sort((a, b) => b.value - a.value)
+    .map((x) => x.chip);
+}
+
+/**
+ * How open an axis must be for resolving it to justify an interruption on its
+ * own, even when the pick was reasonably well attributed.
+ */
+export const WORTH_ASKING_UNCERTAINTY = 0.75;
 
 /**
  * The follow-up worth interrupting for, or null — which is the common case.
@@ -257,6 +296,12 @@ export interface FollowUpContext {
  * WHY OUTRANKS HOW MUCH. Disambiguating a confounded pick recovers information
  * that is otherwise unrecoverable; an appetite is a bonus on top of a pick that
  * already stands on its own. When both are eligible the ambiguous one wins.
+ *
+ * TWO REASONS TO ASK WHY, not one. A confounded pick is the obvious case. The
+ * second is an OPEN AXIS: if one of the chips would resolve something we know
+ * almost nothing about, that is worth a second even when the pick itself was
+ * fairly clean — the value of a question is what it teaches, not only how
+ * muddled the alternative was.
  */
 export function chooseFollowUp(ctx: FollowUpContext): FollowUp {
   if (!ctx.winner) return null;
@@ -264,8 +309,16 @@ export function chooseFollowUp(ctx: FollowUpContext): FollowUp {
   if (ctx.backToBack) return null;
 
   const loser = ctx.winner.id === ctx.pair.left.id ? ctx.pair.right : ctx.pair.left;
-  const chips = reasonsFor(ctx.winner, loser);
-  if (shouldAskWhy(ctx.attribution, chips)) return { kind: 'why', chips };
+  const chips = rankChipsByValue(reasonsFor(ctx.winner, loser), ctx.profile);
+  const openest = ctx.profile
+    ? Math.max(0, ...chips.map((c) => traitUncertainty(ctx.profile!, c.key)))
+    : 0;
+  if (
+    chips.length >= 2 &&
+    (shouldAskWhy(ctx.attribution, chips) || openest >= WORTH_ASKING_UNCERTAINTY)
+  ) {
+    return { kind: 'why', chips };
+  }
 
   if (
     ctx.decisionIndex % INTENSITY_EVERY === 0 &&

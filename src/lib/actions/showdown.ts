@@ -6,7 +6,10 @@ import { recordEvents } from '@/lib/preference/store';
 import { getCachedDimensions } from '@/lib/titleDimensions';
 import { TITLES } from '@/lib/voice/quickdna/definition';
 import { canonicalTitleId, mediaTypeFor } from '@/lib/showdown/mediaType';
-import { decisionToEvents } from '@/lib/showdown/canonical';
+import { gradeForDecision } from '@/lib/showdown/canonical';
+import { reasonsFor } from '@/lib/showdown/reasons';
+import { pairwiseEvents } from '@/lib/taste/crossing';
+import { projectTraits } from '@/lib/taste/fingerprint';
 import { writeCoverage, type WriteCoverage } from '@/lib/showdown/dimensionCoverage';
 
 /**
@@ -67,20 +70,51 @@ export async function recordShowdownSession(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Not signed in.' };
 
-  const refFor = (titleId: string) => {
+  /* THE CROSSING IS AXIS-LEVEL, NOT TITLE-LEVEL — see `lib/taste/crossing.ts`.
+     It used to send one positive event carrying the WINNER'S WHOLE FINGERPRINT,
+     which re-asserted every axis the two films shared (the choice said nothing
+     about those) and recorded nothing at all about axes only the LOSER carried.
+     Measured consequence: someone who systematically avoids sentimental films
+     never picks one, so `sentimentality` stayed at exactly 50 with zero evidence
+     across 321 events. A comparative vector fixes both directions. */
+  const refFor = (titleId: string, at: number) => {
     const t = TITLES.find((x) => x.id === titleId);
     const canonical = canonicalTitleId(titleId);
     if (!t || !canonical) return null;
-    return { titleId: canonical, tmdbId: t.tmdbId, mediaType: mediaTypeFor(titleId) };
+    return {
+      titleId: canonical,
+      fingerprint: projectTraits(
+        { tmdbId: t.tmdbId, mediaType: mediaTypeFor(titleId), title: t.title, year: t.year },
+        t.traits,
+        at,
+      ),
+    };
   };
 
-  const events = parsed.data.decisions.flatMap((d) =>
-    decisionToEvents(
-      d,
-      { left: refFor(d.leftId), right: refFor(d.rightId) },
-      d.attribution,
-    ),
-  );
+  const events = parsed.data.decisions.flatMap((d) => {
+    const left = refFor(d.leftId, d.at);
+    const right = refFor(d.rightId, d.at);
+    if (!left || !right) return [];
+    /* The chip is re-derived from the recorded pair rather than trusted from the
+       payload: the client sends a chip ID, and an ID that does not correspond to
+       a real difference between these two titles is either a stale build or
+       someone hand-editing a request. Either way it must not become a
+       full-strength single-axis belief. */
+    const wt = TITLES.find((x) => x.id === (d.verdict === 'left' ? d.leftId : d.rightId));
+    const lt = TITLES.find((x) => x.id === (d.verdict === 'left' ? d.rightId : d.leftId));
+    const chip =
+      d.reason && wt && lt ? reasonsFor(wt, lt).find((c) => c.id === d.reason) : undefined;
+    return pairwiseEvents({
+      left,
+      right,
+      verdict: d.verdict,
+      at: d.at,
+      responseMs: d.responseMs,
+      ...(chip ? { statedAxis: { key: chip.key, high: chip.high } } : {}),
+      attractionGrade: gradeForDecision(d, d.attribution),
+      source: 'showdown',
+    });
+  });
   if (events.length === 0) return { ok: true, recorded: 0 };
 
   /* Fingerprint enrichment from CACHE ONLY — one indexed query, no TMDB call
@@ -96,7 +130,14 @@ export async function recordShowdownSession(
     for (const e of events) {
       const [mt, id] = e.titleId.split(':');
       const d = dims.get(`${mt}-${id}`);
-      if (d) e.dims = d;
+      /* THE CLASSIFIER NO LONGER OVERWRITES THE COMPARATIVE VECTOR. It used to
+         replace `dims` wholesale, which would now discard the axis-level claim
+         this decision actually made and put the title's absolute fingerprint
+         back in its place — undoing the crossing at the last step. The legacy
+         axes it knows about fill in around the comparative claim; the
+         comparative claim wins where the two overlap, because it is a statement
+         about the CHOICE and the other is a statement about the film. */
+      if (d) e.dims = { ...d, ...e.dims };
     }
   } catch {
     /* enrichment is a bonus; never block the write on it */

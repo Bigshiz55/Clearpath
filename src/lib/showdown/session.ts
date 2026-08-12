@@ -513,6 +513,9 @@ export function followUpFor(state: ShowdownState): FollowUp {
     decisionIndex: index,
     spent: state.followups,
     backToBack: state.lastFollowupRound === index - 1,
+    // What is already believed decides which chips are worth a second — see
+    // `rankChipsByValue`. Without it the budget gets spent confirming.
+    profile: state.profile,
   });
 }
 

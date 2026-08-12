@@ -7,7 +7,8 @@
  * Experience DNA (what they actually enjoyed) outweighs Attraction DNA (what drew
  * them in) when the two are merged into an effective taste. Pure.
  */
-import { DIMENSIONS, DIMENSION_KEYS } from '@/lib/scoring/dimensions';
+import { DIMENSIONS } from '@/lib/scoring/dimensions';
+import { TASTE_AXES, TASTE_AXIS_KEYS } from '@/lib/taste/axes';
 import type { TitleDimensions } from '@/lib/scoring/dimensions';
 import type { ChannelProfile, DnaState, TraitBelief, TraitConfidence } from './types';
 import { emptyBelief, evidenceConfidence, resolveConfidence } from './confidence';
@@ -18,7 +19,13 @@ export const ATTRACTION_WEIGHT = 0.7;
 /** A trait must be at least this confident to produce a reason/concern. */
 export const MIN_REASON_CONF = 0.3;
 
-const DIM_BY_KEY = new Map(DIMENSIONS.map((d) => [d.key, d]));
+/* KEYED OVER THE CANONICAL SET so a rich axis can be phrased at all. Falling
+   back to the fifteen would leave `weirdness` explained as the literal string
+   "weirdness" in user-facing copy. */
+const DIM_BY_KEY = new Map(
+  TASTE_AXES.map((a) => [a.key, { key: a.key, label: a.label, low: a.low, high: a.high }]),
+);
+void DIMENSIONS;
 
 function mergeBelief(a: TraitBelief | undefined, b: TraitBelief | undefined): TraitBelief {
   const ae = (a?.evidence ?? 0) * EXPERIENCE_WEIGHT;
@@ -31,7 +38,7 @@ function mergeBelief(a: TraitBelief | undefined, b: TraitBelief | undefined): Tr
 /** The user's effective taste per axis: Experience and Attraction merged. */
 export function effectiveTaste(state: DnaState): Record<string, TraitConfidence> {
   const out: Record<string, TraitConfidence> = {};
-  for (const k of DIMENSION_KEYS) {
+  for (const k of TASTE_AXIS_KEYS) {
     out[k] = resolveConfidence(mergeBelief(state.experience.dims[k], state.attraction.dims[k]));
   }
   return out;
@@ -109,7 +116,7 @@ export function explainTitle(input: ExplainInput, state: DnaState, opts: Explain
 
   // Dimension matches/clashes.
   if (input.dims) {
-    for (const k of DIMENSION_KEYS) {
+    for (const k of TASTE_AXIS_KEYS) {
       const pref = taste[k];
       const v = input.dims[k];
       if (!pref || typeof v !== 'number' || pref.polarity === 0 || pref.confidence < MIN_REASON_CONF) continue;

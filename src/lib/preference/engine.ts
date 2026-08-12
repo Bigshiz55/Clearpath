@@ -11,6 +11,7 @@
  * this consumes its `DIMENSION_KEYS` and produces a personalization signal.
  */
 import { DIMENSION_KEYS } from '@/lib/scoring/dimensions';
+import { TASTE_AXIS_KEYS } from '@/lib/taste/axes';
 import type {
   ChannelProfile,
   DnaChannel,
@@ -34,7 +35,11 @@ const DAY_MS = 86_400_000;
 
 function emptyChannel(): ChannelProfile {
   const dims: Record<string, TraitBelief> = {};
-  for (const k of DIMENSION_KEYS) dims[k] = emptyBelief();
+  /* SEEDED OVER THE CANONICAL VOCABULARY, which is a SUPERSET of the scoring
+     engine's fifteen — see `lib/taste/axes.ts`. The fifteen keep their keys and
+     their polarity, so every belief accumulated before the rich axes existed
+     keeps accumulating in exactly the same place. */
+  for (const k of TASTE_AXIS_KEYS) dims[k] = emptyBelief();
   return { dims, genres: {}, people: {}, novelty: emptyBelief(), samples: 0 };
 }
 
@@ -80,7 +85,12 @@ function applySignal(
   // 2) Broad dimensional learning from the title's fingerprint — PRIMARY only.
   if (broad && !signal.presentationOnly && event.dims) {
     const w = base * broadDampen;
-    for (const k of DIMENSION_KEYS) {
+    /* THE WRITE GATE, AND IT WAS THE REAL BOTTLENECK. Storage was never
+       fifteen-dimensional — `ChannelProfile.dims` is `Record<string,
+       TraitBelief>` — but this loop decided which of an event's dimensions were
+       allowed in, so a fingerprint carrying `weirdness` had it dropped on the
+       floor here and nothing downstream could have recovered it. */
+    for (const k of TASTE_AXIS_KEYS) {
       const v = event.dims[k];
       if (typeof v !== 'number') continue;
       const info = Math.abs(v - 50); // 0..50
@@ -191,7 +201,7 @@ export interface DimReadout extends TraitConfidence {
 /** Resolve a channel's dimension beliefs into confident, sorted read-outs. */
 export function channelDims(channel: ChannelProfile): Record<string, TraitConfidence> {
   const out: Record<string, TraitConfidence> = {};
-  for (const k of DIMENSION_KEYS) out[k] = resolveConfidence(channel.dims[k] ?? emptyBelief());
+  for (const k of TASTE_AXIS_KEYS) out[k] = resolveConfidence(channel.dims[k] ?? emptyBelief());
   return out;
 }
 
@@ -202,7 +212,7 @@ export function topTraits(
 ): Array<{ kind: 'dim' | 'genre' | 'person'; key: string; conf: TraitConfidence }> {
   const min = opts.min ?? 0.35;
   const rows: Array<{ kind: 'dim' | 'genre' | 'person'; key: string; conf: TraitConfidence }> = [];
-  for (const k of DIMENSION_KEYS) {
+  for (const k of TASTE_AXIS_KEYS) {
     const conf = resolveConfidence(channel.dims[k] ?? emptyBelief());
     if (conf.confidence >= min && conf.polarity !== 0) rows.push({ kind: 'dim', key: k, conf });
   }
@@ -223,6 +233,12 @@ export function topTraits(
  * from the evidence we've gathered on the taste axes (Experience + Attraction).
  * Never jumps to certainty from a single answer.
  */
+/* DELIBERATELY STILL THE FIFTEEN. This is a user-facing "% understood" gauge,
+   calibrated against the fifteen core axes and shipped. Widening the denominator
+   to twenty-eight would drop every existing user's number overnight without one
+   thing being forgotten — a worse reading of the same knowledge. The rich axes
+   change what the ranker can ACT on; they do not change how well we claim to
+   know someone. */
 export function understanding(state: DnaState): number {
   let sum = 0;
   for (const k of DIMENSION_KEYS) {

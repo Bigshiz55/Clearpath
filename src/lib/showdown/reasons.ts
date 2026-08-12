@@ -93,7 +93,7 @@ const HIGHER: Partial<Record<TraitKey, string>> = {
   period: 'Set in the past',
   episodic: 'Worth the commitment',
   mainstream: 'The crowd-pleaser',
-  cynicism: 'Less sentimental',
+  cynicism: 'Harder-edged',
   sentimentality: 'More heart',
   musical: 'The music',
   sport: 'The competition',
@@ -105,7 +105,28 @@ const HIGHER: Partial<Record<TraitKey, string>> = {
   reality: 'Unscripted',
 };
 
+/*
+ * BOTH POLES OR THE AXIS ONLY LEARNS ONE DIRECTION.
+ *
+ * `characterFocus` had a HIGHER phrase and no LOWER one, so "I picked it because
+ * it's more plot-driven" was literally unsayable — a person who prefers plot to
+ * character could play forever and never once state their actual reason. It
+ * showed up as an axis that would not converge: measured over ten simulated
+ * sessions, `character` reached confidence 0.10 for both opposed personas while
+ * `ambiguity`, annotated on a comparable number of titles but phrasable in both
+ * directions, reached 0.55. A missing word is a missing belief.
+ */
 const LOWER: Partial<Record<TraitKey, string>> = {
+  characterFocus: 'More plot-driven',
+  psychological: 'Less internal',
+  suspense: 'Easier ride',
+  grounded: 'More far-fetched',
+  investigation: 'No puzzle needed',
+  crime: 'Nothing to do with crime',
+  scifi: 'No sci-fi',
+  period: 'Set now',
+  international: 'Closer to home',
+  action: 'Less action',
   darkness: 'Less bleak',
   horrorTolerance: 'Not horror',
   violence: 'Less brutal',
