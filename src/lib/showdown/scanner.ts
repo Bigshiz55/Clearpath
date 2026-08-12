@@ -198,10 +198,27 @@ function shortlist(
          seconds — but as a 0.5..1 modifier rather than a gate. */
       score = (0.5 + 0.5 * t.recognition) * (0.2 + 0.8 * noveltyAgainst(t, shown));
     } else if (phase === 'hypothesis') {
-      // Titles that speak to axes we are still unsure about.
+      /* UNCERTAINTY LEADS, APPEAL MODULATES — and the appeal half is what makes
+         the game adapt to a PERSON rather than to a schedule.
+         
+         Every information-theoretic term in this planner — uncertainty, gain,
+         coverage need, even the closeness of a predicted call — is invariant
+         under inverting a profile. Two players with exactly opposite taste
+         develop mirrored beliefs and IDENTICAL confidence, so all of those
+         score every pair the same and both players were dealt the same twenty
+         questions. Measured: 20 of 20 identical for a dark-preferring and a
+         light-preferring player, with beliefs that were perfect mirrors
+         (pref 100 vs pref 0) on every axis.
+         
+         Predicted appeal is the one term that is not symmetric: the titles this
+         person is expected to want are exactly the titles the mirror player is
+         expected to reject. It also happens to be the right product behaviour —
+         a calibration game that keeps showing you things you would never watch
+         is both less informative and less fun than one that argues with you
+         about films you might actually pick. */
       let open = 0;
       for (const [k, v] of vector(t)) open += Math.abs(v) * traitUncertainty(ctx.profile, k);
-      score = open * t.recognition;
+      score = open * t.recognition * (0.5 + 0.5 * predictedAppeal(t, ctx.profile));
     } else {
       // RESOLVE: titles the model has an opinion about — a pair can only be
       // finely balanced if both sides are predictable enough to balance.
@@ -262,7 +279,23 @@ export function nextScanMatchup(ctx: ScanContext): Matchup | null {
           ctx.profile,
           split.map((s) => ({ key: s.key, attribution: axisAttribution(s.sep, seps) })),
         );
-        score = gain * attribution * need * stale(testing, ctx.recentAxes);
+        /* BALANCE IS WHAT MAKES THE GAME ADAPT TO A PERSON RATHER THAN TO A
+           SCHEDULE, and its absence here was a real defect. `gain`, `attribution`
+           and `need` are all functions of how CERTAIN the profile is and none of
+           them of what it BELIEVES — so two players with exactly opposite taste
+           develop identical uncertainty and were dealt an identical session.
+           Measured before this line existed: 20 of 20 questions the same for a
+           dark-preferring and a light-preferring player.
+
+           `1 - |Δpredicted|` is the missing half. It peaks on the pair this
+           particular profile rates most evenly — the question the model cannot
+           call — which is a different pair for two people who have answered
+           differently, and is also the round a player experiences as the game
+           reading them. The resolve phase already used it; the phase where
+           hypotheses actually form did not. */
+        const balance =
+          1 - Math.abs(predictedAppeal(a, ctx.profile) - predictedAppeal(b, ctx.profile));
+        score = gain * attribution * need * stale(testing, ctx.recentAxes) * (0.35 + 0.65 * balance);
       } else {
         /* RESOLVE: closeness. `1 - |Δpredicted|` peaks when the model rates the
            two titles identically — the question it genuinely cannot call, which

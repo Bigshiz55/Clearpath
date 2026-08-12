@@ -66,6 +66,28 @@ export const MIN_AXIS_SPLIT = 0.15;
  */
 export const INFERRED_DAMP = 0.7;
 
+/**
+ * HOW MANY AXES ONE TAP MAY SPEAK TO.
+ *
+ * Unbounded, a comparative vector carries every canonical axis either film
+ * asserts — routinely twelve to fourteen. Attribution then divides the tap
+ * between all of them and every axis lands on the floor, so a full twenty-round
+ * session moved `darkness` to confidence 0.11 and the production ranker, whose
+ * floor is 0.25, correctly declined to act on any of it. The payoff screen had
+ * nothing to show because the evidence really was that thin.
+ *
+ * The fix is not to inflate the weights — it is to stop claiming so much. A
+ * person choosing between two films is not making fourteen simultaneous
+ * judgements; they are responding to the two or three things that actually
+ * separate them. Keeping the strongest splits and dropping the trailing ones
+ * concentrates the same tap into the axes it plausibly refers to, which is both
+ * a truer reading of what happened and enough evidence to reach the ranker.
+ *
+ * FOUR, matching the reason-chip cap — the same claim about how many
+ * distinctions a single choice can carry, made in two places that must agree.
+ */
+export const MAX_COMPARATIVE_AXES = 4;
+
 export interface ComparativeResult {
   /** Canonical axis → target 0..100. Distance from 50 IS the evidence weight. */
   dims: TitleDimensions;
@@ -99,6 +121,12 @@ export function comparativeDims(
     deltas.push({ key, delta: delta * damp });
   }
 
+  /* Strongest splits only. The trailing axes are the ones the player almost
+     certainly was not thinking about, and including them costs the leading axes
+     most of their weight. */
+  deltas.sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta));
+  deltas.splice(MAX_COMPARATIVE_AXES);
+
   const magnitudes = deltas.map((d) => Math.abs(d.delta));
   const dims: TitleDimensions = {};
   for (const { key, delta } of deltas) {
@@ -114,7 +142,7 @@ export function comparativeDims(
   return {
     dims,
     attribution: strongest > 0 ? axisAttribution(strongest, magnitudes) : 0,
-    split: deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).map((d) => d.key),
+    split: deltas.map((d) => d.key),
   };
 }
 

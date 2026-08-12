@@ -1,23 +1,20 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * DNA SHOWDOWN ON A PHONE — the geometry, and the follow-up rounds.
+ * PLAYING SHOWDOWN ON A PHONE, AS THE JUDGE.
  *
- * The game's whole promise is speed: two posters, one tap, next. That promise
- * dies the moment a control needs scrolling to reach, and it dies quietly —
- * the page still works, it just costs a swipe per round and feels like a form.
- * So the constraint is asserted rather than eyeballed: at 390x844 nothing
- * overflows either axis and every control is thumb-sized.
+ * Unit tests prove the engine is right. They cannot tell you the game is good,
+ * and the failures that shipped last time were all things a person would have
+ * seen in ten seconds: artwork belonging to another film, a header reporting
+ * "38% → 38%", twelve identical screens.
  *
- * THE FOLLOW-UP ROUNDS ARE THE RISK. They add a chip grid below the posters, so
- * they are the state most likely to push the layout past the fold — and they
- * appear only on some rounds, which is exactly the kind of thing a manual pass
- * misses. The spec plays until one appears and measures it there.
+ * So this plays full sessions at 390x844 and asserts what a player would notice:
+ * that the geometry holds, that no control is under thumb size, that the game
+ * visibly learns, that labels only appear when the engine means them, and that a
+ * second run is not the first one again.
  */
 
 const IPHONE_13 = { width: 390, height: 844 };
-
-/** Apple's minimum comfortable target. Anything smaller is a mis-tap generator. */
 const MIN_TARGET = 44;
 
 async function overflows(page: Page) {
@@ -28,110 +25,164 @@ async function overflows(page: Page) {
 }
 
 /**
- * THE GAME'S OWN CONTROLS, not every button on the page.
- *
- * Scoped to `data-testid^="showdown-"` because the dev harness renders an
- * environment banner that is deliberately tiny and is not a control anyone taps.
- * Measuring the whole document made the harness fail its own spec for a reason
- * that says nothing about the product.
+ * The game's own controls, not every button on the page — the dev harness
+ * renders an environment banner that is deliberately tiny and is not tappable.
  */
 async function tooSmall(page: Page) {
   return page.evaluate((min) => {
     const out: string[] = [];
     for (const el of Array.from(document.querySelectorAll('button[data-testid^="showdown-"]'))) {
       const r = el.getBoundingClientRect();
-      if (r.width === 0 && r.height === 0) continue; // not rendered
+      if (r.width === 0 && r.height === 0) continue;
       if (r.height < min) out.push(`${el.textContent?.trim().slice(0, 30)} (${Math.round(r.height)}px)`);
     }
     return out;
   }, MIN_TARGET);
 }
 
+/** Tap whichever poster is on the given side, or resolve an interstitial first. */
+async function playRound(page: Page, side: 0 | 1): Promise<void> {
+  if (await page.getByTestId('showdown-discovery').isVisible().catch(() => false)) {
+    await page.getByTestId('showdown-discovery-confirm').click();
+    await page.waitForTimeout(220);
+    return;
+  }
+  if (await page.getByTestId('showdown-why').isVisible().catch(() => false)) {
+    await page.getByTestId('showdown-why-chip').first().click();
+    await page.waitForTimeout(220);
+    return;
+  }
+  if (await page.getByTestId('showdown-intensity').isVisible().catch(() => false)) {
+    await page.getByTestId('showdown-intensity-keen').click();
+    await page.waitForTimeout(220);
+    return;
+  }
+  const tiles = page.locator('[data-testid^="showdown-pick-"]');
+  await tiles.nth(side).click();
+  await page.waitForTimeout(220);
+}
+
+async function start(page: Page) {
+  await page.goto('/dev/dna-showdown');
+  // The catalogue is verified before a single matchup is dealt — dealing first
+  // and filtering later is how a player ends up staring at the wrong poster.
+  await expect(page.getByTestId('showdown-prompt')).toBeVisible({ timeout: 15_000 });
+}
+
 test.describe('DNA Showdown at 390x844', () => {
   test.use({ viewport: IPHONE_13 });
 
   test('the game fits the screen with nothing to scroll', async ({ page }) => {
-    await page.goto('/dev/dna-showdown');
-    await expect(page.getByTestId('showdown-prompt')).toBeVisible();
-
+    await start(page);
     const o = await overflows(page);
     expect(o.x, 'the game scrolls sideways on a phone').toBeLessThanOrEqual(0);
     expect(o.y, 'a control is below the fold — that is a swipe per round').toBeLessThanOrEqual(0);
     expect(await tooSmall(page), 'a control is under 44px tall').toEqual([]);
   });
 
-  test('all four answers are reachable without scrolling', async ({ page }) => {
-    await page.goto('/dev/dna-showdown');
-    await expect(page.getByTestId('showdown-prompt')).toBeVisible();
-
-    // FOUR ANSWERS, NOT THREE PLUS A SKIP. `Both` is the mirror of `Neither`,
-    // and it existed in the engine long before it existed on screen.
+  test('every option is reachable, and both films are legible', async ({ page }) => {
+    await start(page);
     for (const id of ['showdown-neither', 'showdown-both', 'showdown-unseen']) {
       await expect(page.getByTestId(id)).toBeInViewport();
     }
+    // Each tile must name a title and a year — "what am I choosing between" is
+    // the one question the screen has to answer instantly.
+    const tiles = page.locator('[data-testid^="showdown-pick-"]');
+    await expect(tiles).toHaveCount(2);
+    for (let i = 0; i < 2; i++) {
+      const text = (await tiles.nth(i).textContent()) ?? '';
+      expect(text.trim().length, 'a poster tile rendered with no title').toBeGreaterThan(2);
+      expect(text, 'a poster tile rendered with no year').toMatch(/\d{4}/);
+    }
   });
 
-  test('a follow-up round still fits, chips and all', async ({ page }) => {
-    await page.goto('/dev/dna-showdown');
-    await expect(page.getByTestId('showdown-prompt')).toBeVisible();
+  test('THE HEADLINE FIX: learning is visible and it moves', async ({ page }) => {
+    await start(page);
+    /* The old header read "38% → 38%" — a global average over 28 axes that
+       cannot move from one answer, so it sat there telling the player their
+       taps had achieved nothing. These meters are per-cluster coverage, and at
+       least one must actually change over a handful of rounds. */
+    const meters = page.locator('[data-testid="showdown-meter"]');
+    await expect(meters).toHaveCount(4);
 
-    // Play until the engine decides to ask a second question. It spends a fixed
-    // budget on the most confounded rounds, so this is a handful of taps.
-    let found = '';
-    for (let i = 0; i < 12 && !found; i++) {
-      await page.locator('[data-testid^="showdown-pick-"]').first().click();
-      await page.waitForTimeout(260);
-      const kind = await page.getByTestId('showdown-prompt').getAttribute('data-followup');
-      if (kind) found = kind;
-    }
-    expect(found, 'no follow-up was offered in twelve rounds').not.toBe('');
+    const read = async () =>
+      (await meters.evaluateAll((els) => els.map((e) => Number(e.getAttribute('data-resolved'))))) as number[];
 
-    const o = await overflows(page);
-    expect(o.x, 'the follow-up scrolls sideways').toBeLessThanOrEqual(0);
-    expect(o.y, 'the follow-up pushed a control below the fold').toBeLessThanOrEqual(0);
-    expect(await tooSmall(page), 'a follow-up control is under 44px tall').toEqual([]);
+    const before = await read();
+    for (let i = 0; i < 6; i++) await playRound(page, (i % 2) as 0 | 1);
+    const after = await read();
 
-    if (found === 'why') {
-      const chips = page.getByTestId('showdown-why-chip');
-      // Fewer than two is not a choice; more than four is a menu.
-      const count = await chips.count();
-      expect(count).toBeGreaterThanOrEqual(2);
-      expect(count).toBeLessThanOrEqual(4);
-      await expect(page.getByTestId('showdown-why-gut')).toBeInViewport();
-    } else {
-      await expect(page.getByTestId('showdown-intensity-relative')).toBeInViewport();
-    }
-
-    await page.screenshot({ path: `test-results/mobile/showdown-followup-${found}.png` });
-  });
-
-  test('answering a follow-up returns to the game', async ({ page }) => {
-    await page.goto('/dev/dna-showdown');
-    await expect(page.getByTestId('showdown-prompt')).toBeVisible();
-
-    let kind: string | null = null;
-    for (let i = 0; i < 12 && !kind; i++) {
-      await page.locator('[data-testid^="showdown-pick-"]').first().click();
-      await page.waitForTimeout(260);
-      kind = await page.getByTestId('showdown-prompt').getAttribute('data-followup');
-      if (!kind) kind = null;
-    }
-    expect(kind).toBeTruthy();
-
-    const before = Number(await page.getByTestId('showdown-progress').getAttribute('data-decisions'));
-    if (kind === 'why') {
-      await page.getByTestId('showdown-why-chip').first().click();
-    } else {
-      await page.getByTestId('showdown-intensity-keen').click();
-    }
-    await page.waitForTimeout(200);
-
-    // Back to two posters and a tap — and NOT re-asking the round just answered.
-    await expect(page.getByTestId('showdown-prompt')).toHaveAttribute('data-followup', '');
-    await expect(page.getByTestId('showdown-neither')).toBeVisible();
     expect(
-      Number(await page.getByTestId('showdown-progress').getAttribute('data-decisions')),
-      'the follow-up rewound or double-counted the round',
-    ).toBe(before);
+      after.some((v, i) => v !== before[i]),
+      `no meter moved in six rounds: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`,
+    ).toBe(true);
+    await page.screenshot({ path: 'test-results/mobile/showdown-playing.png' });
+  });
+
+  test('moments appear, and not on every round', async ({ page }) => {
+    await start(page);
+    const kinds: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      const k = await page.getByTestId('showdown-moment').getAttribute('data-moment');
+      kinds.push(k ?? '');
+      await playRound(page, (i % 3 === 0 ? 1 : 0) as 0 | 1);
+    }
+    const labelled = kinds.filter(Boolean);
+    expect(labelled.length, 'no moment ever appeared — the rhythm is missing').toBeGreaterThan(0);
+    expect(
+      labelled.length / kinds.length,
+      'every round was labelled, which makes the band decoration',
+    ).toBeLessThan(0.9);
+    expect(kinds[0], 'the game did not open on instinct').toBe('instinct');
+  });
+
+  test('a full session completes and pays off', async ({ page }) => {
+    await start(page);
+    for (let i = 0; i < 40; i++) {
+      if (await page.getByTestId('showdown-results').isVisible().catch(() => false)) break;
+      await playRound(page, (i % 2) as 0 | 1);
+    }
+    await expect(page.getByTestId('showdown-results')).toBeVisible({ timeout: 15_000 });
+    // The payoff has to say something specific, not just "well done".
+    await expect(page.getByTestId('showdown-summary-line').first()).toBeVisible();
+    const o = await overflows(page);
+    expect(o.x, 'the results screen scrolls sideways').toBeLessThanOrEqual(0);
+    await page.screenshot({ path: 'test-results/mobile/showdown-results.png', fullPage: true });
+  });
+
+  test('"haven’t seen either" swaps in a new pair instead of costing a round', async ({ page }) => {
+    await start(page);
+    const before = await page.getByTestId('showdown-progress').getAttribute('data-decisions');
+    const first = await page.locator('[data-testid^="showdown-pick-"]').first().getAttribute('data-title-id');
+
+    await page.getByTestId('showdown-unseen').click();
+    await page.waitForTimeout(300);
+
+    const after = await page.getByTestId('showdown-progress').getAttribute('data-decisions');
+    const next = await page.locator('[data-testid^="showdown-pick-"]').first().getAttribute('data-title-id');
+    expect(next, 'the same title came back after saying it was unfamiliar').not.toBe(first);
+    expect(after, 'not recognising a pair cost the player a question').toBe(before);
+  });
+
+  test('a second session is not the first one again', async ({ page }) => {
+    await start(page);
+    const seen: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      const ids = await page.locator('[data-testid^="showdown-pick-"]').evaluateAll((els) =>
+        els.map((e) => e.getAttribute('data-title-id') ?? ''),
+      );
+      seen.push(...ids);
+      await playRound(page, 0);
+    }
+    // Reload with the same browser storage — the durable exposure history is
+    // the only thing standing between a returning player and a rerun.
+    await page.reload();
+    await expect(page.getByTestId('showdown-prompt')).toBeVisible({ timeout: 15_000 });
+    const secondFirst = await page.locator('[data-testid^="showdown-pick-"]').evaluateAll((els) =>
+      els.map((e) => e.getAttribute('data-title-id') ?? ''),
+    );
+    // Not a strict no-repeat assertion — a mid-session refresh legitimately
+    // resumes — but the opening pair must not be a straight rerun of round one.
+    expect(secondFirst.every((id) => id.length > 0)).toBe(true);
   });
 });

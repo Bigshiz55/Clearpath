@@ -57,6 +57,12 @@ import {
   type Pair,
 } from './followup';
 import { GUT_CALL, type ReasonChip } from './reasons';
+import {
+  discoveriesFor,
+  discoveryDue,
+  discoveryEvidence,
+  type Discovery,
+} from './discovery';
 
 /**
  * BOTH is not a hedge, it is a distinct claim.
@@ -159,6 +165,10 @@ export interface ShowdownState {
   followups: number;
   /** Decision index (1-based) of the last follow-up offered. 0 = none yet. */
   lastFollowupRound: number;
+  /** Discovery ids already put to this player. A moment repeated is a screensaver. */
+  shownDiscoveries: string[];
+  /** Decision count when the last discovery was surfaced. */
+  lastDiscoveryRound: number;
   /** Rounds spent on pairs the player did not recognise. They advance the
    *  scan clock without producing evidence, so the phases still progress. */
   unseenRounds: number;
@@ -202,6 +212,8 @@ export function createSession(
     current: null,
     followups: 0,
     lastFollowupRound: 0,
+    shownDiscoveries: [],
+    lastDiscoveryRound: 0,
     carriedTitleIds: (seed.seenTitleIds ?? []).length,
     unseenRounds: 0,
     openingKnown: seed.openingKnown ?? 0,
@@ -623,9 +635,15 @@ export function markUnseen(state: ShowdownState, now: number): ShowdownState {
     unseenTitles: [...state.unseenTitles, matchup.left.id, matchup.right.id],
     seenTitleIds: [...state.seenTitleIds, matchup.left.id, matchup.right.id],
     seenPairs: [...state.seenPairs, pairKey(matchup.left.id, matchup.right.id)],
-    // Advances the phase clock: an unrecognised pair still consumed a round of
-    // the player's ninety seconds, and the scan must not silently run long.
-    unseenRounds: state.unseenRounds + 1,
+    /* AN UNRECOGNISED PAIR IS NOT A QUESTION, SO IT DOES NOT COST ONE.
+       This used to advance the scan clock on the reasoning that the round
+       consumed the player's time. It does — but the alternative is worse: a
+       player who has not seen four pairs finishes with sixteen answers' worth
+       of profile and a results screen that has to explain why it learned less.
+       The pair is retired, both titles are withheld from every future deal, and
+       a fresh high-information matchup takes its place immediately. Recognition
+       is a fact about the CATALOGUE, and the catalogue should pay for it. */
+    unseenRounds: state.unseenRounds,
     startedAt: state.startedAt || now,
     current: null,
   };
@@ -642,6 +660,50 @@ export function markUnseen(state: ShowdownState, now: number): ShowdownState {
 export function attributionOf(decision: ShowdownDecision): number {
   const pair = pairForDecision(decision);
   return pair ? attributionConfidence(separations(pair)) : 0;
+}
+
+/**
+ * The discovery worth surfacing right now, or null.
+ *
+ * Asked between rounds, never during one. It is the only interruption in the
+ * game that is not a question about films — it is the game telling the player
+ * what it thinks it has worked out and inviting them to disagree.
+ */
+export function discoveryFor(state: ShowdownState): Discovery | null {
+  if (state.mode !== 'dna') return null;
+  if (!discoveryDue(state.decisions.length, state.lastDiscoveryRound, state.shownDiscoveries.length))
+    return null;
+  return discoveriesFor(state.profile, state.shownDiscoveries)[0] ?? null;
+}
+
+/**
+ * Record the player's verdict on a discovery.
+ *
+ * "Not quite" is the highest-value tap in the game — a single-axis correction
+ * from the person themselves, contradicting something the engine had already
+ * become confident about. It is recorded as evidence, never as a dismissal.
+ */
+export function answerDiscovery(
+  state: ShowdownState,
+  discovery: Discovery,
+  verdict: 'confirm' | 'correct',
+): ShowdownState {
+  const profile = applyPermanent(state.profile, discoveryEvidence(discovery, verdict));
+  return {
+    ...state,
+    profile,
+    shownDiscoveries: [...state.shownDiscoveries, discovery.id],
+    lastDiscoveryRound: state.decisions.length,
+  };
+}
+
+/** Dismissed without answering — spends the slot, records nothing. */
+export function skipDiscovery(state: ShowdownState, discovery: Discovery): ShowdownState {
+  return {
+    ...state,
+    shownDiscoveries: [...state.shownDiscoveries, discovery.id],
+    lastDiscoveryRound: state.decisions.length,
+  };
 }
 
 /**
