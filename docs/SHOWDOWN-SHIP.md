@@ -6,7 +6,7 @@ re-audit completed gates; do not restate accepted work.
 
 CURRENT SHA: (see git log — updated each commit)
 CURRENT PREVIEW: https://clearpath-git-claude-showdown-flagship-bigshiz56.vercel.app (Vercel SSO-gated)
-NEXT ACTION: G3 — two-profile downstream ranking divergence. Build two identical starting profiles, run legitimately different Showdown sessions through `sessionToEvents -> deriveDna`, rank the SAME candidate set with `preferenceNudge`, and name one candidate whose order changes plus the trait that caused it. No mocks, no lowered MIN_RANK_CONF; add legitimate repeated sessions until the real threshold clears. Pattern to copy: `src/lib/showdown/persistence.test.ts` (note `canonicalTitleId` takes an ID STRING).
+NEXT ACTION: finish G3. Dump all three `deriveDna` channels (experience / attraction / discovery) for the dark and light users in `divergence.test.ts` and identify why the light profile nudges 0 — hypotheses (a) polarity===0 and (b) dark-skewed catalogue are written up under G3 below. Then either un-skip the order-swap test or, if (b) holds, record it as a catalogue-balance product finding and re-scope G3's order-swap requirement with the owner.
 
 ---
 
@@ -62,13 +62,35 @@ NEXT ACTION: G3 — two-profile downstream ranking divergence. Build two identic
 - **Failures:** none
 
 ### G3 — downstream ranking divergence
-- **Status:** not started
-- **Proof:** —
-- **Files:** —
-- **Failures:** —
-- **Constraint:** no ranking mocks, no injected scores, `MIN_RANK_CONF` must not
-  be lowered. Supply legitimate repeated sessions until the real threshold is
-  cleared.
+- **Status:** IN PROGRESS — divergence PROVED, order-swap NOT yet proved
+- **Proof so far:** `src/lib/showdown/divergence.test.ts` (5 passed, 1 skipped,
+  1 todo). Both users start from identical (empty) permanent DNA, play the same
+  planner with a legitimate strategy (prefer the darker / lighter title of each
+  pair, never "always left"), and are ranked over the same candidates by the
+  real `preferenceNudge`. `MIN_RANK_CONF` is imported and pinned at 0.25.
+  - PROVED: the same candidate scores differently for the two users
+    (bleak thriller: dark **+6.23**, light **0**), and the causal trait is
+    `darkness` — the dark profile prefers bleak over sunny (+6.23 vs -5.81).
+  - PROVED: an empty profile nudges 0 (control).
+- **THE BLOCKER, measured:** the LIGHT-preferring profile yields
+  `preferenceNudge` of exactly **0** on both candidates. Scaled legitimate play
+  to 4 / 8 / 16 / 30 sessions: dark scales +4.63 -> +6.23 -> +6.97 -> +7.07,
+  light stays **0 at every level**. So this is STRUCTURAL, not a threshold more
+  play would clear, and lowering `MIN_RANK_CONF` is both forbidden and the
+  wrong fix.
+- **NEXT DIAGNOSTIC STEP (do this first):** find which channel actually carries
+  the signal. `deriveDna` returns experience/attraction/discovery channels; a
+  probe of `experience.dims.darkness` showed `{pref:50, evidence:0}` for BOTH
+  users even though dark ranks +6.23, so the darkness belief lives in another
+  channel and the probe read the wrong one. Dump all three channels for both
+  users and compare. Two live hypotheses:
+  (a) the light user's belief lands near neutral so `polarity === 0` and
+      `preferenceNudge` skips it at `rank.ts:104/124`;
+  (b) the 113-title diagnostic catalogue is skewed dark, so "the lighter of the
+      pair" is still above 50 darkness and a light-preferring player cannot
+      develop a rankable light preference — which would be a real PRODUCT
+      finding about catalogue balance, not a test problem.
+- **Files:** `src/lib/showdown/divergence.test.ts` (new)
 
 ### G4 — render a real discovery
 - **Status:** not started
