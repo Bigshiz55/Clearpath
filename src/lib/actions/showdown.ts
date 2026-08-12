@@ -6,6 +6,7 @@ import { recordEvents } from '@/lib/preference/store';
 import { getCachedDimensions } from '@/lib/titleDimensions';
 import { TITLES } from '@/lib/voice/quickdna/definition';
 import { canonicalTitleId, mediaTypeFor } from '@/lib/showdown/mediaType';
+import { resolveCatalogue } from '@/lib/showdown/catalogueResolver';
 import { gradeForDecision } from '@/lib/showdown/canonical';
 import { reasonsFor } from '@/lib/showdown/reasons';
 import { pairwiseEvents } from '@/lib/taste/crossing';
@@ -77,9 +78,25 @@ export async function recordShowdownSession(
      Measured consequence: someone who systematically avoids sentimental films
      never picks one, so `sentimentality` stayed at exactly 50 with zero evidence
      across 321 events. A comparative vector fixes both directions. */
+  /* EVIDENCE USES THE VERIFIED ID, NOT THE HAND-AUTHORED ONE.
+     Fixing only the artwork would have left the damaging half of the bug in
+     place: a mis-attributed poster is embarrassing for one screen, but evidence
+     filed against the wrong canonical title is permanent, invisible, and
+     silently teaches the engine about a film the player never saw. The same
+     resolver the catalogue endpoint uses answers both, so the two can never
+     disagree about which record a title is. */
+  let verified: Record<string, string> = {};
+  try {
+    verified = (await resolveCatalogue()).canonicalIds;
+  } catch {
+    /* Checker unavailable — fall back to the recorded id below. That is the
+       pre-existing behaviour, and it is strictly better than dropping the
+       session on the floor when TMDB is down. */
+  }
+
   const refFor = (titleId: string, at: number) => {
     const t = TITLES.find((x) => x.id === titleId);
-    const canonical = canonicalTitleId(titleId);
+    const canonical = verified[titleId] ?? canonicalTitleId(titleId);
     if (!t || !canonical) return null;
     return {
       titleId: canonical,
