@@ -68,6 +68,7 @@ export function PhotoAdd() {
       year: m.year,
       posterPath: m.posterPath,
       status: 'possible',
+      provenance: 'explicit_user_save',
     });
     if (res.ok) {
       setAdded((a) => [...a, label]);

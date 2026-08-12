@@ -66,7 +66,7 @@ export function SaveButton({
           toast.show(res.error ?? 'Could not remove.', 'error');
         }
       } else {
-        const res = await addToWatchlist({ tmdbId, mediaType, title, year, posterPath, status: 'strict' });
+        const res = await addToWatchlist({ tmdbId, mediaType, title, year, posterPath, status: 'strict', provenance: 'explicit_user_save' });
         if (res.ok) {
           const data = res.data as { itemId: string } | undefined;
           setItemId(data?.itemId ?? null);

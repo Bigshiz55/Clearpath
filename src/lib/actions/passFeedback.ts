@@ -127,11 +127,11 @@ export async function submitPassFeedback(input: PassFeedbackInput): Promise<Acti
       case 'seen': {
         watched = true;
         if (v.rating != null) {
-          const r = await rateQuizTitle({ ...base, rating: v.rating });
+          const r = await rateQuizTitle({ ...base, rating: v.rating, provenance: 'explicit_mark_seen' });
           if (!r.ok) return r;
           affectedDna = true;
         } else {
-          const r = await addToWatchlist({ ...base, status: 'watched' });
+          const r = await addToWatchlist({ ...base, status: 'watched', provenance: 'explicit_mark_seen' });
           if (!r.ok) return r;
         }
         break;
@@ -139,7 +139,7 @@ export async function submitPassFeedback(input: PassFeedbackInput): Promise<Acti
       case 'didnt_like': {
         watched = true;
         // They watched it and it missed — a real, strong negative rating.
-        const r = await rateQuizTitle({ ...base, rating: v.rating ?? 2 });
+        const r = await rateQuizTitle({ ...base, rating: v.rating ?? 2, provenance: 'explicit_mark_seen' });
         if (!r.ok) return r;
         affectedDna = true;
         break;
@@ -149,7 +149,7 @@ export async function submitPassFeedback(input: PassFeedbackInput): Promise<Acti
         // rating (that would wrongly teach "dislikes this genre") — only the
         // targeted axis nudge below. With no reason, a moderate title-level
         // negative so "less like this" still has something to learn from.
-        const r = await addToWatchlist({ ...base, status: 'dropped' });
+        const r = await addToWatchlist({ ...base, status: 'dropped', provenance: 'explicit_mark_seen' });
         if (!r.ok) return r;
         const itemId = (r.data as { itemId?: string } | undefined)?.itemId;
         if (itemId && (v.reasonCodes?.length ?? 0) === 0) await updateWatchlistItem({ itemId, rating: 3 });
@@ -159,7 +159,7 @@ export async function submitPassFeedback(input: PassFeedbackInput): Promise<Acti
       case 'removed_without_reason': {
         // A bare pass — just hide it from picks. NO rating, so no DNA ding; the
         // learning comes from the optional reason chip, not the tap itself.
-        const r = await addToWatchlist({ ...base, status: 'dropped' });
+        const r = await addToWatchlist({ ...base, status: 'dropped', provenance: 'explicit_mark_seen' });
         if (!r.ok) return r;
         break;
       }

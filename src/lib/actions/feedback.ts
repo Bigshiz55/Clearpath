@@ -40,6 +40,7 @@ export async function recordTasteFeedback(input: z.infer<typeof schema>): Promis
     year: v.year ?? null,
     posterPath: v.posterPath ?? null,
     status: m.status,
+    provenance: 'explicit_mark_seen',
   });
   if (!res.ok) return res;
 

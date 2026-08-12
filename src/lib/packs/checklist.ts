@@ -1,4 +1,5 @@
 import 'server-only';
+import { partitionEligible, shapeForPack } from './eligibility';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { listStationsForPack } from './stations';
 import type { Pack, ChecklistItem } from './types';
@@ -57,6 +58,15 @@ export async function packListStorageAvailable(supabase: SupabaseClient): Promis
   // PGRST205 = table not in the schema cache, i.e. the migration has not run.
   listTableAvailable = !error || !/schema cache|does not exist/i.test(error.message);
   return listTableAvailable;
+}
+
+interface ProgrammeRow {
+  id: string;
+  title: string;
+  artwork_url: string | null;
+  genres: string[] | null;
+  release_year: number | null;
+  tmdb_media_type?: 'movie' | 'tv' | null;
 }
 
 async function loadProgrammes(
@@ -130,10 +140,47 @@ export async function listPackBrowse(
     listedSet(supabase, userId, pack.id, programmeIds),
   ]);
 
-  return programmeIds
+  /* ELIGIBILITY, WHICH DID NOT EXIST BEFORE THIS.
+     Browse used to show every programme that had aired on the Pack's channels —
+     no filter on media type, genre, or whether the thing was entertainment at
+     all. That is why the Lifetime Movie Vault carried Castle, The Rookie and
+     Dr. Pimple Popper, and Crime Case Files carried Storage Wars and an
+     infomercial about blood pressure. The listings were correct; the product was
+     treating "aired on this channel" as "is what this channel is for", and a
+     cable schedule is mostly not the thing the channel is known for. */
+  const shape = shapeForPack(pack.slug);
+  const rows = programmeIds
     .map((id) => {
       const p = programmes.get(id);
       if (!p) return null;
+      return { id, p };
+    })
+    .filter((x): x is { id: string; p: ProgrammeRow } => x !== null);
+
+  const { kept, rejected } = partitionEligible(
+    shape,
+    rows.map(({ id, p }) => ({
+      id,
+      title: p.title,
+      mediaType: p.tmdb_media_type ?? null,
+      genres: p.genres ?? [],
+      releaseYear: p.release_year,
+    })),
+  );
+
+  /* REPORTED, NOT SWALLOWED. "The Vault is empty" and "the Vault filtered out
+     300 infomercials" are different problems with different owners, and a
+     silently-empty page is indistinguishable from a broken one. */
+  if (rejected.length > 0) {
+    console.info(
+      `[packs] ${pack.slug}: ${rejected.length}/${rows.length} airings excluded as ineligible ` +
+        `(${[...new Set(rejected.map((r) => r.reason))].join('; ')})`,
+    );
+  }
+
+  return kept
+    .map(({ id }) => {
+      const p = programmes.get(id)!;
       return {
         programmeId: id,
         title: p.title,
@@ -144,8 +191,7 @@ export async function listPackBrowse(
         latestAiringUtc: latestByProgramme.get(id) ?? null,
         onList: listed.has(id),
       } as PackTitle;
-    })
-    .filter((x): x is PackTitle => x !== null);
+    });
 }
 
 /**

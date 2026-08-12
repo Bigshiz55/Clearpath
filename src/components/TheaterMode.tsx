@@ -77,7 +77,7 @@ export function TheaterMode({
   async function start() {
     startCountdown();
     // Best-effort: mark it as what we're watching now.
-    addToWatchlist({ tmdbId, mediaType, title, year, posterPath, status: 'watching' }).catch(() => {});
+    addToWatchlist({ tmdbId, mediaType, title, year, posterPath, status: 'watching', provenance: 'explicit_user_save' }).catch(() => {});
 
     const text = (localStorage.getItem(LS_MSG) ?? msg)
       .replace('{title}', `${title}${year ? ` (${year})` : ''}`)

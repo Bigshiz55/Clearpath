@@ -55,6 +55,7 @@ export async function recordPostWatch(input: z.infer<typeof schema>): Promise<Po
     year: v.year ?? null,
     posterPath: v.posterPath ?? null,
     status: 'watched',
+    provenance: 'explicit_mark_seen',
   });
   if (!added.ok) return added;
 

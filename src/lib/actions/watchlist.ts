@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { LIST_PROVENANCES } from '@/lib/watchlist/provenance';
 import { createClient } from '@/lib/supabase/server';
 import { resolveTitleFromText, resolveCandidatesFromText } from '@/lib/quickResolve';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -48,6 +49,13 @@ const addSchema = z.object({
   year: z.number().int().nullable().optional(),
   posterPath: z.string().max(300).nullable().optional(),
   status: z.enum(['strict', 'possible', 'watching', 'watched', 'paused', 'dropped']),
+  /**
+   * WHY THIS ROW EXISTS. Required rather than defaulted: a caller that has not
+   * thought about whether the user actually asked for this is exactly the caller
+   * that put 518 unrecognised titles in someone's list. Making it explicit means
+   * the question cannot be skipped by omission.
+   */
+  provenance: z.enum(LIST_PROVENANCES as unknown as [string, ...string[]]),
 });
 
 export async function addToWatchlist(input: z.infer<typeof addSchema>): Promise<ActionResult> {
@@ -72,6 +80,7 @@ export async function addToWatchlist(input: z.infer<typeof addSchema>): Promise<
           year: v.year ?? null,
           poster_path: v.posterPath ?? null,
           status: v.status,
+          provenance: v.provenance,
           watched_at: v.status === 'watched' ? new Date().toISOString() : null,
         },
         { onConflict: 'watchlist_id,tmdb_id,media_type' },

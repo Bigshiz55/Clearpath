@@ -180,7 +180,7 @@ export function AvailabilityPanel({
               type="button"
               onClick={() => {
                 setNotify('saving');
-                void addToWatchlist({ tmdbId, mediaType, title, year, posterPath, status: 'strict' })
+                void addToWatchlist({ tmdbId, mediaType, title, year, posterPath, status: 'strict', provenance: 'explicit_user_save' })
                   .then((r) => setNotify(r?.ok ? 'saved' : 'failed'))
                   .catch(() => setNotify('failed'));
               }}

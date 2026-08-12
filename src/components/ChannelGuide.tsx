@@ -118,6 +118,7 @@ export function ChannelGuide({
         year: a.year ?? null,
         posterPath: a.posterPath ?? null,
         status: 'possible',
+        provenance: 'explicit_user_save',
       });
       if (!res.ok) {
         setNotice(res.error ?? 'Could not save that.');

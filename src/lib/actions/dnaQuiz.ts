@@ -78,6 +78,7 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
       year: a.year ?? null,
       posterPath: a.posterPath ?? null,
       status: 'possible',
+      provenance: 'explicit_user_save',
     }).catch(() => {});
   }
 
@@ -91,6 +92,7 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
       year: a.year ?? null,
       posterPath: a.posterPath ?? null,
       rating: legacy,
+      provenance: 'explicit_mark_seen',
     }).catch(() => {});
   }
 

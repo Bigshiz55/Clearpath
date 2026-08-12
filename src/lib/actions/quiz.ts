@@ -13,6 +13,22 @@ const schema = z.object({
   year: z.number().int().nullable().optional(),
   posterPath: z.string().max(300).nullable().optional(),
   rating: z.number().int().min(1).max(10),
+  /** Defaults to the game, because that is where the overwhelming majority
+   *  of these come from and a caller that forgets should not be able to
+   *  masquerade as an explicit user action. */
+  provenance: z
+    .enum(['taste_game_rating', 'explicit_mark_seen', 'onboarding_seed'])
+    .optional(),
+  /**
+   * Did the user actually WATCH it?
+   *
+   * Defaults true because a rating normally implies one. It is a parameter
+   * because onboarding asks "what do you want to AVOID", and the old code ran
+   * those answers through here at rating 2 — so naming a film you never want to
+   * see marked it as watched. A stated dislike of something unseen is a real
+   * preference and is not a viewing.
+   */
+  seen: z.boolean().optional(),
 });
 
 async function getOrCreateDefaultWatchlist(
@@ -35,7 +51,24 @@ async function getOrCreateDefaultWatchlist(
   return created!.id as string;
 }
 
-/** Record a taste-quiz rating as a watched item (feeds recommendations). */
+/**
+ * Record a taste-quiz rating.
+ *
+ * THIS FUNCTION IS THE WATCHLIST CONTAMINATION. It wrote `status: 'watched'`
+ * into the user's default watchlist for every rating, and `TasteGame` — which
+ * tops its deck up so "the game feels endless" — calls it on every tap. A real
+ * account reached ~518 watched titles this way, almost none of which the owner
+ * recognised as something they had asked to save.
+ *
+ * The row still exists, because the RATING is real and the recommendation
+ * engine has always been seeded from it. What changed is that it now says where
+ * it came from, so the Watchlist can stop presenting a ratings log as a
+ * collection the user curated. See `lib/watchlist/provenance.ts`.
+ *
+ * `provenance` is a parameter rather than a constant because the same rating
+ * path is used by onboarding seeds and by explicit "I've seen it" verdicts, and
+ * those are genuinely different claims.
+ */
 export async function rateQuizTitle(
   input: z.infer<typeof schema>,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -60,9 +93,10 @@ export async function rateQuizTitle(
         title: v.title,
         year: v.year ?? null,
         poster_path: v.posterPath ?? null,
-        status: 'watched',
+        status: v.seen === false ? 'possible' : 'watched',
+        provenance: v.provenance ?? 'taste_game_rating',
         rating: v.rating,
-        watched_at: new Date().toISOString(),
+        watched_at: v.seen === false ? null : new Date().toISOString(),
       },
       { onConflict: 'watchlist_id,tmdb_id,media_type' },
     );

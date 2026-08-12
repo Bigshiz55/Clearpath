@@ -79,6 +79,12 @@ export function TasteGame({ onDone, build = 'dev' }: { onDone: (ruledCount: numb
       year: current.year,
       posterPath: current.posterPath,
       rating,
+      /* Stated rather than defaulted. Every rating in this game is a real
+         claim — the prompt asks "have you seen it?" and there is a skip for
+         when the answer is no — but it is a claim about TASTE, not a request
+         to add the title to a collection. Hundreds of these were being
+         rendered as the user's watchlist. */
+      provenance: 'taste_game_rating',
     }).catch(() => {});
     advance();
   }

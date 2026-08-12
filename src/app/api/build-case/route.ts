@@ -219,15 +219,32 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2) Honest title seeds — the user explicitly asserted these, so a rating is legit.
-    const seedTitle = async (name: string, rating: number) => {
+    /* 2) Honest title seeds — the user named these, so a rating is legitimate.
+       WHAT WAS NOT LEGITIMATE: the avoid-list ran through the same path, which
+       writes `status: 'watched'`. Naming a film you never want to see marked it
+       as something you had seen. A stated dislike of something unseen is a real
+       preference and is not a viewing, so `seen: false` keeps the negative
+       signal and drops the false claim. Both are `onboarding_seed`: the user
+       typed a name, they did not ask for a list entry. */
+    const seedTitle = async (name: string, rating: number, seen: boolean) => {
       const hits = await searchTitles(name).catch(() => []);
       const top = hits[0];
-      if (top) await rateQuizTitle({ tmdbId: top.id, mediaType: top.mediaType, title: top.title, year: top.year, posterPath: top.posterPath, rating }).catch(() => {});
+      if (top) {
+        await rateQuizTitle({
+          tmdbId: top.id,
+          mediaType: top.mediaType,
+          title: top.title,
+          year: top.year,
+          posterPath: top.posterPath,
+          rating,
+          seen,
+          provenance: 'onboarding_seed',
+        }).catch(() => {});
+      }
     };
     await Promise.all([
-      ...parsed.likedTitles.slice(0, 6).map((n) => seedTitle(n, 9)),
-      ...parsed.avoidTitles.slice(0, 6).map((n) => seedTitle(n, 2)),
+      ...parsed.likedTitles.slice(0, 6).map((n) => seedTitle(n, 9, true)),
+      ...parsed.avoidTitles.slice(0, 6).map((n) => seedTitle(n, 2, false)),
     ]);
 
     revalidateTag(`dim-profile:${user.id}`);

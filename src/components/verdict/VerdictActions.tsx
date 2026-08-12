@@ -49,6 +49,7 @@ export function VerdictActions(props: Props) {
       year: props.year,
       posterPath: props.posterPath,
       status: next,
+      provenance: 'explicit_user_save',
     });
     if (!res.ok) {
       toast.show(res.error ?? 'Something went wrong.', 'error');
@@ -69,6 +70,7 @@ export function VerdictActions(props: Props) {
       year: props.year,
       posterPath: props.posterPath,
       status: status ?? 'possible',
+      provenance: 'explicit_user_save',
     });
     if (!res.ok) {
       toast.show(res.error ?? 'Could not save.', 'error');

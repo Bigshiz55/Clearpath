@@ -119,7 +119,7 @@ export function Mentalist() {
       await Promise.all(
         picks.map((p) =>
           addToWatchlist({
-            tmdbId: p.id, mediaType: p.mediaType, title: p.title, year: p.year, posterPath: p.posterPath, status: 'strict',
+            tmdbId: p.id, mediaType: p.mediaType, title: p.title, year: p.year, posterPath: p.posterPath, status: 'strict', provenance: 'explicit_user_save',
           }).catch(() => {}),
         ),
       );
