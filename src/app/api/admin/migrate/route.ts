@@ -3,7 +3,7 @@ import { Client } from 'pg';
 import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 import { PENDING_MIGRATIONS } from '@/lib/pendingMigrations';
-import { sanitizeDbUrl, validateDbUrl } from '@/lib/adminMigrateUrl';
+import { assertSameProject, sanitizeDbUrl, validateDbUrl } from '@/lib/adminMigrateUrl';
 import { LEDGER_DDL, MIGRATION_LOCK_KEY, checksumOf, decideForMigration, type LedgerRow } from '@/lib/migrationLedger';
 
 // A raw Postgres connection needs real TCP/TLS sockets (`net`/`tls`), which
@@ -90,6 +90,7 @@ export async function POST(request: Request) {
   if (!rawDbUrl) {
     return NextResponse.json(
       {
+        code: 'db_url_missing',
         error:
           'This deployment has no database connection configured, so no migration can run. Set SUPABASE_DB_URL in the deployment environment and redeploy. Credentials are never accepted from the browser.',
       },
@@ -101,10 +102,28 @@ export async function POST(request: Request) {
   if (!validation.ok) {
     // Never echo the URL — only that it is unusable, and why in general terms.
     return NextResponse.json(
-      { stage: 'validate', error: `The server's configured database URL is not usable: ${validation.reason}` },
+      {
+        stage: 'validate',
+        code: 'db_url_invalid',
+        error: `The server's configured database URL is not usable: ${validation.reason}`,
+      },
       { status: 503 },
     );
   }
+
+  /* PROJECT IDENTITY, BEFORE ANY CONNECTION IS OPENED.
+     A well-formed URL is not the same as the right database, and nothing used
+     to check the difference. Applying migrations to another Supabase project is
+     not recoverable by re-running anything, so this refuses rather than warns,
+     and it refuses when it CANNOT TELL as well as when it does not match. */
+  const identity = assertSameProject(process.env.NEXT_PUBLIC_SUPABASE_URL, dbUrl);
+  if (!identity.ok) {
+    return NextResponse.json(
+      { stage: 'validate', code: identity.code, error: identity.reason },
+      { status: 503 },
+    );
+  }
+
   const clientConfig: { connectionString: string } = { connectionString: dbUrl };
 
   // Everything below is wrapped so an unanticipated failure still reaches the
@@ -122,7 +141,7 @@ export async function POST(request: Request) {
     } catch (e) {
       const { error, code } = describeError(e);
       return NextResponse.json(
-        { stage: 'connect', error: `Could not connect to the database: ${error}`, code },
+        { stage: 'connect', code: 'db_connect_failed', pgCode: code, error: `Could not connect to the database: ${error}` },
         { status: 502 },
       );
     }

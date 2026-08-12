@@ -87,13 +87,28 @@ export function ReconcileDryRunButton() {
       });
       const json = (await res.json()) as Result;
       if (!res.ok) {
+        /* THE SERVER'S REASON WINS.
+           This used to translate EVERY 503 into "The server has no database
+           connection configured" and throw `json.error` away — so a malformed
+           URL, a project-ref mismatch and a genuinely missing variable all read
+           as the same thing, and the one message shown was wrong for two of the
+           three. The server already distinguishes them (`code`), and the whole
+           point of a diagnostic page is to say which one it is.
+
+           Status-only mapping survives where the status IS the whole story
+           (401/403/429 have no server detail worth showing) and as the fallback
+           for an unexpected shape, so an unhandled case still reads as a real
+           error rather than an empty box. */
         setResult({
           error:
             res.status === 401 ? 'Not signed in. Sign in with your admin email first.'
             : res.status === 403 ? 'This signed-in account is not on the admin allowlist (ADMIN_EMAILS).'
             : res.status === 429 ? 'Too many checks — wait a minute.'
-            : res.status === 503 ? 'The server has no database connection configured.'
-            : json.error ?? `Failed (${res.status}).`,
+            : json.error
+              ? json.error
+              : res.status === 503
+                ? 'The server could not use its database configuration, and gave no reason.'
+                : `Failed (${res.status}).`,
         });
       } else {
         setResult(json);

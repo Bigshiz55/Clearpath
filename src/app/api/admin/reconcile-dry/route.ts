@@ -3,7 +3,7 @@ import { Client } from 'pg';
 import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 import { isAdminEmail } from '@/lib/admin';
-import { sanitizeDbUrl, validateDbUrl } from '@/lib/adminMigrateUrl';
+import { assertSameProject, sanitizeDbUrl, validateDbUrl } from '@/lib/adminMigrateUrl';
 import { runProbes, type ReconcileResult } from '@/lib/migrationReconcile';
 import { recordReliabilityEvent } from '@/lib/monitoring';
 
@@ -88,15 +88,34 @@ export async function POST(request: Request) {
   const raw = serverEnv.migrationsDbUrl();
   if (!raw) {
     return NextResponse.json(
-      { error: 'The database connection is not configured on the server (SUPABASE_DB_URL).' },
+      {
+        code: 'db_url_missing',
+        error: 'The database connection is not configured on the server (SUPABASE_DB_URL).',
+      },
       { status: 503 },
     );
   }
   const dbUrl = sanitizeDbUrl(raw);
   const validation = validateDbUrl(dbUrl);
   if (!validation.ok) {
-    // Never echo the URL — only that it is unusable.
-    return NextResponse.json({ error: 'The server database URL is not usable.' }, { status: 503 });
+    /* THE REASON, NOT JUST "NOT USABLE". This returned a single generic string
+       for every shape of failure, and the button then replaced even that with
+       "no database connection configured" — so a malformed URL and a missing
+       variable were indistinguishable from the admin page, which sent the
+       investigation in the wrong direction entirely.
+       Never echo the URL — only the structural reason it is unusable. */
+    return NextResponse.json(
+      { code: 'db_url_invalid', error: `The server database URL is not usable: ${validation.reason}` },
+      { status: 503 },
+    );
+  }
+
+  /* THE SAME GUARD THE MIGRATE ROUTE USES — shared, not a second copy that can
+     drift. A read-only ledger check against the wrong project would report a
+     schema that has nothing to do with this application. */
+  const identity = assertSameProject(process.env.NEXT_PUBLIC_SUPABASE_URL, dbUrl);
+  if (!identity.ok) {
+    return NextResponse.json({ code: identity.code, error: identity.reason }, { status: 503 });
   }
 
   let client: Client;
