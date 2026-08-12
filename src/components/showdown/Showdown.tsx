@@ -458,7 +458,12 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
   const progress = Math.min(1, done / TARGET_DECISIONS);
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col gap-3 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+    /* A CENTRED COMPOSITION, NOT A STRETCHED ONE. Letting the poster row take
+       every spare pixel produced two 600px slabs; pinning it to 2:3 and leaving
+       the remainder as one dead band at the bottom is the same mistake wearing
+       different trousers. The whole stack centres instead, so the leftover
+       height becomes symmetric breathing room around a composed screen. */
+    <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center gap-4 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
       {/* HEADER — a rail, not a percentage. The old "38% → 38%" told the player
           their answers had achieved nothing; a rail says how far through they
           are, which is the only thing a counter can honestly claim. */}
@@ -494,11 +499,11 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
             <p
               data-testid="showdown-moment"
               data-moment={moment?.kind ?? ''}
-              className={`h-4 text-[0.6rem] font-black uppercase tracking-[0.3em] transition-colors duration-200 ${
-                moment ? 'text-amber-300' : 'text-transparent'
+              className={`h-4 text-[0.6rem] font-black uppercase tracking-[0.3em] transition-all duration-200 ${
+                moment ? 'text-amber-300 opacity-100' : 'opacity-0'
               }`}
             >
-              {moment?.label ?? '·'}
+              {moment?.label ?? '—'}
             </p>
             <h2
               data-testid="showdown-prompt"
@@ -522,8 +527,8 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
                screen read as a form with pictures on it. Capping the ratio and
                centring the row gives the space back to the parts of the screen
                that are actually saying something. */
-            <div className="flex min-h-0 flex-1 items-center justify-center">
-              <div className="grid h-full max-h-full w-full grid-cols-2 items-center gap-3">
+            <div className="flex min-h-0 shrink items-center justify-center">
+              <div className="grid w-full grid-cols-2 items-stretch gap-3">
                 <PosterTile
                   posterPath={posters[shown.left.id] ?? null}
                   title={shown.left}
@@ -551,6 +556,14 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
               </div>
             </div>
           )}
+
+          {/* THE LEARNING, DIRECTLY UNDER THE FILMS. It is feedback on the tap
+              that was just made, so it belongs where the eye already is — in
+              the header it read as chrome, and in the footer it read as a
+              status bar. */}
+          <div className="shrink-0">
+            <LearningStrip profile={state.profile} />
+          </div>
 
           {followUp?.kind === 'why' ? (
             /* CHIPS BUILT FROM THIS PAIR, never a fixed list. Every one names an
@@ -648,12 +661,6 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
         </>
       )}
 
-      {/* THE LEARNING, ALWAYS VISIBLE. Under the controls rather than in the
-          header: it is feedback on what just happened, so it belongs where the
-          eye lands after a tap. */}
-      <div className="shrink-0 pt-1">
-        <LearningStrip profile={state.profile} />
-      </div>
     </div>
   );
 }
