@@ -26,9 +26,15 @@ const SECONDARY: NavLink[] = [
      destination competing with Watch Now — putting it inline would advertise it
      as somewhere to spend an evening. The label names the relationship so the
      entry explains itself: this is how the DNA above it gets better. */
-  { href: '/app/showdown', label: 'Showdown — train my taste' },
-  { href: '/app/taste-quiz', label: 'Quick Taste Quiz' },
-  { href: '/app/rapid-fire', label: 'Rapid Fire ⚡️' },
+  /* ONE TASTE GAME IN THE NAV (A1). Three entries — Showdown, Quick Taste Quiz
+     and Rapid Fire — advertised three competing calibration products to a
+     player who only ever needed one, and the choice between them is a choice
+     nobody has the information to make. Showdown is the flagship and Rapid Fire
+     is now a PHASE inside it (`arc.ts`), so it is no longer somewhere to go.
+     Both routes stay alive — /app/taste-quiz is still linked from the DNA hub
+     as a way to BUILD DNA, and /app/rapid-fire is still where imported history
+     gets triaged, which is a genuinely different job from instinct pairs. */
+  { href: '/app/showdown', label: 'Taste Game — train my taste' },
   { href: '/import-taste', label: 'Bring your taste with you' },
   { href: '/app/subscriptions', label: 'Subscription check 💸' },
   { href: '/app/together', label: 'The Verdict Room' },

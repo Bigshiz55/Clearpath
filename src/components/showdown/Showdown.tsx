@@ -73,6 +73,10 @@ import {
   type ShowdownState,
   type Verdict,
 } from '@/lib/showdown/session';
+import { calibrationFor, answerCalibration, skipCalibration } from '@/lib/showdown/session';
+import { planRound } from '@/lib/showdown/arc';
+import { ColdOpen } from './ColdOpen';
+import { CalibrationCard } from './CalibrationCard';
 import { PosterTile } from './PosterTile';
 import { ShowdownResults } from './ShowdownResults';
 import { LearningStrip } from './LearningStrip';
@@ -83,7 +87,14 @@ const ADVANCE_MS = 150;
 
 const RESUME_KEY = 'watchverdict:showdown:v2';
 
-type Screen = 'playing' | 'results';
+/**
+ * `open` is new and is the default.
+ *
+ * The game used to mount straight into `playing`, so a player's first sight of
+ * it was a progress rail reading 0/12. An opening is not chrome in front of the
+ * game — it is the five seconds that decide whether somebody plays it.
+ */
+type Screen = 'open' | 'playing' | 'results';
 
 /**
  * THE PROMPT IS THE ARCHITECTURE, VISIBLE.
@@ -115,7 +126,7 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
     decisions: seed?.decisions ?? 0,
   }));
   const [state, setState] = useState<ShowdownState | null>(null);
-  const [screen, setScreen] = useState<Screen>('playing');
+  const [screen, setScreen] = useState<Screen>('open');
   const [picked, setPicked] = useState<string | null>(null);
   const [followUp, setFollowUp] = useState<FollowUp>(null);
   const [discovery, setDiscovery] = useState<Discovery | null>(null);
@@ -438,6 +449,20 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
     );
   }
 
+  /* THE OPENING, BEFORE ANYTHING ELSE — including before the catalogue has
+     finished verifying. The reveal animation and the player reading the promise
+     are the same few hundred milliseconds the verification needs, so the wait
+     costs nothing and the game appears to start instantly. */
+  if (screen === 'open') {
+    return (
+      <ColdOpen
+        posterPaths={Object.values(posters).filter(Boolean).slice(0, 5)}
+        returning={dnaKnown(dna.profile) > 0.05}
+        onStart={() => setScreen('playing')}
+      />
+    );
+  }
+
   /* THE CATALOGUE IS STILL BEING VERIFIED. A held frame rather than a spinner:
      the game is about to be fast, and a spinner promises the opposite. */
   if (!state) {
@@ -457,13 +482,20 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
   const done = state.decisions.length;
   const progress = Math.min(1, done / TARGET_DECISIONS);
 
+  /* DECLARATIVE, LIKE `discovery`. `calibrationFor` already refuses when a
+     follow-up is pending, when the round is too early, and when the axis was
+     asked — so asking it every render is safe and there is no second copy of
+     the interruption budget to keep in step. */
+  const calibration = followUp === null && discovery === null ? calibrationFor(state) : null;
+  const round = planRound(done, TARGET_DECISIONS);
+
   return (
     /* A CENTRED COMPOSITION, NOT A STRETCHED ONE. Letting the poster row take
        every spare pixel produced two 600px slabs; pinning it to 2:3 and leaving
        the remainder as one dead band at the bottom is the same mistake wearing
        different trousers. The whole stack centres instead, so the leftover
        height becomes symmetric breathing room around a composed screen. */
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center gap-4 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+    <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center gap-4 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:max-w-5xl lg:gap-6">
       {/* HEADER — a rail, not a percentage. The old "38% → 38%" told the player
           their answers had achieved nothing; a rail says how far through they
           are, which is the only thing a counter can honestly claim. */}
@@ -485,7 +517,16 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
         </p>
       </header>
 
-      {discovery ? (
+      {calibration ? (
+        /* THE 1-10 MOMENT. Ahead of the matchup because it OWNS the screen —
+           it is the game admitting it could not work an axis out, and burying
+           that under two posters would make it read as another form field. */
+        <CalibrationCard
+          question={calibration}
+          onAnswer={(value) => setState((prev) => (prev ? answerCalibration(prev, calibration, value) : prev))}
+          onSkip={() => setState((prev) => (prev ? skipCalibration(prev, calibration) : prev))}
+        />
+      ) : discovery ? (
         <DiscoveryCard
           discovery={discovery}
           onConfirm={() => resolveDiscovery('confirm')}
@@ -527,8 +568,8 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
                screen read as a form with pictures on it. Capping the ratio and
                centring the row gives the space back to the parts of the screen
                that are actually saying something. */
-            <div className="flex min-h-0 shrink items-center justify-center">
-              <div className="grid w-full grid-cols-2 items-stretch gap-3">
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <div className="grid h-full w-full grid-cols-2 items-stretch gap-3 lg:gap-8">
                 <PosterTile
                   posterPath={posters[shown.left.id] ?? null}
                   title={shown.left}

@@ -58,6 +58,12 @@ import {
 } from './followup';
 import { GUT_CALL, type ReasonChip } from './reasons';
 import {
+  calibrationEvidence,
+  selectCalibration,
+  type AxisObservation,
+  type CalibrationQuestion,
+} from './calibration';
+import {
   discoveriesFor,
   discoveryDue,
   discoveryEvidence,
@@ -184,6 +190,13 @@ export interface ShowdownState {
   carriedTitleIds: number;
   /** Confidence coverage when the session opened — the "21% → 34%" starting point. */
   openingKnown: number;
+  /**
+   * Axes already put to the player as a 1-10 question this run.
+   *
+   * On the state rather than derived, for the same reason `followups` is: an
+   * axis that was ASKED and waved away must not come back three rounds later.
+   */
+  calibrated: TraitKey[];
   startedAt: number;
 }
 
@@ -217,6 +230,7 @@ export function createSession(
     carriedTitleIds: (seed.seenTitleIds ?? []).length,
     unseenRounds: 0,
     openingKnown: seed.openingKnown ?? 0,
+    calibrated: [],
     startedAt,
   };
 }
@@ -723,4 +737,83 @@ export function isComplete(state: ShowdownState): boolean {
 /** Decisions that produced evidence. An unseen pair is not one of them. */
 export function meaningfulDecisions(state: ShowdownState): number {
   return state.decisions.length;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// THE 1-10 CALIBRATION, WIRED INTO THE RUN
+//
+// `calibration.ts` decides WHETHER a question is earned; this decides WHEN the
+// run is willing to hear the answer, and folds it into the same profile every
+// other observation goes through. Two separate jobs on purpose: the rule for
+// "has the player contradicted themselves" is pure and testable without a
+// session, and the rule for "may we interrupt right now" belongs with the rest
+// of the interruption budget.
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * The session's own evidence, replayed as axis observations.
+ *
+ * Deliberately RECOMPUTED from `decisions` rather than accumulated as the run
+ * goes. The profile is a fold — beliefs, already merged — and a contradiction
+ * is invisible once folded: an axis pushed to 90 and then to 10 lands near 50
+ * and reads as "no opinion", which is the exact opposite of what happened.
+ * Only the individual observations still carry the argument.
+ */
+export function calibrationObservations(state: ShowdownState): AxisObservation[] {
+  if (state.mode !== 'dna') return []; // tonight writes no permanent evidence to argue about
+  const out: AxisObservation[] = [];
+  for (const d of state.decisions) {
+    const pair = pairForDecision(d);
+    if (!pair) continue;
+    for (const e of evidenceFor(pair, d.verdict, state.mode).permanent) {
+      out.push({ key: e.key, target: e.target, weight: e.weight });
+    }
+  }
+  return out;
+}
+
+/**
+ * Earliest round a 1-10 question may appear.
+ *
+ * A contradiction needs decisions on both sides of an axis before it means
+ * anything, and interrupting in the first few rounds would teach the player
+ * that this game is a questionnaire before they have seen it be a game.
+ */
+export const MIN_CALIBRATION_ROUND = 5;
+
+/** Never twice in a run. It is a punctuation mark, not a mechanic. */
+export const MAX_CALIBRATIONS = 1;
+
+export function calibrationFor(state: ShowdownState): CalibrationQuestion | null {
+  if (state.calibrated.length >= MAX_CALIBRATIONS) return null;
+  if (state.decisions.length < MIN_CALIBRATION_ROUND) return null;
+  // Never stack interruptions — a follow-up is already pending or just ran.
+  if (followUpFor(state) !== null) return null;
+  return selectCalibration(calibrationObservations(state), { asked: state.calibrated });
+}
+
+/**
+ * Fold a stated 1-10 into the permanent profile.
+ *
+ * Goes through `applyPermanent` like everything else, so the weight cap in
+ * `calibrationWeight` is the ONLY thing standing between a stated answer and a
+ * profile — there is no privileged write path for it to take.
+ */
+export function answerCalibration(
+  state: ShowdownState,
+  question: CalibrationQuestion,
+  value: number,
+): ShowdownState {
+  return {
+    ...state,
+    profile: state.mode === 'dna'
+      ? applyPermanent(state.profile, calibrationEvidence(question, value))
+      : state.profile,
+    calibrated: [...state.calibrated, question.key],
+  };
+}
+
+/** "Depends too much on the film" — a real answer, and it teaches nothing. */
+export function skipCalibration(state: ShowdownState, question: CalibrationQuestion): ShowdownState {
+  return { ...state, calibrated: [...state.calibrated, question.key] };
 }
