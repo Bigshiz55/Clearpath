@@ -1,6 +1,6 @@
 # Search Validation Campaign
 
-- Commit `99ecb1b` · Branch `claude/showdown-cold-start-scanner` · Seed 7
+- Commit `d60677f` · Branch `claude/showdown-cold-start-scanner` · Seed 7
 - **Total searches: 2000 · Passed 2000 (100.0%) · Failed 0 (0.0%)**
 
 ## Per-dimension pass rate (of cases naming that dimension)

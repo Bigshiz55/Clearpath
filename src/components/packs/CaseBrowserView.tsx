@@ -3,6 +3,15 @@ import { listStationsForPack } from '@/lib/packs/stations';
 import type { Pack } from '@/lib/packs/types';
 import { CaseList, type CaseSummary, type UnmatchedProgramme } from './CaseList';
 import { PackEmptyState } from './PackEmptyState';
+import { partitionEligible, shapeForPack } from '@/lib/packs/eligibility';
+
+interface ProgrammeRow {
+  id: string;
+  title: string;
+  artwork_url: string | null;
+  genres?: string[] | null;
+  tmdb_media_type?: 'movie' | 'tv' | null;
+}
 
 /**
  * The Case-browsing + completion-stats feature. Driven entirely by
@@ -40,14 +49,16 @@ export async function CaseBrowserView({ pack, userId }: { pack: Pack; userId: st
 
   const [{ data: linkRows }, { data: programmeRows }, { data: stationRows }, { data: seenRows }] = await Promise.all([
     supabase.from('case_programmes').select('case_id, programme_id').in('programme_id', programmeIds),
-    supabase.from('tv_programmes').select('id, title, artwork_url').in('id', programmeIds),
+    supabase.from('tv_programmes').select('id, title, artwork_url, genres, tmdb_media_type').in('id', programmeIds),
     supabase.from('tv_stations').select('id, name').in('id', stationIdsUsed),
     userId
       ? supabase.from('user_seen_programmes').select('programme_id').in('programme_id', programmeIds).eq('user_id', userId)
       : Promise.resolve({ data: [] as { programme_id: string }[] }),
   ]);
 
-  const programmeById = new Map((programmeRows ?? []).map((r) => [r.id as string, r as { id: string; title: string; artwork_url: string | null }]));
+  const programmeById = new Map(
+    (programmeRows ?? []).map((r) => [r.id as string, r as ProgrammeRow]),
+  );
   const stationById = new Map((stationRows ?? []).map((r) => [r.id as string, r as { id: string; name: string }]));
   const seenProgrammeIds = new Set((seenRows ?? []).map((r) => r.programme_id as string));
 
@@ -117,8 +128,29 @@ export async function CaseBrowserView({ pack, userId }: { pack: Pack; userId: st
     .filter((c): c is CaseSummary => c !== null)
     .sort((a, b) => b.totalCount - a.totalCount);
 
+  /* ELIGIBILITY BEFORE ANYTHING ELSE.
+     This page showed every programme that aired on the Pack's channels, which
+     is how Storage Wars, K9 PD and an infomercial called "Natural Blood
+     Pressure Management" ended up inside a true-crime destination. The listings
+     were right; treating "aired on ID" as "is a case" was not. */
+  const shape = shapeForPack(pack.slug);
+  const eligibleIds = new Set(
+    partitionEligible(
+      shape,
+      programmeIds.map((pid) => {
+        const p = programmeById.get(pid);
+        return {
+          id: pid,
+          title: p?.title ?? '',
+          mediaType: p?.tmdb_media_type ?? null,
+          genres: p?.genres ?? [],
+        };
+      }),
+    ).kept.map((k) => k.id),
+  );
+
   const unmatched: UnmatchedProgramme[] = programmeIds
-    .filter((pid) => !caseIdByProgramme.has(pid))
+    .filter((pid) => !caseIdByProgramme.has(pid) && eligibleIds.has(pid))
     .map((pid) => ({
       id: pid,
       title: programmeById.get(pid)?.title ?? 'Untitled',
@@ -133,6 +165,29 @@ export async function CaseBrowserView({ pack, userId }: { pack: Pack; userId: st
         title="No episodes ingested yet"
         detail="This Pack's channels are connected, but no airings have been ingested yet. Run the admin ingest, then check back."
       />
+    );
+  }
+
+  /* NO VERIFIED CASES MEANS THE PRODUCT'S ACTUAL PROMISE IS NOT AVAILABLE.
+     Crime Case Files exists to say "you already saw this case on Dateline".
+     That requires canonical case identity — a real event with aliases, people,
+     a place and a date, linked to the programmes that retold it — and the
+     `case_programmes` table is empty. Rendering a list of true-crime episodes
+     under a heading about cases implies a linkage that does not exist, which is
+     a fake-certainty claim rather than a sparse one.
+     So when nothing is linked, the page says so, and offers what it CAN
+     honestly offer: the eligible programming, labelled as programming. See
+     docs/CANONICAL-CASE-IDENTITY.md for what has to exist before the real
+     product can ship. */
+  if (cases.length === 0) {
+    return (
+      <div className="space-y-4" data-testid="cases-unlinked">
+        <PackEmptyState
+          title="Case linking isn’t live yet"
+          detail={`We can tell you what's airing, but not yet whether two shows cover the same case — that needs verified case records we don't have. ${unmatched.length} true-crime ${unmatched.length === 1 ? 'programme' : 'programmes'} below, from this Pack's channels.`}
+        />
+        <CaseList cases={[]} unmatched={unmatched} packSlug={pack.slug} signedIn={userId != null} />
+      </div>
     );
   }
 
