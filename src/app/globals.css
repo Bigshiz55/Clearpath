@@ -122,7 +122,7 @@ body {
          and the frame scales with the grid instead of being pinned to two
          magic numbers that only agreed at one breakpoint.
        • `overflow: hidden` — nothing inside can paint outside the frame, so a
-         16:9 trailer in a 3:2 box letterboxes instead of spilling.
+         16:9 trailer in an 8:5 box letterboxes instead of spilling.
        • `contain: layout` — an explicit barrier: layout inside the frame can
          never propagate out to the card. This is the CORE RULE, expressed in
          CSS rather than trusted to every future caller.
@@ -314,6 +314,14 @@ body {
     border-radius: 0.75rem;
     background: theme('colors.ink.850');
     contain: layout;
+    /* THE SAME NAMED CONTAINER AS THE BROWSE CARD'S FRAME, and for the same
+       reason: a rail item is 8.5rem (136px) wide on a 320px phone, which is
+       narrower than ✕ plus three 32px preview controls. Without this the
+       narrow-frame rules at the bottom of this file would silently not apply
+       here, and the close button would be unreachable in the rail exactly as
+       it was on the phone row card. */
+    container-type: inline-size;
+    container-name: wv-media;
     box-shadow: 0 12px 30px -16px rgb(0 0 0 / 0.95);
   }
   .wv-rail-meta {

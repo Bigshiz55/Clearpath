@@ -63,7 +63,10 @@ export function CardFit({
   return (
     <p
       data-testid="card-fit"
-      className={`${clamp ? 'line-clamp-2' : ''} text-[13px] leading-snug text-emerald-200/90 ${className}`}
+      /* Brand blue, not emerald — see WhyThisTitle. The taste sentence is an
+         explanation, and green in this app means FOR, live, or a Watch It
+         verdict. */
+      className={`${clamp ? 'line-clamp-2' : ''} text-[13px] leading-snug text-brand-100/90 ${className}`}
     >
       <span aria-hidden>🧬 </span>
       {r.positive}

@@ -101,7 +101,7 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
  */
 export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen, rank, evidence, objectiveScore = null }: PosterCardProps) {
   // THE POSTER IS LETTERBOXED, NOT CROPPED, from `sm`. The frame is a fixed
-  // 3:2 box (see `.wv-card-art`); `object-contain` keeps the whole poster
+  // 8:5 box (see `.wv-card-art`); `object-contain` keeps the whole poster
   // visible inside it, centered, at its true proportions, over a blurred matte
   // of the same image. `object-cover` on a phone row is untouched: that box IS
   // exactly 2:3, so cover there never crops anything.
@@ -159,10 +159,10 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
        loudest thing in the grid any more. */
     <div className="card wv-tile group flex flex-col overflow-hidden bg-ink-950/85">
       <div className="wv-card">
-        <div className="wv-card-art wv-media">
+        <div className="wv-card-art">
           {/* THE MATTE, FROM `sm` ONLY. A blurred, scaled-up copy of the SAME
               image (no extra request — the browser already has it cached) fills
-              the 3:2 frame behind the true, uncropped poster, so the empty band
+              the 8:5 frame behind the true, uncropped poster, so the empty band
               `object-contain` leaves reads as a deliberate frame instead of
               dead black bars. `aria-hidden`: purely decorative, the real `<img>`
               still carries the alt text. */}
@@ -204,13 +204,13 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
 
               `z-[2]` puts it under the trailer player (`z-[4]`): while a
               preview is running the frame belongs to the video, and ✕ takes
-              this corner. */}
-          {/* `overlay !== null` as well as an id: that flag is the card's
-              read-only mode, used by the landing example for a visitor with no
-              account. More Info holds Save and FOR/AGAINST, both of which write
-              — offering it there would be a control that answers a tap with an
-              error toast, which is exactly what read-only mode exists to
-              prevent. */}
+              this corner.
+
+              Gated on `overlay !== null` as well as an id — that flag is the
+              card's read-only mode, used by the landing example for a visitor
+              with no account. More Info holds Save and FOR/AGAINST, both of
+              which write, so offering it there would be a control that answers
+              a tap with an error toast. */}
           {overlay !== null && saveId != null && (
             <MoreInfoButton
               variant="chip"
