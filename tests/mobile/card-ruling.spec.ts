@@ -173,6 +173,17 @@ async function openWithLateData(page: Page, w: number, h: number) {
       json: { ratings: { standardScore: 84, audience: 78, rtAudience: 81, tomatometer: 90, imdb: 7.8 }, overview: LATE },
     });
   });
+  await page.route('**/api/quicklook/**', (r) =>
+    r.fulfill({
+      json: {
+        id: 1000, mediaType: 'movie', title: 'Se7en', year: 1995, overview: LATE,
+        backdropUrl: null, posterUrl: null, trailerUrl: null, genres: [], contentRating: null,
+        status: null, runtime: null, score: 84, standardScore: 84,
+        ratings: { standardScore: 84, audience: 78, rtAudience: 81, tomatometer: 90, imdb: 7.8 },
+        where: [],
+      },
+    }),
+  );
   await page.goto('/dev/visual-qa');
   await expect(page.getByTestId('qa-grid')).toBeVisible();
 }
@@ -226,17 +237,26 @@ for (const w of [320, 360, 390, 414] as const) {
 }
 
 test('the ratings row is one line at every width, so its height cannot vary', async ({ page }) => {
+  // MOVED SURFACE, SAME RULE. The card-redesign pass took the three source-
+  // rating chips off the browse card and into More Info — on a grid column they
+  // wrapped to their own row, which is a whole row of card height spent
+  // restating the working behind a number nobody has questioned yet. The
+  // guarantee follows them: one line, inside its container, at every width.
   const heights: number[] = [];
   for (const [w, h] of [[320, 800], [390, 900], [1024, 1200]] as const) {
     await openWithLateData(page, w, h);
     await page.waitForTimeout(2000);
-    const card = page.getByTestId('qa-grid').locator('> div').first();
-    const row = card.locator('.wv-ratings-row').first();
-    const [cardBox, rowBox] = [await card.boundingBox(), await row.boundingBox()];
+    await page.getByTestId('qa-grid').locator('> div').first().getByTestId('card-more-info').click();
+    const modal = page.getByTestId('quicklook');
+    await expect(modal).toBeVisible();
+    await page.waitForTimeout(400);
+    const row = modal.locator('.wv-ratings-row').first();
+    const [modalBox, rowBox] = [await modal.locator('> div').boundingBox(), await row.boundingBox()];
     heights.push(Math.round(rowBox!.height));
-    // The wrap was the original fix for IMDb escaping the panel. A three-column
-    // grid has to keep that guarantee without buying it with a variable height.
-    expect(rowBox!.x + rowBox!.width, `ratings escape the card at ${w}px`).toBeLessThanOrEqual(cardBox!.x + cardBox!.width);
+    // The wrap was the original fix for IMDb escaping the panel. The row still
+    // has to stay inside what holds it, without buying it with a variable height.
+    expect(rowBox!.x + rowBox!.width, `ratings escape their container at ${w}px`)
+      .toBeLessThanOrEqual(modalBox!.x + modalBox!.width);
   }
   // One line everywhere: 320 and 390 must agree, and only the deliberate
   // large-screen scale-up may differ.

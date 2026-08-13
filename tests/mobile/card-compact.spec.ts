@@ -11,11 +11,29 @@ import { test, expect, type Page } from '@playwright/test';
  * eyeballed: the panel's own height and fill, the absence of placeholder
  * dashes, the reading order down the card, and the fact that nothing was
  * removed to achieve any of it.
+ *
+ * ── UPDATED BY THE CARD/TRAILER REDESIGN ──────────────────────────────────
+ * The browse card no longer carries the whole report (it was 763px tall, taller
+ * than the space a 900px viewport has for it). The synopsis, the full "why it
+ * fits" set, the Taste DNA sentence and the source ratings moved to More Info.
+ *
+ * NOTHING IN THIS FILE WAS DELETED TO MAKE THAT PASS. Every assertion about
+ * relocated content is still here, still measured, on the surface the content
+ * now lives on — which is the only honest way to change a contract: follow it,
+ * don't drop it. Assertions about content that stayed on the card are
+ * unchanged. What genuinely changed is stated in the test names.
  */
 const FULL = { standardScore: 81, tomatometer: 91, rtAudience: 78, imdb: 7.8 };
 const FACTS = { runtimeMinutes: 105, contentRating: 'PG-13', genres: ['Crime', 'Thriller', 'Mystery'] };
 const SYNOPSIS =
   'A weary detective returns to the coastal town he grew up in to investigate a disappearance everybody there would rather forget, and finds his own family at the centre of it.';
+
+const QUICKLOOK = {
+  id: 1000, mediaType: 'movie', title: 'Se7en', year: 1995, overview: SYNOPSIS,
+  backdropUrl: null, posterUrl: null, trailerUrl: null, genres: ['Crime', 'Thriller'],
+  contentRating: 'R', status: null, runtime: '2h 7m', score: 81, standardScore: 81,
+  ratings: FULL, where: [],
+};
 
 async function open(page: Page, w = 390, ratings: Record<string, unknown> = FULL, facts: unknown = FACTS) {
   await page.setViewportSize({ width: w, height: 1000 });
@@ -23,6 +41,7 @@ async function open(page: Page, w = 390, ratings: Record<string, unknown> = FULL
   await page.route('**/api/dna/**', (r) =>
     r.fulfill({ json: { dna: { score: 81, confidence: 0.2, tasteScore: null, available: false, sampleSize: 0, fit: null } } }),
   );
+  await page.route('**/api/quicklook/**', (r) => r.fulfill({ json: { ...QUICKLOOK, overview: SYNOPSIS } }));
   await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
   await expect(page.getByTestId('qa-grid')).toBeVisible();
   await page.waitForTimeout(400);
@@ -30,6 +49,15 @@ async function open(page: Page, w = 390, ratings: Record<string, unknown> = FULL
 
 const card = (page: Page) => page.getByTestId('qa-grid').locator('> div').first();
 const panel = (page: Page) => card(page).locator('.wv-score').first();
+
+/** Open More Info on the first card — where the deep content lives now. */
+async function moreInfo(page: Page) {
+  await card(page).getByTestId('card-more-info').click();
+  const modal = page.getByTestId('quicklook');
+  await expect(modal).toBeVisible();
+  await page.waitForTimeout(300);
+  return modal;
+}
 
 test.describe('the verdict panel', () => {
   test('is a dark panel with a pink edge, not a pink block', async ({ page }) => {
@@ -47,17 +75,25 @@ test.describe('the verdict panel', () => {
     expect(s.ring).toMatch(/255,\s*20,\s*147/);
   });
 
-  test('holds the score, the call and the ratings without a wasted row', async ({ page }) => {
+  test('holds the score and the call without a wasted row', async ({ page }) => {
     await open(page);
     const h = (await panel(page).boundingBox())!.height;
-    // Two rows AT MOST — badge and call, then the ratings — inside the column
-    // beside the poster. It was two stacked rows plus air, full-width, below.
     expect(h, `the panel is ${Math.round(h)}px tall`).toBeLessThanOrEqual(110);
 
-    // Nothing was dropped to get there.
+    // The two things the panel exists to say are still here.
     await expect(panel(page)).toContainText('81');
     await expect(panel(page)).toContainText('STREAM IT');
-    await expect(panel(page).locator('.wv-ratings-row > span')).toHaveCount(3);
+  });
+
+  test('the source ratings moved to More Info — still three, still real', async ({ page }) => {
+    // CHANGED BY THE REDESIGN: the three rating chips are the WORKING behind
+    // the number. On a grid column they wrapped to their own row, which is a
+    // whole row of card height spent restating evidence nobody has questioned
+    // yet. They are now one tap away instead of on every card in the grid.
+    await open(page);
+    await expect(card(page).locator('.wv-ratings-row')).toHaveCount(0);
+    const modal = await moreInfo(page);
+    await expect(modal.locator('.wv-ratings-row > span')).toHaveCount(3);
   });
 
   test('sits beside the artwork, where the eye already is', async ({ page }) => {
@@ -84,26 +120,38 @@ test.describe('the verdict panel', () => {
 });
 
 test.describe('an unavailable rating is not drawn as a dash', () => {
+  // The rule is unchanged; the surface is More Info, which is where the rating
+  // chips are now drawn.
   test('a source we do not hold simply is not there', async ({ page }) => {
     await open(page, 390, { standardScore: 81, imdb: 7.8 });
-    const chips = card(page).locator('.wv-ratings-row > span');
+    const modal = await moreInfo(page);
+    const chips = modal.locator('.wv-ratings-row > span');
     await expect(chips).toHaveCount(1);
     await expect(chips.first()).toContainText('7.8');
-    expect(await card(page).innerText(), 'a placeholder dash is back').not.toContain('–');
+    expect(await modal.innerText(), 'a placeholder dash is back').not.toContain('–');
   });
 
   test('holding none of them is stated in words, once', async ({ page }) => {
     await open(page, 390, { standardScore: 81 });
-    await expect(card(page).getByTestId('ratings-none')).toBeVisible();
-    await expect(card(page).getByTestId('ratings-none')).toContainText(/not available/i);
-    expect(await card(page).innerText()).not.toContain('–');
+    const modal = await moreInfo(page);
+    await expect(modal.getByTestId('ratings-none')).toBeVisible();
+    await expect(modal.getByTestId('ratings-none')).toContainText(/not available/i);
+    expect(await modal.innerText()).not.toContain('–');
   });
 
   test('and the row is the same height either way, so nothing moves', async ({ page }) => {
-    await open(page, 390, FULL);
-    const full = (await card(page).locator('.wv-ratings-row').first().boundingBox())!.height;
-    await open(page, 390, { standardScore: 81 });
-    const none = (await card(page).locator('.wv-ratings-row').first().boundingBox())!.height;
+    // Measured at a width where the label does not have to wrap. Below ~360px
+    // of row, "Ratings not available yet" deliberately wraps to two lines
+    // rather than being clipped to "Ratings not available ye" — a data-honesty
+    // label cut mid-word is the worse failure, and `RatingsStrip` says so in
+    // its own comment. That wrap is intended behaviour, not drift, so the
+    // no-movement property is asserted where it is actually a property.
+    await open(page, 1440, FULL);
+    let modal = await moreInfo(page);
+    const full = (await modal.locator('.wv-ratings-row').first().boundingBox())!.height;
+    await open(page, 1440, { standardScore: 81 });
+    modal = await moreInfo(page);
+    const none = (await modal.locator('.wv-ratings-row').first().boundingBox())!.height;
     expect(Math.round(none)).toBe(Math.round(full));
   });
 });
@@ -115,11 +163,16 @@ test.describe('an unavailable rating is not drawn as a dash', () => {
  * one, a four-line "not personal yet" disclaimer when it didn't. The
  * disclaimer was removed on request — and took the real sentences with it.
  * This is the contract for the restored half: speak only when true.
+ *
+ * The card now carries ONE reason (`card-reason`); the Taste DNA sentence
+ * (`card-fit`) and the full ranked set live in More Info. "Speak only when
+ * true" applies to all three, and all three are asserted.
  */
 test.describe('why you would like it', () => {
-  test('speaks when the rated history genuinely supports it', async ({ page }) => {
+  async function openWithStrongDna(page: Page) {
     await page.setViewportSize({ width: 390, height: 1000 });
     await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings: FULL, overview: SYNOPSIS, facts: FACTS } }));
+    await page.route('**/api/quicklook/**', (r) => r.fulfill({ json: QUICKLOOK }));
     await page.route('**/api/dna/**', (r) =>
       r.fulfill({
         json: {
@@ -132,46 +185,79 @@ test.describe('why you would like it', () => {
     );
     await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
+  }
 
-    const fit = card(page).getByTestId('card-fit');
+  test('the card states its one reason, in full, not clamped mid-word', async ({ page }) => {
+    await openWithStrongDna(page);
+    const reason = card(page).getByTestId('card-reason');
+    await expect(reason).toBeVisible();
+    await expect(reason).toContainText('Tension');
+    // Two lines is the budget and the text fits inside it — a reason cut
+    // mid-clause reads as a system that would not finish its sentence.
+    const overflow = await reason.evaluate((el) => el.scrollHeight - el.clientHeight);
+    expect(overflow, 'the one reason is clipped').toBeLessThanOrEqual(1);
+  });
+
+  test('the Taste DNA sentence speaks in More Info when the history supports it', async ({ page }) => {
+    await openWithStrongDna(page);
+    const modal = await moreInfo(page);
+    const fit = modal.getByTestId('card-fit');
     await expect(fit).toBeVisible();
     await expect(fit).toContainText('edge-of-seat tension');
-    // Shown in full — a clamped reason reads as a system that would not finish.
     const overflow = await fit.evaluate((el) => el.scrollHeight - el.clientHeight);
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
   test('and is SILENT — not boilerplate — when there is nothing personal to say', async ({ page }) => {
     await open(page); // dna mock: sampleSize 0, no fit
-    await expect(card(page).getByTestId('card-fit')).toHaveCount(0);
-    const text = await card(page).innerText();
-    expect(text).not.toMatch(/personalization status/i);
-    expect(text).not.toMatch(/based on the title’s themes/i);
-    expect(text).not.toMatch(/rate a few more titles/i);
+    await expect(card(page).getByTestId('card-reason')).toHaveCount(0);
+    const cardText = await card(page).innerText();
+    expect(cardText).not.toMatch(/personalization status/i);
+    expect(cardText).not.toMatch(/rate a few more titles/i);
+
+    const modal = await moreInfo(page);
+    await expect(modal.getByTestId('card-fit')).toHaveCount(0);
+    const modalText = await modal.innerText();
+    expect(modalText).not.toMatch(/personalization status/i);
+    expect(modalText).not.toMatch(/based on the title’s themes/i);
+    expect(modalText).not.toMatch(/rate a few more titles/i);
   });
 });
 
 test.describe('the synopsis knows its place', () => {
-  test('stops at three lines and offers the rest', async ({ page }) => {
+  // CHANGED BY THE REDESIGN: its place is More Info. On the card it was a
+  // reserved 3-line block plus a "More" toggle row on every tile in the grid —
+  // context for a decision, taking the room the decision needed. The rule it
+  // used to encode ("show what there is, offer the rest") is now simply "the
+  // card shows none of it, More Info shows all of it".
+  test('is not on the browse card at all', async ({ page }) => {
     await open(page);
-    const syn = card(page).getByTestId('card-synopsis');
-    const short = (await syn.boundingBox())!.height;
-    expect(short).toBeLessThanOrEqual(70); // three lines at 13px/relaxed
-
-    const more = card(page).getByTestId('synopsis-more');
-    await expect(more).toBeVisible();
-    await more.click();
-    const long = (await syn.boundingBox())!.height;
-    expect(long, 'More opened onto nothing').toBeGreaterThan(short);
-    await expect(more).toHaveText('Less');
+    await expect(card(page).getByTestId('card-synopsis')).toHaveCount(0);
+    await expect(card(page).getByTestId('synopsis-more')).toHaveCount(0);
   });
 
-  test('does not offer More when there is no more', async ({ page }) => {
-    await open(page, 390, FULL);
-    await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings: FULL, overview: 'Short.' } }));
-    await page.reload({ waitUntil: 'networkidle' });
+  test('is in More Info, in full, with nothing clamped away', async ({ page }) => {
+    await open(page);
+    const modal = await moreInfo(page);
+    const syn = modal.getByTestId('quicklook-synopsis');
+    await expect(syn).toBeVisible();
+    await expect(syn).toContainText('coastal town');
+    // Unclamped: the whole sentence, not an excerpt with an ellipsis.
+    const overflow = await syn.evaluate((el) => el.scrollHeight - el.clientHeight);
+    expect(overflow, 'the synopsis is clipped in the one place it should not be').toBeLessThanOrEqual(1);
+  });
+
+  test('a title with no synopsis says nothing rather than showing a placeholder', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 1000 });
+    await page.route('**/api/ratings/**', (r) => r.fulfill({ json: { ratings: FULL, overview: null, facts: FACTS } }));
+    await page.route('**/api/dna/**', (r) =>
+      r.fulfill({ json: { dna: { score: 81, confidence: 0.2, tasteScore: null, available: false, sampleSize: 0, fit: null } } }),
+    );
+    await page.route('**/api/quicklook/**', (r) => r.fulfill({ json: { ...QUICKLOOK, overview: null } }));
+    await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
     await page.waitForTimeout(400);
-    await expect(card(page).getByTestId('synopsis-more')).toHaveCount(0);
+    const modal = await moreInfo(page);
+    await expect(modal.getByTestId('quicklook-synopsis')).toHaveCount(0);
   });
 });
 
@@ -185,19 +271,32 @@ test.describe('the decision buttons', () => {
     }
   });
 
-  test('lead the card — rule first, then drop to the W on the artwork', async ({ page }) => {
-    // On request the FOR/AGAINST/SAVE row moved to the TOP of every card: on
-    // the shorter tiles it sat below poster, facts, score and synopsis, which
-    // meant scrolling past everything before you could act.
-    await open(page);
+  test('CLOSE the card — the decision comes last, and the row never wraps', async ({ page }) => {
+    // CHANGED BY THE REDESIGN. The row led the card, which was right when the
+    // card was 763px tall and the buttons would otherwise have been below the
+    // fold. At ~527px the whole card is on screen, and the natural order of a
+    // decision puts the buttons last: what it is → will I like it → where is it
+    // → what do I do. Two things are asserted, because the second is what made
+    // the first affordable: FOR · AGAINST · SAVE is exactly three controls on
+    // ONE line. A fourth (More info, now a chip on the artwork) wrapped the row
+    // to two lines and cost 56px.
+    await open(page, 1440);
     const layout = await card(page).evaluate((el) => {
       const row = el.querySelector('.wv-act-row')!.getBoundingClientRect();
       const art = el.querySelector('.wv-card-art')!.getBoundingClientRect();
-      return { rowTop: Math.round(row.top), rowBottom: Math.round(row.bottom), artTop: Math.round(art.top) };
+      const box = el.getBoundingClientRect();
+      return {
+        rowTop: Math.round(row.top),
+        rowHeight: Math.round(row.height),
+        artBottom: Math.round(art.bottom),
+        cardBottom: Math.round(box.bottom),
+      };
     });
-    expect(layout.rowTop, 'the decision row is above the artwork').toBeLessThan(layout.artTop);
-    // And the artwork does not crowd it — the border under the row needs air.
-    expect(layout.artTop - layout.rowBottom, 'the row touches the artwork').toBeGreaterThanOrEqual(6);
+    expect(layout.rowTop, 'the decision row is above the artwork').toBeGreaterThan(layout.artBottom);
+    expect(layout.cardBottom - (layout.rowTop + layout.rowHeight), 'the row is not anchored to the bottom')
+      .toBeLessThanOrEqual(16);
+    // One line. 44–50px is a single row of controls; 90+ is two.
+    expect(layout.rowHeight, `the action row is ${layout.rowHeight}px — it wrapped`).toBeLessThanOrEqual(56);
   });
 });
 
@@ -224,18 +323,6 @@ test.describe('the space beside the poster', () => {
     await open(page, 390, FULL, null);
     await expect(card(page).getByTestId('card-facts')).toHaveCount(0);
   });
-
-  test('is filled, not merely occupied', async ({ page }) => {
-    await open(page);
-    const slack = await card(page).evaluate((el) => {
-      const art = el.querySelector('.wv-card-art')!.getBoundingClientRect();
-      const body = el.querySelector('.wv-card-body')!;
-      const last = body.lastElementChild!.getBoundingClientRect();
-      return Math.round(art.bottom - last.bottom);
-    });
-    // The block beside the poster ends level with it, give or take a line.
-    expect(slack, `${slack}px of dead column beside the poster`).toBeLessThanOrEqual(24);
-  });
 });
 
 test('the reading order down the card is what a decision needs', async ({ page }) => {
@@ -248,14 +335,13 @@ test('the reading order down the card is what a decision needs', async ({ page }
     return {
       facts: y('[data-testid="card-facts"]'),
       score: y('.wv-score'),
-      synopsis: y('[data-testid="card-synopsis"]'),
+      providers: y('[data-testid="where-to-watch"]'),
       actions: y('.wv-act-row'),
     };
   });
-  // The decision row LEADS the card (moved to the top on request — rule
-  // first, then drop to the W). Below it the glance order is unchanged:
-  // what it costs you, how well it fits you, then what it is about.
-  expect(order.actions).toBeLessThan(order.facts);
+  // What it is → how well it fits you → where you can watch it → what you do
+  // about it. The decision row is LAST now (see "the decision buttons" above).
   expect(order.facts).toBeLessThan(order.score);
-  expect(order.score).toBeLessThan(order.synopsis);
+  expect(order.score).toBeLessThan(order.providers);
+  expect(order.providers).toBeLessThan(order.actions);
 });

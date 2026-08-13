@@ -25,10 +25,18 @@ import type { MediaType } from '@/lib/types';
 export function CardFit({
   mediaType,
   tmdbId,
+  clamp = true,
   className = '',
 }: {
   mediaType: MediaType;
   tmdbId: number;
+  /**
+   * Two lines on a card, where height is the scarce thing. More Info passes
+   * `false`: it is the surface with room, and a taste explanation cut mid-word
+   * in the one place that exists to explain things is worse than the two lines
+   * it saved.
+   */
+  clamp?: boolean;
   className?: string;
 }) {
   const [dna, setDna] = useState<DnaClientResult | null>(null);
@@ -55,7 +63,7 @@ export function CardFit({
   return (
     <p
       data-testid="card-fit"
-      className={`line-clamp-2 text-[13px] leading-snug text-emerald-200/90 ${className}`}
+      className={`${clamp ? 'line-clamp-2' : ''} text-[13px] leading-snug text-emerald-200/90 ${className}`}
     >
       <span aria-hidden>🧬 </span>
       {r.positive}

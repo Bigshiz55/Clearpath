@@ -65,6 +65,27 @@ body {
      hand-rolls its own card — kept the old full-bleed poster and filled the
      whole screen with one title. Two copies of a layout is how that happens, so
      there is now one definition and every grid uses it. */
+
+  /* ── THE CARD IS A BOUNDED BOX, NOT A REPORT ─────────────────────────────
+     MEASURED, BEFORE: a desktop browse card was 763px tall. The app chrome
+     above the grid is ~265px, so the first card's bottom edge landed at 1028px
+     in a 900px viewport — there was NO scroll position at which one whole card
+     was visible. That is the clipping. The trailer never resized anything; it
+     played inside a card that could not fit on screen in the first place, so
+     any preview was necessarily half off the viewport.
+
+     So the fix is a HEIGHT BUDGET, declared here and enforced by
+     `tests/mobile/card-geometry.spec.ts`. Every region below has a bounded
+     contribution, and the total lands around 465px on a desktop column —
+     comfortably inside the space a browser actually gives a grid. Anything
+     that does not fit in the budget belongs in More Info, which is the surface
+     that is allowed to be big.
+
+     MEASURED AFTER: 527px on a desktop column, 393px on a phone row, and a
+     spread of ZERO across a grid holding a 97-character title, a one-character
+     title, a 400-word synopsis, zero providers, five providers, a strong
+     personalized reason and no profile at all. */
+
   /* The upper half: poster beside the facts on a phone, stacked from `sm`.
      `pb-0` because `.wv-card-foot` below carries the bottom padding now. */
   .wv-card {
@@ -88,9 +109,43 @@ body {
      poster sit uncropped inside it via `object-contain`) keeps every card the
      SAME height regardless of which title's key art is unusually tall, and
      puts the rest of the card back in view. */
+  /* ── THE MEDIA FRAME — THE ONE BOX A TRAILER MAY EVER OCCUPY ─────────────
+     `.wv-card-art` IS the media frame. Its size is set by the card's width and
+     a fixed aspect ratio and by nothing else — never by its contents. A poster,
+     a blurred matte, a YouTube iframe and a row of controls all paint inside
+     it, absolutely positioned, so swapping poster→video cannot change one
+     pixel of the card's outer height.
+
+     Three properties make that a guarantee rather than a hope:
+       • `aspect-ratio` from `sm` (was a hard `height` in px) — so every card in
+         a row resolves to the SAME frame height at the same column width,
+         and the frame scales with the grid instead of being pinned to two
+         magic numbers that only agreed at one breakpoint.
+       • `overflow: hidden` — nothing inside can paint outside the frame, so a
+         16:9 trailer in a 3:2 box letterboxes instead of spilling.
+       • `contain: layout` — an explicit barrier: layout inside the frame can
+         never propagate out to the card. This is the CORE RULE, expressed in
+         CSS rather than trusted to every future caller.
+
+     ONE CONSEQUENCE WORTH KNOWING, because it cost a debugging round: layout
+     containment also makes this element the CONTAINING BLOCK for `position:
+     fixed` descendants. The More Info control lives on this frame, so its
+     modal was being laid out inside a 294px poster box — a "full-screen"
+     overlay 244px wide. `QuickLook` renders through a portal for exactly that
+     reason. Anything else fixed-position mounted in here needs the same. */
   .wv-card-art {
-    @apply relative aspect-[2/3] w-[38%] max-w-[160px] flex-none self-start overflow-hidden rounded-lg sm:aspect-auto sm:h-[196px] sm:w-full sm:max-w-none sm:self-auto sm:rounded-none lg:h-[216px];
+    @apply relative aspect-[2/3] w-[38%] max-w-[160px] flex-none self-start overflow-hidden rounded-lg sm:aspect-[8/5] sm:w-full sm:max-w-none sm:self-auto sm:rounded-none;
+    contain: layout;
+    /* …and a CONTAINER, so the preview controls can size themselves against
+       the FRAME rather than the viewport. The same card is a 296px column on a
+       laptop grid and a 127px thumbnail on a phone row; a viewport media query
+       answers the wrong question, exactly as it did for the action row. */
+    container-type: inline-size;
+    container-name: wv-media;
   }
+  /* The narrow-frame control rule that uses this container lives at the very
+     BOTTOM of this file, outside `@layer components`, on purpose — see
+     `.wv-trailer-optional` there. */
   /* ONE ASPECT FOR TV-LISTING ARTWORK: 16:9 at every width, letterboxed.
      Broadcast art arrives as posters, banners and stills in every shape;
      letting the shape drive the box made every card a different height. The
@@ -107,7 +162,58 @@ body {
     object-fit: contain !important;
   }
   .wv-card-body {
-    @apply flex min-w-0 flex-1 flex-col sm:p-3;
+    @apply flex min-w-0 flex-1 flex-col sm:p-3 sm:pb-0;
+  }
+
+  /* ── THE INFORMATION BUDGET, AS CSS ──────────────────────────────────────
+     Each of these reserves a bounded region so a card with a 400-word synopsis
+     and a card with none are the same height. They reserve rather than merely
+     cap, because the alternative — growing when the data lands — is the same
+     defect seen from the other side: the grid moving under a thumb already
+     reaching for a button.
+
+     `min-height` AND `max-height` on the same box is deliberate. A clamp alone
+     bounds the top; without the floor a title with no personalized reason sits
+     34px shorter than its neighbour and the row stops lining up. */
+  /* TWO LINES OF TITLE, RESERVED — never one, never three.
+     `line-clamp-2` bounds the top only. On a phone the text column sits BESIDE
+     the poster and is the taller of the two, so a one-line title made that card
+     22px shorter than its neighbour and a scroll of results had two baselines.
+     Measured on the QA grid at 390px: 371px vs 393px. */
+  .wv-card-title {
+    min-height: 2.75rem;
+    max-height: 2.75rem;
+    overflow: hidden;
+  }
+  @media (min-width: 640px) {
+    .wv-card-title {
+      min-height: 2.625rem;
+      max-height: 2.625rem;
+    }
+  }
+  .wv-reason {
+    /* One concise personalized reason. Two lines at 12.5px/1.4 = 35px. */
+    min-height: 35px;
+    max-height: 35px;
+    overflow: hidden;
+  }
+  .wv-provider-row {
+    /* Availability. One row of brand tiles, or the honest "not confirmed"
+       label — either way the same 34px, so a title we have checked and one we
+       have not do not produce two different card heights. */
+    min-height: 34px;
+    max-height: 34px;
+    overflow: hidden;
+  }
+  /* THE ACTIONS SIT AT THE SAME HEIGHT ON EVERY CARD — and the mechanism is
+     the budget above, not a trick down here. Because the reason, the provider
+     row and the title are each pinned to a fixed height, the action row is at
+     an identical offset on every card in a grid whatever its content does.
+     There is no `mt-auto` doing the work and no stretch to fake, which is the
+     point: "aligned" is a consequence of bounded regions, not a correction
+     applied after the fact. This is the column they stack in. */
+  .wv-card-stack {
+    @apply flex min-h-0 flex-1 flex-col;
   }
   /* THE CARD'S FULL WIDTH, FOR THE THINGS THAT NEED IT.
      A row card is a 2:3 poster beside a text column, and the poster is almost
@@ -184,6 +290,69 @@ body {
   @media (min-width: 1024px) {
     .wv-rail-item { width: 11rem; }
   }
+  /* ── THE RANKED RAIL, REDESIGNED ─────────────────────────────────────────
+     WHAT WENT: a 5.5rem grey numeral set BEHIND each poster (which is why every
+     item carried a 1.75rem left margin to clear it), and a detached green
+     "89 HOW?" rectangle under the title. Between them they made the app's most
+     opinionated surface look like an internal ranking dashboard — the two
+     loudest things on a Top 10 were a grey digit and a green box, neither of
+     which is the film.
+
+     WHAT REPLACED IT: the artwork is the item. The rank is a small badge
+     integrated INTO the frame's corner, and the score speaks the app's own
+     language — the Verd1ct TV badge and its verdict word — instead of a
+     generic coloured rectangle.
+
+     The item is a fixed-height stack so a rail of ten agrees on one baseline:
+     frame (2:3, fixed by aspect-ratio), then a bounded title/score block. Same
+     `contain: layout` guarantee as the browse card, for the same reason — the
+     rail must not grow one pixel when a trailer starts inside a poster. */
+  .wv-rail-frame {
+    position: relative;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    background: theme('colors.ink.850');
+    contain: layout;
+    box-shadow: 0 12px 30px -16px rgb(0 0 0 / 0.95);
+  }
+  .wv-rail-meta {
+    /* Title line + score line + the "Why #N?" control, reserved. A rail where
+       item 3 has a two-line title and item 4 has one is a rail with two
+       baselines. Measured: 19 (title) + 4 + 32 (badge row) + 4 + 36 (control,
+       the touch-target floor) = 95px. */
+    min-height: 6.25rem;
+    max-height: 6.25rem;
+    overflow: hidden;
+  }
+  /* The rank chip: small, sophisticated, ON the artwork. */
+  .wv-rank-chip {
+    position: absolute;
+    left: 0.4rem;
+    top: 0.4rem;
+    /* ABOVE the trailer player layer (z-4). "Rank remains visible" during
+       preview is an explicit requirement of the rail, and the browse card's
+       feed position is the same claim. */
+    z-index: 6;
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.375rem;
+    padding: 0 0.4rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    color: #fff;
+    background: rgb(7 9 15 / 0.72);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+    backdrop-filter: blur(6px);
+  }
+  /* The top three earn a warmer edge — the only place rank is coloured at all. */
+  .wv-rank-chip[data-top='1'] {
+    color: #ffe9a8;
+    box-shadow: inset 0 0 0 1px rgb(245 198 90 / 0.55);
+  }
 
   /* Safari/WebKit min-content guard: a grid child's implicit min-width is
      auto, which lets long unbreakable content (ratings row, badges) stretch
@@ -215,19 +384,47 @@ body {
 
      `.card` still comes first, so tiles keep the radius, blur and fill; this
      only replaces the edge. It is defined AFTER `.card` on purpose — same
-     specificity, source order decides. */
+     specificity, source order decides.
+
+     THE 2026-08 AUDIT — "does every card really need a bright full perimeter?"
+     Answer: it needs a perimeter, and it does NOT need a bright one.
+
+     The boundary itself has a specific semantic purpose recorded above and a
+     test contract behind it (`tests/mobile/tile-edge.spec.ts`, seven widths):
+     without ANY visible edge, a column of tall cards on near-black reads as one
+     continuous scroll and you cannot tell whose buttons you are looking at. So
+     the edge stays.
+
+     What goes is the SATURATION and the HALO. A 55%-alpha brand blue plus a
+     16% blue glow ring around every rectangle in the grid is what made a page
+     of results look like a wireframe gallery: the loudest thing on screen was
+     the boxes, not the artwork inside them. The edge drops to a quiet 26%
+     desaturated blue, the coloured glow ring is replaced by a plain black
+     elevation shadow, and hierarchy now comes from artwork, elevation and the
+     score/verdict accents — not from outlining everything.
+
+     Hover is where the blue is allowed to mean something again: it is a
+     pointer affordance on ONE tile at a time, not a permanent state on forty.
+
+     THE FLOOR IS NOT NEGOTIABLE, AND IT IS MEASURED. `tile-edge.spec.ts`
+     composites this colour over the card fill over the page and requires a
+     WCAG contrast above 1.5 at seven widths, plus blue dominance — that suite
+     exists because a 7%-white hairline shipped once and was invisible. 26%
+     alpha came out at 1.41 and failed it, which is the test doing its job: an
+     edge nobody can see is the defect, not the fix. This is the quietest value
+     that clears the floor with margin (~1.68). Taking the perimeter off
+     entirely is a call for the owner to make against that recorded complaint,
+     not something to do by lowering a threshold. */
   .wv-tile {
     @apply transition;
-    border-color: rgb(79 134 255 / 0.55);
-    box-shadow:
-      0 0 0 1px rgb(79 134 255 / 0.16),
-      0 6px 18px -10px rgb(0 0 0 / 0.95);
+    border-color: rgb(86 128 214 / 0.38);
+    box-shadow: 0 10px 26px -14px rgb(0 0 0 / 0.95);
   }
   .wv-tile:hover {
-    border-color: rgb(79 134 255 / 0.9);
+    border-color: rgb(79 134 255 / 0.55);
     box-shadow:
-      0 0 0 1px rgb(79 134 255 / 0.3),
-      0 10px 24px -12px rgb(0 0 0 / 0.95);
+      0 0 0 1px rgb(79 134 255 / 0.12),
+      0 16px 34px -16px rgb(0 0 0 / 0.98);
   }
   /* NO `:focus-within` BRIGHTENING. It was the obvious thing to add and it is
      wrong: tapping the W focuses a button inside the tile, so the whole edge
@@ -1354,3 +1551,30 @@ body {
   100% { opacity: 0.6; transform: scale(1); }
 }
 .wv-room-verdict { animation: wv-room-verdict 1400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* ---------------------------------------------------------------------------
+   THE PREVIEW CONTROLS IN A THUMBNAIL-SIZED MEDIA FRAME.
+
+   On a phone the browse card is a ROW: the media frame is ~127px wide. That
+   cannot hold ✕ on the left and three 32px controls on the right — measured,
+   they overlap, and the close button becomes literally unclickable (Playwright
+   reports the pause button intercepting the pointer). Pause and restart are the
+   luxuries in a thumbnail; mute and ✕ are not, so those two step aside. The
+   full set returns the moment the frame has room, and More Info owns the real
+   playback surface at any size.
+
+   A CONTAINER query, not a media query: the same card is a 296px column on a
+   laptop grid and a 127px thumbnail on a phone row, so the viewport is
+   answering the wrong question — exactly as it was for the action row.
+
+   OUTSIDE `@layer components` AND AT THE END OF THE FILE, deliberately.
+   `.wv-trailer-optional` and Tailwind's `.grid` utility have identical
+   specificity, and `@tailwind utilities` is emitted after `@tailwind
+   components` — so the same rule inside the components layer loses to
+   `display: grid` on the button and silently does nothing. Source order is the
+   tiebreak; this is the last word in the stylesheet.
+--------------------------------------------------------------------------- */
+@container wv-media (max-width: 220px) {
+  .wv-trailer-optional {
+    display: none;
+  }
+}

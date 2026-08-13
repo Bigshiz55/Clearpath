@@ -11,6 +11,13 @@ import { DocketTray } from '@/components/DocketTray';
  * the header + global build badge, the poster grid with long titles / missing
  * art / huge ratings, and the ratings strip. It stacks the components that the
  * per-screen harnesses never rendered side by side. A 404 in any normal build.
+ *
+ * THE CARD-REDESIGN QA MATRIX lives here too. The work order names eight cases
+ * that must all produce the same card geometry — movie, TV series, a very long
+ * title, a long synopsis, zero providers, several providers, a strong
+ * personalized reason and none at all. The first six are fixed props below; the
+ * last two are driven by what the suite stubs `/api/dna` and `/api/ratings`
+ * with, per card id, so one page covers the whole matrix.
  */
 export const dynamic = 'force-dynamic';
 

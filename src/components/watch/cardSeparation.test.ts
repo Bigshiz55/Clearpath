@@ -20,6 +20,8 @@ const posterCard = read('src/components/PosterCard.tsx');
 const verdictPanel = read('src/components/AlgorithmScore.tsx');
 const whereToWatch = read('src/components/watch/WhereToWatch.tsx');
 const resolver = read('src/lib/availability/watchPresentation.ts');
+const cardReason = read('src/components/CardReason.tsx');
+const quickLook = read('src/components/QuickLook.tsx');
 
 describe('the verdict is visibly a verdict, not an availability instruction', () => {
   it('labels the panel before the call, so "STREAM IT" is never read bare', () => {
@@ -58,7 +60,26 @@ describe('the verdict is visibly a verdict, not an availability instruction', ()
 describe('one shared availability component, one shared resolver', () => {
   it('the card renders the shared block and no bespoke availability code', () => {
     expect(posterCard).toContain('<WhereToWatch');
-    expect(posterCard).toContain('<WhyThisTitle');
+  });
+
+  it('the card and More Info answer "why" from the SAME pure source', () => {
+    // The card used to render `<WhyThisTitle>` — heading, up to two reason
+    // chips, a "Why?" expansion and a separate taste line, ~120px on every tile
+    // in the grid. The browse card now shows ONE reason (`CardReason`) and More
+    // Info shows the full ranked set (`WhyThisTitle`).
+    //
+    // The property this test has always protected is that there is no SECOND
+    // vocabulary — so what matters is not which component the card mounts, but
+    // that both read `buildWhyReasons`, the one pure module that refuses to
+    // produce anything it cannot substantiate. Neither may grow reasons of its
+    // own.
+    expect(posterCard).toContain('<CardReason');
+    expect(quickLook).toContain('<WhyThisTitle');
+    expect(cardReason).toContain("from '@/lib/reasons/whyThisTitle'");
+    expect(cardReason).toContain('buildWhyReasons');
+    // …and the card's one-reason component picks from that ranked list rather
+    // than choosing for itself.
+    expect(cardReason).toContain('primaryReasons');
   });
 
   it('the display component invents no wording of its own', () => {

@@ -70,6 +70,7 @@ export function WhereToWatch({
   extraOptions = [],
   originalNetwork = null,
   showCta = true,
+  compact = false,
   className = '',
 }: {
   mediaType: MediaType;
@@ -83,6 +84,21 @@ export function WhereToWatch({
   /** Historical metadata. Rendered as history, never as availability. */
   originalNetwork?: string | null;
   showCta?: boolean;
+  /**
+   * THE BROWSE-CARD VARIANT — a single fixed 34px row, and nothing else.
+   *
+   * The full block is a heading, a stack of availability lines, a note, a
+   * historical footnote and a 44px call to action: ~88px reserved on every card
+   * in the grid to answer a question the card only has to answer at a glance.
+   * Compact keeps the ANSWER (which services, drawn as brand tiles) and drops
+   * the apparatus. The complete block — every line, the CTA, the live
+   * re-check, the availability panel — is what More Info renders, which is the
+   * surface with room for it.
+   *
+   * It says exactly as much as the full block does about titles we have not
+   * confirmed: "Not yet confirmed" is still shown, never an optimistic blank.
+   */
+  compact?: boolean;
   className?: string;
 }) {
   const [presentation, setPresentation] = useState<WatchPresentation | null>(null);
@@ -143,10 +159,56 @@ export function WhereToWatch({
   // content arriving, not a hole being filled — but the common path no longer
   // moves at all. Measured on /dev/visual-qa at 320/390/1024/1366.
   if (!presentation) {
-    return <div className={`${RESERVE} ${className}`} aria-hidden data-testid="where-to-watch-loading" />;
+    return (
+      <div
+        className={`${compact ? 'wv-provider-row' : RESERVE} ${className}`}
+        aria-hidden
+        data-testid="where-to-watch-loading"
+      />
+    );
   }
 
   const { status, lines, cta, note, historical, ariaLabel } = presentation;
+
+  // The browse card's row: the brand tiles, or the honest label when there is
+  // nothing confirmed. Same resolver, same words — a bounded rendering of them.
+  if (compact) {
+    // A live airing outranks a logo strip: the channel and time are the whole
+    // answer for a title that is on tonight, and reducing that to an icon
+    // would lose it. One line either way.
+    const live = lines.find((l) => l.kind === 'live');
+    const hasStreaming = lines.some((l) => l.kind === 'streaming');
+    return (
+      <section
+        className={`wv-provider-row flex items-center ${className}`}
+        aria-label={ariaLabel}
+        data-testid="where-to-watch"
+        data-compact="1"
+        data-status={status}
+        data-cta={cta.kind}
+      >
+        {live ? (
+          <span
+            data-testid="where-to-watch-line"
+            className={`truncate rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[12px] font-semibold ${live.liveNow ? 'text-emerald-200' : 'text-slate-100'}`}
+          >
+            {live.liveNow && <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 align-middle" aria-hidden />}
+            {live.text}
+          </span>
+        ) : hasStreaming ? (
+          <ProviderLogos lines={lines} dense />
+        ) : (
+          <span
+            className="truncate text-[11.5px] font-semibold text-slate-500"
+            data-testid="where-to-watch-note"
+            title={note ?? undefined}
+          >
+            {status === 'unknown' ? 'Availability not yet confirmed' : 'No streaming option found'}
+          </span>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section

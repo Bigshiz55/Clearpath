@@ -24,6 +24,9 @@ const PHONES = [
 const OVERVIEW =
   'A hardened cab driver moonlights as an avenger for hire, taking the cases the law will not touch — and discovering that the people who hire him are rarely telling the whole truth.';
 
+/** Runtime, certificate and genre — the compact metadata the card keeps. */
+const FACTS = { runtimeMinutes: 105, contentRating: 'PG-13', genres: ['Crime', 'Thriller'] };
+
 async function open(page: Page, w: number, h: number, overview: string | null = OVERVIEW) {
   await page.setViewportSize({ width: w, height: h });
   await page.route('**/api/ratings/**', (r) =>
@@ -31,6 +34,10 @@ async function open(page: Page, w: number, h: number, overview: string | null = 
       json: {
         ratings: { standardScore: 84, audience: 78, rtAudience: 81, tomatometer: 90, imdb: 7.8, metacritic: 72 },
         overview,
+        // `null` overview is this suite's "TMDB gave us nothing" case, so the
+        // facts go with it — otherwise the card would still be describing the
+        // title from a source the test is claiming is empty.
+        facts: overview === null ? null : FACTS,
       },
     }),
   );
@@ -88,16 +95,28 @@ for (const { w, h } of PHONES) {
     const poster = await cards.first().locator('.wv-card-art').first().boundingBox();
     expect(poster!.width, 'poster width').toBeLessThan(card!.width * 0.5);
 
-    // And every card carries its synopsis.
-    await expect(page.getByTestId('card-synopsis').first()).toBeVisible();
-    expect(await page.getByTestId('card-synopsis').count()).toBe(n);
+    // And every card says what it is: the compact facts line (runtime,
+    // certificate, genre) plus the type/year row.
+    //
+    // CHANGED BY THE CARD REDESIGN: this used to require a SYNOPSIS on every
+    // card. The synopsis — a reserved 3-line block plus a "More" toggle on
+    // every tile — moved to More Info, because a card carrying the whole
+    // report was 763px tall and could not fit on screen. The complaint this
+    // test encodes ("nothing said what any of them was about — can't go
+    // strictly by the picture") is still answered on the card itself, by the
+    // facts line and the one personalized reason, and answered in full one tap
+    // away. `card-geometry.spec.ts` asserts the modal carries the synopsis.
+    await expect(page.getByTestId('card-facts').first()).toBeVisible();
+    expect(await page.getByTestId('card-facts').count()).toBe(n);
+    await expect(page.getByTestId('card-more-info').first()).toBeVisible();
+    expect(await page.getByTestId('card-more-info').count()).toBe(n);
   });
 }
 
-test('a title with no synopsis shows nothing rather than a placeholder', async ({ page }) => {
+test('a title with no facts at all shows nothing rather than a placeholder', async ({ page }) => {
   await open(page, 390, 844, null);
   await expect(page.getByTestId('qa-grid')).toBeVisible();
-  // The card still renders; it just has no synopsis line to show.
+  // The card still renders; it just has no facts line to show.
   expect(await page.getByTestId('qa-grid').locator('> div').count()).toBeGreaterThan(0);
   expect(await page.getByTestId('card-synopsis').count()).toBe(0);
 });

@@ -52,12 +52,21 @@ test('a card with no streaming pill still lines up its action row with one that 
   expect(new Set(tops).size, `action rows sit at ${tops.join(', ')}`).toBe(1);
 });
 
-test('the art box is a fixed, shorter height from a desktop width, not the old full 2:3', async ({ page }) => {
+test('the media frame is a fixed ratio from a desktop width, not the old full 2:3', async ({ page }) => {
+  // CHANGED BY THE CARD REDESIGN: the frame was two hard pixel heights (196 /
+  // 216 at `lg`), which only agreed with the grid at the two widths they were
+  // measured on. It is now an aspect-ratio, so every card in a row resolves to
+  // the same frame height at the same column width and the frame scales with
+  // the grid. It is also the box a trailer plays inside, which is why it now
+  // carries `contain: layout` — see `.wv-card-art` in globals.css.
   await openWithResults(page, 1600, [finderItem(1, 'Some Movie')]);
   const art = (await cards(page).first().locator('.wv-card-art').boundingBox())!;
-  // 2:3 at a ~300px column would be ~450px tall; the new fixed box is ~264px.
+  // 2:3 at a ~300px column would be ~450px tall; the frame is 8:5 of the card.
   expect(art.height, `art height ${art.height}`).toBeLessThan(300);
-  expect(art.height, `art height ${art.height}`).toBeGreaterThan(200);
+  expect(art.height, `art height ${art.height}`).toBeGreaterThan(140);
+  expect(art.width / art.height, 'the frame is not 8:5').toBeCloseTo(1.6, 1);
+  const contain = await cards(page).first().locator('.wv-card-art').evaluate((el) => getComputedStyle(el).contain);
+  expect(contain, 'the frame does not contain its own layout').toContain('layout');
 });
 
 test('the poster is letterboxed (object-contain), not cropped, at a desktop width', async ({ page }) => {
