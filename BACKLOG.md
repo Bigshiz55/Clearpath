@@ -35,6 +35,26 @@ Updated at the end of every work order per the Working Agreement in
 
   Re-check with `curl -s https://clearpath-pearl-chi.vercel.app/api/health/showdown`
   until `usable` is true.
+- **DNA Showdown — `claude/showdown-definitive`.** PR #53's recovery work
+  reconciled three-way onto current `main` (nothing newer reverted; the Critic
+  Layer's `criticNudge`/`planNudge` terms in `rank.ts` verified intact) and
+  narrowed to the game. Recovered: verified TMDB identity
+  (`identity.ts` + `catalogueResolver.ts` — a wrong hand-authored id is
+  corrected by search, never displayed), the three-phase adaptive scanner,
+  moments/discoveries derived from what the planner actually did, `Both`,
+  per-cluster meters, cross-session exposure memory, and the axis-level
+  crossing into canonical `preference_events`.
+  **Measured adaptivity: 7–10 of 20 shared questions across six personas**
+  (was 20/20 identical). Canonical vocabulary is a 28-axis SUPERSET of the
+  15 scoring dimensions — same keys, same storage, same copy, pinned by test.
+  `MIN_RANK_CONF` untouched at 0.25.
+  **Real payoff now WIRED, which it was not on #53** — `payoff.ts` shipped
+  there with no caller outside its own test while the results screen went on
+  ranking the diagnostic pool. `payoffPool.ts` + `measurePayoff` run the
+  production `preferenceNudge` over the same TMDB discover pool `/browse?sort=foryou`
+  ranks, with diagnostic titles excluded, folding one event read twice for an
+  exact counterfactual. Three honest outcomes: unmeasured / measured-and-flat /
+  measured-and-moved.
 
 - **Critic Layer — `claude/critic-layer`.** GC1–GC11 complete red-then-green
   (**250 critic tests**). A comparative
@@ -73,6 +93,33 @@ unblocks.
     against PR #54's `WhyVerdict` availability-row change before assuming the
     spec is simply stale.
   Deliberately out of scope for the visual pass rather than silently widened.
+- **The ~50 non-Showdown files stranded on `claude/showdown-cold-start-scanner`.**
+  That branch accumulated real work with nothing to do with the game, and it was
+  reverted to `main` rather than smuggled through a Showdown PR. Each of these
+  needs its own scoped change, and the branch is the record of what was tried:
+  - **Watchlist provenance** (`src/lib/watchlist/provenance.ts`, migration
+    `0047`, and the `quiz.ts` / `postWatch.ts` / `feedback.ts` write paths).
+    Carries a genuine defect fix: onboarding's "what do you want to AVOID"
+    answers ran through the rating path at rating 2 and marked unseen films as
+    watched. Worth landing on its own, with the migration reviewed separately.
+  - **Pack eligibility + identity + mediaKind** (`src/lib/packs/eligibility.ts`,
+    `identity.ts`, `mediaKind.ts`, the admin eligibility route, the pack-enrich
+    cron and its `vercel.json` entry).
+  - **Admin migrate / reconcile-dry route changes** and
+    `adminProjectIdentity.test.ts`.
+  - Assorted component edits: `ChannelGuide`, `TheaterMode`, `PhotoAdd`,
+    `SaveButton`, `AvailabilityPanel`, `VerdictActions`, `Mentalist`,
+    `TasteGame`, `CaseBrowserView`, `ChecklistSection`.
+- **Showdown poster coverage is 0/113 in `poster.ts`.** Pre-existing on `main`,
+  not a regression: the static `POSTERS` map was never populated, so every tile
+  falls back to the typographic treatment unless `/api/showdown/catalogue`
+  resolves artwork live. That route now does resolve and verify it, so the
+  static map is dead weight — either populate it from a verified run or delete
+  it and let `PosterTile` read the catalogue response alone.
+- **The global 💬 `FeedbackButton` overlaps long scrolling pages.** `fixed
+  left-2 bottom-…`, 44×44, sits on top of body copy on the Showdown results
+  screen at 390px. Untouched by any recent work and product-wide, so it needs
+  its own fix (a scroll-aware offset, or a safe gutter on long pages).
 - **Linear network brand asset registry.** Replace the 0/83 monogram fallback
   with verified network marks, using a separate provenance-backed canonical
   asset registry or a licensed authoritative source. NOT part of PR #54 — that
