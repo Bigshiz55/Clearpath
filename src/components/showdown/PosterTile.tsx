@@ -68,7 +68,7 @@ export function PosterTile({
       onClick={onPick}
       disabled={disabled}
       className={[
-        'group relative flex min-h-[44px] w-full flex-col overflow-hidden rounded-2xl',
+        'group relative flex aspect-[2/3] max-h-full min-h-[44px] w-full flex-col overflow-hidden rounded-2xl',
         'bg-ink-900 text-left ring-1 ring-white/10',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
         'motion-safe:transition-all motion-safe:duration-150',

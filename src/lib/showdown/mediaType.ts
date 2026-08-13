@@ -32,6 +32,19 @@ export const TV_TITLE_IDS: ReadonlySet<string> = new Set([
   'last-dance',
   'bridgerton',
   'great-british-bake-off',
+  // Universe-sweep additions that are series, not films.
+  'attack-on-titan',
+  'cowboy-bebop',
+  'sopranos',
+  'the-wire',
+  'succession',
+  'chernobyl',
+  'black-mirror',
+  'tiger-king',
+  'planet-earth',
+  'survivor',
+  'game-of-thrones',
+  'stranger-things',
 ]);
 
 export type ShowdownMediaType = 'movie' | 'tv';
