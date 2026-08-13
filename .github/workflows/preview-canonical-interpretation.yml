@@ -1,0 +1,101 @@
+name: preview-canonical-interpretation
+
+# BLACK-BOX GATE AGAINST THE REAL PREVIEW.
+#
+# Runs only once Vercel reports a READY preview for the PR, then drives that
+# deployment over HTTP — real route, real TMDB, real Supabase. It imports no
+# application module and mocks nothing, because the failure this exists to catch
+# (a sentence losing its meaning between the box and the results) is invisible
+# to every in-process test.
+#
+# It must never silently skip. A missing preview, a SHA mismatch or a failed
+# sign-in exits 2 and FAILS the job with an infrastructure message — quietly
+# passing when the suite did not run is how a gate becomes decoration.
+
+on:
+  # `deployment_status` is the only event that fires when a preview is actually
+  # READY. Running on `pull_request` would race the deployment and test either
+  # nothing or the previous build.
+  deployment_status:
+
+permissions:
+  contents: read
+  deployments: read
+
+jobs:
+  black-box:
+    # Only successful PREVIEW deployments. Production deployments are not this
+    # gate's business, and a failed deployment has nothing to test.
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve the deployment under test
+        id: target
+        env:
+          TARGET_URL: ${{ github.event.deployment_status.target_url }}
+          ENVIRONMENT: ${{ github.event.deployment.environment }}
+          SHA: ${{ github.event.deployment.sha }}
+        run: |
+          # The URL comes from the deployment event, never hard-coded: a preview
+          # URL is ephemeral and pinning one would test a stale build forever.
+          if [ -z "$TARGET_URL" ]; then
+            echo "::error::No target_url on the deployment event — cannot resolve the preview."
+            exit 1
+          fi
+          case "$ENVIRONMENT" in
+            *[Pp]roduction*)
+              echo "Skipping: this gate runs against previews, not production."
+              echo "run=false" >> "$GITHUB_OUTPUT"; exit 0 ;;
+          esac
+          echo "url=$TARGET_URL" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "run=true" >> "$GITHUB_OUTPUT"
+          echo "Deployment: $TARGET_URL (env=$ENVIRONMENT sha=$SHA)"
+
+      - uses: actions/checkout@v4
+        if: steps.target.outputs.run == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.target.outputs.run == 'true'
+        with:
+          node-version: 20
+
+      - name: Report what is configured (names only, never values)
+        if: steps.target.outputs.run == 'true'
+        env:
+          HAS_EMAIL: ${{ secrets.PREVIEW_TEST_EMAIL != '' }}
+          HAS_PASSWORD: ${{ secrets.PREVIEW_TEST_PASSWORD != '' }}
+          HAS_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
+          HAS_SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY != '' }}
+          HAS_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET != '' }}
+        run: |
+          # Presence only. A missing secret is reported by NAME so it can be
+          # fixed without anyone pasting a value anywhere.
+          echo "PREVIEW_TEST_EMAIL present:                    $HAS_EMAIL"
+          echo "PREVIEW_TEST_PASSWORD present:                 $HAS_PASSWORD"
+          echo "NEXT_PUBLIC_SUPABASE_URL present:              $HAS_SUPABASE_URL"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY present:  $HAS_SUPABASE_KEY"
+          echo "VERCEL_AUTOMATION_BYPASS_SECRET present:       $HAS_BYPASS"
+
+      - name: Black-box canonical interpretation
+        if: steps.target.outputs.run == 'true'
+        env:
+          BASE_URL: ${{ steps.target.outputs.url }}
+          EXPECT_SHA: ${{ steps.target.outputs.sha }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          PREVIEW_TEST_EMAIL: ${{ secrets.PREVIEW_TEST_EMAIL }}
+          PREVIEW_TEST_PASSWORD: ${{ secrets.PREVIEW_TEST_PASSWORD }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set +e
+          node eval/preview/canonical-interpretation.mjs
+          code=$?
+          set -e
+          case $code in
+            0) echo "::notice::Canonical interpretation holds against the real preview." ;;
+            1) echo "::error::SEMANTIC failure — the deployed product misread a request." ;;
+            2) echo "::error::INFRASTRUCTURE failure — the gate could not run. This is not a product verdict." ;;
+            *) echo "::error::Unexpected exit $code" ;;
+          esac
+          exit $code
