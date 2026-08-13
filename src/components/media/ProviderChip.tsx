@@ -18,8 +18,16 @@ import { officialProviderNames, resolveProviderBrand } from '@/lib/providers/bra
  */
 
 export interface ProviderChipData {
-  /** Canonical/display provider name, e.g. "Netflix", "Prime Video". */
-  name: string;
+  /**
+   * Canonical/display provider name, e.g. "Netflix", "Prime Video".
+   *
+   * NULLABLE ON PURPOSE. Callers populate this from API payloads, and the
+   * availability payload gained its `service` field after it shipped — so an
+   * older or partial response legitimately arrives without one. Declaring it
+   * non-null did not make it non-null; it only stopped the compiler asking
+   * what happens when it is absent, and the answer was a page-level crash.
+   */
+  name: string | null | undefined;
   /** TMDB logo_path when this caller holds one. Absent is fine — the registry
    *  falls back to its own verified asset for a brand we know. */
   logoPath?: string | null;
@@ -35,6 +43,12 @@ export function ProviderChip({ data, withLabel = false }: { data: ProviderChipDa
   // see src/lib/providers/brand.ts. `via` stays a separate fact: an add-on
   // route is not the base service and must not be folded into its name.
   const brand = resolveProviderBrand({ name: data.name, logoPath: data.logoPath, providerId: data.providerId });
+
+  // NO IDENTITY, NO CHIP. A chip is a claim that a specific named service
+  // carries this title; with no name there is no claim to make, and an empty
+  // white pill would be a worse answer than silence. The caller keeps whatever
+  // non-provider facts it holds (access, confidence) — see WhyVerdict.
+  if (!brand.name) return null;
   const label = data.via ? `${brand.name} (${data.via})` : brand.name;
   const logo = brand.logoPath ? tmdbImage(brand.logoPath, 'w92') : null;
 

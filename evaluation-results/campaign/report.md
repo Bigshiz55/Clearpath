@@ -1,6 +1,6 @@
 # Search Validation Campaign
 
-- Commit `18de532` · Branch `claude/dna-showdown-rebased` · Seed 7
+- Commit `12fd137` · Branch `claude/hotfix-provider-chip-crash` · Seed 7
 - **Total searches: 2000 · Passed 2000 (100.0%) · Failed 0 (0.0%)**
 
 ## Per-dimension pass rate (of cases naming that dimension)

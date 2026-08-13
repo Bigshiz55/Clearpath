@@ -80,19 +80,45 @@ production and apply pending migrations with your `MIGRATE_SECRET` — see the
 unblocks.
 
 ## Next
-- **Fix the 20 pre-existing mobile-suite failures blocking a green CI.**
-  Verified by rebuilding the harness at `0b90f04` with the working tree stashed:
-  the same 20 fail with no PR #58 visual-pass changes applied, so they are
-  inherited, not caused by the Verdict Room work.
-  - `visual-qa.spec.ts` × 12 — the `▶ Trailer` affordance renders 68×25 on
-    `/dev/visual-qa`, below the suite's 44px tap-target minimum, at every
-    viewport in the matrix. `src/components/trailer/TrailerMedia.tsx` is
-    untouched by the whole branch.
-  - `wired-experience.spec.ts` × 8 — "Why this Verd1ct?" on real result cards
-    (TEST A, ONE NUMBER PER CARD, TEST B, TEST E, TEST F). Worth checking
-    against PR #54's `WhyVerdict` availability-row change before assuming the
-    spec is simply stale.
-  Deliberately out of scope for the visual pass rather than silently widened.
+- **The 20 pre-existing mobile-suite failures — 8 now fixed, 12 in flight.**
+  Independently verified twice: by rebuilding the harness at `0b90f04` with the
+  working tree stashed (PR #58's visual pass), and by building `718987e` in a
+  scratch worktree (the card-redesign work). The same 20 fail with neither
+  branch applied, so they are inherited rather than caused.
+  - `wired-experience.spec.ts` × 8 — **FIXED** by the provider-chip hotfix.
+    Root cause was not a stale spec: `WhyVerdict` → `ProviderChip` →
+    `resolveProviderBrand` → `officialProviderName` called `name.trim()` on an
+    availability object with no `service`, which threw DURING RENDER, so React
+    unwound to the error boundary and the whole recommendation page became
+    "Something went wrong". The registry now treats absent identity as a state
+    rather than an error, the chip is suppressed instead of crashing, and the
+    legacy payload shape is pinned under test so it cannot come back.
+    (The suspicion recorded here — "worth checking against PR #54's WhyVerdict
+    availability-row change before assuming the spec is simply stale" — was
+    exactly right: #54 added `service`/`access`/`logoPath` and the fixture, and
+    the renderer, were never brought along.)
+  - `visual-qa.spec.ts` × 12 — the `▶ Trailer` affordance renders below the
+    suite's 44px tap-target minimum at every viewport in the matrix. Addressed
+    in the card + trailer redesign (PR #61), which gives both frame controls
+    44px on BOTH axes — the floor is a box, not a height.
+
+- **A typed runtime constraint never reaches the finder request (TEST E).**
+  Found while fixing the provider-chip crash: with that crash gone,
+  `wired-experience.spec.ts` TEST E reaches its assertion for the first time and
+  fails on its own merits. Asking "a fast mystery movie under 100 minutes" posts
+  `query.maxRuntime: null` — the cap the user typed is dropped, so the search
+  runs unconstrained while the UI behaves as though it applied.
+  NOT a parser bug and NOT a state race: `naiveParseQuery('a fast mystery movie
+  under 100 minutes')` returns `maxRuntime: 100` when called directly, and
+  inserting a 600ms settle between typing and Enter changes nothing — the
+  parsed query simply is not what `FinderUI` submits on the ask path
+  (`src/components/FinderUI.tsx`, `setQ(naiveParseQuery(v))` at ~208 vs
+  `effQuery` at ~284).
+  Deliberately NOT fixed in the provider-chip hotfix: this is finder/search
+  behaviour, and `docs/SEARCH-BASELINE-GOVERNANCE.md` requires any search-surface
+  change to be compared against baseline `68a5a93` with the frozen corpus and a
+  PASS→FAIL / FAIL→PASS delta reported. That is its own piece of work with its
+  own evidence, not a rider on a rendering fix.
 - **The ~50 non-Showdown files stranded on `claude/showdown-cold-start-scanner`.**
   That branch accumulated real work with nothing to do with the game, and it was
   reverted to `main` rather than smuggled through a Showdown PR. Each of these
