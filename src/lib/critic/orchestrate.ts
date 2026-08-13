@@ -31,7 +31,7 @@
  */
 
 import type { DnaState } from '@/lib/preference/types';
-import { resolveAnchor, anchorsToObjective, type AnchorCandidate, type AnchorResolution } from './anchor';
+import { resolveAnchor, anchorsToObjective, canonicalKey, type AnchorCandidate, type AnchorResolution } from './anchor';
 import { hydrateAnchors, type DimensionLoader } from './hydrate';
 import { buildPlan, type CriticPlan } from './plan';
 import { planToHints, type CriticRetrievalHints, type HardConstraints } from './retrieval';
@@ -110,6 +110,16 @@ export interface OrchestrateInput {
   anchorGenreIds?: number[];
   /** Stated media type, which is identity for GC2, not a preference. */
   mediaType?: 'movie' | 'tv';
+  /**
+   * Identities the caller ALREADY established — a clarification the user just
+   * answered, or an anchor resolved before a question was asked.
+   *
+   * These are used verbatim and never searched again. That is not only a saved
+   * round-trip: re-searching a name we have already placed invites a SECOND,
+   * independent resolution that could differ from the first, which would make
+   * the answer to "which one did you mean" quietly not stick.
+   */
+  preResolved?: readonly { spokenAs: string; tmdbId: number; mediaType: 'movie' | 'tv' }[];
 }
 
 /**
@@ -134,8 +144,26 @@ export async function buildCriticState(input: OrchestrateInput): Promise<CriticS
      correspondence with `referenceTitles`, which the authority arithmetic below
      depends on — while a serial loop made a two-anchor comparison pay two
      round-trips before anything else could begin. */
+  const carried = new Map(
+    (input.preResolved ?? []).map((a) => [a.spokenAs, a] as const),
+  );
+
   const resolutions: AnchorResolution[] = await Promise.all(
     request.referenceTitles.map(async (spokenAs) => {
+      /* ALREADY SETTLED — accept it and do no identity work at all. */
+      const known = carried.get(spokenAs);
+      if (known) {
+        return {
+          status: 'resolved' as const,
+          anchor: {
+            titleId: canonicalKey(known.mediaType, known.tmdbId),
+            tmdbId: known.tmdbId,
+            mediaType: known.mediaType,
+            spokenAs,
+            confidence: 1,
+          },
+        };
+      }
       const candidates = await searchCandidates(spokenAs).catch(() => [] as AnchorCandidate[]);
       return resolveAnchor({ spokenAs, mediaType }, candidates);
     }),

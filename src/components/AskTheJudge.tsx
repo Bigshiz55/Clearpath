@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ReasonText } from '@/components/ReasonText';
 import { PosterCard } from '@/components/PosterCard';
 import { JudgeVerdictCard } from '@/components/JudgeVerdictCard';
+import { AnchorClarify, type AnchorOptionView } from '@/components/critic/AnchorClarify';
 import type { TitleVerdict } from '@/lib/askTypes';
 import { type TileRatings } from '@/lib/ratings';
 import { naiveParseQuery, describeQuery, EMPTY_QUERY } from '@/lib/finderParse';
@@ -41,6 +42,8 @@ interface Msg {
   text: string;
   items?: ResultItem[];
   verdict?: TitleVerdict; // a named title put on trial
+  /** A comparative anchor we could not place — the user picks which title. */
+  clarify?: { question: string; options: AnchorOptionView[]; pending: unknown };
 }
 
 const EXAMPLES = [
@@ -119,6 +122,11 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
     setMsgs((m) => [...m, { id: nextId.current++, role, text, items, verdict }]);
   }
 
+  /** Ask which title was meant, carrying the rest of the request untouched. */
+  function askWhich(question: string, options: AnchorOptionView[], pending: unknown) {
+    setMsgs((m) => [...m, { id: nextId.current++, role: 'judge', text: '', clarify: { question, options, pending } }]);
+  }
+
   useEffect(() => {
     setMsgs([
       {
@@ -152,12 +160,22 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
     return { shownYears: [], shownIds: [] };
   }
 
-  async function submit(rawText?: string, queryOverride?: FinderQuery, convOverride?: CanonicalRequest) {
+  async function submit(
+    rawText?: string,
+    queryOverride?: FinderQuery,
+    convOverride?: CanonicalRequest,
+    /** A clarification the user just answered — resumes the original request. */
+    clarifyAnswer?: { pendingComparison: unknown; comparisonChoice: unknown },
+  ) {
     if (loading) return;
     const query = queryOverride ?? q;
     const text = (rawText ?? input).trim();
     setInput('');
-    if (text || !convOverride) say(text || `Filed my case — ${describeQuery(query)}.`, undefined, 'you');
+    /* A clarification answer already showed the chosen title as the user's
+       turn; re-echoing the original sentence would read as asking twice. */
+    if (!clarifyAnswer && (text || !convOverride)) {
+      say(text || `Filed my case — ${describeQuery(query)}.`, undefined, 'you');
+    }
     setLoading(true);
     const mySeq = ++turnSeq.current;
     try {
@@ -172,6 +190,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
           // conversation that belongs to a different account.
           userKey: userKeyRef.current ?? undefined,
           turnContext: lastShown(),
+          ...(clarifyAnswer ?? {}),
         }),
       });
       const data = await res.json();
@@ -209,6 +228,18 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
           `${v.title}${v.year ? ` (${v.year})` : ''} — my ruling: ${v.primaryCall} at ${v.matchScore} for you. ${v.oneLiner}` +
           (alts.length > 0 ? (skip ? ' Here’s why, and better picks below.' : ' Here’s the case — and a few more in the same lane.') : '');
         say(ruling, alts, 'judge', v);
+        return;
+      }
+
+      /* AN ANCHOR NEEDS SETTLING. The comparison is intact — the server sent
+         back everything needed to resume it — so this asks one question rather
+         than answering a different, smaller request. */
+      if (data.kind === 'clarify' && Array.isArray(data.comparisonOptions) && data.comparisonOptions.length > 0) {
+        askWhich(
+          typeof data.clarify === 'string' ? data.clarify : 'Which title did you mean?',
+          data.comparisonOptions as AnchorOptionView[],
+          data.pendingComparison,
+        );
         return;
       }
 
@@ -325,6 +356,32 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
                 {m.role === 'judge' ? (
                   <div className="rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-slate-100">
                     {m.text}
+                    {m.clarify && (
+                      <AnchorClarify
+                        question={m.clarify.question}
+                        options={m.clarify.options}
+                        disabled={loading}
+                        onChoose={(o) => {
+                          /* Resume the ORIGINAL request. The pending envelope
+                             carries the relation, the anchor that already
+                             resolved and every stated constraint, so nothing is
+                             retyped and nothing is searched twice. */
+                          const env = m.clarify!.pending as { text?: string; pending?: { spokenAs?: string }[] } | null;
+                          say(`${o.title}${o.year ? ` (${o.year})` : ''}`, undefined, 'you');
+                          void submit(env?.text ?? undefined, undefined, undefined, {
+                            pendingComparison: m.clarify!.pending,
+                            comparisonChoice: {
+                              // The NAME we asked about, not the option's title —
+                              // they differ whenever the catalogue spells it
+                              // differently from the user.
+                              spokenAs: env?.pending?.[0]?.spokenAs ?? o.title,
+                              tmdbId: o.tmdbId,
+                              mediaType: o.mediaType,
+                            },
+                          });
+                        }}
+                      />
+                    )}
                     {m.verdict && (
                       <div className="mt-3">
                         <JudgeVerdictCard v={m.verdict} />
