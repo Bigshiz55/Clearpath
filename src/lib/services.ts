@@ -9,9 +9,19 @@ export interface StreamingService {
   name: string;
   /** All TMDB provider-id variants that count as "this service" when matching. */
   ids: number[];
-  /** Short glyph for the picker (kept generic — real logos come from TMDB). */
-  emoji: string;
 }
+
+/**
+ * THERE IS NO `emoji` FIELD, DELIBERATELY.
+ *
+ * Every service here used to carry one — 🅽 for Netflix, ⚽ for fuboTV, 📺 for
+ * Pluto TV — and four surfaces printed it in front of the brand name. A glyph
+ * chosen to evoke a company is a homemade approximation of its mark, and the
+ * site-wide rule is that a brand gets its official asset or its official NAME,
+ * never a stand-in. We hold no verified logo for this curated list (it is a
+ * subscription picker, not provider rows), so the honest presentation is the
+ * name — see src/lib/providers/brand.ts.
+ */
 
 /**
  * A curated list of the mainstream subscription services. `ids` collapses TMDB's
@@ -19,21 +29,21 @@ export interface StreamingService {
  * ads) so a subscription matches however TMDB labels the availability.
  */
 export const STREAMING_SERVICES: StreamingService[] = [
-  { id: 8, name: 'Netflix', ids: [8, 1796], emoji: '🅽' },
-  { id: 9, name: 'Prime Video', ids: [9, 119, 2100], emoji: '📦' },
-  { id: 337, name: 'Disney+', ids: [337, 2739], emoji: '🏰' },
-  { id: 1899, name: 'Max', ids: [1899, 384, 1825], emoji: '🎬' },
-  { id: 15, name: 'Hulu', ids: [15], emoji: '🟢' },
-  { id: 531, name: 'Paramount+', ids: [531, 582, 1770, 633], emoji: '⛰️' },
-  { id: 386, name: 'Peacock', ids: [386, 387], emoji: '🦚' },
-  { id: 350, name: 'Apple TV+', ids: [350, 2552], emoji: '🍎' },
-  { id: 43, name: 'Starz', ids: [43, 634], emoji: '✴️' },
-  { id: 37, name: 'Showtime', ids: [37, 349], emoji: '🅢' },
-  { id: 526, name: 'AMC+', ids: [526, 528], emoji: '🅐' },
-  { id: 257, name: 'fuboTV', ids: [257], emoji: '⚽' },
-  { id: 73, name: 'Tubi (free)', ids: [73], emoji: '🆓' },
-  { id: 300, name: 'Pluto TV (free)', ids: [300], emoji: '📺' },
-  { id: 207, name: 'The Roku Channel (free)', ids: [207], emoji: '🟪' },
+  { id: 8, name: 'Netflix', ids: [8, 1796] },
+  { id: 9, name: 'Prime Video', ids: [9, 119, 2100] },
+  { id: 337, name: 'Disney+', ids: [337, 2739] },
+  { id: 1899, name: 'Max', ids: [1899, 384, 1825] },
+  { id: 15, name: 'Hulu', ids: [15] },
+  { id: 531, name: 'Paramount+', ids: [531, 582, 1770, 633] },
+  { id: 386, name: 'Peacock', ids: [386, 387] },
+  { id: 350, name: 'Apple TV+', ids: [350, 2552] },
+  { id: 43, name: 'Starz', ids: [43, 634] },
+  { id: 37, name: 'Showtime', ids: [37, 349] },
+  { id: 526, name: 'AMC+', ids: [526, 528] },
+  { id: 257, name: 'Fubo', ids: [257] },
+  { id: 73, name: 'Tubi (free)', ids: [73] },
+  { id: 300, name: 'Pluto TV (free)', ids: [300] },
+  { id: 207, name: 'The Roku Channel (free)', ids: [207] },
 ];
 
 /**
@@ -44,18 +54,18 @@ export const STREAMING_SERVICES: StreamingService[] = [
  * Ids are in a private 900000+ range so they never collide with a real TMDB id.
  */
 export const LIVE_TV_PROVIDERS: StreamingService[] = [
-  { id: 900001, name: 'YouTube TV', ids: [900001], emoji: '📺' },
-  { id: 900002, name: 'Hulu + Live TV', ids: [900002], emoji: '📺' },
-  { id: 900003, name: 'Sling TV', ids: [900003], emoji: '📺' },
-  { id: 900004, name: 'DIRECTV / DIRECTV Stream', ids: [900004], emoji: '📡' },
-  { id: 900005, name: 'DISH Network', ids: [900005], emoji: '📡' },
-  { id: 900006, name: 'Verizon Fios TV', ids: [900006], emoji: '📡' },
-  { id: 900007, name: 'Xfinity (Comcast)', ids: [900007], emoji: '📡' },
-  { id: 900008, name: 'Spectrum (Charter)', ids: [900008], emoji: '📡' },
-  { id: 900009, name: 'Cox Contour', ids: [900009], emoji: '📡' },
-  { id: 900010, name: 'Optimum / Altice', ids: [900010], emoji: '📡' },
-  { id: 900011, name: 'AT&T U-verse', ids: [900011], emoji: '📡' },
-  { id: 900012, name: 'Antenna / Over-the-air', ids: [900012], emoji: '📶' },
+  { id: 900001, name: 'YouTube TV', ids: [900001] },
+  { id: 900002, name: 'Hulu + Live TV', ids: [900002] },
+  { id: 900003, name: 'Sling TV', ids: [900003] },
+  { id: 900004, name: 'DIRECTV / DIRECTV Stream', ids: [900004] },
+  { id: 900005, name: 'DISH Network', ids: [900005] },
+  { id: 900006, name: 'Verizon Fios TV', ids: [900006] },
+  { id: 900007, name: 'Xfinity (Comcast)', ids: [900007] },
+  { id: 900008, name: 'Spectrum (Charter)', ids: [900008] },
+  { id: 900009, name: 'Cox Contour', ids: [900009] },
+  { id: 900010, name: 'Optimum / Altice', ids: [900010] },
+  { id: 900011, name: 'AT&T U-verse', ids: [900011] },
+  { id: 900012, name: 'Antenna / Over-the-air', ids: [900012] },
 ];
 
 /** Subscription/free types — the ones a plan "includes" (not rent/buy). */

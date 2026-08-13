@@ -1,190 +1,234 @@
 import 'server-only';
-import Link from 'next/link';
-import { searchTitles, getSimilar } from '@/lib/tmdb/client';
 import { getScoringData } from '@/lib/titleData';
 import { buildVerdict } from '@/lib/scoring';
 import { regionFor } from '@/lib/profile';
-import { streamingNames } from '@/lib/services';
+import { topStreamingProvider } from '@/lib/services';
 import { tmdbImage } from '@/lib/tmdb/image';
-import { matchBand } from '@/lib/verdict/matchBand';
-import type { ConfidenceLevel } from '@/lib/verdictExplain';
+import { explainVerdict, type VerdictExplanation } from '@/lib/verdictExplain';
+import { withoutRawSourceQuotes } from '@/lib/verdict/sourceQuotes';
+import { PosterCard } from '@/components/PosterCard';
+import { WhyVerdict } from '@/components/verdict/WhyVerdict';
+import { EnterWatchVerd1ctCta } from './EnterWatchVerd1ctCta';
+import { TourGutter, TourLegend } from './ExampleTour';
+import type { MediaType } from '@/lib/types';
 
 /**
- * PROVE THE OUTPUT, DON'T JUST DESCRIBE IT.
+ * PROVE THE OUTPUT BY SHOWING THE ACTUAL PRODUCT.
  *
- * The three-step cards above explain the PROCESS; a visitor still hasn't seen
- * what a real Verd1ct actually looks like. This runs the exact same scoring
- * pipeline `askJudgeTitle` uses (`getScoringData` → `buildVerdict`) against a
- * fixed, unambiguous title, live, at request time — the quality numbers and
- * ratings are real. What CANNOT be honest here is personal fit (there is no
- * taste profile for an anonymous visitor) and live provider availability
- * without a signed-in region — both are labeled as illustrative rather than
- * presented as real personalization or current availability.
+ * ── WHAT THIS REPLACES ────────────────────────────────────────────────────
+ * This section used to draw its own bespoke report: a 20px-wide poster in a
+ * near-empty box, a standalone green FOR pill, prose metadata, ± evidence
+ * bullets floating OUTSIDE the card, availability as a sentence ("Available on
+ * fuboTV, Paramount Plus Premium"), an alternate recommendation as more prose,
+ * and its own underlined link out. None of it existed anywhere else in
+ * WatchVerd1ct, so the one screen whose job is "here is what you get" showed a
+ * thing you would never see again after signing in.
  *
- * Fails open: no TMDB key, a network miss, or an empty search all render the
- * same honest fallback rather than a broken section or (worse) invented data.
+ * ── WHAT IT IS NOW ────────────────────────────────────────────────────────
+ * The REAL card. `PosterCard` — the same component `/app`, search, the finder,
+ * Packs and the release wall all render — with the same children it always
+ * carries: `CardFacts`, `CardSynopsis`, `AlgorithmScore` (Verd1ct badge, call
+ * and ratings), `WhyThisTitle`, `CardFit`, and `WhereToWatch` with its
+ * `ProviderLogos` strip. The "Why this Verd1ct?" panel (`WhyVerdict`) goes in
+ * the card's own `evidence` slot, exactly as `FinderUI` does it, and carries
+ * why-watch ("Why it matched") and watch-out ("Things to know" / "Remaining
+ * uncertainty"). There is no landing-only card markup left in this file.
+ *
+ * ── WHAT IS HONEST HERE, AND HOW ──────────────────────────────────────────
+ * The scoring is real and runs at request time through the same pipeline
+ * `askJudgeTitle` uses (`getScoringData` → `buildVerdict`).
+ *
+ * The PERSONALIZATION is not faked, and nothing here has to remember not to
+ * fake it — the production components already refuse. An anonymous visitor has
+ * no Taste DNA, so `/api/dna` answers `{ dna: null }`, and:
+ *   • `AlgorithmScore` labels itself "WatchVerd1ct" instead of "Your VERD1CT"
+ *     and shows the general quality number we pass as `objectiveScore`;
+ *   • `CardFit` renders nothing at all rather than a disclaimer;
+ *   • `WhyThisTitle` produces no "your preferences" reason, because
+ *     `buildWhyReasons` will not make a claim about a viewer it knows nothing
+ *     about;
+ *   • `explainVerdict` is given `matchScore: null`, so the panel's own
+ *     confidence line reads "No personal taste signal yet — match is generic."
+ * That is the shipped anonymous state of the real card, not a demo mode.
+ *
+ * Fails open: no TMDB key or a network miss renders the honest fallback plus
+ * the same entrance, rather than a broken section or (worse) invented data.
  */
 
-const EXAMPLE_QUERY = 'The Godfather';
+/**
+ * THE EXAMPLE IS A FIXED ENTITY, LOOKED UP BY ID — NEVER SEARCHED FOR.
+ *
+ * This used to run `searchTitles('The Godfather')` and take the first result
+ * whose title contained "godfather". That made the landing page's identity a
+ * function of TMDB's popularity ordering and of a substring match — the exact
+ * class of defect the search work exists to remove. "The Godfather Part III",
+ * a re-release entry, or a documentary about the film could all satisfy it, and
+ * which one won could change between two requests without anything here
+ * changing. There is no query to get right, because there is no query: the
+ * example IS movie 238, resolved through the same `getScoringData` path every
+ * other surface uses.
+ */
+const EXAMPLE_MEDIA_TYPE: MediaType = 'movie';
+const EXAMPLE_TMDB_ID = 238; // The Godfather (1972)
 
-const CONFIDENCE_TEXT: Record<ConfidenceLevel, string> = {
-  high: 'Strong evidence — independent sources agree.',
-  medium: 'Good evidence — real signal, not unanimous.',
-  low: 'Limited evidence on this title.',
-};
-
-interface ExampleData {
+/** Everything the section needs, resolved server-side. Serializable, so the
+ *  harness at /dev/landing-example can render the identical section. */
+export interface ExampleCard {
+  tmdbId: number;
+  mediaType: MediaType;
   title: string;
   year: number | null;
   posterUrl: string | null;
-  mediaType: 'movie' | 'tv';
-  ruling: 'FOR' | 'AGAINST';
-  rulingHeadline: string;
+  posterPath: string | null;
+  /** The deterministic general score — the judgment everyone gets, not a match. */
   quality: number;
-  reasons: string[];
-  caution: string | null;
-  runtimeLabel: string | null;
-  where: string | null;
-  confidenceLevel: ConfidenceLevel;
-  alternate: { title: string; year: number | null; posterUrl: string | null } | null;
+  /** The production "Why this Verd1ct?" payload. */
+  explain: VerdictExplanation;
 }
 
-function fmtRuntime(minutes: number | null): string | null {
-  if (!minutes) return null;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
-
-async function loadExample(): Promise<ExampleData | null> {
+async function loadExample(): Promise<ExampleCard | null> {
   try {
-    const results = await searchTitles(EXAMPLE_QUERY);
-    const top = results.find((r) => r.mediaType === 'movie' && r.title.toLowerCase().includes('godfather'));
-    if (!top) return null;
-
     const region = regionFor(null);
-    const { meta, providers } = await getScoringData(top.mediaType, top.id, region);
+    const { meta, providers } = await getScoringData(EXAMPLE_MEDIA_TYPE, EXAMPLE_TMDB_ID, region);
     const report = buildVerdict({
       meta,
       providers,
-      // No real visitor taste data exists here — this only ever reads
-      // report.general.score below, never report.personal, but hasSignal:
-      // false keeps the context honest regardless.
+      // There is no visitor taste data here, and `hasSignal: false` keeps the
+      // engine from pretending otherwise. Only `report.general` is read below.
       personal: { label: 'General Verdict', rules: [], likedFranchiseIds: [], collectionId: null, hasSignal: false },
     });
 
     const quality = Math.round(report.general.standardScore ?? report.general.score);
-    const ruling: ExampleData['ruling'] = report.primaryCall === 'SKIP IT' ? 'AGAINST' : 'FOR';
-    const rulingHeadline =
-      report.primaryCall === 'WATCH IT' ? 'WATCH THIS TONIGHT' : report.primaryCall === 'MAYBE' ? 'WORTH A LOOK' : 'NOT RIGHT NOW';
-
-    const where = providers?.available ? streamingNames(providers.options as never).slice(0, 2).join(', ') || null : null;
-
-    let alternate: ExampleData['alternate'] = null;
-    try {
-      const similar = await getSimilar(top.mediaType, top.id);
-      const first = similar[0];
-      if (first) {
-        alternate = { title: first.title, year: first.year, posterUrl: tmdbImage(first.posterPath, 'w185') };
-      }
-    } catch {
-      /* the alternate is a bonus; the example still stands without it */
-    }
+    // The one included provider we name in the explanation, WITH its verified
+    // logo — taken from the same option, never matched by resemblance, so the
+    // availability row can use the site's official brand treatment.
+    const topProvider = providers?.available ? topStreamingProvider(providers.options) : null;
+    // "Well received by audiences (8.7/10 (23,328 votes))." is the engine
+    // quoting a rating row verbatim, and `explainVerdict` states the same fact
+    // below it in one clean sentence. See lib/verdict/sourceQuotes.ts — this
+    // removes the duplicate, it does not rewrite anything.
+    const sources = report.general.sources;
+    const reasonsFor = withoutRawSourceQuotes(report.reasonsFor, sources);
+    const reasonsAgainst = withoutRawSourceQuotes(report.reasonsAgainst, sources);
 
     return {
+      tmdbId: EXAMPLE_TMDB_ID,
+      mediaType: EXAMPLE_MEDIA_TYPE,
       title: meta.title,
       year: meta.year,
       posterUrl: tmdbImage(meta.posterPath, 'w342'),
-      mediaType: top.mediaType,
-      ruling,
-      rulingHeadline,
+      posterPath: meta.posterPath ?? null,
       quality,
-      reasons: report.reasonsFor.slice(0, 3),
-      caution: report.reasonsAgainst[0] ?? null,
-      runtimeLabel: fmtRuntime(meta.runtimeMinutes ?? meta.episodeRuntimeMinutes ?? null),
-      where,
-      confidenceLevel: report.general.confidence,
-      alternate,
+      explain: explainVerdict({
+        // NO PERSONAL MATCH. `explainVerdict` states the absence in its own
+        // words instead of this section inventing a number for a stranger.
+        matchScore: null,
+        generalScore: quality,
+        matchedTraits: reasonsFor.slice(0, 4),
+        riskTraits: reasonsAgainst.slice(0, 3),
+        // Nobody asked for anything — an anonymous visitor set no constraints,
+        // so there are no checked requirements to report.
+        requirements: [],
+        ratingSourceCount: sources.filter((s) => s.available).length,
+        // TMDB-listed is "likely", never "verified" — the same claim the
+        // finder's own cards are allowed to make. See finderExplain.ts.
+        availability: topProvider
+          ? { where: topProvider.name, kind: 'included', confidence: 'likely', logoPath: topProvider.logoPath }
+          : null,
+      }),
     };
   } catch {
     return null;
   }
 }
 
-export async function ExampleVerdict() {
-  const data = await loadExample();
-
+/**
+ * The section itself, given already-resolved data. Split out from the fetch so
+ * the visual harness can render the exact production markup without a TMDB key.
+ */
+export function ExampleVerdictSection({ data }: { data: ExampleCard | null }) {
   return (
     <section className="border-t border-white/10" data-testid="example-verdict">
       <div className="container-page py-8 sm:py-10">
         <h2 className="text-center text-sm font-black uppercase tracking-[0.16em] text-slate-500">Example Verd1ct</h2>
+        <p className="mx-auto mt-2 max-w-sm text-center text-sm text-slate-400">
+          A real card, scored live — and the same one you land on inside.
+        </p>
 
         {!data ? (
           <p className="mx-auto mt-4 max-w-md text-center text-sm text-slate-500" data-testid="example-verdict-fallback">
-            Live example unavailable right now — enter the courtroom to see a real one.
+            Live example unavailable right now — Enter WatchVerd1ct to see your recommendations.
           </p>
         ) : (
-          <div className="mx-auto mt-5 max-w-lg" data-testid="example-verdict-card">
-            <div className="wv-tile flex gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              {data.posterUrl && (
-                // eslint-disable-next-line @next/next/no-img-element -- external TMDB CDN, matches PosterCard's convention
-                <img src={data.posterUrl} alt="" className="h-[120px] w-20 flex-none rounded-lg object-cover" />
-              )}
-              <div className="min-w-0">
-                <span
-                  className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-black uppercase tracking-wide ${
-                    data.ruling === 'FOR' ? 'bg-emerald-500/25 text-emerald-100' : 'bg-red-500/25 text-red-100'
-                  }`}
-                >
-                  {data.ruling} — {data.rulingHeadline}
-                </span>
-                <h3 className="mt-1.5 truncate text-base font-bold text-white">
-                  {data.title} {data.year ? <span className="font-normal text-slate-400">({data.year})</span> : null}
-                </h3>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  Quality {data.quality} · Fit for you <span className="italic">illustrative — no taste profile yet</span>
-                </p>
-                <p className="mt-0.5 text-xs text-slate-400">{matchBand(data.confidenceLevel)} · {CONFIDENCE_TEXT[data.confidenceLevel]}</p>
+          <>
+            {/* ONE GRID CELL, NOT A BANNER. The old section stretched a single
+                card across the full page and filled the difference with black.
+                A production card is a column in `poster-grid` (280px floor,
+                see globals.css), so on a laptop it is drawn at that width and
+                nothing else changes; below `sm` it is left full-width, which
+                is exactly what a phone card is in the app — `.wv-card` turns
+                it into the poster-beside-text row on its own. */}
+            {/* THE TOUR IS A GRID SIBLING OF THE CARD, NEVER AN OVERLAY.
+                On a laptop the callouts occupy the two outer columns and the
+                card keeps the middle one at its production width — so an
+                annotation cannot land on top of a provider tile or the
+                "Why this Verd1ct?" summary. Below `xl` the columns collapse
+                and the legend under the card carries the same six concepts.
+                See ExampleTour's own doc comment. */}
+            <div className="mx-auto mt-5 grid w-full max-w-[1180px] gap-x-8 xl:grid-cols-[minmax(0,1fr)_320px_minmax(0,1fr)] xl:items-start">
+              <TourGutter side="left" />
+              <div className="mx-auto w-full sm:max-w-[320px]" data-testid="example-verdict-card">
+              <PosterCard
+                href={`/app/title/${data.mediaType}/${data.tmdbId}`}
+                tmdbId={data.tmdbId}
+                mediaType={data.mediaType}
+                title={data.title}
+                year={data.year}
+                posterUrl={data.posterUrl}
+                posterPath={data.posterPath}
+                // The general judgment, for the one surface where "no DNA" is
+                // the truth rather than a loading state.
+                objectiveScore={data.quality}
+                // FOR / AGAINST / SAVE / W ARE OFF, VIA THE CARD'S OWN OPT-OUT.
+                // Every one of them writes to a signed-in viewer's DNA and
+                // watchlist. Rendering them to a visitor with no account would
+                // be four controls that answer a tap with an error toast — so
+                // the card is shown in its read-only state (`overlay={null}`,
+                // a documented PosterCard mode) and the entrance below is the
+                // action. Nothing is redrawn to achieve that.
+                overlay={null}
+                evidence={<WhyVerdict data={data.explain} />}
+              />
               </div>
+              <TourGutter side="right" />
             </div>
 
-            {data.reasons.length > 0 && (
-              <ul className="mt-3 space-y-1 text-sm text-slate-200">
-                {data.reasons.map((r) => (
-                  <li key={r} className="flex gap-1.5">
-                    <span aria-hidden className="text-brand-300">+</span>
-                    {r}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {data.caution && (
-              <p className="mt-1.5 flex gap-1.5 text-sm text-slate-400">
-                <span aria-hidden>—</span>
-                {data.caution}
-              </p>
-            )}
-
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-              {data.runtimeLabel && <span>{data.runtimeLabel}</span>}
-              <span>{data.where ? `Available on ${data.where}` : 'Where to watch — sample presentation, not current availability'}</span>
-            </div>
-
-            {data.alternate && (
-              <p className="mt-3 text-xs text-slate-500">
-                The Alternate: {data.alternate.title} {data.alternate.year ? `(${data.alternate.year})` : ''}
-              </p>
-            )}
-
-            <p className="mt-3 text-center text-xs text-slate-600">
-              A live example, not personalized to you.{' '}
-              <Link href="/app" className="text-brand-300 underline hover:text-brand-200">
-                Enter WatchVerd1ct for your own Verd1ct →
-              </Link>
+            {/* THE HONEST LABEL FOR WHAT THE CARD IS SHOWING. Section copy,
+                not card chrome: the card says "WatchVerd1ct" rather than "Your
+                VERD1CT" on its own, and this says why. */}
+            <p className="mx-auto mt-3 max-w-sm text-center text-xs text-slate-500" data-testid="example-verdict-anon">
+              The general Verd1ct. Build your Taste DNA and it becomes your Match.
             </p>
-          </div>
+
+            {/* The legend is the tour on a phone, and the accessible reading of
+                it at every width — the gutter callouts are `aria-hidden`. */}
+            <TourLegend className="mx-auto mt-5 max-w-md xl:hidden" />
+          </>
         )}
+
+        {/* ONE TRANSITION, ONE BUTTON — the site's primary entrance component,
+            not a second button language. */}
+        <div className="mt-7 flex flex-col items-center gap-3 text-center">
+          <p className="text-base font-semibold text-slate-200 sm:text-lg" data-testid="example-verdict-transition">
+            This is the generic verdict. Yours gets personal.
+          </p>
+          <EnterWatchVerd1ctCta testId="example-verdict-cta" />
+        </div>
       </div>
     </section>
   );
+}
+
+export async function ExampleVerdict() {
+  return <ExampleVerdictSection data={await loadExample()} />;
 }

@@ -23,10 +23,33 @@ Updated at the end of every work order per the Working Agreement in
 
 **Action needed from you:** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the
-"Restored: /admin/migrations" entry below for why this is currently required
-and what it unblocks.
+"Restored: /admin/migrations" entry below for why this is required and what it
+unblocks.
 
 ## Next
+- **Linear network brand asset registry.** Replace the 0/83 monogram fallback
+  with verified network marks, using a separate provenance-backed canonical
+  asset registry or a licensed authoritative source. NOT part of PR #54 — that
+  work established the plumbing (`tv_stations.logo_url` → `ingestedGuide` →
+  `channelGuide` → `NetworkChip`) and proved the gap is an asset-source problem,
+  not a wiring one: TVmaze's network object carries no logo, Watchmode sets
+  `logoPath: null` and is a streaming source anyway, TV Media is egress-denied
+  under `DATA_MODE=free_live`, and `linear_networks.logo_path` is fixture-fed.
+  - **Runtime fuzzy name → logo inference stays forbidden.** A logo resolved by
+    string resemblance is a claim about who broadcast something, made on no
+    evidence.
+  - **A streaming-service mark may never substitute for a network mark.** They
+    are different factual entities; `ProviderChip` and `NetworkChip` are
+    separate for that reason and must stay separate.
+  - **Verified canonical mappings ARE allowed** — station/network identity to a
+    specific asset, decided once and reviewed, never inferred per request.
+  - **Every manually verified asset must retain provenance:** where it came
+    from, who confirmed it, and when. Same rule the streaming table follows in
+    `src/lib/providers/assets.ts`, which records that each path was fetched and
+    looked at before being written down.
+  - **Order of work:** ABC / CBS / NBC / FOX / The CW first, then Hallmark
+    (Channel, Mystery, Family), Lifetime / LMN, then major cable, news, sports
+    and premium.
 - **Turn on the AI orchestrator (owner action).** The provider-independent
   Claude discovery brain is built, tested, and shipped OFF (`AI_DISCOVERY_MODE`
   defaults to `legacy`). To evaluate it: set `ANTHROPIC_API_KEY` (server-only)
@@ -87,6 +110,115 @@ and what it unblocks.
   representative.
 
 ## Done
+- **Streaming brand coverage is 14/15, and the last one is an upstream fact.**
+  Starz, AMC+, Fubo, Tubi, Pluto TV and The Roku Channel now render their own
+  marks. Their paths were not guessed: production's already-deployed
+  `/api/ratings/:type/:id` returns TMDB's provider rows, each pairing a
+  `provider_name` with its `logo_path`, so the identity came from TMDB itself
+  across a sweep of ~36 real titles; each asset was then fetched and looked at.
+  No diagnostic route was added and no secret was handled.
+  **Showtime is the one gap and it is not fixable here:** TMDB's US
+  watch-provider data carries no standalone Showtime entry (checked across nine
+  Showtime originals) since the service folded into "Paramount+ with Showtime".
+  Giving it Paramount+'s mark would be the brand merge the registry exists to
+  prevent, so it renders as its official NAME.
+- **Linear network logos: plumbed, and genuinely blocked on source, not wiring.**
+  Forensic pass over every source in the stack: both station writers
+  (`tvmazeWriter`, `tvMediaWriter`) upsert `name`/`network`/`call_sign` and no
+  logo, because neither source supplies one — TVmaze's network object is
+  `{id, name, country, officialSite}`; Watchmode explicitly sets `logoPath:
+  null` ("per-title sources carry no logo") and is a STREAMING source anyway;
+  TV Media, the paid adapter, is egress-denied under `DATA_MODE=free_live`;
+  `linear_networks.logo_path` (0044) is fixture-fed and read by nothing. The
+  only remaining candidate — mapping a station name onto a TMDB *network* id —
+  is name inference and is refused. Rendered coverage is therefore 0, the
+  monogram stands, and the wired path lights up the moment a licensed source
+  writes `tv_stations.logo_url`.
+- **Known brands render their own marks, not just their names.** The registry
+  now resolves canonical provider identity → verified asset
+  (`src/lib/providers/assets.ts`), so a surface that knows only "Netflix" — the
+  subscription picker, a group verdict's service list, the availability row —
+  draws the brand instead of spelling it. Callers no longer need to arrive
+  holding a `logoPath`. Every entry was fetched from image.tmdb.org and LOOKED
+  AT before it was written down; a 200 is not verification. Plan variants
+  inherit the brand's mark ("Peacock Premium" → Peacock); distribution routes
+  never do ("Paramount+ Amazon Channel" stays text).
+- **Linear network logos are plumbed end to end.** `tv_stations.logo_url` →
+  `ingestedGuide` → `channelGuide` row → `NetworkChip` in the guide. No source
+  writes that column today, so every row still shows its monogram — the
+  deliberate non-hotlinked identity, not an emoji — and lights up the moment a
+  licensed source lands.
+- **One provider-brand registry, and no service is drawn as an emoji any more.**
+  `src/lib/providers/brand.ts` is now the single lookup from a provider
+  identity to its official display name, its verified logo asset, its
+  accessible label and its brand-safe text fallback. `ProviderLogos`,
+  `ProviderChip`/`NetworkChip`, the availability dedupe (`providerBrand.ts`)
+  and `explainVerdict` all read it — there is no second map.
+  - **The named defect is gone:** "Why this Verd1ct?" rendered
+    `📺 fuboTV · Included with subscription · likely` while the card's own
+    Where-to-watch strip two rows above drew Fubo's real logo. The row is now
+    the site's provider chip plus the access level and the confidence as their
+    own labelled parts. Availability LOGIC is untouched; `verified` vs
+    `likely` is still the only thing that decides what may be claimed.
+  - **Swept:** the television emoji is gone from every place it stood next to a
+    named service or network — TasteCourt, CloudCrews, LiveCourt,
+    TogetherPlanner, VotingFloor, AskTheJudge, JudgeVerdictCard, FinderUI (×4),
+    ReportExtras, SearchBar's provider/network intent card, SeasonWhereToWatch —
+    and `TvDetective` now uses `NetworkChip` for a linear network. The
+    `emoji` field on `STREAMING_SERVICES`/`LIVE_TV_PROVIDERS` (🅽 for Netflix,
+    ⚽ for fuboTV…) was a homemade second logo map and is deleted, with its
+    four render sites falling back to the official name.
+  - **Guarded** by `src/lib/providers/brand.test.ts`: the rename table never
+    merges two identities, a logo is never invented, and a source scan fails on
+    any 📺 outside the media-type/empty-state allowlist.
+- **The landing example teaches the product.** A landing-only annotation layer
+  (`ExampleTour`) puts six restrained callouts in the page's gutters on a
+  laptop — Score, Match, More, Where to Watch, Why this Verd1ct?, Things
+  to Know — and the same six as a numbered "What you're looking at" legend
+  under the card below `xl`. It is a grid SIBLING of the card, never an
+  overlay: the visual suite measures that no callout intersects the card or
+  another callout. `PosterCard` was not touched. The Match callout says the
+  number appears once Taste DNA exists rather than implying one already does,
+  and the "More" callout describes what that control actually is — an inline
+  synopsis expand — with poster/title navigation named separately, because it
+  is a different control.
+- **The landing "Example Verd1ct" is the real card now, not a drawing of one.**
+  The section rendered its own bespoke horizontal report — thumbnail poster in
+  an oversized empty box, standalone FOR pill, prose metadata, ± evidence rows
+  outside the card, availability as a sentence, alternate title as prose, its
+  own underlined link. All of it is deleted. The section now renders the
+  production `PosterCard` (and therefore `CardFacts`, `CardSynopsis`,
+  `AlgorithmScore`, `WhyThisTitle`, `CardFit`, `WhereToWatch` +
+  `ProviderLogos`) with `WhyVerdict` in the card's own `evidence` slot, exactly
+  as `FinderUI` composes a result. No landing-only card markup remains.
+  - **Anonymous personalization is the shipped state, not a demo mode.**
+    `/api/dna` answers `{ dna: null }` for a visitor, so the panel labels
+    itself "WatchVerd1ct" (not "Your VERD1CT") over the general score passed as
+    the new `PosterCard.objectiveScore` pass-through, `CardFit` renders
+    nothing, `WhyThisTitle` claims nothing, and `explainVerdict({ matchScore:
+    null })` prints "No personal taste signal yet — match is generic."
+  - **One primary CTA component.** `EnterWatchVerd1ctCta` now owns
+    `.btn-watchverdict`; the hero and the new post-example transition both
+    render it, so a second button language cannot appear by copy-paste.
+    `quizReachable.test.ts` follows the component and still pins "exactly one
+    ceremonial entrance in the hero".
+  - **The example is a fixed entity, not a search result.** It briefly resolved
+    itself with `searchTitles('The Godfather')` + a `.includes('godfather')`
+    pick, which made the landing page's identity a function of TMDB popularity
+    ordering and a substring match. It is now `movie:238`, loaded by id through
+    `getScoringData`. Pinned by `exampleIdentity.test.ts` (source-level: no
+    search call, canonical constants) and at runtime by the visual spec, which
+    asserts every per-title fetch is `/api/ratings/movie/238`.
+  - **Verified at 1440 and 390** via `/dev/landing-example` (MOBILE_HARNESS
+    harness) + `tests/mobile/landing-example.spec.ts`, 12 assertions incl.
+    card proportions, the phone row collapse, and no horizontal overflow.
+  - **Follow-up worth queueing:** `splitMath` (`lib/verdict/explainSections`)
+    cannot lift a nested numeric parenthetical, so the engine's
+    "Well received by audiences (8.7/10 (23,328 votes))." renders in full
+    wherever `WhyVerdict` shows it — including production finder cards. The
+    landing loader drops that reason as a duplicate
+    (`lib/verdict/sourceQuotes.ts`, tested); fixing `splitMath` itself would
+    clean it up everywhere and was out of scope here.
 - **The three false channels are gone from production (`bcb1974`).**
   `NBC.com`, `ABC News Live` and `CBS News` — streaming feeds rendered as
   television channels — are removed from the data and the rendered guide.

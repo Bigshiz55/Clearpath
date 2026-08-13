@@ -19,6 +19,10 @@ export interface Airing {
   airstamp: string; // ISO UTC start — used to build a calendar reminder
   runtime: number | null; // minutes
   network: string; // channel, e.g. "AMC"
+  /** The station's VERIFIED logo, when the ingest source licensed one
+   *  (`tv_stations.logo_url`). Null/absent = we hold none, and the guide draws
+   *  its own monogram rather than borrowing a streaming provider's mark. */
+  networkLogoUrl?: string | null;
   showName: string;
   showId: number;
   episodeName: string | null;

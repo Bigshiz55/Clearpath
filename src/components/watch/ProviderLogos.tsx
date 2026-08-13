@@ -3,6 +3,7 @@
 import { tmdbImage } from '@/lib/tmdb/image';
 import type { WatchLine } from '@/lib/availability/watchPresentation';
 import { dedupeByBrand } from '@/lib/availability/providerBrand';
+import { resolveProviderBrand } from '@/lib/providers/brand';
 
 /**
  * THE ONE PROVIDER-LOGO STRIP. Every WatchVerd1ct result card renders where a
@@ -54,8 +55,13 @@ export function ProviderLogos({ lines }: { lines: WatchLine[] }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5" data-testid="where-to-watch-providers">
       {shown.map((l, i) => {
-        const logo = l.logoPath ? tmdbImage(l.logoPath, 'w92') : null;
-        const label = l.service ?? l.text;
+        // ONE REGISTRY DECIDES THE BRAND. The official name, the verified
+        // asset and the accessible label all come from the same resolve, so
+        // this strip and the availability row in "Why this Verd1ct?" cannot
+        // disagree about what a service is called or what it looks like.
+        const brand = resolveProviderBrand({ name: l.service ?? l.text, logoPath: l.logoPath, access: l.badge });
+        const logo = brand.logoPath ? tmdbImage(brand.logoPath, 'w92') : null;
+        const label = brand.name;
         const inner = (
           <>
             {logo ? (
@@ -66,6 +72,7 @@ export function ProviderLogos({ lines }: { lines: WatchLine[] }) {
                 width={28}
                 height={28}
                 loading="lazy"
+                data-testid="brand-mark"
                 className="h-7 w-7 rounded object-contain"
               />
             ) : (

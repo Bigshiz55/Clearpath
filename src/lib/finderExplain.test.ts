@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { buildItemExplanation, checkedRequirements, assembleHousehold, type ExplainFacts } from './finderExplain';
 import { EMPTY_QUERY } from './finderParse';
 import type { FinderQuery } from './finder';
+import { assetForProvider } from '@/lib/providers/assets';
+
+const NETFLIX_LOGO = assetForProvider('Netflix');
 
 const q = (over: Partial<FinderQuery>): FinderQuery => ({ ...EMPTY_QUERY, genreIds: [], ...over });
 const facts = (over: Partial<ExplainFacts> = {}): ExplainFacts => ({
@@ -37,7 +40,17 @@ describe('buildItemExplanation — real reasons, honest availability', () => {
     const e = buildItemExplanation(q({ mediaType: 'movie' }), facts());
     expect(e.rose).toContain('Fast investigative storytelling');
     expect(e.heldBack).toContain('Darker than most picks');
-    expect(e.availability).toEqual({ text: 'Netflix · Included with subscription', confidence: 'likely' });
+    // The row carries the OFFICIAL brand identity in parts (so it can render
+    // the site's provider treatment) as well as the joined sentence.
+    expect(e.availability).toEqual({
+      text: 'Netflix · Included with subscription',
+      confidence: 'likely',
+      service: 'Netflix',
+      // The registry's own verified Netflix mark — the row renders the brand
+      // even though this caller passed no logo. See providers/assets.ts.
+      logoPath: NETFLIX_LOGO,
+      access: 'Included with subscription',
+    });
     // 3 rating sources + personal signal + all requirements → but availability
     // is only "likely" (not verified), so confidence must not claim more than
     // medium-tier evidence supports… it can still be high on the other three.

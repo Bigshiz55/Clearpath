@@ -9,10 +9,11 @@ import { STREAMING_SERVICES } from '@/lib/services';
 import { GENRE_CHIPS } from '@/lib/finderGenres';
 import { PosterCard } from '@/components/PosterCard';
 import { MatchMark } from '@/components/MatchMark';
-import { WhyVerdict } from '@/components/verdict/WhyVerdict';
+import { WhyVerdict, type WhyVerdictData } from '@/components/verdict/WhyVerdict';
 import { buildPills } from '@/lib/verdict/pills';
 import { type TileRatings } from '@/lib/ratings';
 import type { FinderQuery } from '@/lib/finder';
+import { officialProviderNames } from '@/lib/providers/brand';
 
 export interface WatcherOption {
   name: string;
@@ -36,14 +37,12 @@ interface ResultItem {
   deciderUrl: string;
   ratings?: TileRatings;
   airing?: { network: string; time: string; airstamp: string } | null;
-  /** "Why this Verd1ct?" — real reasons/requirements/confidence from the engine. */
-  explain?: {
-    rose: string[];
-    heldBack: string[];
-    requirements: { label: string; satisfied: boolean; evidence: string }[];
-    availability: { text: string; confidence: string } | null;
-    confidence: { level: 'high' | 'medium' | 'low'; because: string[] };
-  };
+  /** "Why this Verd1ct?" — real reasons/requirements/confidence from the engine.
+   *  THE PANEL'S OWN TYPE, not a copy of it: this was an inline duplicate that
+   *  silently went stale the moment the availability row gained its provider
+   *  identity, and a second declaration of one contract is how the panel and
+   *  its data disagree in the first place. */
+  explain?: WhyVerdictData;
   /** Floor-weighted joint verdict when several people are watching. */
   household?: {
     score: number;
@@ -363,7 +362,7 @@ export function FinderUI({
     <div className="space-y-5">
       {(q.providerIds?.length ?? 0) > 0 && (
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2 rounded-xl border border-brand-400/40 bg-brand-500/10 px-3.5 py-2.5 text-sm text-brand-100">
-          <span>📺 Filtered to <b className="text-white">{providerFilterNames.join(', ') || 'your pick'}</b> — real availability from TMDB.</span>
+          <span>Filtered to <b className="text-white">{officialProviderNames(providerFilterNames).join(' · ') || 'your pick'}</b> — real availability from TMDB.</span>
           <button onClick={() => set('providerIds', [])} className="flex-none text-xs font-semibold text-brand-200 underline underline-offset-2 hover:text-white">Clear</button>
         </div>
       )}
@@ -517,7 +516,7 @@ export function FinderUI({
                                         : 'inline-flex min-h-[36px] items-center rounded-lg border border-white/10 bg-white/[0.04] px-2.5 text-[12px] text-slate-400'
                                     }
                                   >
-                                    {p.tone === 'watch' ? <><span aria-hidden>📺</span>{p.label}</> : `✓ ${p.label}`}
+                                    {p.tone === 'watch' ? p.label : `✓ ${p.label}`}
                                   </span>
                                 ))}
                               </div>
@@ -529,7 +528,6 @@ export function FinderUI({
                           if (!info) return null;
                           return (
                             <div className="inline-flex items-center gap-2 rounded-lg border border-brand-400/50 bg-brand-500/15 px-2 py-1 text-xs font-bold text-white">
-                              <span aria-hidden>📺</span>
                               <span className="tabular-nums">{info.text}</span>
                             </div>
                           );
@@ -704,7 +702,7 @@ export function FinderUI({
               title="TV only: every episode of the latest season is already out — nothing left to wait on (vs. an ongoing, week-to-week release)."
               className={`rounded-lg border px-3 py-1.5 text-sm transition ${q.bingeableOnly ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
             >
-              {q.bingeableOnly ? '✓ ' : ''}📺 All episodes out
+              {q.bingeableOnly ? '✓ ' : ''}All episodes out
             </button>
           )}
           <button

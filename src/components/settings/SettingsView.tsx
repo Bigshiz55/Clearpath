@@ -13,6 +13,7 @@ import { useToast } from '@/components/Toast';
 import { STREAMING_SERVICES, LIVE_TV_PROVIDERS } from '@/lib/services';
 import { EnableNotifications } from '@/components/EnableNotifications';
 import { TrailerAutoplayToggle } from '@/components/trailer/TrailerAutoplayToggle';
+import { ProviderChip } from '@/components/media/ProviderChip';
 
 export interface ShareRow {
   token: string;
@@ -361,8 +362,7 @@ export function SettingsView(props: {
                   : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10'
               }`}
             >
-              {s.emoji && <span aria-hidden>{s.emoji}</span>}
-              {s.name}
+              <ProviderChip data={{ name: s.name, providerId: s.id }} withLabel />
               {services.has(s.id) && <span className="text-xs font-bold text-emerald-300">✓</span>}
             </button>
           ))}

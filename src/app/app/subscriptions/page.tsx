@@ -84,7 +84,6 @@ export default async function SubscriptionsPage() {
               const b = BADGE[s.verdict];
               return (
                 <div key={s.id} className="card flex items-center gap-3 p-4">
-                  <span className="text-2xl" aria-hidden>{s.emoji}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-white">{s.name}</span>

@@ -15,6 +15,7 @@ import {
   type CanonicalRequest,
   type Chip,
 } from '@/lib/nlu/conversationState';
+import { ProviderNameList } from '@/components/media/ProviderChip';
 
 /** sessionStorage key for conversation persistence across rerenders/refreshes. */
 const CONV_STORE_KEY = 'wv-judge-conversation-v1';
@@ -349,7 +350,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
                               {it.reason && <ReasonText text={it.reason} className="mt-1.5 text-[11px] text-slate-300" />}
                               {it.where && (
                                 <div className="mt-1.5">
-                                  <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">📺 {it.where}</span>
+                                  <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300"><ProviderNameList names={[it.where]} /></span>
                                 </div>
                               )}
                             </PosterCard>

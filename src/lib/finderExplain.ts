@@ -27,6 +27,10 @@ export interface ExplainFacts {
   ratings: TileRatings;
   /** Streaming service the result is shown with (null = none listed). */
   where: string | null;
+  /** That service's VERIFIED logo path, when the provider data carried one, so
+   *  the explanation's availability row can use the site's official brand
+   *  treatment instead of a name in prose. Never guessed; null is fine. */
+  whereLogoPath?: string | null;
   /** Whether `where` is one of the user's own services. */
   onUsersService: boolean;
   /** Facts observed while the candidate passed the hard filters. */
@@ -101,7 +105,7 @@ export function buildItemExplanation(q: FinderQuery, f: ExplainFacts): VerdictEx
     requirements: checkedRequirements(q, f),
     ratingSourceCount: ratingSourceCount(f.ratings),
     availability: f.where
-      ? { where: f.where, kind: 'included', confidence: 'likely' } // TMDB-listed = likely, never "verified"
+      ? { where: f.where, kind: 'included', confidence: 'likely', logoPath: f.whereLogoPath ?? null } // TMDB-listed = likely, never "verified"
       : null,
   });
 }

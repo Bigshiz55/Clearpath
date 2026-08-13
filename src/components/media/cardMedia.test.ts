@@ -53,7 +53,7 @@ describe('topStreamingProvider — name + verified logo, identity preserved', ()
 describe('ProviderChip / NetworkChip — verified logo or clean text, no emoji', () => {
   const src = read('src/components/media/ProviderChip.tsx');
   it('builds a real TMDB logo URL when a logo path is present', () => {
-    expect(src).toMatch(/tmdbImage\(data\.logoPath/);
+    expect(src).toMatch(/tmdbImage\(brand\.logoPath/);
   });
   it('has an explicit text fallback and NO television emoji as a fallback mark', () => {
     // The only 📺 in the file is inside doc comments forbidding it, never in JSX.

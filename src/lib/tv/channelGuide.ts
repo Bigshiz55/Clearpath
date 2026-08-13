@@ -20,6 +20,8 @@ import type { Airing } from '@/lib/onTv';
 
 export interface ChannelRow {
   network: string;
+  /** The station's verified mark, when the ingest source licensed one. */
+  networkLogoUrl?: string | null;
   /** Airing covering `nowMs`, when the grid gives us enough to know. */
   onNow: Airing | null;
   /** How far through the current airing we are, 0..1. Null without a runtime. */
@@ -104,7 +106,11 @@ export function buildChannelGuide(airings: readonly Airing[], nowMs: number): Ch
       const start = startOf(onNow);
       progress = Math.min(1, Math.max(0, (nowMs - start) / (end - start)));
     }
-    rows.push({ network, onNow, progress, upNext });
+    // The logo travels with the channel, not the programme: every airing on a
+    // row is the same station, so the first one that carries a licensed mark
+    // speaks for the row. Absent stays absent — never a borrowed asset.
+    const networkLogoUrl = list.find((a) => a.networkLogoUrl)?.networkLogoUrl ?? null;
+    rows.push({ network, networkLogoUrl, onNow, progress, upNext });
   }
 
   return rows.sort((a, b) => {
