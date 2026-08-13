@@ -1,6 +1,6 @@
 # Search Validation Campaign
 
-- Commit `b9b605e` · Branch `claude/card-trailer-premium` · Seed 7
+- Commit `949b879` · Branch `claude/card-trailer-premium` · Seed 7
 - **Total searches: 2000 · Passed 2000 (100.0%) · Failed 0 (0.0%)**
 
 ## Per-dimension pass rate (of cases naming that dimension)

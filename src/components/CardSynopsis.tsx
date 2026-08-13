@@ -32,11 +32,22 @@ export function CardSynopsis({
   tmdbId,
   /** Lines before the clamp. Three on a wide row, two in a narrow grid cell. */
   lines = 3,
+  /**
+   * BROWSE CARDS PASS `false`.
+   *
+   * A browse card is for deciding; the title page is for investigating. The
+   * card needs enough synopsis to answer "what is this?", and nothing more —
+   * so on a card the text is clamped, the reserved height is fixed, and there
+   * is NO control that can grow the card vertically. The full synopsis is one
+   * tap away behind More info, which is where the long read belongs.
+   */
+  expandable = true,
   className = '',
 }: {
   mediaType: MediaType;
   tmdbId: number;
   lines?: 2 | 3;
+  expandable?: boolean;
   className?: string;
 }) {
   const [overview, setOverview] = useState<string | null>(null);
@@ -61,7 +72,8 @@ export function CardSynopsis({
   // and a control that appears only on some titles, a few hundred milliseconds
   // after paint, is the same "everything moved under my thumb" defect as text
   // arriving into no reserved space.
-  const toggleRow = 'h-[18px]';
+  // Nothing to reserve when there is no toggle at all.
+  const toggleRow = expandable ? 'h-[18px]' : 'h-0';
 
   // The placeholder mirrors the loaded structure exactly — text box AND toggle
   // row. Padding on a single box does not work here: `box-sizing: border-box`
@@ -85,13 +97,16 @@ export function CardSynopsis({
   // the estimate is deliberately conservative (~50 characters a line at the
   // card's own width at 14px, three lines).
   const clamped = lines === 2 ? 2 : 3;
-  const hasMore = overview.length > clamped * 50;
+  const hasMore = expandable && overview.length > clamped * 50;
+  // On a card the clamp is unconditional: `open` can never be set, so a long
+  // synopsis and a short one occupy exactly the same reserved box.
+  const showFull = expandable && open;
 
   return (
     <div className={className}>
       <p
         data-testid="card-synopsis"
-        className={`${open ? '' : `${reserve} ${clamped === 2 ? 'line-clamp-2' : 'line-clamp-3'}`} text-[14px] leading-relaxed text-slate-300`}
+        className={`${showFull ? '' : `${reserve} ${clamped === 2 ? 'line-clamp-2' : 'line-clamp-3'}`} text-[14px] leading-relaxed text-slate-300`}
       >
         {overview}
       </p>

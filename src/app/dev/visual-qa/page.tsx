@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { Nav } from '@/components/Nav';
 import { PosterCard } from '@/components/PosterCard';
 import { RatingsStrip } from '@/components/RatingsStrip';
+import { AlgorithmScore } from '@/components/AlgorithmScore';
 import { DocketTray } from '@/components/DocketTray';
 
 /**
@@ -42,6 +43,19 @@ export default function VisualQaHarness() {
             mediaType="movie"
             tmdbId={999}
           />
+        </section>
+
+        {/* THE RATINGS ROW AT CARD WIDTH.
+            The browse card no longer carries source ratings — they are evidence
+            and moved to the title page — but `AlgorithmScore` still renders
+            them inside a grid-column-width card on WatchNowGrid, ReleaseWall
+            and RecommendationSlate. That narrow column is where a rating clips,
+            truncates to "IMDb 6", or wraps onto a second line, so the
+            guarantees against all three are measured HERE now rather than
+            against a full-width strip that has room to spare and proves
+            nothing. 280px is `.poster-grid`'s own minimum column. */}
+        <section data-testid="qa-ratings-card" className="card mb-6 w-[280px] p-3">
+          <AlgorithmScore compact mediaType="movie" tmdbId={998} title="Ratings At Card Width" year={2024} />
         </section>
 
         <section aria-label="poster grid" className="poster-grid" data-testid="qa-grid">

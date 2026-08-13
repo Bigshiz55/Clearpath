@@ -19,6 +19,16 @@ export function AlgorithmScore({
   year,
   objectiveScore = null,
   compact = false,
+  /**
+   * THE SOURCE RATINGS ARE EVIDENCE, AND EVIDENCE IS FOR THE TITLE PAGE.
+   *
+   * Rotten Tomatoes, the audience score and IMDb are what you read to AUDIT
+   * the Verd1ct; the Verd1ct is what you read to DECIDE. A browse card is for
+   * deciding, so it carries the score and the call and sends the sources one
+   * tap down, behind More info. Every surface whose job IS the evidence — the
+   * title page, the ruling, the comparison views — leaves this on.
+   */
+  showRatings = true,
   className = '',
 }: {
   mediaType: MediaType;
@@ -28,6 +38,7 @@ export function AlgorithmScore({
   objectiveScore?: number | null;
   /** Row cards are height-constrained: smaller badge, tighter box, one line. */
   compact?: boolean;
+  showRatings?: boolean;
   className?: string;
 }) {
   const [dna, setDna] = useState<DnaClientResult | null>(null);
@@ -109,7 +120,9 @@ export function AlgorithmScore({
         </div>
 
         {/* The source ratings that feed the score. */}
-        <CardRatings mediaType={mediaType} tmdbId={tmdbId} title={title} year={year} hideCall className="wv-score-ratings" />
+        {showRatings && (
+          <CardRatings mediaType={mediaType} tmdbId={tmdbId} title={title} year={year} hideCall className="wv-score-ratings" />
+        )}
       </div>
     </div>
   );

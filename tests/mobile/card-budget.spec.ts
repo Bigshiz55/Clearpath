@@ -95,6 +95,62 @@ test('More info is present, a real target, and points at the title page', async 
   await expect(more).toHaveAttribute('href', /\/app\/title\/(movie|tv)\/\d+/);
 });
 
+/**
+ * THE HARD GEOMETRY CONTRACT.
+ *
+ * The browse card is for deciding; the title page is for investigating. That
+ * only holds if the card cannot GROW — every block it carries is bounded, and
+ * nothing on it opens into more card. These measure the card's outer box under
+ * each condition the content could vary.
+ */
+test('no child on a browse card can grow it', async ({ page }) => {
+  await open(page, 1440, 900);
+  // The controls that used to expand the card in place are gone from it: the
+  // synopsis "More", and the reason stack's "Why?".
+  await expect(page.getByTestId('qa-grid').getByTestId('synopsis-more')).toHaveCount(0);
+  await expect(page.getByTestId('qa-grid').getByTestId('why-expand')).toHaveCount(0);
+  // And the detailed source ratings, which are evidence for the title page.
+  await expect(page.getByTestId('qa-grid').locator('.wv-ratings-row')).toHaveCount(0);
+
+  // Whatever IS still interactive inside a card must leave its height alone.
+  const before = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="qa-grid"] > .card')].map((c) =>
+      Math.round(c.getBoundingClientRect().height),
+    ),
+  );
+  const controls = page.getByTestId('qa-grid').locator('.card button, .card [aria-expanded]');
+  const n = Math.min(await controls.count(), 12);
+  for (let i = 0; i < n; i++) {
+    const c = controls.nth(i);
+    // Skip anything that navigates or opens a full-screen surface.
+    if (await c.isVisible()) await c.click({ trial: true }).catch(() => {});
+  }
+  const after = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="qa-grid"] > .card')].map((c) =>
+      Math.round(c.getBoundingClientRect().height),
+    ),
+  );
+  expect(after, 'a control inside a card changed its height').toEqual(before);
+});
+
+test('a card holds its height whatever its content turns out to be', async ({ page }) => {
+  // The fixture spans the axes that used to move the card: a one-character
+  // title beside a 60-character one, a title with a long synopsis beside one
+  // with none, and titles with and without providers.
+  for (const [w, h] of [[1440, 900], [390, 844]] as const) {
+    await open(page, w, h);
+    // Let every async block on the card land before measuring.
+    await page.waitForTimeout(1200);
+    const heights = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-testid="qa-grid"] > .card')].map((c) =>
+        Math.round(c.getBoundingClientRect().height),
+      ),
+    );
+    const spread = Math.max(...heights) - Math.min(...heights);
+    expect(spread, `card heights at ${w} spread ${spread}px: ${heights.join(' / ')}`).toBeLessThanOrEqual(1);
+  }
+});
+
 test('the grid never scrolls sideways at any width', async ({ page }) => {
   for (const [w, h] of [[1440, 900], [1280, 800], [834, 1112], [390, 844]] as const) {
     await open(page, w, h);

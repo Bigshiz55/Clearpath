@@ -27,9 +27,11 @@ import type { MediaType } from '@/lib/types';
  * ── WHAT IT IS NOW ────────────────────────────────────────────────────────
  * The REAL card. `PosterCard` — the same component `/app`, search, the finder,
  * Packs and the release wall all render — with the same children it always
- * carries: `CardFacts`, `CardSynopsis`, `AlgorithmScore` (Verd1ct badge, call
- * and ratings), `WhyThisTitle`, `CardFit`, and `WhereToWatch` with its
- * `ProviderLogos` strip. The "Why this Verd1ct?" panel (`WhyVerdict`) goes in
+ * carries: `CardFacts`, `CardSynopsis` (short and fixed — no "More" on a
+ * browse card), `AlgorithmScore` (the Verd1ct badge and the call; the source
+ * ratings are evidence and live on the title page now), `WhyThisTitle` in its
+ * one-reason `compact` form, and `WhereToWatch` with its `ProviderLogos`
+ * strip. The "Why this Verd1ct?" panel (`WhyVerdict`) goes in
  * the card's own `evidence` slot, exactly as `FinderUI` does it, and carries
  * why-watch ("Why it matched") and watch-out ("Things to know" / "Remaining
  * uncertainty"). There is no landing-only card markup left in this file.
@@ -43,7 +45,6 @@ import type { MediaType } from '@/lib/types';
  * no Taste DNA, so `/api/dna` answers `{ dna: null }`, and:
  *   • `AlgorithmScore` labels itself "WatchVerd1ct" instead of "Your VERD1CT"
  *     and shows the general quality number we pass as `objectiveScore`;
- *   • `CardFit` renders nothing at all rather than a disclaimer;
  *   • `WhyThisTitle` produces no "your preferences" reason, because
  *     `buildWhyReasons` will not make a claim about a viewer it knows nothing
  *     about;

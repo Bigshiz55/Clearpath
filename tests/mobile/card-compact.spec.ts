@@ -30,6 +30,14 @@ async function open(page: Page, w = 390, ratings: Record<string, unknown> = FULL
 
 const card = (page: Page) => page.getByTestId('qa-grid').locator('> div').first();
 const panel = (page: Page) => card(page).locator('.wv-score').first();
+// THE SOURCE RATINGS LEFT THE BROWSE CARD. They are evidence — what you read
+// to AUDIT the Verd1ct rather than to make a decision — and they now live on
+// the title page, behind More info. `AlgorithmScore` still renders them inside
+// a grid-column-width card on WatchNowGrid, ReleaseWall and
+// RecommendationSlate, and the harness renders exactly that at 280px, so every
+// guarantee below (no dash, nothing clipped, constant height) is measured
+// where the constraint is real instead of where the row no longer exists.
+const ratingsCard = (page: Page) => page.getByTestId('qa-ratings-card');
 
 test.describe('the verdict panel', () => {
   test('is a dark panel with a pink edge, not a pink block', async ({ page }) => {
@@ -47,17 +55,20 @@ test.describe('the verdict panel', () => {
     expect(s.ring).toMatch(/255,\s*20,\s*147/);
   });
 
-  test('holds the score, the call and the ratings without a wasted row', async ({ page }) => {
+  test('holds the score and the call without a wasted row', async ({ page }) => {
     await open(page);
     const h = (await panel(page).boundingBox())!.height;
-    // Two rows AT MOST — badge and call, then the ratings — inside the column
-    // beside the poster. It was two stacked rows plus air, full-width, below.
+    // ONE row now, not two: the browse card's panel carries the decision — the
+    // number and the call — and the source ratings moved to the title page.
     expect(h, `the panel is ${Math.round(h)}px tall`).toBeLessThanOrEqual(110);
 
-    // Nothing was dropped to get there.
+    // Nothing that decides anything was dropped to get there.
     await expect(panel(page)).toContainText('81');
     await expect(panel(page)).toContainText('STREAM IT');
-    await expect(panel(page).locator('.wv-ratings-row > span')).toHaveCount(3);
+    // And the evidence is genuinely gone from the card rather than hidden.
+    await expect(panel(page).locator('.wv-ratings-row')).toHaveCount(0);
+    // It is still rendered where a card-width column really does carry it.
+    await expect(ratingsCard(page).locator('.wv-ratings-row > span')).toHaveCount(3);
   });
 
   test('sits beside the artwork, where the eye already is', async ({ page }) => {
@@ -86,24 +97,24 @@ test.describe('the verdict panel', () => {
 test.describe('an unavailable rating is not drawn as a dash', () => {
   test('a source we do not hold simply is not there', async ({ page }) => {
     await open(page, 390, { standardScore: 81, imdb: 7.8 });
-    const chips = card(page).locator('.wv-ratings-row > span');
+    const chips = ratingsCard(page).locator('.wv-ratings-row > span');
     await expect(chips).toHaveCount(1);
     await expect(chips.first()).toContainText('7.8');
-    expect(await card(page).innerText(), 'a placeholder dash is back').not.toContain('–');
+    expect(await ratingsCard(page).innerText(), 'a placeholder dash is back').not.toContain('–');
   });
 
   test('holding none of them is stated in words, once', async ({ page }) => {
     await open(page, 390, { standardScore: 81 });
-    await expect(card(page).getByTestId('ratings-none')).toBeVisible();
-    await expect(card(page).getByTestId('ratings-none')).toContainText(/not available/i);
-    expect(await card(page).innerText()).not.toContain('–');
+    await expect(ratingsCard(page).getByTestId('ratings-none')).toBeVisible();
+    await expect(ratingsCard(page).getByTestId('ratings-none')).toContainText(/not available/i);
+    expect(await ratingsCard(page).innerText()).not.toContain('–');
   });
 
   test('and the row is the same height either way, so nothing moves', async ({ page }) => {
     await open(page, 390, FULL);
-    const full = (await card(page).locator('.wv-ratings-row').first().boundingBox())!.height;
+    const full = (await ratingsCard(page).locator('.wv-ratings-row').first().boundingBox())!.height;
     await open(page, 390, { standardScore: 81 });
-    const none = (await card(page).locator('.wv-ratings-row').first().boundingBox())!.height;
+    const none = (await ratingsCard(page).locator('.wv-ratings-row').first().boundingBox())!.height;
     expect(Math.round(none)).toBe(Math.round(full));
   });
 });
@@ -133,12 +144,20 @@ test.describe('why you would like it', () => {
     await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
 
-    const fit = card(page).getByTestId('card-fit');
-    await expect(fit).toBeVisible();
-    await expect(fit).toContainText('edge-of-seat tension');
-    // Shown in full — a clamped reason reads as a system that would not finish.
-    const overflow = await fit.evaluate((el) => el.scrollHeight - el.clientHeight);
-    expect(overflow).toBeLessThanOrEqual(1);
+    // THE DEEPER TASTE EXPLANATION MOVED TO THE TITLE PAGE.
+    //
+    // `CardFit`'s sentence is the "why YOU, specifically" read — investigation,
+    // not decision — so the browse card no longer carries it. What survives on
+    // the card is a single grounded reason (see WhyThisTitle `compact`).
+    //
+    // The durable half of this contract is the one kept here: whatever the
+    // card says about taste must be TRUE, and it must never fall back to a
+    // disclaimer about not knowing you yet. That is asserted below and is
+    // exactly what regressed last time.
+    await expect(card(page).getByTestId('card-fit')).toHaveCount(0);
+    const text = await card(page).innerText();
+    expect(text).not.toMatch(/personalization status/i);
+    expect(text).not.toMatch(/rate a few more titles/i);
   });
 
   test('and is SILENT — not boilerplate — when there is nothing personal to say', async ({ page }) => {
@@ -152,18 +171,22 @@ test.describe('why you would like it', () => {
 });
 
 test.describe('the synopsis knows its place', () => {
-  test('stops at three lines and offers the rest', async ({ page }) => {
+  test('stops, and does not offer to grow the card', async ({ page }) => {
     await open(page);
     const syn = card(page).getByTestId('card-synopsis');
     const short = (await syn.boundingBox())!.height;
-    expect(short).toBeLessThanOrEqual(70); // three lines at 13px/relaxed
+    expect(short).toBeLessThanOrEqual(70);
 
-    const more = card(page).getByTestId('synopsis-more');
-    await expect(more).toBeVisible();
-    await more.click();
-    const long = (await syn.boundingBox())!.height;
-    expect(long, 'More opened onto nothing').toBeGreaterThan(short);
-    await expect(more).toHaveText('Less');
+    // THE "MORE" EXPANSION IS GONE FROM THE BROWSE CARD.
+    //
+    // It used to open the full synopsis in place, which is the one thing a
+    // browse card may not do: the card is for deciding and its height is a
+    // contract with the rest of the grid. A short, fixed synopsis still
+    // answers "what is this?"; the long read is behind More info, on the title
+    // page. `expandable={false}` on CardSynopsis is what enforces it.
+    await expect(card(page).getByTestId('synopsis-more')).toHaveCount(0);
+    // And the clamp holds regardless of how long the text actually is.
+    expect((await syn.boundingBox())!.height).toBe(short);
   });
 
   test('does not offer More when there is no more', async ({ page }) => {
