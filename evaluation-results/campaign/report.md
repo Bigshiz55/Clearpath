@@ -1,6 +1,6 @@
 # Search Validation Campaign
 
-- Commit `12fd137` · Branch `claude/hotfix-provider-chip-crash` · Seed 7
+- Commit `29fe520` · Seed 7
 - **Total searches: 2000 · Passed 2000 (100.0%) · Failed 0 (0.0%)**
 
 ## Per-dimension pass rate (of cases naming that dimension)

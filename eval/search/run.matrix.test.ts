@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeEvaluationArtifact, evaluatedCommit } from '../runner/artifacts';
 import { join } from 'node:path';
 import { classifySearch } from '@/lib/nlu/searchMode';
 import { isExactTitle, titleMatchTier } from '@/lib/nlu/titleNormalize';
@@ -55,7 +54,6 @@ function generate(n: number, seed: number): Case[] {
   return out;
 }
 
-function gitOr(cmd: string, fb: string) { try { return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return fb; } }
 
 describe(`search matrix (${N} cases)`, () => {
   const cases = generate(N, SEED);
@@ -78,15 +76,14 @@ describe(`search matrix (${N} cases)`, () => {
 
   const passed = results.filter((r) => r.ok).length;
 
-  it('writes the stamped matrix report', () => {
-    const sha = gitOr('git rev-parse --short HEAD', 'dev');
+  it('produces the matrix report (written only on an explicit refresh)', () => {
+    const sha = evaluatedCommit();
     const L = ['# Title+Provider Search Matrix', '', `- Commit \`${sha}\` · Seed ${SEED} · **${passed}/${N} (${((passed / N) * 100).toFixed(1)}%)**`, ''];
     L.push('## Sample failures (first 20)', '');
     for (const r of results.filter((x) => !x.ok).slice(0, 20)) L.push(`- ❌ \`${r.prompt}\` → ${r.fails.join('; ')}`);
     if (passed === N) L.push('None — every case classified, extracted and guarded correctly.');
-    const dir = join(process.cwd(), 'evaluation-results', 'search-matrix');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'report.md'), L.join('\n'), 'utf8');
+    expect(L.length).toBeGreaterThan(0);
+    writeEvaluationArtifact('search-matrix', 'report.md', L.join('\n'));
     // eslint-disable-next-line no-console
     console.log(`\nSEARCH MATRIX [${sha}] ${N} cases — ${((passed / N) * 100).toFixed(1)}% pass\n`);
     expect(results.length).toBe(N);

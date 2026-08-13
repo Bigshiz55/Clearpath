@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeEvaluationArtifact, evaluatedCommit } from '../runner/artifacts';
 import { join } from 'node:path';
 import { buildSearchQa } from '@/lib/searchQa';
 
@@ -49,13 +48,12 @@ const DECOMPOSITION: Record<string, { transfer: string[]; replace: string[]; not
   },
 };
 
-function gitOr(cmd: string, fb: string) { try { return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return fb; } }
 
 describe('§3/§5 difficult-search offline inspection', () => {
   const views = QUERIES.map((q) => ({ q, v: buildSearchQa(q) }));
 
-  it('writes the stamped difficult-search report', () => {
-    const sha = gitOr('git rev-parse --short HEAD', 'dev');
+  it('produces the difficult-search report (written only on an explicit refresh)', () => {
+    const sha = evaluatedCommit();
     const L: string[] = ['# Difficult-Search Inspection (offline)', '', `- Commit \`${sha}\` · ${QUERIES.length} queries`,
       '- Parse-level fields are verified here; candidate counts / final titles / per-constraint metadata evidence are **LIVE-only** and require a TMDB key (see eval/live/audit.mjs).', ''];
     for (const { q, v } of views) {
@@ -76,9 +74,8 @@ describe('§3/§5 difficult-search offline inspection', () => {
       }
       L.push('');
     }
-    const dir = join(process.cwd(), 'evaluation-results', 'difficult');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'report.md'), L.join('\n'), 'utf8');
+    expect(L.length).toBeGreaterThan(0);
+    writeEvaluationArtifact('difficult', 'report.md', L.join('\n'));
     expect(views.length).toBe(QUERIES.length);
   });
 

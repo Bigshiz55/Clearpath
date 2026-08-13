@@ -48,6 +48,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx vitest run
+      # AN ORDINARY TEST RUN IS READ-ONLY. The evaluation suites used to write
+      # eight tracked files in evaluation-results/ on every invocation, stamped
+      # with whichever branch happened to execute them — meaningless diffs,
+      # rebase conflicts in shared evidence, and false provenance (main was
+      # left naming a deleted branch). Regeneration is now explicit
+      # (`npm run eval:refresh`). This fails the build if that ever regresses.
+      # The arch guard in eval/runner/artifacts.arch.test.ts catches it at the
+      # source; this catches it at the outcome, including any writer it cannot
+      # see statically.
+      - name: evaluation evidence is unchanged by an ordinary test run
+        run: git diff --exit-code -- evaluation-results
 
   build:
     runs-on: ubuntu-latest
