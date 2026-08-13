@@ -146,6 +146,16 @@ unblocks.
   left-2 bottom-…`, 44×44, sits on top of body copy on the Showdown results
   screen at 390px. Untouched by any recent work and product-wide, so it needs
   its own fix (a scroll-aware offset, or a safe gutter on long pages).
+- **`evaluation-results/*` are re-stamped by every `vitest run`, so they show up
+  as spurious diffs on every branch.** The scores never move (17/17, 3000/3000,
+  23/23) — only the `sha`/`branch` provenance lines do, which means any branch
+  that runs the unit suite dirties eight tracked files with its own name. It
+  already produced one avoidable conflict during the card-redesign rebase, and
+  `main` now carries a stamp naming a branch that has been deleted. Either stop
+  writing the stamp on a plain `vitest run` (write it only when an eval campaign
+  is deliberately re-run), or move the stamped summaries out of version control
+  and keep the scores alone under it. Evidence should be committed on purpose,
+  not as a side effect of running tests.
 - **Decide whether the card perimeter survives at all (owner call).** The work
   order asked whether every card needs a bright full perimeter. Audited: the
   halo is gone and the border dropped from 55% saturated brand blue to a quiet
