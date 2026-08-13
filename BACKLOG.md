@@ -18,8 +18,9 @@ Updated at the end of every work order per the Working Agreement in
   with a structural — never title-specific — mechanism.
   **GC11** measured the request path and fixed three real defects (identity
   resolved twice per anchor, serial anchor resolution, and `loadPreferenceCached`
-  having zero callers). Ledger: `docs/CRITIC-SHIP.md`. Next gate is GC12 (full
-  gates + merge recommendation).
+  having zero callers), and **GC12** merged `main` @ `ae25f6f` cleanly, audited
+  the diff for rollback, and re-ran every gate green. **PR is open against
+  `main`, not merged** — awaiting your review. Ledger: `docs/CRITIC-SHIP.md`.
 
 **Action needed from you:** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the

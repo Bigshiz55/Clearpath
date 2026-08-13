@@ -5,14 +5,14 @@ sessions: read this, execute **NEXT ACTION**.
 
 CURRENT SHA: `0470cf1a9d77ef098ea29a6977bf8a080b6c943f`
 BRANCH: `claude/critic-layer`, cut from `main` @ 6080287.
-NEXT ACTION: GC12 — full gates + merge recommendation.
+NEXT ACTION: none — GC1–GC12 complete. PR is open against `main`, awaiting
+owner review. Do not merge without explicit approval.
 
-STATE: GC1–GC11 complete (250 critic tests). A comparative Ask parses the relation and both
+STATE: GC1–GC12 complete (250 critic tests), merged with `main` @ ae25f6f. A comparative Ask parses the relation and both
 anchors, resolves each identity through GC2, hydrates canonical fingerprints,
 builds a GC4 plan, issues recall-safe GC5 strands, orders the real response by
 `decisionScore = matchScore + planNudge`, and explains the winner from that same
-contribution arithmetic, within a measured round-trip budget. Remaining: GC12
-(full gates + merge recommendation).
+contribution arithmetic, within a measured round-trip budget.
 
 ---
 
@@ -112,7 +112,97 @@ narrower than "teach the explainer about anchors": it is (a) populate
 - [x] **GC9** Counterfactual suite: anchors / DNA / relationship / modifiers / context each causal — **COMPLETE**
 - [x] **GC10** Exact-query regression for `Better than Furious or Widows Bay` (structural, not hardcoded titles) — **COMPLETE**
 - [x] **GC11** Latency budget + caching — **COMPLETE, red-then-green**
-- [ ] **GC12** Full gates + merge recommendation
+- [x] **GC12** Full gates + merge recommendation — **COMPLETE. Recommendation:
+      MERGE.** PR open against `main`; not merged.
+
+---
+
+## GC12 — COMPLETE · full gates + merge recommendation
+
+### Integration
+
+`origin/main` verified at execution time as **`ae25f6f`** (9 commits ahead of
+this branch's base `6080287`: the landing Example Verd1ct, the canonical
+provider-brand registry, and verified brand marks). Integrated by **merge**
+(`git merge origin/main`) rather than rebase, so the red-then-green history each
+gate rests on stays intact and auditable.
+
+**Conflicts: none.** Git auto-merged the two files both sides touched —
+`verdictExplain.ts` and `WhyVerdict.tsx` — because main's changes were to the
+`availability` shape and this branch's were the separate `comparison` field.
+
+### Rollback audit
+
+Four files differ from `origin/main`, and every difference was inspected line by
+line. **All 27 deletions are this branch's own intentional work; none removes
+anything main added.**
+
+| file | delta | verdict |
+|---|---|---|
+| `WhyVerdict.tsx` | +`comparison` field, +FOR THIS REQUEST block | pure addition — main's `ProviderChip` availability row intact |
+| `verdictExplain.ts` | +`comparison` field | pure addition — main's `service`/`logoPath`/`access` shape intact |
+| `finder.ts` | +`minVotes`, one default expression widened | additive; unset behaves exactly as before |
+| `BACKLOG.md` | critic entries | main's brand-registry entry preserved |
+
+Remaining deletions, each accounted for: the old `searchTitles(name)[0]` block
+(replaced by GC2 resolution + GC11's keyword split), the `anthropic` guard line
+(GC1-correction added `!criticRequest`), the `lex` declaration and its comment
+(moved to 0.6, above the AI orchestrator), the `minVotes` default, and
+`rank.ts`'s options/`finalScore` lines (GC8's critic term).
+
+**One accidental rollback WAS found and fixed.** `evaluation-results/*` — eval
+evidence belonging to the DNA-showdown workstream — had been picked up by the
+GC2–GC4 commits as auto-regenerated copies, rewriting main's recorded SHAs with
+this branch's. Pass counts were unchanged, but the branch had no business
+rewriting another workstream's evidence. Restored to main's version verbatim.
+
+**The frozen search corpus was never touched.** `artifacts/search-audit/` is
+byte-identical to `main`, and `search-corpus-1000.json` still hashes to
+`32fbe023…11002`, matching its recorded `.sha256`.
+
+### Final gate run, on the merged tree
+
+| gate | exit | result |
+|---|---|---|
+| GC1 | 0 | 31 passed |
+| GC2 anchor identity | 0 | 19 passed |
+| GC3 hydration | 0 | 15 passed |
+| GC4 plan | 0 | 20 passed |
+| GC5 retrieval | 0 | 17 passed |
+| GC6 | 0 | 22 passed |
+| GC6 double-count audit | 0 | 5 passed |
+| GC7 | 0 | 27 passed |
+| GC8 material dependence | 0 | 8 passed |
+| GC9 counterfactual causality | 0 | 30 passed |
+| GC10 exact-query regression | 0 | 21 passed |
+| GC11 latency + caching | 0 | 14 passed |
+| serving-mode (GC1 correction) | 0 | 14 passed |
+| production wiring | 0 | 7 passed |
+| **all critic** | 0 | **250 passed** |
+| `npx vitest run` | 0 | 3499 passed, 24 skipped, **0 failed** |
+| `npm run typecheck` | 0 | clean |
+| `npm run lint` | 0 | no warnings or errors |
+| `npm run build` | 0 | clean |
+| searchrouting Playwright | 0 | 21 passed |
+| frozen corpus | 0 | P0 **635/635** · P1 **515/515** |
+
+**Frozen delta: 0 PASS→FAIL, 0 FAIL→PASS.**
+
+### Merge recommendation: **YES**
+
+The incident that opened this workstream is closed at the mechanism, not the
+symptom. `Better than Furious or Widows Bay` now keeps its relation, resolves
+both anchors independently against decoy-first candidates, hydrates them from
+the canonical cache, reasons about them with the user's own taste, retrieves
+without letting a critic guess become a filter, orders the real `/api/ask`
+response, and explains the winner from the same arithmetic that produced it —
+without ever claiming the user liked a title merely because they named it.
+
+Known limits, recorded rather than hidden: the `preference_rules` ↔ canonical
+DNA overlap is bounded (±10) rather than eliminated and needs a separate
+migration; `rankWithPreference` is now dead production code awaiting a
+deliberate decision; and GC11 measured round-trip structure, not real TMDB
+latency, which wants sampling once deployed. None blocks merge.
 
 ---
 
