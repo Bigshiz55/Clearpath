@@ -37,6 +37,8 @@
  * PURE. No I/O, no clock, no randomness.
  */
 
+import { stripRequestFrame } from '@/lib/nlu/requestFrame';
+
 export type ClauseRole = 'request' | 'taste' | 'companion' | 'constraint' | 'background';
 
 export interface Clause {
@@ -73,8 +75,20 @@ export function splitClauses(raw: string): string[] {
  * background clause to the thing being executed and hands its genre words to
  * the engine — which is the precise leak this whole layer exists to stop.
  */
+/* THE FOUR AMBIGUOUS VERBS ARE NOT IN THE LEADING ALTERNATIVE.
+   "find", "show", "give" and "get" open requests and they open FILMS — the
+   unrestricted leading form read "Get Out" as an order. They are still matched
+   below when an object follows ("find ME"), and `stripRequestFrame` above
+   already accepts the other legitimate shapes ("find 3 …", "show some …"),
+   which is exactly the division of labour: the primitive knows which framings
+   are real, this file decides what a framed clause is for.
+
+   "put on" and "play" stay: they carry the same title risk ("Play Misty for
+   Me") and that risk is PRE-EXISTING here, so removing them would trade a
+   named regression for an unnamed one. Narrowing them belongs in its own
+   change, judged on its own evidence. */
 const REQUEST_VERB =
-  /^\s*(?:please\s+|just\s+|maybe\s+|ok(?:ay)?,?\s+)*(?:find|show|give|get|recommend|suggest|pull up|put on|queue up|play|hit me with)\b|\b(?:find|show|give|recommend|suggest|get)\s+(?:me|us)\b|\bi(?:'|’)?m looking for\b|\blooking for\b|\bi want\b|\bi'?d like\b|\bi would like\b|\bi wanna\b|\bwhat should (?:i|we) watch\b|\bwhat to watch\b|\bin the mood for\b|\bfeel like watching\b|\bsurprise me\b|\bhelp me (?:find|pick|choose)\b|\bany (?:good|recommendations?)\b/i;
+  /^\s*(?:please\s+|just\s+|maybe\s+|ok(?:ay)?,?\s+)*(?:recommend|suggest|pull up|put on|queue up|play|hit me with)\b|\b(?:find|show|give|recommend|suggest|get)\s+(?:me|us)\b|\bi(?:'|’)?m looking for\b|\blooking for\b|\bi want\b|\bi'?d like\b|\bi would like\b|\bi wanna\b|\bwhat should (?:i|we) watch\b|\bwhat to watch\b|\bin the mood for\b|\bfeel like watching\b|\bsurprise me\b|\bhelp me (?:find|pick|choose)\b|\bany (?:good|recommendations?)\b/i;
 
 /** The kind of thing one asks to be shown several of. */
 const MEDIA_NOUN =
@@ -82,6 +96,10 @@ const MEDIA_NOUN =
 
 /** A bare count leading a media noun: "3 Stallone movies". */
 const COUNT_LED = /^\s*(?:\d+|a couple of|a few|one|two|three|four|five|six|seven|eight|nine|ten)\b/i;
+
+/** A media noun handed to a credit cue: "movies directed by …", "films with …". */
+const MEDIA_PERSON_REQUEST =
+  /^\s*(?:movies?|films?|shows?|series)\s+(?:with|starring|featuring|directed\s+by|written\s+by|created\s+by|by|from)\b/i;
 
 /** "Something funny", "anything but horror" — a description standing in for a request. */
 const LEADING_SOMETHING = /^\s*(?:something|anything)\b/i;
@@ -119,8 +137,25 @@ export function classifyClause(text: string): ClauseRole {
   if (COMPANION.test(t)) return 'companion';
 
   const media = MEDIA_NOUN.test(t);
+  /* THE LEXICAL FRAME IS CONSUMED, NOT RE-DERIVED.
+     `stripRequestFrame` already owns the question "did this sentence carry
+     request scaffolding" — the lead phrases, the count forms, the
+     personalization tail, and the discipline that keeps "Get Out" and "A Few
+     Good Men" from looking like orders. Asking it is how this layer inherits
+     that work instead of growing a second, divergent copy of it.
+
+     Measured before this call existed: "how about a Bruce Willis movie" came
+     back `statement` with no person at all, because `REQUEST_VERB` has no
+     "how about". The lexical layer had the answer and nothing asked it. */
+  if (stripRequestFrame(t).stripped) return 'request';
   if (REQUEST_VERB.test(t)) return 'request';
   if (LEADING_SOMETHING.test(t)) return 'request';
+  /* "movies directed by Christopher Nolan" — a media noun handed straight to a
+     credit cue. No imperative, and unmistakably a request. This is a SEMANTIC
+     judgement about clause role, so it lives here rather than in the lexical
+     primitive: `requestFrame` may say what framing a sentence wears, never what
+     the sentence is for. */
+  if (MEDIA_PERSON_REQUEST.test(t)) return 'request';
   // A count only makes a request when it is counting the thing being asked for.
   // "I watched 3 movies yesterday" is past tense about the user, not an order.
   if (COUNT_LED.test(t) && media && !REACTION.test(t) && !FAMILIARITY.test(t) && !PAST_TENSE.test(t)) {
