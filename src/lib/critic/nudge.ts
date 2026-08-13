@@ -54,6 +54,35 @@ export const CRITIC_NUDGE_MAX = 10;
 /** Fewer shared axes than this and the comparison is noise, not a reading. */
 const MIN_SHARED_AXES = 2;
 
+/**
+ * ONE AXIS'S SHARE OF THE NUDGE — the explanation's only source of truth.
+ *
+ * GC7 must explain the ranking it actually got, so this is a DECOMPOSITION of
+ * `planNudge`'s arithmetic rather than a second, approximate reconstruction:
+ * the `points` across contributions sum to the nudge (before clamping). A
+ * separate explanation calculation would be free to drift from the ranking it
+ * claims to describe, which is the failure mode that makes a grounded
+ * explanation unfalsifiable.
+ */
+export interface CriticAxisContribution {
+  axis: string;
+  kind: 'preserve' | 'improve' | 'avoid';
+  /** What the candidate actually is on this axis, 0..100. */
+  candidateValue: number;
+  /** What the plan asked for, 0..100. */
+  target: number;
+  /** Where the ANCHORS sit on this axis, when they expressed anything. */
+  anchorValue?: number;
+  /** The instruction's weight, 0..1. */
+  strength: number;
+  /** WHICH FACTS produced the instruction. This governs the wording. */
+  evidence: Provenance[];
+  /** −1 (as far from target as possible) .. +1 (exactly on it). */
+  agreement: number;
+  /** Signed points this axis contributed. Sums to `nudge`. */
+  points: number;
+}
+
 export interface CriticContribution {
   /** Bounded points added to the candidate's score. */
   nudge: number;
@@ -61,9 +90,11 @@ export interface CriticContribution {
   distance: number;
   /** Axes that actually took part — the attribution trail. */
   axes: string[];
+  /** Per-axis decomposition of `nudge`. Empty for the legacy centroid path. */
+  contributions: CriticAxisContribution[];
 }
 
-const INERT: CriticContribution = { nudge: 0, distance: 0, axes: [] };
+const INERT: CriticContribution = { nudge: 0, distance: 0, axes: [], contributions: [] };
 
 /** The anchors' shared position: per-axis mean over anchors that assert it. */
 export function anchorCentroid(objective: CriticObjective): TitleDimensions {
@@ -136,6 +167,10 @@ export function criticNudge(
     nudge: Math.max(-CRITIC_NUDGE_MAX, Math.min(CRITIC_NUDGE_MAX, direction * CRITIC_NUDGE_MAX * authority)),
     distance,
     axes,
+    /* The legacy centroid path has no per-axis instructions to decompose — it
+       measures undirected distance. Empty rather than fabricated, so an
+       explanation built from this path says nothing instead of guessing. */
+    contributions: [],
   };
 }
 
@@ -158,7 +193,7 @@ export function criticNudge(
 // authority, inert when there is nothing to say, and reporting which axes moved.
 // ───────────────────────────────────────────────────────────────────────────
 
-import type { CriticPlan } from './plan';
+import type { CriticPlan, Provenance } from './plan';
 
 export function planNudge(
   candidate: { dims?: TitleDimensions },
@@ -170,6 +205,7 @@ export function planNudge(
 
   const cand = candidate.dims as Record<string, number | undefined>;
   const axes: string[] = [];
+  const parts: { ins: (typeof plan.instructions)[number]; value: number; agreement: number }[] = [];
   let weighted = 0;
   let mass = 0;
 
@@ -186,10 +222,12 @@ export function planNudge(
     const agreement = 1 - (2 * Math.abs(v - ins.target)) / 100;
     weighted += agreement * ins.strength;
     mass += ins.strength;
+    parts.push({ ins, value: v, agreement });
   }
 
   if (mass <= 0) return INERT;
   const score = weighted / mass; // -1 .. +1
+  const scale = (CRITIC_NUDGE_MAX * authority) / mass;
 
   return {
     nudge: Math.max(
@@ -198,5 +236,20 @@ export function planNudge(
     ),
     distance: (1 - score) / 2,
     axes,
+    /* THE SAME ARITHMETIC, SPLIT PER AXIS. `agreement * strength * scale` is
+       literally the term this axis added to `weighted / mass * MAX * authority`,
+       so these points sum to `nudge` whenever the clamp does not bite. GC7
+       explains from these and nothing else. */
+    contributions: parts.map(({ ins, value, agreement }) => ({
+      axis: ins.axis,
+      kind: ins.kind,
+      candidateValue: value,
+      target: ins.target,
+      anchorValue: ins.anchorValue,
+      strength: ins.strength,
+      evidence: [...ins.evidence],
+      agreement,
+      points: agreement * ins.strength * scale,
+    })),
   };
 }

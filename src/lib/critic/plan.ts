@@ -65,6 +65,17 @@ export interface TraitInstruction {
   strength: number;
   /** Which facts produced this instruction. */
   evidence: Provenance[];
+  /**
+   * WHERE THE ANCHORS ACTUALLY SIT on this axis (their mean), when they said
+   * anything at all.
+   *
+   * Distinct from `target`, which is where we want the CANDIDATE to end up.
+   * Explanation copy needs the anchor's own value to make an anchor claim
+   * truthfully: "drops the high humour of X" is a statement about X, and
+   * deriving it from the target or the candidate produces a confident sentence
+   * about the wrong title.
+   */
+  anchorValue?: number;
 }
 
 export interface CriticPlan {
@@ -135,6 +146,7 @@ export function buildPlan(input: PlanInput): CriticPlan {
         target: modifier === 'higher' ? Math.min(100, from + 30) : Math.max(0, from - 30),
         strength: REQUEST_STRENGTH,
         evidence: anchor ? ['request', 'anchor'] : ['request'],
+        anchorValue: anchor?.mean,
       });
       continue;
     }
@@ -152,6 +164,7 @@ export function buildPlan(input: PlanInput): CriticPlan {
         target: belief!.pref,
         strength: Math.min(1, belief!.confidence),
         evidence: ['anchor', 'user_dna'],
+        anchorValue: anchor.mean,
       });
       continue;
     }
@@ -172,6 +185,7 @@ export function buildPlan(input: PlanInput): CriticPlan {
           target: anchor.mean,
           strength: Math.min(1, belief!.confidence),
           evidence: ['anchor', 'user_dna'],
+          anchorValue: anchor.mean,
         });
       } else {
         /* CONFLICT — the anchor leans one way and the user's mature taste the
@@ -187,6 +201,7 @@ export function buildPlan(input: PlanInput): CriticPlan {
           target: belief!.pref,
           strength: Math.min(1, belief!.confidence),
           evidence: ['anchor', 'user_dna'],
+          anchorValue: anchor.mean,
         });
       }
       continue;
@@ -203,6 +218,7 @@ export function buildPlan(input: PlanInput): CriticPlan {
         target: anchor.mean,
         strength: 0.5,
         evidence: ['anchor'],
+        anchorValue: anchor.mean,
       });
     }
   }

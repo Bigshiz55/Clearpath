@@ -5,13 +5,15 @@ Updated at the end of every work order per the Working Agreement in
 
 ## Now
 - **Critic Layer — `claude/critic-layer`.** GC8, GC1, GC2, GC3, GC4, GC5 and
-  **GC6** complete red-then-green (158 critic tests). A comparative Ask now runs
-  the full pipeline and **the CriticPlan orders the response the user gets**:
-  `decisionScore = matchScore + planNudge`, bounded ±10 and authority-scaled,
-  with the durable Match still displayed on the card. Comparative intent is
-  detected at a provider-independent boundary (`src/lib/critic/gate.ts`) so
-  meaning does not depend on `AI_DISCOVERY_MODE`. Ledger:
-  `docs/CRITIC-SHIP.md`. Next gate is GC7 (grounded explanations).
+  **GC6** and **GC7** complete red-then-green (185 critic tests). A comparative
+  Ask runs the full pipeline, **the CriticPlan orders the response the user
+  gets** (`decisionScore = matchScore + planNudge`, bounded ±10 and
+  authority-scaled, durable Match still on the card), and each item carries a
+  grounded **FOR THIS REQUEST** explanation generated from the same contribution
+  trail that produced the order. Comparative intent is detected at a
+  provider-independent boundary (`src/lib/critic/gate.ts`) so meaning does not
+  depend on `AI_DISCOVERY_MODE`. Ledger: `docs/CRITIC-SHIP.md`. Next gate is
+  GC9 (counterfactual suite).
 
 **Action needed from you:** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the

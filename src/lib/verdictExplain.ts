@@ -33,6 +33,19 @@ export interface VerdictExplanation {
   requirements: { label: string; satisfied: boolean; evidence: string }[];
   availability: { text: string; confidence: AvailabilityConfidence } | null;
   confidence: { level: ConfidenceLevel; because: string[] };
+  /**
+   * REQUEST-SPECIFIC REASON (GC7) — attached ONLY on a comparative ask, and
+   * only when the critic genuinely moved this title.
+   *
+   * Deliberately a field of its own rather than more entries in `rose`: every
+   * other part of this object describes the title and the user's DURABLE taste,
+   * and lives as long as they do. This describes one sentence they typed once.
+   * Mixing the two would make a passing request look like a lasting judgment.
+   *
+   * `explainVerdict` never sets it — the Ask route attaches it after ranking,
+   * because only the ranker knows what actually moved.
+   */
+  comparison?: { heading: string; helped: string[]; cautions: string[] } | null;
 }
 
 const KIND_LABEL: Record<NonNullable<ExplainInput['availability']>['kind'], string> = {

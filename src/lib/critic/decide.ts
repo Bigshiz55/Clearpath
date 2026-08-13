@@ -49,7 +49,7 @@
  */
 
 import type { TitleDimensions } from '@/lib/scoring/dimensions';
-import { planNudge, CRITIC_NUDGE_MAX } from './nudge';
+import { planNudge, CRITIC_NUDGE_MAX, type CriticAxisContribution } from './nudge';
 import type { CriticPlan } from './plan';
 
 export interface CriticCandidate {
@@ -77,6 +77,14 @@ export interface CriticDecision {
   criticNudge: number;
   /** Which axes actually moved it. */
   criticAxes: string[];
+  /**
+   * The per-axis decomposition that PRODUCED `criticNudge`.
+   *
+   * Carried on the decision so GC7 explains the ranking that actually happened
+   * rather than reconstructing a plausible one from `relation + anchor names`.
+   * One arithmetic, one story.
+   */
+  contributions: CriticAxisContribution[];
   /** Whether a cached fingerprint existed for this candidate at all. */
   fingerprinted: boolean;
   /** ORDERING ONLY. Never displayed as a rating, never persisted. */
@@ -85,8 +93,25 @@ export interface CriticDecision {
 
 export interface CriticRankResult {
   decisions: CriticDecision[];
-  /** True only when the plan actually had standing to move anything. */
+  /**
+   * DID THE PLAN ACTUALLY MOVE ANYTHING?
+   *
+   * True only when at least one candidate received a NON-ZERO plan-derived
+   * contribution. Standing is not influence: a plan can be well-formed, carry
+   * instructions and hold positive authority while every candidate is missing
+   * its cached fingerprint, or while every contribution lands at exactly 0. In
+   * both cases the returned order is the incoming order, and reporting
+   * `applied: true` would let `finalRankingConsumesPlan` imply a causal
+   * influence that never occurred.
+   */
   applied: boolean;
+  /**
+   * The weaker, separate notion: the plan had STANDING to act — it exists, has
+   * instructions, and authority is positive. `eligible && !applied` is the
+   * honest description of "we were ready to reason and had nothing to reason
+   * about", which is a different fact from "there was no comparison".
+   */
+  eligible: boolean;
   authority: number;
 }
 
@@ -106,7 +131,13 @@ export function rankCriticCandidates(
 ): CriticRankResult {
   const authority = Math.max(0, Math.min(1, plan?.authority ?? 0));
 
-  const base = (c: CriticCandidate, nudge: number, axes: string[], fp: boolean): CriticDecision => ({
+  const base = (
+    c: CriticCandidate,
+    nudge: number,
+    axes: string[],
+    fp: boolean,
+    contributions: CriticAxisContribution[] = [],
+  ): CriticDecision => ({
     id: c.id,
     mediaType: c.mediaType,
     key: candidateKey(c.mediaType, c.id),
@@ -114,6 +145,7 @@ export function rankCriticCandidates(
     matchScore: c.matchScore,
     criticNudge: nudge,
     criticAxes: axes,
+    contributions,
     fingerprinted: fp,
     decisionScore: c.matchScore + nudge,
   });
@@ -121,10 +153,12 @@ export function rankCriticCandidates(
   /* NOTHING TO SAY → EXACT EXISTING BEHAVIOUR. Not "a very small nudge", not a
      re-sort that happens to agree: the incoming order is returned untouched, so
      a request with no objective is byte-identical to what shipped before. */
-  if (!plan || plan.instructions.length === 0 || authority <= 0) {
+  const eligible = !!plan && plan.instructions.length > 0 && authority > 0;
+  if (!eligible) {
     return {
       decisions: candidates.map((c) => base(c, 0, [], c.dims != null)),
       applied: false,
+      eligible: false,
       authority,
     };
   }
@@ -132,8 +166,13 @@ export function rankCriticCandidates(
   const decisions = candidates.map((c) => {
     if (!c.dims) return base(c, 0, [], false); // silent, not neutral
     const contribution = planNudge({ dims: c.dims }, plan);
-    return base(c, contribution.nudge, contribution.axes, true);
+    return base(c, contribution.nudge, contribution.axes, true, contribution.contributions);
   });
+
+  /* INFLUENCE, NOT STANDING. Measured from the contributions that actually
+     landed rather than from the plan's own paperwork. Ordering below is
+     unchanged either way — this only decides what we CLAIM happened. */
+  const applied = decisions.some((d) => d.criticNudge !== 0);
 
   /* STABLE AND DETERMINISTIC. `index` is the final tie-break so two candidates
      the critic cannot separate keep the order retrieval gave them, rather than
@@ -147,7 +186,7 @@ export function rankCriticCandidates(
     return a.index - b.index;
   });
 
-  return { decisions: withIndex.map((x) => x.d), applied: true, authority };
+  return { decisions: withIndex.map((x) => x.d), applied, eligible, authority };
 }
 
 /** The bound, re-exported so callers cannot invent a different one. */

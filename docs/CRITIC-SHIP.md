@@ -102,12 +102,198 @@ narrower than "teach the explainer about anchors": it is (a) populate
       by GC1** (contract red-then-green; strands now issued by `/api/ask`)
 - [x] **GC6** Anchors + objective reach FINAL RANKING — **COMPLETE,
       red-then-green.** Audit done first; composition is explicit.
-- [ ] **GC7** Grounded explanations — new reason kind carrying the comparison
+- [x] **GC7** Grounded comparative explanations — **COMPLETE, red-then-green**
 - [x] **GC8** Material-dependence test — **COMPLETE, red-then-green**
 - [ ] **GC9** Counterfactual suite: anchors / DNA / relationship / modifiers / context each causal
 - [ ] **GC10** Exact-query regression for `Better than Furious or Widows Bay` (structural, not hardcoded titles)
 - [ ] **GC11** Latency budget + caching
 - [ ] **GC12** Full gates + merge recommendation
+
+---
+
+## GC7 — COMPLETE (red-then-green)
+
+### Pre-GC7 correction — `applied` meant standing, not influence
+
+`rankCriticCandidates().applied` returned `true` whenever a plan existed, had
+instructions and held positive authority — **even when every candidate lacked a
+cached fingerprint, or every contribution landed at exactly 0**. In both cases
+the returned order is the incoming order, so `finalRankingConsumesPlan: true`
+asserted a causal influence that never happened.
+
+Two notions, now separate and both reported:
+
+| field | means | measured from |
+|---|---|---|
+| `eligible` | the plan had STANDING to act | plan exists · instructions > 0 · authority > 0 |
+| `applied` | the plan actually MOVED something | `decisions.some(d => d.criticNudge !== 0)` |
+
+`eligible && !applied` is the honest description of "ready to reason, nothing to
+reason about". Ordering is unchanged — this only governs what is claimed.
+Pinned by gc7 tests 0a/0b/0c.
+
+### Existing explanation path — the gap, recorded
+
+```
+runFinder  scoreCandidate
+  buildItemExplanation(q, facts)               finderExplain.ts:95
+    -> explainVerdict({ matchScore, generalScore, matchedTraits, riskTraits,
+                        requirements, ratingSourceCount, availability })
+       -> VerdictExplanation { rose, heldBack, requirements,
+                               availability, confidence }
+  FinderItem.explain = explain                 finder.ts:622
+```
+
+It is built **inside `runFinder`, before GC6 exists**. It therefore knows the
+durable Match, general quality, hard requirements, availability and the normal
+reasons for/against — and **nothing whatsoever about why a comparative request
+reordered this title**. There was no field it could have gone in.
+
+### Contribution-trace contract — one arithmetic, one story
+
+`planNudge` now returns `contributions: CriticAxisContribution[]`:
+
+```
+axis · kind · candidateValue · target · anchorValue · strength
+     · evidence[] · agreement · points
+```
+
+`points = agreement × strength × (CRITIC_NUDGE_MAX × authority / mass)` — a
+DECOMPOSITION of the ranking arithmetic, not a second calculation. gc7 test 1
+asserts `Σ points ≈ criticNudge` to 6dp. `CriticDecision` carries the trail, and
+`explain.ts` is asserted to contain no `CRITIC_NUDGE_MAX` and no agreement
+formula, so it cannot drift from the decision it describes.
+
+### Provenance → language rules
+
+| evidence | wording | why |
+|---|---|---|
+| `request` | "Moves toward more pacing — **the change you asked for**." | the only class the user stated outright; leads the section always |
+| `anchor` + `user_dna`, preserve | "Keeps Furious's high suspense, **which fits your taste**." | two facts stated as two facts |
+| `anchor` + `user_dna`, avoid | "Drops the high humour of Furious, **which tends to work against it for you**." | anchor possession + user rejection |
+| `anchor` only | "Tracks Furious closely on suspense." | no claim about the user is licensed |
+
+**FORBIDDEN, and asserted absent:** `you liked` / `you loved` / `you enjoyed` /
+`you rated` / `you watched` / `your favourite`. Naming a title in "Better than
+X" is not evidence the user liked X — wanting *better* is, if anything, mild
+evidence against it. Test 5 sweeps every relation × both DNA profiles.
+
+`better_than` never claims objective superiority (test 8: no
+`objectively better|superior|higher rated|acclaim`). Anchors are named
+collectively when several resolved, so **`blend` cannot assign a trait to one
+anchor** — `readAnchors` averages, so per-anchor ownership is not in the data.
+Unresolved anchors are never spoken of (test 18 → explanation is `null`).
+
+### RED → GREEN
+
+```
+RED    6 failed | 20 passed (26)
+GREEN  27 passed (27)
+```
+
+RED failures were production wiring (20–23) plus two real defects:
+
+1. **Test 11 — the requested shift was being crowded out.** "Furious but faster"
+   ranked pacing 4th by points, and `MAX_REASONS = 3` dropped it, so the one
+   thing the user said outright never appeared. Fixed in the CODE, not the test:
+   `request` provenance now sorts ahead of every inference regardless of
+   magnitude.
+2. **Test 3 was over-specific** — it banned the literal `spokenAs)`, which is
+   legitimate property access on an already-resolved anchor. Narrowed to what it
+   meant: no `searchTitles` / `pickMatch` / `resolveAnchor` in the explainer.
+
+### A false anchor fact, caught by inspecting the real copy
+
+The `avoid` line originally read its level from `target` / `candidateValue` and
+emitted **"Drops the low humour of Furious"** — while Furious sits at **80** on
+humour. Fluent, confident, and about the wrong title. `TraitInstruction` now
+carries `anchorValue` (the anchors' own mean) and the claim is made only when
+that reading exists. Pinned by test 7b.
+
+### Winner explanation proof (real output)
+
+`Better than Furious`, dark DNA, nudge **+9.89**:
+
+```
+Drops the high humour of Furious, which tends to work against it for you.
+Keeps Furious's high suspense, which fits your taste.
+Keeps Furious's high darkness, which fits your taste.
+```
+
+Preserve axes that helped, the avoided axis that helped, correct provenance
+(`anchor` + `user_dna`), resolved anchor identity — and no claim the user liked
+anything.
+
+### Opposite-user proof
+
+Same anchor, same candidates, opposite mature DNA → nudge **−4.02** and the
+winner itself flips:
+
+```
+Still carries the suspense your profile tends to reject.
+Sits further from the humour your profile favours.
+Still carries the darkness your profile tends to reject.
+```
+
+Test 10 also bans generic filler (`strong match for you|great fit|you'll love`).
+
+### Explicit-modifier proof
+
+`Furious but faster` → relation `like_but`, modifiers `{pacing: 'higher'}`, and
+pacing carries `request` provenance:
+
+```
+Moves toward more pacing — the change you asked for.
+Drops the high humour of Furious, which tends to work against it for you.
+Keeps Furious's high suspense, which fits your taste.
+```
+
+Test 12 asserts the pacing line is NOT described as a Taste-DNA preference.
+
+### Zero-impact silence proof
+
+`buildComparativeExplanation` returns **null** when: no contributions, `nudge`
+is exactly 0, no material contribution, or no anchor resolved. Tests 13
+(no fingerprint), 14 (authority 0), 18 (unresolved anchor). Cautions require a
+real negative contribution — **placing second is never evidence** (test 15).
+Prose carries no coefficients (test 19: no `\d+\.\d+`, no `nudge`/`decisionScore`).
+
+### Production wiring
+
+`/api/ask`, after GC6 ranking: each item's `explain` payload gains a
+`comparison` section built from that item's own `CriticDecision`. It is
+assembled **before** the `NODE_ENV` diagnostics gate (test 21 compares indices),
+so the customer-facing reason ships in production while `criticAttribution`
+stays development-only. `VerdictExplanation.comparison` was added as an explicit
+optional field rather than relying on structural pass-through.
+
+### Display semantics
+
+`matchScore` remains what the card shows; `decisionScore` is never rendered
+(test 22 asserts it appears nowhere in `WhyVerdict.tsx`). The new **FOR THIS
+REQUEST** section renders first and only when grounded evidence exists — a
+heading with nothing under it would imply a comparison happened. Non-comparative
+cards have no `comparison` field and render byte-identically. No card redesign,
+no new modal.
+
+### GC8 regression
+
+Unchanged and green (8/8).
+
+### Gates
+
+| gate | exit | result |
+|---|---|---|
+| GC7 focused | 0 | 27 passed |
+| all critic (GC1–GC8, wiring, audit) | 0 | 185 passed |
+| `npx vitest run` | 0 | 3395 passed, 24 skipped, **0 failed** |
+| `npm run typecheck` | 0 | clean |
+| `npm run lint` | 0 | no warnings or errors |
+| `npm run build` | 0 | clean |
+| `npx playwright test -c playwright.searchrouting.config.ts` | 0 | 21 passed |
+| frozen corpus `layerBext` | 0 | P0 635/635 · P1 515/515 |
+
+Frozen corpus delta: **0 PASS→FAIL, 0 FAIL→PASS**.
 
 ---
 

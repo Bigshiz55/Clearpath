@@ -31,6 +31,18 @@ export interface WhyVerdictData {
   requirements: { label: string; satisfied: boolean; evidence: string }[];
   availability: { text: string; confidence: string } | null;
   confidence: { level: string; because: string[] };
+  /**
+   * REQUEST-SPECIFIC, AND KEPT SEPARATE FROM THE DURABLE MATCH.
+   *
+   * Present only on a comparative ask ("better than X") where the critic
+   * genuinely moved this title. Everything below it answers "what do we know
+   * about you generally"; this answers "why is this the best answer to what you
+   * asked just now" — a different question with a different lifetime, so it
+   * gets its own section rather than being mixed into the Match reasons.
+   *
+   * Absent on every other card, which therefore renders exactly as before.
+   */
+  comparison?: { heading: string; helped: string[]; cautions: string[] } | null;
 }
 
 function Heading({ children, tone }: { children: React.ReactNode; tone: string }) {
@@ -57,6 +69,22 @@ export function WhyVerdict({ data, className = '' }: { data: WhyVerdictData; cla
         Why this Verd1ct?
       </summary>
       <div className="space-y-3 px-3 pb-1">
+        {/* FOR THIS REQUEST — first, because it is the only section that
+            answers the question actually asked. Rendered ONLY when the critic
+            produced grounded evidence: a heading with nothing under it would
+            imply a comparison happened when it did not. */}
+        {data.comparison && (data.comparison.helped.length > 0 || data.comparison.cautions.length > 0) && (
+          <div data-testid="why-comparison" className="space-y-0.5">
+            <Heading tone="text-brand-200">{data.comparison.heading}</Heading>
+            {data.comparison.helped.map((t) => (
+              <p key={t} className="text-[15px] leading-relaxed text-slate-100">{t}</p>
+            ))}
+            {data.comparison.cautions.map((t) => (
+              <p key={t} className="text-[15px] leading-relaxed text-slate-300">{t}</p>
+            ))}
+          </div>
+        )}
+
         {s.matched.lead.length > 0 && (
           <div data-testid="why-matched" className="space-y-0.5">
             <Heading tone="text-emerald-300">{s.matched.heading}</Heading>

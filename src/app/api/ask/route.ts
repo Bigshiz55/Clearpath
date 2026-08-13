@@ -14,6 +14,7 @@ import { buildCriticState } from '@/lib/critic/orchestrate';
 import { resolveAnchor } from '@/lib/critic/anchor';
 import { runStrands } from '@/lib/critic/strands';
 import { rankCriticCandidates } from '@/lib/critic/decide';
+import { buildComparativeExplanation } from '@/lib/critic/explain';
 import { getCachedDimensions } from '@/lib/titleDimensions';
 import { loadPreference } from '@/lib/preference/store';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
@@ -415,8 +416,34 @@ export async function POST(req: Request) {
          and is request-specific, so it orders the list and is never written
          back onto the card or into Taste DNA. GC7 explains why the winner won. */
       const byKey = new Map(strandRun.items.map((i) => [`${i.mediaType}-${i.id}`, i]));
+
+      /* ── GC7 · WHY IT WON ──────────────────────────────────────────────
+         Built from the SAME contribution trail that produced the order, and
+         attached to the item's existing `explain` payload as its own section.
+         This is CUSTOMER-FACING, so it is assembled here rather than inside
+         the development-only diagnostics below. A candidate the critic did not
+         actually move gets `null` and the card renders exactly as before —
+         "Why this beats X" must never appear merely because the user typed a
+         comparison. */
       const criticItems = ranked.decisions
-        .map((d) => byKey.get(d.key))
+        .map((d) => {
+          const item = byKey.get(d.key);
+          if (!item) return null;
+          const comparison = buildComparativeExplanation({
+            relation: criticState.objective.relation,
+            anchors: criticState.objective.anchors,
+            contributions: d.contributions,
+            nudge: d.criticNudge,
+          });
+          if (!comparison) return item;
+          return {
+            ...item,
+            // The durable Match and its reasons are untouched below this.
+            explain: item.explain
+              ? { ...item.explain, comparison: { heading: comparison.heading, helped: comparison.helped, cautions: comparison.cautions } }
+              : item.explain,
+          };
+        })
         .filter((i): i is NonNullable<typeof i> => i != null)
         .slice(0, limitCritic);
 
