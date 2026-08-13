@@ -70,8 +70,14 @@ for (const w of WIDTHS) {
     });
 
     test('the "no ratings" label is never cut mid-word', async ({ page }) => {
-      await page.goto('/dev/verdict', { waitUntil: 'networkidle' });
-      const none = page.getByTestId('ratings-none').first();
+      // MEASURED WHERE THE ROW STILL LIVES. This pointed at /dev/verdict's
+      // PosterCard grid, but source ratings left the browse card for the title
+      // page — so `ratings-none` was never present there and all three widths
+      // silently SKIPPED rather than failing. `qa-ratings-card` is
+      // `AlgorithmScore` in a 280px column, which is the real remaining narrow
+      // case (WatchNowGrid, ReleaseWall, RecommendationSlate).
+      await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
+      const none = page.getByTestId('qa-ratings-card').getByTestId('ratings-none').first();
       if ((await none.count()) === 0) test.skip(true, 'this harness state has ratings');
       const own = await clipping(page, 'ratings-none');
       expect(own.clippedX, `label clipped by its own box at ${w}px`).toBe(false);
