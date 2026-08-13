@@ -22,6 +22,7 @@
  */
 
 import { useMemo } from 'react';
+import type { ShowdownPayoff } from '@/lib/actions/showdown';
 import type { ShowdownMode } from '@/lib/showdown/evidence';
 import { dnaKnown } from '@/lib/tastedna/families';
 import { clusterReadout, dnaSummary } from '@/lib/showdown/dnaSummary';
@@ -59,12 +60,78 @@ function recommend(state: ShowdownState, count = 3) {
     .slice(0, count);
 }
 
+/**
+ * WHAT THE SESSION DID TO THE REAL RECOMMENDATION POOL.
+ *
+ * The section below this one ranks the game's own 113 diagnostic titles and
+ * says so. This one is the actual claim: the same TMDB discover pool the "For
+ * you" surface ranks, scored by the production `preferenceNudge`, ordered
+ * against the player's DNA before this session and after it, with the
+ * diagnostic titles removed so nothing they just answered about can appear as
+ * its own reward. Computed server-side in `payoffPool.ts`.
+ *
+ * THREE OUTCOMES, AND TWO OF THEM ARE "NO". `movement: 0` is the honest and
+ * common answer after one session — `MIN_RANK_CONF` is 0.25 and a single scan
+ * does not usually clear it — and it is stated rather than dressed up. Not
+ * measured at all (a guest, TMDB down) is a THIRD thing and says so separately,
+ * because "we could not look" and "we looked and nothing moved" are different
+ * facts and collapsing them is how a screen starts lying.
+ */
+function RealRankingPayoff({ payoff }: { payoff: ShowdownPayoff }) {
+  const moved = payoff.movement > 0;
+  return (
+    <div data-testid="showdown-payoff" data-movement={payoff.movement}>
+      <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">
+        Your real recommendations
+      </h2>
+      {!moved ? (
+        <p className="mt-2 rounded-xl bg-white/5 px-4 py-3 text-sm leading-relaxed text-slate-300">
+          Your ranking hasn&rsquo;t changed yet. One scan moves what we believe about you, but not
+          far enough for the recommender to act on it — that takes a couple more. Nothing here is
+          being held back; there is genuinely nothing to show yet.
+        </p>
+      ) : (
+        <>
+          <p className="mt-2 text-sm text-slate-400">
+            {payoff.climbed.length > 0
+              ? `${payoff.climbed.length} title${payoff.climbed.length === 1 ? '' : 's'} climbed into your top ${payoff.top.length} because of this session.`
+              : 'Your ranking shifted — the order below is now yours rather than everyone’s.'}
+          </p>
+          <ul className="mt-2 flex flex-col gap-2">
+            {payoff.top.map((c) => (
+              <li
+                key={c.id}
+                data-testid="showdown-payoff-row"
+                data-moved={c.moved}
+                className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3"
+              >
+                <span className="min-w-0 flex-1 text-base font-semibold text-white">
+                  {c.title}
+                  {c.year ? (
+                    <span className="ml-1.5 text-sm font-normal text-slate-400">({c.year})</span>
+                  ) : null}
+                </span>
+                {c.moved > 0 && (
+                  <span className="shrink-0 text-xs font-black tabular-nums text-emerald-300">
+                    ↑{c.moved}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function ShowdownResults({
   state,
   openingKnown,
   onPlayAgain,
   onContinue,
   mode = 'dna',
+  payoff = null,
 }: {
   state: ShowdownState;
   openingKnown: number;
@@ -72,6 +139,11 @@ export function ShowdownResults({
   onContinue: () => void;
   /** Which run this was. Decides what the screen may honestly claim. */
   mode?: ShowdownMode;
+  /**
+   * Real-ranking movement from the server, or null while it is still in flight
+   * — and permanently null for a guest, who has no server-side DNA to move.
+   */
+  payoff?: ShowdownPayoff | null;
 }) {
   const known = useMemo(() => dnaKnown(state.profile), [state.profile]);
   const summary = useMemo(() => dnaSummary(state.profile, 3), [state.profile]);
@@ -198,6 +270,8 @@ export function ShowdownResults({
           </ul>
         </div>
       )}
+
+      {!learnedNothing && payoff && <RealRankingPayoff payoff={payoff} />}
 
       {!learnedNothing && (
         <div>

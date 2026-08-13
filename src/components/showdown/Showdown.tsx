@@ -44,7 +44,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loadDna, saveDna, type StoredDna } from '@/lib/tastedna/persist';
 import { saveTonight } from '@/lib/showdown/handoff';
-import { recordShowdownSession } from '@/lib/actions/showdown';
+import { recordShowdownSession, type ShowdownPayoff } from '@/lib/actions/showdown';
 import { sessionPayload } from '@/lib/showdown/canonical';
 import type { ShowdownMode } from '@/lib/showdown/evidence';
 import { TITLES } from '@/lib/voice/quickdna/definition';
@@ -120,6 +120,7 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
   const [followUp, setFollowUp] = useState<FollowUp>(null);
   const [discovery, setDiscovery] = useState<Discovery | null>(null);
   const [posters, setPosters] = useState<Record<string, string>>({});
+  const [payoff, setPayoff] = useState<ShowdownPayoff | null>(null);
 
   const busy = useRef(false);
   const shownAt = useRef(0);
@@ -211,12 +212,22 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
     if (next.mode !== 'dna') return;
 
     if (completed && next.decisions.length > 0) {
+      /* THE PAYOFF ARRIVES LATE, AND THE SCREEN OPENS WITHOUT IT.
+         Measuring what the session did to the real pool takes a discover call;
+         holding the results screen behind it would make the reward for playing
+         a spinner. So the screen renders immediately from what the client
+         already knows, and the real-ranking section appears when the server
+         answers — or never, for a guest, which is a state it draws. */
       void recordShowdownSession({
         mode: 'dna',
         decisions: sessionPayload(next.decisions, attributionOf),
-      }).catch(() => {
-        /* guest, offline, or transient — the local profile stands */
-      });
+      })
+        .then((r) => {
+          if (r.ok && r.payoff) setPayoff(r.payoff);
+        })
+        .catch(() => {
+          /* guest, offline, or transient — the local profile stands */
+        });
     }
 
     setDna((prior) => {
@@ -406,6 +417,7 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
         state={state}
         openingKnown={state.openingKnown}
         mode={mode}
+        payoff={payoff}
         onPlayAgain={() => {
           const now = Date.now();
           shownAt.current = now;
@@ -426,6 +438,10 @@ export function Showdown({ seed, mode = 'dna' }: { seed?: Partial<StoredDna>; mo
           );
           setFollowUp(null);
           setDiscovery(null);
+          // Last run's movement is not this run's. Cleared rather than left to
+          // be overwritten, so a second session that cannot be measured shows
+          // the unmeasured state instead of the first session's numbers.
+          setPayoff(null);
           setScreen('playing');
         }}
         onContinue={() => {

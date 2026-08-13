@@ -186,3 +186,52 @@ test.describe('DNA Showdown at 390x844', () => {
     expect(secondFirst.every((id) => id.length > 0)).toBe(true);
   });
 });
+
+/**
+ * THE REAL-RANKING PAYOFF, IN A BROWSER.
+ *
+ * The section only renders for a signed-in player after a server round-trip, so
+ * a Playwright run against the harness can never reach it by playing. It is
+ * driven through `/dev/showdown-payoff`, which renders the SHIPPED component
+ * with the payoff object the server would have returned — see that route for
+ * why it exists.
+ *
+ * What is being checked here is the thing a unit test cannot see: that the two
+ * claims stay visibly distinct on a 390px screen. "Your real recommendations"
+ * and "Closest matches in the game's catalogue" are different assertions about
+ * the product, and a player who reads them as one list has been told the game's
+ * own 113 titles are their recommendations.
+ */
+test.describe('the payoff states at 390x844', () => {
+  test.use({ viewport: IPHONE_13 });
+
+  test('moved — climbed titles are named, with how far, above the catalogue list', async ({ page }) => {
+    await page.goto('/dev/showdown-payoff?state=moved');
+    const payoff = page.getByTestId('showdown-payoff');
+    await expect(payoff).toBeVisible();
+    await expect(payoff).toHaveAttribute('data-movement', '26');
+    await expect(page.getByTestId('showdown-payoff-row')).toHaveCount(5);
+    await expect(payoff).toContainText('climbed into your top 5');
+
+    const payoffBox = (await payoff.boundingBox())!;
+    const catalogue = (await page.getByTestId('showdown-picks').boundingBox())!;
+    expect(payoffBox.y, 'the real claim comes before the instrument list').toBeLessThan(catalogue.y);
+    expect(await overflows(page)).toMatchObject({ x: 0 });
+  });
+
+  test('flat — says nothing moved, and shows no rows to imply otherwise', async ({ page }) => {
+    await page.goto('/dev/showdown-payoff?state=flat');
+    const payoff = page.getByTestId('showdown-payoff');
+    await expect(payoff).toHaveAttribute('data-movement', '0');
+    await expect(payoff).toContainText('hasn’t changed yet');
+    await expect(page.getByTestId('showdown-payoff-row')).toHaveCount(0);
+  });
+
+  test('unmeasured — the section is absent entirely, not empty', async ({ page }) => {
+    // A guest has no server-side DNA, so there is nothing to claim. An empty
+    // "your recommendations" panel would imply a measurement nobody took.
+    await page.goto('/dev/showdown-payoff?state=none');
+    await expect(page.getByTestId('showdown-results')).toBeVisible();
+    await expect(page.getByTestId('showdown-payoff')).toHaveCount(0);
+  });
+});
