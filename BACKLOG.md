@@ -12,8 +12,11 @@ Updated at the end of every work order per the Working Agreement in
   grounded **FOR THIS REQUEST** explanation generated from the same contribution
   trail that produced the order. Comparative intent is detected at a
   provider-independent boundary (`src/lib/critic/gate.ts`) so meaning does not
-  depend on `AI_DISCOVERY_MODE`. Ledger: `docs/CRITIC-SHIP.md`. Next gate is
-  GC9 (counterfactual suite).
+  depend on `AI_DISCOVERY_MODE`. **GC9** proves all five sources of meaning
+  (anchors, DNA, relationship, modifiers, hard context) are causal at the
+  correct stage, and **GC10** pins the original incident sentence end to end
+  with a structural — never title-specific — mechanism. 236 critic tests.
+  Ledger: `docs/CRITIC-SHIP.md`. Next gate is GC11 (latency budget + caching).
 
 **Action needed from you:** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the

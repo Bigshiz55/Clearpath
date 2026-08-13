@@ -3,11 +3,16 @@
 Make the AI the film critic, not the search parser. Continuation state across
 sessions: read this, execute **NEXT ACTION**.
 
-CURRENT SHA: (see git log)
+CURRENT SHA: `a3fe0b576b1390d6e7c88af4c7d189fa93ca70b4`
 BRANCH: `claude/critic-layer`, cut from `main` @ 6080287.
-NEXT ACTION: GC5 — anchors + objective reach candidate RETRIEVAL. The plan now
-decides ranking; retrieval is still keyword-driven, so a candidate the critic
-would argue for can never appear if the keyword filter did not surface it.
+NEXT ACTION: GC11 — latency budget + caching.
+
+STATE: GC1–GC10 complete. A comparative Ask parses the relation and both
+anchors, resolves each identity through GC2, hydrates canonical fingerprints,
+builds a GC4 plan, issues recall-safe GC5 strands, orders the real response by
+`decisionScore = matchScore + planNudge`, and explains the winner from that same
+contribution arithmetic. Remaining: GC11 (latency/caching), GC12 (full gates +
+merge recommendation).
 
 ---
 
@@ -104,10 +109,118 @@ narrower than "teach the explainer about anchors": it is (a) populate
       red-then-green.** Audit done first; composition is explicit.
 - [x] **GC7** Grounded comparative explanations — **COMPLETE, red-then-green**
 - [x] **GC8** Material-dependence test — **COMPLETE, red-then-green**
-- [ ] **GC9** Counterfactual suite: anchors / DNA / relationship / modifiers / context each causal
-- [ ] **GC10** Exact-query regression for `Better than Furious or Widows Bay` (structural, not hardcoded titles)
+- [x] **GC9** Counterfactual suite: anchors / DNA / relationship / modifiers / context each causal — **COMPLETE**
+- [x] **GC10** Exact-query regression for `Better than Furious or Widows Bay` (structural, not hardcoded titles) — **COMPLETE**
 - [ ] **GC11** Latency budget + caching
 - [ ] **GC12** Full gates + merge recommendation
+
+---
+
+## GC9 — COMPLETE · counterfactual causality suite
+
+`src/lib/critic/gc9.test.ts`, 30 tests. All five factors changed ONE AT A TIME
+through the real production functions. Passed on first run; no RED was
+manufactured.
+
+### The causal matrix
+
+| factor changed | held constant | what changed downstream | why |
+|---|---|---|---|
+| **anchor** fingerprint | pool · DNA · relation · modifiers · context · base scores | plan axis set `[darkness,suspense]` → `[humor]`; **order flips** movie-1 ↔ movie-2; nudge gap > 2 pts | the anchor decides WHICH AXES earn an instruction, and (for a neutral user) the target itself |
+| **anchor** identity | as above + per-title fingerprints | `502` → `701` reaches a different fingerprint → different order | identity → hydration → plan is a real chain, not a label |
+| **Taste DNA** | anchor · pool · relation · modifiers · context · base | tense +9.51/funny −4.30 → tense **−4.45**/funny **+9.23**; order reverses | targets follow `effectiveTaste`, so opposite taste inverts every agreement |
+| **relationship** | anchors · fingerprints · DNA · pool · modifiers · context | `like`(neutral) twin +9.80 → top=twin, applied **true**; `better_than`(neutral) **0 instructions**, applied **false**; `better_than`(confident) top=improved | GC4 lets `like` preserve on relation alone and forbids `better_than` from preserving on one fact |
+| **modifiers** | everything else | "but faster" fast **+7.60**/slow −4.40; "but slower" fast **−4.40**/slow **+7.60**; order flips | a request modifier emits a `request`-provenance instruction with its own target |
+| **hard context** | anchor · DNA · relation · modifiers | `hints.hard` changes; **plan byte-identical**; ranking identical | context is a retrieval fact, deliberately NOT a critic-interpretation fact |
+
+### A weak fixture caught and fixed (disclosed)
+
+The first GC9-A draft used two anchors expressing the SAME axes for a user
+confident on all of them. `planNudge` consumes `target` and `strength` only —
+`kind` is explanatory — so with a confident user the target follows the USER and
+both anchors produced nearly the same numbers: **9.51 → 9.64, order unchanged**.
+It passed `not.toBeCloseTo(…, 3)` while proving nothing.
+
+That is not a defect in the system: "preserve at 85" and "avoid, move to 86"
+genuinely point at the same destination and *should* score alike. It was a
+defect in the test. Rewritten to exercise the two real causal channels — axis
+selection, and target-when-the-user-is-neutral — and to demand an **order flip**
+plus a material (> 2 point) gap. GC9-A3 then caught a second fixture error of
+mine (`like` + neutral DNA preserves warmth too, so one candidate resembled both
+anchors); fixed with a pool where each candidate resembles exactly one.
+
+### Negative controls (GC9-F)
+
+Determinism (identical inputs → byte-identical plan and decisions) · unhydrated
+anchor → authority 0, no invented effect, input order preserved · partial
+resolution → strictly lower but positive authority · non-comparative requests
+critic-silent · ungrounded comparative ("better acted") changes **no** ranking
+instruction and leaves the nudge identical to 10dp · zero contribution →
+`eligible: true`, `applied: false` · bound holds (≤ 10) across 18 combinations of
+DNA × relation × anchor.
+
+---
+
+## GC10 — COMPLETE · the original failure, exact sentence
+
+`src/lib/critic/gc10.test.ts`, 21 tests. Literal sentence, structural mechanism.
+
+### The incident, end to end
+
+```
+"Better than Furious or Widows Bay"
+  relation      better_than
+  anchors       Furious=movie:502, Widows Bay=movie:602   (decoys 501/601 rejected)
+  authority     1.000  (both resolved, both hydrated)
+  strands       recall-floor, anchor-keywords, anchor-genres, acclaim
+  plan          darkness:preserve@85  humor:avoid@10
+                suspense:preserve@87  complexity:preserve@81
+  order         movie-3002 (+9.70)   movie-3001 (+6.07)   movie-3003 (+2.58)
+  applied       true
+  WHY           Drops the high humour of Furious and Widows Bay, which tends to
+                work against it for you.
+                Keeps Furious and Widows Bay's high suspense, which fits your taste.
+                Keeps Furious and Widows Bay's high darkness, which fits your taste.
+```
+
+Base scores are identical across the pool, so the entire order is the critic's.
+
+### The regression anchor
+
+Test 1 asserts the **untouched shipped parsers still fail**: `extractReference`
+→ null, `classifySearch().mode` → `exact_title` with the whole sentence as the
+title, `applyTurn().referenceTitles` → `[]`. That is the fallback the request
+lands in if the critic path ever becomes unreachable — so it is pinned rather
+than assumed. Test 2 proves the critic claims the sentence first, in all three
+serving modes.
+
+### Invariants asserted (not a frozen winner)
+
+relation survived · both identities survived and resolved independently · both
+hydrated · authority honest under full/partial/no hydration · plan grounded with
+`preserve` on suspense and `avoid` on humour · recall-floor ungated · hard
+constraints intact with no inference joining them · pool reaches ranking with
+identical membership · order materially critic-dependent (vs `undefined` plan) ·
+explanation sums to the nudge (6dp) and speaks only about axes that participated
+· anchors named collectively · no "you liked/loved/rated/watched" · no claim of
+objective superiority · `matchScore`/`generalScore` untouched · no coefficients
+in prose · bound holds against a 25-point-stronger baseline.
+
+**No expected winner is frozen.** Nothing asserts a particular title must rank
+first forever.
+
+### No special-casing
+
+Test 20 strips comments from all 12 production modules in `src/lib/critic/` and
+asserts the remaining CODE matches neither `Furious` nor `Widows Bay`. Test 21
+runs the same shapes on `Better than Heat or Sicario`.
+
+### Control
+
+`Something like Furious or Widows Bay` — same fixtures, same two identities
+(`movie:502`, `movie:602`), yet relation `like` vs `better_than` and different
+strand sets. The two requests do not collapse into one search, which is the
+defect class that started this workstream.
 
 ---
 
