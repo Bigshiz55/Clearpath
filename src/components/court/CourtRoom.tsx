@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { WatchVerdictWordmark } from '@/components/WatchVerdictWordmark';
+import {
+  RoomPanel,
+  RoomShell,
+  type RoomPerson,
+  type RoomStageKey,
+} from '@/components/court/RoomShell';
 import { CourtSizePicker } from '@/components/court/CourtSizePicker';
 import { COURT_SIZES, DEFAULT_COURT_SIZE, type CourtSize } from '@/lib/court/pool';
 import { asCourtSize } from '@/lib/court/roomSettings';
@@ -397,6 +402,38 @@ export function CourtRoom({ code }: { code: string }) {
     stage: (state?.status === 'verdict' ? 'verdict' : state?.status === 'veto' ? 'reacting' : 'open') as 'open' | 'reacting' | 'verdict',
   };
 
+  /**
+   * WHERE THE ROOM IS, FOR THE RAIL.
+   *
+   * DERIVED FROM ROOM STATE, NEVER COUNTED. A step counter kept in this
+   * component would drift the moment anyone else moved the room, and a late
+   * joiner arriving during REACT would be shown the beginning. The rail says
+   * where the ROOM is, which is the only thing worth showing several people at
+   * once.
+   *
+   * The lobby is one screen carrying three of the five stages, so its position
+   * comes from what the room has actually accumulated: nobody has nominated
+   * anything yet means the room is still setting tonight, whatever the screen
+   * happens to be scrolled to.
+   */
+  const roomStage: RoomStageKey = !participantId
+    ? 'join'
+    : state?.status === 'verdict'
+      ? 'verdict'
+      : state?.status === 'veto'
+        ? 'react'
+        : snapshot.candidateCount > 0
+          ? 'shortlist'
+          : 'tonight';
+
+  /** Presence for the header — the room's own participants, never a stand-in. */
+  const roomPeople: readonly RoomPerson[] = participants.map((p) => ({
+    id: p.id,
+    name: p.name,
+    host: p.host,
+    ready: p.ready,
+  }));
+
   // ---- Invite (a SUMMONS, not just a link) ----
   async function shareInvite() {
     if (!shareUrl) return;
@@ -427,16 +464,43 @@ export function CourtRoom({ code }: { code: string }) {
 
   if (notFound) {
     return (
-      <Shell sync={sync}>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
-          <p className="text-sm text-slate-400">This Court has ended or the link is no longer valid.</p>
-          <Link href="/app" className="btn-secondary mt-4 inline-flex">Open WatchVerd1ct</Link>
-        </div>
+      <Shell sync={sync} stage="join">
+        {/* THE ROOM IS GONE, AND THE ROOM SAYS SO. Still inside the room's own
+            shell rather than dumped onto a bare page: an error that throws away
+            the surrounding place reads as the app breaking, when what actually
+            happened is that a session ended, which is normal. */}
+        <RoomPanel tone="warn" data-testid="court-not-found" className="wv-room-enter p-8 text-center">
+          <p className="text-base font-bold text-white">This room has closed</p>
+          <p className="mx-auto mt-1.5 max-w-sm text-sm text-amber-100/80">
+            The Verdict Room you were sent to has ended, or the link is no longer valid. Any room
+            you start yourself will still be here.
+          </p>
+          <Link href="/app/together" className="btn-secondary mt-5 inline-flex">Open the Verdict Room</Link>
+        </RoomPanel>
       </Shell>
     );
   }
   if (!state) {
-    return <Shell sync={sync}><p className="text-sm text-slate-400">Connecting to your group…</p></Shell>;
+    /* LOADING IS A ROOM WITH THE LIGHTS ON AND NOBODY IN IT YET, not a spinner
+       on a black page. The shell, the rail and the floor are all already known;
+       the only thing being waited for is the room's contents, so only that part
+       is allowed to be absent. */
+    return (
+      <Shell sync={sync} stage="join">
+        <RoomPanel data-testid="court-connecting" className="wv-room-enter p-8 text-center">
+          <p className="text-sm font-semibold text-slate-300">Connecting to your group…</p>
+          <div aria-hidden className="mx-auto mt-4 flex max-w-xs flex-col gap-2.5">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="h-3 rounded-full bg-white/[0.06]"
+                style={{ width: `${100 - i * 18}%` }}
+              />
+            ))}
+          </div>
+        </RoomPanel>
+      </Shell>
+    );
   }
 
   const isHost = !!hostToken;
@@ -454,8 +518,12 @@ export function CourtRoom({ code }: { code: string }) {
   // silently did nothing.
   if (!participantId && state.status !== 'verdict') {
     return (
-      <Shell sync={sync}>
-        <section data-testid="court-join" className="rounded-2xl border border-gold-400/30 bg-white/[0.03] p-5">
+      <Shell sync={sync} stage="join" people={roomPeople} code={code}>
+        <RoomPanel
+          tone="decisive"
+          data-testid="court-join"
+          className="wv-room-enter mx-auto max-w-xl p-5 sm:p-6"
+        >
           <p className="text-[11px] font-black uppercase tracking-widest text-gold-300">⚖️ Official summons</p>
           <h1 className="mt-1 text-lg font-bold text-white">
             {hostName ? `${hostName} summoned you` : 'You’ve been summoned to Court'}
@@ -513,7 +581,7 @@ export function CourtRoom({ code }: { code: string }) {
           >
             {joining ? 'Joining…' : 'Join Court'}
           </button>
-        </section>
+        </RoomPanel>
       </Shell>
     );
   }
@@ -533,27 +601,47 @@ export function CourtRoom({ code }: { code: string }) {
     const note = partialNote(snapshot);
     if (!winner) {
       return (
-        <Shell sync={sync}>
-          <section data-testid="court-verdict-empty" className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5">
+        <Shell sync={sync} stage="verdict" people={roomPeople} code={code}>
+          <RoomPanel tone="warn" data-testid="court-verdict-empty" className="wv-room-enter mx-auto max-w-xl p-5 sm:p-6">
             <h1 className="text-lg font-bold text-white">No option survived</h1>
             <p className="mt-1 text-sm text-amber-100">Every title was vetoed or appealed. Remove a veto or add more possibilities to get a Verd1ct.</p>
             <button onClick={() => setAppealed([])} className="btn-secondary mt-4">Reconsider all titles</button>
-          </section>
+          </RoomPanel>
         </Shell>
       );
     }
     const f = (state.finalists ?? []).find((x) => keyOf(x) === winner.key);
     return (
-      <Shell onChat={() => setChatOpen(true)} unread={unread} sync={sync}>
-        <section data-testid="court-verdict">
-          <p className="text-xs font-semibold uppercase tracking-widest text-brand-300">Your group’s Verd1ct</p>
-          <h1 className="mt-1 text-2xl font-black leading-tight text-white sm:text-3xl" data-testid="verdict-headline">
-            {reveal.winnerRevealed ? (
-              <>{winner.title}{f?.year ? <span className="font-bold text-slate-400"> ({f.year})</span> : null}</>
-            ) : (
-              <span className="text-slate-400">Tallying the votes…</span>
-            )}
-          </h1>
+      <Shell onChat={() => setChatOpen(true)} unread={unread} sync={sync} stage="verdict" people={roomPeople} code={code}>
+        <section data-testid="court-verdict" className="wv-room-enter relative">
+          {/* THE ONE FLOURISH THE ROOM GETS, AND IT LANDS ONCE.
+              A single slow bloom behind the title at the moment it resolves —
+              no loop, nothing that keeps moving afterwards. It is keyed to
+              `winnerRevealed` so it cannot fire while the room is still
+              tallying, and under reduced motion the global rule collapses it to
+              a still glow, which is the correct end state rather than nothing. */}
+          {reveal.winnerRevealed && (
+            <span
+              aria-hidden
+              data-testid="verdict-bloom"
+              className="wv-room-verdict pointer-events-none absolute left-1/2 top-[-12%] -ml-[42%] h-[46vh] w-[84%] rounded-full bg-[radial-gradient(ellipse_at_top,rgba(120,160,255,0.3),rgba(255,20,147,0.1)_46%,transparent_72%)] blur-3xl"
+            />
+          )}
+          <div className="relative">
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-brand-300/80">
+              Your group’s Verd1ct
+            </p>
+            <h1
+              className="mt-1.5 text-[clamp(1.9rem,7.5vw,3.25rem)] font-black leading-[0.98] tracking-[-0.02em] text-white"
+              data-testid="verdict-headline"
+            >
+              {reveal.winnerRevealed ? (
+                <>{winner.title}{f?.year ? <span className="font-bold text-slate-400"> ({f.year})</span> : null}</>
+              ) : (
+                <span className="text-slate-400">Tallying the votes…</span>
+              )}
+            </h1>
+          </div>
 
           {/* JURORS' SCORES FLIP IN FIRST — for the title the room is about to
               name, before it's named. Named again on the reveal (the title
@@ -561,7 +649,14 @@ export function CourtRoom({ code }: { code: string }) {
               unexplained. */}
           <div className="mt-4" data-testid="verdict-jury-reveal">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Everyone’s score for tonight’s winner</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            {/* A HISTOGRAM, BECAUSE THE SHAPE IS THE STORY.
+                Three chips reading 88 / 74 / 91 are three numbers to compare in
+                your head; three bars are one picture of whether the room agreed
+                or merely out-voted somebody. Every value is the engine's own
+                per-member score, unchanged — this gives it a length. The
+                reveal order is untouched: a bar that has not flipped yet shows
+                its track and no fill, so nothing is spoiled early. */}
+            <div className="mt-2 space-y-1.5">
               {winner.perMember.map((m, i) => {
                 const shown = i < reveal.revealedJurors;
                 return (
@@ -569,13 +664,20 @@ export function CourtRoom({ code }: { code: string }) {
                     key={m.name}
                     data-testid="verdict-juror"
                     data-revealed={shown ? 'true' : 'false'}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm text-slate-300"
+                    className="flex items-center gap-2.5"
                   >
-                    {m.name}{' '}
+                    <span className="w-[5.5rem] shrink-0 truncate text-[13px] font-semibold text-slate-300">{m.name}</span>
+                    <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-white/10">
+                      <span
+                        aria-hidden
+                        className="block h-full rounded-full bg-gradient-to-r from-brand-300 to-fuchsia-300 transition-[width] duration-700"
+                        style={{ width: shown ? `${Math.max(0, Math.min(100, m.score))}%` : '0%' }}
+                      />
+                    </span>
                     {shown ? (
-                      <b className="wv-flip-in tabular-nums text-white">{m.score}</b>
+                      <b className="wv-flip-in w-8 shrink-0 text-right tabular-nums text-white">{m.score}</b>
                     ) : (
-                      <b aria-hidden className="tabular-nums text-slate-600">···</b>
+                      <b aria-hidden className="w-8 shrink-0 text-right tabular-nums text-slate-600">···</b>
                     )}
                   </span>
                 );
@@ -650,7 +752,7 @@ export function CourtRoom({ code }: { code: string }) {
                   <button
                     data-testid="appeal"
                     onClick={() => setAppealed((prev) => [...prev, winner.key])}
-                    className="rounded-xl border border-white/12 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/5"
+                    className="min-h-[44px] rounded-xl border border-white/12 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/5"
                   >
                     Appeal
                   </button>
@@ -679,6 +781,33 @@ export function CourtRoom({ code }: { code: string }) {
                     }}
                   />
                 </div>
+
+                {/* WHERE THE EVENING GOES NEXT.
+                    The room had two continuations and neither was reachable
+                    from the screen you actually end on. "Appeal" above is the
+                    another-round path INSIDE this room — strike the winner and
+                    let the next candidate stand — and it is the right default,
+                    because the shortlist everyone built is still good. A fresh
+                    room is a different act: new night, new shortlist, and it
+                    lived only back at `/app/together` with nothing pointing at
+                    it. Quiet, and below the share card, because most rooms end
+                    here. */}
+                <div
+                  data-testid="verdict-continue"
+                  className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/[0.07] pt-4 text-[13px]"
+                >
+                  <span className="text-slate-500">Not this one?</span>
+                  <span className="text-slate-400">
+                    Appeal it above to hand the night to {backup ? backup.title : 'the next title'}.
+                  </span>
+                  <Link
+                    href="/app/together"
+                    data-testid="verdict-new-room"
+                    className="inline-flex min-h-[44px] items-center font-semibold text-brand-200 underline decoration-dotted underline-offset-4 transition hover:text-white"
+                  >
+                    Start a new room
+                  </Link>
+                </div>
               </>
             )}
           </div>
@@ -691,38 +820,74 @@ export function CourtRoom({ code }: { code: string }) {
   // ==================== STAGE 4 — REACT TOGETHER ============================
   if (state.status === 'veto' && ranked.length > 0) {
     return (
-      <Shell onChat={() => setChatOpen(true)} unread={unread} sync={sync}>
-        <section data-testid="court-react">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h1 className="text-lg font-bold text-white">React together</h1>
-            <span data-testid="react-status" className="text-xs text-slate-400">{nextActionLabel(snapshot)}</span>
-          </div>
-          <div className="mt-3 space-y-3">
-            {ranked.map((r) => {
+      <Shell onChat={() => setChatOpen(true)} unread={unread} sync={sync} stage="react" people={roomPeople} code={code}>
+        <section data-testid="court-react" className="wv-room-enter">
+          <StageHeading
+            eyebrow="Stage four"
+            title="React together"
+            note={nextActionLabel(snapshot)}
+            noteTestId="react-status"
+          />
+          <div className="mt-4 space-y-3">
+            {ranked.map((r, i) => {
               const f = (state.finalists ?? []).find((x) => keyOf(x) === r.key);
               const mineR = myReactions[r.key];
+              const leading = i === 0 && !r.vetoed;
               return (
-                <article key={r.key} data-testid="react-card" data-key={r.key} className={`rounded-2xl border p-3 ${r.vetoed ? 'border-red-400/40 bg-red-500/[0.06]' : 'border-white/10 bg-white/[0.03]'}`}>
+                <article
+                  key={r.key}
+                  data-testid="react-card"
+                  data-key={r.key}
+                  data-leading={leading ? '1' : '0'}
+                  /* THE STAGGER IS CAPPED. A Deep court carries sixteen
+                     candidates, and an uncapped 70ms step would leave the last
+                     one arriving 1.1 seconds after the first — which stops
+                     being a deal and becomes a wait. Six steps is the whole
+                     effect; everything past that lands with the sixth. */
+                  style={{ '--wv-room-step': Math.min(i, 5) } as React.CSSProperties}
+                  /* A CANDIDATE IS A PLATE ON A STAGE, NOT A ROW IN A TABLE.
+                     The leading title is lit and the vetoed one is struck —
+                     both states drawn from the engine's own verdict, so the
+                     lighting is never decoration. */
+                  className={`wv-room-enter relative overflow-hidden rounded-2xl border p-3 transition ${
+                    r.vetoed
+                      ? 'border-red-400/35 bg-[linear-gradient(160deg,rgba(255,80,80,0.09),rgba(8,10,18,0.66))]'
+                      : leading
+                        ? 'border-brand-400/35 bg-[linear-gradient(160deg,rgba(79,134,255,0.13),rgba(8,10,18,0.68))] shadow-[0_26px_60px_-42px_rgba(79,134,255,0.7)]'
+                        : 'border-white/10 bg-[linear-gradient(160deg,rgba(255,255,255,0.05),rgba(8,10,18,0.62))]'
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(to_right,transparent,rgba(255,255,255,0.2),transparent)]"
+                  />
                   <div className="flex gap-3">
-                    {f?.posterUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={f.posterUrl} alt={`Poster for ${r.title}`} className="h-24 w-16 flex-none rounded-lg border border-white/10 object-cover" />
-                    ) : (
-                      <div className="grid h-24 w-16 flex-none place-items-center rounded-lg border border-white/10 bg-white/5 text-[10px] text-slate-500">No art</div>
-                    )}
+                    <PosterFrame url={f?.posterUrl ?? null} title={r.title} vetoed={r.vetoed} />
                     <div className="min-w-0 flex-1">
-                      <h2 className="line-clamp-2 text-sm font-bold text-white">{r.title}{f?.year ? <span className="font-semibold text-slate-400"> ({f.year})</span> : null}</h2>
+                      <h2 className="line-clamp-2 text-[15px] font-black leading-tight text-white">{r.title}{f?.year ? <span className="font-bold text-slate-400"> ({f.year})</span> : null}</h2>
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
                         <span className="rounded bg-white/10 px-1.5 py-0.5 font-bold uppercase tracking-wide text-slate-300">{f?.mediaType === 'tv' ? 'Show' : 'Movie'}</span>
-                        <span className="tabular-nums">Group {r.groupScore}</span>
                         {f && f.streaming.length > 0 && <span className="truncate">{f.streaming[0]}</span>}
                       </div>
-                      {r.reasons[0] && <p className="mt-1 text-[11px] text-slate-400">{r.reasons[0]}</p>}
+                      {/* THE GROUP'S FIT, AS A LENGTH RATHER THAN A NUMBER TO
+                          PARSE. Same figure the engine computed; a bar is what
+                          makes three candidates comparable at a glance. */}
+                      <GroupMatchMeter score={r.groupScore} leading={leading} />
+                      {r.reasons[0] && <p className="mt-1.5 text-[11px] leading-snug text-slate-400">{r.reasons[0]}</p>}
                       {f && f.pickedBy.length > 0 && <p className="mt-0.5 text-[11px] text-emerald-200">Added by {f.pickedBy.join(', ')}</p>}
                       {r.vetoed && <p data-testid="vetoed-flag" className="mt-1 text-[11px] font-bold text-red-200">Removed by veto — {r.vetoedBy.join(', ')}</p>}
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    {/* THREE KEYS, AND THEY LOOK LIKE THREE DIFFERENT ANSWERS.
+                        Unselected, they were three identical grey rectangles, so
+                        the difference between "watch it" and "pass" existed only
+                        in the word — and this is the control the whole room
+                        spends its time on. Each now carries a hint of its own
+                        colour before it is pressed and the full weight after, so
+                        the row reads as a ballot rather than a segmented
+                        control. The pressed state is unchanged in meaning and
+                        still carries `aria-pressed`. */}
                     {(['for', 'maybe', 'pass'] as const).map((r2) => (
                       <button
                         key={r2}
@@ -732,10 +897,12 @@ export function CourtRoom({ code }: { code: string }) {
                         disabled={busy}
                         className={`min-h-[44px] flex-1 rounded-xl border px-3 text-xs font-bold uppercase tracking-wide transition ${
                           mineR === r2
-                            ? r2 === 'for' ? 'border-emerald-400/60 bg-emerald-500/25 text-emerald-100'
-                              : r2 === 'maybe' ? 'border-gold-400/60 bg-gold-500/20 text-gold-200'
-                              : 'border-slate-400/50 bg-white/10 text-slate-200'
-                            : 'border-white/12 bg-white/[0.04] text-slate-300 hover:bg-white/10'
+                            ? r2 === 'for' ? 'border-emerald-400/70 bg-emerald-500/25 text-emerald-100 shadow-[0_10px_26px_-14px_rgba(52,211,153,0.9)]'
+                              : r2 === 'maybe' ? 'border-gold-400/70 bg-gold-500/20 text-gold-200 shadow-[0_10px_26px_-14px_rgba(230,173,51,0.9)]'
+                              : 'border-slate-300/50 bg-white/12 text-slate-100'
+                            : r2 === 'for' ? 'border-emerald-400/20 bg-emerald-500/[0.06] text-emerald-200/75 hover:border-emerald-400/45 hover:bg-emerald-500/15'
+                              : r2 === 'maybe' ? 'border-gold-400/20 bg-gold-500/[0.06] text-gold-200/75 hover:border-gold-400/45 hover:bg-gold-500/15'
+                              : 'border-white/12 bg-white/[0.04] text-slate-400 hover:bg-white/10 hover:text-slate-200'
                         }`}
                       >
                         {mineR === r2 ? '✓ ' : ''}{r2}
@@ -782,12 +949,12 @@ export function CourtRoom({ code }: { code: string }) {
   // the court itself in the middle, the live activity feed on the right.
   // A single column below 1280 — the phone flow is untouched.
   return (
-    <Shell wide onChat={() => setChatOpen(true)} unread={unread} sync={sync}>
+    <Shell wide onChat={() => setChatOpen(true)} unread={unread} sync={sync} stage={roomStage} people={roomPeople} code={code}>
       <div className="xl:grid xl:grid-cols-3 xl:items-start xl:gap-5" data-testid="lobby-grid">
       {/* Your group */}
-      <section data-testid="court-group" className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <RoomPanel data-testid="court-group" className="wv-room-enter p-4" style={{ '--wv-room-step': 0 } as React.CSSProperties}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-base font-bold text-white">Your group</h1>
+          <h1 className="text-base font-black tracking-tight text-white">Your group</h1>
           <span data-testid="room-status" className="text-xs text-slate-400">
             {roomReady(snapshot) ? `${participants.length} people joined` : `Waiting for others · ${participants.length} of 2 minimum joined`}
           </span>
@@ -818,13 +985,13 @@ export function CourtRoom({ code }: { code: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={shareInvite} data-testid="share-invite" className="btn-primary text-sm">📜 Send summons</button>
             <button onClick={toggleQr} data-testid="show-qr" className="btn-secondary text-sm">{qr ? 'Hide QR code' : 'Show QR code'}</button>
-            <button onClick={copyLink} data-testid="copy-link" className="rounded-xl border border-white/12 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5">Copy link</button>
+            <button onClick={copyLink} data-testid="copy-link" className="min-h-[44px] rounded-xl border border-white/12 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5">Copy link</button>
             <span className="ml-auto font-mono text-xs tracking-widest text-slate-400">{code}</span>
           </div>
           {(copied || shared) && <p role="status" data-testid="invite-feedback" className="mt-2 text-xs text-emerald-300">{copied ? 'Link copied' : 'Summons ready to send'}</p>}
           {qr && <div data-testid="qr" className="mx-auto mt-3 h-40 w-40 rounded-lg bg-white p-2" dangerouslySetInnerHTML={{ __html: qr }} />}
         </div>
-      </section>
+      </RoomPanel>
 
       {/* CENTER COLUMN — the court itself. */}
       <div>
@@ -834,9 +1001,9 @@ export function CourtRoom({ code }: { code: string }) {
           they live behind Advanced with the room-size setting instead of
           costing every juror two more decisions. The whole default form fits a
           900px viewport without scrolling. */}
-      <section data-testid="court-tonight" className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 xl:mt-0">
+      <RoomPanel data-testid="court-tonight" className="wv-room-enter mt-4 p-4 xl:mt-0" style={{ '--wv-room-step': 1 } as React.CSSProperties}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-bold text-white">Tonight’s preferences</h2>
+          <h2 className="text-base font-black tracking-tight text-white">Tonight’s preferences</h2>
           {tonightDone
             ? <button onClick={() => setTonightDone(false)} className="text-xs font-semibold text-brand-300">Edit</button>
             : <span className="text-xs text-slate-500">Takes ~20 seconds · tonight only</span>}
@@ -892,7 +1059,12 @@ export function CourtRoom({ code }: { code: string }) {
                 data-testid="advanced-toggle"
                 aria-expanded={advOpen}
                 onClick={() => setAdvOpen((o) => !o)}
-                className="text-xs font-semibold text-slate-400 underline decoration-dotted underline-offset-2 hover:text-white"
+                /* A 16px tap target on a phone. It stays a text control — it is
+                   a disclosure, not an action, and making it a button would give
+                   it weight it should not have — but the box it lives in is now
+                   thumb-sized. Inline padding only, so the underline still hugs
+                   the words. */
+                className="inline-flex min-h-[44px] items-center text-xs font-semibold text-slate-400 underline decoration-dotted underline-offset-2 hover:text-white"
               >
                 {advOpen ? 'Hide advanced' : 'Advanced — type, runtime & court size'}
               </button>
@@ -927,12 +1099,12 @@ export function CourtRoom({ code }: { code: string }) {
             </div>
           </div>
         )}
-      </section>
+      </RoomPanel>
 
       {/* Stage 3 — Build the shortlist */}
-      <section data-testid="court-shortlist" className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <RoomPanel data-testid="court-shortlist" className="wv-room-enter mt-4 p-4" style={{ '--wv-room-step': 2 } as React.CSSProperties}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-bold text-white">Add a possibility</h2>
+          <h2 className="text-base font-black tracking-tight text-white">Add a possibility</h2>
           <span className="text-xs text-slate-500">{picks.length}/3 · optional</span>
         </div>
         <div className="relative mt-3">
@@ -998,7 +1170,7 @@ export function CourtRoom({ code }: { code: string }) {
         {!shortlistReady(snapshot) && participants.length >= 2 && (
           <p className="mt-1 text-[11px] text-slate-500">Fewer than 3 possibilities so far. Building the shortlist will fill in verified options.</p>
         )}
-      </section>
+      </RoomPanel>
       </div>
 
       {/* RIGHT COLUMN — the live activity feed, desktop only. Below `xl` the
@@ -1083,6 +1255,116 @@ function ActivityFeed({
   );
 }
 
+/**
+ * A STAGE'S OWN TITLE.
+ *
+ * Every stage used to open with `<h1 className="text-lg font-bold">`, which is
+ * the same weight the app gives a settings section. A room that runs five acts
+ * should say which act you are in, and the eyebrow is what makes the rail above
+ * mean something rather than being a decoration nobody maps to the screen.
+ */
+function StageHeading({
+  eyebrow,
+  title,
+  note,
+  noteTestId,
+}: {
+  eyebrow: string;
+  title: string;
+  note?: string;
+  noteTestId?: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
+      <div className="min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-brand-300/80">{eyebrow}</p>
+        <h1 className="mt-0.5 text-[22px] font-black leading-tight tracking-tight text-white sm:text-[26px]">
+          {title}
+        </h1>
+      </div>
+      {note && (
+        <span data-testid={noteTestId} className="shrink-0 text-xs text-slate-400">
+          {note}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A candidate's artwork, or the absence of it treated as a designed state.
+ *
+ * "No art" in a grey box was the honest answer and looked like a broken image.
+ * A poster-shaped frame with the room's own light in it reads as a plate on a
+ * stage that happens to carry no image — which is what it is. Nothing here
+ * invents artwork; the frame is empty when the title has none.
+ */
+function PosterFrame({ url, title, vetoed = false }: { url: string | null; title: string; vetoed?: boolean }) {
+  return (
+    <div
+      className={`relative h-[104px] w-[70px] flex-none overflow-hidden rounded-lg border ${
+        vetoed ? 'border-red-400/25' : 'border-white/12'
+      }`}
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt={`Poster for ${title}`} className={`h-full w-full object-cover ${vetoed ? 'opacity-45 saturate-0' : ''}`} />
+      ) : (
+        <>
+          <span
+            aria-hidden
+            className="absolute inset-0 bg-[linear-gradient(160deg,rgba(120,150,220,0.16),rgba(10,12,22,0.9))]"
+          />
+          <span
+            aria-hidden
+            className="absolute inset-x-0 bottom-0 h-1/2 bg-[radial-gradient(ellipse_at_bottom,rgba(140,170,255,0.16),transparent_70%)]"
+          />
+          {/* NO TITLE PRINTED IN THE FRAME. The first pass put it here and it
+              was wrong twice over: the heading sits two centimetres to the
+              right, so the name was on screen twice, and it gave a screen
+              reader the same words back to back. An empty plate that is LIT
+              reads as artwork we do not have; a plate with a label on it reads
+              as a broken image with alt text. */}
+        </>
+      )}
+      {vetoed && (
+        <span aria-hidden className="absolute inset-0 grid place-items-center">
+          <span className="h-px w-[130%] rotate-[-32deg] bg-red-300/70" />
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * How well the room as a whole fits this title.
+ *
+ * The number is the engine's `groupScore` unchanged — this only gives it a
+ * length, because "79" and "42" side by side are two facts to compare and two
+ * bars are one glance. The leading candidate's bar carries the room's accent so
+ * the ranking is legible without reading any digits at all.
+ */
+function GroupMatchMeter({ score, leading }: { score: number; leading: boolean }) {
+  const pct = Math.max(0, Math.min(100, score));
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/10">
+        <span
+          data-testid="group-match-bar"
+          data-score={score}
+          className={`block h-full rounded-full transition-[width] duration-700 ${
+            leading ? 'bg-gradient-to-r from-brand-300 to-fuchsia-300' : 'bg-white/35'
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+      <span className={`shrink-0 text-[11px] font-black tabular-nums ${leading ? 'text-brand-100' : 'text-slate-400'}`}>
+        {score}
+      </span>
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <fieldset>
@@ -1120,7 +1402,11 @@ function Chip({
       disabled={disabled}
       title={disabled && disabledReason ? `Already ${disabledReason}` : undefined}
       onClick={onClick}
-      className={`min-h-[36px] rounded-full border px-3 text-xs font-semibold transition ${
+      /* 44px, NOT 36. Measured on a 390px phone: every mood and avoid chip
+         rendered 36px tall, under the touch minimum this project holds
+         everything else to — and these are the most-tapped controls in the
+         room. The text size is unchanged; only the box grew. */
+      className={`min-h-[44px] rounded-full border px-3.5 text-xs font-semibold transition ${
         disabled
           ? 'cursor-not-allowed border-white/5 bg-transparent text-slate-600 line-through'
           : on
@@ -1188,12 +1474,28 @@ function ChatPanel({
   );
 }
 
+/**
+ * The room's chrome, now delegated to `RoomShell`.
+ *
+ * KEPT AS AN ADAPTER RATHER THAN REPLACED AT TWELVE CALL SITES. Every branch in
+ * this file already renders `<Shell sync={sync} …>`, and the smallest change
+ * that carries the redesign through the whole room is to change what `Shell`
+ * IS. That also keeps the diff on the engine at zero: nothing below this line
+ * knows the room grew a floor.
+ *
+ * The sync chip stays here because it is this component's vocabulary — `live`
+ * versus `reconnecting` is a fact about the polling loop, and `RoomShell` has
+ * no business having an opinion about how it is worded.
+ */
 function Shell({
   children,
   onChat,
   unread = 0,
   sync,
   wide = false,
+  stage = 'join',
+  people = [],
+  code,
 }: {
   children: React.ReactNode;
   onChat?: () => void;
@@ -1203,48 +1505,58 @@ function Shell({
    *  `xl` so a 1920 screen carries three ≤640px columns with ≤120px gutters,
    *  and the floating chat button stands down where the feed is inline. */
   wide?: boolean;
+  /** Which of the five stages the room is standing in. Lights the rail. */
+  stage?: RoomStageKey;
+  people?: readonly RoomPerson[];
+  code?: string;
 }) {
   return (
-    <div className="min-h-dvh pb-24 sm:pb-8">
-      {/* The global build badge floats across the top of every screen, so the
-          header reserves clearance for it (same rule as the app shell) — without
-          this the wordmark and Group chat button sat under the badge. */}
-      <header className="container-page flex min-h-14 flex-wrap items-center justify-between gap-3 pt-[calc(env(safe-area-inset-top)+1.5rem)]">
-        <span className="inline-flex min-w-0 items-baseline gap-1.5 text-base">
-          <WatchVerdictWordmark />
-          <span className="whitespace-nowrap font-semibold text-slate-400">Court</span>
-        </span>
-        <span className="flex items-center gap-2">
-          {sync && (
-            <span
-              data-testid="sync-status"
-              data-sync={sync}
-              title={syncLabel(sync)}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-semibold ${
-                sync === 'live'
-                  ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-                  : 'border-amber-400/40 bg-amber-500/10 text-amber-100'
-              }`}
-            >
-              <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${sync === 'live' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              {syncLabel(sync)}
-            </span>
-          )}
-        {onChat && (
-          <button
-            onClick={onChat}
-            data-testid="open-chat"
-            className={`relative min-h-[44px] rounded-xl border border-white/12 px-3 text-sm font-semibold text-slate-200 transition hover:bg-white/5 ${wide ? 'xl:hidden' : ''}`}
+    <RoomShell
+      stage={stage}
+      people={people}
+      code={code}
+      onChat={onChat}
+      unread={unread}
+      wide={wide}
+      status={
+        sync ? (
+          /* COMPACT, BECAUSE IT SHARES A LINE WITH THE ROOM'S IDENTITY.
+             "Reconnecting — still updating" is the right sentence and it wrapped
+             to two lines at 390px, pushing the chat button onto a third. The
+             full wording survives as the accessible name and the tooltip; the
+             chip itself carries a dot and one word, which is all a glance needs.
+             `sr-only` keeps the whole sentence for a screen reader, where there
+             is no width to run out of. */
+          <span
+            data-testid="sync-status"
+            data-sync={sync}
+            title={syncLabel(sync)}
+            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border px-2 py-1 text-[11px] font-semibold ${
+              sync === 'live'
+                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                : 'border-amber-400/40 bg-amber-500/10 text-amber-100'
+            }`}
           >
-            Group chat
-            {unread > 0 && (
-              <span data-testid="chat-unread" className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-black text-white">{unread}</span>
-            )}
-          </button>
-        )}
-        </span>
-      </header>
-      <main className={`mx-auto w-full py-3 ${wide ? 'max-w-2xl px-4 sm:px-6 xl:max-w-[1760px]' : 'container-page max-w-2xl'}`}>{children}</main>
-    </div>
+            <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${sync === 'live' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            {(() => {
+              const short = sync === 'live' ? 'Live' : sync === 'connecting' ? 'Connecting' : 'Reconnecting';
+              const full = syncLabel(sync);
+              /* The long form is only added when it SAYS SOMETHING MORE. For
+                 `live` the two are identical, and rendering both gave the chip
+                 the text "LiveLive" — read out twice by a screen reader, and
+                 caught by the live-sync test asserting the chip's text. */
+              return (
+                <>
+                  <span>{short}</span>
+                  {full !== short && <span className="sr-only">{full}</span>}
+                </>
+              );
+            })()}
+          </span>
+        ) : null
+      }
+    >
+      {children}
+    </RoomShell>
   );
 }

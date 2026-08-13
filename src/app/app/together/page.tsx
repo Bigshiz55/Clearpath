@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
-import { StartLiveCourt } from '@/components/StartLiveCourt';
-import { CourtSecondaryActions } from '@/components/court/CourtSecondaryActions';
+import { VerdictRoomEntrance } from '@/components/court/VerdictRoomEntrance';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -8,21 +7,15 @@ export const metadata: Metadata = {
 };
 
 /**
- * THE VERDICT ROOM — one obvious primary action, two clear secondary cards.
- * The rest of the page (Cloud Crews) stays reachable but demoted to a small
- * link under the cards, so it doesn't compete with the main entry.
+ * THE VERDICT ROOM — the entrance to one of WatchVerd1ct's signature
+ * experiences, composed as a full screen rather than a launcher.
+ *
+ * The page itself is deliberately thin: the whole composition (the shadow
+ * room behind the glass, the identity, the entrance control, the two modes and
+ * the crew rail) lives in `VerdictRoomEntrance`, which is where its reasoning
+ * is documented. Room creation, Quick Pick, Invite the Jury and saved Crews
+ * all behave exactly as they did.
  */
-export default async function TogetherPage() {
-  return (
-    <div className="mx-auto max-w-xl">
-      <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">The Verdict Room</h1>
-      <p className="mt-1.5 text-sm text-slate-400">Everyone weighs in. One title wins.</p>
-
-      <div className="mt-6">
-        <StartLiveCourt />
-      </div>
-
-      <CourtSecondaryActions />
-    </div>
-  );
+export default function TogetherPage() {
+  return <VerdictRoomEntrance />;
 }
