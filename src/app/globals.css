@@ -235,14 +235,21 @@ body {
   @media (max-width: 359px) {
     .wv-tray-status { display: none; }
     /* THE 320px CARD, MEASURED.
-       At 320 the card is 288 wide; a 38% poster leaves the body 143 and the
+       At 320 the card is 288 wide; a 38% poster left the body 143 and the
        ratings row 130 — 39px a chip, where "IMDb 6.8" needs 51. The result was
        a rating that rendered as "IMDb 6", which is worse than none: it is a
-       wrong number, confidently displayed.
-       Two small concessions at this width only: the poster takes 30% instead of
-       38% (86px — still a recognisable placard), and the rating type drops a
-       step. Together that gives 51px a chip against a 44px need. */
-    .wv-card-art { width: 30%; }
+       wrong number, confidently displayed. So the poster gave up 8% of the
+       card's width to buy the chips room.
+
+       THE CONCESSION IS REPAID. The rating chips are not on the browse card any
+       more — they are the working behind the number and they live in More Info
+       — so the poster takes its full 38% back (109px instead of 86px). That
+       matters for a reason the old layout did not have: the frame now carries
+       two controls, ⓘ Info and ▶ Trailer, and two 44px tap targets plus their
+       insets need 96px. At 86px they overlapped and one of them stopped being
+       clickable. The type-size drops below stay — they apply to the ratings
+       strip wherever it is drawn, which is now the modal.
+       Measured at 320: frame 109px, chips at 4..48 and 61..105. */
     .wv-ratings-row { font-size: 11px; }
     .wv-ratings-emoji { font-size: 10px; }
     .wv-ratings-tag { font-size: 7px; }

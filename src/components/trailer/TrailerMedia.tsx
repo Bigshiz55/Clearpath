@@ -477,10 +477,10 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
           onClick={manualPlay}
           aria-label={`Play ${title} trailer`}
           data-testid="trailer-play"
-          /* 36px minimum. It is a real control on a poster, and the smallest
-             phone the app supports puts it in a 136px rail item — the tap-target
-             floor applies there exactly as it does in the action row. */
-          className="absolute bottom-1 right-1 z-[2] inline-flex min-h-[36px] items-center gap-1 rounded-full bg-black/60 px-2.5 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80"
+          /* 44px ON BOTH AXES — the floor is a box, not a height. Collapsed to
+             its glyph in a narrow frame this measured 28×36 and failed the
+             tap-target sweep at all twelve viewports. */
+          className="absolute bottom-1 right-1 z-[2] inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full bg-black/60 px-2.5 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80"
         >
           <span aria-hidden>▶</span>
           {/* The WORD goes before the control does. In a 86px media frame (a

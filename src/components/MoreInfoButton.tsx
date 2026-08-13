@@ -44,10 +44,11 @@ export function MoreInfoButton({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  // 36px minimum — the same tap-target floor as the ▶ Trailer control it sits
-  // opposite. A control on artwork is still a control.
+  // 44px ON BOTH AXES. A control on artwork is still a control, and the floor
+  // is a box, not a height: collapsed to its glyph in a narrow frame this chip
+  // measured 31×36 and failed the tap-target sweep at all twelve viewports.
   const chip =
-    'inline-flex min-h-[36px] items-center gap-1 rounded-full bg-black/60 px-2.5 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80';
+    'inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full bg-black/60 px-2.5 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80';
   const plain =
     'inline-flex min-h-[44px] items-center rounded-xl border border-white/12 bg-white/5 px-3 text-[12px] font-bold text-slate-200 transition hover:border-white/25 hover:bg-white/10';
   return (
