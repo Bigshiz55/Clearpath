@@ -311,6 +311,13 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
                the full detail — that is precisely the card this affordance
                exists for. */
             href={href ?? `/app/title/${mediaType}/${saveId}`}
+            /* NO PREFETCH. `next/link` prefetches every link that enters the
+               viewport, and a browse grid is twenty of these at once — twenty
+               RSC payloads for dynamic title pages the reader may never open.
+               Measured, not theorised: with prefetch on, `/dev/visual-qa`
+               never reached `networkidle` within 20s. A grid is exactly the
+               place where prefetching everything is the wrong default. */
+            prefetch={false}
             data-testid="card-more-info"
             className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-semibold text-brand-200 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950"
           >
