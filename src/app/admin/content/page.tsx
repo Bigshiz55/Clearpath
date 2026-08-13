@@ -1,8 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
-import { isAdminEmail } from '@/lib/admin';
 import { buildRegistry, countsByKind, duplicateSlugs } from '@/lib/discovery/registry';
 import { titlePages } from '@/lib/discovery/titlePages';
 import type { PageKind, PageStatus } from '@/lib/discovery/types';
@@ -40,13 +37,8 @@ export default async function AdminContentPage({
 }: {
   searchParams: { kind?: string; status?: string };
 }) {
-  // Server-side authorization — never trust the client.
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email || !isAdminEmail(user.email)) notFound();
-
+  // Authorization is the /admin layout's job — one gate, applied to every
+  // page under it. See src/app/admin/layout.tsx.
   const titles = titlePages();
   const registry = buildRegistry(new Date(), titles);
   const counts = countsByKind(registry);

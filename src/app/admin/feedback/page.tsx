@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isAdminEmail } from '@/lib/admin';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -45,18 +43,12 @@ function formatWhen(iso: string): string {
 
 /**
  * Read-only feedback inbox — newest first, full captured context per report.
- * Gated the same way as /admin/content: server-side ADMIN_EMAILS check,
- * notFound() (not a redirect) for anyone else so its existence isn't leaked.
- * Reads via the service-role client since `feedback` has no select RLS
+ * Authorization belongs to the /admin layout, which gates every page beneath
+ * it against ADMIN_EMAILS and 404s everyone else so the route's existence is
+ * not leaked. Reads via the service-role client since `feedback` has no select RLS
  * policy (migration 0040) — this page is the only place these rows are read.
  */
 export default async function AdminFeedbackPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email || !isAdminEmail(user.email)) notFound();
-
   const admin = createAdminClient();
   const { data, error } = await admin
     .from('feedback_reports')

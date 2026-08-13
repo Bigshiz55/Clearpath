@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `18de532` · Branch: `claude/dna-showdown-rebased`
+- Commit: `ae25f6f` · Branch: `claude/admin-gate`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 

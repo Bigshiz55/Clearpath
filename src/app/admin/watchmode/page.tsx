@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isAdminEmail } from '@/lib/admin';
 import { MONTHLY_CALL_LIMIT } from '@/lib/watchmode/sync';
 
 export const dynamic = 'force-dynamic';
@@ -23,18 +21,12 @@ function formatWhen(iso: string | null): string {
 /**
  * Read-only headroom view for the Watchmode free-tier budget guard (see
  * src/lib/watchmode/sync.ts). Gated the same way as /admin/feedback and
- * /admin/content: server-side ADMIN_EMAILS check, notFound() (not a
- * redirect) for anyone else. Reads via the service-role client, since
+ * the /admin layout: a single server-side ADMIN_EMAILS check that 404s
+ * everyone else. Reads via the service-role client, since
  * `watchmode_call_ledger` and `watchmode_title_map` have no SELECT policy —
  * same reasoning as `tv_call_ledger`/`tv_ingestion_runs`.
  */
 export default async function AdminWatchmodePage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email || !isAdminEmail(user.email)) notFound();
-
   const admin = createAdminClient();
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();

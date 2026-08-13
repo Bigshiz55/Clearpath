@@ -48,11 +48,6 @@ unblocks.
 - **Semantic reference similarity via embeddings/pgvector.** Reference "like X"
   similarity is TMDB getSimilar + keyword/genre overlap today; `embed()` infra
   exists (powers DNA) but isn't wired into reference similarity yet.
-- **Shared admin token gate across all `/admin` routes.** `/admin/content`
-  and `/admin/feedback` each hand-roll the same `isAdminEmail()` +
-  `notFound()` check independently — a shared gate (middleware or a small
-  wrapper) would remove the risk of a future `/admin/*` route shipping
-  without it.
 - **Trial onboarding flow.** There's no first-run "try it before you commit"
   path for a brand-new visitor before they've built a taste profile — worth
   scoping once the accounts/feedback loop above has real usage to learn from.
@@ -65,6 +60,21 @@ unblocks.
   representative.
 
 ## Done
+- **`/admin` has one gate, and two pages that were never gated now are.** The
+  check was three lines copied per page, which is a gate you have to remember —
+  and the record showed what that is worth: `/admin/migrations` (whose own doc
+  comment claimed "SESSION-GATED") and `/admin/tv` (data mode, egress counts,
+  per-source blockers) both rendered to anyone who guessed the path. Neither
+  exposed a destructive action — every `/api/admin/*` route authorizes itself,
+  and still does — but both leaked operational detail. `src/app/admin/layout.tsx`
+  is now the single gate; Next.js runs it for every nested route, so a new
+  `/admin/*` page is covered the moment it exists. The three hand-rolled copies
+  are removed. `adminSurfaces.test.ts` pins all of it: the layout verifies via
+  `getUser()` (never `getSession()`), 404s rather than 403s, is `force-dynamic`,
+  no page re-implements it, and every admin API route still refuses a stranger —
+  with `whoami` carved out and explained, since a self-status endpoint must
+  answer a non-admin to be useful. Build output confirms the fix: all five admin
+  pages are now server-rendered on demand rather than static.
 - **Streaming brand coverage is 14/15, and the last one is an upstream fact.**
   Starz, AMC+, Fubo, Tubi, Pluto TV and The Roku Channel now render their own
   marks. Their paths were not guessed: production's already-deployed
