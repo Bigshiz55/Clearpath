@@ -49,6 +49,7 @@
 import { DIMENSION_KEYS } from '@/lib/scoring/dimensions';
 import type { CriticRelation, ResolvedAnchor } from './objective';
 import type { CriticPlan, TraitInstruction } from './plan';
+import { MAX_STRANDS } from './strandBudget';
 
 /**
  * EXACTLY what `discoverTitlesChecked` can put on the wire, verified against
@@ -202,9 +203,17 @@ export function planToHints(input: HintInput): CriticRetrievalHints {
          blend must not do.
 
          PER SEED, NOT PER ANCHOR — honestly named, because `ResolvedAnchor`
-         carries no keywords and the ids arrive here already flattened. Grouping
-         by anchor is strictly better and needs that shape to exist first. */
-      for (const kw of anchorKeywordIds) {
+         carries no keywords and the ids arrive here already flattened. The
+         caller interleaves them per anchor so position alternates sides.
+
+         BUDGETED HERE, because emitting more than the cap does not widen
+         anything — `runStrands` slices to `MAX_STRANDS`, so an unbounded fan
+         silently discarded the TAIL of the list (the second anchor's seeds)
+         AND the anchor-genres strand below it. That reproduced exactly the
+         failure per-seed strands exist to prevent. Reserve room for the recall
+         floor and the genre net, then take what is left. */
+      const reserved = 1 + (anchorGenreIds.length > 0 ? 1 : 0); // floor + genres
+      for (const kw of anchorKeywordIds.slice(0, Math.max(1, MAX_STRANDS - reserved))) {
         strands.push({ label: `anchor-seed-${kw}`, keywordIds: [kw] });
       }
     } else {

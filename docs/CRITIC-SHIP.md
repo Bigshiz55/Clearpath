@@ -188,6 +188,55 @@ byte-identical to `main`, and `search-corpus-1000.json` still hashes to
 
 **Frozen delta: 0 PASS→FAIL, 0 FAIL→PASS.**
 
+### Post-review fixes (PR #57, three defects found by automated review)
+
+Review on the open PR found three real logic defects in this workstream's own
+code. Each was **verified empirically before being believed**, and each defeated
+a guarantee the ledger states in writing. Pinned by
+`src/lib/critic/reviewFindings.test.ts` (13 tests).
+
+**1 · The ungated recall floor was being gated — by an anchor's own NAME.**
+`criticBase` was `naiveParseQuery(text)` over the whole comparative sentence,
+anchors included, and the shipped parser reads genre words out of free text:
+
+```
+"Better than Supernatural or True Detective"  ->  genreIds [14, 9648]
+"Better than Funny Games"                     ->  genreIds [35]
+```
+
+`runStrands` spreads the base onto EVERY strand, so a genre inferred from a
+title was removing candidates from the strand whose entire purpose is to be
+ungated — breaking "a bad critic guess can only fail to ADD a title, never
+remove one". Fixed with `stripAnchorSpans(text, referenceTitles)`: constraints
+are parsed from the sentence MINUS the known title spans, so a genre the user
+genuinely stated ("better than X, but a comedy") still survives.
+
+**2 · `blend` silently dropped one anchor — the exact failure it exists to
+prevent.** `planToHints` emitted one strand per seed with no budget awareness,
+and `runStrands` sliced to `MAX_STRANDS`. With anchor A's keywords flattened
+first, a well-tagged A consumed the whole budget: measured at 10 strands emitted,
+5 kept — `recall-floor` plus A's first four seeds, with **both of anchor B's
+seeds and the `anchor-genres` strand discarded**. Fixed on both sides: the seed
+list is now interleaved per anchor rather than concatenated, and `planToHints`
+reserves room for the floor and the genre net before fanning seeds.
+
+**3 · The acclaim strand's sort was dead metadata.** `RetrievalStrand.sortBy`
+declared `vote_average.desc`, `FinderQuery` had no sort field, and `runFinder`
+hardcoded `popularity.desc` — so the one strand meant to reach what a popularity
+sweep HIDES was itself sorted by popularity. Fixed by adding optional
+`FinderQuery.sortBy` (unset keeps the existing default for every other query)
+and passing the strand's sort through.
+
+**One claim of mine that did NOT survive checking.** A draft of the regression
+test also asserted the fix stopped "Blade Runner 2049" being read as a date
+bound. It does not, because there was nothing to stop — `naiveParseQuery` never
+extracts a year from that position. The measured fact is pinned instead of the
+plausible-sounding one.
+
+Re-run after the fixes: **263 critic tests**, 3512 vitest, typecheck · lint ·
+build clean, searchrouting 21, frozen corpus P0 635/635 · P1 515/515 with zero
+movement.
+
 ### Merge recommendation: **YES**
 
 The incident that opened this workstream is closed at the mechanism, not the

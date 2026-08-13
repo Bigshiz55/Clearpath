@@ -191,6 +191,41 @@ function readModifiers(region: string): { modifiers: Modifiers; unresolved: stri
 }
 
 /**
+ * Remove the anchor titles from a sentence before it is parsed for CONSTRAINTS.
+ *
+ * ── WHY THIS EXISTS ───────────────────────────────────────────────────────
+ * `naiveParseQuery` reads genre words out of free text, and it cannot know that
+ * "Supernatural" is a title here rather than a request for fantasy. Feeding it
+ * the whole comparative sentence turned an anchor's own NAME into a positive
+ * genre filter:
+ *
+ *   "Better than Supernatural or True Detective"  ->  genreIds [14, 9648]
+ *   "Better than Funny Games"                     ->  genreIds [35]
+ *
+ * Those ids then rode the base query onto EVERY retrieval strand — including
+ * the recall floor, whose entire purpose is to be ungated. A guess derived from
+ * a title was REMOVING candidates, which is the one thing GC5 promises a critic
+ * inference can never do.
+ *
+ * Stripping the spans rather than discarding `genreIds` wholesale matters: a
+ * genre the user genuinely stated ("better than X, but a comedy") is a fact of
+ * the sentence and must survive. Only the names we already know to be titles
+ * are removed.
+ */
+export function stripAnchorSpans(text: string, anchors: readonly string[]): string {
+  let out = text ?? '';
+  /* LONGEST FIRST, so "Blade Runner 2049" is removed as a unit rather than
+     leaving "2049" behind after a shorter overlapping match. */
+  for (const a of [...anchors].sort((x, y) => y.length - x.length)) {
+    const name = a.trim();
+    if (name.length < 2) continue;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(escaped, 'gi'), ' ');
+  }
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+/**
  * Read a comparison out of a sentence, or return null when there isn't one.
  *
  * Null is the common case and it MATTERS: a request with no comparative

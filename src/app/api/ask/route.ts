@@ -10,6 +10,7 @@ import { augmentInternational } from '@/lib/askInternational';
 import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
 import { routeAsk } from '@/lib/critic/gate';
+import { stripAnchorSpans } from '@/lib/critic/request';
 import { buildCriticState } from '@/lib/critic/orchestrate';
 import { resolveAnchor } from '@/lib/critic/anchor';
 import { runStrands } from '@/lib/critic/strands';
@@ -98,7 +99,22 @@ async function anchorKeywordsFor(
   anchors: readonly { mediaType: 'movie' | 'tv'; tmdbId: number }[],
 ): Promise<number[]> {
   const per = await Promise.all(anchors.slice(0, 2).map((a) => keywordsForAnchor(a).catch(() => [])));
-  return [...new Set(per.flat())].slice(0, 12);
+  /* INTERLEAVED, NOT CONCATENATED. `blend` turns each seed into its own strand
+     and the strand budget takes a PREFIX of this list, so anchor-A-then-
+     anchor-B ordering meant a well-tagged A consumed the whole budget and B
+     contributed nothing — the precise starvation per-seed strands exist to
+     prevent. Round-robin makes the prefix contain both sides. */
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (let i = 0; i < Math.max(...per.map((p) => p.length), 0); i++) {
+    for (const list of per) {
+      const kw = list[i];
+      if (kw == null || seen.has(kw)) continue;
+      seen.add(kw);
+      out.push(kw);
+    }
+  }
+  return out.slice(0, 12);
 }
 
 function hasCompetingConstraints(text: string): boolean {
@@ -342,9 +358,19 @@ export async function POST(req: Request) {
       // Stated constraints only. The conversational state already carries the
       // accumulated ones; a fresh ask reads them off the deterministic parser
       // (never the LLM — a hard constraint must not depend on a key being set).
+      /* CONSTRAINTS ARE PARSED FROM THE SENTENCE MINUS THE TITLES.
+         `naiveParseQuery` reads genre words out of free text and cannot know
+         "Supernatural" is an anchor here, so parsing the whole sentence turned
+         an anchor's own NAME into a positive `genreIds` filter — which then rode
+         the base query onto every strand, gating even the ungated recall floor.
+         A guess derived from a title was REMOVING candidates, the one thing GC5
+         promises an inference can never do. Genres the user genuinely stated
+         ("better than X, but a comedy") survive, because only the known title
+         spans are removed. */
+      const constraintText = stripAnchorSpans(text, criticRequest.referenceTitles);
       const criticBase: FinderQuery = conversational && convState
         ? stateToQuery(convState)
-        : augmentInternational(naiveParseQuery(text), text);
+        : augmentInternational(naiveParseQuery(constraintText), constraintText);
       if (criticRequest.referenceTitles.length > 0) {
         criticBase.similarTo = criticRequest.referenceTitles.join(' / ');
       }

@@ -149,6 +149,15 @@ export interface FinderQuery {
    * pool.
    */
   minVotes?: number | null;
+  /**
+   * TMDB `sort_by` for discovery. Optional and additive: unset keeps the
+   * long-standing `popularity.desc` default for every existing query.
+   *
+   * Exists for the critic's acclaim strand, which asks for `vote_average.desc`.
+   * Without this the strand declared a sort nothing read, so the one query meant
+   * to surface what a popularity sweep HIDES was itself sorted by popularity.
+   */
+  sortBy?: string;
 }
 
 export interface FinderItem {
@@ -406,7 +415,7 @@ export async function runFinder(
           originalLanguage: lang,
           originCountry: q.originCountries?.[0],
           monetization: q.monetization,
-          sortBy: 'popularity.desc',
+          sortBy: q.sortBy ?? 'popularity.desc',
           page,
         }),
       ),

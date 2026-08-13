@@ -89,6 +89,10 @@ export async function runStrands(
       // The strand's own quality bars, in the finder's units (% → 0..10).
       if (s.minRating != null) q.minAudience = Math.round(s.minRating * 10);
       if (s.minVotes != null) q.minVotes = s.minVotes;
+      /* The strand's own sort. Acclaim asks for `vote_average.desc`; without
+         this it inherited popularity and returned the popular subset of the
+         acclaimed pool — the opposite of what the strand is for. */
+      if (s.sortBy) q.sortBy = s.sortBy;
 
       const r = await runFinder(supabase, userId, q, watcher, limit).catch(() => null);
       return { label: s.label, items: r?.items ?? [], scoredFor: r?.scoredFor ?? '', relaxed: r?.relaxed ?? null };
