@@ -3,7 +3,7 @@
 Make the AI the film critic, not the search parser. Continuation state across
 sessions: read this, execute **NEXT ACTION**.
 
-CURRENT SHA: `9c381dc74e35860b2cdfdd2a018bb450250c8e55`
+CURRENT SHA: `0470cf1a9d77ef098ea29a6977bf8a080b6c943f`
 BRANCH: `claude/critic-layer`, cut from `main` @ 6080287.
 NEXT ACTION: GC12 — full gates + merge recommendation.
 
