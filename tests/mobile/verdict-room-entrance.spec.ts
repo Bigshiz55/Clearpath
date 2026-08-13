@@ -126,12 +126,84 @@ test('reduced motion leaves a still, complete composition', async ({ page }) => 
   await expect(page.getByTestId('start-court')).toBeVisible();
   await expect(page.getByTestId('crew-rail')).toBeVisible();
   const durations = await page.evaluate(() =>
-    [...document.querySelectorAll('.wv-vr-enter, .wv-vr-drift, .wv-vr-ready, .wv-vr-pulse')].map(
-      (el) => getComputedStyle(el).animationDuration,
+    [
+      ...document.querySelectorAll(
+        '.wv-vr-enter, .wv-vr-drift, .wv-vr-ready, .wv-vr-pulse, .wv-vr-react, .wv-vr-consensus, .wv-vr-sheen > span',
+      ),
+    ].map((el) => getComputedStyle(el).animationDuration),
+  );
+  expect(durations.length, 'no animated elements found — the selector list is stale').toBeGreaterThan(0);
+  for (const d of durations) expect(parseFloat(d)).toBeLessThan(0.01);
+  // The room is still DRESSED, not merely still: a reduced-motion visitor gets
+  // the same composition, not a set of elements frozen mid-reveal.
+  await expect(page.getByTestId('shadow-poster')).toHaveCount(3);
+  await expect(page.getByTestId('shadow-decision')).toBeAttached();
+  await page.screenshot({ path: 'test-results/mobile/verdict-room-reduced-motion.png' });
+});
+
+/**
+ * WHAT THE ROOM IS MADE OF.
+ *
+ * The first version of this composition was two blank gradient rectangles, a
+ * row of anonymous dots and a generic bar — legible as a wireframe rather than
+ * as a room. These assertions are the floor under the replacement: the plates
+ * carry drawn artwork, the people are people and at least one of them has
+ * reacted, and the room has a moment where it decides.
+ */
+test('the shadow room is dressed, not a wireframe', async ({ page }) => {
+  await open(page, 1440, 900);
+
+  const posters = page.getByTestId('shadow-poster');
+  await expect(posters).toHaveCount(3);
+  // Each plate holds an actual illustration. A blank plate would be an <svg>
+  // with a background rect and nothing else, so the bar is set above that.
+  const shapes = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="shadow-poster"] svg')].map(
+      (svg) => svg.querySelectorAll('path, circle, rect, ellipse, line').length,
     ),
   );
-  for (const d of durations) expect(parseFloat(d)).toBeLessThan(0.01);
-  await page.screenshot({ path: 'test-results/mobile/verdict-room-reduced-motion.png' });
+  expect(shapes.length, 'a plate is missing its artwork entirely').toBe(3);
+  for (const n of shapes) expect(n, `a plate has only ${n} drawn shapes`).toBeGreaterThan(8);
+
+  // People, and at least one of them has pressed a key.
+  expect(await page.getByTestId('shadow-seat').count()).toBeGreaterThanOrEqual(4);
+  expect(await page.getByTestId('shadow-reaction').count()).toBeGreaterThanOrEqual(1);
+  await expect(page.getByTestId('shadow-decision')).toBeAttached();
+});
+
+test('nothing in the room escapes the box it was drawn in', async ({ page }) => {
+  await open(page, 1440, 900);
+  // REGRESSION. `PosterArt` is `absolute inset-0`, so a container that forgets
+  // `position: relative` does not clip it — it hands it the whole verdict
+  // board, and a 36px thumbnail paints across 340px of panel.
+  const thumb = (await page.getByTestId('shadow-board-thumb').boundingBox())!;
+  expect(thumb.width, `board thumbnail is ${thumb.width}px wide`).toBeLessThan(60);
+
+  const art = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="shadow-board-thumb"] svg')!;
+    const r = el.getBoundingClientRect();
+    return { w: Math.round(r.width), h: Math.round(r.height) };
+  });
+  expect(art.w, 'the board artwork is painting outside its thumbnail').toBeLessThan(60);
+});
+
+test('the whole shortlist is on screen on a phone', async ({ page }) => {
+  await open(page, 390, 844);
+  // REGRESSION. `rotateY` before `translateZ` applies the depth push in the
+  // ROTATED frame, which adds z·sin(θ) of sideways travel — enough to hang
+  // both flanking plates off the edges of a 390px screen as slivers.
+  const boxes = await page.getByTestId('shadow-poster').evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { left: Math.round(r.left), right: Math.round(r.right), w: Math.round(r.width) };
+    }),
+  );
+  expect(boxes).toHaveLength(3);
+  for (const b of boxes) {
+    expect(b.left, `a plate starts at ${b.left}px`).toBeGreaterThanOrEqual(-8);
+    expect(b.right, `a plate ends at ${b.right}px in a 390px screen`).toBeLessThanOrEqual(398);
+    expect(b.w, `a plate is only ${b.w}px wide — too small to read as a poster`).toBeGreaterThan(55);
+  }
 });
 
 test('the empty crew state is designed, not an apology', async ({ page }) => {

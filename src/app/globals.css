@@ -1266,6 +1266,24 @@ body {
 }
 .wv-vr-pulse { animation: wv-vr-pulse 5.5s ease-in-out infinite; }
 
+/* A reaction coming back from one of the seats — the key they just pressed,
+   arriving. Both ends of the cycle are the fully-drawn state, so the collapsed
+   reduced-motion version is a reaction that is simply THERE. */
+@keyframes wv-vr-react {
+  0%, 100% { transform: scale(1); opacity: 0.92; }
+  46%      { transform: scale(1.16); opacity: 1; }
+}
+.wv-vr-react { animation: wv-vr-react 4.2s ease-in-out infinite; }
+
+/* How far the room has swung. It breathes around its resting width rather
+   than filling from zero: a bar that animates in from empty would be claiming
+   a count is being tallied, and at the entrance nothing is. */
+@keyframes wv-vr-consensus {
+  0%, 100% { width: 66%; }
+  50%      { width: 73%; }
+}
+.wv-vr-consensus { width: 66%; animation: wv-vr-consensus 7.5s ease-in-out infinite; }
+
 /* The staged entrance. Foreground elements arrive in reading order rather than
    all at once; `--wv-vr-step` is set per element. */
 @keyframes wv-vr-enter {
