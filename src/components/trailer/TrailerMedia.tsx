@@ -235,17 +235,38 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
     [id, resolve, emit],
   );
 
+  // The one way back to the poster, whatever asked for it.
+  const dismiss = useCallback(() => {
+    setOpen(false);
+    setMuted(true);
+    startedSent.current = false;
+    playing.release(id);
+    emit('trailer_closed');
+  }, [id, emit]);
+
   const close = useCallback(
     (e: React.MouseEvent) => {
       stop(e);
-      setOpen(false);
-      setMuted(true);
-      startedSent.current = false;
-      playing.release(id);
-      emit('trailer_closed');
+      dismiss();
     },
-    [id, emit],
+    [dismiss],
   );
+
+  // ESCAPE RETURNS THE POSTER. A video that took over the media frame is a
+  // mode, and every mode needs the key people already press to leave one —
+  // otherwise the only way out is finding a 32px ✕ over moving artwork. Bound
+  // only while this card is the one playing, so a grid of fifty cards never
+  // has fifty listeners and Escape never reaches a card that is not showing.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      dismiss();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, dismiss]);
 
   // Lightweight YouTube control via postMessage (no full SDK).
   const command = useCallback((func: string, args: unknown[] = []) => {
@@ -300,7 +321,16 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
       {/* The poster (and the card's own click target) is always present underneath
           — the trailer crossfades over it, and is what remains if resolution
           misses or the player is closed. */}
-      <div className={showIframe ? 'opacity-0 transition-opacity duration-500' : 'opacity-100'}>{children}</div>
+      {/* `h-full w-full` IS LOAD-BEARING. This wrapper had no size, so a child
+          asking for `h-full` (every poster/Link/button passed in here does)
+          resolved against an auto-height box and collapsed to its content —
+          which is why a card with no artwork drew its fallback title at the
+          top of an empty frame instead of centred in it. The wrapper must be
+          exactly the media frame, because that is what the poster state is
+          defined as occupying. */}
+      <div className={`h-full w-full ${showIframe ? 'opacity-0 transition-opacity duration-500' : 'opacity-100'}`}>
+        {children}
+      </div>
 
       {showIframe && embed && (
         <div className="absolute inset-0" data-testid="trailer-player">

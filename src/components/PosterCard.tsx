@@ -94,8 +94,16 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   const heading = (
     <>
       {/* Full-width cards on a phone mean the title has room to be read rather
-          than scanned, so it is sized for reading. */}
-      <div className="line-clamp-2 text-base font-semibold leading-snug text-white sm:text-sm">{title}</div>
+          than scanned, so it is sized for reading.
+
+          IT RESERVES BOTH LINES WHETHER IT NEEDS THEM OR NOT. The clamp caps a
+          long title at two lines, but a SHORT one took only one — so in a row
+          of four cards, "A" and "Gōngfu Sūpermán 功夫超人 — Édition Spéciale"
+          started their facts, score, synopsis and provider row at different
+          heights, and nothing below lined up across the row. Reserving the
+          second line costs one line of space on short titles and buys a grid
+          whose rows scan straight across. */}
+      <div className="line-clamp-2 min-h-[2.75rem] text-base font-semibold leading-snug text-white sm:min-h-[2.5rem] sm:text-sm">{title}</div>
       <div className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-400 sm:text-xs">
         <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
           {mediaType === 'movie' ? 'Movie' : 'TV'}
@@ -283,6 +291,33 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         {/* Supporting evidence: the pills, the household verdict, and the
             "Why this Verd1ct?" panel. */}
         {evidence && <div className="space-y-2">{evidence}</div>}
+
+        {/* MORE INFO — WHERE THE DEEP DETAIL LIVES.
+            The card answers four questions: what is it, will I like it, where
+            can I watch it, what can I do about it. Everything beyond that —
+            the full synopsis, every reason, the cautions, the detailed
+            ratings, the expanded availability, the cast, the deeper DNA
+            explanation — belongs one level down, and one level down already
+            exists: the title page. This is a link to THAT, not a second
+            detail surface built beside it.
+            It also gives the card a deliberate end, which the foot did not
+            have — the last thing on it was whatever async block happened to
+            resolve last. */}
+        {saveId != null && (
+          <Link
+            /* Derived, not required from the caller. Every card that knows its
+               id knows where its title page is, and a card whose poster opens
+               a QuickLook (`onOpen`, no `href`) still needs a way through to
+               the full detail — that is precisely the card this affordance
+               exists for. */
+            href={href ?? `/app/title/${mediaType}/${saveId}`}
+            data-testid="card-more-info"
+            className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-semibold text-brand-200 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950"
+          >
+            More info
+            <span aria-hidden>→</span>
+          </Link>
+        )}
 
         {/* The FOR/AGAINST/SAVE row lives at the TOP of the card now — see the
             block above `.wv-card`. The foot ends on the evidence. */}
