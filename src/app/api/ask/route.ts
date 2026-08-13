@@ -16,7 +16,7 @@ import { runStrands } from '@/lib/critic/strands';
 import { rankCriticCandidates } from '@/lib/critic/decide';
 import { buildComparativeExplanation } from '@/lib/critic/explain';
 import { getCachedDimensions } from '@/lib/titleDimensions';
-import { loadPreference } from '@/lib/preference/store';
+import { loadPreferenceCached } from '@/lib/preference/store';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
 import { buildQueryPlan } from '@/lib/nlu/queryPlan';
@@ -59,7 +59,12 @@ async function referenceKeywordIds(referenceTitles: string[]): Promise<number[]>
        Furious" fetched the keywords of Furious 7, so the search was biased
        toward a film the user had not named, and the read-back said we had kept
        the feel of the one they did. `resolveAnchor` refuses instead of
-       guessing, and an anchor it cannot place contributes no keywords at all. */
+       guessing, and an anchor it cannot place contributes no keywords at all.
+
+       STILL USED BY THE NON-CRITIC CONVERSATIONAL PATH, which carries reference
+       titles as strings and never resolves them. The critic path takes
+       `anchorKeywordsFor` below instead, which reuses the resolution GC2
+       already did rather than repeating it. */
     const candidates = (await searchTitles(name).catch(() => [])).map((c) => ({
       id: c.id,
       title: c.title,
@@ -68,13 +73,32 @@ async function referenceKeywordIds(referenceTitles: string[]): Promise<number[]>
     }));
     const res = resolveAnchor({ spokenAs: name }, candidates);
     if (res.status !== 'resolved') continue;
-    const detail = await getTitle(res.anchor.mediaType, res.anchor.tmdbId).catch(() => null);
-    const kwNames = (detail?.keywords ?? []).slice(0, 6);
-    if (kwNames.length === 0) continue;
-    const ids = await searchKeywords(kwNames).catch(() => []);
-    ids.slice(0, 8).forEach((id) => out.add(id));
+    const kws = await keywordsForAnchor(res.anchor);
+    kws.forEach((id) => out.add(id));
   }
   return [...out].slice(0, 12);
+}
+
+/** TMDB keyword ids for ONE already-resolved anchor. No identity work at all. */
+async function keywordsForAnchor(a: { mediaType: 'movie' | 'tv'; tmdbId: number }): Promise<number[]> {
+  const detail = await getTitle(a.mediaType, a.tmdbId).catch(() => null);
+  const kwNames = (detail?.keywords ?? []).slice(0, 6);
+  if (kwNames.length === 0) return [];
+  return (await searchKeywords(kwNames).catch(() => [])).slice(0, 8);
+}
+
+/**
+ * The critic path's soft keyword seed, derived from anchors GC2 already placed.
+ *
+ * Anchors are fetched CONCURRENTLY — a two-anchor comparison should cost one
+ * round-trip, not two — and any failure yields an empty seed, because the
+ * keywords are a recall widener and never the comparison itself.
+ */
+async function anchorKeywordsFor(
+  anchors: readonly { mediaType: 'movie' | 'tv'; tmdbId: number }[],
+): Promise<number[]> {
+  const per = await Promise.all(anchors.slice(0, 2).map((a) => keywordsForAnchor(a).catch(() => [])));
+  return [...new Set(per.flat())].slice(0, 12);
 }
 
 function hasCompetingConstraints(text: string): boolean {
@@ -325,7 +349,12 @@ export async function POST(req: Request) {
         criticBase.similarTo = criticRequest.referenceTitles.join(' / ');
       }
 
-      const { dna } = await loadPreference(supabase, user.id);
+      /* CACHED. `loadPreferenceCached` already existed with a 300s revalidate
+         and had ZERO callers — a cache the codebase built and never used. Taste
+         DNA is derived from an append-only event log, so a short window costs
+         nothing in correctness and removes a full event-table read from every
+         comparative request. */
+      const { dna } = await loadPreferenceCached(supabase, user.id, Date.now());
       const criticState = await buildCriticState({
         request: criticRequest,
         dna,
@@ -348,9 +377,13 @@ export async function POST(req: Request) {
           })),
         // GC3, cache-only. A miss costs the anchor its authority, nothing more.
         loadDimensions: getCachedDimensions,
-        // SOFT seeds. Reusing the shipped keyword extraction, now demoted from
-        // "the search" to "one strand of it".
-        anchorKeywordIds: await referenceKeywordIds(criticRequest.referenceTitles),
+        /* SOFT seeds, derived from the anchors GC2 ALREADY RESOLVED.
+           This used to call `referenceKeywordIds(names)`, which searched and
+           resolved each name a SECOND time — two independent resolutions of the
+           same title per request, free to disagree, and an extra TMDB identity
+           search each. Now the keywords belong to the title we actually chose,
+           and the loader runs concurrently with hydration. */
+        loadAnchorKeywords: anchorKeywordsFor,
         anchorGenreIds: [],
         mediaType: criticBase.mediaType === 'any' ? undefined : criticBase.mediaType,
       });

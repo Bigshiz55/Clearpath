@@ -4,8 +4,8 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-- **Critic Layer — `claude/critic-layer`.** GC8, GC1, GC2, GC3, GC4, GC5 and
-  **GC6** and **GC7** complete red-then-green (185 critic tests). A comparative
+- **Critic Layer — `claude/critic-layer`.** GC1–GC11 complete red-then-green
+  (**250 critic tests**). A comparative
   Ask runs the full pipeline, **the CriticPlan orders the response the user
   gets** (`decisionScore = matchScore + planNudge`, bounded ±10 and
   authority-scaled, durable Match still on the card), and each item carries a
@@ -15,8 +15,11 @@ Updated at the end of every work order per the Working Agreement in
   depend on `AI_DISCOVERY_MODE`. **GC9** proves all five sources of meaning
   (anchors, DNA, relationship, modifiers, hard context) are causal at the
   correct stage, and **GC10** pins the original incident sentence end to end
-  with a structural — never title-specific — mechanism. 236 critic tests.
-  Ledger: `docs/CRITIC-SHIP.md`. Next gate is GC11 (latency budget + caching).
+  with a structural — never title-specific — mechanism.
+  **GC11** measured the request path and fixed three real defects (identity
+  resolved twice per anchor, serial anchor resolution, and `loadPreferenceCached`
+  having zero callers). Ledger: `docs/CRITIC-SHIP.md`. Next gate is GC12 (full
+  gates + merge recommendation).
 
 **Action needed from you:** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the
@@ -71,10 +74,12 @@ and what it unblocks.
   use `rankByDna` (`computeGeneralScore` + embedding + dim nudge + rerank +
   `preferenceNudge`). They never meet, and neither knows about the other. Worth
   a deliberate decision once the consolidation above is scoped.
-- **Critic strand TMDB budget (GC11).** The critic path issues one `runFinder`
-  per GC5 strand (up to `MAX_STRANDS = 5`, four for `better_than`). They run
-  concurrently so wall-clock is roughly one strand, but the TMDB call budget is
-  genuinely N×. Needs measuring and tuning against real pools.
+- **Critic strand TMDB budget — MEASURED in GC11, still worth a real-pool
+  check.** The fan-out is capped by `MAX_STRANDS` (now a declared constant in
+  `src/lib/critic/strandBudget.ts`) and proven not to grow with anchor count.
+  Per-request identity searches dropped 4 → 2 and round-trip depth 3 → 2. What
+  GC11 could NOT measure is real TMDB latency and cache hit rates against
+  production pools; worth sampling once deployed.
 - **Score distribution audit.** The median appears compressed: four
   recommendations scored 79-91, all reading STREAM IT. Blocked on real title
   data existing in production — the local/dev catalog is synthetic fixture

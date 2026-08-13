@@ -35,9 +35,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { runFinder, type FinderItem, type FinderQuery, type Watcher } from '@/lib/finder';
 import type { CriticRetrievalHints } from './retrieval';
-
-/** Concurrency and TMDB budget ceiling. `better_than` emits four. */
-const MAX_STRANDS = 5;
+import { MAX_STRANDS } from './strandBudget';
 
 export interface StrandRun {
   label: string;

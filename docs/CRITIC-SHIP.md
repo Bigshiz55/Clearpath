@@ -5,14 +5,14 @@ sessions: read this, execute **NEXT ACTION**.
 
 CURRENT SHA: `9c381dc74e35860b2cdfdd2a018bb450250c8e55`
 BRANCH: `claude/critic-layer`, cut from `main` @ 6080287.
-NEXT ACTION: GC11 — latency budget + caching.
+NEXT ACTION: GC12 — full gates + merge recommendation.
 
-STATE: GC1–GC10 complete (236 critic tests). A comparative Ask parses the relation and both
+STATE: GC1–GC11 complete (250 critic tests). A comparative Ask parses the relation and both
 anchors, resolves each identity through GC2, hydrates canonical fingerprints,
 builds a GC4 plan, issues recall-safe GC5 strands, orders the real response by
 `decisionScore = matchScore + planNudge`, and explains the winner from that same
-contribution arithmetic. Remaining: GC11 (latency/caching), GC12 (full gates +
-merge recommendation).
+contribution arithmetic, within a measured round-trip budget. Remaining: GC12
+(full gates + merge recommendation).
 
 ---
 
@@ -111,8 +111,112 @@ narrower than "teach the explainer about anchors": it is (a) populate
 - [x] **GC8** Material-dependence test — **COMPLETE, red-then-green**
 - [x] **GC9** Counterfactual suite: anchors / DNA / relationship / modifiers / context each causal — **COMPLETE**
 - [x] **GC10** Exact-query regression for `Better than Furious or Widows Bay` (structural, not hardcoded titles) — **COMPLETE**
-- [ ] **GC11** Latency budget + caching
+- [x] **GC11** Latency budget + caching — **COMPLETE, red-then-green**
 - [ ] **GC12** Full gates + merge recommendation
+
+---
+
+## GC11 — COMPLETE · latency budget + caching (red-then-green)
+
+### Definition, as recorded on this branch
+
+Checklist: *"GC11 Latency budget + caching."* GC5 section: *"Strands run
+concurrently … TMDB budget genuinely N×, capped at `MAX_STRANDS = 5` — **tuning
+is GC11**."* BACKLOG: *"The critic path issues one `runFinder` per GC5 strand …
+**Needs measuring and tuning against real pools.**"*
+
+Latency is behavioural, so the gate is measured, not read: `gc11.test.ts`
+instruments the real `buildCriticState` and counts what it actually does.
+
+### Why serial depth, not milliseconds
+
+Wall-clock in CI measures the machine. **Round-trip depth** — how many network
+hops must happen one after another before an answer can exist — is what the code
+controls and what a user feels. Assertions are on depth, peak concurrency and
+call counts (all deterministic), with one wall-clock cross-check under simulated
+latency whose bound only parallelism can meet.
+
+### RED
+
+```
+Tests  5 failed | 8 passed (13)
+  4 · anchors resolve CONCURRENTLY      peak concurrency = 1
+  5 · serial depth bounded              depth 3, needed ≤ 2
+  2 · keywords from resolved anchors    loader never called
+  6 · wall-clock reflects parallelism   3 calls where ≥ 4 expected
+ 13 · no model call in request path     (docblock false positive — rescoped)
+```
+
+### Production defects found
+
+1. **Identity resolved TWICE per anchor.** The route computed the soft keyword
+   seed with `referenceKeywordIds(names)`, which ran `searchTitles` +
+   `resolveAnchor` again for names GC2 had *already* resolved. A two-anchor
+   comparison paid **four** identity searches and produced **two independent
+   resolutions of the same title** — free to disagree, with no reconciliation.
+2. **Anchors resolved serially.** `for (… ) { await searchCandidates(…) }` made
+   each additional anchor cost a full extra round-trip before anything else
+   could start.
+3. **A cache with zero callers.** `loadPreferenceCached` (300s revalidate) had
+   existed since before this workstream and was used nowhere; the critic path
+   did a full preference-event read on every request.
+
+### Fixes
+
+| defect | fix | effect |
+|---|---|---|
+| duplicate resolution | `OrchestrateInput.loadAnchorKeywords(resolvedAnchors)` — the seed is derived from the anchors GC2 placed | identity searches per request **4 → 2**; one resolution, so disagreement is impossible |
+| serial resolution | `Promise.all` over `referenceTitles`, order preserved for the authority arithmetic | peak concurrency **1 → 2**; anchor count no longer adds hops |
+| serial hydration + keywords | both depend only on identity, so they run in one `Promise.all` | **depth 3 → 2** |
+| unused cache | route now calls `loadPreferenceCached` | one event-table read removed per comparative request |
+| cap unreadable | `MAX_STRANDS` extracted to pure `strandBudget.ts` (`strands.ts` is `server-only`) | the fan-out budget is now assertable |
+
+Deriving keywords from the resolved anchor is also **more correct**, not just
+cheaper: the old path fetched *Furious 7's* keywords for "Furious".
+
+### Behavioural proof (GREEN, 14/14)
+
+| measured | result |
+|---|---|
+| identity searches for a 2-anchor request | **2** (was 4) |
+| keyword loader invocations | **1**, called with `[502, 602]` — the resolved, decoy-free ids |
+| fingerprint reads | **1** batch, cache-only |
+| peak concurrency | **> 1** |
+| serial depth, 1 anchor vs 2 | **equal**, and ≤ 3 |
+| wall-clock under simulated latency | **< 80%** of the serial sum |
+| strands per relation | ≤ `MAX_STRANDS` for all four relations |
+| strands vs anchor count | **unchanged** — naming more titles does not multiply the TMDB budget |
+
+### Caching may not change meaning
+
+Fingerprint miss → identity survives, authority 0, plan silent, **no retry
+storm** (still exactly 2 searches). Keyword-loader throw → comparison intact,
+plan intact, recall-floor intact; only the soft seed is lost. Repeated identical
+requests → byte-identical plan and hints. No model call anywhere in
+`src/lib/critic` (asserted against code, comments stripped).
+
+### Contracts preserved
+
+No change to `CRITIC_NUDGE_MAX`, `MIN_RANK_CONF`, `applied` semantics, Match vs
+`decisionScore`, DNA double-counting, DNA writes, cache-only hydration, anchor
+identity, hard constraints, or explanation grounding. GC8 8/8, GC9 30/30 and
+GC10 21/21 all unchanged and green.
+
+### Gates
+
+| gate | exit | result |
+|---|---|---|
+| GC8 | 0 | 8 passed |
+| GC9 | 0 | 30 passed |
+| GC10 | 0 | 21 passed |
+| GC11 | 0 | 14 passed |
+| all critic | 0 | 250 passed |
+| `npx vitest run` | 0 | 3460 passed, 24 skipped, **0 failed** |
+| typecheck · lint · build | 0 · 0 · 0 | clean |
+| searchrouting Playwright | 0 | 21 passed |
+| frozen corpus | 0 | P0 635/635 · P1 515/515 |
+
+Frozen corpus delta: **0 PASS→FAIL, 0 FAIL→PASS**.
 
 ---
 

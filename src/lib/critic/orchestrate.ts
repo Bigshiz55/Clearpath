@@ -36,7 +36,7 @@ import { hydrateAnchors, type DimensionLoader } from './hydrate';
 import { buildPlan, type CriticPlan } from './plan';
 import { planToHints, type CriticRetrievalHints, type HardConstraints } from './retrieval';
 import type { CriticRequest } from './request';
-import type { CriticObjective } from './objective';
+import type { CriticObjective, ResolvedAnchor } from './objective';
 
 /** Structured evidence a developer can inspect. NOT chain-of-thought. */
 export interface CriticAttribution {
@@ -91,7 +91,21 @@ export interface OrchestrateInput {
   searchCandidates: (name: string) => Promise<AnchorCandidate[]>;
   /** Cache-only fingerprint read, injected. GC3 never classifies. */
   loadDimensions: DimensionLoader;
-  /** Anchor keywords for the SOFT retrieval seed, when the route has them. */
+  /**
+   * Derive the SOFT keyword seed FROM THE RESOLVED ANCHORS.
+   *
+   * Preferred over `anchorKeywordIds`, and not merely for speed. The route used
+   * to compute those ids by searching and resolving each name a SECOND time —
+   * two independent resolutions of the same title, free to disagree, and paying
+   * for an extra identity search per anchor. Deriving them here means the
+   * keywords belong to the title GC2 actually chose.
+   *
+   * Called with the resolved anchors, CONCURRENTLY with hydration. A failure is
+   * absorbed: the seed is soft, so losing it costs recall breadth, never the
+   * comparison.
+   */
+  loadAnchorKeywords?: (anchors: readonly ResolvedAnchor[]) => Promise<number[]>;
+  /** Pre-computed seed. Ignored when `loadAnchorKeywords` is supplied. */
   anchorKeywordIds?: number[];
   anchorGenreIds?: number[];
   /** Stated media type, which is identity for GC2, not a preference. */
@@ -116,16 +130,32 @@ export async function buildCriticState(input: OrchestrateInput): Promise<CriticS
      Search supplies CANDIDATES; `resolveAnchor` supplies the verdict. The
      forbidden `searchTitles(name)[0]` is absent by construction: this code
      cannot see search order, only the list. */
-  const resolutions: AnchorResolution[] = [];
-  for (const spokenAs of request.referenceTitles) {
-    const candidates = await searchCandidates(spokenAs).catch(() => [] as AnchorCandidate[]);
-    resolutions.push(resolveAnchor({ spokenAs, mediaType }, candidates));
-  }
+  /* CONCURRENT, AND THE ORDER IS PRESERVED. `Promise.all` keeps positional
+     correspondence with `referenceTitles`, which the authority arithmetic below
+     depends on — while a serial loop made a two-anchor comparison pay two
+     round-trips before anything else could begin. */
+  const resolutions: AnchorResolution[] = await Promise.all(
+    request.referenceTitles.map(async (spokenAs) => {
+      const candidates = await searchCandidates(spokenAs).catch(() => [] as AnchorCandidate[]);
+      return resolveAnchor({ spokenAs, mediaType }, candidates);
+    }),
+  );
 
-  /* ── GC3 · HYDRATION ───────────────────────────────────────────────────
-     Cache-only. A miss leaves the anchor unhydrated, which costs it authority
-     rather than inventing a fingerprint. */
-  const hydratedResolutions = await hydrateAnchors(resolutions, loadDimensions);
+  const placed = resolutions
+    .filter((r): r is Extract<AnchorResolution, { status: 'resolved' }> => r.status === 'resolved')
+    .map((r) => r.anchor);
+
+  /* ── GC3 · HYDRATION, and the keyword seed, TOGETHER ───────────────────
+     Both depend only on the resolved identities and on nothing from each other,
+     so they are one hop rather than two. Hydration stays cache-only: a miss
+     leaves the anchor unhydrated, which costs it authority rather than
+     inventing a fingerprint. */
+  const [hydratedResolutions, seedKeywords] = await Promise.all([
+    hydrateAnchors(resolutions, loadDimensions),
+    input.loadAnchorKeywords
+      ? input.loadAnchorKeywords(placed).catch(() => [] as number[])
+      : Promise.resolve(input.anchorKeywordIds ?? []),
+  ]);
 
   /* ── OBJECTIVE ─────────────────────────────────────────────────────────
      `requested` is what the user NAMED, so an anchor we failed to place still
@@ -153,7 +183,7 @@ export async function buildCriticState(input: OrchestrateInput): Promise<CriticS
     anchors: objective.anchors,
     plan,
     hard,
-    anchorKeywordIds: input.anchorKeywordIds ?? [],
+    anchorKeywordIds: seedKeywords,
     anchorGenreIds: input.anchorGenreIds ?? [],
   });
 
