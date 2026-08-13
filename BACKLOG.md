@@ -4,12 +4,30 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-Nothing in flight. **Action needed from you:** open `/admin/migrations` on
-production and apply pending migrations with your `MIGRATE_SECRET` — see the
-"Restored: /admin/migrations" entry below for why this is required and what it
-unblocks.
+- **PR #58 — the Verdict Room entrance — awaiting your visual review.** The
+  final visual impact pass is pushed (`c433416`); review screenshots for all
+  four widths plus reduced motion are committed under
+  `docs/review/verdict-room/`. Not merged, per instruction. Note that PR #58's
+  CI is red for reasons that are NOT this branch's redesign — see the next item.
+
+**Action needed from you:** open `/admin/migrations` on production and apply
+pending migrations with your `MIGRATE_SECRET` — see the "Restored:
+/admin/migrations" entry below for why this is required and what it unblocks.
 
 ## Next
+- **Fix the 20 pre-existing mobile-suite failures blocking a green CI.**
+  Verified by rebuilding the harness at `0b90f04` with the working tree stashed:
+  the same 20 fail with no PR #58 visual-pass changes applied, so they are
+  inherited, not caused by the Verdict Room work.
+  - `visual-qa.spec.ts` × 12 — the `▶ Trailer` affordance renders 68×25 on
+    `/dev/visual-qa`, below the suite's 44px tap-target minimum, at every
+    viewport in the matrix. `src/components/trailer/TrailerMedia.tsx` is
+    untouched by the whole branch.
+  - `wired-experience.spec.ts` × 8 — "Why this Verd1ct?" on real result cards
+    (TEST A, ONE NUMBER PER CARD, TEST B, TEST E, TEST F). Worth checking
+    against PR #54's `WhyVerdict` availability-row change before assuming the
+    spec is simply stale.
+  Deliberately out of scope for the visual pass rather than silently widened.
 - **Linear network brand asset registry.** Replace the 0/83 monogram fallback
   with verified network marks, using a separate provenance-backed canonical
   asset registry or a licensed authoritative source. NOT part of PR #54 — that
@@ -65,6 +83,17 @@ unblocks.
   representative.
 
 ## Done
+- **The Verdict Room shadow room is dressed rather than sketched** (PR #58,
+  pending review). The plates carry three original drawn poster compositions,
+  the participants are silhouettes with real reaction states, the verdict board
+  shows the shape of a finished session, and a gavel inside a converging arc
+  marks the decision. Three positioning bugs surfaced and were fixed along the
+  way, each now pinned by a test: Tailwind `-translate-*` losing to an inline or
+  animated `transform` (the board was 250px off-position and invisible); a
+  `rotateY`-before-`translateZ` transform order adding `z·sin(θ)` of sideways
+  travel (the flanking plates hung off both edges of a phone); and an
+  `absolute inset-0` child escaping a container that lacked `position: relative`
+  (a 36px thumbnail painting across a 340px panel).
 - **Streaming brand coverage is 14/15, and the last one is an upstream fact.**
   Starz, AMC+, Fubo, Tubi, Pluto TV and The Roku Channel now render their own
   marks. Their paths were not guessed: production's already-deployed
