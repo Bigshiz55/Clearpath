@@ -50,10 +50,26 @@ repo: its declaration (`finder.ts:138`) and a human-readable summary string
 
 ### Why the explanation said what it said
 
-`whyThisTitle` (`src/lib/reasons/whyThisTitle.ts`) **has no anchor input at all**
-— there is no `kind: 'comparison'` reason and no field to carry one. The string
-you saw is its LAST-RESORT branch (line 179-187), reached only when *zero*
-stronger reasons fired:
+**CORRECTION to an earlier draft of this audit:** `whyThisTitle` DOES have an
+anchor input. `src/lib/reasons/whyThisTitle.ts:40` declares
+`similarTo?: string[]` and line 130-133 emits
+`Similar to X, which you rated highly`. `preference/explain.ts:156` has its own
+`Similar to X` reason at strength 0.6. So the explanation layer is not blind to
+anchors, and any plan built on "it has no anchor concept" would be wrong.
+
+Two real gaps remain, and they are different from that:
+
+1. **The existing reason is the WRONG RELATION.** `Similar to X, which you rated
+   highly` answers *"is this like X?"* — the question the user did NOT ask. There
+   is no reason kind expressing *"this beats X for you, and here is the trade"*.
+   A comparative request cannot be explained by a similarity sentence.
+2. **It also requires the user to have RATED the anchor** ("which you rated
+   highly"), so it cannot fire for a title merely NAMED in the request. On this
+   path `input.similarTo` was not populated from `s.referenceTitles` at all.
+
+With the similar branch unable to fire and nothing else qualifying, the LAST
+RESORT branch (line 179-187) is reached — correctly reporting that nothing about
+the request had arrived:
 
 ```ts
 if (out.length === 0 && genres.length > 0 && (input.ratedCount ?? 0) > 0) {
@@ -63,7 +79,11 @@ if (out.length === 0 && genres.length > 0 && (input.ratedCount ?? 0) > 0) {
 
 So the copy was not lying about its own evidence — it was accurately reporting
 that nothing about the request had reached it. **The explanation layer is
-working correctly; it is the only honest component in the chain.**
+behaving correctly given its inputs; the failure is upstream.** GC7 is therefore
+narrower than "teach the explainer about anchors": it is (a) populate
+`similarTo` from the request's anchors rather than only from rated history, and
+(b) add a genuinely COMPARATIVE reason kind, because "similar to" is not
+"better than".
 
 ### AI-theater audit (section 20) — three confirmed instances
 
