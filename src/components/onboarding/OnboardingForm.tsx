@@ -7,6 +7,7 @@ import { humanTrait } from '@/lib/scoring/traits';
 import { saveOnboarding } from '@/lib/actions/profile';
 import { STREAMING_SERVICES } from '@/lib/services';
 import { useToast } from '@/components/Toast';
+import { ProviderChip } from '@/components/media/ProviderChip';
 
 const AVOIDABLE: PreferenceTrait[] = ['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn'];
 const LOVABLE: PreferenceTrait[] = ['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer'];
@@ -273,7 +274,7 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
                     on ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'
                   }`}
                 >
-                  {s.name}
+                  <ProviderChip data={{ name: s.name, providerId: s.id }} withLabel />
                   {on && <span className="text-xs font-bold text-emerald-300">✓</span>}
                 </button>
               );

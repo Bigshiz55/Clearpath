@@ -83,6 +83,8 @@ export interface IngestedAiringRow {
   startAtUtc: string;
   providerAiringId: string | null;
   stationName: string;
+  /** `tv_stations.logo_url` — a licensed station mark, or null. Never guessed. */
+  stationLogoUrl?: string | null;
   programmeProviderId: string | null;
   title: string;
   episodeTitle: string | null;
@@ -109,6 +111,7 @@ export function ingestedRowToAiring(row: IngestedAiringRow): Airing {
     airstamp: row.startAtUtc,
     runtime: row.runtimeMinutes,
     network: row.stationName,
+    networkLogoUrl: row.stationLogoUrl ?? null,
     showName: row.title,
     showId: Number.isFinite(parsedShowId) ? parsedShowId : stableIntId(row.programmeProviderId ?? row.title),
     episodeName: row.episodeTitle,
@@ -132,6 +135,10 @@ interface RawAiring {
 interface RawStation {
   id: string;
   name: string;
+  /** Licensed station mark, where the ingest source provided one. Migration
+   *  0032 declares it ("only where licensed"); nothing writes it today, so the
+   *  guide keeps its own monogram until a licensed source lands. */
+  logo_url: string | null;
 }
 interface RawProgramme {
   id: string;
@@ -180,7 +187,7 @@ export async function getIngestedGuideAirings(
   const programmeIds = [...new Set(rows.map((r) => r.programme_id))];
 
   const [{ data: stations, error: stationsError }, { data: programmes, error: programmesError }] = await Promise.all([
-    supabase.from('tv_stations').select('id, name').in('id', stationIds),
+    supabase.from('tv_stations').select('id, name, logo_url').in('id', stationIds),
     supabase
       .from('tv_programmes')
       .select('id, provider_programme_id, title, episode_title, programme_type, season_number, episode_number, genres, description, runtime_minutes, artwork_url')
@@ -203,6 +210,7 @@ export async function getIngestedGuideAirings(
         startAtUtc: r.start_at_utc,
         providerAiringId: r.provider_airing_id,
         stationName: station.name,
+        stationLogoUrl: station.logo_url ?? null,
         programmeProviderId: programme.provider_programme_id,
         title: programme.title,
         episodeTitle: programme.episode_title,

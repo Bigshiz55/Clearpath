@@ -32,9 +32,13 @@ describe('the provider-brand registry', () => {
     expect(officialProviderName('Starz Apple TV Channel')).toBe('Starz Apple TV Channel');
   });
 
-  it('never invents a logo — the asset is only ever the one it was handed', () => {
-    expect(resolveProviderBrand({ name: 'Netflix' }).logoPath).toBeNull();
-    expect(resolveProviderBrand({ name: 'Netflix' }).textOnly).toBe(true);
+  it('never invents a logo — it is the caller’s, or one we verified by eye', () => {
+    // A brand with no entry in the verified table gets nothing, not a guess.
+    expect(resolveProviderBrand({ name: 'Some Regional Service' }).logoPath).toBeNull();
+    expect(resolveProviderBrand({ name: 'Some Regional Service' }).textOnly).toBe(true);
+    // A brand we DO hold an asset for renders it even with no caller logo —
+    // that is the whole point of the table (see providers/assets.test.ts).
+    expect(resolveProviderBrand({ name: 'Netflix' }).textOnly).toBe(false);
     const withLogo = resolveProviderBrand({ name: 'fuboTV', logoPath: '/fubo.jpg' });
     expect(withLogo.logoPath).toBe('/fubo.jpg');
     expect(withLogo.textOnly).toBe(false);

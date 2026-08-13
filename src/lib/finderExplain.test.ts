@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { buildItemExplanation, checkedRequirements, assembleHousehold, type ExplainFacts } from './finderExplain';
 import { EMPTY_QUERY } from './finderParse';
 import type { FinderQuery } from './finder';
+import { assetForProvider } from '@/lib/providers/assets';
+
+const NETFLIX_LOGO = assetForProvider('Netflix');
 
 const q = (over: Partial<FinderQuery>): FinderQuery => ({ ...EMPTY_QUERY, genreIds: [], ...over });
 const facts = (over: Partial<ExplainFacts> = {}): ExplainFacts => ({
@@ -43,7 +46,9 @@ describe('buildItemExplanation — real reasons, honest availability', () => {
       text: 'Netflix · Included with subscription',
       confidence: 'likely',
       service: 'Netflix',
-      logoPath: null,
+      // The registry's own verified Netflix mark — the row renders the brand
+      // even though this caller passed no logo. See providers/assets.ts.
+      logoPath: NETFLIX_LOGO,
       access: 'Included with subscription',
     });
     // 3 rating sources + personal signal + all requirements → but availability

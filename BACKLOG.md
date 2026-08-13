@@ -4,10 +4,18 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-Nothing in flight. **Action needed from you:** open `/admin/migrations` on
-production and apply pending migrations with your `MIGRATE_SECRET` — see the
-"Restored: /admin/migrations" entry below for why this is currently required
-and what it unblocks.
+**Finish provider logo coverage (owner action, one command).** 8 of the 15
+curated services have a verified brand asset in `src/lib/providers/assets.ts`;
+Starz, Showtime, AMC+, Fubo, Tubi, Pluto TV and The Roku Channel still render
+their official NAME as text because their TMDB `logo_path` needs the server key
+to look up, and nothing goes in that table unverified. Run
+`TMDB_API_KEY=… npx tsx scripts/syncProviderLogos.ts`, open each candidate URL
+it prints, confirm the mark, paste the rows in. `assets.test.ts` reports current
+coverage and fails if it drops.
+
+**Also still needed from you:** open `/admin/migrations` on production and apply
+pending migrations with your `MIGRATE_SECRET` — see the "Restored:
+/admin/migrations" entry below for why this is required and what it unblocks.
 
 ## Next
 - **Turn on the AI orchestrator (owner action).** The provider-independent
@@ -42,6 +50,20 @@ and what it unblocks.
   representative.
 
 ## Done
+- **Known brands render their own marks, not just their names.** The registry
+  now resolves canonical provider identity → verified asset
+  (`src/lib/providers/assets.ts`), so a surface that knows only "Netflix" — the
+  subscription picker, a group verdict's service list, the availability row —
+  draws the brand instead of spelling it. Callers no longer need to arrive
+  holding a `logoPath`. Every entry was fetched from image.tmdb.org and LOOKED
+  AT before it was written down; a 200 is not verification. Plan variants
+  inherit the brand's mark ("Peacock Premium" → Peacock); distribution routes
+  never do ("Paramount+ Amazon Channel" stays text).
+- **Linear network logos are plumbed end to end.** `tv_stations.logo_url` →
+  `ingestedGuide` → `channelGuide` row → `NetworkChip` in the guide. No source
+  writes that column today, so every row still shows its monogram — the
+  deliberate non-hotlinked identity, not an emoji — and lights up the moment a
+  licensed source lands.
 - **One provider-brand registry, and no service is drawn as an emoji any more.**
   `src/lib/providers/brand.ts` is now the single lookup from a provider
   identity to its official display name, its verified logo asset, its
@@ -67,12 +89,15 @@ and what it unblocks.
     any 📺 outside the media-type/empty-state allowlist.
 - **The landing example teaches the product.** A landing-only annotation layer
   (`ExampleTour`) puts six restrained callouts in the page's gutters on a
-  laptop — Score, Match, More Info, Where to Watch, Why this Verd1ct?, Things
+  laptop — Score, Match, More, Where to Watch, Why this Verd1ct?, Things
   to Know — and the same six as a numbered "What you're looking at" legend
   under the card below `xl`. It is a grid SIBLING of the card, never an
   overlay: the visual suite measures that no callout intersects the card or
   another callout. `PosterCard` was not touched. The Match callout says the
-  number appears once Taste DNA exists rather than implying one already does.
+  number appears once Taste DNA exists rather than implying one already does,
+  and the "More" callout describes what that control actually is — an inline
+  synopsis expand — with poster/title navigation named separately, because it
+  is a different control.
 - **The landing "Example Verd1ct" is the real card now, not a drawing of one.**
   The section rendered its own bespoke horizontal report — thumbnail poster in
   an oversized empty box, standalone FOR pill, prose metadata, ± evidence rows

@@ -4,11 +4,13 @@ import { officialProviderNames, resolveProviderBrand } from '@/lib/providers/bra
 /**
  * THE ONE STREAMING-PROVIDER BRAND CHIP.
  *
- * Logo-first, compact, recognizable. When a VERIFIED logo path exists (TMDB
- * `logo_path`) it renders the real branded logo in a consistent bounding box —
- * aspect-preserved, never stretched or cropped, legible in dark mode, lazy, with
- * an accessible label. When no verified logo exists it falls back to a clean
- * short NAME — never a generic 📺 emoji, never a fabricated/guessed image URL.
+ * Logo-first, compact, recognizable. It renders the real branded logo in a
+ * consistent bounding box — aspect-preserved, never stretched or cropped,
+ * legible in dark mode, lazy, with an accessible label — whenever a VERIFIED
+ * asset exists, which now includes brands the project has verified itself
+ * (providers/assets.ts) and not only ones the caller happened to arrive with.
+ * When no verified asset exists at all it falls back to a clean short NAME —
+ * never a generic 📺 emoji, never a fabricated/guessed image URL.
  *
  * This is for STREAMING services (Netflix, Prime Video, …). Linear networks are a
  * DIFFERENT factual entity — see NetworkChip below — and must not be rendered
@@ -18,8 +20,11 @@ import { officialProviderNames, resolveProviderBrand } from '@/lib/providers/bra
 export interface ProviderChipData {
   /** Canonical/display provider name, e.g. "Netflix", "Prime Video". */
   name: string;
-  /** TMDB logo_path (verified) or null → text fallback. */
+  /** TMDB logo_path when this caller holds one. Absent is fine — the registry
+   *  falls back to its own verified asset for a brand we know. */
   logoPath?: string | null;
+  /** TMDB watch-provider id, when the caller has one. The strongest key. */
+  providerId?: number | null;
   /** Optional distribution note kept factually distinct, e.g. "via Amazon".
    *  Presentation may simplify, but an add-on route is NOT the base service. */
   via?: string | null;
@@ -29,7 +34,7 @@ export function ProviderChip({ data, withLabel = false }: { data: ProviderChipDa
   // The official spelling and the verified asset come from the one registry —
   // see src/lib/providers/brand.ts. `via` stays a separate fact: an add-on
   // route is not the base service and must not be folded into its name.
-  const brand = resolveProviderBrand({ name: data.name, logoPath: data.logoPath });
+  const brand = resolveProviderBrand({ name: data.name, logoPath: data.logoPath, providerId: data.providerId });
   const label = data.via ? `${brand.name} (${data.via})` : brand.name;
   const logo = brand.logoPath ? tmdbImage(brand.logoPath, 'w92') : null;
 
@@ -113,16 +118,23 @@ export function ProviderNameList({
   className = '',
 }: {
   names: string[];
-  /** The lead-in word. "On Netflix · Hulu". */
+  /** The lead-in word. "On [Netflix] [Hulu]". */
   label?: string;
   className?: string;
 }) {
   const list = officialProviderNames(names);
   if (list.length === 0) return null;
+  // A BRAND WE KNOW IS DRAWN, NOT SPELLED. These surfaces carry names only, so
+  // this used to be a text list by necessity — but the registry now resolves a
+  // verified asset from the name alone, and a service WatchVerd1ct knows should
+  // look like itself here too. Anything we hold no asset for keeps the official
+  // name, which is the honest fallback and never an emoji.
   return (
-    <span className={className} data-testid="provider-name-list">
-      <span className="text-slate-500">{label} </span>
-      {list.join(' · ')}
+    <span className={`inline-flex flex-wrap items-center gap-1 ${className}`} data-testid="provider-name-list">
+      <span className="text-slate-500">{label}</span>
+      {list.map((n) => (
+        <ProviderChip key={n} data={{ name: n }} />
+      ))}
     </span>
   );
 }

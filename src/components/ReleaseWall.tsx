@@ -226,7 +226,7 @@ export function ReleaseWall({
               onClick={() => toggleProvider(s.id)}
               className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${providerIds.includes(s.id) ? 'border-brand-400/60 bg-brand-500/20 text-brand-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'}`}
             >
-              {s.name}
+              <ProviderChip data={{ name: s.name, providerId: s.id }} withLabel />
             </button>
           ))}
           {services.length > 6 && (

@@ -66,8 +66,15 @@ export const TOUR_STOPS: TourStop[] = [
   },
   {
     n: 3,
-    label: 'More Info',
-    body: 'What it is about, in two lines. Tap through for the full title page — cast, content guide, availability by season.',
+    label: 'More',
+    // TWO CONTROLS, NAMED SEPARATELY, BECAUSE THEY DO DIFFERENT THINGS.
+    // This callout previously read "Tap through for the full title page",
+    // which described `More` as navigation. It is not: `CardSynopsis`'s More
+    // expands the synopsis IN PLACE and never leaves the card. The title page
+    // is reached by the poster or the title, which genuinely are links here —
+    // so that fact is stated as its own sentence about its own control rather
+    // than folded into this one.
+    body: 'A quick synopsis of what it’s about. Expand it in place when you want a little more context before deciding — the poster and the title are the links to the full page.',
     side: 'left',
     top: 452,
   },

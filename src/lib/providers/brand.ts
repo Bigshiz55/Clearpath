@@ -9,15 +9,19 @@
  *
  * ── WHAT IT RESOLVES ──────────────────────────────────────────────────────
  *   • the OFFICIAL display name  ("fuboTV" → "Fubo", "Paramount Plus" → "Paramount+")
- *   • the OFFICIAL logo asset    (the verified path the caller was given)
+ *   • the OFFICIAL logo asset    (the caller's verified path, else our own
+ *                                  verified table — see providers/assets.ts)
  *   • accessible alt text        (brand + how you get it, spelled out)
  *   • a brand-safe fallback      (restrained plain text — never an emoji)
  *
  * ── WHAT IT WILL NOT DO ───────────────────────────────────────────────────
- *   • It never invents a logo. `logoPath` is only ever the VERIFIED path the
- *     caller already holds (TMDB `logo_path`), passed through. There is no
- *     table of guessed asset URLs here and there must never be one: a wrong
- *     logo is a false claim about who carries a title.
+ *   • It never invents a logo. An asset is either the VERIFIED path the caller
+ *     already holds (TMDB `logo_path`), or the one this project has verified by
+ *     eye for that brand — see `providers/assets.ts`, where every entry was
+ *     fetched and LOOKED AT before it was written down. Nothing is guessed
+ *     per-request and nothing is derived from a name: a wrong logo is a false
+ *     claim about who carries a title, so a brand we cannot prove renders as
+ *     text.
  *   • It never merges two distinct provider identities. Renaming is EXACT
  *     match on the whole normalized name, so "Paramount+ Amazon Channel" — a
  *     genuinely different way to buy the thing — stays itself and never
@@ -28,6 +32,8 @@
  *
  * Pure and client-safe: no I/O, no server imports.
  */
+import { assetForProvider } from './assets';
+
 
 /** Generic subscription-tier / channel qualifiers, identical for every service.
  *  Used ONLY for the dedupe key — never to rename a service. */
@@ -118,8 +124,15 @@ export function officialProviderNames(names: string[]): string[] {
 export interface ProviderBrandInput {
   /** The provider name exactly as the data gave it. */
   name: string;
-  /** A VERIFIED logo path (TMDB `logo_path`). Null/absent → text fallback. */
+  /**
+   * A VERIFIED logo path (TMDB `logo_path`) the caller already holds. Absent is
+   * FINE and no longer means "text": the registry falls back to its own
+   * verified asset table, so a surface that knows only a service still shows
+   * the brand. See providers/assets.ts.
+   */
   logoPath?: string | null;
+  /** TMDB watch-provider id, when the caller has one. The strongest key. */
+  providerId?: number | null;
   /** How you get it, for the accessible label: "Included with subscription". */
   access?: string | null;
 }
@@ -140,7 +153,11 @@ export interface ProviderBrand {
 /** Resolve one provider reference to its official presentation. */
 export function resolveProviderBrand(input: ProviderBrandInput): ProviderBrand {
   const name = officialProviderName(input.name);
-  const logoPath = input.logoPath ?? null;
+  // THE CALLER'S OWN ASSET WINS. It came with this exact provider row, so it is
+  // the most specific truth available. Only when there is none do we reach for
+  // the verified table — which is what makes "Netflix" render as Netflix on a
+  // surface that never saw a TMDB provider object.
+  const logoPath = input.logoPath ?? assetForProvider(name, input.providerId);
   const access = input.access?.trim();
   return {
     key: providerBrandKey(input.name, logoPath),

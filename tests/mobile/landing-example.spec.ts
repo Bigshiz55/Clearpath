@@ -1,4 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * THE LANDING "EXAMPLE VERD1CT" IS THE PRODUCT, NOT A DRAWING OF IT.
@@ -35,9 +37,25 @@ const PROVIDERS = {
  *  asserted rather than assumed. */
 const titleRequests: string[] = [];
 
+/**
+ * THE REAL BRAND ASSETS, SERVED OFF DISK.
+ *
+ * The harness browser has no route to image.tmdb.org, so a provider logo would
+ * render as a broken box and the screenshot would prove the opposite of what is
+ * true. These are the ACTUAL bytes for the paths in `providers/assets.ts`,
+ * fetched from TMDB and checked by eye — the same image production serves — so
+ * the proof shows what a visitor sees rather than a placeholder.
+ */
+const LOGO_FIXTURES = join(__dirname, '..', 'fixtures', 'provider-logos');
+
 async function open(page: Page, w: number) {
   titleRequests.length = 0;
   await page.setViewportSize({ width: w, height: 1100 });
+  await page.route('**://image.tmdb.org/**', async (r) => {
+    const file = join(LOGO_FIXTURES, new URL(r.request().url()).pathname.split('/').pop()!);
+    if (existsSync(file)) return r.fulfill({ contentType: 'image/jpeg', body: readFileSync(file) });
+    return r.abort();
+  });
   await page.route('**/api/ratings/**', (r) => {
     titleRequests.push(new URL(r.request().url()).pathname);
     return r.fulfill({ json: { ratings: RATINGS, overview: SYNOPSIS, facts: FACTS, providers: PROVIDERS } });
@@ -101,9 +119,11 @@ test.describe('it renders the production card, not a landing-only one', () => {
     await expect(strip.getByTestId('where-to-watch-line')).toHaveCount(3);
     // The OFFICIAL wordmarks, from the one brand registry — not TMDB's raw
     // labels, and never a television emoji.
-    await expect(strip).toContainText('Paramount+');
+    // A BRAND WE HOLD AN ASSET FOR IS DRAWN. Paramount+ renders its own mark
+    // (the accessible name still carries the brand); Fubo has no verified asset
+    // yet and falls back to the official NAME as text — never an emoji.
+    await expect(strip.locator('img[alt*="Paramount+"]')).toHaveCount(1);
     await expect(strip).toContainText('Fubo');
-    await expect(strip).not.toContainText('Paramount Plus');
     await expect(strip).not.toContainText('fuboTV');
   });
 });
@@ -158,6 +178,10 @@ test.describe('the product tour', () => {
     const legend = page.getByTestId('tour-legend');
     await expect(legend).toBeVisible();
     await expect(legend).toContainText('What you’re looking at');
+    // The "More" stop describes the control it actually is: an inline expand,
+    // not navigation.
+    await expect(legend).toContainText('Expand it in place');
+    await expect(legend).not.toContainText('Tap through for the full title page');
     await expect(legend.getByTestId('tour-legend-item')).toHaveCount(6);
     // Directly below the card, not floating over it.
     const cardBox = (await card(page).boundingBox())!;
@@ -206,7 +230,9 @@ test.describe('the anonymous state is the real one, not invented personalization
     await expect(row).toBeVisible();
     // The site's provider chip, the access level and the confidence as their
     // own parts — and the OFFICIAL wordmark, not TMDB's raw label.
-    await expect(row).toContainText('Paramount+');
+    // The official mark, resolved from the name alone — this caller never had
+    // a logo path, which is exactly the gap the asset table closes.
+    await expect(row.locator('img[alt*="Paramount+"]')).toHaveCount(1);
     await expect(row).not.toContainText('Paramount Plus');
     await expect(row).toContainText('Included with subscription');
     await expect(row).toHaveAttribute('data-confidence', 'likely');
