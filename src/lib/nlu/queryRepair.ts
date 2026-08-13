@@ -144,7 +144,19 @@ export function splitTitleQualifiers(raw: string): QualifiedTitle {
 // ── Person phrasing ───────────────────────────────────────────────────────
 
 const PERSON_LEAD =
-  /^\s*(?:who\s+is|who'?s|movies?\s+(?:with|starring|featuring|by|of|from)|films?\s+(?:with|starring|featuring|by|of|from)|shows?\s+(?:with|starring|featuring|by|of|from)|everything\s+(?:with|by|from)|anything\s+(?:with|by)|starring|featuring|directed\s+by|written\s+by|created\s+by|filmography\s+of)\s+/i;
+  /^\s*(?:who\s+is|who'?s|(?:movies?|films?|shows?|series)\s+(?:with|starring|featuring|by|of|from|directed\s+by|written\s+by|created\s+by)|everything\s+(?:with|by|from)|anything\s+(?:with|by)|starring|featuring|directed\s+by|written\s+by|created\s+by|filmography\s+of)\s+/i;
+
+/**
+ * A bare preposition opening the remainder — "…with Tom Hanks".
+ *
+ * Split out from `PERSON_LEAD` because it is far weaker evidence: "With
+ * Honors" and "Starring Adam Bakri" are titles, so this one is only trusted
+ * when what follows looks like a full name (two words or more). It exists
+ * because peeling the request frame off "what should I watch tonight with Tom
+ * Hanks" leaves exactly this shape, and it is one of the commonest things
+ * anybody says to a microphone.
+ */
+const PERSON_PREP_LEAD = /^\s*(?:with|starring|featuring)\s+/i;
 const PERSON_TAIL =
   /\s+(?:movies?|films?|shows?|series|filmography|roles?|performances?|credits?|movies\s+and\s+shows)\s*[?!.]*\s*$/i;
 
@@ -178,6 +190,11 @@ export function extractPersonName(raw: string): string | null {
   let stripped = false;
   const lead = t.replace(PERSON_LEAD, '');
   if (lead !== t) { t = lead; stripped = true; }
+  if (!stripped) {
+    const prep = t.replace(PERSON_PREP_LEAD, '');
+    // Two words minimum: a bare "with" is evidence only when a full name follows.
+    if (prep !== t && prep.trim().split(/\s+/).length >= 2) { t = prep.trim(); stripped = true; }
+  }
   const tail = t.replace(PERSON_TAIL, '');
   if (tail !== t) { t = tail; stripped = true; }
   t = t.replace(/[?!.]+\s*$/, '').trim();
@@ -185,12 +202,16 @@ export function extractPersonName(raw: string): string | null {
   // A name is a handful of words with no digits — "movies with 500 days" is
   // not a person, and letting it through would search people for a title.
   if (/\d/.test(t) || t.split(/\s+/).length > 4) return null;
-  /* A NAME DOES NOT OPEN WITH AN ARTICLE OR A QUALITY WORD. "a good heist
-     movie" reduces to "a good heist", which is a subject request wearing a
-     name's shape; offering it to the person index costs a lookup and can only
-     return a false match. Cheap, and it never rejects a real name — nobody is
-     credited as "The Smith" or "Best Jones". */
-  if (/^(?:the|a|an|good|best|great|top|new|old|scary|funny|sad|classic)\b/i.test(t)) return null;
+  /* AN ARTICLE IS DROPPED; A QUALITY WORD IS DISQUALIFYING.
+     These look alike and are not. "how about a Bruce Willis movie" reduces to
+     "a Bruce Willis" — a real name wearing an article, and rejecting it outright
+     (my first draft) lost a perfectly good query. "a good heist movie" reduces
+     to "a good heist", which is a SUBJECT wearing a name's shape; no article
+     removal saves that, and offering it to the person index can only return a
+     false match. So the article comes off and the quality word ends it. */
+  t = t.replace(/^(?:the|a|an)\s+/i, '').trim();
+  if (!t || /^(?:good|best|great|top|new|old|scary|funny|sad|classic|other|more)\b/i.test(t)) return null;
+  if (t.split(/\s+/).length > 4) return null;
   return t;
 }
 

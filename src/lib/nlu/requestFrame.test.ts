@@ -153,3 +153,37 @@ describe('peeling is safe to repeat and cannot empty a query', () => {
     expect(stripRequestFrame('find me 50 Stallone movies').count).toBeNull();
   });
 });
+
+describe('the other things people say to a microphone', () => {
+  /* Found by probing the fix against a wider set of real phrasings rather than
+     by re-reading the regex. Two of these were pre-existing gaps in the same
+     family as the reported bug, and one was a guard of mine that was too blunt:
+     "how about a Bruce Willis movie" reduces to "a Bruce Willis", a real name
+     wearing an article, and the first draft rejected it outright. */
+  const RESOLVES: Array<[string, string]> = [
+    ['what should I watch tonight with Tom Hanks', 'Tom Hanks'],
+    ['movies directed by Christopher Nolan', 'Christopher Nolan'],
+    ['how about a Bruce Willis movie', 'Bruce Willis'],
+    ['got any Denzel Washington movies', 'Denzel Washington'],
+    ['pull up Al Pacino movies', 'Al Pacino'],
+    ["I'm looking for Robin Williams films I would love", 'Robin Williams'],
+    ['suggest 4 Tom Hardy films for me', 'Tom Hardy'],
+    ['anything with Meryl Streep', 'Meryl Streep'],
+  ];
+  for (const [said, person] of RESOLVES) {
+    it(`"${said}"`, () => expect(extractPersonName(said)).toBe(person));
+  }
+
+  it('a bare "with" needs a FULL name behind it — "With Honors" is a film', () => {
+    /* The weakest lead in the set, so it is the one that has to prove itself:
+       two words minimum, or it is a title that happens to open with "with".
+
+       "starring" and "featuring" deliberately do NOT carry the same floor, and
+       a first draft of this test asserted they did. "starring Cher" is a real
+       query with a one-word answer, and no rule can tell it apart from
+       "Starring Adam" — so the floor goes on the preposition that films
+       actually start with, and not on the participles they do not. */
+    expect(extractPersonName('With Honors')).toBeNull();
+    expect(extractPersonName('starring Cher'), 'a one-word name is still a name').toBe('Cher');
+  });
+});
