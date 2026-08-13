@@ -93,12 +93,13 @@ narrower than "teach the explainer about anchors": it is (a) populate
 
 ## SHIP GATES
 
-- [ ] **GC1** Recommendation Objective type + LLM extraction; `relationship` survives parse
+- [x] **GC1** Real Recommendation Objective construction on `/api/ask` —
+      **COMPLETE, red-then-green**
 - [x] **GC2** Anchor identity resolution — **COMPLETE, red-then-green**
 - [x] **GC3** Anchor fingerprint hydration — **COMPLETE, red-then-green**
 - [x] **GC4** Critic Reasoning stage — **COMPLETE, red-then-green**
-- [~] **GC5** Anchors + objective reach candidate retrieval — **CONTRACT COMPLETE,
-      red-then-green; PRODUCTION WIRING BLOCKED (see "GC5 blockers")**
+- [x] **GC5** Anchors + objective reach candidate retrieval — **PRODUCTION WIRED
+      by GC1** (contract red-then-green; strands now issued by `/api/ask`)
 - [ ] **GC6** Anchors + objective reach FINAL RANKING (the causality gate)
       — **SCOPE HAS GROWN: `rankWithPreference` is not the production ranker**
 - [ ] **GC7** Grounded explanations — new reason kind carrying the comparison
@@ -110,7 +111,162 @@ narrower than "teach the explainer about anchors": it is (a) populate
 
 ---
 
-## GC5 — CONTRACT COMPLETE (red-then-green) · PRODUCTION WIRING BLOCKED
+## GC1 — COMPLETE (red-then-green)
+
+### The defect, measured on this branch
+
+All three shipped ask parsers were run over the target sentence. The result is
+worse than "anchors are flattened":
+
+| parser | `Better than Furious or Widows Bay` | `Something like Furious or Widows Bay` |
+|---|---|---|
+| `extractReference` | **null** | `"Furious or Widows Bay"` (one flat string) |
+| `classifySearch().mode` | **`exact_title`** | `similar_to` |
+| `classifySearch().requestedTitle` | **the entire sentence** | null |
+| `applyTurn().referenceTitles` | **`[]`** | `["Furious", "Widows Bay"]` |
+
+`REF_CUE` in `askJudge.ts` has no "better than" branch, and the conversational
+extractor's regex is literally `/\b(?:like|similar to)\s+.../`. So the anchors
+were not lost in transit — **they were never extracted**, and the whole sentence
+was looked up as if it were the name of a film. That lookup finds nothing, the
+request degrades to generic discovery with no anchors, and Taste DNA alone picks
+a drama. **That is the Cool Hand Luke mechanism, end to end.**
+
+`like_but` and `blend` failed the same way (`Furious but funnier` and
+`Furious meets Widows Bay` both classified `exact_title`).
+
+### Production parse path, after GC1
+
+```
+POST /api/ask
+  0.9  parseCriticRequest(text)          ← ONE parser, ALL modes
+         null  -> every existing path runs untouched
+         hit   -> critic path:
+           hard  = stateToQuery(convState)            (conversational)
+                 | augmentInternational(naiveParseQuery(text))  (fresh)
+           GC2   resolveAnchor(spokenAs, searchTitles candidates)
+           GC3   hydrateAnchors(getCachedDimensions)
+                 anchorsToObjective(requested = names the user typed)
+           GC4   buildPlan(relation, anchors, DNA, modifiers, authority)
+           GC5   planToHints -> runStrands (concurrent, base query per strand)
+           ──────── GC6 BOUNDARY ────────  items stay in finder matchScore order
+  1)   askJudgeTitle …           (unchanged, now guarded by !criticRequest)
+  2a)  conversational discovery  (unchanged)
+  2)   AI / naive discovery      (unchanged)
+```
+
+Placed **above** the exact-title lookup deliberately — that is the branch that
+was swallowing the sentence.
+
+### RED → GREEN
+
+`src/lib/critic/gc1.test.ts`, behavioural not module-absent: section 1 runs the
+SHIPPED parsers and pins what they really do, so those assertions hold before
+and after; everything downstream failed because nothing built an objective.
+
+```
+RED    2 failed | 27 passed (29)   ← both failures were the route wiring
+GREEN  31 passed (31)              ← +2 added for the no-anchor fall-through
+```
+
+A parser bug the RED surfaced and fixed before wiring: `better` sat in the
+`NOT_COMPARATIVE` guard list, so `"but better acted"` produced no unresolved
+modifier. It is a genuine comparative; the relation cue never reaches that scan
+because the modifier region starts after the last anchor.
+
+### Relationship
+
+Canonical enum only — `like` / `better_than` / `like_but` / `blend`. Natural
+variants are recognised in `request.ts` and never leak downstream. `like_but` is
+derived (`like` + grounded modifiers), not a separate cue; a comparative keeps
+its own identity, so "better than X but funnier" stays `better_than`.
+No title is special-cased — proved on `Heat`/`Sicario`/`Arrival`.
+
+### Anchor identity
+
+`searchTitles(name)[0]` is **gone from the route entirely**, including from
+`referenceKeywordIds`, which now resolves through GC2 as well. That was not
+merely a latent risk: "like Furious" was fetching **Furious 7's** keywords, so
+the search was biased toward a film the user never named while the read-back
+claimed we had kept the feel of the one they did.
+
+Test 9 makes the decoys **first** in both candidate lists, so any code trusting
+search order fails. Ambiguous → `authority: 0`, no guess, and the route falls
+through rather than answering (test 31) — GC2's refusal is worth nothing if the
+caller answers anyway.
+
+### Modifiers
+
+Grounded only where honest, and every target asserted against `DIMENSION_KEYS`
+at module load so a renamed axis breaks the build. `funnier→humor↑`,
+`less depressing→darkness↓`, `faster→pacing↑`, `less sentimental→emotion↓`, etc.
+Deliberately ungrounded: "better acted", "prettier", "more original" — directional
+but not *about* an axis. They surface as `unresolvedModifiers`, never bent onto
+the nearest-looking axis.
+
+### GC5 — now production wired
+
+`runStrands` issues every strand through the **same `runFinder` with the same
+base query**, so subject strictness, providers, runtime, years, exclusions and
+media type are enforced on every strand. A strand may only ADD soft seeds; there
+is no code path that removes a constraint. Strands run concurrently (wall-clock
+≈ one strand; TMDB budget genuinely N×, capped at `MAX_STRANDS = 5` — tuning is
+GC11). `FinderQuery.minVotes` was added, optional and additive, because the
+ungated recall floor needs its own popularity bar.
+
+### ACCLAIM STRAND — corrected semantics
+
+`vote_average` is a crowd average and is **not** the definition of "better".
+"Better for this user" is decided by the GC4 plan and final ranking. The strand
+is an **additive recall heuristic only**: it can put a well-reviewed,
+modest-audience title in front of the judge; it cannot make it the answer and
+carries no ranking weight. Comments in `retrieval.ts` updated accordingly.
+
+### Observability
+
+`CriticAttribution` — relation, cue, requested anchors, GC2 status per anchor,
+GC3 hydrated flags, authority, GC4 instructions with provenance, GC5 strand
+labels, ranking-only axes, unresolved modifiers, candidate ids, per-strand
+counts. Non-production responses only. Enums, ids, labels and numbers —
+structured evidence, never a prompt or free-text reasoning (test 25).
+
+### Baseline inertness
+
+`parseCriticRequest` returns null for every non-comparative ask, and null means
+the existing pipeline runs untouched. Pinned on "three wrestling movies",
+"a boxing movie", "crime dramas on BritBox", "Gone on BritBox", bare titles, and
+the `X but <ungroundable>` form.
+
+### GC6 — STILL OPEN, and not quietly crossed
+
+`strandRun.items` stay in the finder's own `matchScore` order. The plan is built,
+carried and reported, and reorders nothing. `rankWithPreference` still has zero
+production callers. `attribution.finalRankingConsumesPlan` is hard-coded `false`
+and `productionWiring.test.ts` asserts that literal, so flipping it without
+wiring GC6 fails the suite.
+
+### Gates
+
+| gate | exit | result |
+|---|---|---|
+| GC1 focused | 0 | 31 passed |
+| GC2 / GC3 / GC4 / GC5 / GC8 + wiring | 0 | 117 passed (all critic files) |
+| `npx vitest run` | 0 | 3327 passed, 24 skipped, **0 failed** |
+| `npm run typecheck` | 0 | clean |
+| `npm run lint` | 0 | no warnings or errors |
+| `npm run build` | 0 | clean |
+| `npx playwright test -c playwright.searchrouting.config.ts` | 0 | 21 passed |
+| frozen corpus `layerBext` | 0 | P0 635/635 · P1 515/515 |
+
+**Frozen corpus delta vs the pre-GC1 baseline captured on this branch: 0
+PASS→FAIL, 0 FAIL→PASS.** Byte-identical, because `extractReference`,
+`classifySearch` and `resolveSearchDestination` — the surfaces the corpus judges
+— were not modified. `layerA` was not run: it measures the live deployment, not
+this branch.
+
+---
+
+## GC5 — CONTRACT COMPLETE (red-then-green) · PRODUCTION WIRED BY GC1
 
 ### The production retrieval path, traced on THIS branch (not assumed from GC1)
 
@@ -245,15 +401,15 @@ pool. **It cannot**, and not by tuning: dimension instructions are classified
 Test 14 asserts a rich plan retrieves ≥ an empty one. `MIN_RANK_CONF` was not
 touched and test 15 pins it at `0.25`.
 
-### GC5 blockers — PROVEN, not assumed (`src/lib/critic/productionWiring.test.ts`, 5/5)
+### GC5 blockers — PROVEN, not assumed (`src/lib/critic/productionWiring.test.ts`)
 
 The brief required proving the dependency rather than faking a production path.
-There are **two**, and the second was not previously known.
+There were **two**, and the second was not previously known.
 
-1. **GC1 blocks it.** Nothing outside `src/lib/critic/` constructs a
-   `CriticObjective`. `ask/route.ts` still calls `referenceKeywordIds` and
-   `searchTitles(name)[0]`. Only tests construct the objective, so **GC5 is a
-   contract, not a production path**, and this ledger does not claim otherwise.
+1. ~~**GC1 blocks it.**~~ **CLOSED BY GC1.** `/api/ask` now constructs the
+   objective and issues the strands; `searchTitles(name)[0]` is gone from the
+   route. The assertions were inverted rather than deleted, so they now guard
+   the wiring against regressing. See the GC1 section above.
 2. **`rankWithPreference` has ZERO production callers.** This is the bigger
    find. GC8 and GC4 proved causality against a function whose own docblock
    says it is "exposed as a pure helper so the before/after report reflects

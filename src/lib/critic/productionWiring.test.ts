@@ -3,15 +3,17 @@ import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
 /**
- * GC5 BLOCKER — PROVEN, NOT ASSUMED.
+ * WHAT IS AND IS NOT WIRED — the file that refuses to let a claim outrun the code.
  *
- * The brief is explicit: "If GC5 cannot be connected without GC1 because
- * production currently never constructs a CriticObjective, stop and prove that
- * dependency rather than faking a production path."
+ * GC5 found TWO independent gaps. GC1 CLOSED THE FIRST: the real `/api/ask`
+ * request path now constructs the canonical critic state and issues the GC5
+ * retrieval strands. The assertions below were inverted rather than deleted, so
+ * they now guard the wiring against regressing instead of pinning its absence.
  *
- * Tracing the current branch turned up TWO independent gaps, and the second was
- * not previously known. These tests pin both, so the day either one closes this
- * file fails and tells the next session the blocker is gone.
+ * THE SECOND IS STILL OPEN and is deliberately left pinned: production's final
+ * ordering does not consume the critic plan. That is GC6.
+ *
+ * In one line: GC1 closed; GC6 still open.
  */
 
 /**
@@ -40,28 +42,42 @@ const grepUses = (pattern: string): string[] => {
 
 const grepCount = (pattern: string): number => grepUses(pattern).length;
 
-describe('BLOCKER 1 — production never constructs a CriticObjective (GC1)', () => {
-  it('nothing outside src/lib/critic builds one', () => {
-    // `rank.ts` imports the TYPE; that is the consumer, not a constructor.
-    const constructors = grepCount("buildPlan\\|anchorsToObjective\\|resolveAnchor");
-    expect(constructors, 'a production caller appeared — GC1 may be unblocked').toBe(0);
+describe('BLOCKER 1 — CLOSED by GC1: production constructs the critic state', () => {
+  it('a real production caller now builds the objective', () => {
+    // Was asserted to be 0. The ask route is the caller.
+    expect(grepCount("buildCriticState"), 'GC1 wiring vanished from production').toBeGreaterThan(0);
   });
 
-  it('the ask route still reduces anchors to keyword ids', () => {
+  it('the ask route no longer treats search order as identity', () => {
     const route = readFileSync('src/app/api/ask/route.ts', 'utf8');
-    expect(route).toContain('referenceKeywordIds');
-    expect(route).toContain('searchTitles(name)');
+    /* The exact line that made popularity into identity. Anchors now go
+       through `resolveAnchor`, which refuses rather than guessing. */
+    expect(route).not.toContain('searchTitles(name).catch(() => []))[0]');
+    expect(route).toContain('resolveAnchor(');
+  });
+
+  it('the relation survives parsing instead of being discarded', () => {
+    const route = readFileSync('src/app/api/ask/route.ts', 'utf8');
+    expect(route).toContain('parseCriticRequest');
   });
 });
 
-describe('BLOCKER 2 — the critic ranker is not the production ranker', () => {
+describe('BLOCKER 2 — STILL OPEN: the critic ranker is not the production ranker', () => {
   it('rankWithPreference has NO production caller at all', () => {
-    /* THE FINDING THAT MATTERS MOST. GC8 proved the critic term changes the
-       order returned by `rankWithPreference` — and that function is a REPORTING
-       HELPER. Its own docblock says it exists "so the before/after report
-       reflects production behavior". Nothing in the app calls it. */
+    /* THE FINDING THAT MATTERS MOST, and GC1 did not change it. GC8 proved the
+       critic term changes the order returned by `rankWithPreference` — and that
+       function is a REPORTING HELPER. Its own docblock says it exists "so the
+       before/after report reflects production behavior". Nothing calls it. */
     const uses = grepUses("rankWithPreference(");
     expect(uses, `rankWithPreference gained a caller: ${uses.join(' | ')}`).toEqual([]);
+  });
+
+  it('the critic path reports that final ranking does NOT consume the plan', () => {
+    /* GC1 carries the plan to the boundary and stops. This constant is the
+       honest record of that, and flipping it without wiring GC6 would make the
+       API tell the user something untrue. */
+    const orch = readFileSync('src/lib/critic/orchestrate.ts', 'utf8');
+    expect(orch).toContain('finalRankingConsumesPlan: false');
   });
 
   it('the Ask/Finder path ranks by matchScore, never by the critic term', () => {

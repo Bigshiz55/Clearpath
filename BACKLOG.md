@@ -4,10 +4,11 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-- **Critic Layer — `claude/critic-layer`.** GC8, GC2, GC3, GC4 complete
-  red-then-green; **GC5 contract complete** (`src/lib/critic/retrieval.ts`,
-  17/17). Ledger: `docs/CRITIC-SHIP.md`. Next gate is GC6 — but read the two
-  blockers below first, both proven by `src/lib/critic/productionWiring.test.ts`.
+- **Critic Layer — `claude/critic-layer`.** GC8, GC2, GC3, GC4, GC5, **GC1**
+  complete red-then-green (117 critic tests). `/api/ask` now constructs the real
+  CriticObjective/CriticPlan and issues the GC5 retrieval strands, so **GC5 is
+  production wired**. Ledger: `docs/CRITIC-SHIP.md`. Next gate is GC6 — see the
+  remaining blocker below.
 
 **Action needed from you:** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the
@@ -40,16 +41,17 @@ and what it unblocks.
   scoping once the accounts/feedback loop above has real usage to learn from.
 
 ## Blocked
-- **Critic GC5 production wiring — blocked on GC1.** Nothing outside
-  `src/lib/critic/` constructs a `CriticObjective`; `/api/ask` still reduces
-  named titles to `referenceKeywordIds` + `searchTitles(name)[0]`. GC5 is
-  therefore a *contract*, deliberately not claimed as a production path.
 - **Critic GC6 is larger than it was scoped.** `rankWithPreference` — the
   function GC8/GC4 proved causality against — has **zero production callers**;
   its docblock says it exists "so the before/after report reflects production
   behavior". `runFinder` sorts by `matchScore`; `rankByDna` (`src/lib/dna.ts`)
   calls `preferenceNudge` directly, bypassing it. GC6 must first change a real
-  call site, not add one line. Discovered during GC5.
+  call site, not add one line. Discovered during GC5; unchanged by GC1, which
+  deliberately stops at the boundary before final ranking.
+- **Critic strand TMDB budget (GC11).** The critic path issues one `runFinder`
+  per GC5 strand (up to `MAX_STRANDS = 5`, four for `better_than`). They run
+  concurrently so wall-clock is roughly one strand, but the TMDB call budget is
+  genuinely N×. Needs measuring and tuning against real pools.
 - **Score distribution audit.** The median appears compressed: four
   recommendations scored 79-91, all reading STREAM IT. Blocked on real title
   data existing in production — the local/dev catalog is synthetic fixture

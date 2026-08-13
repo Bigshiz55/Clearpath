@@ -9,6 +9,12 @@ import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askP
 import { augmentInternational } from '@/lib/askInternational';
 import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
+import { parseCriticRequest } from '@/lib/critic/request';
+import { buildCriticState } from '@/lib/critic/orchestrate';
+import { resolveAnchor } from '@/lib/critic/anchor';
+import { runStrands } from '@/lib/critic/strands';
+import { getCachedDimensions } from '@/lib/titleDimensions';
+import { loadPreference } from '@/lib/preference/store';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
 import { buildQueryPlan } from '@/lib/nlu/queryPlan';
@@ -45,9 +51,22 @@ import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBr
 async function referenceKeywordIds(referenceTitles: string[]): Promise<number[]> {
   const out = new Set<number>();
   for (const name of referenceTitles.slice(0, 2)) {
-    const hit = (await searchTitles(name).catch(() => []))[0];
-    if (!hit) continue;
-    const detail = await getTitle(hit.mediaType, hit.id).catch(() => null);
+    /* IDENTITY THROUGH GC2, NOT THROUGH SEARCH ORDER.
+       This used to be `searchTitles(name)[0]` — popularity treated as identity.
+       It did not merely risk the wrong anchor, it reliably produced one: "like
+       Furious" fetched the keywords of Furious 7, so the search was biased
+       toward a film the user had not named, and the read-back said we had kept
+       the feel of the one they did. `resolveAnchor` refuses instead of
+       guessing, and an anchor it cannot place contributes no keywords at all. */
+    const candidates = (await searchTitles(name).catch(() => [])).map((c) => ({
+      id: c.id,
+      title: c.title,
+      mediaType: c.mediaType,
+      year: c.year ?? null,
+    }));
+    const res = resolveAnchor({ spokenAs: name }, candidates);
+    if (res.status !== 'resolved') continue;
+    const detail = await getTitle(res.anchor.mediaType, res.anchor.tmdbId).catch(() => null);
     const kwNames = (detail?.keywords ?? []).slice(0, 6);
     if (kwNames.length === 0) continue;
     const ids = await searchKeywords(kwNames).catch(() => []);
@@ -262,6 +281,116 @@ export async function POST(req: Request) {
     // request for that thing — it must never be treated as a title ask, no
     // matter what happens to share the name.
     const lex = text.trim() ? lexicalIntent(text) : null;
+
+    // 0.9) THE CRITIC PATH — a request that COMPARES.
+    //
+    // One parser for every mode. `parseCriticRequest` reads the relation and
+    // the individual anchors out of the sentence, so a comparison cannot
+    // survive on the conversational route and silently degrade to a keyword
+    // union on the discovery route. It returns null for everything else, and
+    // null means the existing pipeline below runs completely untouched.
+    //
+    // This sits ABOVE the exact-title lookup deliberately. "Better than Furious
+    // or Widows Bay" classifies as `exact_title` today — the whole sentence is
+    // searched as if it were the name of a film, finds nothing, and falls
+    // through to generic discovery with no anchors at all. That is the precise
+    // mechanism behind the Cool Hand Luke answer.
+    const criticRequest = text.trim() && !lex ? parseCriticRequest(text) : null;
+    if (criticRequest) {
+      // Stated constraints only. The conversational state already carries the
+      // accumulated ones; a fresh ask reads them off the deterministic parser
+      // (never the LLM — a hard constraint must not depend on a key being set).
+      const criticBase: FinderQuery = conversational && convState
+        ? stateToQuery(convState)
+        : augmentInternational(naiveParseQuery(text), text);
+      if (criticRequest.referenceTitles.length > 0) {
+        criticBase.similarTo = criticRequest.referenceTitles.join(' / ');
+      }
+
+      const { dna } = await loadPreference(supabase, user.id);
+      const criticState = await buildCriticState({
+        request: criticRequest,
+        dna,
+        // HARD = what the sentence said. Nothing inferred may enter this object.
+        hard: {
+          mediaType: criticBase.mediaType,
+          minYear: criticBase.minYear ?? null,
+          maxYear: criticBase.maxYear ?? null,
+          providerIds: criticBase.providerIds,
+          excludeGenreIds: criticBase.excludeGenreIds,
+          subjectKeywordIds: criticBase.subjectKeywordIds,
+        },
+        // GC2 JUDGES these candidates; search order never decides identity.
+        searchCandidates: async (name) =>
+          (await searchTitles(name).catch(() => [])).map((c) => ({
+            id: c.id,
+            title: c.title,
+            mediaType: c.mediaType,
+            year: c.year ?? null,
+          })),
+        // GC3, cache-only. A miss costs the anchor its authority, nothing more.
+        loadDimensions: getCachedDimensions,
+        // SOFT seeds. Reusing the shipped keyword extraction, now demoted from
+        // "the search" to "one strand of it".
+        anchorKeywordIds: await referenceKeywordIds(criticRequest.referenceTitles),
+        anchorGenreIds: [],
+        mediaType: criticBase.mediaType === 'any' ? undefined : criticBase.mediaType,
+      });
+
+      /* NOTHING RESOLVED, NOTHING TO SAY — so do not take the request over.
+         With no placed anchor the critic's only strand is the ungated recall
+         floor, which is a popularity sweep wearing the authority of a
+         comparison. Falling through leaves the user with the existing pipeline,
+         which is a weaker answer honestly arrived at rather than a generic one
+         presented as understanding. GC2's refusal is worth nothing if the
+         caller answers anyway. */
+      if (criticState.objective.anchors.length === 0) {
+        convInterpretation.push(
+          `I couldn't pin down ${criticRequest.referenceTitles.join(' or ')} — answering without the comparison.`,
+        );
+      } else {
+      const limitCritic = text ? parseRequestedCount(text) : DEFAULT_RESULT_LIMIT;
+      /* GC5 RETRIEVAL, ISSUED FOR REAL. `hints.strands` always contains at
+         least the ungated recall floor, so this is never an empty search — but
+         the guard states that dependency rather than assuming it, because a
+         zero-strand union would silently return nothing at all. */
+      const { hints } = criticState;
+      if (hints.strands.length === 0) throw new Error('critic: no retrieval strands');
+      const strandRun = await runStrands(
+        supabase,
+        user.id,
+        hints,
+        criticBase,
+        null,
+        limitCritic,
+      );
+      criticState.attribution.candidateIds = strandRun.candidateIds;
+
+      /* THE GC6 BOUNDARY, AND IT IS NOT CROSSED HERE.
+         `strandRun.items` arrive in the finder's own `matchScore` order. The
+         plan is built, carried and reported, and it does NOT reorder anything —
+         `rankWithPreference` still has no production caller. Sorting by the
+         critic here would make `finalRankingConsumesPlan: false` a lie. */
+      const criticItems = strandRun.items.slice(0, limitCritic);
+
+      return NextResponse.json(
+        withConv({
+          kind: 'search',
+          requestId,
+          appliedText: text || null,
+          query: criticBase,
+          scoredFor: strandRun.scoredFor || 'Your match',
+          relaxed: strandRun.relaxed,
+          items: criticItems.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+          // Structured evidence for development — enums, ids, labels and
+          // numbers. Never a prompt, never free-text reasoning.
+          ...(process.env.NODE_ENV === 'production'
+            ? {}
+            : { criticAttribution: { ...criticState.attribution, perStrand: strandRun.perStrand } }),
+        }),
+      );
+      }
+    }
 
     // 1) Named-title lookup → put THAT title on trial (with the identity guard,
     // exact-match ranking and provider hard filter inside askJudgeTitle).

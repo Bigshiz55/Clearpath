@@ -144,15 +144,26 @@ export interface HintInput {
 const RECALL_MIN_VOTES = 1000;
 
 /**
- * ACCLAIM, WHICH IS NOT POPULARITY. The quality strand exists to reach exactly
- * what a popularity sweep hides: a well-reviewed title with a modest audience.
- * So it TRADES the vote bar for a rating bar rather than stacking both — a
- * strand that demanded high votes AND high rating would return a subset of the
- * sweep and add nothing.
+ * AN ADDITIVE RECALL HEURISTIC. NOT A DEFINITION OF "BETTER".
  *
- * Provisional values. They are set so the two strands are non-redundant, and
- * they should be tuned against real TMDB pools when GC6 issues these queries
- * for real; nothing downstream depends on the specific numbers.
+ * ── READ THIS BEFORE CHANGING IT ──────────────────────────────────────────
+ * TMDB `vote_average` is a crowd average. It is NOT what "better" means here,
+ * and it must never be treated as though it were. "Better FOR THIS USER" is
+ * decided downstream — by the GC4 plan and by final ranking — from the user's
+ * own taste evidence. A title with a high audience score is not thereby a
+ * better answer for anyone in particular; plenty of well-rated films are
+ * exactly wrong for a given viewer, which is the entire premise of the product.
+ *
+ * All this strand does is BROADEN the pool in a direction a popularity sweep
+ * systematically misses: the well-reviewed title with a modest audience. It can
+ * put a candidate in front of the judge. It cannot make it the answer, and it
+ * carries no weight at ranking time.
+ *
+ * It trades the vote bar for a rating bar rather than stacking both — demanding
+ * high votes AND high rating would return a subset of the sweep and add nothing.
+ *
+ * Provisional values, set so the two strands are non-redundant. Tune against
+ * real TMDB pools; nothing downstream depends on the specific numbers.
  */
 const ACCLAIM_MIN_RATING = 7.0;
 const ACCLAIM_MIN_VOTES = 200;
@@ -207,12 +218,13 @@ export function planToHints(input: HintInput): CriticRetrievalHints {
     strands.push({ label: 'anchor-genres', genreIds: anchorGenreIds });
   }
 
-  /* 4 · RELATION. `better_than` is a claim about QUALITY, and quality is the
-     one critic-side idea TMDB can genuinely express (`vote_average.gte`). This
-     is not a proxy standing in for a fingerprint axis — it is the real thing
-     the word means. `like` gets no such strand: resemblance is not a quality
-     claim, and adding an acclaim floor there would quietly refuse to return the
-     mediocre-but-similar title the user actually asked for. */
+  /* 4 · RELATION. `better_than` says the user wants to do better than the
+     anchors, so the pool should also contain titles a popularity sweep would
+     never surface. `vote_average.gte` is a legitimate way to REACH those — and
+     nothing more than that. It does not decide, or even suggest, that a
+     candidate is better; see the note on ACCLAIM_MIN_RATING. `like` gets no
+     such strand: resemblance is not a quality claim, and an acclaim floor there
+     would quietly refuse the mediocre-but-similar title actually asked for. */
   if (relation === 'better_than') {
     strands.push({
       label: 'acclaim',

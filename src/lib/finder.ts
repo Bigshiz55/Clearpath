@@ -139,6 +139,16 @@ export interface FinderQuery {
   /** Monetization filter for discovery — 'flatrate', 'flatrate|free|ads', … .
    *  "Included with a subscription" is a HARD ask; rentals must not satisfy it. */
   monetization?: string;
+  /**
+   * Minimum TMDB vote count (`vote_count.gte`). Optional and additive: when
+   * unset, discovery keeps the existing defaults exactly.
+   *
+   * Exists for the critic's recall-floor strand, which searches with NO genre
+   * and NO keyword and therefore needs its own popularity bar — the standing
+   * default of 80 is safe only because something else is already narrowing the
+   * pool.
+   */
+  minVotes?: number | null;
 }
 
 export interface FinderItem {
@@ -370,7 +380,8 @@ export async function runFinder(
           region,
           minRating: q.upcoming ? undefined : minRating,
           // Upcoming titles have no votes/ratings yet, so don't require any.
-          minVotes: q.upcoming ? 0 : q.castIds && q.castIds.length > 0 ? 20 : 80,
+          minVotes:
+            q.upcoming ? 0 : q.minVotes != null ? q.minVotes : q.castIds && q.castIds.length > 0 ? 20 : 80,
           sinceDays: q.upcoming ? undefined : sinceDays,
           upcomingDays: q.upcoming ? 365 : undefined,
           maxRuntime: q.maxRuntime ?? undefined,
