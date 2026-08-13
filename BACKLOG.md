@@ -4,13 +4,14 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-- **Critic Layer — `claude/critic-layer`.** GC8, GC2, GC3, GC4, GC5, **GC1**
-  complete red-then-green (131 critic tests). `/api/ask` now constructs the real
-  CriticObjective/CriticPlan and issues the GC5 retrieval strands, so **GC5 is
-  production wired**. Comparative intent is detected at a provider-independent
-  boundary (`src/lib/critic/gate.ts`) ahead of the AI orchestrator, so the
-  meaning of a request no longer depends on `AI_DISCOVERY_MODE`. Ledger:
-  `docs/CRITIC-SHIP.md`. Next gate is GC6 — read its warning below first.
+- **Critic Layer — `claude/critic-layer`.** GC8, GC1, GC2, GC3, GC4, GC5 and
+  **GC6** complete red-then-green (158 critic tests). A comparative Ask now runs
+  the full pipeline and **the CriticPlan orders the response the user gets**:
+  `decisionScore = matchScore + planNudge`, bounded ±10 and authority-scaled,
+  with the durable Match still displayed on the card. Comparative intent is
+  detected at a provider-independent boundary (`src/lib/critic/gate.ts`) so
+  meaning does not depend on `AI_DISCOVERY_MODE`. Ledger:
+  `docs/CRITIC-SHIP.md`. Next gate is GC7 (grounded explanations).
 
 **Action needed from you:** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the
@@ -43,20 +44,28 @@ and what it unblocks.
   scoping once the accounts/feedback loop above has real usage to learn from.
 
 ## Blocked
-- **Critic GC6 must start with a score-composition audit (owner instruction).**
-  `runFinder` builds `matchScore` from `buildVerdict(...).personal.score`, which
-  is already personalized via `getPersonalContext`; `rankByDna` adds DNA terms on
-  some surfaces. Do NOT feed `matchScore` into `rankWithPreference(…, dna,
-  criticPlan)` until it is proved that does not double-count the same user taste.
-  GC6 must establish ONE explicit final-score composition. Details in
-  `docs/CRITIC-SHIP.md` → "GC6 — read before starting".
-- **Critic GC6 is larger than it was scoped.** `rankWithPreference` — the
-  function GC8/GC4 proved causality against — has **zero production callers**;
-  its docblock says it exists "so the before/after report reflects production
-  behavior". `runFinder` sorts by `matchScore`; `rankByDna` (`src/lib/dna.ts`)
-  calls `preferenceNudge` directly, bypassing it. GC6 must first change a real
-  call site, not add one line. Discovered during GC5; unchanged by GC1, which
-  deliberately stops at the boundary before final ranking.
+- **Consolidate `preference_rules` with canonical Taste DNA (separate
+  migration).** GC6's audit proved a real semantic overlap: `slow_burn` (a
+  legacy rule, +12 into `matchScore`) and low canonical `pacing` (a GC4 plan
+  instruction, +9.77) are the same preference in two vocabularies, and both fire
+  on the same candidate. Also `grounded_crime`↔realism/darkness,
+  `noir`↔darkness/morality, `serial_killer`↔violence/darkness,
+  `psychological_thriller`↔suspense/complexity. GC6 BOUNDS the overlap (critic
+  capped at ±10) rather than removing it; removing it means a data migration
+  touching `rankByDna`, `browse`, `/app/watch` and the legacy rules UI.
+  Numbers in `docs/CRITIC-SHIP.md` → GC6 double-count finding.
+- **`rankWithPreference` is dead production code — decide its fate.** It
+  composes `objective + preferenceNudge + critic`, which is exactly the formula
+  GC6's audit rejected (it would apply canonical DNA twice, since `buildPlan`
+  already consumes it). GC6 deliberately did NOT wire it and built an explicit
+  composition instead. It still has zero production callers and remains pinned
+  by `productionWiring.test.ts`. Either delete it or narrow it to its GC8
+  reporting role explicitly.
+- **Two parallel personalization compositions exist by surface.** Ask/Finder
+  uses `matchScore` (general + `preference_rules`); `/app/watch` and `browse`
+  use `rankByDna` (`computeGeneralScore` + embedding + dim nudge + rerank +
+  `preferenceNudge`). They never meet, and neither knows about the other. Worth
+  a deliberate decision once the consolidation above is scoped.
 - **Critic strand TMDB budget (GC11).** The critic path issues one `runFinder`
   per GC5 strand (up to `MAX_STRANDS = 5`, four for `better_than`). They run
   concurrently so wall-clock is roughly one strand, but the TMDB call budget is

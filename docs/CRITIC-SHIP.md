@@ -100,9 +100,8 @@ narrower than "teach the explainer about anchors": it is (a) populate
 - [x] **GC4** Critic Reasoning stage — **COMPLETE, red-then-green**
 - [x] **GC5** Anchors + objective reach candidate retrieval — **PRODUCTION WIRED
       by GC1** (contract red-then-green; strands now issued by `/api/ask`)
-- [ ] **GC6** Anchors + objective reach FINAL RANKING (the causality gate)
-      — **MUST BEGIN WITH A SCORE-COMPOSITION AUDIT. See "GC6 — read before
-      starting" below. Do NOT wire the plan into a ranker before then.**
+- [x] **GC6** Anchors + objective reach FINAL RANKING — **COMPLETE,
+      red-then-green.** Audit done first; composition is explicit.
 - [ ] **GC7** Grounded explanations — new reason kind carrying the comparison
 - [x] **GC8** Material-dependence test — **COMPLETE, red-then-green**
 - [ ] **GC9** Counterfactual suite: anchors / DNA / relationship / modifiers / context each causal
@@ -112,32 +111,207 @@ narrower than "teach the explainer about anchors": it is (a) populate
 
 ---
 
-## GC6 — READ BEFORE STARTING (owner warning, recorded not implemented)
+## GC6 — COMPLETE (audit first, then red-then-green)
 
-**GC6 must begin with a score-composition audit, not with wiring.**
+### PHASE 1 · SCORE-COMPOSITION FORENSIC AUDIT
 
-`runFinder` already builds `matchScore` from `buildVerdict(...).personal.score`,
-whose personalization comes from `getPersonalContext`. Separately:
+Traced on this branch. `FinderItem.matchScore` is **not** a quality number:
 
-- `rankByDna` adds preference/DNA terms on some production surfaces
-- `rankWithPreference` holds the canonical preference + critic composition and
-  still has **no production caller**
+```
+runFinder
+  basePersonal = getPersonalContext(supabase, userId, null)   profile.ts:144
+                   -> getProfile           (profiles.liked_franchise_ids)
+                   -> getRawPreferenceRules (preference_rules)
+                   -> hasSignal = rules.length > 0 || likedFranchiseIds.length > 0
+  buildVerdict({ meta, providers, personal })                 verdict.ts:251
+    general = computeGeneralScore(meta, providers)
+    match   = computePersonalMatch(meta, general.score, personal)   personal.ts:41
+              hasSignal === false -> score = general.score, adjustments = []
+              else  score = clamp(general.score + Σ rule.weight  where
+                                  detectTrait(rule.trait, meta) fires)
+  effectiveMatch = household ? household.score : report.personal.score   finder.ts:538
+  FinderItem.matchScore = effectiveMatch                               finder.ts:592
+  items.sort((a, b) => b.matchScore - a.matchScore)                    finder.ts:719
+```
 
-So `FinderItem.matchScore` is already a *personalized* number, and nobody has
-established exactly which user-taste evidence is inside it.
+#### Term table
 
-**Do NOT run `rankWithPreference(matchScore, dna, criticPlan)` until it is
-proved that doing so does not double-count the same user taste.** Feeding an
-already-personalized score into a second personalization layer would apply the
-user's DNA twice with no way to see it in the output — the numbers would simply
-be more confident and less correct.
+| term | source data | durable vs request | production surfaces | bound | can overlap? |
+|---|---|---|---|---|---|
+| `computeGeneralScore` | TMDB meta + providers | neither (title quality) | everywhere | 0–100 | — |
+| `preference_rules` weights | `preference_rules` table | **durable** | `runFinder` → Ask, Finder | unbounded sum, clamped 0–100 | **yes — with canonical DNA** |
+| `liked_franchise_ids` | `profiles` | durable | same | via a rule weight | no (franchise identity) |
+| `deriveDna` → `effectiveTaste` | `preference_events` | **durable** | `rankByDna`, GC4 `buildPlan` | pref 0–100 + confidence | **yes — with rules** |
+| `preferenceNudge` | canonical DNA | durable | **`rankByDna` only** | ±`PREF_NUDGE_MAX` = 10 | yes |
+| `dimensionMatch` → dim nudge | `title_dimensions` + profile | durable | `rankByDna` only | ±`DIM_NUDGE_MAX` = 8 | yes |
+| `rerankNudge` | learned weights | durable | `rankByDna` only | model-bounded (currently no-op) | yes |
+| `dnaScore` (embeddings) | `title_vectors` | durable | `rankByDna` only | blends into base | yes |
+| **`planNudge` (GC4)** | anchors + relation + DNA + modifiers | **request-specific** | **Ask comparative (GC6)** | ±`CRITIC_NUDGE_MAX` = 10 × authority | yes |
 
-GC6's job is to establish **one explicit final-score composition**, not to stack
-another personalization system on top of an opaque personalized score.
+#### The decisive structural finding
 
-Required first step: enumerate what user preference evidence is represented in
-`matchScore` today — `getPersonalContext` → `buildVerdict` → `personal.score` —
-and write it down before any ranking change.
+**`rankByDna` is never called by `/api/ask`.** Its only callers are
+`src/app/app/watch/page.tsx` and `src/lib/browse.ts`. It also builds its score
+from `computeGeneralScore`, **not** from `matchScore` — it is a parallel
+composition on other surfaces, not a layer above this one.
+
+So on the Ask comparative path the only personalization present is
+`preference_rules`, and canonical event-derived DNA reaches Ask ordering
+**nowhere at all**.
+
+### DOUBLE-COUNT FINDING — overlap is REAL
+
+Not answered by "different tables". The vocabularies genuinely collide:
+
+| legacy rule trait | canonical DNA axis | relationship |
+|---|---|---|
+| `slow_burn` | `pacing` (low) | **same preference, two vocabularies** |
+| `grounded_crime` | `realism` + `darkness` | partial |
+| `noir` | `darkness` + `morality` | partial |
+| `serial_killer` | `violence` + `darkness` | partial |
+| `psychological_thriller` | `suspense` + `complexity` | partial |
+| `supernatural` / `fantasy` / `science_fiction` | `realism` (inverse) | partial |
+| `franchise_favorite` | — | **none** |
+
+`src/lib/critic/doubleCount.test.ts` prints the real terms:
+
+| case | general | rule term | matchScore | criticNudge | decisionScore |
+|---|---|---|---|---|---|
+| 1 · rule only, no DNA | 72 | **+12** | 84 | **0** | 84 |
+| 2 · DNA only, no rule | 72 | 0 | 72 | **+9.77** | 81.77 |
+| 3 · both, SAME preference | 72 | **+12** | 84 | **+9.77** | **93.77** |
+| 4 · both, CONFLICTING | 72 | +12 | 84 | **−3.59** | 80.41 |
+
+**Case 3 is a genuine overlap and it is not eliminated — it is bounded.** The
+critic contributes at most ±10 no matter how many vocabularies agree, and the
+two terms answer different questions (see the formula below). Fully removing the
+overlap means consolidating `preference_rules` with canonical DNA, which is a
+data migration touching `rankByDna`, `browse`, `/app/watch` and the legacy rules
+UI. **Recorded in BACKLOG rather than forced into GC6**, per the scope rule.
+
+### FINAL-SCORE FORMULA — proved, not assumed
+
+```
+decisionScore = matchScore + planNudge(candidate.dims, criticPlan)
+```
+
+**NOT** `matchScore + preferenceNudge + planNudge`, and the reason is in the
+code rather than in a preference: `buildPlan` already consumes canonical DNA —
+its targets are literally `effectiveTaste(dna)[axis].pref`, asserted by
+doubleCount CASE 5:
+
+```
+plan.instructions.pacing.target === effectiveTaste(DNA_SLOW).pacing.pref
+plan.instructions.pacing.evidence includes 'user_dna'
+```
+
+So the plan term **already is** the canonical DNA, applied through the request.
+Adding the raw per-axis preference nudge beside it would move the same candidate
+on the same evidence twice, and it would be invisible — both terms are bounded,
+so the output would simply look more confident.
+
+`rankWithPreference` was therefore deliberately **not** wired: it composes
+`objective + preferenceNudge + critic`, which is exactly the rejected formula.
+It remains with zero production callers, still pinned by
+`productionWiring.test.ts`, now flagged as dead code needing a deliberate
+decision.
+
+### Three concepts, kept apart
+
+| concept | field | question it answers | persisted? |
+|---|---|---|---|
+| GENERAL QUALITY | `generalScore` | is this title any good? | — |
+| DURABLE MATCH | `matchScore` | what do we lastingly know about this user? | yes |
+| REQUEST DECISION | `criticNudge` → `decisionScore` | which of these best answers what you asked **right now**? | **no** |
+
+### RED → GREEN
+
+`rankCriticCandidates` was first written to model today's behaviour (plan
+reaches the pool and stops):
+
+```
+RED    10 failed | 12 passed (22)
+GREEN  22 passed (22)
+```
+
+RED failures were the causality gate itself: test 1 returned
+`['movie-9001','movie-9002']` (input order) where `['movie-9002','movie-9001']`
+was required; tests 3, 4, 5 failed on `criticNudge` being 0 everywhere.
+
+Two RED failures (16, 17) were the test correctly catching **my own docblock
+prose** — the module named `preferenceNudge(` and `preference_events` while
+explaining why it does not use them. Reworded rather than relaxing the guard.
+
+### Same-pool proof (GC6, not GC5)
+
+Test 2 asserts membership is identical before and after ranking:
+`poolOf(ranked) === sorted(POOL keys)`, `decisions.length === POOL.length`. Only
+the sequence moves. Every causal test uses the same frozen `POOL` — same ids,
+same base scores, same dims.
+
+### Realistic critic case
+
+Anchor is strong on three axes the user loves (`darkness` 85, `complexity` 82,
+`suspense` 88) **and** on one they reject (`humor` 80). Plan verified:
+`darkness/complexity/suspense → preserve`, `humor → avoid`. Candidate A keeps
+the three and fixes the fourth; candidate B is merely more different. **A wins**
+— which undirected "be different from the anchor" could never have produced.
+
+### Opposite-user proof
+
+Same anchors, same candidates, same base scores, opposite mature DNA. Plans
+differ (test 6) and the order flips: dark-loving DNA → A first, light-loving DNA
+→ B first, with identical pool membership.
+
+### Authority / bounds
+
+- `CRITIC_NUDGE_MAX` = 10, unchanged and asserted
+- `MIN_RANK_CONF` = 0.25, unchanged and asserted
+- authority scaling preserved (`planNudge` × authority)
+- **no plan / authority 0 → input order returned byte-identical**, `applied: false`
+- **missing candidate dims → contribution exactly 0**, `fingerprinted: false`,
+  `decisionScore === matchScore` — never a neutral 50
+- a candidate 25 points better on durable merit and worst-possible plan fit
+  still wins (max swing is 20 < 25)
+- `decisionScore === matchScore + criticNudge` asserted to 10dp — no hidden term
+
+### Production call site
+
+`/api/ask`, immediately after `runStrands`:
+batch `getCachedDimensions` (cache-only, composite `mediaType + tmdbId`) →
+`rankCriticCandidates` → items re-ordered by decision → response.
+`finalRankingConsumesPlan` is set from `ranked.applied` — **the report of what
+happened**, not a claim. `orchestrate.ts` initialises it via a named
+`NOT_YET_RANKED` constant because at that point in the pipeline ranking has not
+run.
+
+### Displayed Match vs decision score
+
+`matchScore` and `generalScore` pass through untouched (test 14). The card keeps
+showing the durable Match it earned; `decisionScore` only orders the list and is
+never written onto the card or into Taste DNA (tests 15, 17). No card copy was
+redesigned — GC7 will explain why the winner won.
+
+### GC8 regression
+
+Unchanged and green (8/8). GC6 did not touch `rankWithPreference`, so GC8
+remains the lower-level invariant; GC6 completion rests on the real Ask path.
+
+### Gates
+
+| gate | exit | result |
+|---|---|---|
+| GC6 focused | 0 | 22 passed |
+| double-count audit | 0 | 5 passed |
+| all critic (GC1–GC6, GC8, wiring) | 0 | 158 passed |
+| `npx vitest run` | 0 | 3368 passed, 24 skipped, **0 failed** |
+| `npm run typecheck` | 0 | clean |
+| `npm run lint` | 0 | no warnings or errors |
+| `npm run build` | 0 | clean |
+| `npx playwright test -c playwright.searchrouting.config.ts` | 0 | 21 passed |
+| frozen corpus `layerBext` | 0 | P0 635/635 · P1 515/515 |
+
+Frozen corpus delta: **0 PASS→FAIL, 0 FAIL→PASS**.
 
 ---
 

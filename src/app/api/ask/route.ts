@@ -13,6 +13,7 @@ import { routeAsk } from '@/lib/critic/gate';
 import { buildCriticState } from '@/lib/critic/orchestrate';
 import { resolveAnchor } from '@/lib/critic/anchor';
 import { runStrands } from '@/lib/critic/strands';
+import { rankCriticCandidates } from '@/lib/critic/decide';
 import { getCachedDimensions } from '@/lib/titleDimensions';
 import { loadPreference } from '@/lib/preference/store';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
@@ -382,12 +383,44 @@ export async function POST(req: Request) {
       );
       criticState.attribution.candidateIds = strandRun.candidateIds;
 
-      /* THE GC6 BOUNDARY, AND IT IS NOT CROSSED HERE.
-         `strandRun.items` arrive in the finder's own `matchScore` order. The
-         plan is built, carried and reported, and it does NOT reorder anything —
-         `rankWithPreference` still has no production caller. Sorting by the
-         critic here would make `finalRankingConsumesPlan: false` a lie. */
-      const criticItems = strandRun.items.slice(0, limitCritic);
+      /* ── GC6 · THE FINAL DECISION ──────────────────────────────────────
+         Candidate fingerprints, batch and CACHE-ONLY, keyed on the composite
+         `mediaType + tmdbId`. No classifier, no per-title AI call, no title
+         string. A candidate the classifier has not reached yet simply
+         contributes nothing — it is never read as a neutral 50. */
+      const candidateDims = await getCachedDimensions(
+        strandRun.items.map((i) => ({ tmdb_id: i.id, media_type: i.mediaType })),
+      );
+
+      /* decisionScore = matchScore + planNudge, and nothing else.
+         `matchScore` already carries general quality + the user's DURABLE
+         preference rules; `buildPlan` already consumed canonical DNA to choose
+         its targets. A raw preference nudge here would apply that same evidence
+         a second time. See the audit in `docs/CRITIC-SHIP.md`. */
+      const ranked = rankCriticCandidates(
+        strandRun.items.map((i) => ({
+          id: i.id,
+          mediaType: i.mediaType,
+          matchScore: i.matchScore,
+          generalScore: i.generalScore,
+          dims: candidateDims.get(`${i.mediaType}-${i.id}`),
+        })),
+        criticState.plan,
+      );
+
+      /* ORDER BY THE DECISION, DISPLAY THE DURABLE MATCH.
+         The card keeps showing the Match it earned — general quality plus what
+         we lastingly know about this user. `decisionScore` answers a different
+         question ("which of these best answers what you asked me RIGHT NOW")
+         and is request-specific, so it orders the list and is never written
+         back onto the card or into Taste DNA. GC7 explains why the winner won. */
+      const byKey = new Map(strandRun.items.map((i) => [`${i.mediaType}-${i.id}`, i]));
+      const criticItems = ranked.decisions
+        .map((d) => byKey.get(d.key))
+        .filter((i): i is NonNullable<typeof i> => i != null)
+        .slice(0, limitCritic);
+
+      criticState.attribution.finalRankingConsumesPlan = ranked.applied;
 
       return NextResponse.json(
         withConv({
@@ -402,7 +435,13 @@ export async function POST(req: Request) {
           // numbers. Never a prompt, never free-text reasoning.
           ...(process.env.NODE_ENV === 'production'
             ? {}
-            : { criticAttribution: { ...criticState.attribution, perStrand: strandRun.perStrand } }),
+            : {
+                criticAttribution: {
+                  ...criticState.attribution,
+                  perStrand: strandRun.perStrand,
+                  decisions: ranked.decisions.slice(0, limitCritic),
+                },
+              }),
         }),
       );
       }

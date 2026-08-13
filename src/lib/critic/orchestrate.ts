@@ -60,10 +60,16 @@ export interface CriticAttribution {
   /** Candidate ids that reached the final-ranking boundary. */
   candidateIds: string[];
   /**
-   * GC6 STATUS, CARRIED AS DATA. False until final ordering actually consumes
-   * the plan. A boolean here is much harder to overlook than a paragraph in a
-   * ledger, and the whole risk of this workstream is claiming a wiring that
-   * does not exist.
+   * GC6 STATUS, CARRIED AS DATA — and it is a REPORT, never a claim.
+   *
+   * `buildCriticState` stops at the candidate pool by design, so it always
+   * leaves this at the honest default. The ranking call site sets it to
+   * whatever `rankCriticCandidates` actually did: true only when a plan with
+   * positive authority genuinely ordered the response, false when the critic
+   * had nothing to say and the existing Finder order was returned untouched.
+   *
+   * A boolean is much harder to overlook than a paragraph in a ledger, and the
+   * whole risk of this workstream is claiming a wiring that does not exist.
    */
   finalRankingConsumesPlan: boolean;
 }
@@ -91,6 +97,17 @@ export interface OrchestrateInput {
   /** Stated media type, which is identity for GC2, not a preference. */
   mediaType?: 'movie' | 'tv';
 }
+
+/**
+ * The value of `finalRankingConsumesPlan` before ranking has happened.
+ *
+ * Named rather than written inline because the literal alone reads like a claim
+ * about the system ("the critic does not affect ordering"), when what it
+ * actually states is a fact about this point in the pipeline: ranking has not
+ * run yet. The GC6 call site replaces it with what `rankCriticCandidates`
+ * really did.
+ */
+const NOT_YET_RANKED = false;
 
 export async function buildCriticState(input: OrchestrateInput): Promise<CriticState> {
   const { request, dna, hard, searchCandidates, loadDimensions, mediaType } = input;
@@ -161,8 +178,7 @@ export async function buildCriticState(input: OrchestrateInput): Promise<CriticS
     unresolvedModifiers: [...request.unresolvedModifiers],
     objectiveAuthority: objective.authority,
     candidateIds: [],
-    // GC6 has not run. Anything else here would be a false claim.
-    finalRankingConsumesPlan: false,
+    finalRankingConsumesPlan: NOT_YET_RANKED,
   };
 
   return { request, resolutions: hydratedResolutions, objective, plan, hints, attribution };

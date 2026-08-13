@@ -68,29 +68,36 @@ describe('BLOCKER 1 — CLOSED by GC1: production constructs the critic state', 
   });
 });
 
-describe('BLOCKER 2 — STILL OPEN: the critic ranker is not the production ranker', () => {
-  it('rankWithPreference has NO production caller at all', () => {
-    /* THE FINDING THAT MATTERS MOST, and GC1 did not change it. GC8 proved the
-       critic term changes the order returned by `rankWithPreference` — and that
-       function is a REPORTING HELPER. Its own docblock says it exists "so the
-       before/after report reflects production behavior". Nothing calls it. */
+describe('BLOCKER 2 — CLOSED by GC6: the critic orders the real response', () => {
+  it('the comparative Ask response is ordered by the critic decision', () => {
+    expect(grepCount("rankCriticCandidates"), 'GC6 wiring vanished').toBeGreaterThan(0);
+    const route = readFileSync('src/app/api/ask/route.ts', 'utf8');
+    expect(route).toContain('rankCriticCandidates');
+    expect(route).toContain('finalRankingConsumesPlan');
+  });
+
+  it('rankWithPreference STILL has no production caller — deliberately', () => {
+    /* GC6 did NOT wire this. It is the GC8 helper: its own docblock says it
+       exists "so the before/after report reflects production behavior", and it
+       composes `objective + preferenceNudge + critic`. Feeding the Finder's
+       already-personalized `matchScore` into it would apply the user's taste
+       twice (audit in docs/CRITIC-SHIP.md), so GC6 built an explicit
+       composition instead and left this as the lower-level invariant.
+
+       Kept pinned because it is now genuinely dead production code and the next
+       session should decide its fate on purpose rather than by accident. */
     const uses = grepUses("rankWithPreference(");
     expect(uses, `rankWithPreference gained a caller: ${uses.join(' | ')}`).toEqual([]);
   });
 
-  it('the critic path reports that final ranking does NOT consume the plan', () => {
-    /* GC1 carries the plan to the boundary and stops. This constant is the
-       honest record of that, and flipping it without wiring GC6 would make the
-       API tell the user something untrue. */
-    const orch = readFileSync('src/lib/critic/orchestrate.ts', 'utf8');
-    expect(orch).toContain('finalRankingConsumesPlan: false');
-  });
-
-  it('the Ask/Finder path ranks by matchScore, never by the critic term', () => {
+  it('the Finder itself is untouched — the critic composes above it', () => {
+    /* Non-comparative requests must keep the exact ordering they had. The
+       critic never reached inside the finder to do its work. */
     const finder = readFileSync('src/lib/finder.ts', 'utf8');
     expect(finder).toMatch(/sort\(\(a, b\) => b\.matchScore - a\.matchScore\)/);
     expect(finder).not.toContain('rankWithPreference');
     expect(finder).not.toContain('criticPlan');
+    expect(finder).not.toContain('rankCriticCandidates');
   });
 
   it('the browse path calls preferenceNudge DIRECTLY, bypassing the critic term', () => {
