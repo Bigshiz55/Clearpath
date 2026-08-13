@@ -3,11 +3,11 @@
 Make the AI the film critic, not the search parser. Continuation state across
 sessions: read this, execute **NEXT ACTION**.
 
-CURRENT SHA: `a3fe0b576b1390d6e7c88af4c7d189fa93ca70b4`
+CURRENT SHA: `9c381dc74e35860b2cdfdd2a018bb450250c8e55`
 BRANCH: `claude/critic-layer`, cut from `main` @ 6080287.
 NEXT ACTION: GC11 — latency budget + caching.
 
-STATE: GC1–GC10 complete. A comparative Ask parses the relation and both
+STATE: GC1–GC10 complete (236 critic tests). A comparative Ask parses the relation and both
 anchors, resolves each identity through GC2, hydrates canonical fingerprints,
 builds a GC4 plan, issues recall-safe GC5 strands, orders the real response by
 `decisionScore = matchScore + planNudge`, and explains the winner from that same
