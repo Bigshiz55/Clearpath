@@ -4,8 +4,15 @@ import { effectiveTaste } from '@/lib/preference/explain';
 import { preferenceNudge } from '@/lib/preference/rank';
 import type { PreferenceEvent } from '@/lib/preference/types';
 import { TITLES } from '@/lib/voice/quickdna/definition';
-import { TARGET_DECISIONS, answer, createSession, startSession, type ShowdownState } from './session';
-import { sessionToEvents } from './canonical';
+import {
+  TARGET_DECISIONS,
+  answer,
+  attributionOf,
+  createSession,
+  startSession,
+  type ShowdownState,
+} from './session';
+import { decisionToEvents, sessionToEvents } from './canonical';
 import { canonicalTitleId, mediaTypeFor } from './mediaType';
 import { accumulateSession } from './evidence';
 import { applyTonight } from './tonight';
@@ -159,6 +166,104 @@ describe('Build My DNA changes the canonical profile, and the ranking with it', 
     const empty = deriveDna([], Date.now());
     const nudge = preferenceNudge({ dims: { darkness: 95 }, genres: [] }, empty, { corrections: {} }).nudge;
     expect(nudge).toBe(0);
+  });
+});
+
+/**
+ * DOES THE NEW EVIDENCE ACTUALLY CHANGE THE ORDER?
+ *
+ * A richer game that produces an identical ranking is a richer RESULTS SCREEN
+ * and nothing more — which is the failure mode the whole rebuild is against. So
+ * these hold one session's picks completely fixed and vary ONLY the follow-up
+ * answers, then read the nudge the real ranker would apply. Any difference is
+ * attributable to the second question and to nothing else: same pairs, same
+ * verdicts, same timestamps, same fingerprints.
+ */
+describe('the follow-up answers reach the ranker', () => {
+  const played = playToward('dna', 'dark');
+
+  /**
+   * Re-file every pick with the same follow-up answer.
+   *
+   * THE REAL ATTRIBUTION, not the 0.9 the older cases pin. 0.9 is a Twist —
+   * already the top of the inferred ladder — so a follow-up could not possibly
+   * change anything there, and a test that used it would prove the feature does
+   * nothing rather than proving the fixture was wrong. Real sweep matchups sit
+   * near 0.3, which is where the second question earns its second.
+   */
+  function withFollowUp(patch: Partial<ShowdownState['decisions'][number]>) {
+    const decisions = played.decisions.map((d) => ({ ...d, ...patch }));
+    const events = sessionToEvents(decisions, 'dna', resolve, (d) =>
+      attributionOf(d as ShowdownState['decisions'][number]),
+    );
+    for (const e of events) {
+      const catalogueId = TITLES.find((t) => `${mediaTypeFor(t.id)}:${t.tmdbId}` === e.titleId)?.id;
+      const dims = catalogueId ? fixtureDims(catalogueId) : undefined;
+      if (dims) e.dims = dims;
+    }
+    return events;
+  }
+
+  const bleak = { dims: { darkness: 95, humor: 5 }, genres: ['thriller'] };
+  const nudgeOf = (events: PreferenceEvent[]) =>
+    preferenceNudge(bleak, deriveDna(events, Date.now()), { corrections: {} }).nudge;
+
+  it('"watching that tonight" outranks "just better than the other one"', () => {
+    const must = nudgeOf(withFollowUp({ intensity: 'must' }));
+    const relative = nudgeOf(withFollowUp({ intensity: 'relative' }));
+
+    expect(must, 'a stated appetite produced no ranking signal at all').toBeGreaterThan(0);
+    expect(
+      must,
+      'saying "I am watching that tonight" ranked no higher than "it was just the better of two"',
+    ).toBeGreaterThan(relative);
+  });
+
+  it('a named reason outranks the same pick left unexplained', () => {
+    const explained = nudgeOf(withFollowUp({ reason: 'darkness:hi' }));
+    const silent = nudgeOf(withFollowUp({}));
+
+    expect(
+      explained,
+      'explaining every pick changed the ranking not at all — the reason never crossed to the engine',
+    ).toBeGreaterThan(silent);
+  });
+
+  it('but a gut call is honoured as the non-answer it is', () => {
+    const gut = nudgeOf(withFollowUp({ reason: 'gut' }));
+    const silent = nudgeOf(withFollowUp({}));
+    expect(gut, '"just a gut call" was banked as if it had named an axis').toBe(silent);
+  });
+
+  it('and a stated appetite beats an inferred one, whichever way it points', () => {
+    // The ordering must be total, not merely "must beats relative": a ladder
+    // with a hole in it is how one rung silently stops meaning anything.
+    const must = nudgeOf(withFollowUp({ intensity: 'must' }));
+    const keen = nudgeOf(withFollowUp({ intensity: 'keen' }));
+    const relative = nudgeOf(withFollowUp({ intensity: 'relative' }));
+    expect(must).toBeGreaterThan(keen);
+    expect(keen).toBeGreaterThan(relative);
+  });
+});
+
+describe('"Both" is two answers, not a coin toss', () => {
+  it('records positive interest in BOTH titles', () => {
+    const events = decisionToEvents(
+      { leftId: 'a', rightId: 'b', verdict: 'both', at: 1, responseMs: 500 },
+      {
+        left: { titleId: 'movie:1', tmdbId: 1, mediaType: 'movie' },
+        right: { titleId: 'movie:2', tmdbId: 2, mediaType: 'movie' },
+      },
+      0.6,
+    );
+    /* THE DEFECT THIS PINS. `both` existed in the engine before it existed on
+       screen, and the canonical crossing had no branch for it — it fell through
+       `verdict === 'left' ? left : right` and filed "I want both of these" as a
+       vote for whichever poster happened to be on the right. Half the answer
+       was discarded and a preference nobody expressed was invented, silently,
+       for as long as no control could produce the verdict. */
+    expect(events.map((e) => e.titleId).sort()).toEqual(['movie:1', 'movie:2']);
+    expect(events.every((e) => e.action === 'unseen_interested')).toBe(true);
   });
 });
 
