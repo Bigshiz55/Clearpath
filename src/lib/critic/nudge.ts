@@ -138,3 +138,65 @@ export function criticNudge(
     axes,
   };
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// PLAN-DRIVEN SCORING — GC4. This supersedes centroid distance as the
+// authoritative critic input.
+//
+// `criticNudge` above measured how FAR a candidate sat from the anchors.
+// `planNudge` measures how well it AGREES WITH THE PLAN — which of the
+// anchors' qualities it keeps, which of the user's conflicts it fixes, which of
+// their grounded dislikes it avoids. That is the difference between a geometry
+// function and a critic.
+//
+// Distance still has a legitimate internal role for pure resemblance, and the
+// plan expresses that directly: `like` emits `preserve` instructions at the
+// anchor's own values, so agreement with the plan IS proximity for that
+// relation. One mechanism, no special case.
+//
+// Everything GC8 pinned is preserved: bounded at ±CRITIC_NUDGE_MAX, scaled by
+// authority, inert when there is nothing to say, and reporting which axes moved.
+// ───────────────────────────────────────────────────────────────────────────
+
+import type { CriticPlan } from './plan';
+
+export function planNudge(
+  candidate: { dims?: TitleDimensions },
+  plan: CriticPlan | undefined,
+): CriticContribution {
+  if (!plan || plan.instructions.length === 0) return INERT;
+  const authority = Math.max(0, Math.min(1, plan.authority));
+  if (authority <= 0 || !candidate.dims) return INERT;
+
+  const cand = candidate.dims as Record<string, number | undefined>;
+  const axes: string[] = [];
+  let weighted = 0;
+  let mass = 0;
+
+  for (const ins of plan.instructions) {
+    const v = cand[ins.axis];
+    if (typeof v !== 'number') continue; // the candidate is silent here
+    axes.push(ins.axis);
+
+    /* AGREEMENT, CENTRED. `1 - 2*|v - target|/100` runs +1 (exactly on target)
+       to -1 (as far from it as possible), so a candidate that satisfies the
+       plan gains and one that violates it loses. Centring matters: a score
+       that only ever rewarded would shift every candidate equally and reorder
+       nothing, which is the failure mode that makes a signal decorative. */
+    const agreement = 1 - (2 * Math.abs(v - ins.target)) / 100;
+    weighted += agreement * ins.strength;
+    mass += ins.strength;
+  }
+
+  if (mass <= 0) return INERT;
+  const score = weighted / mass; // -1 .. +1
+
+  return {
+    nudge: Math.max(
+      -CRITIC_NUDGE_MAX,
+      Math.min(CRITIC_NUDGE_MAX, score * CRITIC_NUDGE_MAX * authority),
+    ),
+    distance: (1 - score) / 2,
+    axes,
+  };
+}

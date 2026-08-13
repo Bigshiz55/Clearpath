@@ -5,10 +5,9 @@ sessions: read this, execute **NEXT ACTION**.
 
 CURRENT SHA: (see git log)
 BRANCH: `claude/critic-layer`, cut from `main` @ 6080287.
-NEXT ACTION: GC4 — the Critic Reasoning stage (traitsToPreserve / toImprove /
-toAvoid). The chain identity -> fingerprint -> bounded ranking term is now
-causal end to end; GC4 is what makes the term ARGUE rather than merely measure
-distance from a centroid.
+NEXT ACTION: GC5 — anchors + objective reach candidate RETRIEVAL. The plan now
+decides ranking; retrieval is still keyword-driven, so a candidate the critic
+would argue for can never appear if the keyword filter did not surface it.
 
 ---
 
@@ -97,7 +96,7 @@ narrower than "teach the explainer about anchors": it is (a) populate
 - [ ] **GC1** Recommendation Objective type + LLM extraction; `relationship` survives parse
 - [x] **GC2** Anchor identity resolution — **COMPLETE, red-then-green**
 - [x] **GC3** Anchor fingerprint hydration — **COMPLETE, red-then-green**
-- [ ] **GC4** Critic Reasoning stage producing traitsToPreserve / improve / avoid
+- [x] **GC4** Critic Reasoning stage — **COMPLETE, red-then-green**
 - [ ] **GC5** Anchors + objective reach candidate retrieval
 - [ ] **GC6** Anchors + objective reach FINAL RANKING (the causality gate)
 - [ ] **GC7** Grounded explanations — new reason kind carrying the comparison
@@ -106,6 +105,90 @@ narrower than "teach the explainer about anchors": it is (a) populate
 - [ ] **GC10** Exact-query regression for `Better than Furious or Widows Bay` (structural, not hardcoded titles)
 - [ ] **GC11** Latency budget + caching
 - [ ] **GC12** Full gates + merge recommendation
+
+---
+
+## GC4 — COMPLETE (red-then-green)
+
+### RED
+`Cannot find module './plan'`, then the substantive failure the gate exists for.
+The fixture is built so the two models disagree:
+
+- **anchors** carry qualities the user loves (suspense ~89, darkness ~84) AND
+  one they reject (warmth ~86)
+- **user** confidently likes suspense/darkness, rejects warmth
+- **candidate A** keeps suspense 90 / darkness 86, fixes warmth to 10
+- **candidate B** is simply farther from the centroid on everything — including
+  the qualities that were working (suspense 12, darkness 14)
+
+Under centroid-departure B wins on every axis of distance. Under a plan A wins.
+
+### Why centroid departure was insufficient
+"Better than X" does not mean "different from X". Someone naming two films they
+love and asking for better is not asking to flee them, and a candidate can be
+dramatically different from an anchor and dramatically worse. Undirected
+distance cannot tell those apart because it has no idea WHICH of the anchor's
+qualities were the good ones. It was correct for what GC8 needed — proving
+causality — and wrong as semantics.
+
+### CriticPlan contract
+```ts
+TraitInstruction { axis, kind: 'preserve'|'improve'|'avoid', target, strength, evidence }
+CriticPlan      { instructions, authority, relation }
+```
+Structured claims only; no prose is ever ranking evidence.
+
+**PRESERVE** requires TWO facts — the anchor expresses it AND the user's
+confident taste agrees. Anchor possession alone is one fact and is explicitly
+insufficient under `better_than`.
+**IMPROVE** requires a supported direction: a confident user preference pointing
+elsewhere, or an explicit modifier. Always improve FOR THIS USER — there is no
+objectively better value of an axis.
+**AVOID** requires grounded negative evidence: the anchor is strong on
+something the user confidently rejects. Never inferred from possession.
+
+### Provenance rules
+Three classes kept apart on every instruction: `anchor` (a fact about the
+films), `user_dna` (a fact about the person), `request` (a fact about what they
+asked). Confidence reuses `MIN_RANK_CONF` rather than a critic-only threshold,
+so there is one answer to "do we know this about the user". A `request` carries
+strength 0.95 — higher than any inference — so an explicit modifier outranks
+inferred anchor similarity, and a test pins that ordering.
+
+### Silence over fake certainty
+An axis the anchors do not express produces no instruction. A user with no
+confident direction gets none invented. **Contradictory anchors are not
+averaged**: 10 and 90 do not become 50. With a confident user preference the
+plan picks a side; without one the axis stays unresolved and silent.
+
+### Opposite-user proof
+Identical anchors, identical relation, opposite confident DNA -> the plans are
+not identical (`JSON.stringify` differs) and they disagree about `darkness`
+specifically, in both `target` and `kind`.
+
+### Mature-evidence proof
+Anchors at darkness ~11, user's mature DNA (40 events) at darkness 95: the
+instruction targets **above** 50. The plan cannot decide "lighter is objectively
+better" for someone whose explicit evidence says otherwise. Low-confidence DNA
+(1 event) produces strength < 0.6 on every `user_dna` instruction.
+
+### Production ranking proof
+`planNudge` replaces centroid distance as the authoritative critic input inside
+`rankWithPreference`. Agreement is centred at 0 (+1 on target, -1 as far as
+possible), so satisfying the plan gains and violating it loses — a reward-only
+score would shift every candidate equally and reorder nothing. Candidate A now
+ranks first with a strictly greater `criticNudge`, and `criticAxes` names
+`suspense` and `warmth` as the movers.
+
+`opts.critic` (GC8's objective form) is retained for callers without a
+reasoning stage; a plan supersedes it when present.
+
+### GC8 regression
+Unchanged file, **8 passed / 8**. GC2 19/19, GC3 15/15, GC4 20/20 — critic
+suites **62 / 62**.
+
+### Gates
+typecheck 0 · lint 0 · **vitest 3272 passed / 0 failed** · build 0.
 
 ---
 
