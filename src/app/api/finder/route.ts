@@ -12,6 +12,7 @@ import { applyRequiredSubject } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
 import { serverEnv } from '@/lib/env';
 import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBridge';
+import { requestedRoleFor, roleSupport, type RoleSupport } from '@/lib/people/constraint';
 
 const BUILD_SHA = getBuildInfo().gitSha || 'unknown';
 
@@ -169,12 +170,28 @@ export async function POST(req: Request) {
         query.providerIds = clientProviders;
       }
     }
-    // Guarantee the actor filter regardless of AI (fuzzy, so misspellings match).
-    if (text && (!query.castIds || query.castIds.length === 0)) {
+    /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see below. */
+    let unsupportedRole: RoleSupport | null = null;
+    // Guarantee the person filter regardless of AI (fuzzy, so misspellings match).
+    if (text && (!query.castIds || query.castIds.length === 0) && (!query.people || query.people.length === 0) ) {
       const pid = await resolvePersonId(text);
       if (pid) {
-        query.castIds = [pid];
-        query.mediaType = 'movie';
+        /* THE ROLE THE SENTENCE ASKED FOR, OR NOTHING.
+           This used to write `castIds` whatever the request said, so "directed
+           by Nolan" was executed as "starring Nolan". A role the engine cannot
+           run is REFUSED here rather than degraded: an unsupported credit is
+           reported to the caller and the person constraint is simply not
+           applied, because handing back films someone merely appeared in is a
+           confidently wrong answer to a question about their directing. */
+        const requested = requestedRoleFor(text) ?? 'actor';
+        const support = roleSupport(requested, 'movie');
+        if (support.supported) {
+          query.people = [{ personId: pid, role: support.role }];
+          query.mediaType = 'movie';
+          if (support.role === 'actor') query.castIds = [pid];
+        } else {
+          unsupportedRole = support;
+        }
       }
     }
 
@@ -199,6 +216,12 @@ export async function POST(req: Request) {
     // same thing. Runs on the free text after all other parsing, so it also
     // corrects an AI parse that degraded the subject into genres.
     let interpretation: string[] = [];
+    /* SAID OUT LOUD. A refused role that vanished silently would look exactly
+       like a role that was applied, which is the failure mode this whole change
+       exists to end. */
+    const roleNote = unsupportedRole
+      ? [`${unsupportedRole.reason} — showing results without that person filter`]
+      : [];
     let subjectCanonical: string | null = null;
     if (text) {
       const applied = await applyRequiredSubject(query, text);
@@ -246,7 +269,7 @@ export async function POST(req: Request) {
     return finderJson({
       route: '/api/finder',
       query,
-      interpretation,
+      interpretation: [...roleNote, ...interpretation],
       constraintReceipt,
       diagnostics: result.diagnostics,
       scoredFor: result.scoredFor,

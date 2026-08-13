@@ -2,7 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MediaType } from '@/lib/types';
 import type { PreferenceTrait } from '@/lib/types';
-import { discoverTitles } from '@/lib/tmdb/client';
+import { discoverTitles, getCredits} from '@/lib/tmdb/client';
 import { getScoringData } from '@/lib/titleData';
 import { buildVerdict, avoidRule, loveRule } from '@/lib/scoring';
 import { getProfile, getPersonalContext, regionFor, getMyServices } from '@/lib/profile';
@@ -32,6 +32,7 @@ import {
   type CandidateEvidence,
 } from '@/lib/nlu/semanticEligibility';
 import { adjudicateSubjectCentrality, type SubjectAdjudicator } from '@/lib/nlu/subjectAdjudicator';
+import { filterByRole, type PersonConstraint } from '@/lib/people/constraint';
 
 const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
 const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
@@ -94,6 +95,14 @@ export interface FinderQuery {
   pace: number | null;
   /** Bias candidates toward titles featuring these TMDB people (with_cast). */
   castIds?: number[];
+  /**
+   * Role-aware person constraints — the only way to express a DIRECTOR.
+   *
+   * `castIds` above is kept and still means "these actors"; rewriting its half
+   * dozen callers would be a refactor inside a defect fix. A director has no
+   * legacy spelling, so it only ever arrives here.
+   */
+  people?: PersonConstraint[];
   /** Only titles released no later than this year (for "classics"). */
   maxYear?: number | null;
   /** Only titles released in or after this year (era ranges). */
@@ -390,11 +399,18 @@ export async function runFinder(
           minRating: q.upcoming ? undefined : minRating,
           // Upcoming titles have no votes/ratings yet, so don't require any.
           minVotes:
-            q.upcoming ? 0 : q.minVotes != null ? q.minVotes : q.castIds && q.castIds.length > 0 ? 20 : 80,
+            q.upcoming
+              ? 0
+              : q.minVotes != null
+                ? q.minVotes
+                : (q.castIds && q.castIds.length > 0) || (q.people && q.people.length > 0)
+                  ? 20
+                  : 80,
           sinceDays: q.upcoming ? undefined : sinceDays,
           upcomingDays: q.upcoming ? 365 : undefined,
           maxRuntime: q.maxRuntime ?? undefined,
           castIds: q.castIds,
+          people: q.people,
           maxYear: q.maxYear ?? undefined,
           minYear: q.minYear ?? undefined,
           excludeGenreIds: q.excludeGenreIds,
@@ -823,6 +839,24 @@ export async function runFinder(
           `(e.g. ${leaked.slice(0, 3).map((i) => `${i.title} [${i.subjectEvidence?.centrality ?? 'UNSUPPORTED'}]`).join(', ')})`,
       );
     }
+  }
+
+  /* THE DIRECTOR CONSTRAINT IS MADE HARD HERE.
+     `with_crew` narrowed retrieval to titles Nolan worked on; it cannot say he
+     DIRECTED them, and he is a writer and producer on most of his own films —
+     to say nothing of the ones he only produced. So every surviving candidate
+     is checked against its real credits before it can be shown.
+
+     ONLY WHEN A DIRECTOR IS ASKED FOR, and only over the ranked head of the
+     list, so a request that names nobody pays nothing. An unverifiable title is
+     DROPPED rather than kept: this is the one filter whose whole purpose is the
+     guarantee, and "we could not check" is not evidence that it holds. */
+  const directorConstraints = (q.people ?? []).filter((p) => p.role === 'director');
+  if (directorConstraints.length > 0) {
+    const head = items.slice(0, Math.max(24, (q.finalCount ?? limit) * 4));
+    const kept = await filterByRole(head, directorConstraints, (mt, id) => getCredits(mt, id).catch(() => null));
+    const keep = new Set(kept.map((i) => `${i.mediaType}-${i.id}`));
+    items = items.filter((i) => keep.has(`${i.mediaType}-${i.id}`));
   }
 
   // REQUESTED-COUNT SELECTION. "a boxing movie" asks for ONE — the final cap is
