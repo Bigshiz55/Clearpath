@@ -13,6 +13,7 @@ import { applyRequiredSubject } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
 import { serverEnv } from '@/lib/env';
 import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBridge';
+import { requestedRoleFor, roleSupport, type RoleSupport } from '@/lib/people/constraint';
 
 const BUILD_SHA = getBuildInfo().gitSha || 'unknown';
 
@@ -170,19 +171,31 @@ export async function POST(req: Request) {
         query.providerIds = clientProviders;
       }
     }
-    /* Guarantee the actor filter regardless of AI (fuzzy, so misspellings
+    /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see below. */
+    let unsupportedRole: RoleSupport | null = null;
+    /* Guarantee the person filter regardless of AI (fuzzy, so misspellings
        match) — and record which ENTITY that cost, so the subject layer cannot
-       spend them again. The Forensic Search resolves people exactly as Ask the
-       Judge does and shares one subject layer, so it shares the collision:
-       leaving it out would be the cross-route drift finderSubject.ts exists to
-       prevent. */
+       spend the same occurrence again (the #69 boundary), while carrying the
+       CREDIT ROLE the sentence asked for as a TYPED constraint (the #68
+       contract): "directed by Nolan" must never execute as "starring Nolan",
+       and a role the engine cannot run is refused out loud, never silently
+       degraded to actor. */
     const consumedEntities: ConsumedEntity[] = [...(ai?.resolvedPeople ?? [])];
-    if (text && (!query.castIds || query.castIds.length === 0)) {
+    if (text && (!query.castIds || query.castIds.length === 0) && (!query.people || query.people.length === 0)) {
       const person = await resolvePerson(text);
       if (person) {
-        query.castIds = [person.id];
-        query.mediaType = 'movie';
+        // The words were spent naming a person either way — the subject layer
+        // may not re-read them even when the role is refused.
         consumedEntities.push({ spokenAs: person.spokenAs, resolvedName: person.name });
+        const requested = requestedRoleFor(text) ?? 'actor';
+        const support = roleSupport(requested, 'movie');
+        if (support.supported) {
+          query.people = [{ personId: person.id, role: support.role }];
+          query.mediaType = 'movie';
+          if (support.role === 'actor') query.castIds = [person.id];
+        } else {
+          unsupportedRole = support;
+        }
       }
     }
 
@@ -207,6 +220,12 @@ export async function POST(req: Request) {
     // same thing. Runs on the free text after all other parsing, so it also
     // corrects an AI parse that degraded the subject into genres.
     let interpretation: string[] = [];
+    /* SAID OUT LOUD. A refused role that vanished silently would look exactly
+       like a role that was applied, which is the failure mode this whole change
+       exists to end. */
+    const roleNote = unsupportedRole
+      ? [`${unsupportedRole.reason} — showing results without that person filter`]
+      : [];
     let subjectCanonical: string | null = null;
     if (text) {
       const applied = await applyRequiredSubject(query, text, { consumedEntities });
@@ -254,7 +273,7 @@ export async function POST(req: Request) {
     return finderJson({
       route: '/api/finder',
       query,
-      interpretation,
+      interpretation: [...roleNote, ...interpretation],
       constraintReceipt,
       diagnostics: result.diagnostics,
       scoredFor: result.scoredFor,

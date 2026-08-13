@@ -39,6 +39,7 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { serverEnv } from '@/lib/env';
 import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBridge';
+import { requestedRoleFor, roleSupport, type RoleSupport } from '@/lib/people/constraint';
 
 /**
  * "Something like X" is best served by TMDB-similar ONLY when the reference is
@@ -933,15 +934,17 @@ export async function POST(req: Request) {
      * On the legacy arm (no canonical request — a lookup or a bare statement)
      * the fuzzy whole-utterance resolver still runs, and EACH ENTITY IT
      * RESOLVES is recorded so the subject layer cannot read the same
-     * occurrence a second time as a content subject. Each record carries both
-     * namings because they are not interchangeable: the user may say only a
-     * surname, or spell it their own way, while the catalog answers with the
-     * canonical full name — see lib/nlu/consumedEntities.ts.
+     * occurrence a second time as a content subject — and the CREDIT ROLE the
+     * sentence asked for travels as a TYPED constraint (the #68 contract):
+     * "directed by Nolan" must never execute as "starring Nolan", and a role
+     * the engine cannot run is refused out loud, never degraded to actor.
      */
     const consumedEntities: ConsumedEntity[] = [...(ai?.resolvedPeople ?? [])];
     let canonicalInterpretation: string[] = [];
     let canonicalAmbiguity: Awaited<ReturnType<typeof resolveCanonicalExecution>>['ambiguity'] = null;
     let canonicalExcludedPersonIds: number[] = [];
+    /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see roleNote below. */
+    let unsupportedRole: RoleSupport | null = null;
     if (canonicalOwnsLanguage) {
       const exec = await resolveCanonicalExecution(canonical);
       canonicalAmbiguity = exec.ambiguity;
@@ -955,15 +958,24 @@ export async function POST(req: Request) {
        * raw sentence to build it, so nothing from the anecdote can be inside.
        */
       query = { ...exec.query };
-    } else if (text && (!query.castIds || query.castIds.length === 0) && !lex) {
-      // LEGACY PATH ONLY. Guarantee the actor filter regardless of AI: if a
+    } else if (text && (!query.castIds || query.castIds.length === 0) && (!query.people || query.people.length === 0) && !lex) {
+      // LEGACY PATH ONLY. Guarantee the person filter regardless of AI: if a
       // person is named and not already resolved, look them up (fuzzy, so
       // misspellings still match) — and record what that resolution spent.
       const person = await resolvePerson(text);
       if (person) {
-        query.castIds = [person.id];
-        query.mediaType = 'movie';
+        // The words were spent naming a person either way — the subject layer
+        // may not re-read them even when the role is refused.
         consumedEntities.push({ spokenAs: person.spokenAs, resolvedName: person.name });
+        const requested = requestedRoleFor(text) ?? 'actor';
+        const support = roleSupport(requested, 'movie');
+        if (support.supported) {
+          query.people = [{ personId: person.id, role: support.role }];
+          query.mediaType = 'movie';
+          if (support.role === 'actor') query.castIds = [person.id];
+        } else {
+          unsupportedRole = support;
+        }
       }
     }
 
@@ -1022,6 +1034,12 @@ export async function POST(req: Request) {
      * request.
      */
     let askInterpretation: string[] = canonicalInterpretation;
+    /* SAID OUT LOUD. A refused role that vanished silently would look exactly
+       like a role that was applied, which is the failure mode this whole change
+       exists to end. */
+    const roleNote = unsupportedRole
+      ? [`${unsupportedRole.reason} — showing results without that person filter`]
+      : [];
     if (text && !canonicalOwnsLanguage) {
       const applied = await applyRequiredSubject(query, text, { consumedEntities });
       query = applied.query;
@@ -1113,7 +1131,7 @@ export async function POST(req: Request) {
         appliedText: text || null,
         sha: getBuildInfo().gitSha || 'unknown',
         query,
-        interpretation: askInterpretation,
+        interpretation: [...roleNote, ...askInterpretation],
         diagnostics: result.diagnostics,
         scoredFor: result.scoredFor,
         relaxed: result.relaxed,

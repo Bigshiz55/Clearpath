@@ -10,6 +10,7 @@ import type {
 } from '@/lib/types';
 import { computeEnglishAvailability } from './meta-helpers';
 import { rankAndLimit } from '@/lib/nlu/titleNormalize';
+import { discoverParamFor, fromCastIds, idsForRole, type PersonConstraint } from '@/lib/people/constraint';
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 export { TMDB_IMAGE_BASE, tmdbImage } from './image';
@@ -341,6 +342,13 @@ export interface DiscoverOptions {
   monetization?: string;
   /** Bias toward titles featuring these TMDB person ids (with_cast). */
   castIds?: number[];
+  /**
+   * Role-aware person constraints. Supersedes `castIds`, which is kept because
+   * several callers legitimately mean "these actors" and rewriting them all
+   * would be a refactor in a defect fix. Both are honoured; `castIds` is read
+   * as `actor`, which is what it has always meant.
+   */
+  people?: readonly PersonConstraint[];
   /** Only titles released up to and including this year. */
   maxYear?: number;
   /** Only titles released in or after this year. */
@@ -401,7 +409,21 @@ export async function discoverTitlesChecked(
   if (opts.minVotes != null) params['vote_count.gte'] = String(opts.minVotes);
   if (opts.minRating != null) params['vote_average.gte'] = String(opts.minRating);
   if (opts.maxRuntime != null) params['with_runtime.lte'] = String(opts.maxRuntime); // movies: feature length · tv: per-episode
-  if (opts.castIds && opts.castIds.length > 0 && mediaType === 'movie') params.with_cast = opts.castIds.join('|'); // OR — any favorite actor
+  /* PERSON CONSTRAINTS CARRY THEIR ROLE ONTO THE WIRE.
+     Before this, every person id — however the request described them — left as
+     `with_cast`, so "directed by Nolan" and "starring Nolan" produced
+     byte-identical queries and the product answered the wrong one. `with_crew`
+     is the retrieval primitive for a director; it is a CREW filter rather than a
+     director filter, so it narrows here and `satisfiesRole` verifies downstream.
+
+     Movie-only, unchanged: `/discover/tv` accepts neither parameter. */
+  if (mediaType === 'movie') {
+    const constraints = [...fromCastIds(opts.castIds), ...(opts.people ?? [])];
+    for (const role of ['actor', 'director'] as const) {
+      const ids = [...new Set(idsForRole(constraints, role))];
+      if (ids.length > 0) params[discoverParamFor(role)] = ids.join('|'); // OR within a role
+    }
+  }
   if (opts.minReleaseDate != null) {
     // Exact calendar boundary — e.g. "the last 20 years" resolves to a real
     // date (2006-08-06 on 2026-08-06), not months×30 which would wrongly drop

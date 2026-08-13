@@ -104,6 +104,28 @@ production and apply pending migrations with your `MIGRATE_SECRET` — see the
 unblocks.
 
 ## Next
+- **Credit roles the engine still cannot execute — refused, never degraded.**
+  `people/constraint.ts` supports exactly `actor` and `director`, movie-only.
+  Everything else is refused out loud with a reason that reaches the user's
+  `interpretation`, and `constraint.test.ts` pins that no unsupported role can
+  ever resolve to `actor`. Each of these needs its own change and its own
+  evidence — none may be "enabled" by widening the type:
+  - **`written by` (writer).** TMDB `/discover/movie` has no writer filter;
+    `with_crew` retrieves the person's crew credits and qualification would need
+    `job` in the Writing department. Doable on the same shape as director.
+  - **`created by` (creator).** A TV concept, and `/discover/tv` accepts neither
+    `with_cast` nor `with_crew`, so retrieval has no server-side narrowing at
+    all. Needs a different strategy (person credits first, then filter), not a
+    wider enum.
+  - **TV director, and TV cast.** Same provider limitation as above. `roleSupport`
+    already returns `supported: false` for both; the refusal is the correct
+    behaviour until a retrieval strategy exists.
+  - **`interpret`'s `CreditRole` must adapt onto `PersonRole`, not beside it.**
+    `CanonicalIntent.people[].role` can say `creator`; execution can say two
+    things. When PR #64 is wired, it must pass through `roleSupport` so an
+    unexecutable role is refused rather than silently dropped — and
+    `requestedRoleFor` in `people/constraint.ts` is the reader both should share
+    rather than a third copy.
 - **The 20 pre-existing mobile-suite failures — 8 now fixed, 12 in flight.**
   Independently verified twice: by rebuilding the harness at `0b90f04` with the
   working tree stashed (PR #58's visual pass), and by building `718987e` in a
