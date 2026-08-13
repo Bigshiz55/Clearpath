@@ -62,8 +62,15 @@ and what it unblocks.
     render it, so a second button language cannot appear by copy-paste.
     `quizReachable.test.ts` follows the component and still pins "exactly one
     ceremonial entrance in the hero".
+  - **The example is a fixed entity, not a search result.** It briefly resolved
+    itself with `searchTitles('The Godfather')` + a `.includes('godfather')`
+    pick, which made the landing page's identity a function of TMDB popularity
+    ordering and a substring match. It is now `movie:238`, loaded by id through
+    `getScoringData`. Pinned by `exampleIdentity.test.ts` (source-level: no
+    search call, canonical constants) and at runtime by the visual spec, which
+    asserts every per-title fetch is `/api/ratings/movie/238`.
   - **Verified at 1440 and 390** via `/dev/landing-example` (MOBILE_HARNESS
-    harness) + `tests/mobile/landing-example.spec.ts`, 11 assertions incl.
+    harness) + `tests/mobile/landing-example.spec.ts`, 12 assertions incl.
     card proportions, the phone row collapse, and no horizontal overflow.
   - **Follow-up worth queueing:** `splitMath` (`lib/verdict/explainSections`)
     cannot lift a nested numeric parenthetical, so the engine's

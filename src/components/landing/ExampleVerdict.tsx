@@ -1,5 +1,4 @@
 import 'server-only';
-import { searchTitles } from '@/lib/tmdb/client';
 import { getScoringData } from '@/lib/titleData';
 import { buildVerdict } from '@/lib/scoring';
 import { regionFor } from '@/lib/profile';
@@ -51,12 +50,25 @@ import type { MediaType } from '@/lib/types';
  *     confidence line reads "No personal taste signal yet — match is generic."
  * That is the shipped anonymous state of the real card, not a demo mode.
  *
- * Fails open: no TMDB key, a network miss, or an empty search all render the
- * honest fallback plus the same entrance, rather than a broken section or
- * (worse) invented data.
+ * Fails open: no TMDB key or a network miss renders the honest fallback plus
+ * the same entrance, rather than a broken section or (worse) invented data.
  */
 
-const EXAMPLE_QUERY = 'The Godfather';
+/**
+ * THE EXAMPLE IS A FIXED ENTITY, LOOKED UP BY ID — NEVER SEARCHED FOR.
+ *
+ * This used to run `searchTitles('The Godfather')` and take the first result
+ * whose title contained "godfather". That made the landing page's identity a
+ * function of TMDB's popularity ordering and of a substring match — the exact
+ * class of defect the search work exists to remove. "The Godfather Part III",
+ * a re-release entry, or a documentary about the film could all satisfy it, and
+ * which one won could change between two requests without anything here
+ * changing. There is no query to get right, because there is no query: the
+ * example IS movie 238, resolved through the same `getScoringData` path every
+ * other surface uses.
+ */
+const EXAMPLE_MEDIA_TYPE: MediaType = 'movie';
+const EXAMPLE_TMDB_ID = 238; // The Godfather (1972)
 
 /** Everything the section needs, resolved server-side. Serializable, so the
  *  harness at /dev/landing-example can render the identical section. */
@@ -75,12 +87,8 @@ export interface ExampleCard {
 
 async function loadExample(): Promise<ExampleCard | null> {
   try {
-    const results = await searchTitles(EXAMPLE_QUERY);
-    const top = results.find((r) => r.mediaType === 'movie' && r.title.toLowerCase().includes('godfather'));
-    if (!top) return null;
-
     const region = regionFor(null);
-    const { meta, providers } = await getScoringData(top.mediaType, top.id, region);
+    const { meta, providers } = await getScoringData(EXAMPLE_MEDIA_TYPE, EXAMPLE_TMDB_ID, region);
     const report = buildVerdict({
       meta,
       providers,
@@ -100,8 +108,8 @@ async function loadExample(): Promise<ExampleCard | null> {
     const reasonsAgainst = withoutRawSourceQuotes(report.reasonsAgainst, sources);
 
     return {
-      tmdbId: top.id,
-      mediaType: top.mediaType,
+      tmdbId: EXAMPLE_TMDB_ID,
+      mediaType: EXAMPLE_MEDIA_TYPE,
       title: meta.title,
       year: meta.year,
       posterUrl: tmdbImage(meta.posterPath, 'w342'),
@@ -143,7 +151,7 @@ export function ExampleVerdictSection({ data }: { data: ExampleCard | null }) {
 
         {!data ? (
           <p className="mx-auto mt-4 max-w-md text-center text-sm text-slate-500" data-testid="example-verdict-fallback">
-            Live example unavailable right now — enter the courtroom to see a real one.
+            Live example unavailable right now — Enter WatchVerd1ct to see your recommendations.
           </p>
         ) : (
           <>
@@ -182,8 +190,7 @@ export function ExampleVerdictSection({ data }: { data: ExampleCard | null }) {
                 not card chrome: the card says "WatchVerd1ct" rather than "Your
                 VERD1CT" on its own, and this says why. */}
             <p className="mx-auto mt-3 max-w-sm text-center text-xs text-slate-500" data-testid="example-verdict-anon">
-              No Taste DNA yet, so this is the general Verd1ct — the quality call everyone gets. Once it knows you,
-              that number becomes your Match.
+              The general Verd1ct. Build your Taste DNA and it becomes your Match.
             </p>
           </>
         )}

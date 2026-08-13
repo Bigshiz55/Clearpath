@@ -28,11 +28,17 @@ const PROVIDERS = {
   checkedAt: '2026-08-13T00:00:00.000Z',
 };
 
+/** Every per-title path the card asked for, so the identity it resolves can be
+ *  asserted rather than assumed. */
+const titleRequests: string[] = [];
+
 async function open(page: Page, w: number) {
+  titleRequests.length = 0;
   await page.setViewportSize({ width: w, height: 1100 });
-  await page.route('**/api/ratings/**', (r) =>
-    r.fulfill({ json: { ratings: RATINGS, overview: SYNOPSIS, facts: FACTS, providers: PROVIDERS } }),
-  );
+  await page.route('**/api/ratings/**', (r) => {
+    titleRequests.push(new URL(r.request().url()).pathname);
+    return r.fulfill({ json: { ratings: RATINGS, overview: SYNOPSIS, facts: FACTS, providers: PROVIDERS } });
+  });
   // THE TRUE ANONYMOUS ANSWER. `/api/dna` returns exactly this for a visitor
   // with no account — the section must be honest against the real response,
   // not against a stubbed profile.
@@ -68,6 +74,21 @@ test.describe('it renders the production card, not a landing-only one', () => {
     await expect(page.getByText(/^The Alternate:/)).toHaveCount(0);
     await expect(page.getByText('sample presentation, not current availability')).toHaveCount(0);
     await expect(page.getByText('Enter WatchVerd1ct for your own Verd1ct →')).toHaveCount(0);
+    // No courtroom/jury language anywhere in the section — that ceremony
+    // belongs to the Live Jury / Verdict Room, never the front door.
+    await expect(page.getByTestId('example-verdict').getByText(/courtroom|jury|gavel/i)).toHaveCount(0);
+  });
+
+  test('the card resolves the canonical entity movie:238, by id', async ({ page }) => {
+    await open(page, 1440);
+    // Whatever the card hydrates, it hydrates for the one fixed title — there
+    // is no search step whose ordering could hand it a different one.
+    expect(titleRequests.length).toBeGreaterThan(0);
+    for (const path of titleRequests) expect(path).toBe('/api/ratings/movie/238');
+    await expect(card(page).getByRole('link', { name: /Poster for The Godfather/ })).toHaveAttribute(
+      'href',
+      '/app/title/movie/238',
+    );
   });
 
   test('availability is the provider strip, never a sentence', async ({ page }) => {
@@ -93,7 +114,9 @@ test.describe('the anonymous state is the real one, not invented personalization
     await open(page, 1440);
     // CardFit is the "why YOU'd like it" line; with no DNA it renders nothing.
     await expect(card(page).getByTestId('card-fit')).toHaveCount(0);
-    await expect(page.getByTestId('example-verdict-anon')).toContainText('No Taste DNA yet');
+    await expect(page.getByTestId('example-verdict-anon')).toHaveText(
+      'The general Verd1ct. Build your Taste DNA and it becomes your Match.',
+    );
     await page.getByTestId('why-verdict').getByText('Why this Verd1ct?').click();
     await expect(page.getByTestId('why-verdict')).toContainText('No personal taste signal yet');
   });
