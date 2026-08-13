@@ -119,12 +119,13 @@ test.describe('it renders the production card, not a landing-only one', () => {
     await expect(strip.getByTestId('where-to-watch-line')).toHaveCount(3);
     // The OFFICIAL wordmarks, from the one brand registry — not TMDB's raw
     // labels, and never a television emoji.
-    // A BRAND WE HOLD AN ASSET FOR IS DRAWN. Paramount+ renders its own mark
-    // (the accessible name still carries the brand); Fubo has no verified asset
-    // yet and falls back to the official NAME as text — never an emoji.
+    // A BRAND WE HOLD AN ASSET FOR IS DRAWN, resolved from TMDB's own spelling
+    // via the registry — the accessible name carries the official brand, and
+    // TMDB's raw label never reaches the screen.
     await expect(strip.locator('img[alt*="Paramount+"]')).toHaveCount(1);
-    await expect(strip).toContainText('Fubo');
+    await expect(strip.locator('img[alt*="Fubo"]')).toHaveCount(1);
     await expect(strip).not.toContainText('fuboTV');
+    await expect(strip).not.toContainText('Paramount Plus');
   });
 });
 

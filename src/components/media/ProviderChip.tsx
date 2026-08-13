@@ -51,6 +51,7 @@ export function ProviderChip({ data, withLabel = false }: { data: ProviderChipDa
           src={logo}
           alt={label}
           loading="lazy"
+          data-testid="brand-mark"
           className="h-4 w-auto max-w-[68px] object-contain"
         />
         {withLabel && <span className="truncate pr-0.5 text-xs font-semibold text-ink-900">{brand.name}</span>}
@@ -85,7 +86,7 @@ export function NetworkChip({ name, logoUrl }: { name: string; logoUrl?: string 
     return (
       <span className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-white/95 px-1.5 py-1 align-middle shadow-sm ring-1 ring-black/5" title={name}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logoUrl} alt={name} loading="lazy" className="h-4 w-auto max-w-[68px] object-contain" />
+        <img src={logoUrl} alt={name} loading="lazy" data-testid="brand-mark" className="h-4 w-auto max-w-[68px] object-contain" />
       </span>
     );
   }

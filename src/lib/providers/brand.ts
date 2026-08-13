@@ -67,6 +67,12 @@ const OFFICIAL_NAMES: Record<string, string> = {
   'mgm plus': 'MGM+',
   'discovery plus': 'discovery+',
   'espn plus': 'ESPN+',
+  // TMDB still labels Tubi with the "TV" the brand dropped from its wordmark.
+  'tubi tv': 'Tubi',
+  // Plan variants of Prime Video, named so they key to the same brand. They are
+  // the SAME subscription catalogue with a cheaper tier, not another service.
+  'amazon prime video with ads': 'Prime Video with Ads',
+  'amazon prime video free with ads': 'Prime Video Free with Ads',
 };
 
 /** Lower-cased, whitespace-collapsed — the key both tables are read with. */

@@ -11,7 +11,10 @@ import { STREAMING_SERVICES } from '@/lib/services';
  */
 describe('verified provider assets', () => {
   it('resolves a mark from a NAME ALONE, with no caller-supplied logo', () => {
-    for (const name of ['Netflix', 'Prime Video', 'Disney+', 'Max', 'Hulu', 'Paramount+', 'Peacock', 'Apple TV+']) {
+    for (const name of [
+      'Netflix', 'Prime Video', 'Disney+', 'Max', 'Hulu', 'Paramount+', 'Peacock', 'Apple TV+',
+      'Starz', 'AMC+', 'Fubo', 'Tubi', 'Pluto TV', 'The Roku Channel',
+    ]) {
       const b = resolveProviderBrand({ name });
       expect(b.logoPath, name).toBeTruthy();
       expect(b.textOnly, name).toBe(false);
@@ -61,21 +64,30 @@ describe('verified provider assets', () => {
   });
 
   /**
-   * COVERAGE IS REPORTED, NOT ASSERTED AT 100%.
+   * EVERY CURATED SERVICE RESOLVES, EXCEPT THE ONE UPSTREAM NO LONGER CARRIES.
    *
-   * The remaining catalogue services have no verified asset yet — TMDB's
-   * provider list needs the server key, and nothing goes in the table until it
-   * has been looked at (see scripts/syncProviderLogos.ts). This test fails only
-   * if coverage goes DOWN, so the honest number is visible and cannot silently
-   * regress while the gap is closed.
+   * Showtime was folded into "Paramount+ with Showtime" and TMDB's US provider
+   * data has no standalone entry for it (checked across nine Showtime
+   * originals). Giving it Paramount+'s mark would be the brand merge this
+   * registry exists to prevent, so it is named here as a KNOWN, ACCEPTED gap
+   * rather than left as a silent hole — and if it ever becomes resolvable the
+   * list below is what has to change.
    */
-  it('reports catalogue coverage and never loses ground', () => {
-    const covered = STREAMING_SERVICES.filter((s) => assetForProvider(officialProviderName(s.name), s.id) != null);
+  const UPSTREAM_HAS_NO_MARK = new Set(['Showtime']);
+
+  it('every curated service resolves to a verified mark, bar the documented one', () => {
     const missing = STREAMING_SERVICES.filter((s) => assetForProvider(officialProviderName(s.name), s.id) == null);
-    // Visible in the test output rather than buried in a number.
+    expect(missing.map((m) => m.name)).toEqual([...UPSTREAM_HAS_NO_MARK]);
+    const covered = STREAMING_SERVICES.length - missing.length;
     expect(
-      covered.length,
-      `catalogue coverage ${covered.length}/${STREAMING_SERVICES.length}; still text-only: ${missing.map((m) => m.name).join(', ')}`,
-    ).toBeGreaterThanOrEqual(8);
+      covered,
+      `catalogue coverage ${covered}/${STREAMING_SERVICES.length}`,
+    ).toBe(STREAMING_SERVICES.length - UPSTREAM_HAS_NO_MARK.size);
+  });
+
+  it('a distribution route still never inherits a base brand’s new mark', () => {
+    for (const route of ['Starz Amazon Channel', 'AMC+ Roku Premium Channel', 'AMC Plus Apple TV Channel']) {
+      expect(assetForProvider(route), route).toBeNull();
+    }
   });
 });

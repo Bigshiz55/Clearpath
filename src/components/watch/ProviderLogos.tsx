@@ -72,6 +72,7 @@ export function ProviderLogos({ lines }: { lines: WatchLine[] }) {
                 width={28}
                 height={28}
                 loading="lazy"
+                data-testid="brand-mark"
                 className="h-7 w-7 rounded object-contain"
               />
             ) : (

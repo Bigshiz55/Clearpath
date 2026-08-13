@@ -45,7 +45,8 @@ export interface ProviderAsset {
  * Paramount+'s asset just because the words overlap; `amazon channel` is
  * deliberately absent from this list for exactly that reason.
  */
-const PLAN_WORDS = /\b(?:premium plus|premium|plus|with ads|ad[- ]?supported|basic|standard|hd|uhd|4k|free)\b/g;
+const PLAN_WORDS =
+  /\b(?:premium plus|premium|plus|essential|with ads|ad[- ]?supported|basic|standard|hd|uhd|4k|free)\b/g;
 
 /** The key both sides of the asset lookup are built with. */
 export function providerAssetKey(name: string): string {
@@ -73,10 +74,36 @@ export const PROVIDER_ASSETS: ProviderAsset[] = [
   // The mark reads "Apple tv" — Apple dropped the raised plus from the wordmark
   // in the 2024 app rebrand, so this IS the current asset for the subscription.
   { providerId: 350, name: 'Apple TV+', logoPath: '/9ghgSC0MA082EL6HLCW3GalykFD.jpg' },
+  // ── Resolved from the deployed app's OWN TMDB data ────────────────────
+  // These seven were missing because their paths could not be recalled. They
+  // were not guessed: production's `/api/ratings/:type/:id` already returns
+  // TMDB's provider rows, each pairing a `provider_name` with its `logo_path`,
+  // so the identity comes from TMDB itself rather than from a name match. Each
+  // path was then fetched and LOOKED AT, same rule as everything above.
+  { providerId: 43, name: 'Starz', logoPath: '/yIKwylTLP1u8gl84Is7FItpYLGL.jpg' },
+  { providerId: 526, name: 'AMC+', logoPath: '/ovmu6uot1XVvsemM2dDySXLiX57.jpg' },
+  { providerId: 257, name: 'Fubo', logoPath: '/9BgaNQRMDvVlji1JBZi6tcfxpKx.jpg' },
+  { providerId: 73, name: 'Tubi', logoPath: '/zLYr7OPvpskMA4S79E3vlCi71iC.jpg' },
+  { providerId: 300, name: 'Pluto TV', logoPath: '/dB8G41Q6tSL5NBisrIeqByfepBc.jpg' },
+  { providerId: 207, name: 'The Roku Channel', logoPath: '/wQzSN83BnWVgO7xEh0SeTVqtrFv.jpg' },
   // Verified and kept even though it is outside the curated picker: MUBI turns
   // up in real provider rows, and a brand we can prove should never be text.
   { providerId: 11, name: 'MUBI', logoPath: '/fj9Y8iIMFUC6952HwxbGixTQPb7.jpg' },
 ];
+
+/**
+ * SHOWTIME IS ABSENT ON PURPOSE, AND IT IS NOT AN OVERSIGHT.
+ *
+ * TMDB's US watch-provider data no longer carries a standalone Showtime entry —
+ * checked across seven Showtime originals (Dexter, Dexter: New Blood, Weeds,
+ * Californication, Penny Dreadful, The Affair, Your Honor, Billions, The Chi):
+ * not one returns a Showtime provider row. The service was folded into
+ * "Paramount+ with Showtime", so upstream has no separate mark to give us.
+ *
+ * Handing Showtime the Paramount+ asset would be exactly the merge this file
+ * forbids — a different subscription wearing another brand's logo. It renders
+ * as the official NAME until an authoritative source carries one again.
+ */
 
 const BY_ID = new Map<number, ProviderAsset>();
 const BY_KEY = new Map<string, ProviderAsset>();

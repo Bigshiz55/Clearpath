@@ -4,18 +4,10 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-**Finish provider logo coverage (owner action, one command).** 8 of the 15
-curated services have a verified brand asset in `src/lib/providers/assets.ts`;
-Starz, Showtime, AMC+, Fubo, Tubi, Pluto TV and The Roku Channel still render
-their official NAME as text because their TMDB `logo_path` needs the server key
-to look up, and nothing goes in that table unverified. Run
-`TMDB_API_KEY=… npx tsx scripts/syncProviderLogos.ts`, open each candidate URL
-it prints, confirm the mark, paste the rows in. `assets.test.ts` reports current
-coverage and fails if it drops.
-
-**Also still needed from you:** open `/admin/migrations` on production and apply
-pending migrations with your `MIGRATE_SECRET` — see the "Restored:
-/admin/migrations" entry below for why this is required and what it unblocks.
+Nothing in flight. **Action needed from you:** open `/admin/migrations` on
+production and apply pending migrations with your `MIGRATE_SECRET` — see the
+"Restored: /admin/migrations" entry below for why this is required and what it
+unblocks.
 
 ## Next
 - **Turn on the AI orchestrator (owner action).** The provider-independent
@@ -50,6 +42,30 @@ pending migrations with your `MIGRATE_SECRET` — see the "Restored:
   representative.
 
 ## Done
+- **Streaming brand coverage is 14/15, and the last one is an upstream fact.**
+  Starz, AMC+, Fubo, Tubi, Pluto TV and The Roku Channel now render their own
+  marks. Their paths were not guessed: production's already-deployed
+  `/api/ratings/:type/:id` returns TMDB's provider rows, each pairing a
+  `provider_name` with its `logo_path`, so the identity came from TMDB itself
+  across a sweep of ~36 real titles; each asset was then fetched and looked at.
+  No diagnostic route was added and no secret was handled.
+  **Showtime is the one gap and it is not fixable here:** TMDB's US
+  watch-provider data carries no standalone Showtime entry (checked across nine
+  Showtime originals) since the service folded into "Paramount+ with Showtime".
+  Giving it Paramount+'s mark would be the brand merge the registry exists to
+  prevent, so it renders as its official NAME.
+- **Linear network logos: plumbed, and genuinely blocked on source, not wiring.**
+  Forensic pass over every source in the stack: both station writers
+  (`tvmazeWriter`, `tvMediaWriter`) upsert `name`/`network`/`call_sign` and no
+  logo, because neither source supplies one — TVmaze's network object is
+  `{id, name, country, officialSite}`; Watchmode explicitly sets `logoPath:
+  null` ("per-title sources carry no logo") and is a STREAMING source anyway;
+  TV Media, the paid adapter, is egress-denied under `DATA_MODE=free_live`;
+  `linear_networks.logo_path` (0044) is fixture-fed and read by nothing. The
+  only remaining candidate — mapping a station name onto a TMDB *network* id —
+  is name inference and is refused. Rendered coverage is therefore 0, the
+  monogram stands, and the wired path lights up the moment a licensed source
+  writes `tv_stations.logo_url`.
 - **Known brands render their own marks, not just their names.** The registry
   now resolves canonical provider identity → verified asset
   (`src/lib/providers/assets.ts`), so a surface that knows only "Netflix" — the
