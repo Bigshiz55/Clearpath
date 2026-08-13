@@ -5,11 +5,10 @@ sessions: read this, execute **NEXT ACTION**.
 
 CURRENT SHA: (see git log)
 BRANCH: `claude/critic-layer`, cut from `main` @ 6080287.
-NEXT ACTION: GC3 — load anchor fingerprints from `title_dimensions` so a
-resolved anchor stops earning zero authority. `resolveAnchor` deliberately
-leaves `dims` undefined; `objectiveAuthority` therefore returns 0 for it, so
-today a correctly-resolved anchor still cannot move ranking. That is honest
-(no fingerprint = no claim) and it is the next gate.
+NEXT ACTION: GC4 — the Critic Reasoning stage (traitsToPreserve / toImprove /
+toAvoid). The chain identity -> fingerprint -> bounded ranking term is now
+causal end to end; GC4 is what makes the term ARGUE rather than merely measure
+distance from a centroid.
 
 ---
 
@@ -97,7 +96,7 @@ narrower than "teach the explainer about anchors": it is (a) populate
 
 - [ ] **GC1** Recommendation Objective type + LLM extraction; `relationship` survives parse
 - [x] **GC2** Anchor identity resolution — **COMPLETE, red-then-green**
-- [ ] **GC3** Anchor fingerprints loaded from `title_dimensions` (not keywords)
+- [x] **GC3** Anchor fingerprint hydration — **COMPLETE, red-then-green**
 - [ ] **GC4** Critic Reasoning stage producing traitsToPreserve / improve / avoid
 - [ ] **GC5** Anchors + objective reach candidate retrieval
 - [ ] **GC6** Anchors + objective reach FINAL RANKING (the causality gate)
@@ -107,6 +106,83 @@ narrower than "teach the explainer about anchors": it is (a) populate
 - [ ] **GC10** Exact-query regression for `Better than Furious or Widows Bay` (structural, not hardcoded titles)
 - [ ] **GC11** Latency budget + caching
 - [ ] **GC12** Full gates + merge recommendation
+
+---
+
+## GC3 — COMPLETE (red-then-green)
+
+### RED
+`Cannot find module './hydrate'` — and, more usefully, the BEFORE assertion that
+now lives permanently beside the AFTER one in `GC3 — the same anchor, two
+states`:
+
+```
+BEFORE — resolved but unhydrated: authority 0, ranking identical to baseline
+  objective.anchors[0].dims === undefined
+  objective.authority === 0
+  finalScore[] === baseline finalScore[]
+```
+
+Both states use the SAME `widowsBay()` resolution, the same DNA, the same
+candidates and the same ranker. The test was not rewritten between RED and
+GREEN — the AFTER case simply had no `hydrateAnchors` to call.
+
+### Canonical fingerprint source
+`title_dimensions`, read through `getCachedDimensions` -> `getCachedDimsBatch`
+— the same table, reader and `isValidDimensions` gate the production ranker
+already trusts. **No** `critic_dimensions`, no critic-only classifier, no second
+enrichment path, no hard-coded anchor dims. One title, one fingerprint
+vocabulary.
+
+### Hydration contract
+`hydrateAnchors(resolutions, load)` returns the resolutions **in the same order
+and shape**, attaching `dims` only to resolved anchors whose canonical key hits
+a VALID cached row. The loader is injected, so this module performs no I/O of
+its own; production passes `getCachedDimensions`.
+
+**Cache-only, architecturally.** `getCachedDimensions` never classifies, so no
+AI or remote call enters the request path. The backfill that populates the cache
+(`/api/cron/classify` -> `getTitleDimensions`) is a recorded DEPENDENCY, not
+something hydration bypasses: an anchor the classifier has not reached is silent
+until it does. That is a coverage question, not a correctness one.
+
+**Identity survives.** Lookup is `tmdbId` + `mediaType` only. A test asserts the
+loader is asked for `[{ tmdb_id: 555, media_type: 'movie' }]` and that the
+request contains no title text at all.
+
+**The composite key is load-bearing.** `title_dimensions` is queried by
+`tmdb_id` ALONE (`.in('tmdb_id', ids)`), so returned rows can include a series
+sharing a film's numeric id. Keying on `media_type-tmdb_id` is the only thing
+stopping a movie anchor adopting a TV fingerprint — which would error nowhere
+and make the critic confidently wrong. Proven: `movie:555` does not hydrate from
+a `tv-555` row, and 1984 *Dune* does not hydrate from the 2021 film's row.
+
+### Missing-dimension behaviour
+Cache miss, malformed dims, empty object, or a loader that throws all leave the
+anchor unhydrated, authority 0, and `finalScore[]` identical to the
+critic-absent baseline. Malformed is rejected by the EXISTING
+`isValidDimensions` gate — a partial blob is not a weaker fingerprint, it is not
+one — rather than by a new critic confidence system.
+
+### Partial-authority proof
+- 1 hydrated + 1 ambiguous, `requested: 2` -> `0 < authority < 1`
+- 1 hydrated + 1 resolved-but-unfingerprinted -> `0 < authority < 1`
+- 2 hydrated -> `authority === 1`
+
+The renormalisation trap is closed: `anchorsToObjective` pads the denominator
+with anchors it could not place, so authority is measured against what was
+ASKED rather than what happened to work.
+
+### Production ranking proof
+Same anchor, same everything: hydrating flips `criticNudge` from 0 to non-zero
+and the returned **order changes** versus baseline — the GC8 property, reached
+through the real GC2 -> GC3 path rather than hand-built anchors.
+
+### GC8 regression
+Unchanged file, **8 passed / 8**. All critic suites: **42 passed / 42**.
+
+### Gates
+typecheck 0 · lint 0 · **vitest 3252 passed / 0 failed** · build 0.
 
 ---
 
