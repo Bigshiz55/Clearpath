@@ -101,6 +101,19 @@ async function overflowX(page: Page) {
 }
 
 /** Product controls only — the dev harness's build badge is not one. */
+/**
+ * Screenshot only once the staged entrance has finished.
+ *
+ * The panels arrive on a 70ms step capped at six, on top of a 460ms animation,
+ * so a frame grabbed on the first paint catches half the room mid-fade — which
+ * is a true picture of one moment and a useless one for review. Waiting is not
+ * papering over a slow screen: the content is present and interactive
+ * throughout; only its opacity is still resolving.
+ */
+async function settled(page: Page) {
+  await page.waitForTimeout(1100);
+}
+
 async function underTouchMinimum(page: Page) {
   return page.evaluate(() => {
     const bad: string[] = [];
@@ -275,6 +288,7 @@ test.describe('atmosphere never costs legibility, a tap target, or a line', () =
       await expect(page.getByTestId('court-react')).toBeVisible();
       expect(await overflowX(page), 'the room must never scroll sideways').toBe(0);
       expect(await underTouchMinimum(page)).toEqual([]);
+      await settled(page);
       await page.screenshot({ path: path.join(SHOTS, `react-${label}.png`), fullPage: true });
     });
   }
@@ -288,6 +302,7 @@ test.describe('atmosphere never costs legibility, a tap target, or a line', () =
     await page.getByTestId('join-court').click();
     await expect(page.getByTestId('court-tonight')).toBeVisible();
     expect(await underTouchMinimum(page)).toEqual([]);
+    await settled(page);
     await page.screenshot({ path: path.join(SHOTS, 'lobby-phone.png'), fullPage: true });
   });
 
@@ -313,6 +328,7 @@ test.describe('atmosphere never costs legibility, a tap target, or a line', () =
         .filter((d) => parseFloat(d) > 0.01),
     );
     expect(slow, 'every ambient animation should be collapsed below 10ms').toEqual([]);
+    await settled(page);
     await page.screenshot({ path: path.join(SHOTS, 'verdict-reduced-motion.png'), fullPage: true });
   });
 });
