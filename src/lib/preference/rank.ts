@@ -11,6 +11,9 @@
  */
 import { DIMENSION_KEYS } from '@/lib/scoring/dimensions';
 import type { TitleDimensions } from '@/lib/scoring/dimensions';
+import type { CriticObjective } from '@/lib/critic/objective';
+import { criticNudge, planNudge } from '@/lib/critic/nudge';
+import type { CriticPlan } from '@/lib/critic/plan';
 import type { DnaState, TraitConfidence } from './types';
 import { resolveConfidence } from './confidence';
 import { effectiveTaste } from './explain';
@@ -157,6 +160,10 @@ export interface RankOutput extends RankInput {
   nudge: number;
   finalScore: number;
   confidence: number;
+  /** Bounded points contributed by the Recommendation Objective. 0 when absent. */
+  criticNudge?: number;
+  /** Which fingerprint axes the comparison actually used — the attribution trail. */
+  criticAxes?: string[];
 }
 
 /**
@@ -167,11 +174,31 @@ export interface RankOutput extends RankInput {
 export function rankWithPreference(
   candidates: RankInput[],
   dna: DnaState,
-  opts: { corrections?: Record<string, number> } = {},
+  opts: { corrections?: Record<string, number>; critic?: CriticObjective; criticPlan?: CriticPlan } = {},
 ): RankOutput[] {
   const out = candidates.map((c) => {
     const { nudge, confidence } = preferenceNudge({ dims: c.dims, genres: c.genres }, dna, opts);
-    return { ...c, nudge, confidence, finalScore: clamp(c.objective + nudge, 0, 100) };
+    /* THE REQUEST ITSELF, AS A RANKING TERM. Separate from the preference
+       nudge on purpose: `nudge` is who the user IS (Taste DNA, accumulated),
+       `critic` is what they ASKED FOR right now (bounded, authority-scaled,
+       inert when absent). Keeping them apart is what lets the attribution below
+       say which one moved a title, and stops a one-off request from being
+       mistaken for a durable preference. */
+    /* THE PLAN IS AUTHORITATIVE WHEN PRESENT (GC4). `opts.critic` remains for
+       callers that have anchors but no reasoning stage yet; a plan supersedes
+       it, because agreeing with a critic's instructions is a different and
+       better question than sitting far from a centroid. */
+    const critic = opts.criticPlan
+      ? planNudge({ dims: c.dims }, opts.criticPlan)
+      : criticNudge({ dims: c.dims }, opts.critic);
+    return {
+      ...c,
+      nudge,
+      confidence,
+      criticNudge: critic.nudge,
+      criticAxes: critic.axes,
+      finalScore: clamp(c.objective + nudge + critic.nudge, 0, 100),
+    };
   });
   out.sort((a, b) => b.finalScore - a.finalScore);
   return out;

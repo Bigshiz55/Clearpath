@@ -139,6 +139,25 @@ export interface FinderQuery {
   /** Monetization filter for discovery — 'flatrate', 'flatrate|free|ads', … .
    *  "Included with a subscription" is a HARD ask; rentals must not satisfy it. */
   monetization?: string;
+  /**
+   * Minimum TMDB vote count (`vote_count.gte`). Optional and additive: when
+   * unset, discovery keeps the existing defaults exactly.
+   *
+   * Exists for the critic's recall-floor strand, which searches with NO genre
+   * and NO keyword and therefore needs its own popularity bar — the standing
+   * default of 80 is safe only because something else is already narrowing the
+   * pool.
+   */
+  minVotes?: number | null;
+  /**
+   * TMDB `sort_by` for discovery. Optional and additive: unset keeps the
+   * long-standing `popularity.desc` default for every existing query.
+   *
+   * Exists for the critic's acclaim strand, which asks for `vote_average.desc`.
+   * Without this the strand declared a sort nothing read, so the one query meant
+   * to surface what a popularity sweep HIDES was itself sorted by popularity.
+   */
+  sortBy?: string;
 }
 
 export interface FinderItem {
@@ -370,7 +389,8 @@ export async function runFinder(
           region,
           minRating: q.upcoming ? undefined : minRating,
           // Upcoming titles have no votes/ratings yet, so don't require any.
-          minVotes: q.upcoming ? 0 : q.castIds && q.castIds.length > 0 ? 20 : 80,
+          minVotes:
+            q.upcoming ? 0 : q.minVotes != null ? q.minVotes : q.castIds && q.castIds.length > 0 ? 20 : 80,
           sinceDays: q.upcoming ? undefined : sinceDays,
           upcomingDays: q.upcoming ? 365 : undefined,
           maxRuntime: q.maxRuntime ?? undefined,
@@ -395,7 +415,7 @@ export async function runFinder(
           originalLanguage: lang,
           originCountry: q.originCountries?.[0],
           monetization: q.monetization,
-          sortBy: 'popularity.desc',
+          sortBy: q.sortBy ?? 'popularity.desc',
           page,
         }),
       ),

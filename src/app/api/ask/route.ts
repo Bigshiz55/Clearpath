@@ -9,6 +9,15 @@ import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askP
 import { augmentInternational } from '@/lib/askInternational';
 import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
+import { routeAsk } from '@/lib/critic/gate';
+import { stripAnchorSpans } from '@/lib/critic/request';
+import { buildCriticState } from '@/lib/critic/orchestrate';
+import { resolveAnchor } from '@/lib/critic/anchor';
+import { runStrands } from '@/lib/critic/strands';
+import { rankCriticCandidates } from '@/lib/critic/decide';
+import { buildComparativeExplanation } from '@/lib/critic/explain';
+import { getCachedDimensions } from '@/lib/titleDimensions';
+import { loadPreferenceCached } from '@/lib/preference/store';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
 import { buildQueryPlan } from '@/lib/nlu/queryPlan';
@@ -45,15 +54,67 @@ import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBr
 async function referenceKeywordIds(referenceTitles: string[]): Promise<number[]> {
   const out = new Set<number>();
   for (const name of referenceTitles.slice(0, 2)) {
-    const hit = (await searchTitles(name).catch(() => []))[0];
-    if (!hit) continue;
-    const detail = await getTitle(hit.mediaType, hit.id).catch(() => null);
-    const kwNames = (detail?.keywords ?? []).slice(0, 6);
-    if (kwNames.length === 0) continue;
-    const ids = await searchKeywords(kwNames).catch(() => []);
-    ids.slice(0, 8).forEach((id) => out.add(id));
+    /* IDENTITY THROUGH GC2, NOT THROUGH SEARCH ORDER.
+       This used to be `searchTitles(name)[0]` — popularity treated as identity.
+       It did not merely risk the wrong anchor, it reliably produced one: "like
+       Furious" fetched the keywords of Furious 7, so the search was biased
+       toward a film the user had not named, and the read-back said we had kept
+       the feel of the one they did. `resolveAnchor` refuses instead of
+       guessing, and an anchor it cannot place contributes no keywords at all.
+
+       STILL USED BY THE NON-CRITIC CONVERSATIONAL PATH, which carries reference
+       titles as strings and never resolves them. The critic path takes
+       `anchorKeywordsFor` below instead, which reuses the resolution GC2
+       already did rather than repeating it. */
+    const candidates = (await searchTitles(name).catch(() => [])).map((c) => ({
+      id: c.id,
+      title: c.title,
+      mediaType: c.mediaType,
+      year: c.year ?? null,
+    }));
+    const res = resolveAnchor({ spokenAs: name }, candidates);
+    if (res.status !== 'resolved') continue;
+    const kws = await keywordsForAnchor(res.anchor);
+    kws.forEach((id) => out.add(id));
   }
   return [...out].slice(0, 12);
+}
+
+/** TMDB keyword ids for ONE already-resolved anchor. No identity work at all. */
+async function keywordsForAnchor(a: { mediaType: 'movie' | 'tv'; tmdbId: number }): Promise<number[]> {
+  const detail = await getTitle(a.mediaType, a.tmdbId).catch(() => null);
+  const kwNames = (detail?.keywords ?? []).slice(0, 6);
+  if (kwNames.length === 0) return [];
+  return (await searchKeywords(kwNames).catch(() => [])).slice(0, 8);
+}
+
+/**
+ * The critic path's soft keyword seed, derived from anchors GC2 already placed.
+ *
+ * Anchors are fetched CONCURRENTLY — a two-anchor comparison should cost one
+ * round-trip, not two — and any failure yields an empty seed, because the
+ * keywords are a recall widener and never the comparison itself.
+ */
+async function anchorKeywordsFor(
+  anchors: readonly { mediaType: 'movie' | 'tv'; tmdbId: number }[],
+): Promise<number[]> {
+  const per = await Promise.all(anchors.slice(0, 2).map((a) => keywordsForAnchor(a).catch(() => [])));
+  /* INTERLEAVED, NOT CONCATENATED. `blend` turns each seed into its own strand
+     and the strand budget takes a PREFIX of this list, so anchor-A-then-
+     anchor-B ordering meant a well-tagged A consumed the whole budget and B
+     contributed nothing — the precise starvation per-seed strands exist to
+     prevent. Round-robin makes the prefix contain both sides. */
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (let i = 0; i < Math.max(...per.map((p) => p.length), 0); i++) {
+    for (const list of per) {
+      const kw = list[i];
+      if (kw == null || seen.has(kw)) continue;
+      seen.add(kw);
+      out.push(kw);
+    }
+  }
+  return out.slice(0, 12);
 }
 
 function hasCompetingConstraints(text: string): boolean {
@@ -227,6 +288,27 @@ export async function POST(req: Request) {
       });
     }
 
+    // 0.6) A BARE vocabulary word ("crime", "Hulu", "boxing") is a browse
+    // request for that thing — it must never be treated as a title ask, no
+    // matter what happens to share the name.
+    const lex = text.trim() ? lexicalIntent(text) : null;
+
+    // 0.65) THE COMPARATIVE INTENT BOUNDARY.
+    //
+    // UNDERSTANDING WHAT WAS ASKED PRECEDES CHOOSING WHO ANSWERS IT. This runs
+    // BEFORE the AI orchestrator on purpose: in `anthropic` mode
+    // `runAiDiscovery` returns a finished search response, so a comparative
+    // sentence would otherwise get the canonical GC1–GC5 pipeline under
+    // `legacy` and an entirely independent interpretation under `anthropic`.
+    // The default being `legacy` made that latent, not safe.
+    //
+    // `routeAsk` is the single decision, executed by `servingMode.test.ts`, so
+    // the ordering rule cannot quietly reverse in a refactor. There is exactly
+    // one parser — no Anthropic-specific CriticRequest exists anywhere.
+    const aiMode = serverEnv.aiDiscoveryMode();
+    const askDecision = routeAsk(text, aiMode, { conversational, lexical: lex != null });
+    const criticRequest = askDecision.request;
+
     // 0.7) AI ORCHESTRATOR (feature-flagged; default legacy = OFF, nothing here
     // runs in production until the owner sets AI_DISCOVERY_MODE + a key). In
     // ANTHROPIC mode Claude is the primary brain for single-shot semantic
@@ -235,8 +317,10 @@ export async function POST(req: Request) {
     // and only then ranks by DNA. Exact-title/person/live-TV intents defer back
     // to the deterministic handlers below. Any AI failure falls through to the
     // legacy path — the user never sees a broken search.
-    const aiMode = serverEnv.aiDiscoveryMode();
-    if (aiMode === 'anthropic' && !conversational && text.trim()) {
+    //
+    // Comparatives are NOT its to answer — that is `askDecision` above, and the
+    // guard restates it here so the branch is self-explaining at the call site.
+    if (aiMode === 'anthropic' && !conversational && text.trim() && !criticRequest) {
       const ai = await runAiDiscovery({ supabase, userId: user.id, text, route: 'ask', limit: parseRequestedCount(text) });
       if (ai.kind === 'clarify') {
         return NextResponse.json({ kind: 'clarify', requestId, clarify: ai.question, options: ai.options, interpretation: ai.interpretation, query: { ...EMPTY_QUERY }, items: [] });
@@ -258,10 +342,196 @@ export async function POST(req: Request) {
       // ai.kind === 'unavailable' → fall through to the deterministic path.
     }
 
-    // 0.8) A BARE vocabulary word ("crime", "Hulu", "boxing") is a browse
-    // request for that thing — it must never be treated as a title ask, no
-    // matter what happens to share the name.
-    const lex = text.trim() ? lexicalIntent(text) : null;
+    // 0.9) THE CRITIC PATH — a request that COMPARES.
+    //
+    // The relation and the individual anchors were read at 0.65 by the one
+    // parser every mode shares, so a comparison cannot survive on the
+    // conversational route and silently degrade to a keyword union on the
+    // discovery route — or be answered by a different brain entirely.
+    //
+    // This also sits ABOVE the exact-title lookup deliberately. "Better than
+    // Furious or Widows Bay" classifies as `exact_title` today — the whole
+    // sentence is searched as if it were the name of a film, finds nothing, and
+    // falls through to generic discovery with no anchors at all. That is the
+    // precise mechanism behind the Cool Hand Luke answer.
+    if (criticRequest) {
+      // Stated constraints only. The conversational state already carries the
+      // accumulated ones; a fresh ask reads them off the deterministic parser
+      // (never the LLM — a hard constraint must not depend on a key being set).
+      /* CONSTRAINTS ARE PARSED FROM THE SENTENCE MINUS THE TITLES.
+         `naiveParseQuery` reads genre words out of free text and cannot know
+         "Supernatural" is an anchor here, so parsing the whole sentence turned
+         an anchor's own NAME into a positive `genreIds` filter — which then rode
+         the base query onto every strand, gating even the ungated recall floor.
+         A guess derived from a title was REMOVING candidates, the one thing GC5
+         promises an inference can never do. Genres the user genuinely stated
+         ("better than X, but a comedy") survive, because only the known title
+         spans are removed. */
+      const constraintText = stripAnchorSpans(text, criticRequest.referenceTitles);
+      const criticBase: FinderQuery = conversational && convState
+        ? stateToQuery(convState)
+        : augmentInternational(naiveParseQuery(constraintText), constraintText);
+      if (criticRequest.referenceTitles.length > 0) {
+        criticBase.similarTo = criticRequest.referenceTitles.join(' / ');
+      }
+
+      /* CACHED. `loadPreferenceCached` already existed with a 300s revalidate
+         and had ZERO callers — a cache the codebase built and never used. Taste
+         DNA is derived from an append-only event log, so a short window costs
+         nothing in correctness and removes a full event-table read from every
+         comparative request. */
+      const { dna } = await loadPreferenceCached(supabase, user.id, Date.now());
+      const criticState = await buildCriticState({
+        request: criticRequest,
+        dna,
+        // HARD = what the sentence said. Nothing inferred may enter this object.
+        hard: {
+          mediaType: criticBase.mediaType,
+          minYear: criticBase.minYear ?? null,
+          maxYear: criticBase.maxYear ?? null,
+          providerIds: criticBase.providerIds,
+          excludeGenreIds: criticBase.excludeGenreIds,
+          subjectKeywordIds: criticBase.subjectKeywordIds,
+        },
+        // GC2 JUDGES these candidates; search order never decides identity.
+        searchCandidates: async (name) =>
+          (await searchTitles(name).catch(() => [])).map((c) => ({
+            id: c.id,
+            title: c.title,
+            mediaType: c.mediaType,
+            year: c.year ?? null,
+          })),
+        // GC3, cache-only. A miss costs the anchor its authority, nothing more.
+        loadDimensions: getCachedDimensions,
+        /* SOFT seeds, derived from the anchors GC2 ALREADY RESOLVED.
+           This used to call `referenceKeywordIds(names)`, which searched and
+           resolved each name a SECOND time — two independent resolutions of the
+           same title per request, free to disagree, and an extra TMDB identity
+           search each. Now the keywords belong to the title we actually chose,
+           and the loader runs concurrently with hydration. */
+        loadAnchorKeywords: anchorKeywordsFor,
+        anchorGenreIds: [],
+        mediaType: criticBase.mediaType === 'any' ? undefined : criticBase.mediaType,
+      });
+
+      /* NOTHING RESOLVED, NOTHING TO SAY — so do not take the request over.
+         With no placed anchor the critic's only strand is the ungated recall
+         floor, which is a popularity sweep wearing the authority of a
+         comparison. Falling through leaves the user with the existing pipeline,
+         which is a weaker answer honestly arrived at rather than a generic one
+         presented as understanding. GC2's refusal is worth nothing if the
+         caller answers anyway. */
+      if (criticState.objective.anchors.length === 0) {
+        convInterpretation.push(
+          `I couldn't pin down ${criticRequest.referenceTitles.join(' or ')} — answering without the comparison.`,
+        );
+      } else {
+      const limitCritic = text ? parseRequestedCount(text) : DEFAULT_RESULT_LIMIT;
+      /* GC5 RETRIEVAL, ISSUED FOR REAL. `hints.strands` always contains at
+         least the ungated recall floor, so this is never an empty search — but
+         the guard states that dependency rather than assuming it, because a
+         zero-strand union would silently return nothing at all. */
+      const { hints } = criticState;
+      if (hints.strands.length === 0) throw new Error('critic: no retrieval strands');
+      const strandRun = await runStrands(
+        supabase,
+        user.id,
+        hints,
+        criticBase,
+        null,
+        limitCritic,
+      );
+      criticState.attribution.candidateIds = strandRun.candidateIds;
+
+      /* ── GC6 · THE FINAL DECISION ──────────────────────────────────────
+         Candidate fingerprints, batch and CACHE-ONLY, keyed on the composite
+         `mediaType + tmdbId`. No classifier, no per-title AI call, no title
+         string. A candidate the classifier has not reached yet simply
+         contributes nothing — it is never read as a neutral 50. */
+      const candidateDims = await getCachedDimensions(
+        strandRun.items.map((i) => ({ tmdb_id: i.id, media_type: i.mediaType })),
+      );
+
+      /* decisionScore = matchScore + planNudge, and nothing else.
+         `matchScore` already carries general quality + the user's DURABLE
+         preference rules; `buildPlan` already consumed canonical DNA to choose
+         its targets. A raw preference nudge here would apply that same evidence
+         a second time. See the audit in `docs/CRITIC-SHIP.md`. */
+      const ranked = rankCriticCandidates(
+        strandRun.items.map((i) => ({
+          id: i.id,
+          mediaType: i.mediaType,
+          matchScore: i.matchScore,
+          generalScore: i.generalScore,
+          dims: candidateDims.get(`${i.mediaType}-${i.id}`),
+        })),
+        criticState.plan,
+      );
+
+      /* ORDER BY THE DECISION, DISPLAY THE DURABLE MATCH.
+         The card keeps showing the Match it earned — general quality plus what
+         we lastingly know about this user. `decisionScore` answers a different
+         question ("which of these best answers what you asked me RIGHT NOW")
+         and is request-specific, so it orders the list and is never written
+         back onto the card or into Taste DNA. GC7 explains why the winner won. */
+      const byKey = new Map(strandRun.items.map((i) => [`${i.mediaType}-${i.id}`, i]));
+
+      /* ── GC7 · WHY IT WON ──────────────────────────────────────────────
+         Built from the SAME contribution trail that produced the order, and
+         attached to the item's existing `explain` payload as its own section.
+         This is CUSTOMER-FACING, so it is assembled here rather than inside
+         the development-only diagnostics below. A candidate the critic did not
+         actually move gets `null` and the card renders exactly as before —
+         "Why this beats X" must never appear merely because the user typed a
+         comparison. */
+      const criticItems = ranked.decisions
+        .map((d) => {
+          const item = byKey.get(d.key);
+          if (!item) return null;
+          const comparison = buildComparativeExplanation({
+            relation: criticState.objective.relation,
+            anchors: criticState.objective.anchors,
+            contributions: d.contributions,
+            nudge: d.criticNudge,
+          });
+          if (!comparison) return item;
+          return {
+            ...item,
+            // The durable Match and its reasons are untouched below this.
+            explain: item.explain
+              ? { ...item.explain, comparison: { heading: comparison.heading, helped: comparison.helped, cautions: comparison.cautions } }
+              : item.explain,
+          };
+        })
+        .filter((i): i is NonNullable<typeof i> => i != null)
+        .slice(0, limitCritic);
+
+      criticState.attribution.finalRankingConsumesPlan = ranked.applied;
+
+      return NextResponse.json(
+        withConv({
+          kind: 'search',
+          requestId,
+          appliedText: text || null,
+          query: criticBase,
+          scoredFor: strandRun.scoredFor || 'Your match',
+          relaxed: strandRun.relaxed,
+          items: criticItems.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+          // Structured evidence for development — enums, ids, labels and
+          // numbers. Never a prompt, never free-text reasoning.
+          ...(process.env.NODE_ENV === 'production'
+            ? {}
+            : {
+                criticAttribution: {
+                  ...criticState.attribution,
+                  perStrand: strandRun.perStrand,
+                  decisions: ranked.decisions.slice(0, limitCritic),
+                },
+              }),
+        }),
+      );
+      }
+    }
 
     // 1) Named-title lookup → put THAT title on trial (with the identity guard,
     // exact-match ranking and provider hard filter inside askJudgeTitle).
