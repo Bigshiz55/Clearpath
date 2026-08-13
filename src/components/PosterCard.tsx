@@ -205,7 +205,13 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
               `z-[2]` puts it under the trailer player (`z-[4]`): while a
               preview is running the frame belongs to the video, and ✕ takes
               this corner. */}
-          {saveId != null && (
+          {/* `overlay !== null` as well as an id: that flag is the card's
+              read-only mode, used by the landing example for a visitor with no
+              account. More Info holds Save and FOR/AGAINST, both of which write
+              — offering it there would be a control that answers a tap with an
+              error toast, which is exactly what read-only mode exists to
+              prevent. */}
+          {overlay !== null && saveId != null && (
             <MoreInfoButton
               variant="chip"
               className="absolute bottom-1 left-1 z-[2]"

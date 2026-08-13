@@ -39,8 +39,14 @@ export interface TourStop {
   /** Which gutter it sits in on a laptop. */
   side: 'left' | 'right';
   /** Distance from the top of the card to the region it points at, in px.
-   *  The card's own boxes are fixed height from `sm` (see `.wv-card-art`,
-   *  CardFacts' reserve, WhereToWatch's RESERVE), so these stay put. */
+   *  Every box on the card is a fixed height from `sm` — the media frame is an
+   *  aspect-ratio, and the title, reason and provider row are pinned (see
+   *  `.wv-card-title`, `.wv-reason`, `.wv-provider-row` in globals.css) — so
+   *  these stay put whatever a title's content does.
+   *  MEASURED, NOT GUESSED: `node scripts/tourOffsets.mjs` prints the rendered
+   *  offsets of every region on this exact card. Re-run it after any card
+   *  layout change and move these to match, rather than nudging until the
+   *  overlap test goes quiet. */
   top: number;
 }
 
@@ -52,52 +58,52 @@ export interface TourStop {
 export const TOUR_STOPS: TourStop[] = [
   {
     n: 1,
-    label: 'WatchVerd1ct Score',
-    body: 'Our quality judgment for this title — one 0–100 number blended from every rating source we actually hold.',
+    label: 'Preview it',
+    // RE-AIMED BY THE CARD REDESIGN. This stop used to point at `More`, the
+    // synopsis expander — which the browse card no longer carries (the full
+    // synopsis moved to More Info, because a card carrying the whole report was
+    // 763px tall and could not fit on screen). Pointing a tour at a control
+    // that is not there is worse than one stop fewer, so it now names the
+    // affordance that IS on the artwork and that a first-time reader genuinely
+    // cannot infer: the trailer plays inside the poster frame, in place.
+    body: 'Play the trailer right here — it runs inside the poster, so the recommendation never leaves your screen.',
     side: 'left',
-    top: 330,
+    top: 150,
   },
   {
     n: 2,
-    label: 'Your Match',
-    body: 'Your personal fit. It replaces the number above once WatchVerd1ct has learned your Taste DNA — we never invent one for a visitor we do not know yet.',
-    side: 'right',
-    top: 322,
+    label: 'WatchVerd1ct Score',
+    body: 'Our quality judgment for this title — one 0–100 number blended from every rating source we actually hold.',
+    side: 'left',
+    top: 300,
   },
   {
     n: 3,
-    label: 'More',
-    // TWO CONTROLS, NAMED SEPARATELY, BECAUSE THEY DO DIFFERENT THINGS.
-    // This callout previously read "Tap through for the full title page",
-    // which described `More` as navigation. It is not: `CardSynopsis`'s More
-    // expands the synopsis IN PLACE and never leaves the card. The title page
-    // is reached by the poster or the title, which genuinely are links here —
-    // so that fact is stated as its own sentence about its own control rather
-    // than folded into this one.
-    body: 'A quick synopsis of what it’s about. Expand it in place when you want a little more context before deciding — the poster and the title are the links to the full page.',
-    side: 'left',
-    top: 452,
+    label: 'Your Match',
+    body: 'Your personal fit. It replaces the number above once WatchVerd1ct has learned your Taste DNA — we never invent one for a visitor we do not know yet.',
+    side: 'right',
+    top: 296,
   },
   {
     n: 4,
     label: 'Where to Watch',
     body: 'Subscription, rental and purchase options, drawn as each service’s own brand mark.',
     side: 'right',
-    top: 500,
+    top: 418,
   },
   {
     n: 5,
     label: 'Why this Verd1ct?',
     body: 'The evidence behind the call: what matched, which of your requirements were checked, and how confident that makes us.',
     side: 'left',
-    top: 588,
+    top: 452,
   },
   {
     n: 6,
     label: 'Things to Know',
     body: 'The trade-offs, in that same panel — a long runtime, availability we could not verify.',
     side: 'right',
-    top: 620,
+    top: 516,
   },
 ];
 

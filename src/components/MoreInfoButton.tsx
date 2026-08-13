@@ -69,7 +69,12 @@ export function MoreInfoButton({
         className={`${variant === 'chip' ? chip : plain} ${className}`}
       >
         {variant === 'chip' && <span aria-hidden>ⓘ</span>}
-        <span>{variant === 'chip' ? 'Info' : 'More info'}</span>
+        {/* See TrailerMedia's ▶ chip: below a 220px media frame the two chips
+            collide, so both drop their label and keep their glyph. The
+            accessible name is on the button, not in this span. */}
+        <span className={variant === 'chip' ? 'wv-chip-label' : ''}>
+          {variant === 'chip' ? 'Info' : 'More info'}
+        </span>
       </button>
       {open && (
         <QuickLook

@@ -1578,3 +1578,15 @@ body {
     display: none;
   }
 }
+
+/* The same container, the same reason: below a 220px media frame the ⓘ Info
+   chip (bottom-left) and the ▶ Trailer chip (bottom-right) are 66px and 72px
+   wide inside 86px of frame on a 320px phone. They overlap, and whichever
+   paints on top makes the other unclickable — measured, Playwright could not
+   reach Info at all. Both keep their glyph and drop their word; the button's
+   `aria-label` carries the full name regardless, so nothing is lost. */
+@container wv-media (max-width: 220px) {
+  .wv-chip-label {
+    display: none;
+  }
+}

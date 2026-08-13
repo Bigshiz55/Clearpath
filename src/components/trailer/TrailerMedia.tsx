@@ -483,7 +483,13 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
           className="absolute bottom-1 right-1 z-[2] inline-flex min-h-[36px] items-center gap-1 rounded-full bg-black/60 px-2.5 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80"
         >
           <span aria-hidden>▶</span>
-          <span>{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
+          {/* The WORD goes before the control does. In a 86px media frame (a
+              320px phone's row card) this chip and the ⓘ Info chip opposite it
+              are 72px and 66px wide — they overlap, and whichever paints on top
+              makes the other unclickable. Collapsed to their glyphs both fit
+              with room; `aria-label` on the button carries the full name
+              either way, so nothing is lost to a screen reader. */}
+          <span className="wv-chip-label">{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
         </button>
       )}
     </div>
