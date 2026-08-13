@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `f787999` · Branch: `claude/critic-layer`
+- Commit: `18de532` · Branch: `claude/dna-showdown-rebased`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 
