@@ -16,6 +16,8 @@
  * never be autocorrected into an unrelated one that doesn't exist.
  */
 
+import { stripRequestFrame } from './requestFrame';
+
 // ── Title + year ──────────────────────────────────────────────────────────
 
 /**
@@ -158,7 +160,21 @@ const PERSON_TAIL =
 export function extractPersonName(raw: string): string | null {
   const q = (raw ?? '').trim();
   if (!q) return null;
-  let t = q;
+  /* THE REQUEST FRAME COMES OFF FIRST.
+     Measured on the reported production failure: "find me 3 Sylvester Stallone
+     movies you think I'll like" matched NEITHER pattern below — no leading
+     "movies with", and the sentence ends in "like" rather than in "movies" —
+     so the person index was searched for the whole sentence and found nobody.
+     With the framing peeled the remainder is "Sylvester Stallone movies", which
+     the TAIL pattern has always handled. A frame that strips nothing leaves
+     bare-name behaviour byte-identical. */
+  const frame = stripRequestFrame(q);
+  let t = frame.text;
+  /* `stripped` MUST STILL MEAN "PERSON PHRASING WAS FOUND".
+     Seeding it from the frame — my first draft — made every framed request look
+     like a person request, so "three comedies you think I will love" came back
+     with the person "comedies". Peeling the frame changes what the patterns
+     below are shown; it must not change what counts as evidence. */
   let stripped = false;
   const lead = t.replace(PERSON_LEAD, '');
   if (lead !== t) { t = lead; stripped = true; }
@@ -169,6 +185,12 @@ export function extractPersonName(raw: string): string | null {
   // A name is a handful of words with no digits — "movies with 500 days" is
   // not a person, and letting it through would search people for a title.
   if (/\d/.test(t) || t.split(/\s+/).length > 4) return null;
+  /* A NAME DOES NOT OPEN WITH AN ARTICLE OR A QUALITY WORD. "a good heist
+     movie" reduces to "a good heist", which is a subject request wearing a
+     name's shape; offering it to the person index costs a lookup and can only
+     return a false match. Cheap, and it never rejects a real name — nobody is
+     credited as "The Smith" or "Best Jones". */
+  if (/^(?:the|a|an|good|best|great|top|new|old|scary|funny|sad|classic)\b/i.test(t)) return null;
   return t;
 }
 
