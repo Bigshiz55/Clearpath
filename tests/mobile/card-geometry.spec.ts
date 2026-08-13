@@ -87,10 +87,20 @@ async function open(page: Page, w: number, h: number, opts: OpenOpts = {}) {
     return r.fulfill({ json: { dna: perCardDna[id] ?? dna } });
   });
   await page.route('**/api/availability/refresh', (r) => r.fulfill({ json: { available: false } }));
+  // TMDB'S IMAGE HOST IS UNREACHABLE FROM THE HARNESS, and every provider tile
+  // asks it for a logo. Left alone, each of those requests hangs until the
+  // browser gives up, so a `networkidle` wait sat on the timeout: these tests
+  // ran at ~15s each instead of ~3, which on a 1090-test suite is the
+  // difference between finishing and hitting the global timeout. Aborting them
+  // is also more honest than waiting — the tile geometry is what is under test
+  // and it does not depend on the mark loading.
+  await page.route('https://image.tmdb.org/**', (r) => r.abort());
 
-  await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
+  await page.goto('/dev/visual-qa', { waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('qa-grid')).toBeVisible();
-  // Everything on the card is async; settle before measuring anything.
+  // Everything on the card is async; settle before measuring anything. The
+  // card deliberately reserves its regions, so this is waiting for text to
+  // land in space that is already claimed, not for the layout to stop moving.
   await page.waitForTimeout(700);
 }
 
