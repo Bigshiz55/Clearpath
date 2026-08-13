@@ -97,14 +97,193 @@ narrower than "teach the explainer about anchors": it is (a) populate
 - [x] **GC2** Anchor identity resolution — **COMPLETE, red-then-green**
 - [x] **GC3** Anchor fingerprint hydration — **COMPLETE, red-then-green**
 - [x] **GC4** Critic Reasoning stage — **COMPLETE, red-then-green**
-- [ ] **GC5** Anchors + objective reach candidate retrieval
+- [~] **GC5** Anchors + objective reach candidate retrieval — **CONTRACT COMPLETE,
+      red-then-green; PRODUCTION WIRING BLOCKED (see "GC5 blockers")**
 - [ ] **GC6** Anchors + objective reach FINAL RANKING (the causality gate)
+      — **SCOPE HAS GROWN: `rankWithPreference` is not the production ranker**
 - [ ] **GC7** Grounded explanations — new reason kind carrying the comparison
 - [x] **GC8** Material-dependence test — **COMPLETE, red-then-green**
 - [ ] **GC9** Counterfactual suite: anchors / DNA / relationship / modifiers / context each causal
 - [ ] **GC10** Exact-query regression for `Better than Furious or Widows Bay` (structural, not hardcoded titles)
 - [ ] **GC11** Latency budget + caching
 - [ ] **GC12** Full gates + merge recommendation
+
+---
+
+## GC5 — CONTRACT COMPLETE (red-then-green) · PRODUCTION WIRING BLOCKED
+
+### The production retrieval path, traced on THIS branch (not assumed from GC1)
+
+Verified by reading the current files, because the GC1 audit is no longer
+guaranteed exact:
+
+```
+POST /api/ask  (src/app/api/ask/route.ts)
+  ├─ conversational branch  ~L352
+  │    stateToQuery(s) -> FinderQuery
+  │    subjects        -> resolveSubjectRequirementForTerms
+  │                       q.subjectKeywordIds / subjectLexemes / subjectStrict   HARD
+  │    referenceTitles -> referenceKeywordIds(names)            L45
+  │                         searchTitles(name)[0]               L48   <-- no identity check
+  │                         -> q.keywordIds  (union of anchors)  L385  SOFT
+  │    similarTo       -> q.similarTo = names.join(' / ')        L402  READ-BACK COPY ONLY
+  └─ discovery branch       ~L430
+       parseAskWithAI / naiveParseQuery -> FinderQuery
+       augmentInternational, deterministic year/genre overlay
+       parseTopicTerms -> searchKeywords -> q.keywordIds merged  L524  SOFT
+       applyRequiredSubject                                      L566  HARD
+
+runFinder  (src/lib/finder.ts:277)
+  discoverTitles(...)                                           L362
+    keywordIds: q.subjectKeywordIds?.length ? q.subjectKeywordIds : q.keywordIds   L387
+      ^^ WITH A SUBJECT PRESENT, THE ANCHOR UNION IS DROPPED ENTIRELY
+  candidate map -> normalization -> scoring
+  items.sort((a, b) => b.matchScore - a.matchScore)             L708
+  relaxation ladder:
+    subject present      -> NEVER relaxed, honest shortfall     L723
+    isKeywordStarved()   -> retry with keywordIds: undefined    L736  (SOFT, relaxable)
+    minMatch/onMyServices-> retry relaxed                       L756
+```
+
+`discoverTitlesChecked` (`src/lib/tmdb/client.ts:378`) is the honesty boundary.
+`with_keywords` and `with_genres` are **OR** (`join('|')`); `without_*` are
+AND-NOT. Mirrored into `TMDB_QUERYABLE` in `src/lib/critic/retrieval.ts`.
+
+### What the anchors actually contribute today
+
+A **union of TMDB keyword ids, and nothing else.** Identity, relation and plan
+are all absent from retrieval. Two consequences, both confirmed in code:
+
+- **Too strong.** `with_keywords` is the discovery *gate*. A title carrying none
+  of the anchors' keywords cannot enter the pool at any rank. The right answer
+  is removed before judgment, so a causal ranker (GC8/GC4) orders survivors of
+  an arbitrary tag filter.
+- **Too weak.** `better than X` and `like X` issue a byte-identical search.
+  `q.similarTo` exists but is read-back copy, never a retrieval input.
+
+### RED
+
+`src/lib/critic/retrieval.test.ts`, 17 items, against `planToHints` written as a
+faithful port of today's single keyword-union query:
+
+```
+Test Files  1 failed (1)
+     Tests  8 failed | 9 passed (17)
+```
+
+The decisive one: `pool = ['anchor-alike']` — `the-answer` was not retrievable
+at all, so tests 1, 2 and 5 failed on an empty or one-title pool.
+
+### GREEN — same file, unedited
+
+```
+Test Files  1 passed (1)
+     Tests  17 passed (17)
+```
+
+### One test corrected BEFORE the RED baseline (disclosed)
+
+Test 17 originally asserted "with the same pool, relation alone changes the
+order". **GC4 does not do that, by design.** Probed with the real `buildPlan`:
+for a user with confident DNA, `like` and `better_than` return an *identical*
+instruction set, because GC4 decided the target follows the USER. The test was
+rewritten to assert what GC5 actually owns — relation changes the **pool** —
+before the RED baseline was taken, and never touched afterwards. Weakening a
+test after seeing GREEN fail would be the forbidden move; this was a
+mis-specification caught against GC4's documented semantics.
+
+### The contract — `src/lib/critic/retrieval.ts`
+
+`CriticRetrievalHints = { strands, hard, rankingOnly, relation }`.
+
+**Retrieval maximises recall; ranking supplies judgment.** A critic inference
+widens the pool by adding a *strand* (an extra legitimate query, results
+UNIONED) and may never narrow it.
+
+| class | contents | may remove a title? |
+|---|---|---|
+| **HARD** | media type, year bounds, providers, explicit exclusions, named subject — facts of the sentence | **yes** — applied to every strand |
+| **SOFT** | anchor keywords, anchor genres — critic *inferences* | **no** — seeds a strand, never gates one |
+| **RANKING-ONLY** | every fingerprint axis | **no** — no search representation exists |
+
+Strands emitted:
+
+1. `recall-floor` — HARD constraints only, popularity-sorted. **Always present.
+   This is the load-bearing property**: because a strand exists that no
+   inference gates, a wrong keyword union can only fail to *add* a title, never
+   remove one. Test 6 pins it.
+2. `anchor-keywords` — today's only strand, demoted to one of several.
+3. `anchor-genres` — a wider net than tags.
+4. `acclaim` — `better_than` only.
+
+### No fake filters
+
+TMDB cannot query a single one of `DIMENSION_KEYS` — there is no
+`with_darkness`, no `warmth.gte`. Every dimension instruction is therefore
+classified `rankingOnly` and applied by `planNudge`, never converted into a
+proxy filter ("high violence, so require Action"), which would be a fabricated
+constraint wearing the authority of a real one. Tests 8–10.
+
+### Relation reaches retrieval — legitimately
+
+- `better_than` adds the `acclaim` strand. **This is not a proxy**: "better" is
+  a quality claim and `vote_average.gte` is genuinely that claim. It *trades*
+  the vote bar for a rating bar rather than stacking both, so it reaches the
+  acclaimed-but-less-popular title a popularity sweep hides.
+- `like` / `like_but` get no acclaim floor — resemblance is not a quality claim,
+  and adding one would refuse the mediocre-but-similar title that was asked for.
+- `blend` emits one strand **per seed** rather than a single OR union, so the
+  better-tagged side cannot fill the cap and drop the other. Named per-*seed*,
+  not per-*anchor*, because `ResolvedAnchor` carries no keywords and the ids
+  arrive flattened — per-anchor grouping needs that shape to exist first.
+
+### Starvation: measured, and structurally impossible
+
+The brief asked whether using GC4 instructions as retrieval hints starves the
+pool. **It cannot**, and not by tuning: dimension instructions are classified
+`rankingOnly` and never become filters, so a richer plan adds zero constraints.
+Test 14 asserts a rich plan retrieves ≥ an empty one. `MIN_RANK_CONF` was not
+touched and test 15 pins it at `0.25`.
+
+### GC5 blockers — PROVEN, not assumed (`src/lib/critic/productionWiring.test.ts`, 5/5)
+
+The brief required proving the dependency rather than faking a production path.
+There are **two**, and the second was not previously known.
+
+1. **GC1 blocks it.** Nothing outside `src/lib/critic/` constructs a
+   `CriticObjective`. `ask/route.ts` still calls `referenceKeywordIds` and
+   `searchTitles(name)[0]`. Only tests construct the objective, so **GC5 is a
+   contract, not a production path**, and this ledger does not claim otherwise.
+2. **`rankWithPreference` has ZERO production callers.** This is the bigger
+   find. GC8 and GC4 proved causality against a function whose own docblock
+   says it is "exposed as a pure helper so the before/after report reflects
+   production behavior". `runFinder` sorts by `matchScore` and mentions neither
+   `rankWithPreference` nor `criticPlan`; `rankByDna` (`src/lib/dna.ts`) calls
+   `preferenceNudge` **directly**, reaching past it.
+
+   **This changes GC6's scope.** GC6 was written as "wire the objective into
+   the ranker". The ranker it would wire into is not the one production uses,
+   so GC6 must first choose and change a real call site — `runFinder`'s
+   `matchScore` sort or `rankByDna` — which is a larger change than GC6 was
+   scoped for. Do not start GC6 assuming a one-line hookup.
+
+The test file pins both, so it FAILS the day either blocker closes and tells the
+next session the constraint is gone.
+
+### Gates
+
+| gate | exit | result |
+|---|---|---|
+| `npm run typecheck` | 0 | clean |
+| `npm run lint` | 0 | no warnings or errors |
+| `npx vitest run` | 0 | 3294 passed, 24 skipped, **0 failed** |
+| `npm run build` | 0 | clean |
+| `npx playwright test -c playwright.searchrouting.config.ts` | 0 | 21 passed |
+
+Frozen search corpus (`layerA` / `layerBext`) **not run, and not required**:
+`retrieval.ts` is a new pure module with zero callers (blocker 2 above proves
+it), so no search surface changed. It becomes required the moment GC6 wires a
+real call site.
 
 ---
 

@@ -4,7 +4,12 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-Nothing in flight. **Action needed from you:** open `/admin/migrations` on
+- **Critic Layer — `claude/critic-layer`.** GC8, GC2, GC3, GC4 complete
+  red-then-green; **GC5 contract complete** (`src/lib/critic/retrieval.ts`,
+  17/17). Ledger: `docs/CRITIC-SHIP.md`. Next gate is GC6 — but read the two
+  blockers below first, both proven by `src/lib/critic/productionWiring.test.ts`.
+
+**Action needed from you:** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the
 "Restored: /admin/migrations" entry below for why this is currently required
 and what it unblocks.
@@ -35,6 +40,16 @@ and what it unblocks.
   scoping once the accounts/feedback loop above has real usage to learn from.
 
 ## Blocked
+- **Critic GC5 production wiring — blocked on GC1.** Nothing outside
+  `src/lib/critic/` constructs a `CriticObjective`; `/api/ask` still reduces
+  named titles to `referenceKeywordIds` + `searchTitles(name)[0]`. GC5 is
+  therefore a *contract*, deliberately not claimed as a production path.
+- **Critic GC6 is larger than it was scoped.** `rankWithPreference` — the
+  function GC8/GC4 proved causality against — has **zero production callers**;
+  its docblock says it exists "so the before/after report reflects production
+  behavior". `runFinder` sorts by `matchScore`; `rankByDna` (`src/lib/dna.ts`)
+  calls `preferenceNudge` directly, bypassing it. GC6 must first change a real
+  call site, not add one line. Discovered during GC5.
 - **Score distribution audit.** The median appears compressed: four
   recommendations scored 79-91, all reading STREAM IT. Blocked on real title
   data existing in production — the local/dev catalog is synthetic fixture
