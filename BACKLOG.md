@@ -76,6 +76,22 @@ unblocks.
   scoping once the accounts/feedback loop above has real usage to learn from.
 
 ## Blocked
+- **`normalizeTitle` splits interior apostrophes — anchors with one cannot
+  resolve.** `src/lib/packs/tmdbMatch.ts` maps `[^a-z0-9]+` to a SPACE, so the
+  real catalogue title `"Widow's Bay"` normalizes to `widow s bay` while a user
+  typing `Widows Bay` produces `widows bay`; they never match and GC2 returns
+  `not_found`. Found by the post-merge production smoke of
+  `"Better than Furious or Widows Bay"` against the public `/api/search`.
+  **Predates the Critic Layer** (ported from the Lifetime work) and affects Pack
+  matching on the same path. The likely fix is eliding `'` before the
+  non-alphanumeric collapse, but it changes a shipped shared matcher and wants
+  its own gate + Pack regression run. Not attempted post-merge.
+- **Authenticated production smoke of the Critic path is still unrun.**
+  `/api/ask` requires a session, so no unattended check can exercise it. Run
+  signed in, from the browser console on the production origin:
+  `await (await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'Better than Furious or Widows Bay'})})).json()`
+  Expect, given the finding above, an honest no-comparison read-back until the
+  normalization gap is closed.
 - **Consolidate `preference_rules` with canonical Taste DNA (separate
   migration).** GC6's audit proved a real semantic overlap: `slow_burn` (a
   legacy rule, +12 into `matchScore`) and low canonical `pacing` (a GC4 plan

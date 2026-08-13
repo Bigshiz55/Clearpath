@@ -5,8 +5,9 @@ sessions: read this, execute **NEXT ACTION**.
 
 CURRENT SHA: `1a84d8e6a21ec6bedd631a5ee4deb51ef302a0f4`
 BRANCH: `claude/critic-layer`, cut from `main` @ 6080287.
-NEXT ACTION: none — GC1–GC12 complete. PR is open against `main`, awaiting
-owner review. Do not merge without explicit approval.
+NEXT ACTION: none — GC1–GC12 complete and MERGED. See "PRODUCTION RECEIPT"
+below for one open production finding (anchor normalization) that is queued in
+BACKLOG rather than fixed here.
 
 STATE: GC1–GC12 complete (250 critic tests), merged with `main` @ ae25f6f. A comparative Ask parses the relation and both
 anchors, resolves each identity through GC2, hydrates canonical fingerprints,
@@ -114,6 +115,68 @@ narrower than "teach the explainer about anchors": it is (a) populate
 - [x] **GC11** Latency budget + caching — **COMPLETE, red-then-green**
 - [x] **GC12** Full gates + merge recommendation — **COMPLETE. Recommendation:
       MERGE.** PR open against `main`; not merged.
+
+---
+
+## PRODUCTION RECEIPT — merged and deployed, with one open finding
+
+| fact | value |
+|---|---|
+| reviewed head | `ee5e7c849164ab081539b22d4219b7fdad9043ba` |
+| merge commit | `718987eeee6c4aada2b492a4f2430a924582bba7` |
+| `/api/version` | `sha 718987e · branch main · vercelEnv production` |
+| `POST /api/ask` | HTTP 401 — deployed and alive; the route requires a session |
+
+### The authenticated smoke was NOT run
+
+`/api/ask` verifies identity with `supabase.auth.getUser()` and returns
+`{"error":"Not signed in."}` without a session. No credential was requested and
+none was used. The end-to-end comparative smoke therefore remains **unverified
+by this session**. The exact command for an owner to run, signed in, is in
+BACKLOG.
+
+### What the PUBLIC catalogue shows about the flagship sentence
+
+`/api/search` is public, so the real anchor candidates could be read and passed
+through the shipped `resolveAnchor` verbatim:
+
+```
+"Furious"     -> 5 exact-name titles: tv 287238 (2026), movie 415381 (2017),
+                 movie 87035 (2011), movie 167104 (1984), "The Furious" (2026)
+                 GC2 verdict: AMBIGUOUS — refuses to guess
+"Widows Bay"  -> the real catalogue title is "Widow's Bay" (tv 270476)
+                 GC2 verdict: NOT_FOUND
+```
+
+**The `Furious` result is the system working.** Five real films share that exact
+name; refusing is the designed behaviour, and it is precisely what the old
+`searchTitles(name)[0]` got wrong — that line would have confidently taken the
+2026 series.
+
+**The `Widows Bay` result is a real gap, and it is in the ported matcher.**
+`normalizeTitle` maps `[^a-z0-9]+` to a SPACE, so `"Widow's Bay"` becomes
+`"widow s bay"` while the typed `"Widows Bay"` becomes `"widows bay"`. An
+apostrophe INSIDE a word should elide, not split it. The docblock claims
+"punctuation is noise"; for interior apostrophes it is not. This predates the
+Critic Layer — `tmdbMatch.ts` was ported from the Lifetime work — and affects
+Pack matching on the same code path.
+
+### Consequence, stated plainly
+
+For this exact sentence in production today, **zero anchors resolve**, so the
+GC1 fall-through guard engages: the request is answered by the existing pipeline
+with the honest note "I couldn't pin down Furious or Widows Bay — answering
+without the comparison." No wrong answer, no decoy substitution, no fabricated
+claim about the user. **The safety discipline holds; the comparative mechanism
+does not engage for this sentence.**
+
+Queued in BACKLOG, deliberately NOT fixed here — it touches a matcher shared
+with Packs and the merge is already complete.
+
+### Non-comparative control
+
+`/api/search` behaves normally on production: `wrestling` 19 results,
+`boxing` 19, `Heat` 20 (first result `Heat (1995)`). No regression.
 
 ---
 
