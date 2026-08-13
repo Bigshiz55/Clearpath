@@ -123,4 +123,19 @@ describe('single-source brand identity', () => {
     expect(src).not.toMatch(/logo/i);
     expect(src).not.toMatch(/image\.tmdb\.org|https?:\/\//);
   });
+
+  /**
+   * THE SECOND DOCUMENTED EXCEPTION, ALSO NOT A BRAND REGISTRY.
+   *
+   * `viewing/channels/channelIdentity.ts` is the list of 83 linear channels
+   * WatchVerd1ct claims to carry, with the alias spellings that mean each one.
+   * It answers "is this channel one we support and what do we call it" — an
+   * identity question — and holds no asset of any kind. A logo field here would
+   * be a network brand map growing outside the registry, so it is pinned shut.
+   */
+  it('the linear channel registry names channels and owns no assets', () => {
+    const src = code(join(SRC, 'lib', 'viewing', 'channels', 'channelIdentity.ts'));
+    expect(src).not.toMatch(/logo/i);
+    expect(src).not.toMatch(/https?:\/\//);
+  });
 });
