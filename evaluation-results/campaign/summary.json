@@ -1,6 +1,6 @@
 {
-  "sha": "18de532",
-  "branch": "claude/dna-showdown-rebased",
+  "sha": "6080287",
+  "branch": "claude/critic-layer",
   "seed": 7,
   "total": 2000,
   "passed": 2000,
