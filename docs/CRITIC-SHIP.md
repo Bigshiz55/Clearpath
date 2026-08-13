@@ -5,13 +5,11 @@ sessions: read this, execute **NEXT ACTION**.
 
 CURRENT SHA: (see git log)
 BRANCH: `claude/critic-layer`, cut from `main` @ 6080287.
-NEXT ACTION: GC2 — entity resolution. **Blocker to handle first:**
-`src/lib/packs/tmdbMatch.ts` does NOT exist on `main`; it lives on
-`claude/showdown-flagship`. PORT it to this branch (it is pure and imports
-nothing) rather than writing a second matcher. Then resolve anchors with exact
-normalized title + media-type constraint + unambiguous winner, never
-`searchTitles(name)[0]`, and ASK when confidence is insufficient instead of
-silently dropping the anchor.
+NEXT ACTION: GC3 — load anchor fingerprints from `title_dimensions` so a
+resolved anchor stops earning zero authority. `resolveAnchor` deliberately
+leaves `dims` undefined; `objectiveAuthority` therefore returns 0 for it, so
+today a correctly-resolved anchor still cannot move ranking. That is honest
+(no fingerprint = no claim) and it is the next gate.
 
 ---
 
@@ -98,7 +96,7 @@ narrower than "teach the explainer about anchors": it is (a) populate
 ## SHIP GATES
 
 - [ ] **GC1** Recommendation Objective type + LLM extraction; `relationship` survives parse
-- [ ] **GC2** Entity resolution with confidence + disambiguation question; never silently drop an anchor
+- [x] **GC2** Anchor identity resolution — **COMPLETE, red-then-green**
 - [ ] **GC3** Anchor fingerprints loaded from `title_dimensions` (not keywords)
 - [ ] **GC4** Critic Reasoning stage producing traitsToPreserve / improve / avoid
 - [ ] **GC5** Anchors + objective reach candidate retrieval
@@ -109,6 +107,81 @@ narrower than "teach the explainer about anchors": it is (a) populate
 - [ ] **GC10** Exact-query regression for `Better than Furious or Widows Bay` (structural, not hardcoded titles)
 - [ ] **GC11** Latency budget + caching
 - [ ] **GC12** Full gates + merge recommendation
+
+---
+
+## GC2 — COMPLETE (red-then-green)
+
+### RED
+Two failures, captured in order.
+1. **Module absent** — `Cannot find module './anchor'`. A weak proof on its own,
+   so it was not relied on.
+2. **The substantive one, now PINNED PERMANENTLY** as
+   `describe('RED — the popularity-first strategy cannot satisfy identity')`.
+   It models `ask/route.ts:48` (`candidates[0]`) against the same deterministic
+   fixtures and shows it is structurally incapable of the identity contract:
+   returns 2021 *Dune* when 1984 was asked for; always answers where the truth
+   is ambiguous; ignores media type (*Fargo* the film when the series was
+   asked for); accepts *The Fast and the Furious* as "Furious". It stays in the
+   suite so the unsafe strategy cannot quietly return.
+
+### Matcher provenance
+`src/lib/packs/tmdbMatch.ts` + its 14 tests, ported **unchanged in behaviour**
+from `origin/claude/showdown-cold-start-scanner` (PR #53, the Lifetime work
+where the same popularity-as-identity defect was first found). Its own suite
+passes 14/14 on this branch. No second matching algorithm was written.
+
+**One concrete incompatibility, fixed minimally:** `MIN_NORMALIZED_LENGTH`
+rejected titles under 3 characters outright, so `It (2017)` could not resolve
+even with a year. The rule's OWN comment is conditional — *"Without a year there
+is no way to tell them apart"* — so the floor now applies only when no year is
+supplied. Nothing else was loosened: the year branch still requires exact
+normalized title, in-range year and a unique winner. Both suites green.
+
+### Identity contract
+`resolveAnchor(request, candidates)` -> `resolved` | `ambiguous` | `not_found`.
+Evidence: canonical TMDB id, media type as a HARD constraint (a stated type
+excludes rather than down-weights), exact normalized title (case, accents,
+punctuation, leading article are noise; a different WORD is a different title),
+year as filter and tie-break. Popularity is never consulted. A `resolved`
+anchor carries `titleId` (`tv:60622`), `tmdbId`, `mediaType` — never a display
+string as identity.
+
+### Ambiguous behaviour
+Returns every exact-title alternative with id/title/mediaType/year, which is
+enough for an interactive surface to ask *"which Dune did you mean?"*. It
+contributes **zero** to ranking: `anchorsToObjective` keeps only resolved
+anchors AND pads the authority denominator with the ones it could not place, so
+one-of-two resolved yields PARTIAL authority rather than a request reported as
+fully understood. Proven: `finalScore` array identical to baseline.
+
+### Not-found behaviour
+Reported with `spokenAs` so a caller can say *"I don't know that one"*. Also
+contributes zero — proven against baseline.
+
+### Production call path
+**`ask/route.ts:48` does NOT own critic anchors.** `grep` confirms nothing
+outside `src/lib/critic/` constructs a `CriticObjective`; the only importer is
+`preference/rank.ts`. `referenceKeywordIds` feeds the legacy `runFinder`
+keyword path. Per the scope instruction this was RECORDED, not casually fixed:
+
+> **DEFECT — `src/app/api/ask/route.ts:45-57`.** `searchTitles(name)[0]` +
+> keyword extraction. **Owning gate: GC1** (Recommendation Objective
+> construction), which is where anchors will start being built and where this
+> call must be replaced with `resolveAnchor`. Not GC2's scope, and expanding
+> into it would have turned this gate into a repo-wide TMDB rewrite.
+
+The layering is enforced and unchanged: parsing -> identity resolution ->
+resolved `CriticObjective` -> `criticNudge` -> `rankWithPreference`.
+`criticNudge` remains pure; `anchor.ts` performs no network call (it takes
+candidates); no request-path AI call was added.
+
+### GC8 regression
+`materialDependence.test.ts` unchanged, **8 passed / 8**.
+
+### Gates
+typecheck 0 · lint 0 · **vitest 3237 passed / 0 failed** · build 0.
+preference + critic + taste + packs: 257 passed / 0 failed.
 
 ---
 
