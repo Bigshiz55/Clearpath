@@ -4,6 +4,37 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **The Verdict Room — `claude/verdict-room-complete`.** PR #58's entrance
+  reconciled onto current `main` and carried through the WHOLE room, so the
+  interior no longer collapses back to a stack of `max-w-2xl` cards the moment
+  you walk in. `RoomShell` gives every stage the same floor, key light and
+  horizon; a five-node rail driven by real room state (never a per-device
+  counter, so a late joiner sees where the ROOM is); presence in the header at
+  every stage instead of only on JOIN; candidates lit by the engine's own
+  ranking with the group fit as a length; one bloom at the verdict and jurors'
+  scores as a histogram. Engine untouched — 78 existing court/together E2E tests
+  green, plus 15 new interior ones.
+  **Three real defects fixed on the way:** a 46px horizontal overflow at 320px
+  (the identity line), mood/avoid chips at 36px (the most-tapped controls in the
+  room, and the only ones in the app under the 44px minimum), and the sync chip
+  wrapping to three header lines on a phone.
+
+- **Owner action — run the fingerprint backfill so Showdown can move ranking
+  fully.** `/api/health/showdown` on production reports **73/113 covered,
+  ratio 0.646, threshold 0.67, `usable: false`** — 40 diagnostic titles have no
+  row in `title_dimensions`, so evidence about them records correctly and then
+  contributes nothing to the ranker. This is a DATA condition, not a code one,
+  and it predates the Showdown work; the new payoff reports `measured: false` /
+  `movement: 0` honestly rather than papering over it. The fix is the batch
+  classifier, which needs your `CRON_SECRET`:
+
+  ```
+  curl -s -X POST "https://clearpath-pearl-chi.vercel.app/api/cron/classify" \
+    -H "Authorization: Bearer $CRON_SECRET"
+  ```
+
+  Re-check with `curl -s https://clearpath-pearl-chi.vercel.app/api/health/showdown`
+  until `usable` is true.
 - **DNA Showdown — `claude/showdown-definitive`.** PR #53's recovery work
   reconciled three-way onto current `main` (nothing newer reverted; the Critic
   Layer's `criticNudge`/`planNudge` terms in `rank.ts` verified intact) and
@@ -49,10 +80,32 @@ production and apply pending migrations with your `MIGRATE_SECRET` — see the
 unblocks.
 
 ## Next
+- **The 20 pre-existing mobile-suite failures — 8 now fixed, 12 in flight.**
+  Independently verified twice: by rebuilding the harness at `0b90f04` with the
+  working tree stashed (PR #58's visual pass), and by building `718987e` in a
+  scratch worktree (the card-redesign work). The same 20 fail with neither
+  branch applied, so they are inherited rather than caused.
+  - `wired-experience.spec.ts` × 8 — **FIXED** by the provider-chip hotfix.
+    Root cause was not a stale spec: `WhyVerdict` → `ProviderChip` →
+    `resolveProviderBrand` → `officialProviderName` called `name.trim()` on an
+    availability object with no `service`, which threw DURING RENDER, so React
+    unwound to the error boundary and the whole recommendation page became
+    "Something went wrong". The registry now treats absent identity as a state
+    rather than an error, the chip is suppressed instead of crashing, and the
+    legacy payload shape is pinned under test so it cannot come back.
+    (The suspicion recorded here — "worth checking against PR #54's WhyVerdict
+    availability-row change before assuming the spec is simply stale" — was
+    exactly right: #54 added `service`/`access`/`logoPath` and the fixture, and
+    the renderer, were never brought along.)
+  - `visual-qa.spec.ts` × 12 — the `▶ Trailer` affordance renders below the
+    suite's 44px tap-target minimum at every viewport in the matrix. Addressed
+    in the card + trailer redesign (PR #61), which gives both frame controls
+    44px on BOTH axes — the floor is a box, not a height.
+
 - **A typed runtime constraint never reaches the finder request (TEST E).**
   Found while fixing the provider-chip crash: with that crash gone,
-  `wired-experience.spec.ts` TEST E now reaches its assertion for the first
-  time and fails. Asking "a fast mystery movie under 100 minutes" posts
+  `wired-experience.spec.ts` TEST E reaches its assertion for the first time and
+  fails on its own merits. Asking "a fast mystery movie under 100 minutes" posts
   `query.maxRuntime: null` — the cap the user typed is dropped, so the search
   runs unconstrained while the UI behaves as though it applied.
   NOT a parser bug and NOT a state race: `naiveParseQuery('a fast mystery movie
@@ -176,6 +229,17 @@ unblocks.
   representative.
 
 ## Done
+- **The Verdict Room shadow room is dressed rather than sketched** (PR #58,
+  pending review). The plates carry three original drawn poster compositions,
+  the participants are silhouettes with real reaction states, the verdict board
+  shows the shape of a finished session, and a gavel inside a converging arc
+  marks the decision. Three positioning bugs surfaced and were fixed along the
+  way, each now pinned by a test: Tailwind `-translate-*` losing to an inline or
+  animated `transform` (the board was 250px off-position and invisible); a
+  `rotateY`-before-`translateZ` transform order adding `z·sin(θ)` of sideways
+  travel (the flanking plates hung off both edges of a phone); and an
+  `absolute inset-0` child escaping a container that lacked `position: relative`
+  (a 36px thumbnail painting across a 340px panel).
 - **Streaming brand coverage is 14/15, and the last one is an upstream fact.**
   Starz, AMC+, Fubo, Tubi, Pluto TV and The Roku Channel now render their own
   marks. Their paths were not guessed: production's already-deployed

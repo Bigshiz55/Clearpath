@@ -42,18 +42,29 @@ test('one obvious primary action, above the fold, with two secondary cards', asy
   const invite = page.getByTestId('open-invite');
   await expect(device).toBeVisible();
   await expect(invite).toBeVisible();
+  // The card LABELS are the contract here — the supporting line was rewritten
+  // by the entrance redesign ("Choose together on this phone" → "We're all
+  // here…"), and this assertion was still pinning the retired wording. What
+  // this test is actually for is that each card names a distinct mode and says
+  // which screens it involves, so that is what it checks.
   await expect(device).toContainText('Quick Pick');
-  await expect(device).toContainText('Choose together on this phone');
+  await expect(device).toContainText('one phone');
   await expect(invite).toContainText('Invite the Jury');
-  await expect(invite).toContainText('Everyone joins from their own phone');
+  await expect(invite).toContainText('their own phone');
 
   // Hierarchy: the primary button is the brightest fill on the page; the
   // secondary cards use a distinctly different (navy, not brand-blue) fill so
   // they never compete with it for attention.
+  // READ THE FILL, NOT `backgroundColor`. Every surface on this screen is a
+  // gradient now, and a gradient lives in `background-image` — so all three
+  // controls reported `rgba(0, 0, 0, 0)` and the comparison below was passing
+  // transparent against transparent, which is no check at all.
   const colors = await page.evaluate(() => {
     const read = (testId: string) => {
       const el = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
-      return el ? getComputedStyle(el).backgroundColor : null;
+      if (!el) return null;
+      const s = getComputedStyle(el);
+      return s.backgroundImage !== 'none' ? s.backgroundImage : s.backgroundColor;
     };
     return { primary: read('start-court'), device: read('open-device'), invite: read('open-invite') };
   });
@@ -69,9 +80,14 @@ test('one obvious primary action, above the fold, with two secondary cards', asy
     expect(b!.height, `${testId} tap target`).toBeGreaterThanOrEqual(44);
   }
 
-  // Quick Pick discloses the on-device planner in place.
+  // Quick Pick discloses the on-device planner in place. It opens BELOW the
+  // stage now rather than inside the `together-secondary` grid, so this looks
+  // for the disclosed panel on the page instead of inside that container —
+  // the behaviour under test is the disclosure, not where the node hangs.
   await device.click();
-  await expect(page.getByTestId('together-secondary')).toContainText('stored just on this phone');
+  await expect(page.getByRole('region', { name: 'Quick Pick' })).toContainText(
+    'stored just on this phone',
+  );
 });
 
 for (const w of [1440, 1920, 2560]) {

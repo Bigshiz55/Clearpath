@@ -1,25 +1,25 @@
 import { notFound } from 'next/navigation';
-import { StartLiveCourt } from '@/components/StartLiveCourt';
-import { CourtSecondaryActions } from '@/components/court/CourtSecondaryActions';
+import { VerdictRoomEntrance } from '@/components/court/VerdictRoomEntrance';
 
-/** The Verdict Room landing harness (gated by MOBILE_HARNESS=1) — the exact
- *  layout of /app/together without a session, so Playwright can assert the
- *  entry hierarchy (one primary CTA, two secondary cards, centered column) at
- *  every width. 404 in any normal build. */
+/**
+ * The Verdict Room entrance harness (gated by MOBILE_HARNESS=1).
+ *
+ * It renders the REAL `VerdictRoomEntrance` inside the same shell the app
+ * layout provides (`main.container-page py-6`) — which matters, because the
+ * composition bleeds to the screen edges by cancelling exactly that padding.
+ * A harness that reproduced the page's markup instead of using the component
+ * would drift from it, and this one used to: it carried its own copy of the
+ * old heading, CTA and cards.
+ *
+ * 404 in any normal build.
+ */
 export const dynamic = 'force-dynamic';
 
 export default function TogetherHarnessPage() {
   if (process.env.MOBILE_HARNESS !== '1') notFound();
   return (
     <main className="container-page py-6" data-testid="together-harness">
-      <div className="mx-auto max-w-xl">
-        <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">The Verdict Room</h1>
-        <p className="mt-1.5 text-sm text-slate-400">Everyone weighs in. One title wins.</p>
-        <div className="mt-6">
-          <StartLiveCourt />
-        </div>
-        <CourtSecondaryActions />
-      </div>
+      <VerdictRoomEntrance />
     </main>
   );
 }
