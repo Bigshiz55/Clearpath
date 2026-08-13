@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { VETO_TOKENS_PER_MEMBER, type VoteAction } from '@/lib/court/voting';
+import { ProviderNameList } from '@/components/media/ProviderChip';
 
 /**
  * THE VOTING FLOOR — the moment after "Build our court".
@@ -110,7 +111,7 @@ export function VotingFloor({
               {[current.genre, current.runtimeMinutes ? `${current.runtimeMinutes} min` : null].filter(Boolean).join(' · ')}
             </p>
             {current.availableOn.length > 0 ? (
-              <p data-testid="candidate-availability" className="mt-2 text-xs text-slate-300">📺 {current.availableOn.join(', ')}</p>
+              <p data-testid="candidate-availability" className="mt-2 text-xs text-slate-300"><ProviderNameList names={current.availableOn} /></p>
             ) : (
               <p data-testid="candidate-availability" className="mt-2 text-xs text-amber-200">Availability unconfirmed</p>
             )}

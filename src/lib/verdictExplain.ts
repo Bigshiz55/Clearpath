@@ -7,6 +7,8 @@
  * mathematical precision the data can't support.
  */
 
+import { resolveProviderBrand } from '@/lib/providers/brand';
+
 export type AvailabilityConfidence = 'verified' | 'likely' | 'unconfirmed';
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
@@ -24,14 +26,45 @@ export interface ExplainInput {
   /** Number of independent rating sources actually present (RT/IMDb/TMDB…). */
   ratingSourceCount: number;
   /** Availability as the app verified it (null = nothing verifiable). */
-  availability: { where: string; kind: 'included' | 'free_with_ads' | 'rent' | 'buy'; confidence: AvailabilityConfidence } | null;
+  availability: {
+    where: string;
+    kind: 'included' | 'free_with_ads' | 'rent' | 'buy';
+    confidence: AvailabilityConfidence;
+    /** The provider's VERIFIED logo path, when the caller holds one. Never
+     *  guessed — absent simply means the row renders the official name as
+     *  text. See src/lib/providers/brand.ts. */
+    logoPath?: string | null;
+  } | null;
 }
 
 export interface VerdictExplanation {
   rose: string[];
   heldBack: string[];
   requirements: { label: string; satisfied: boolean; evidence: string }[];
-  availability: { text: string; confidence: AvailabilityConfidence } | null;
+  /**
+   * THE AVAILABILITY ROW, AS PARTS RATHER THAN A SENTENCE.
+   *
+   * It used to be one pre-joined string ("fuboTV · Included with
+   * subscription"), which the UI could only render as text — so the panel drew
+   * "📺 fuboTV" while the card two rows above it drew Fubo's actual logo. Same
+   * title, same second, two presentations of one fact.
+   *
+   * The parts are separate now so the row can use the site's official provider
+   * treatment: `service` is the OFFICIAL name from the brand registry,
+   * `logoPath` is the verified asset when we hold one (never invented), and
+   * `access` is how you get it. `text` is unchanged and still the joined
+   * sentence — it remains the accessible label and keeps every existing
+   * consumer working. NOTHING about what may be CLAIMED changed here:
+   * `confidence` is untouched and still the only thing that distinguishes
+   * verified from likely.
+   */
+  availability: {
+    text: string;
+    confidence: AvailabilityConfidence;
+    service: string;
+    logoPath: string | null;
+    access: string;
+  } | null;
   confidence: { level: ConfidenceLevel; because: string[] };
 }
 
@@ -87,7 +120,19 @@ export function explainVerdict(i: ExplainInput): VerdictExplanation {
     heldBack,
     requirements: i.requirements,
     availability: i.availability
-      ? { text: `${i.availability.where} · ${KIND_LABEL[i.availability.kind]}`, confidence: i.availability.confidence }
+      ? (() => {
+          // The OFFICIAL spelling, from the one registry — so this row says
+          // "Fubo" wherever the card's logo strip shows Fubo's mark.
+          const brand = resolveProviderBrand({ name: i.availability.where, logoPath: i.availability.logoPath });
+          const access = KIND_LABEL[i.availability.kind];
+          return {
+            text: `${brand.name} · ${access}`,
+            confidence: i.availability.confidence,
+            service: brand.name,
+            logoPath: brand.logoPath,
+            access,
+          };
+        })()
       : null,
     confidence: { level, because },
   };

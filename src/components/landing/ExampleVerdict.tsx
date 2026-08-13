@@ -2,13 +2,14 @@ import 'server-only';
 import { getScoringData } from '@/lib/titleData';
 import { buildVerdict } from '@/lib/scoring';
 import { regionFor } from '@/lib/profile';
-import { streamingNames } from '@/lib/services';
+import { topStreamingProvider } from '@/lib/services';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { explainVerdict, type VerdictExplanation } from '@/lib/verdictExplain';
 import { withoutRawSourceQuotes } from '@/lib/verdict/sourceQuotes';
 import { PosterCard } from '@/components/PosterCard';
 import { WhyVerdict } from '@/components/verdict/WhyVerdict';
 import { EnterWatchVerd1ctCta } from './EnterWatchVerd1ctCta';
+import { TourGutter, TourLegend } from './ExampleTour';
 import type { MediaType } from '@/lib/types';
 
 /**
@@ -98,7 +99,10 @@ async function loadExample(): Promise<ExampleCard | null> {
     });
 
     const quality = Math.round(report.general.standardScore ?? report.general.score);
-    const where = providers?.available ? (streamingNames(providers.options)[0] ?? null) : null;
+    // The one included provider we name in the explanation, WITH its verified
+    // logo — taken from the same option, never matched by resemblance, so the
+    // availability row can use the site's official brand treatment.
+    const topProvider = providers?.available ? topStreamingProvider(providers.options) : null;
     // "Well received by audiences (8.7/10 (23,328 votes))." is the engine
     // quoting a rating row verbatim, and `explainVerdict` states the same fact
     // below it in one clean sentence. See lib/verdict/sourceQuotes.ts — this
@@ -128,7 +132,9 @@ async function loadExample(): Promise<ExampleCard | null> {
         ratingSourceCount: sources.filter((s) => s.available).length,
         // TMDB-listed is "likely", never "verified" — the same claim the
         // finder's own cards are allowed to make. See finderExplain.ts.
-        availability: where ? { where, kind: 'included', confidence: 'likely' } : null,
+        availability: topProvider
+          ? { where: topProvider.name, kind: 'included', confidence: 'likely', logoPath: topProvider.logoPath }
+          : null,
       }),
     };
   } catch {
@@ -162,7 +168,16 @@ export function ExampleVerdictSection({ data }: { data: ExampleCard | null }) {
                 nothing else changes; below `sm` it is left full-width, which
                 is exactly what a phone card is in the app — `.wv-card` turns
                 it into the poster-beside-text row on its own. */}
-            <div className="mx-auto mt-5 w-full sm:max-w-[320px]" data-testid="example-verdict-card">
+            {/* THE TOUR IS A GRID SIBLING OF THE CARD, NEVER AN OVERLAY.
+                On a laptop the callouts occupy the two outer columns and the
+                card keeps the middle one at its production width — so an
+                annotation cannot land on top of a provider tile or the
+                "Why this Verd1ct?" summary. Below `xl` the columns collapse
+                and the legend under the card carries the same six concepts.
+                See ExampleTour's own doc comment. */}
+            <div className="mx-auto mt-5 grid w-full max-w-[1180px] gap-x-8 xl:grid-cols-[minmax(0,1fr)_320px_minmax(0,1fr)] xl:items-start">
+              <TourGutter side="left" />
+              <div className="mx-auto w-full sm:max-w-[320px]" data-testid="example-verdict-card">
               <PosterCard
                 href={`/app/title/${data.mediaType}/${data.tmdbId}`}
                 tmdbId={data.tmdbId}
@@ -184,6 +199,8 @@ export function ExampleVerdictSection({ data }: { data: ExampleCard | null }) {
                 overlay={null}
                 evidence={<WhyVerdict data={data.explain} />}
               />
+              </div>
+              <TourGutter side="right" />
             </div>
 
             {/* THE HONEST LABEL FOR WHAT THE CARD IS SHOWING. Section copy,
@@ -192,6 +209,10 @@ export function ExampleVerdictSection({ data }: { data: ExampleCard | null }) {
             <p className="mx-auto mt-3 max-w-sm text-center text-xs text-slate-500" data-testid="example-verdict-anon">
               The general Verd1ct. Build your Taste DNA and it becomes your Match.
             </p>
+
+            {/* The legend is the tour on a phone, and the accessible reading of
+                it at every width — the gutter callouts are `aria-hidden`. */}
+            <TourLegend className="mx-auto mt-5 max-w-md xl:hidden" />
           </>
         )}
 

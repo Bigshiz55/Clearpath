@@ -6,6 +6,7 @@ import type { PreferenceTrait } from '@/lib/types';
 import { humanTrait } from '@/lib/scoring/traits';
 import { TasteCourt } from './TasteCourt';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { ProviderNameList } from '@/components/media/ProviderChip';
 
 const AVOIDABLE: PreferenceTrait[] = ['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn'];
 const LOVABLE: PreferenceTrait[] = ['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer'];
@@ -452,7 +453,7 @@ export function TogetherPlanner() {
                         </span>
                       ))}
                     </div>
-                    {p.streaming.length > 0 && <div className="mt-2 text-xs text-slate-400"><span className="text-slate-300">📺</span> {p.streaming.join(', ')}</div>}
+                    {p.streaming.length > 0 && <ProviderNameList names={p.streaming} className="mt-2 block text-xs text-slate-400" />}
                   </div>
                 </div>
                 {i === 0 && (

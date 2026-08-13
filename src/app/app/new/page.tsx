@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'New releases · WatchVerd1ct' };
 
 // Providers offered as platform filters on the wall (the full catalog we track).
-const WALL_SERVICES: WallService[] = STREAMING_SERVICES.map((s) => ({ id: s.id, name: s.name, emoji: s.emoji }));
+const WALL_SERVICES: WallService[] = STREAMING_SERVICES.map((s) => ({ id: s.id, name: s.name }));
 
 export default async function NewPage() {
   const supabase = createClient();

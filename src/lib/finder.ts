@@ -584,6 +584,11 @@ export async function runFinder(
         reasonsAgainst: report.reasonsAgainst,
         ratings,
         where,
+        // EXACT identity match, never a lookup by resemblance: the logo is the
+        // one belonging to the option we are actually naming, or null.
+        whereLogoPath: where
+          ? (providers?.options.find((o) => o.providerName === where)?.logoPath ?? null)
+          : null,
         onUsersService: included.length > 0,
         meta: {
           mediaType,

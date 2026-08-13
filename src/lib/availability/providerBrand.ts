@@ -1,26 +1,23 @@
 import type { WatchLine } from '@/lib/availability/watchPresentation';
+import { providerBrandKey } from '@/lib/providers/brand';
 
 /**
  * Collapsing several plan variants of the SAME service to one brand tile.
  *
  * "Peacock Premium" and "Peacock Premium Plus" are one brand (Peacock) and must
  * show one logo on the compact card; each surviving tile keeps its exact plan
- * in its own title + aria-label. This is done with NO per-brand table: two
- * options that share a TMDB logo are the
- * same brand (language-independent and exact), and when a logo is missing a
- * brand key is derived by stripping the same list of generic tier words from
- * every service — so a brand we have never seen still dedupes correctly, and two
- * genuinely different services never merge.
+ * in its own title + aria-label.
+ *
+ * THE KEY ITSELF NOW LIVES IN THE PROVIDER-BRAND REGISTRY
+ * (`src/lib/providers/brand.ts`), because identity and presentation have to
+ * agree: the thing that decides two rows are one brand must be the same thing
+ * that decides what that brand is called and which logo it wears. This module
+ * is the availability-shaped adapter over it — it knows what a `WatchLine` is,
+ * the registry does not.
  */
 
-/** Generic subscription-tier / channel qualifiers, identical for every service. */
-const TIER_WORDS =
-  /\b(?:premium plus|premium|plus|with ads|ad[- ]?supported|amazon channel|apple tv channel|roku premium channel|basic|standard|free|hd|uhd|4k)\b/g;
-
 export function brandKey(l: WatchLine): string {
-  if (l.logoPath) return `logo:${l.logoPath}`;
-  const base = (l.service ?? l.text).toLowerCase();
-  return `name:${base.replace(TIER_WORDS, '').replace(/[^a-z0-9]+/g, ' ').trim()}`;
+  return providerBrandKey(l.service ?? l.text, l.logoPath);
 }
 
 /**

@@ -361,7 +361,6 @@ export function SettingsView(props: {
                   : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10'
               }`}
             >
-              {s.emoji && <span aria-hidden>{s.emoji}</span>}
               {s.name}
               {services.has(s.id) && <span className="text-xs font-bold text-emerald-300">✓</span>}
             </button>

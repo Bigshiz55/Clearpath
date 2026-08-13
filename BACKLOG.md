@@ -42,6 +42,37 @@ and what it unblocks.
   representative.
 
 ## Done
+- **One provider-brand registry, and no service is drawn as an emoji any more.**
+  `src/lib/providers/brand.ts` is now the single lookup from a provider
+  identity to its official display name, its verified logo asset, its
+  accessible label and its brand-safe text fallback. `ProviderLogos`,
+  `ProviderChip`/`NetworkChip`, the availability dedupe (`providerBrand.ts`)
+  and `explainVerdict` all read it — there is no second map.
+  - **The named defect is gone:** "Why this Verd1ct?" rendered
+    `📺 fuboTV · Included with subscription · likely` while the card's own
+    Where-to-watch strip two rows above drew Fubo's real logo. The row is now
+    the site's provider chip plus the access level and the confidence as their
+    own labelled parts. Availability LOGIC is untouched; `verified` vs
+    `likely` is still the only thing that decides what may be claimed.
+  - **Swept:** the television emoji is gone from every place it stood next to a
+    named service or network — TasteCourt, CloudCrews, LiveCourt,
+    TogetherPlanner, VotingFloor, AskTheJudge, JudgeVerdictCard, FinderUI (×4),
+    ReportExtras, SearchBar's provider/network intent card, SeasonWhereToWatch —
+    and `TvDetective` now uses `NetworkChip` for a linear network. The
+    `emoji` field on `STREAMING_SERVICES`/`LIVE_TV_PROVIDERS` (🅽 for Netflix,
+    ⚽ for fuboTV…) was a homemade second logo map and is deleted, with its
+    four render sites falling back to the official name.
+  - **Guarded** by `src/lib/providers/brand.test.ts`: the rename table never
+    merges two identities, a logo is never invented, and a source scan fails on
+    any 📺 outside the media-type/empty-state allowlist.
+- **The landing example teaches the product.** A landing-only annotation layer
+  (`ExampleTour`) puts six restrained callouts in the page's gutters on a
+  laptop — Score, Match, More Info, Where to Watch, Why this Verd1ct?, Things
+  to Know — and the same six as a numbered "What you're looking at" legend
+  under the card below `xl`. It is a grid SIBLING of the card, never an
+  overlay: the visual suite measures that no callout intersects the card or
+  another callout. `PosterCard` was not touched. The Match callout says the
+  number appears once Taste DNA exists rather than implying one already does.
 - **The landing "Example Verd1ct" is the real card now, not a drawing of one.**
   The section rendered its own bespoke horizontal report — thumbnail poster in
   an oversized empty box, standalone FOR pill, prose metadata, ± evidence rows

@@ -50,7 +50,11 @@ const DATA: ExampleCard = {
     riskTraits: ['Long runtime (175 min) — a real time commitment.'],
     requirements: [],
     ratingSourceCount: 3,
-    availability: { where: 'Paramount Plus', kind: 'included', confidence: 'likely' },
+    // "Paramount Plus" is how TMDB spells it; the brand registry renders it as
+    // Paramount+ with its verified mark. No logo path in the harness (the test
+    // browser cannot reach image.tmdb.org), so this exercises the honest
+    // text fallback — the official NAME, never an emoji.
+    availability: { where: 'Paramount Plus', kind: 'included', confidence: 'likely', logoPath: null },
   }),
 };
 

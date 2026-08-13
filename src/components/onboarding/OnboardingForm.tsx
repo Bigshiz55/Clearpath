@@ -273,7 +273,6 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
                     on ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100' : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10'
                   }`}
                 >
-                  <span aria-hidden>{s.emoji}</span>
                   {s.name}
                   {on && <span className="text-xs font-bold text-emerald-300">✓</span>}
                 </button>

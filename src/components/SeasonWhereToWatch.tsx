@@ -63,7 +63,7 @@ export function SeasonWhereToWatch({ mediaType, tmdbId }: { mediaType: MediaType
   return (
     <section className="card p-4 sm:p-5">
       <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-        <span aria-hidden>📺</span> Where to watch — by season
+        Where to watch — by season
       </h3>
       <p className="mt-0.5 text-xs text-slate-400">Heads up: this series is split across services.</p>
       <div className="mt-3 space-y-2">

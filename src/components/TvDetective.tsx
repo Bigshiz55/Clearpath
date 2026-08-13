@@ -12,6 +12,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { CardVerdict } from '@/components/CardVerdict';
 import type { MediaType } from '@/lib/types';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { NetworkChip } from '@/components/media/ProviderChip';
 
 const VISIBLE = 12; // show a window of the pool; hiding one slides the next in
 
@@ -203,9 +204,7 @@ export function TvDetective() {
                           <span className="rounded-lg border border-brand-400/40 bg-brand-500/20 px-2.5 py-1 text-sm font-black text-brand-100">
                             {whenLabel(p.airstamp)}
                           </span>
-                          <span className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-sm font-bold text-white">
-                            📺 {p.network}
-                          </span>
+                          {p.network && <NetworkChip name={p.network} />}
                         </div>
 
                         {p.tmdbId && p.mediaType ? (

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { PreferenceTrait } from '@/lib/types';
 import { ShareCard, CourtCardArt } from './ShareCards';
+import { ProviderNameList } from '@/components/media/ProviderChip';
 
 export interface CourtMember {
   name: string;
@@ -247,7 +248,7 @@ export function TasteCourt({
               ))}
             </div>
             {finalists[winnerIdx]!.streaming.length > 0 && (
-              <div className="mt-2 text-center text-xs text-slate-400">📺 {finalists[winnerIdx]!.streaming.join(', ')}</div>
+              <ProviderNameList names={finalists[winnerIdx]!.streaming} className="mt-2 block text-center text-xs text-slate-400" />
             )}
 
             <div className="mt-5 card p-4">

@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import { explainSections, SECTION, type Reason } from '@/lib/verdict/explainSections';
+import { ProviderChip } from '@/components/media/ProviderChip';
 
 /**
  * "WHY THIS VERD1CT?" — the same explanation, in an order a person can scan.
@@ -29,7 +30,16 @@ export interface WhyVerdictData {
   rose: string[];
   heldBack: string[];
   requirements: { label: string; satisfied: boolean; evidence: string }[];
-  availability: { text: string; confidence: string } | null;
+  availability: {
+    text: string;
+    confidence: string;
+    /** Official brand name, from the provider registry. */
+    service: string;
+    /** Verified logo path, or null → the name renders as restrained text. */
+    logoPath: string | null;
+    /** "Included with subscription", "Rental", … */
+    access: string;
+  } | null;
   confidence: { level: string; because: string[] };
 }
 
@@ -82,11 +92,35 @@ export function WhyVerdict({ data, className = '' }: { data: WhyVerdictData; cla
           </div>
         )}
 
+        {/* WHERE YOU CAN WATCH IT — THE BRAND, NOT A TELEVISION EMOJI.
+            This row read "📺 fuboTV · Included with subscription · likely"
+            while the card's own Where-to-watch strip, two rows above, drew
+            Fubo's actual logo. One fact, two presentations, and the panel's
+            was the homemade one. It now renders the site's official provider
+            treatment (`ProviderChip` → the brand registry), with the access
+            level and the confidence as their own labelled parts.
+            The DISTINCTION IS PRESERVED, and is the only thing that decides
+            what may be claimed: `verified` is stated plainly, anything else
+            is marked as the softer claim it is. */}
         {data.availability && (
-          <p className="text-[15px] leading-relaxed text-slate-100">
-            📺 {data.availability.text}
-            <span className="ml-1.5 text-[13px] text-slate-400">· {data.availability.confidence}</span>
-          </p>
+          <div
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] leading-relaxed text-slate-100"
+            data-testid="why-availability"
+            data-confidence={data.availability.confidence}
+            aria-label={`${data.availability.text} — ${data.availability.confidence}`}
+          >
+            <ProviderChip data={{ name: data.availability.service, logoPath: data.availability.logoPath }} withLabel />
+            <span className="text-[13px] text-slate-300">{data.availability.access}</span>
+            <span
+              className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+                data.availability.confidence === 'verified'
+                  ? 'bg-emerald-500/20 text-emerald-100'
+                  : 'bg-white/10 text-slate-300'
+              }`}
+            >
+              {data.availability.confidence}
+            </span>
+          </div>
         )}
 
         <p className="text-[14px] leading-relaxed text-slate-300">

@@ -37,7 +37,15 @@ describe('buildItemExplanation — real reasons, honest availability', () => {
     const e = buildItemExplanation(q({ mediaType: 'movie' }), facts());
     expect(e.rose).toContain('Fast investigative storytelling');
     expect(e.heldBack).toContain('Darker than most picks');
-    expect(e.availability).toEqual({ text: 'Netflix · Included with subscription', confidence: 'likely' });
+    // The row carries the OFFICIAL brand identity in parts (so it can render
+    // the site's provider treatment) as well as the joined sentence.
+    expect(e.availability).toEqual({
+      text: 'Netflix · Included with subscription',
+      confidence: 'likely',
+      service: 'Netflix',
+      logoPath: null,
+      access: 'Included with subscription',
+    });
     // 3 rating sources + personal signal + all requirements → but availability
     // is only "likely" (not verified), so confidence must not claim more than
     // medium-tier evidence supports… it can still be high on the other three.

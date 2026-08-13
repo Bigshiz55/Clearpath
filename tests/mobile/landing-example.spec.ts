@@ -22,7 +22,10 @@ const SYNOPSIS =
 const PROVIDERS = {
   region: 'US',
   options: [
+    // TMDB's own spellings — the brand registry is what turns them into the
+    // official wordmarks ("Paramount+", "Fubo") wherever they are shown.
     { name: 'Paramount Plus', type: 'flatrate', link: null, logo: null },
+    { name: 'fuboTV', type: 'flatrate', link: null, logo: null },
     { name: 'Prime Video', type: 'rent', link: null, logo: null },
   ],
   checkedAt: '2026-08-13T00:00:00.000Z',
@@ -95,7 +98,72 @@ test.describe('it renders the production card, not a landing-only one', () => {
     await open(page, 1440);
     const strip = card(page).getByTestId('where-to-watch-providers');
     await expect(strip).toBeVisible();
-    await expect(strip.getByTestId('where-to-watch-line')).toHaveCount(2);
+    await expect(strip.getByTestId('where-to-watch-line')).toHaveCount(3);
+    // The OFFICIAL wordmarks, from the one brand registry — not TMDB's raw
+    // labels, and never a television emoji.
+    await expect(strip).toContainText('Paramount+');
+    await expect(strip).toContainText('Fubo');
+    await expect(strip).not.toContainText('Paramount Plus');
+    await expect(strip).not.toContainText('fuboTV');
+  });
+});
+
+test.describe('the product tour', () => {
+  test('desktop: six gutter callouts, and not one of them covers the card', async ({ page }) => {
+    await open(page, 1440);
+    const callouts = page.getByTestId('tour-callout');
+    await expect(callouts).toHaveCount(6);
+    const cardBox = (await card(page).boundingBox())!;
+    const boxes: { x: number; y: number; width: number; height: number }[] = [];
+    for (let i = 0; i < 6; i++) {
+      const b = (await callouts.nth(i).boundingBox())!;
+      boxes.push(b);
+      // NO OVERLAP WITH THE CARD, measured — an annotation must never sit on
+      // top of a provider tile, a link or the "Why this Verd1ct?" summary.
+      const overlaps =
+        b.x < cardBox.x + cardBox.width && b.x + b.width > cardBox.x &&
+        b.y < cardBox.y + cardBox.height && b.y + b.height > cardBox.y;
+      expect(overlaps, `callout ${i + 1} overlaps the card`).toBe(false);
+      // And each one still points at the card's vertical span, not off in space.
+      expect(b.y + b.height).toBeGreaterThan(cardBox.y);
+      expect(b.y).toBeLessThan(cardBox.y + cardBox.height);
+    }
+    // AND THEY DO NOT COLLIDE WITH EACH OTHER. Two callouts running into one
+    // another is the same defect as one covering the card — unreadable, and
+    // the reason the vertical offsets are tuned rather than guessed.
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]!, c = boxes[j]!;
+        const hit =
+          a.x < c.x + c.width && a.x + a.width > c.x && a.y < c.y + c.height && a.y + a.height > c.y;
+        expect(hit, `callouts ${i + 1} and ${j + 1} overlap`).toBe(false);
+      }
+    }
+    // The legend is the phone presentation; a laptop must not show both.
+    await expect(page.getByTestId('tour-legend')).toBeHidden();
+    await page.screenshot({ path: 'test-results/mobile/landing-tour-desktop.png', fullPage: true });
+  });
+
+  test('the Match callout promises a Match only AFTER Taste DNA', async ({ page }) => {
+    await open(page, 1440);
+    const match = page.getByTestId('tour-callout').filter({ hasText: 'Your Match' });
+    await expect(match).toContainText('Taste DNA');
+    await expect(match).toContainText('never invent');
+  });
+
+  test('mobile 390: no leader lines, a numbered legend under the card instead', async ({ page }) => {
+    await open(page, 390);
+    await expect(page.getByTestId('tour-gutter-left')).toBeHidden();
+    await expect(page.getByTestId('tour-gutter-right')).toBeHidden();
+    const legend = page.getByTestId('tour-legend');
+    await expect(legend).toBeVisible();
+    await expect(legend).toContainText('What you’re looking at');
+    await expect(legend.getByTestId('tour-legend-item')).toHaveCount(6);
+    // Directly below the card, not floating over it.
+    const cardBox = (await card(page).boundingBox())!;
+    const legendBox = (await legend.boundingBox())!;
+    expect(legendBox.y).toBeGreaterThan(cardBox.y + cardBox.height);
+    await page.screenshot({ path: 'test-results/mobile/landing-tour-390.png', fullPage: true });
   });
 });
 
@@ -128,6 +196,22 @@ test.describe('the anonymous state is the real one, not invented personalization
     await expect(why.getByTestId('why-matched')).toBeVisible();
     await expect(why.getByTestId('why-know')).toBeVisible();
     await page.screenshot({ path: 'test-results/mobile/landing-example-why-open.png', fullPage: true });
+  });
+
+  test('the availability row uses the official provider treatment, not "📺 fuboTV"', async ({ page }) => {
+    await open(page, 1440);
+    const why = card(page).getByTestId('why-verdict');
+    await why.getByText('Why this Verd1ct?').click();
+    const row = why.getByTestId('why-availability');
+    await expect(row).toBeVisible();
+    // The site's provider chip, the access level and the confidence as their
+    // own parts — and the OFFICIAL wordmark, not TMDB's raw label.
+    await expect(row).toContainText('Paramount+');
+    await expect(row).not.toContainText('Paramount Plus');
+    await expect(row).toContainText('Included with subscription');
+    await expect(row).toHaveAttribute('data-confidence', 'likely');
+    // No television emoji anywhere in the panel.
+    await expect(why).not.toContainText('📺');
   });
 
   test('the write actions are off — nothing that answers a tap with an error', async ({ page }) => {

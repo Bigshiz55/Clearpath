@@ -98,7 +98,13 @@ describe('why this verd1ct — explanation assembly', () => {
     expect(e.rose).toContain('Strong personal fit (88 match).');
     expect(e.rose).toContain('Fast investigative storytelling');
     expect(e.heldBack).toContain('Darker than your usual weeknight choice');
-    expect(e.availability).toEqual({ text: 'Netflix · Included with subscription', confidence: 'verified' });
+    expect(e.availability).toEqual({
+      text: 'Netflix · Included with subscription',
+      confidence: 'verified',
+      service: 'Netflix',
+      logoPath: null,
+      access: 'Included with subscription',
+    });
     expect(e.confidence.level).toBe('high');
     expect(e.confidence.because).toContain('Availability verified.');
   });

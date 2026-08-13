@@ -1,4 +1,5 @@
 import { tmdbImage } from '@/lib/tmdb/image';
+import { officialProviderNames, resolveProviderBrand } from '@/lib/providers/brand';
 
 /**
  * THE ONE STREAMING-PROVIDER BRAND CHIP.
@@ -25,8 +26,12 @@ export interface ProviderChipData {
 }
 
 export function ProviderChip({ data, withLabel = false }: { data: ProviderChipData; withLabel?: boolean }) {
-  const label = data.via ? `${data.name} (${data.via})` : data.name;
-  const logo = data.logoPath ? tmdbImage(data.logoPath, 'w92') : null;
+  // The official spelling and the verified asset come from the one registry —
+  // see src/lib/providers/brand.ts. `via` stays a separate fact: an add-on
+  // route is not the base service and must not be folded into its name.
+  const brand = resolveProviderBrand({ name: data.name, logoPath: data.logoPath });
+  const label = data.via ? `${brand.name} (${data.via})` : brand.name;
+  const logo = brand.logoPath ? tmdbImage(brand.logoPath, 'w92') : null;
 
   if (logo) {
     return (
@@ -43,7 +48,7 @@ export function ProviderChip({ data, withLabel = false }: { data: ProviderChipDa
           loading="lazy"
           className="h-4 w-auto max-w-[68px] object-contain"
         />
-        {withLabel && <span className="truncate pr-0.5 text-xs font-semibold text-ink-900">{data.name}</span>}
+        {withLabel && <span className="truncate pr-0.5 text-xs font-semibold text-ink-900">{brand.name}</span>}
         {data.via && <span className="pr-0.5 text-[10px] font-medium text-ink-700">{data.via}</span>}
       </span>
     );
@@ -86,6 +91,38 @@ export function NetworkChip({ name, logoUrl }: { name: string; logoUrl?: string 
       data-testid="network-chip"
     >
       <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
+/**
+ * A LIST OF SERVICES WE HOLD NO ASSETS FOR — SET AS TEXT, NOT AS EMOJI.
+ *
+ * Several surfaces know only NAMES ("everyone can watch it on Netflix, Hulu"),
+ * because the group/verdict pipelines carry a service list rather than provider
+ * rows with logo paths. Every one of them printed "📺 Netflix, Hulu".
+ *
+ * There is no asset to render, so the honest fallback is the official NAME —
+ * which is what the brand registry is for. A television emoji is not a brand
+ * mark, and standing one in front of a service list implies we know something
+ * about the platform that we do not.
+ */
+export function ProviderNameList({
+  names,
+  label = 'On',
+  className = '',
+}: {
+  names: string[];
+  /** The lead-in word. "On Netflix · Hulu". */
+  label?: string;
+  className?: string;
+}) {
+  const list = officialProviderNames(names);
+  if (list.length === 0) return null;
+  return (
+    <span className={className} data-testid="provider-name-list">
+      <span className="text-slate-500">{label} </span>
+      {list.join(' · ')}
     </span>
   );
 }
