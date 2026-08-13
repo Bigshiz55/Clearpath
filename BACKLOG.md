@@ -10,6 +10,29 @@ production and apply pending migrations with your `MIGRATE_SECRET` — see the
 unblocks.
 
 ## Next
+- **Linear network brand asset registry.** Replace the 0/83 monogram fallback
+  with verified network marks, using a separate provenance-backed canonical
+  asset registry or a licensed authoritative source. NOT part of PR #54 — that
+  work established the plumbing (`tv_stations.logo_url` → `ingestedGuide` →
+  `channelGuide` → `NetworkChip`) and proved the gap is an asset-source problem,
+  not a wiring one: TVmaze's network object carries no logo, Watchmode sets
+  `logoPath: null` and is a streaming source anyway, TV Media is egress-denied
+  under `DATA_MODE=free_live`, and `linear_networks.logo_path` is fixture-fed.
+  - **Runtime fuzzy name → logo inference stays forbidden.** A logo resolved by
+    string resemblance is a claim about who broadcast something, made on no
+    evidence.
+  - **A streaming-service mark may never substitute for a network mark.** They
+    are different factual entities; `ProviderChip` and `NetworkChip` are
+    separate for that reason and must stay separate.
+  - **Verified canonical mappings ARE allowed** — station/network identity to a
+    specific asset, decided once and reviewed, never inferred per request.
+  - **Every manually verified asset must retain provenance:** where it came
+    from, who confirmed it, and when. Same rule the streaming table follows in
+    `src/lib/providers/assets.ts`, which records that each path was fetched and
+    looked at before being written down.
+  - **Order of work:** ABC / CBS / NBC / FOX / The CW first, then Hallmark
+    (Channel, Mystery, Family), Lifetime / LMN, then major cable, news, sports
+    and premium.
 - **Turn on the AI orchestrator (owner action).** The provider-independent
   Claude discovery brain is built, tested, and shipped OFF (`AI_DISCOVERY_MODE`
   defaults to `legacy`). To evaluate it: set `ANTHROPIC_API_KEY` (server-only)
