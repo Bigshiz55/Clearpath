@@ -28,10 +28,16 @@
 
 const BASE_URL = process.env.BASE_URL;
 const EXPECT_SHA = process.env.EXPECT_SHA ?? '';
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-const TEST_EMAIL = process.env.PREVIEW_TEST_EMAIL;
-const TEST_PASSWORD = process.env.PREVIEW_TEST_PASSWORD;
+/*
+ * TWO SECRETS, NOT FIVE.
+ *
+ * The first version copied Supabase config and the test user's email and
+ * password into GitHub. That was more secret surface than the job needs: the
+ * deployment already holds those, so CI only has to prove it is allowed to ASK
+ * for a session. A leaked login secret buys a synthetic session on a preview;
+ * leaked credentials would be reusable wherever Supabase is reachable.
+ */
+const LOGIN_SECRET = process.env.PREVIEW_TEST_LOGIN_SECRET ?? '';
 const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? '';
 
 /** Exit codes the workflow reads to tell infrastructure from semantics apart. */
@@ -78,34 +84,44 @@ async function main() {
     infra(`preview SHA ${version.sha} does not match PR head ${EXPECT_SHA}. Testing the wrong build proves nothing.`);
   }
 
-  // ── AUTH: a real Supabase session for a preview-only identity ────────────
-  if (!SUPABASE_URL || !SUPABASE_KEY) infra('NEXT_PUBLIC_SUPABASE_URL / _PUBLISHABLE_KEY are not set.');
-  if (!TEST_EMAIL || !TEST_PASSWORD) {
-    infra('PREVIEW_TEST_EMAIL / PREVIEW_TEST_PASSWORD are not set. /api/ask returns 401 without a real session.');
+  // ── AUTH: a REAL cookie session, because that is what the app reads ──────
+  /*
+   * `createServerClient` is built with a cookie adapter and no Authorization
+   * passthrough (pinned by src/lib/arch/authTransport.test.ts), so a bearer
+   * token is anonymous to this application. An earlier version of this script
+   * sent one and would have reported 401 forever while looking like a product
+   * failure. The harness signs in the way a person does and keeps the cookies.
+   */
+  if (!LOGIN_SECRET) {
+    infra('PREVIEW_TEST_LOGIN_SECRET is not set. /api/ask returns 401 without a real cookie session.');
   }
 
-  let accessToken;
+  let cookieHeader = '';
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    const res = await fetch(`${BASE_URL}/api/preview-test-login`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', apikey: SUPABASE_KEY },
-      body: JSON.stringify({ email: TEST_EMAIL, password: TEST_PASSWORD }),
+      headers: headers({ 'x-preview-test-secret': LOGIN_SECRET }),
     });
-    if (!res.ok) infra(`test-user sign-in failed with ${res.status}.`); // body may echo the email
-    accessToken = (await res.json()).access_token;
+    if (res.status === 404) {
+      infra('preview login answered 404 — the deployment is production, or its test identity is unconfigured.');
+    }
+    if (!res.ok) infra(`preview login failed with ${res.status}.`);
+    // Cookie VALUES are held here and never printed. Only the count is logged.
+    const raw = res.headers.getSetCookie?.() ?? [];
+    cookieHeader = raw.map((c) => c.split(';')[0]).join('; ');
+    if (!cookieHeader) infra('preview login set no cookies.');
+    console.log(`  authenticated with ${raw.length} session cookie(s) (values not logged)`);
   } catch (e) {
-    infra(`Supabase sign-in unreachable: ${e.message}`);
+    infra(`preview login unreachable: ${e.message}`);
   }
-  if (!accessToken) infra('sign-in returned no access token.');
-  console.log('  authenticated as the preview test identity (token not logged)');
 
   const ask = async (text) => {
     const res = await fetch(`${BASE_URL}/api/ask`, {
       method: 'POST',
-      headers: headers({ authorization: `Bearer ${accessToken}` }),
+      headers: headers({ cookie: cookieHeader }),
       body: JSON.stringify({ text }),
     });
-    if (res.status === 401) infra('/api/ask returned 401 — the session did not reach the route.');
+    if (res.status === 401) infra('/api/ask returned 401 — the cookie session did not reach the route.');
     if (res.status >= 500) infra(`/api/ask returned ${res.status}.`);
     return { status: res.status, body: await res.json().catch(() => ({})) };
   };

@@ -63,29 +63,23 @@ jobs:
       - name: Report what is configured (names only, never values)
         if: steps.target.outputs.run == 'true'
         env:
-          HAS_EMAIL: ${{ secrets.PREVIEW_TEST_EMAIL != '' }}
-          HAS_PASSWORD: ${{ secrets.PREVIEW_TEST_PASSWORD != '' }}
-          HAS_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
-          HAS_SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY != '' }}
+          HAS_LOGIN: ${{ secrets.PREVIEW_TEST_LOGIN_SECRET != '' }}
           HAS_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET != '' }}
         run: |
-          # Presence only. A missing secret is reported by NAME so it can be
-          # fixed without anyone pasting a value anywhere.
-          echo "PREVIEW_TEST_EMAIL present:                    $HAS_EMAIL"
-          echo "PREVIEW_TEST_PASSWORD present:                 $HAS_PASSWORD"
-          echo "NEXT_PUBLIC_SUPABASE_URL present:              $HAS_SUPABASE_URL"
-          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY present:  $HAS_SUPABASE_KEY"
-          echo "VERCEL_AUTOMATION_BYPASS_SECRET present:       $HAS_BYPASS"
+          # TWO secrets, presence only, reported by NAME so a gap can be fixed
+          # without anyone pasting a value. The Supabase config and the test
+          # user's credentials stay in Vercel Preview, where the deployment
+          # already needs them — copying them here would widen the blast radius
+          # of a leaked CI token for no gain.
+          echo "PREVIEW_TEST_LOGIN_SECRET present:        $HAS_LOGIN"
+          echo "VERCEL_AUTOMATION_BYPASS_SECRET present:  $HAS_BYPASS"
 
       - name: Black-box canonical interpretation
         if: steps.target.outputs.run == 'true'
         env:
           BASE_URL: ${{ steps.target.outputs.url }}
           EXPECT_SHA: ${{ steps.target.outputs.sha }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          PREVIEW_TEST_EMAIL: ${{ secrets.PREVIEW_TEST_EMAIL }}
-          PREVIEW_TEST_PASSWORD: ${{ secrets.PREVIEW_TEST_PASSWORD }}
+          PREVIEW_TEST_LOGIN_SECRET: ${{ secrets.PREVIEW_TEST_LOGIN_SECRET }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set +e
