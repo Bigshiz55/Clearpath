@@ -11,6 +11,7 @@ import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/f
 import { getBuildInfo } from '@/lib/buildInfo';
 import { routeAsk } from '@/lib/critic/gate';
 import { stripAnchorSpans } from '@/lib/critic/request';
+import { needsClarification, applyChoice, readClarification } from '@/lib/critic/clarifyRequest';
 import { buildCriticState } from '@/lib/critic/orchestrate';
 import { resolveAnchor } from '@/lib/critic/anchor';
 import { runStrands } from '@/lib/critic/strands';
@@ -381,6 +382,15 @@ export async function POST(req: Request) {
          nothing in correctness and removes a full event-table read from every
          comparative request. */
       const { dna } = await loadPreferenceCached(supabase, user.id, Date.now());
+
+      /* A CLARIFICATION THE USER JUST ANSWERED. The client echoes back the
+         pending comparison it was given, plus the identity chosen, so the
+         ORIGINAL request resumes rather than a new search starting. Anchors
+         already placed are carried as canonical ids and never searched again. */
+      const answered = readClarification(body);
+      const carriedAnchors = answered
+        ? applyChoice(answered.comparison, answered.choice).resolved
+        : undefined;
       const criticState = await buildCriticState({
         request: criticRequest,
         dna,
@@ -411,6 +421,7 @@ export async function POST(req: Request) {
            and the loader runs concurrently with hydration. */
         loadAnchorKeywords: anchorKeywordsFor,
         anchorGenreIds: [],
+        preResolved: carriedAnchors,
         mediaType: criticBase.mediaType === 'any' ? undefined : criticBase.mediaType,
       });
 
@@ -421,6 +432,34 @@ export async function POST(req: Request) {
          which is a weaker answer honestly arrived at rather than a generic one
          presented as understanding. GC2's refusal is worth nothing if the
          caller answers anyway. */
+      /* ── AMBIGUOUS OR UNKNOWN ANCHOR → ASK, DON'T ABANDON ──────────────
+         GC2 still refuses to guess; this gives that refusal somewhere to go.
+         Silently dropping the comparison is a different failure from guessing,
+         not a fix for it: for a request whose whole point is the comparison,
+         the honest move is the one question that settles it. */
+      const clarification = needsClarification(
+        text,
+        criticRequest.relation,
+        criticRequest.modifiers,
+        criticRequest.unresolvedModifiers,
+        criticState.resolutions,
+      );
+      if (clarification) {
+        return NextResponse.json(
+          withConv({
+            kind: 'clarify',
+            requestId,
+            appliedText: text || null,
+            clarify: clarification.question,
+            // The real candidates, bounded — never an invented option.
+            comparisonOptions: clarification.pending.options,
+            pendingComparison: clarification.comparison,
+            query: criticBase,
+            items: [],
+          }),
+        );
+      }
+
       if (criticState.objective.anchors.length === 0) {
         convInterpretation.push(
           `I couldn't pin down ${criticRequest.referenceTitles.join(' or ')} — answering without the comparison.`,

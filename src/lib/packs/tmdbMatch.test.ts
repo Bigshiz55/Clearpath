@@ -26,7 +26,14 @@ describe('normalization removes noise and nothing else', () => {
     expect(normalizeTitle('girl in the basement')).toBe('girl in the basement');
     expect(normalizeTitle('Amélie')).toBe('amelie');
     expect(normalizeTitle('Marley & Me')).toBe('marley and me');
-    expect(normalizeTitle('Ocean’s Eleven')).toBe('ocean s eleven');
+    /* CORRECTED. This previously expected `ocean s eleven`, which pinned a real
+       defect rather than a decision: an apostrophe inside a word was becoming a
+       word break, so the catalogue's "Ocean's Eleven" could never match a user
+       typing "Oceans Eleven". Found in production when "Widow's Bay" made a
+       named Critic anchor resolve `not_found`. Apostrophes now elide; hyphens
+       and colons still separate. See `apostropheIdentity.test.ts`. */
+    expect(normalizeTitle('Ocean’s Eleven')).toBe('oceans eleven');
+    expect(normalizeTitle('Oceans Eleven')).toBe('oceans eleven');
   });
 
   it('does NOT collapse titles that differ by a word', () => {

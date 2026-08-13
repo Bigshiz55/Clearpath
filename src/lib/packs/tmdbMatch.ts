@@ -86,11 +86,37 @@ const YEAR_TOLERANCE = 1;
  * always noise between a listings feed and a title database. Nothing else is
  * removed: two titles that differ in a WORD are two different titles.
  */
+/**
+ * Apostrophe forms, ELIDED rather than turned into a space.
+ *
+ * \u2500\u2500 THE PRODUCTION DEFECT THIS FIXES \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+ * The generic `[^a-z0-9]+ -> ' '` rule below is correct for hyphens and colons,
+ * which really do separate words. It is wrong for an apostrophe INSIDE a word,
+ * which never does:
+ *
+ *   catalogue "Widow's Bay"  ->  "widow s bay"      three tokens
+ *   user      "Widows Bay"   ->  "widows bay"       two tokens
+ *
+ * so an exact title became unfindable over a punctuation mark nobody types
+ * consistently. Found by the post-merge smoke of the Critic Layer against the
+ * real catalogue, where it made a named anchor resolve `not_found`.
+ *
+ * DELIBERATELY NARROW. "Strip all punctuation" would merge titles that
+ * punctuation genuinely distinguishes; only the marks that sit inside a word
+ * are removed, and everything else keeps becoming a separator.
+ *
+ * Covers the straight quote, both curly forms, the modifier letter apostrophe
+ * TMDB occasionally carries, and the two accent characters people type in their
+ * place. NFD above does not decompose any of them, so they survive to here.
+ */
+const APOSTROPHES = /['‘’ʼ´`]/g;
+
 export function normalizeTitle(raw: string): string {
   return raw
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    .replace(APOSTROPHES, '')
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
