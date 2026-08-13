@@ -53,6 +53,20 @@ for (const [name, w, h] of [['desktop', 1280, 800], ['mobile-390', 390, 844]] as
   });
 }
 
+test('NOT_FOUND renders the question alone, with no fabricated options', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setContent(html(390).replace(/<div role="group"[\s\S]*?<\/div>/,
+    '<p data-testid="anchor-clarify-hint" class="s">Type the title again below and I&rsquo;ll keep the rest of your comparison.</p>')
+    .replace('Which Furious did you mean?', "I don't know a title called Widows Whatever — which one did you mean?"));
+  await expect(page.getByTestId('anchor-clarify')).toBeVisible();
+  await expect(page.getByTestId('anchor-clarify-hint')).toBeVisible();
+  // No candidate grid, and above all no invented candidates.
+  await expect(page.getByTestId('anchor-option')).toHaveCount(0);
+  const doc = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(doc).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: '/tmp/claude-0/-home-user-Clearpath/7bed97c5-9653-5e4e-a7e5-75fc18d685dd/scratchpad/qa/notfound-390.png', fullPage: true });
+});
+
 test('keyboard reaches every option', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.setContent(html(390));

@@ -5,6 +5,7 @@ import { ReasonText } from '@/components/ReasonText';
 import { PosterCard } from '@/components/PosterCard';
 import { JudgeVerdictCard } from '@/components/JudgeVerdictCard';
 import { AnchorClarify, type AnchorOptionView } from '@/components/critic/AnchorClarify';
+import { classifyAskResponse } from '@/lib/critic/askResponseKind';
 import type { TitleVerdict } from '@/lib/askTypes';
 import { type TileRatings } from '@/lib/ratings';
 import { naiveParseQuery, describeQuery, EMPTY_QUERY } from '@/lib/finderParse';
@@ -220,7 +221,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
       }
 
       // A specifically-named title got put on trial — show the full ruling.
-      if (data.kind === 'title' && data.verdict) {
+      if (classifyAskResponse(data) === 'title') {
         const v = data.verdict as TitleVerdict;
         const alts = (data.alternatives ?? []) as ResultItem[];
         const skip = v.primaryCall === 'SKIP IT';
@@ -233,11 +234,17 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
 
       /* AN ANCHOR NEEDS SETTLING. The comparison is intact — the server sent
          back everything needed to resume it — so this asks one question rather
-         than answering a different, smaller request. */
-      if (data.kind === 'clarify' && Array.isArray(data.comparisonOptions) && data.comparisonOptions.length > 0) {
+         than answering a different, smaller request.
+
+         BRANCHED ON `kind`, NOT ON THE OPTION COUNT. A NOT_FOUND anchor carries
+         an EMPTY option list on purpose, and gating entry on its length sent it
+         into the generic results branch below, where it rendered "No title
+         clears all of that" and the clarification question together. */
+      const branch = classifyAskResponse(data);
+      if (branch === 'clarify-options' || branch === 'clarify-question') {
         askWhich(
           typeof data.clarify === 'string' ? data.clarify : 'Which title did you mean?',
-          data.comparisonOptions as AnchorOptionView[],
+          branch === 'clarify-options' ? (data.comparisonOptions as AnchorOptionView[]) : [],
           data.pendingComparison,
         );
         return;

@@ -42,10 +42,21 @@ export function AnchorClarify({
   onChoose: (o: AnchorOptionView) => void;
   disabled?: boolean;
 }) {
-  if (options.length === 0) return null;
+  /* NO OPTIONS IS A REAL STATE, NOT AN ABSENCE.
+     A NOT_FOUND anchor has nothing to offer — we could not place the title at
+     all — and fabricating candidates would be the guess this refuses to make.
+     So the question is asked on its own, and the user corrects it in the
+     ordinary input, which is already the way every other turn works. */
+  const hasOptions = options.length > 0;
   return (
     <div data-testid="anchor-clarify" className="mt-2 rounded-lg border border-brand-400/30 bg-brand-500/[0.06] p-3">
       <p className="text-[15px] font-semibold leading-relaxed text-slate-100">{question}</p>
+      {!hasOptions && (
+        <p data-testid="anchor-clarify-hint" className="mt-1 text-[13px] leading-relaxed text-slate-300">
+          Type the title again below and I&rsquo;ll keep the rest of your comparison.
+        </p>
+      )}
+      {hasOptions && (
       <div
         role="group"
         aria-label={question}
@@ -83,6 +94,7 @@ export function AnchorClarify({
           </button>
         ))}
       </div>
+      )}
     </div>
   );
 }
