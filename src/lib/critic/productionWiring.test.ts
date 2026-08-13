@@ -57,8 +57,14 @@ describe('BLOCKER 1 — CLOSED by GC1: production constructs the critic state', 
   });
 
   it('the relation survives parsing instead of being discarded', () => {
+    /* The route reaches the parser through the comparative-intent gate, so the
+       chain is asserted rather than a single string: route -> routeAsk ->
+       parseCriticRequest. Pinning only the route's own text would go green
+       again the day someone inlined a SECOND parser beside the gate. */
     const route = readFileSync('src/app/api/ask/route.ts', 'utf8');
-    expect(route).toContain('parseCriticRequest');
+    expect(route).toContain('routeAsk(');
+    const gate = readFileSync('src/lib/critic/gate.ts', 'utf8');
+    expect(gate).toContain('parseCriticRequest(');
   });
 });
 

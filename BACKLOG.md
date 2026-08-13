@@ -5,10 +5,12 @@ Updated at the end of every work order per the Working Agreement in
 
 ## Now
 - **Critic Layer — `claude/critic-layer`.** GC8, GC2, GC3, GC4, GC5, **GC1**
-  complete red-then-green (117 critic tests). `/api/ask` now constructs the real
+  complete red-then-green (131 critic tests). `/api/ask` now constructs the real
   CriticObjective/CriticPlan and issues the GC5 retrieval strands, so **GC5 is
-  production wired**. Ledger: `docs/CRITIC-SHIP.md`. Next gate is GC6 — see the
-  remaining blocker below.
+  production wired**. Comparative intent is detected at a provider-independent
+  boundary (`src/lib/critic/gate.ts`) ahead of the AI orchestrator, so the
+  meaning of a request no longer depends on `AI_DISCOVERY_MODE`. Ledger:
+  `docs/CRITIC-SHIP.md`. Next gate is GC6 — read its warning below first.
 
 **Action needed from you:** open `/admin/migrations` on
 production and apply pending migrations with your `MIGRATE_SECRET` — see the
@@ -41,6 +43,13 @@ and what it unblocks.
   scoping once the accounts/feedback loop above has real usage to learn from.
 
 ## Blocked
+- **Critic GC6 must start with a score-composition audit (owner instruction).**
+  `runFinder` builds `matchScore` from `buildVerdict(...).personal.score`, which
+  is already personalized via `getPersonalContext`; `rankByDna` adds DNA terms on
+  some surfaces. Do NOT feed `matchScore` into `rankWithPreference(…, dna,
+  criticPlan)` until it is proved that does not double-count the same user taste.
+  GC6 must establish ONE explicit final-score composition. Details in
+  `docs/CRITIC-SHIP.md` → "GC6 — read before starting".
 - **Critic GC6 is larger than it was scoped.** `rankWithPreference` — the
   function GC8/GC4 proved causality against — has **zero production callers**;
   its docblock says it exists "so the before/after report reflects production

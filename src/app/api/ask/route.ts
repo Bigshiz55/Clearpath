@@ -9,7 +9,7 @@ import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askP
 import { augmentInternational } from '@/lib/askInternational';
 import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
-import { parseCriticRequest } from '@/lib/critic/request';
+import { routeAsk } from '@/lib/critic/gate';
 import { buildCriticState } from '@/lib/critic/orchestrate';
 import { resolveAnchor } from '@/lib/critic/anchor';
 import { runStrands } from '@/lib/critic/strands';
@@ -246,6 +246,27 @@ export async function POST(req: Request) {
       });
     }
 
+    // 0.6) A BARE vocabulary word ("crime", "Hulu", "boxing") is a browse
+    // request for that thing — it must never be treated as a title ask, no
+    // matter what happens to share the name.
+    const lex = text.trim() ? lexicalIntent(text) : null;
+
+    // 0.65) THE COMPARATIVE INTENT BOUNDARY.
+    //
+    // UNDERSTANDING WHAT WAS ASKED PRECEDES CHOOSING WHO ANSWERS IT. This runs
+    // BEFORE the AI orchestrator on purpose: in `anthropic` mode
+    // `runAiDiscovery` returns a finished search response, so a comparative
+    // sentence would otherwise get the canonical GC1–GC5 pipeline under
+    // `legacy` and an entirely independent interpretation under `anthropic`.
+    // The default being `legacy` made that latent, not safe.
+    //
+    // `routeAsk` is the single decision, executed by `servingMode.test.ts`, so
+    // the ordering rule cannot quietly reverse in a refactor. There is exactly
+    // one parser — no Anthropic-specific CriticRequest exists anywhere.
+    const aiMode = serverEnv.aiDiscoveryMode();
+    const askDecision = routeAsk(text, aiMode, { conversational, lexical: lex != null });
+    const criticRequest = askDecision.request;
+
     // 0.7) AI ORCHESTRATOR (feature-flagged; default legacy = OFF, nothing here
     // runs in production until the owner sets AI_DISCOVERY_MODE + a key). In
     // ANTHROPIC mode Claude is the primary brain for single-shot semantic
@@ -254,8 +275,10 @@ export async function POST(req: Request) {
     // and only then ranks by DNA. Exact-title/person/live-TV intents defer back
     // to the deterministic handlers below. Any AI failure falls through to the
     // legacy path — the user never sees a broken search.
-    const aiMode = serverEnv.aiDiscoveryMode();
-    if (aiMode === 'anthropic' && !conversational && text.trim()) {
+    //
+    // Comparatives are NOT its to answer — that is `askDecision` above, and the
+    // guard restates it here so the branch is self-explaining at the call site.
+    if (aiMode === 'anthropic' && !conversational && text.trim() && !criticRequest) {
       const ai = await runAiDiscovery({ supabase, userId: user.id, text, route: 'ask', limit: parseRequestedCount(text) });
       if (ai.kind === 'clarify') {
         return NextResponse.json({ kind: 'clarify', requestId, clarify: ai.question, options: ai.options, interpretation: ai.interpretation, query: { ...EMPTY_QUERY }, items: [] });
@@ -277,25 +300,18 @@ export async function POST(req: Request) {
       // ai.kind === 'unavailable' → fall through to the deterministic path.
     }
 
-    // 0.8) A BARE vocabulary word ("crime", "Hulu", "boxing") is a browse
-    // request for that thing — it must never be treated as a title ask, no
-    // matter what happens to share the name.
-    const lex = text.trim() ? lexicalIntent(text) : null;
-
     // 0.9) THE CRITIC PATH — a request that COMPARES.
     //
-    // One parser for every mode. `parseCriticRequest` reads the relation and
-    // the individual anchors out of the sentence, so a comparison cannot
-    // survive on the conversational route and silently degrade to a keyword
-    // union on the discovery route. It returns null for everything else, and
-    // null means the existing pipeline below runs completely untouched.
+    // The relation and the individual anchors were read at 0.65 by the one
+    // parser every mode shares, so a comparison cannot survive on the
+    // conversational route and silently degrade to a keyword union on the
+    // discovery route — or be answered by a different brain entirely.
     //
-    // This sits ABOVE the exact-title lookup deliberately. "Better than Furious
-    // or Widows Bay" classifies as `exact_title` today — the whole sentence is
-    // searched as if it were the name of a film, finds nothing, and falls
-    // through to generic discovery with no anchors at all. That is the precise
-    // mechanism behind the Cool Hand Luke answer.
-    const criticRequest = text.trim() && !lex ? parseCriticRequest(text) : null;
+    // This also sits ABOVE the exact-title lookup deliberately. "Better than
+    // Furious or Widows Bay" classifies as `exact_title` today — the whole
+    // sentence is searched as if it were the name of a film, finds nothing, and
+    // falls through to generic discovery with no anchors at all. That is the
+    // precise mechanism behind the Cool Hand Luke answer.
     if (criticRequest) {
       // Stated constraints only. The conversational state already carries the
       // accumulated ones; a fresh ask reads them off the deterministic parser

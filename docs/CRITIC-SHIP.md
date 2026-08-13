@@ -101,13 +101,43 @@ narrower than "teach the explainer about anchors": it is (a) populate
 - [x] **GC5** Anchors + objective reach candidate retrieval — **PRODUCTION WIRED
       by GC1** (contract red-then-green; strands now issued by `/api/ask`)
 - [ ] **GC6** Anchors + objective reach FINAL RANKING (the causality gate)
-      — **SCOPE HAS GROWN: `rankWithPreference` is not the production ranker**
+      — **MUST BEGIN WITH A SCORE-COMPOSITION AUDIT. See "GC6 — read before
+      starting" below. Do NOT wire the plan into a ranker before then.**
 - [ ] **GC7** Grounded explanations — new reason kind carrying the comparison
 - [x] **GC8** Material-dependence test — **COMPLETE, red-then-green**
 - [ ] **GC9** Counterfactual suite: anchors / DNA / relationship / modifiers / context each causal
 - [ ] **GC10** Exact-query regression for `Better than Furious or Widows Bay` (structural, not hardcoded titles)
 - [ ] **GC11** Latency budget + caching
 - [ ] **GC12** Full gates + merge recommendation
+
+---
+
+## GC6 — READ BEFORE STARTING (owner warning, recorded not implemented)
+
+**GC6 must begin with a score-composition audit, not with wiring.**
+
+`runFinder` already builds `matchScore` from `buildVerdict(...).personal.score`,
+whose personalization comes from `getPersonalContext`. Separately:
+
+- `rankByDna` adds preference/DNA terms on some production surfaces
+- `rankWithPreference` holds the canonical preference + critic composition and
+  still has **no production caller**
+
+So `FinderItem.matchScore` is already a *personalized* number, and nobody has
+established exactly which user-taste evidence is inside it.
+
+**Do NOT run `rankWithPreference(matchScore, dna, criticPlan)` until it is
+proved that doing so does not double-count the same user taste.** Feeding an
+already-personalized score into a second personalization layer would apply the
+user's DNA twice with no way to see it in the output — the numbers would simply
+be more confident and less correct.
+
+GC6's job is to establish **one explicit final-score composition**, not to stack
+another personalization system on top of an opaque personalized score.
+
+Required first step: enumerate what user preference evidence is represented in
+`matchScore` today — `getPersonalContext` → `buildVerdict` → `personal.score` —
+and write it down before any ranking change.
 
 ---
 
@@ -135,11 +165,17 @@ a drama. **That is the Cool Hand Luke mechanism, end to end.**
 `like_but` and `blend` failed the same way (`Furious but funnier` and
 `Furious meets Widows Bay` both classified `exact_title`).
 
-### Production parse path, after GC1
+### Production parse path, after GC1 + the serving-mode correction
 
 ```
 POST /api/ask
-  0.9  parseCriticRequest(text)          ← ONE parser, ALL modes
+  0.6  lexicalIntent(text)
+  0.65 routeAsk(text, aiMode)            ← COMPARATIVE INTENT BOUNDARY
+         consumer = 'critic'          -> canonical GC1–GC5 path
+         consumer = 'ai_discovery'    -> provider brain (non-comparative only)
+         consumer = 'legacy_discovery'-> existing pipeline
+  0.7  AI orchestrator                   guarded by `!criticRequest`
+  0.9  critic path (uses 0.65's request)
          null  -> every existing path runs untouched
          hit   -> critic path:
            hard  = stateToQuery(convState)            (conversational)
@@ -156,7 +192,51 @@ POST /api/ask
 ```
 
 Placed **above** the exact-title lookup deliberately — that is the branch that
-was swallowing the sentence.
+was swallowing the sentence — and **above the AI orchestrator**, for the reason
+in the next section.
+
+### CORRECTION — the critic must survive AI discovery mode
+
+The first GC1 commit put the critic at 0.9 and left the AI orchestrator at 0.7.
+`runAiDiscovery` returns a **finished search response**, so in
+`AI_DISCOVERY_MODE='anthropic'` a comparative sentence never reached
+`parseCriticRequest` at all. The claim *"one pure parser for conversational, AI
+and naive modes"* was therefore **not true when written**. It is true now.
+
+The default mode being `legacy` did not make this safe — it made it latent, and
+the failure would have appeared the moment a provider flag flipped.
+
+**Root cause:** provider selection was happening *before* comprehension. The
+route decided WHO answers before deciding WHAT was asked.
+
+**Fix:** `src/lib/critic/gate.ts` — `routeAsk(text, mode, opts)`. `mode` is read
+only *after* comparative intent, and a comparison returns before any expression
+a serving flag could evaluate differently. It is a pure function rather than the
+physical order of two blocks, because an ordering rule that exists only as
+block position is one refactor away from silently reversing.
+
+RED was behavioural — `routeAsk` first modelled the shipped ordering:
+
+```
+RED    7 failed | 7 passed (14)   ← anthropic → 'ai_discovery' on both sentences
+GREEN  14 passed (14)
+```
+
+| assertion | result |
+|---|---|
+| all three modes route a comparative to the critic | ✅ |
+| anthropic may NOT consume a comparative | ✅ |
+| canonical `CriticRequest` byte-identical across modes | ✅ |
+| legacy vs anthropic canonical shape (relation, anchors, resolution, hydration, authority, plan, strands) | ✅ identical |
+| conversational agrees with both | ✅ |
+| non-comparative asks still reach the provider brain | ✅ unchanged |
+| `discoveryBridge.ts` contains no critic parser/objective/relation | ✅ |
+| route consults the gate BEFORE `runAiDiscovery` (index-compared) | ✅ |
+
+**One contract, no duplication.** `parseCriticRequest` is not reimplemented
+inside `runAiDiscovery`; there is no Anthropic-specific `CriticObjective` and no
+provider-specific ranking semantics. Downstream candidate pools may legitimately
+differ if the retrieval brain differs — the *meaning* of the request may not.
 
 ### RED → GREEN
 
