@@ -12,6 +12,7 @@ against a room whose state is stated in the spec rather than drawn.
 | `react-desktop-1440.png` | The same stage with room to breathe. The rail runs the full width; the reading measure does not. |
 | `verdict-phone-390.png` | The reveal. One bloom, once, keyed to `winnerRevealed`. Jurors' scores are a histogram — the shape says whether the room agreed or out-voted somebody. |
 | `verdict-reduced-motion.png` | Reduced motion: the same composition, complete and still, resolved on the first frame. Not a stripped-down version — the end state, immediately. |
+| `verdict-continuation.png` | The foot of the verdict. Both continuations named — Appeal hands the night to the title actually standing by, and a fresh room is a different act. Neither was linked from here before. |
 | `zoom-200.png` | 200% browser zoom (720×450 CSS px). No horizontal scroll. |
 
 ## What is NOT in these frames
