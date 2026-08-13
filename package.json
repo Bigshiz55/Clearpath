@@ -36,7 +36,7 @@
     "verify:schema": "tsx scripts/verifyProductionSchema.ts",
     "prove:migration": "tsx scripts/proveMigration.ts",
     "gates": "bash scripts/gates.sh",
-    "eval:refresh": "EVAL_WRITE=1 vitest run eval/"
+    "eval:refresh": "node scripts/evalRefresh.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
