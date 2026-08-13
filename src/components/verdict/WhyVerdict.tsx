@@ -33,12 +33,23 @@ export interface WhyVerdictData {
   availability: {
     text: string;
     confidence: string;
-    /** Official brand name, from the provider registry. */
-    service: string;
+    /**
+     * Official brand name, from the provider registry.
+     *
+     * OPTIONAL BECAUSE THIS IS DESERIALIZED JSON, NOT A CHECKED VALUE. The
+     * current producer (`explainVerdict`) always fills `service`, `logoPath`
+     * and `access` — but they were added to the payload after `availability`
+     * itself shipped, so an older deployment mid-rollout, a cached response or
+     * a replayed fixture can still hand this component the earlier shape.
+     * Declaring them required did not make them present; it only hid the
+     * question, and the answer was `name.trim()` on undefined — a render-time
+     * throw that took the whole results page down with it.
+     */
+    service?: string | null;
     /** Verified logo path, or null → the name renders as restrained text. */
-    logoPath: string | null;
+    logoPath?: string | null;
     /** "Included with subscription", "Rental", … */
-    access: string;
+    access?: string | null;
   } | null;
   confidence: { level: string; because: string[] };
   /**
@@ -138,7 +149,17 @@ export function WhyVerdict({ data, className = '' }: { data: WhyVerdictData; cla
             aria-label={`${data.availability.text} — ${data.availability.confidence}`}
           >
             <ProviderChip data={{ name: data.availability.service, logoPath: data.availability.logoPath }} withLabel />
-            <span className="text-[13px] text-slate-300">{data.availability.access}</span>
+            {/* WHAT SURVIVES WHEN THERE IS NO BRAND TO DRAW.
+                `ProviderChip` renders nothing without a service name, and
+                `access` is part of the same later addition to the payload — so
+                a legacy shape would leave this row holding a bare confidence
+                badge and nothing to attach it to. `text` is the producer's own
+                resolved sentence ("Netflix · Included with subscription"), so
+                it is the honest fallback: fewer facts, none invented, and the
+                row still says something true. */}
+            <span className="text-[13px] text-slate-300">
+              {data.availability.access || (data.availability.service ? null : data.availability.text)}
+            </span>
             <span
               className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
                 data.availability.confidence === 'verified'

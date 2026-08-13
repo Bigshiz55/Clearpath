@@ -75,17 +75,38 @@ const OFFICIAL_NAMES: Record<string, string> = {
   'amazon prime video free with ads': 'Prime Video Free with Ads',
 };
 
+/**
+ * ── ABSENT IDENTITY IS A STATE, NOT A PROGRAMMING ERROR ───────────────────
+ *
+ * Every entry point below used to start at `name.trim()`, so `undefined`,
+ * `null` or a blank string threw. The nearest caller is a React component
+ * (`ProviderChip`), which meant the throw happened DURING RENDER and React
+ * unwound to the error boundary: one missing provider name replaced an entire
+ * recommendation page with "Something went wrong".
+ *
+ * These names arrive as deserialized JSON from an API whose payload has gained
+ * fields over time, so "no identity" is a real shape that reaches here, not a
+ * hypothetical. The registry's answer is a NON-BRAND — an empty name, no asset
+ * — which a caller renders as nothing. What it must never be is a guess, and
+ * what it must never do is throw.
+ */
+function nameOrEmpty(name: string | null | undefined): string {
+  return typeof name === 'string' ? name.trim() : '';
+}
+
 /** Lower-cased, whitespace-collapsed — the key both tables are read with. */
-export function normalizeProviderName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+export function normalizeProviderName(name: string | null | undefined): string {
+  return nameOrEmpty(name).toLowerCase().replace(/\s+/g, ' ');
 }
 
 /**
  * The official display name for a provider, or the name unchanged when it is
- * already official (which is the common case).
+ * already official (which is the common case). An absent or blank name
+ * resolves to the empty string — there is no brand here to name.
  */
-export function officialProviderName(name: string): string {
-  const raw = name.trim();
+export function officialProviderName(name: string | null | undefined): string {
+  const raw = nameOrEmpty(name);
+  if (!raw) return '';
   return OFFICIAL_NAMES[normalizeProviderName(raw)] ?? raw;
 }
 
@@ -98,8 +119,13 @@ export function officialProviderName(name: string): string {
  * never seen still dedupes correctly, and two genuinely different services
  * never merge.
  */
-export function providerBrandKey(name: string, logoPath?: string | null): string {
+export function providerBrandKey(name: string | null | undefined, logoPath?: string | null): string {
+  // A verified logo is the strongest key the registry has, so a row carrying
+  // one is a real brand whatever its name field is doing.
   if (logoPath) return `logo:${logoPath}`;
+  // No logo AND no name is one single non-brand, so a dedupe collapses a run
+  // of nameless rows instead of multiplying them into empty tiles.
+  if (!nameOrEmpty(name)) return 'name:';
   // CANONICALIZE FIRST. "fuboTV" and "Fubo" are one company, and a list that
   // received both spellings used to print both. Keying off the official name
   // makes the identity independent of which label the data happened to carry.
@@ -128,8 +154,12 @@ export function officialProviderNames(names: string[]): string[] {
 }
 
 export interface ProviderBrandInput {
-  /** The provider name exactly as the data gave it. */
-  name: string;
+  /**
+   * The provider name exactly as the data gave it. Nullable because this is
+   * routinely populated from an API payload rather than a checked value — see
+   * the absent-identity note above `nameOrEmpty`.
+   */
+  name: string | null | undefined;
   /**
    * A VERIFIED logo path (TMDB `logo_path`) the caller already holds. Absent is
    * FINE and no longer means "text": the registry falls back to its own
@@ -159,6 +189,13 @@ export interface ProviderBrand {
 /** Resolve one provider reference to its official presentation. */
 export function resolveProviderBrand(input: ProviderBrandInput): ProviderBrand {
   const name = officialProviderName(input.name);
+  // NO IDENTITY, NO BRAND. Returned rather than thrown, and deliberately not
+  // filled in from `providerId` or the asset table: a lookup by resemblance is
+  // exactly the invention this module exists to refuse. `textOnly` with an
+  // empty name is the signal a caller checks to render nothing at all.
+  if (!name) {
+    return { key: 'name:', name: '', logoPath: null, alt: '', textOnly: true };
+  }
   // THE CALLER'S OWN ASSET WINS. It came with this exact provider row, so it is
   // the most specific truth available. Only when there is none do we reach for
   // the verified table — which is what makes "Netflix" render as Netflix on a

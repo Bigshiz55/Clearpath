@@ -49,6 +49,23 @@ production and apply pending migrations with your `MIGRATE_SECRET` — see the
 unblocks.
 
 ## Next
+- **A typed runtime constraint never reaches the finder request (TEST E).**
+  Found while fixing the provider-chip crash: with that crash gone,
+  `wired-experience.spec.ts` TEST E now reaches its assertion for the first
+  time and fails. Asking "a fast mystery movie under 100 minutes" posts
+  `query.maxRuntime: null` — the cap the user typed is dropped, so the search
+  runs unconstrained while the UI behaves as though it applied.
+  NOT a parser bug and NOT a state race: `naiveParseQuery('a fast mystery movie
+  under 100 minutes')` returns `maxRuntime: 100` when called directly, and
+  inserting a 600ms settle between typing and Enter changes nothing — the
+  parsed query simply is not what `FinderUI` submits on the ask path
+  (`src/components/FinderUI.tsx`, `setQ(naiveParseQuery(v))` at ~208 vs
+  `effQuery` at ~284).
+  Deliberately NOT fixed in the provider-chip hotfix: this is finder/search
+  behaviour, and `docs/SEARCH-BASELINE-GOVERNANCE.md` requires any search-surface
+  change to be compared against baseline `68a5a93` with the frozen corpus and a
+  PASS→FAIL / FAIL→PASS delta reported. That is its own piece of work with its
+  own evidence, not a rider on a rendering fix.
 - **The ~50 non-Showdown files stranded on `claude/showdown-cold-start-scanner`.**
   That branch accumulated real work with nothing to do with the game, and it was
   reverted to `main` rather than smuggled through a Showdown PR. Each of these

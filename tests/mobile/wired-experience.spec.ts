@@ -24,7 +24,25 @@ function itemWith(over: Record<string, unknown>) {
         { label: 'Movie', satisfied: true, evidence: 'feature film' },
         { label: 'Under 100 min', satisfied: true, evidence: '96 min' },
       ],
-      availability: { text: 'Netflix · Included with subscription', confidence: 'likely' },
+      // THE CURRENT PRODUCER SHAPE. `explainVerdict` resolves the provider
+      // through the brand registry and emits `service`/`logoPath`/`access`
+      // alongside `text`. This fixture carried only `text` + `confidence` —
+      // the shape from before those fields existed — and that gap is what
+      // crashed the page: ProviderChip called `name.trim()` on `undefined`
+      // and React unwound to the error boundary, so all eight cases in this
+      // file failed with "Something went wrong" instead of a result. The
+      // renderer is now hardened too (it suppresses the chip rather than
+      // throwing); this makes the fixture agree with what the API actually
+      // serializes, so these tests exercise the real contract.
+      // The legacy shape is kept under test in the block at the foot of this
+      // file, so the crash cannot come back.
+      availability: {
+        text: 'Netflix · Included with subscription',
+        confidence: 'likely',
+        service: 'Netflix',
+        logoPath: null,
+        access: 'Included with subscription',
+      },
       confidence: { level: 'high', because: ['Personal taste signal available.'] },
     },
     household: null,
@@ -57,7 +75,18 @@ test.describe('TEST A — Why this Verd1ct? on real result cards', () => {
     await expect(why).toContainText('Darker than your usual weeknight choice');
     await expect(why).toContainText('Your requirements');
     await expect(why).toContainText('✓ Under 100 min');
-    await expect(why).toContainText('Netflix · Included with subscription');
+    // THE SAME FACTS, IN THE PRESENTATION THIS PANEL NOW USES. The row was a
+    // single sentence ("📺 Netflix · Included with subscription · likely")
+    // until the ProviderChip refactor split it into the brand, the access level
+    // and the confidence as separate labelled parts — the same commit that
+    // introduced the `service` field this fixture was missing. The assertion
+    // was never updated because the page crashed before reaching it, so it
+    // still described the old sentence. Nothing is being relaxed here: every
+    // fact it checked is checked, on the element that owns them.
+    const availability = why.getByTestId('why-availability');
+    await expect(availability).toContainText('Netflix');
+    await expect(availability).toContainText('Included with subscription');
+    await expect(availability).toContainText('likely');
     await expect(why).toContainText('likely');
     await expect(why).toContainText(/Confidence: high/i);
 
@@ -297,5 +326,54 @@ test.describe('TEST F — mobile result card', () => {
 
     await why.locator('summary').first().click();
     await expect(why.getByText('Why it matched')).not.toBeVisible();
+  });
+});
+
+/**
+ * ── THE LEGACY AVAILABILITY SHAPE, PINNED ─────────────────────────────────
+ *
+ * The fixture above now matches what the server serializes today. This block
+ * keeps the OLD shape — `text` + `confidence` and nothing else — under test on
+ * purpose, because that is the payload a client gets from an older deployment
+ * mid-rollout, from a cached response, or from a replayed recording, and it is
+ * the payload that took the whole recommendation page down.
+ *
+ * The invariant: a missing provider identity may suppress the provider chip.
+ * It may never crash the page.
+ */
+test.describe('availability with no provider identity', () => {
+  const legacyItem = itemWith({
+    explain: {
+      rose: ['Strong personal fit (88 match).'],
+      heldBack: [],
+      requirements: [{ label: 'Movie', satisfied: true, evidence: 'feature film' }],
+      // No `service`, no `logoPath`, no `access` — the pre-registry shape.
+      availability: { text: 'Netflix · Included with subscription', confidence: 'likely' },
+      confidence: { level: 'high', because: ['Personal taste signal available.'] },
+    },
+  });
+
+  test('renders the results page instead of the error boundary', async ({ page }) => {
+    await mock(page, (route) => route.fulfill({ json: { items: [legacyItem], scoredFor: 'Your match', relaxed: null } }));
+    await page.goto(HARNESS);
+    const finder = page.getByTestId('harness-finder');
+    await finder.getByRole('textbox').first().fill('a fast mystery');
+    await finder.getByRole('button', { name: /Find titles/ }).first().click();
+
+    // The page survives — this is the whole point.
+    await expect(page.getByText('Something went wrong')).toHaveCount(0);
+    await expect(page.getByText('The Night Detective').first()).toBeVisible();
+
+    const why = page.getByTestId('why-verdict');
+    await expect(why).toBeVisible();
+    await why.locator('summary').first().click();
+
+    // The availability row still says what we honestly know…
+    const row = page.getByTestId('why-availability');
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('Netflix · Included with subscription');
+    await expect(row).toContainText('likely');
+    // …and invents no brand mark for an identity the payload never carried.
+    await expect(row.getByTestId('brand-mark')).toHaveCount(0);
   });
 });
