@@ -812,7 +812,12 @@ export function CourtRoom({ code }: { code: string }) {
                   data-testid="react-card"
                   data-key={r.key}
                   data-leading={leading ? '1' : '0'}
-                  style={{ '--wv-room-step': i } as React.CSSProperties}
+                  /* THE STAGGER IS CAPPED. A Deep court carries sixteen
+                     candidates, and an uncapped 70ms step would leave the last
+                     one arriving 1.1 seconds after the first — which stops
+                     being a deal and becomes a wait. Six steps is the whole
+                     effect; everything past that lands with the sixth. */
+                  style={{ '--wv-room-step': Math.min(i, 5) } as React.CSSProperties}
                   /* A CANDIDATE IS A PLATE ON A STAGE, NOT A ROW IN A TABLE.
                      The leading title is lit and the vetoed one is struck —
                      both states drawn from the engine's own verdict, so the

@@ -1,6 +1,6 @@
 # Search Validation Campaign
 
-- Commit `aa82bba` · Branch `claude/verdict-room-complete` · Seed 7
+- Commit `18de532` · Branch `claude/dna-showdown-rebased` · Seed 7
 - **Total searches: 2000 · Passed 2000 (100.0%) · Failed 0 (0.0%)**
 
 ## Per-dimension pass rate (of cases naming that dimension)
