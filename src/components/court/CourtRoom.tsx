@@ -781,6 +781,33 @@ export function CourtRoom({ code }: { code: string }) {
                     }}
                   />
                 </div>
+
+                {/* WHERE THE EVENING GOES NEXT.
+                    The room had two continuations and neither was reachable
+                    from the screen you actually end on. "Appeal" above is the
+                    another-round path INSIDE this room — strike the winner and
+                    let the next candidate stand — and it is the right default,
+                    because the shortlist everyone built is still good. A fresh
+                    room is a different act: new night, new shortlist, and it
+                    lived only back at `/app/together` with nothing pointing at
+                    it. Quiet, and below the share card, because most rooms end
+                    here. */}
+                <div
+                  data-testid="verdict-continue"
+                  className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/[0.07] pt-4 text-[13px]"
+                >
+                  <span className="text-slate-500">Not this one?</span>
+                  <span className="text-slate-400">
+                    Appeal it above to hand the night to {backup ? backup.title : 'the next title'}.
+                  </span>
+                  <Link
+                    href="/app/together"
+                    data-testid="verdict-new-room"
+                    className="inline-flex min-h-[44px] items-center font-semibold text-brand-200 underline decoration-dotted underline-offset-4 transition hover:text-white"
+                  >
+                    Start a new room
+                  </Link>
+                </div>
               </>
             )}
           </div>

@@ -316,3 +316,24 @@ test.describe('atmosphere never costs legibility, a tap target, or a line', () =
     await page.screenshot({ path: path.join(SHOTS, 'verdict-reduced-motion.png'), fullPage: true });
   });
 });
+
+test.describe('the evening has somewhere to go after the verdict', () => {
+  test('both continuations are reachable from the screen the room ends on', async ({ page }) => {
+    /* The room had two of them and neither was linked from here. "Appeal" is
+       the another-round path INSIDE this room and it was already on screen; a
+       FRESH room lived only back at /app/together with nothing pointing at it,
+       so the only way to run a second night was the browser's back button. */
+    await asMember(page);
+    await mockRoom(page, { status: 'verdict', participants: PEOPLE, finalists: FINALISTS, messages: [], hostName: 'Scott' });
+    await page.goto(HARNESS);
+    await expect(page.getByTestId('court-verdict')).toBeVisible();
+    await page.waitForTimeout(2600); // the reveal sequence has to finish first
+
+    await expect(page.getByTestId('verdict-continue')).toBeVisible();
+    // Named, not "the next one" — the room knows which title is standing by.
+    await expect(page.getByTestId('verdict-continue')).toContainText('Nightshift');
+    await expect(page.getByTestId('verdict-new-room')).toHaveAttribute('href', '/app/together');
+    await expect(page.getByTestId('appeal')).toBeVisible();
+    expect(await underTouchMinimum(page)).toEqual([]);
+  });
+});
