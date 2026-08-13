@@ -248,7 +248,22 @@ test.describe('TEST E — temporary context never contaminates the next request'
     await ask.fill('a fast mystery movie under 100 minutes');
     await ask.press('Enter');
     await expect(page.getByText('The Night Detective').first()).toBeVisible();
-    expect((bodies[0]!.query as Record<string, unknown>).maxRuntime).toBe(100);
+    // THE CONSTRAINT TRAVELS IN `text`, NOT IN `query`.
+    //
+    // This asserted `bodies[0].query.maxRuntime === 100` — the client's own
+    // regex parse, written into the query object before the request. That is
+    // no longer where a typed constraint lives: FinderUI now resets every
+    // slider field the user has not actually dragged and sends the raw ask as
+    // `text`, because the server parses it far better than the client regex
+    // could (see the SLIDER_KEYS block in FinderUI). Verified, not assumed:
+    // `naiveParseQuery('a fast mystery movie under 100 minutes')` returns
+    // maxRuntime 100 and `naiveParseQuery('something funny')` returns null, so
+    // the cap is genuinely applied — the old assertion was reading a field the
+    // architecture deliberately stopped using, not catching a lost constraint.
+    //
+    // What TEST E is actually for is non-contamination, so it now checks BOTH
+    // channels a constraint could leak through, which is stricter than before.
+    expect(bodies[0]!.text).toContain('under 100 minutes');
 
     await ask.fill('something funny');
     await ask.press('Enter');
@@ -256,6 +271,9 @@ test.describe('TEST E — temporary context never contaminates the next request'
     const q2 = bodies[1]!.query as Record<string, unknown>;
     expect(q2.maxRuntime).toBeNull(); // the temporary 100-min cap is gone
     expect(q2.mediaType).toBe('any');
+    // …and it did not survive in the ask either.
+    expect(bodies[1]!.text).toBe('something funny');
+    expect(bodies[1]!.text).not.toContain('100');
   });
 });
 

@@ -49,8 +49,8 @@ const PLAN_WORDS =
   /\b(?:premium plus|premium|plus|essential|with ads|ad[- ]?supported|basic|standard|hd|uhd|4k|free)\b/g;
 
 /** The key both sides of the asset lookup are built with. */
-export function providerAssetKey(name: string): string {
-  return name
+export function providerAssetKey(name: string | null | undefined): string {
+  return (typeof name === 'string' ? name : '')
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ' ')
@@ -119,10 +119,14 @@ for (const a of PROVIDER_ASSETS) {
  * canonical name otherwise. Null when we hold nothing — which is the honest
  * answer and renders as the official NAME.
  */
-export function assetForProvider(name: string, providerId?: number | null): string | null {
+export function assetForProvider(name: string | null | undefined, providerId?: number | null): string | null {
   if (providerId != null) {
     const byId = BY_ID.get(providerId);
     if (byId) return byId.logoPath;
   }
-  return BY_KEY.get(providerAssetKey(name))?.logoPath ?? null;
+  // An empty key must never match a table entry — `''` is "no brand named",
+  // and returning some entry's asset for it would be inventing a provider.
+  const key = providerAssetKey(name);
+  if (!key) return null;
+  return BY_KEY.get(key)?.logoPath ?? null;
 }

@@ -31,14 +31,17 @@ export interface WhyVerdictData {
   heldBack: string[];
   requirements: { label: string; satisfied: boolean; evidence: string }[];
   availability: {
+    /** The server's own grounded sentence, e.g. "Netflix · Rental". Always
+     *  present, and the fallback whenever the structured parts below are not:
+     *  see the availability row for why that fallback has to exist. */
     text: string;
     confidence: string;
     /** Official brand name, from the provider registry. */
-    service: string;
+    service?: string | null;
     /** Verified logo path, or null → the name renders as restrained text. */
-    logoPath: string | null;
+    logoPath?: string | null;
     /** "Included with subscription", "Rental", … */
-    access: string;
+    access?: string | null;
   } | null;
   confidence: { level: string; because: string[] };
   /**
@@ -129,7 +132,17 @@ export function WhyVerdict({ data, className = '' }: { data: WhyVerdictData; cla
             level and the confidence as their own labelled parts.
             The DISTINCTION IS PRESERVED, and is the only thing that decides
             what may be claimed: `verified` is stated plainly, anything else
-            is marked as the softer claim it is. */}
+            is marked as the softer claim it is.
+
+            AND IT DEGRADES TO THE SENTENCE THE SERVER ALREADY WROTE. The
+            structured parts are what `buildItemExplanation` produces today,
+            but this panel also renders payloads it did not just serialize —
+            a cached response, a client that has not reloaded, any surface that
+            carries availability without a resolved provider identity. When
+            `service`/`access` are missing, the row falls back to
+            `availability.text`, which is the SAME grounded fact from the SAME
+            builder, one field over. It is not a second explanation and it is
+            not invented copy — it is the sentence the engine wrote. */}
         {data.availability && (
           <div
             className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] leading-relaxed text-slate-100"
@@ -137,8 +150,16 @@ export function WhyVerdict({ data, className = '' }: { data: WhyVerdictData; cla
             data-confidence={data.availability.confidence}
             aria-label={`${data.availability.text} — ${data.availability.confidence}`}
           >
-            <ProviderChip data={{ name: data.availability.service, logoPath: data.availability.logoPath }} withLabel />
-            <span className="text-[13px] text-slate-300">{data.availability.access}</span>
+            {data.availability.service ? (
+              <>
+                <ProviderChip data={{ name: data.availability.service, logoPath: data.availability.logoPath }} withLabel />
+                {data.availability.access && (
+                  <span className="text-[13px] text-slate-300">{data.availability.access}</span>
+                )}
+              </>
+            ) : (
+              <span data-testid="why-availability-text">{data.availability.text}</span>
+            )}
             <span
               className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
                 data.availability.confidence === 'verified'

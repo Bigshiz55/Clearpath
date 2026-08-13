@@ -18,8 +18,10 @@ import { officialProviderNames, resolveProviderBrand } from '@/lib/providers/bra
  */
 
 export interface ProviderChipData {
-  /** Canonical/display provider name, e.g. "Netflix", "Prime Video". */
-  name: string;
+  /** Canonical/display provider name, e.g. "Netflix", "Prime Video".
+   *  May legitimately be absent when a payload carries availability without a
+   *  resolved service — the chip renders nothing rather than an empty pill. */
+  name: string | null | undefined;
   /** TMDB logo_path when this caller holds one. Absent is fine — the registry
    *  falls back to its own verified asset for a brand we know. */
   logoPath?: string | null;
@@ -35,8 +37,14 @@ export function ProviderChip({ data, withLabel = false }: { data: ProviderChipDa
   // see src/lib/providers/brand.ts. `via` stays a separate fact: an add-on
   // route is not the base service and must not be folded into its name.
   const brand = resolveProviderBrand({ name: data.name, logoPath: data.logoPath, providerId: data.providerId });
-  const label = data.via ? `${brand.name} (${data.via})` : brand.name;
   const logo = brand.logoPath ? tmdbImage(brand.logoPath, 'w92') : null;
+  // NOTHING IDENTIFIES THIS SERVICE, SO NOTHING IS DRAWN. An empty white pill
+  // is a brand mark for a brand that was never named; the caller's surrounding
+  // copy still carries whatever the payload did know. (This branch used to be
+  // unreachable because an absent name threw one level down — see
+  // `safeName` in providers/brand.ts.)
+  if (!brand.name && !logo) return null;
+  const label = data.via ? `${brand.name} (${data.via})` : brand.name;
 
   if (logo) {
     return (

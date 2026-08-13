@@ -319,52 +319,66 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
             onClick={close}
             aria-label={`Close ${title} trailer`}
             data-testid="trailer-close"
-            className="absolute left-1 top-1 z-[3] grid h-8 w-8 place-items-center rounded-full bg-black/65 text-sm text-white backdrop-blur transition hover:bg-black/85"
+            className="wv-tr-hit absolute left-0 top-0 z-[3] justify-start pl-1 pt-1"
           >
-            ✕
+            <span aria-hidden className="wv-tr-chip h-8 w-8 justify-center text-sm">✕</span>
           </button>
-          {/* Minimal control overlay — mute / restart / fullscreen. */}
-          <div className="absolute bottom-1 right-1 flex gap-1">
+          {/* Minimal control overlay — mute / restart / fullscreen. Same
+              pattern: a 44px button, an 32px mark inside it. */}
+          <div className="absolute bottom-0 right-0 flex">
             <button
               type="button"
               onClick={toggleMute}
+              data-testid="trailer-mute"
               aria-label={muted ? `Unmute ${title} trailer` : `Mute ${title} trailer`}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
+              className="wv-tr-hit pb-1"
             >
-              {muted ? '🔇' : '🔊'}
+              <span aria-hidden className="wv-tr-chip h-8 w-8 justify-center text-sm">{muted ? '🔇' : '🔊'}</span>
             </button>
             <button
               type="button"
               onClick={restart}
+              data-testid="trailer-restart"
               aria-label={`Restart ${title} trailer`}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
+              className="wv-tr-hit pb-1"
             >
-              ↺
+              <span aria-hidden className="wv-tr-chip h-8 w-8 justify-center text-sm">↺</span>
             </button>
             <button
               type="button"
               onClick={fullscreen}
+              data-testid="trailer-fullscreen"
               aria-label={`Play ${title} trailer fullscreen`}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
+              className="wv-tr-hit pb-1 pr-1"
             >
-              ⛶
+              <span aria-hidden className="wv-tr-chip h-8 w-8 justify-center text-sm">⛶</span>
             </button>
           </div>
         </div>
       )}
 
       {/* MANUAL ▶ Trailer affordance — always present (no flag) while not playing.
-          Bottom-RIGHT so it clears bottom-left card labels (release date, etc.). */}
+          Bottom-RIGHT so it clears bottom-left card labels (release date, etc.).
+
+          THE TARGET IS 44px; THE MARK IS NOT. This rendered as a 68×25 pill —
+          the whole control was the visible chrome, so meeting the interaction
+          minimum by growing it would have meant a slab of black across the
+          corner of every poster. Instead the BUTTON is the target (>=44 in both
+          axes, transparent, extending into the poster's own dead corner) and
+          the pill inside it is the mark. Same refined chrome, a thumb-sized
+          hit area. See `.wv-tr-hit` / `.wv-tr-chip` in globals.css. */}
       {!showIframe && (
         <button
           type="button"
           onClick={manualPlay}
           aria-label={`Play ${title} trailer`}
           data-testid="trailer-play"
-          className="absolute bottom-1 right-1 z-[2] flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80"
+          className="wv-tr-hit absolute bottom-0 right-0 z-[2] pb-1 pr-1"
         >
-          <span aria-hidden>▶</span>
-          <span>{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
+          <span className="wv-tr-chip gap-1 px-2 py-1 text-[11px] font-bold">
+            <span aria-hidden>▶</span>
+            <span>{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
+          </span>
         </button>
       )}
     </div>

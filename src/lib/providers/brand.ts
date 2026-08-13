@@ -75,17 +75,37 @@ const OFFICIAL_NAMES: Record<string, string> = {
   'amazon prime video free with ads': 'Prime Video Free with Ads',
 };
 
+/**
+ * A MISSING NAME IS A DATA GAP, NOT A CRASH.
+ *
+ * These functions sit at the boundary between the app and every payload that
+ * carries a provider reference — a TMDB row, a cached availability record, a
+ * serialized explanation. Any of those can arrive without the field, and until
+ * this guard existed `name.trim()` threw a TypeError there: one result with an
+ * unresolved service took down the ENTIRE Finder results page into the error
+ * boundary ("Something went wrong"), because a render that throws unmounts its
+ * whole tree, not the one chip that had bad input.
+ *
+ * The honest answer to "which brand is this?" when nothing identifies it is
+ * "we don't know" — an empty name, which every caller here already treats as
+ * "render nothing". It is never a guess and never a placeholder brand.
+ */
+function safeName(name: string | null | undefined): string {
+  return typeof name === 'string' ? name.trim() : '';
+}
+
 /** Lower-cased, whitespace-collapsed — the key both tables are read with. */
-export function normalizeProviderName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+export function normalizeProviderName(name: string | null | undefined): string {
+  return safeName(name).toLowerCase().replace(/\s+/g, ' ');
 }
 
 /**
  * The official display name for a provider, or the name unchanged when it is
- * already official (which is the common case).
+ * already official (which is the common case). An absent name stays absent.
  */
-export function officialProviderName(name: string): string {
-  const raw = name.trim();
+export function officialProviderName(name: string | null | undefined): string {
+  const raw = safeName(name);
+  if (!raw) return '';
   return OFFICIAL_NAMES[normalizeProviderName(raw)] ?? raw;
 }
 
@@ -98,7 +118,7 @@ export function officialProviderName(name: string): string {
  * never seen still dedupes correctly, and two genuinely different services
  * never merge.
  */
-export function providerBrandKey(name: string, logoPath?: string | null): string {
+export function providerBrandKey(name: string | null | undefined, logoPath?: string | null): string {
   if (logoPath) return `logo:${logoPath}`;
   // CANONICALIZE FIRST. "fuboTV" and "Fubo" are one company, and a list that
   // received both spellings used to print both. Keying off the official name
@@ -128,8 +148,10 @@ export function officialProviderNames(names: string[]): string[] {
 }
 
 export interface ProviderBrandInput {
-  /** The provider name exactly as the data gave it. */
-  name: string;
+  /** The provider name exactly as the data gave it. May legitimately be absent
+   *  — a payload can carry availability with no resolved service, and that is
+   *  a data gap to render honestly, not an error to throw on. */
+  name: string | null | undefined;
   /**
    * A VERIFIED logo path (TMDB `logo_path`) the caller already holds. Absent is
    * FINE and no longer means "text": the registry falls back to its own
