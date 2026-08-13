@@ -53,12 +53,25 @@ describe('entry points', () => {
     expect(heroBlock.match(/btn-primary/g)).toBeNull();
     expect(heroBlock.match(/btn-pulse/g)).toBeNull();
     expect(heroBlock.match(/btn-courtroom/g)).toBeNull();
-    expect(heroBlock.match(/btn-watchverdict/g)).toHaveLength(1);
+    // THE ENTRANCE IS A COMPONENT NOW, NOT INLINE MARKUP. A second section
+    // (the Example Verd1ct) needed the same button, and copying the markup
+    // would have been the start of a second button language — so
+    // `EnterWatchVerd1ctCta` owns it and both places render that. The rule is
+    // unchanged and still enforced: the hero contains exactly ONE brand
+    // entrance, and the class it carries is `.btn-watchverdict`.
+    expect(heroBlock.match(/EnterWatchVerd1ctCta/g)).toHaveLength(1);
+    const cta = read('src/components/landing/EnterWatchVerd1ctCta.tsx');
+    expect(cta.match(/className="btn-watchverdict"/g)).toHaveLength(1);
+    expect(cta).not.toMatch(/btn-primary|btn-pulse|btn-courtroom/);
+    expect(cta).toContain("href=\"/app\"");
     // The DNA quiz + import history are real, visible buttons (btn-secondary
     // — a plain bordered pill, not the brand accent) rather than buried
     // underlined text, but still a visibly quieter class than the brand CTA.
     expect(heroBlock.match(/btn-secondary/g)).toHaveLength(2);
-    expect(page).toContain('data-testid="cta-enter"');
+    // The entrance still identifies itself as `cta-enter`; the component
+    // stamps it onto the anchor from this prop.
+    expect(page).toContain('testId="cta-enter"');
+    expect(cta).toContain('data-testid={testId}');
     expect(page).toContain('data-testid="cta-dna"');
     expect(page).toContain(QUIZ_HREF);
   });

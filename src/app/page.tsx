@@ -3,6 +3,7 @@ import { Logo } from '@/components/Logo';
 import { VerdictProcessPreview } from '@/components/landing/VerdictProcessPreview';
 import { HowYouRule } from '@/components/landing/HowYouRule';
 import { ExampleVerdict } from '@/components/landing/ExampleVerdict';
+import { EnterWatchVerd1ctCta } from '@/components/landing/EnterWatchVerd1ctCta';
 import { GroupVerdictSection } from '@/components/landing/GroupVerdictSection';
 import { PacksSpotlight } from '@/components/landing/PacksSpotlight';
 import { NeedSomethingSpecific } from '@/components/landing/NeedSomethingSpecific';
@@ -110,14 +111,7 @@ export default async function LandingPage() {
         <section className="border-t border-white/10" data-testid="main-cta">
           <div className="container-page flex flex-col items-center py-8 text-center sm:py-8">
             <div className="flex flex-col items-center gap-2 sm:gap-3" data-testid="hero-ctas">
-              <Link
-                href="/app"
-                className="btn-watchverdict"
-                data-testid="cta-enter"
-              >
-                <span aria-hidden className="text-[0.9em] opacity-90">⚖️</span> Enter WatchVerd1ct
-                <span aria-hidden className="wv-cta-sheen pointer-events-none absolute inset-y-0 left-0 w-1/5 bg-gradient-to-r from-transparent via-white/45 to-transparent" />
-              </Link>
+              <EnterWatchVerd1ctCta testId="cta-enter" />
 
               <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
                 <Link
@@ -141,9 +135,11 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* PRODUCT PROOF — a real example of the output, not just the
-            process. See ExampleVerdict's own doc comment for the honesty
-            rules (live scoring, illustrative personal fit/availability). */}
+        {/* PRODUCT PROOF — the REAL card (PosterCard and everything it
+            carries), scored live, in its shipped anonymous state, followed by
+            the one transition into the app. See ExampleVerdict's own doc
+            comment for how each production component tells the truth about
+            having no Taste DNA to work from. */}
         <ExampleVerdict />
 
         {/* WHAT THE CONTROLS ON A REAL CARD MEAN — supporting education,

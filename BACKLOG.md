@@ -42,6 +42,36 @@ and what it unblocks.
   representative.
 
 ## Done
+- **The landing "Example Verd1ct" is the real card now, not a drawing of one.**
+  The section rendered its own bespoke horizontal report — thumbnail poster in
+  an oversized empty box, standalone FOR pill, prose metadata, ± evidence rows
+  outside the card, availability as a sentence, alternate title as prose, its
+  own underlined link. All of it is deleted. The section now renders the
+  production `PosterCard` (and therefore `CardFacts`, `CardSynopsis`,
+  `AlgorithmScore`, `WhyThisTitle`, `CardFit`, `WhereToWatch` +
+  `ProviderLogos`) with `WhyVerdict` in the card's own `evidence` slot, exactly
+  as `FinderUI` composes a result. No landing-only card markup remains.
+  - **Anonymous personalization is the shipped state, not a demo mode.**
+    `/api/dna` answers `{ dna: null }` for a visitor, so the panel labels
+    itself "WatchVerd1ct" (not "Your VERD1CT") over the general score passed as
+    the new `PosterCard.objectiveScore` pass-through, `CardFit` renders
+    nothing, `WhyThisTitle` claims nothing, and `explainVerdict({ matchScore:
+    null })` prints "No personal taste signal yet — match is generic."
+  - **One primary CTA component.** `EnterWatchVerd1ctCta` now owns
+    `.btn-watchverdict`; the hero and the new post-example transition both
+    render it, so a second button language cannot appear by copy-paste.
+    `quizReachable.test.ts` follows the component and still pins "exactly one
+    ceremonial entrance in the hero".
+  - **Verified at 1440 and 390** via `/dev/landing-example` (MOBILE_HARNESS
+    harness) + `tests/mobile/landing-example.spec.ts`, 11 assertions incl.
+    card proportions, the phone row collapse, and no horizontal overflow.
+  - **Follow-up worth queueing:** `splitMath` (`lib/verdict/explainSections`)
+    cannot lift a nested numeric parenthetical, so the engine's
+    "Well received by audiences (8.7/10 (23,328 votes))." renders in full
+    wherever `WhyVerdict` shows it — including production finder cards. The
+    landing loader drops that reason as a duplicate
+    (`lib/verdict/sourceQuotes.ts`, tested); fixing `splitMath` itself would
+    clean it up everywhere and was out of scope here.
 - **The three false channels are gone from production (`bcb1974`).**
   `NBC.com`, `ABC News Live` and `CBS News` — streaming feeds rendered as
   television channels — are removed from the data and the rendered guide.
