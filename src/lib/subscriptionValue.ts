@@ -39,7 +39,6 @@ const EST_PRICE: Record<number, number> = {
 export interface ServiceValue {
   id: number;
   name: string;
-  emoji: string;
   estPrice: number | null; // monthly, null = unknown
   watched: number; // recent watched titles available here
   perWatch: number | null; // est cost per watch over the window
@@ -118,7 +117,6 @@ export async function getSubscriptionValue(
     return {
       id,
       name: meta?.name ?? `Service ${id}`,
-      emoji: meta?.emoji ?? '📺',
       estPrice,
       watched,
       perWatch,

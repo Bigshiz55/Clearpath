@@ -4,6 +4,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { verdictVisualForCall } from '@/lib/verdictVisual';
 import { EMPTY_TILE_RATINGS } from '@/lib/ratings';
 import type { TitleVerdict } from '@/lib/askTypes';
+import { ProviderNameList } from '@/components/media/ProviderChip';
 
 const ENGLISH: Record<TitleVerdict['english'], { icon: string; text: string; warn: boolean }> = {
   native: { icon: '🔊', text: 'English (original language)', warn: false },
@@ -92,7 +93,7 @@ export function JudgeVerdictCard({ v }: { v: TitleVerdict }) {
       <div className="mt-3">
         <RatingsStrip ratings={v.ratings ?? EMPTY_TILE_RATINGS} title={v.title} year={v.year} />
         <div className="mt-1.5 flex flex-wrap gap-1">
-          {v.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-300">📺 {v.where}</span>}
+          {v.where && <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-300"><ProviderNameList names={[v.where]} /></span>}
         </div>
       </div>
     </div>

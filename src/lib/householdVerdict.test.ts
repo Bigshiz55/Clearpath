@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { householdVerdict } from './householdVerdict';
 import { explainVerdict } from './verdictExplain';
+import { assetForProvider } from '@/lib/providers/assets';
+
+const NETFLIX_LOGO = assetForProvider('Netflix');
 
 describe('household verd1ct — NOT a blind average', () => {
   it('the mission example: Scott 92 / Heather 86 → strong, no objections', () => {
@@ -98,7 +101,15 @@ describe('why this verd1ct — explanation assembly', () => {
     expect(e.rose).toContain('Strong personal fit (88 match).');
     expect(e.rose).toContain('Fast investigative storytelling');
     expect(e.heldBack).toContain('Darker than your usual weeknight choice');
-    expect(e.availability).toEqual({ text: 'Netflix · Included with subscription', confidence: 'verified' });
+    expect(e.availability).toEqual({
+      text: 'Netflix · Included with subscription',
+      confidence: 'verified',
+      service: 'Netflix',
+      // The registry's own verified Netflix mark — the row renders the brand
+      // even though this caller passed no logo. See providers/assets.ts.
+      logoPath: NETFLIX_LOGO,
+      access: 'Included with subscription',
+    });
     expect(e.confidence.level).toBe('high');
     expect(e.confidence.because).toContain('Availability verified.');
   });

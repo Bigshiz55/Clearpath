@@ -15,6 +15,7 @@ import {
   type Crew,
 } from '@/lib/actions/crews';
 import { TasteCourt } from './TasteCourt';
+import { ProviderNameList } from '@/components/media/ProviderChip';
 
 const AVOIDABLE: PreferenceTrait[] = ['supernatural', 'paranormal', 'science_fiction', 'fantasy', 'noir', 'slow_burn'];
 const LOVABLE: PreferenceTrait[] = ['grounded_crime', 'psychological_thriller', 'detective_mystery', 'domestic_thriller', 'serial_killer'];
@@ -261,7 +262,7 @@ export function CloudCrews() {
                         <div className="mt-1.5 flex flex-wrap gap-1">
                           {p.perMember.map((pm) => <span key={pm.name} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${pm.vetoed ? 'bg-red-500/20 text-red-200' : 'bg-white/10 text-slate-200'}`}>{pm.name} {pm.vetoed ? '✗' : pm.score}</span>)}
                         </div>
-                        {p.streaming.length > 0 && <div className="mt-1 text-[11px] text-slate-400">📺 {p.streaming.join(', ')}</div>}
+                        {p.streaming.length > 0 && <ProviderNameList names={p.streaming} className="mt-1 block text-[11px] text-slate-400" />}
                       </div>
                     </div>
                     {i === 0 && (

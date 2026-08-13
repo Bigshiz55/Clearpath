@@ -352,9 +352,16 @@ export function SearchBar({
               data-testid="search-intent-card"
               className="mb-3 flex min-h-[52px] items-center gap-3 rounded-xl border border-brand-400/40 bg-brand-500/15 px-3 py-2.5 hover:bg-brand-500/25"
             >
-              <span aria-hidden className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-brand-500/25 text-base">
-                {intent.kind === 'provider' ? '📺' : intent.kind === 'network' ? '🏛️' : '🎬'}
-              </span>
+              {/* NO GLYPH STANDS IN FOR A BRAND. A provider or network intent
+                  names a real company, and a television emoji is not its mark —
+                  the bold label beside this ("Best on Netflix", "Hallmark
+                  picks") is the identity, set as text. Genre and subject rows
+                  are not brands, so they keep their decorative icon. */}
+              {intent.kind !== 'provider' && intent.kind !== 'network' && (
+                <span aria-hidden className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-brand-500/25 text-base">
+                  🎬
+                </span>
+              )}
               <span className="min-w-0">
                 <span className="block truncate text-sm font-bold text-brand-50">
                   {intent.kind === 'provider' && `Best on ${intent.label}`}

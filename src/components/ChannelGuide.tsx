@@ -22,6 +22,7 @@ import { setTvReminder } from '@/lib/actions/tvReminders';
 import { addToWatchlist } from '@/lib/actions/watchlist';
 import { ScoreBadge } from '@/components/tv/ScoreBadge';
 import type { Airing } from '@/lib/onTv';
+import { NetworkChip } from '@/components/media/ProviderChip';
 
 /**
  * THE CHANNEL GUIDE — the cable-box view.
@@ -301,13 +302,24 @@ export function ChannelGuide({
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <h3 className="flex min-w-0 items-center gap-2 truncate text-sm font-black uppercase tracking-wide text-white">
-                    <span
-                      aria-hidden
-                      className="grid h-6 w-9 flex-none place-items-center rounded-md text-[9px] font-black tracking-wide"
-                      style={{ backgroundColor: `hsl(${channelHue(id.name)} 45% 22%)`, color: `hsl(${channelHue(id.name)} 80% 82%)` }}
-                    >
-                      {id.monogram}
-                    </span>
+                    {/* THE STATION'S OWN MARK WHEN WE HOLD ONE, the monogram
+                        when we do not. `tv_stations.logo_url` is licensed data
+                        and is plumbed through `ingestedGuide` → `channelGuide`
+                        → here, so a licensed source lights every row up without
+                        another change. Until then the monogram stands: it is a
+                        stable, honest identity, and it is emphatically not a
+                        borrowed streaming logo or a television emoji. */}
+                    {r.networkLogoUrl ? (
+                      <NetworkChip name={id.name} logoUrl={r.networkLogoUrl} />
+                    ) : (
+                      <span
+                        aria-hidden
+                        className="grid h-6 w-9 flex-none place-items-center rounded-md text-[9px] font-black tracking-wide"
+                        style={{ backgroundColor: `hsl(${channelHue(id.name)} 45% 22%)`, color: `hsl(${channelHue(id.name)} 80% 82%)` }}
+                      >
+                        {id.monogram}
+                      </span>
+                    )}
                     <span className="truncate" title={id.mapped ? `${id.name} (${r.network})` : id.name} data-testid="guide-channel-name">
                       {id.name}
                     </span>

@@ -31,6 +31,15 @@ interface PosterCardProps {
   onOpen?: () => void;
   /** 1-based position in an endless feed. Drawn on the artwork; omitted elsewhere. */
   rank?: number;
+  /**
+   * The general, non-personal quality score, for surfaces where `/api/dna`
+   * legitimately answers "no profile" — i.e. an anonymous viewer. Handed
+   * straight to `AlgorithmScore`, which has always taken it (see
+   * `WatchNowGrid`) and which falls back to it only when there is no DNA to
+   * blend. Signed-in surfaces leave it null and are unchanged: DNA wins
+   * wherever it exists, so this can never override a personal score.
+   */
+  objectiveScore?: number | null;
   /** Supporting evidence for the decision — pills, the household verdict, the
    *  "Why this Verd1ct?" panel. Rendered at the card's FULL width, after the
    *  score and before the buttons, which is the order a decision is made in:
@@ -61,7 +70,7 @@ export function Poster({ posterUrl, title, className = '' }: { posterUrl?: strin
   );
 }
 
-export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen, rank, evidence }: PosterCardProps) {
+export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath, tmdbId, meta, children, overlay, onOpen, rank, evidence, objectiveScore = null }: PosterCardProps) {
   // FROM `sm`, THE POSTER IS LETTERBOXED, NOT CROPPED. The tile itself is now a
   // fixed, shorter box (see `.wv-card-art`) — `object-contain` keeps the whole
   // poster visible inside it, centered, at its true proportions. `object-cover`
@@ -220,7 +229,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             level with the poster instead of leaving the gap it was put there
             to fill. */}
         {saveId != null && (
-          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} className="mt-auto pt-2" />
+          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} objectiveScore={objectiveScore} className="mt-auto pt-2" />
         )}
       </div>
       </div>

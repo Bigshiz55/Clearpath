@@ -4,6 +4,7 @@ import { originSummary } from '@/lib/origin';
 import { DnaScore } from '@/components/DnaScore';
 import { formatRating } from '@/lib/ratings/format';
 import { VerdictConfidence } from './VerdictConfidence';
+import { officialProviderNames } from '@/lib/providers/brand';
 
 // Niche community aggregators we don't surface — they read as "random stars".
 // Metacritic is dropped too: it's usually sparse and adds a fourth number that
@@ -113,10 +114,12 @@ export function AtAGlance({
       </div>
 
       <div className="mt-3 flex items-start gap-2 text-sm">
-        <span aria-hidden>📺</span>
         {streamNames.length > 0 ? (
           <span className="text-slate-200">
-            <span className="font-semibold text-white">Streaming:</span> {streamNames.join(', ')}
+            {/* The official spellings, from the one brand registry — a
+                television emoji is not a brand mark. */}
+            <span className="font-semibold text-white">Streaming:</span>{' '}
+            {officialProviderNames(streamNames).join(' · ')}
           </span>
         ) : (
           <span className="text-slate-400">

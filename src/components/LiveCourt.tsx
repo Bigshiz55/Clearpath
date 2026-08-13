@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { WatchVerdictWordmark } from './WatchVerdictWordmark';
 import { qrForUrl } from '@/lib/actions/qr';
 import { getMyTaste, type MyTaste } from '@/lib/actions/profile';
+import { ProviderNameList } from '@/components/media/ProviderChip';
 
 const MOODS = [
   { key: 'any', label: 'Anything', emoji: '🎬' }, { key: 'light', label: 'Light', emoji: '🌤️' },
@@ -363,7 +364,7 @@ function FinalistCard({ f, onVeto, busy }: { f: Finalist; onVeto: () => void; bu
               </span>
             ))}
           </div>
-          {f.streaming.length > 0 && <div className="mt-1.5 line-clamp-1 text-[11px] text-slate-400">📺 {f.streaming.join(', ')}</div>}
+          {f.streaming.length > 0 && <ProviderNameList names={f.streaming} className="mt-1.5 line-clamp-1 block text-[11px] text-slate-400" />}
         </div>
       </div>
       <button onClick={onVeto} disabled={busy} className="mt-2 w-full rounded-xl border border-red-400/40 bg-red-500/10 py-2 text-xs font-bold text-red-100 transition hover:bg-red-500/20 disabled:opacity-40">
