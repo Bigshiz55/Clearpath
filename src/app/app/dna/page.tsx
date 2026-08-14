@@ -86,8 +86,8 @@ export default async function WatchDnaPage() {
               <span aria-hidden>⚡️</span> Rapid Fire
             </div>
             <p className="mt-1 text-sm text-slate-400">
-              Import your history, then rate it at a tap a title. Turns &ldquo;you pressed play&rdquo; into
-              something worth ranking on. Try it on sample data first.
+              Rate what your real history says you watched, a tap a title. Turns &ldquo;you pressed
+              play&rdquo; into something worth ranking on.
             </p>
           </Link>
           <Link href="/import-taste" className="card p-4 transition hover:bg-white/10" data-testid="link-import-taste">
