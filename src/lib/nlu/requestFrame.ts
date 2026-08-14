@@ -42,6 +42,24 @@
  * returned untouched, because a title made entirely of framing words is still a
  * title — "Get Out", "Us", "Some Like It Hot".
  *
+ * ── WHERE THIS SITS, AND WHAT IT MAY NEVER BECOME ────────────────────────
+ * This is a LEXICAL PRIMITIVE and it is deliberately the junior partner. It
+ * knows which framings are real — the lead phrases, the count forms, the
+ * personalization tail, and the discipline that keeps "Get Out" and "A Few Good
+ * Men" from looking like orders. It has NO opinion about what a request is FOR.
+ *
+ * `src/lib/interpret/` is the canonical semantic front door: clause role,
+ * `kind`, `requestedCount`, person spans, and the CREDIT ROLE this file cannot
+ * express at all. It CONSUMES this module (see `classifyClause`) rather than
+ * re-deriving the same framing, which is what stops `/api/ask` from eventually
+ * disagreeing with itself depending on which layer answered.
+ *
+ * SO: nothing semantic may be added here. No roles, no relations, no genre or
+ * subject extraction, no decision about whether something should be executed.
+ * If a change needs any of those, it belongs in `interpret/` and this file
+ * should be given a smaller job, not a bigger one.
+ * `interpret/inheritance.test.ts` enforces the boundary in both directions.
+ *
  * PURE. No I/O, no clock.
  */
 
