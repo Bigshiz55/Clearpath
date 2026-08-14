@@ -297,6 +297,19 @@ export async function POST(req: Request) {
     // matter what happens to share the name.
     const lex = text.trim() ? lexicalIntent(text) : null;
 
+    // 0.62) INTERPRETATION PRECEDES MODE SELECTION.
+    //
+    // The canonical reading of the sentence is computed here — BEFORE any
+    // serving-mode branch — because serving mode may choose WHO executes a
+    // request, never WHAT it means. Before this ordering, `anthropic` mode
+    // returned a finished answer from the orchestrator without the canonical
+    // interpreter ever running, and read the count off the whole utterance:
+    // the same sentence meant different things under different deployment
+    // variables. The interpreter is pure and environment-blind (its own
+    // tests grep for env reads), so this single reading is what every mode
+    // downstream executes.
+    const canonical = text.trim() ? interpret(text) : null;
+
     // 0.65) THE COMPARATIVE INTENT BOUNDARY.
     //
     // UNDERSTANDING WHAT WAS ASKED PRECEDES CHOOSING WHO ANSWERS IT. This runs
@@ -324,7 +337,13 @@ export async function POST(req: Request) {
     //
     // Comparatives are NOT its to answer — that is `askDecision` above, and the
     // guard restates it here so the branch is self-explaining at the call site.
-    if (aiMode === 'anthropic' && !conversational && text.trim() && !criticRequest) {
+    // A request the canonical layer RECOGNISES — a recommendation or a title
+    // lookup — takes the canonical pipeline in every mode; the orchestrator
+    // may only be handed language the interpreter does not recognise as an
+    // executable request. Anything else lets a deployment variable change
+    // what the same sentence means.
+    const canonicalRecognises = canonical !== null && canonical.kind !== 'statement';
+    if (aiMode === 'anthropic' && !conversational && text.trim() && !criticRequest && !canonicalRecognises) {
       const ai = await runAiDiscovery({ supabase, userId: user.id, text, route: 'ask', limit: parseRequestedCount(text) });
       if (ai.kind === 'clarify') {
         return NextResponse.json({ kind: 'clarify', requestId, clarify: ai.question, options: ai.options, interpretation: ai.interpretation, query: { ...EMPTY_QUERY }, items: [] });
@@ -804,7 +823,7 @@ export async function POST(req: Request) {
      * is untouched and still built exactly as before. This step removes the
      * duplicated language decisions; it does not rewrite the engine underneath.
      */
-    const canonical = text.trim() ? interpret(text) : null;
+    // (`canonical` was computed at 0.62, before any serving-mode branch.)
     const canonicalOwnsLanguage = canonical !== null && canonical.kind === 'recommendation';
 
     if (canonicalOwnsLanguage) {
