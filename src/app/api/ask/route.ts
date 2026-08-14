@@ -807,31 +807,48 @@ export async function POST(req: Request) {
     const canonical = text.trim() ? interpret(text) : null;
     const canonicalOwnsLanguage = canonical !== null && canonical.kind === 'recommendation';
 
-    if (ai) {
+    if (canonicalOwnsLanguage) {
+      /*
+       * THE CANONICAL ARM STARTS EMPTY — no whole-utterance base to patch.
+       *
+       * The previous shape took the LLM/naive parse of the WHOLE SENTENCE as
+       * the base query and overwrote person/subject/count from the canonical
+       * reading. Every field the overwrite missed was a side door: measured,
+       * "I watched a horror movie yesterday. Give me a courtroom movie."
+       * executed with the anecdote's horror in `genreIds`, a background year
+       * landed in `minYear`, background TV moved `mediaType`. The burrito
+       * defect, one field over.
+       *
+       * So on this arm the query is BUILT from CanonicalIntent + world
+       * resolution (below, `resolveCanonicalExecution`) and from nothing
+       * else. The count is the request clause's; an unsaid count stays
+       * unsaid and the shared default applies.
+       */
+      query = { ...EMPTY_QUERY };
+      limit = canonical.requestedCount ?? DEFAULT_RESULT_LIMIT;
+    } else if (ai) {
       query = ai.query;
       limit = ai.limit;
     } else {
       query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
+      // The arm already excludes the canonical path; the guard restates it so
+      // the fence is visible at the call site itself.
       if (text && !canonicalOwnsLanguage) limit = parseRequestedCount(text);
-    }
-    /*
-     * The count the sentence carried, read from the request clause only —
-     * REPLACING both readings above rather than running alongside them. The
-     * whole-utterance reader took the "3" out of "I watched 3 movies yesterday"
-     * because it scanned the anecdote too, so on this path it is not called at
-     * all. An unsaid count stays unsaid and the shared default applies.
-     */
-    if (canonicalOwnsLanguage) {
-      limit = canonical.requestedCount ?? DEFAULT_RESULT_LIMIT;
     }
     // Foreign-origin / English-audio / runtime augmentation (deterministic; the
     // parser paths don't extract these) — restricts the pool to the real origin.
-    query = augmentInternational(query, text);
+    // LEGACY ARM ONLY here: the canonical arm applies the origin/audio overlay
+    // after its query is built, with the canonical-owned fields protected.
+    if (!canonicalOwnsLanguage) {
+      query = augmentInternational(query, text);
+    }
     // DETERMINISTIC CONSTRAINT OVERLAY. Stated years and genre exclusions are
     // facts of the sentence, not judgment calls — when the LLM parse dropped
     // one ("after 2020" arriving with no year bound), the regex parser's
-    // reading fills the gap. Overlay only, never override.
-    if (text.trim()) {
+    // reading fills the gap. Overlay only, never override. LEGACY ARM ONLY:
+    // on the canonical arm dates and genres are the interpreter's to state,
+    // and this overlay reads the whole utterance — anecdote included.
+    if (text.trim() && !canonicalOwnsLanguage) {
       const det = naiveParseQuery(text);
       if (det.minYear != null && query.minYear == null) query.minYear = det.minYear;
       if (det.maxYear != null && query.maxYear == null) query.maxYear = det.maxYear;
@@ -852,7 +869,8 @@ export async function POST(req: Request) {
       // the subject itself and answered with generic action. Keep only the
       // genres the sentence actually states whenever a subject keyword is
       // present; the subject is the request.
-      if ((query.keywordIds?.length ?? 0) > 0 || parseTopicTerms(text).length > 0) {
+      const statedTopics = parseTopicTerms(text);
+      if ((query.keywordIds?.length ?? 0) > 0 || statedTopics.length > 0) {
         const stated = new Set(det.genreIds);
         if (query.genreIds.length > 0) query.genreIds = query.genreIds.filter((g) => stated.has(g));
       }
@@ -864,7 +882,10 @@ export async function POST(req: Request) {
     // deterministically every time. Resolved through the same `searchKeywords`
     // the AI path uses. Best-effort: an unresolved term is skipped, never
     // guessed.
-    if (text) {
+    // LEGACY ARM ONLY: `parseTopicTerms` reads the whole utterance, so on the
+    // canonical arm it would hand the anecdote's nouns to keyword resolution —
+    // the canonical subject already reached the query through the interpreter.
+    if (text && !canonicalOwnsLanguage) {
       const topics = parseTopicTerms(text);
       if (topics.length) {
         const ids = await searchKeywords(topics).catch(() => []);
@@ -901,30 +922,34 @@ export async function POST(req: Request) {
     const consumedEntities: ConsumedEntity[] = [...(ai?.resolvedPeople ?? [])];
     let canonicalInterpretation: string[] = [];
     let canonicalAmbiguity: Awaited<ReturnType<typeof resolveCanonicalExecution>>['ambiguity'] = null;
+    let canonicalExcludedPersonIds: number[] = [];
     if (canonicalOwnsLanguage) {
       const exec = await resolveCanonicalExecution(canonical);
       canonicalAmbiguity = exec.ambiguity;
       canonicalInterpretation = exec.interpretation;
-      // The canonical reading REPLACES any person the AI parse guessed at, so
-      // the two can never both be live on the same request.
-      delete query.castIds;
-      if (exec.query.castIds?.length) {
-        query.castIds = exec.query.castIds;
-        query.mediaType = 'movie';
-      }
-      if (exec.query.subjectStrict) {
-        query.subjectKeywordIds = exec.query.subjectKeywordIds;
-        query.subjectLexemes = exec.query.subjectLexemes;
-        query.subjectStrict = true;
-        query.subjectLabel = exec.query.subjectLabel;
-        query.subjectCanonical = exec.query.subjectCanonical;
-      }
-      if (exec.query.excludeKeywordIds?.length) {
-        query.excludeKeywordIds = [
-          ...new Set([...(query.excludeKeywordIds ?? []), ...exec.query.excludeKeywordIds]),
-        ];
-      }
-      if (exec.query.finalCount != null) query.finalCount = exec.query.finalCount;
+      canonicalExcludedPersonIds = exec.excludePersonIds;
+      /*
+       * THE QUERY IS THE EXECUTION OF THE INTENT — wholesale, not a patch.
+       * `exec.query` was built from `CanonicalIntent` (media, genres and
+       * their vetoes, dates, runtime, count) plus world resolution (cast ids,
+       * subject keywords, excluded keywords, provider ids). Nothing read the
+       * raw sentence to build it, so nothing from the anecdote can be inside.
+       */
+      query = { ...exec.query };
+      /*
+       * TRANSITIONAL, EXPLICITLY NOT OWNED: foreign-origin and English-audio
+       * restriction. `CanonicalIntent` does not model origin/audio yet, and
+       * dropping the overlay would broaden every "french thriller" ask, so
+       * the overlay still reads the sentence FOR THOSE FIELDS ONLY — the
+       * canonical-owned media and runtime are restored so a whole-utterance
+       * reader cannot move them. Delete this the day the interpreter grows
+       * an origin field.
+       */
+      const ownedMediaType = query.mediaType;
+      const ownedMaxRuntime = query.maxRuntime;
+      query = augmentInternational(query, text);
+      query.mediaType = ownedMediaType;
+      query.maxRuntime = ownedMaxRuntime;
     } else if (text && (!query.castIds || query.castIds.length === 0) && !lex) {
       // LEGACY PATH ONLY. Guarantee the actor filter regardless of AI: if a
       // person is named and not already resolved, look them up (fuzzy, so
@@ -995,26 +1020,40 @@ export async function POST(req: Request) {
     // The same excluded-person hard constraint, on the discovery path. Enforced
     // on real credit evidence, only when the ask names someone to rule out; an
     // unverifiable candidate is kept rather than silently emptying the answer.
-    const finderExclName = text ? extractExcludedPerson(text) : null;
-    if (finderExclName) {
-      const pid = (await searchPeople(finderExclName).catch(() => []))[0]?.id ?? null;
-      if (pid != null) {
-        const verdicts = await Promise.all(
-          items.map((i) =>
-            getCredits(i.mediaType === 'tv' ? 'tv' : 'movie', i.id)
-              .then(
-                (c) =>
-                  !c.cast.some((p) => p.id === pid) &&
-                  !c.directors.some((p) => p.id === pid) &&
-                  !c.creators.some((p) => p.id === pid),
-              )
-              .catch(() => true),
-          ),
-        );
-        items = items.filter((_, idx) => verdicts[idx]);
+    // The canonical arm supplies ids the interpreter + world already resolved;
+    // the legacy arm still reads the raw sentence.
+    let excludedPersonIds: number[] = canonicalExcludedPersonIds;
+    if (text && !canonicalOwnsLanguage) {
+      const finderExclName = extractExcludedPerson(text);
+      if (finderExclName) {
+        const pid = (await searchPeople(finderExclName).catch(() => []))[0]?.id ?? null;
+        if (pid != null) excludedPersonIds = [pid];
       }
     }
-    const plan = text.trim() ? buildQueryPlan(text) : null;
+    if (excludedPersonIds.length > 0) {
+      const verdicts = await Promise.all(
+        items.map((i) =>
+          getCredits(i.mediaType === 'tv' ? 'tv' : 'movie', i.id)
+            .then(
+              (c) =>
+                !excludedPersonIds.some(
+                  (pid) =>
+                    c.cast.some((p) => p.id === pid) ||
+                    c.directors.some((p) => p.id === pid) ||
+                    c.creators.some((p) => p.id === pid),
+                ),
+            )
+            .catch(() => true),
+        ),
+      );
+      items = items.filter((_, idx) => verdicts[idx]);
+    }
+    // LEGACY ARM ONLY: the coarse media plan reads the whole utterance; the
+    // canonical arm's medium is already a hard constraint on discovery.
+    let plan: ReturnType<typeof buildQueryPlan> | null = null;
+    if (text.trim() && !canonicalOwnsLanguage) {
+      plan = buildQueryPlan(text);
+    }
     if (plan && plan.mediaTypes.length > 0) {
       items = items.filter((i) => plan.mediaTypes.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
     }

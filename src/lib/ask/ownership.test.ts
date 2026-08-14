@@ -42,6 +42,15 @@ const RAW_LANGUAGE_HELPERS = [
   { name: 'resolvePerson', owns: 'person identity' },
   { name: 'parseRequestedCount', owns: 'requested count' },
   { name: 'applyRequiredSubject', owns: 'required subject' },
+  // The side doors closed by the integration: each of these reads the WHOLE
+  // utterance — anecdote included — and used to contribute executable fields
+  // underneath the canonical reading. Measured: background "horror" reached
+  // `genreIds`, a background year reached `minYear`, background TV moved
+  // `mediaType`. On the canonical arm every one of them is fenced off.
+  { name: 'naiveParseQuery', owns: 'genres / media / dates' },
+  { name: 'parseTopicTerms', owns: 'topic keywords' },
+  { name: 'extractExcludedPerson', owns: 'excluded people' },
+  { name: 'buildQueryPlan', owns: 'coarse media filtering' },
 ] as const;
 
 /** Comments describe the fence; only executable text can breach it. */

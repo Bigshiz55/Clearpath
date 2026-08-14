@@ -67,12 +67,28 @@ export function intentToQuery(intent: CanonicalIntent): MappedIntent {
   const wantedGenres = intent.genres.filter((g) => g.wanted);
   const vetoedGenres = intent.genres.filter((g) => !g.wanted);
 
-  const genreIds = wantedGenres
-    .map((g) => genreIdFromName(g.span))
-    .filter((n): n is number => n != null);
-  const excludeGenreIds = vetoedGenres
-    .map((g) => genreIdFromName(g.span))
-    .filter((n): n is number => n != null);
+  /*
+   * A GENRE WORD THE CATALOG HAS NO GENRE FOR IS STILL A CONSTRAINT.
+   * "supernatural" is in the interpreter's genre vocabulary but TMDB has no
+   * such genre id — dropping it silently would turn "no supernatural stuff"
+   * into nothing at all, which is ignoring a veto. The span falls back to the
+   * SUBJECT channel instead (keyword resolution downstream), so the
+   * constraint stays executable and canonical-owned.
+   */
+  const genreIds: number[] = [];
+  const unmappedWanted: string[] = [];
+  for (const g of wantedGenres) {
+    const id = genreIdFromName(g.span);
+    if (id != null) genreIds.push(id);
+    else unmappedWanted.push(g.span);
+  }
+  const excludeGenreIds: number[] = [];
+  const unmappedVetoed: string[] = [];
+  for (const g of vetoedGenres) {
+    const id = genreIdFromName(g.span);
+    if (id != null) excludeGenreIds.push(id);
+    else unmappedVetoed.push(g.span);
+  }
 
   const query: FinderQuery = {
     ...EMPTY_QUERY,
@@ -92,8 +108,8 @@ export function intentToQuery(intent: CanonicalIntent): MappedIntent {
         .filter((p) => p.relation === 'required')
         .map((p) => ({ spokenAs: p.span, role: p.role })),
       excludedPeople: intent.people.filter((p) => p.relation === 'excluded').map((p) => p.span),
-      requiredSubjects: intent.subjects.filter((s) => s.wanted).map((s) => s.span),
-      excludedSubjects: intent.subjects.filter((s) => !s.wanted).map((s) => s.span),
+      requiredSubjects: [...intent.subjects.filter((s) => s.wanted).map((s) => s.span), ...unmappedWanted],
+      excludedSubjects: [...intent.subjects.filter((s) => !s.wanted).map((s) => s.span), ...unmappedVetoed],
       providers: [...intent.providers],
     },
     requestedCount: intent.requestedCount,
