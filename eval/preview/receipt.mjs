@@ -10,10 +10,13 @@
  *                that had understood the request perfectly was reported as
  *                having misread it. TMDB genre 53 IS Thriller.
  *
- *   FALSE GREEN  `/\b53\b/` over the whole response matches `minImdb: 5.3`
- *                once JSON is flattened, a runtime of 53, a `sinceMonths` of
- *                53, a person id containing 53, and the string "1953" in a
- *                title. Any of those would have "proved" the genre.
+ *   FALSE GREEN  `/\b53\b/` over the whole response also matches a 53-minute
+ *                runtime cap, a 53-month window, an audience floor of 53,
+ *                PERSON id 53, genre 53 in the EXCLUDE list — the opposite
+ *                meaning — a returned item whose id is 53, and a returned item
+ *                that IS a thriller. Any of those would have "proved" that a
+ *                thriller was requested. Each one is asserted in
+ *                receipt.test.ts: matched by the text oracle, rejected here.
  *
  * So a canonical field is asserted at its PATH, with an exact value. The claim
  * becomes precisely what it says: *TMDB Thriller genre id 53 is present in
@@ -27,9 +30,15 @@
  * contract changes.
  */
 
-/** TMDB genre ids used by the canonical cases. Ids, because that is what the
- *  executable query carries — a name here would be a translation layer that
- *  could disagree with the thing it claims to describe. */
+/**
+ * TMDB genre ids used by the canonical cases. Ids, because that is what the
+ * executable query carries — a name here would be a translation layer that
+ * could disagree with the thing it claims to describe.
+ *
+ * These are the app's OWN canonical mapping, not this file's opinion of TMDB:
+ * `src/lib/finderGenres.ts:24` is `thriller: 53`, and line 32 pairs id 53 with
+ * the label "Thriller". The gate asserts against the product's vocabulary.
+ */
 export const TMDB_GENRE = { THRILLER: 53, DOCUMENTARY: 99 };
 
 /** TMDB person ids used by the canonical cases. */
@@ -117,6 +126,10 @@ export function describeQuery(body) {
     subjectCanonical: q.subjectCanonical,
     subjectLexemes: q.subjectLexemes,
     subjectStrict: q.subjectStrict,
+    // Whether the strict subject resolved to anything the catalog can retrieve
+    // WITH. An empty list here and a zero candidate pool are the same fact seen
+    // from two sides, and printing it stops that having to be inferred.
+    subjectKeywordIds: q.subjectKeywordIds,
   };
   return JSON.stringify(Object.fromEntries(Object.entries(picked).filter(([, v]) => v !== undefined)));
 }
