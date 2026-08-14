@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { NavLink } from './MoreMenu';
+import { navHref } from '@/lib/nav/returnTo';
 
 /** Mobile bottom bar: primary links inline + a "More" sheet for the rest, so the
  *  bar never gets crowded past the point of usability. */
@@ -39,7 +40,8 @@ export function MobileNav({ primary, secondary }: { primary: NavLink[]; secondar
             {secondary.map((l) => (
               <Link
                 key={l.href}
-                href={l.href}
+                // The tour carries where you are now, so its Done returns here.
+                href={navHref(l.href, pathname)}
                 className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${isActive(l.href) ? 'bg-[#ff1493]/20 text-pink-100' : 'text-slate-200 hover:bg-white/10'}`}
               >
                 {l.label}

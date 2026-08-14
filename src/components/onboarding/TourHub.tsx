@@ -31,7 +31,7 @@ function markSeen() {
   }
 }
 
-export function TourHub() {
+export function TourHub({ returnTo = '/app' }: { returnTo?: string }) {
   const [selected, setSelected] = useState<string | null>(null);
 
   // Arriving here at all is "taking the tour" — TourHint's own CTA says
@@ -44,12 +44,14 @@ export function TourHub() {
   const topic = selected ? TOUR_TOPICS.find((t) => t.id === selected) : null;
 
   if (!topic) {
-    return <TopicGrid onSelect={setSelected} />;
+    return <TopicGrid onSelect={setSelected} returnTo={returnTo} />;
   }
-  return <TopicDetail topic={topic} onBack={() => setSelected(null)} onSelect={setSelected} />;
+  return (
+    <TopicDetail topic={topic} onBack={() => setSelected(null)} onSelect={setSelected} returnTo={returnTo} />
+  );
 }
 
-function TopicGrid({ onSelect }: { onSelect: (id: string) => void }) {
+function TopicGrid({ onSelect, returnTo }: { onSelect: (id: string) => void; returnTo: string }) {
   return (
     <div className="mx-auto w-full max-w-4xl">
       <div className="text-center">
@@ -79,8 +81,11 @@ function TopicGrid({ onSelect }: { onSelect: (id: string) => void }) {
       </div>
 
       <div className="mt-8 text-center">
-        <Link href="/app" data-testid="tour-done" className="btn-secondary inline-flex">
-          Done — take me to the app
+        {/* Back to WHERE YOU CAME FROM — the validated returnTo, never a raw
+            query value and never the browser's back stack (which, after
+            topic-hopping, points into the tour itself). */}
+        <Link href={returnTo} data-testid="tour-done" className="btn-secondary inline-flex">
+          Done — take me back
         </Link>
       </div>
     </div>
@@ -91,10 +96,12 @@ function TopicDetail({
   topic,
   onBack,
   onSelect,
+  returnTo,
 }: {
   topic: TourTopic;
   onBack: () => void;
   onSelect: (id: string) => void;
+  returnTo: string;
 }) {
   const index = TOUR_TOPICS.findIndex((t) => t.id === topic.id);
   const isFirst = index === 0;
@@ -111,7 +118,17 @@ function TopicDetail({
         <ArrowLeft aria-hidden className="h-4 w-4" /> All topics
       </button>
 
-      <div className="card wv-tile p-6 text-center sm:p-8" data-testid={`tour-topic-detail-${topic.id}`}>
+      {/* A STABLE VIEWPORT, STRUCTURALLY. The card used to size itself to each
+          topic's content, so the footer below it jumped between slides and the
+          Next button moved out from under the pointer. The card is now a
+          FIXED-height column per breakpoint; the CONTENT area is the only
+          thing that flexes, and it scrolls internally when a topic runs long —
+          controls never move, content never truncates. */}
+      <div
+        className="card wv-tile flex h-[min(30rem,65dvh)] flex-col p-0 text-center sm:h-[min(34rem,70dvh)]"
+        data-testid={`tour-topic-detail-${topic.id}`}
+      >
+        <div className="flex-1 overflow-y-auto p-6 sm:p-8" data-testid="tour-topic-scroll">
         <span aria-hidden className="text-5xl">
           {topic.icon}
         </span>
@@ -158,9 +175,14 @@ function TopicDetail({
             ))}
           </div>
         )}
+        </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-2">
+      {/* THE FOOTER LIVES OUTSIDE THE SCROLL AND BELOW A FIXED-HEIGHT CARD,
+          so Prev / progress / Next hold the same coordinates on every slide.
+          On the last topic the Next SLOT (same size, same position) becomes
+          Done — and Done goes back to the page the user entered from. */}
+      <div className="mt-5 flex items-center justify-between gap-2" data-testid="tour-footer">
         <button
           type="button"
           onClick={() => onSelect(TOUR_TOPICS[index - 1]!.id)}
@@ -175,15 +197,24 @@ function TopicDetail({
           {index + 1} of {TOUR_TOPICS.length}
         </span>
 
-        <button
-          type="button"
-          onClick={() => onSelect(TOUR_TOPICS[index + 1]!.id)}
-          disabled={isLast}
-          data-testid="tour-next-topic"
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-slate-300 transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          Next <ArrowRight aria-hidden className="h-4 w-4" />
-        </button>
+        {isLast ? (
+          <Link
+            href={returnTo}
+            data-testid="tour-final-done"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 text-sm font-bold text-brand-200 transition hover:bg-white/5"
+          >
+            Done <ArrowRight aria-hidden className="h-4 w-4" />
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onSelect(TOUR_TOPICS[index + 1]!.id)}
+            data-testid="tour-next-topic"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-slate-300 transition hover:bg-white/5"
+          >
+            Next <ArrowRight aria-hidden className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );
