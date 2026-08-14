@@ -136,6 +136,52 @@ export function guideSummary(rows: readonly ChannelRow[]): { channels: number; o
 }
 
 /**
+ * WHY IS "MOVIES" EMPTY? — the smoke distinction the guide owes its reader.
+ *
+ * "0 channels with listings" under the Movies chip is three DIFFERENT truths
+ * wearing one sentence, and only one of them is about the world:
+ *
+ *   true-empty      — the window genuinely holds no listing classified as a
+ *                     movie. A statement about the data, not an error.
+ *   filtered-out    — movie listings EXIST in the window, but the active
+ *                     combination (a category chip, a search) removed the
+ *                     channels carrying them. The media filter alone cannot
+ *                     produce this: it keeps every channel with any movie.
+ *   unprovable-now  — listings classified as movies exist, but every one of
+ *                     them already started and carries NO runtime, so the
+ *                     guide cannot honestly claim it is still on (`onNowOf`
+ *                     refuses) and it appears nowhere. The failing boundary
+ *                     is the SOURCE's runtime field — a pipeline gap, named,
+ *                     never papered over by showing the row anyway.
+ *
+ * Pure; the component renders the right sentence per kind and NEVER
+ * auto-switches the filter, disables the chip, or pads with unrelated
+ * channels to avoid a zero.
+ */
+export type MoviesEmptyDiagnosis =
+  | { kind: 'true-empty'; channelsWithListings: number }
+  | { kind: 'filtered-out'; moviesInWindow: number }
+  | { kind: 'unprovable-now'; startedNoRuntime: number };
+
+export function diagnoseMoviesEmpty(
+  allRows: readonly ChannelRow[],
+  airings: readonly Airing[],
+  nowMs: number,
+): MoviesEmptyDiagnosis {
+  const moviesInWindow = guideSummary(allRows).movies;
+  if (moviesInWindow > 0) return { kind: 'filtered-out', moviesInWindow };
+  const startedNoRuntime = airings.filter(
+    (a) =>
+      a.showType === 'Movie' &&
+      Number.isFinite(Date.parse(a.airstamp)) &&
+      Date.parse(a.airstamp) <= nowMs &&
+      (a.runtime == null || a.runtime <= 0),
+  ).length;
+  if (startedNoRuntime > 0) return { kind: 'unprovable-now', startedNoRuntime };
+  return { kind: 'true-empty', channelsWithListings: allRows.length };
+}
+
+/**
  * Filter a guide to the channels matching a search — by channel name OR by
  * what is on it ("hallmark" finds the channel; "die hard" finds whoever is
  * showing it). Empty query returns everything.

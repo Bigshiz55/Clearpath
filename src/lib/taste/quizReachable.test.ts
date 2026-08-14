@@ -36,7 +36,7 @@ describe('entry points', () => {
     expect(page).toContain("title: 'Taste Quiz");
   });
 
-  it('the landing hero makes ONE ceremonial entrance — the DNA quiz and import history are visible but secondary', () => {
+  it('the landing hero makes ONE entrance — and ONLY one', () => {
     const page = read('src/app/page.tsx');
     // The CTA block is not the first `<section>` on the page — the hero and
     // the three-card process explanation come first, by design (see
@@ -57,39 +57,27 @@ describe('entry points', () => {
     // (the Example Verd1ct) needed the same button, and copying the markup
     // would have been the start of a second button language — so
     // `EnterWatchVerd1ctCta` owns it and both places render that. The rule is
-    // unchanged and still enforced: the hero contains exactly ONE brand
-    // entrance, and the class it carries is `.btn-watchverdict`.
+    // enforced: the hero contains exactly ONE brand entrance, and the class
+    // it carries is `.btn-watchverdict`.
     expect(heroBlock.match(/EnterWatchVerd1ctCta/g)).toHaveLength(1);
     const cta = read('src/components/landing/EnterWatchVerd1ctCta.tsx');
     expect(cta.match(/className="btn-watchverdict"/g)).toHaveLength(1);
     expect(cta).not.toMatch(/btn-primary|btn-pulse|btn-courtroom/);
     expect(cta).toContain("href=\"/app\"");
-    // The DNA quiz + import history are real, visible buttons (btn-secondary
-    // — a plain bordered pill, not the brand accent) rather than buried
-    // underlined text, but still a visibly quieter class than the brand CTA.
-    expect(heroBlock.match(/btn-secondary/g)).toHaveLength(2);
-    // The entrance still identifies itself as `cta-enter`; the component
-    // stamps it onto the anchor from this prop.
+    // The entrance identifies itself as `cta-enter`; the component stamps it
+    // onto the anchor from this prop.
     expect(page).toContain('testId="cta-enter"');
     expect(cta).toContain('data-testid={testId}');
-    expect(page).toContain('data-testid="cta-dna"');
-    expect(page).toContain(QUIZ_HREF);
-  });
-
-  it('the DNA link and import history are secondary buttons, never styled as the primary entrance', () => {
-    const page = read('src/app/page.tsx');
-    for (const testid of ['cta-dna', 'cta-import']) {
-      const at = page.indexOf(`data-testid="${testid}"`);
-      const link = page.slice(page.lastIndexOf('<Link', at), page.indexOf('</Link>', at));
-      expect(link, testid).not.toContain('btn-primary');
-      expect(link, testid).not.toContain('btn-pulse');
-      expect(link, testid).not.toContain('btn-courtroom');
-      expect(link, testid).not.toContain('btn-watchverdict');
-      expect(link, testid).toContain('btn-secondary');
-    }
-    const importAt = page.indexOf('data-testid="cta-import"');
-    const importLink = page.slice(page.lastIndexOf('<Link', importAt), page.indexOf('</Link>', importAt));
-    expect(importLink).toContain('/import-taste');
+    // AND NOTHING ELSE COMPETES. The DNA quiz and import-history pills used
+    // to sit under the entrance as btn-secondary; three doors on the front
+    // step is a decision a visitor hasn't earned yet. Both remain first-class
+    // INSIDE the app — the DNA hub and nav assertions below are what keeps
+    // them reachable — so the hero holds exactly one button and no
+    // secondary items.
+    expect(heroBlock.match(/btn-secondary/g)).toBeNull();
+    expect(page).not.toContain('data-testid="cta-dna"');
+    expect(page).not.toContain('data-testid="cta-import"');
+    expect(page).not.toContain('No account needed');
   });
 
   it('never shows a second, equally-prominent "Start watching" button in the header', () => {
@@ -97,12 +85,14 @@ describe('entry points', () => {
     expect(page).not.toContain('Start watching');
   });
 
-  it('the Build my Watch DNA call to action adapts to how much DNA there is', () => {
+  it('the landing no longer reads per-user DNA to word a second door', () => {
+    // The adaptive "Build/Keep building/Sharpen my Watch DNA" button was the
+    // landing's second entrance; with it gone, the per-user stage query and
+    // its copy table must be gone too — dead machinery on the front page is
+    // how a second door grows back.
     const page = read('src/app/page.tsx');
-    expect(page).toContain('DNA_CTA');
-    for (const stage of ['none', 'started', 'developed']) {
-      expect(page).toContain(`${stage}:`);
-    }
+    expect(page).not.toContain('DNA_CTA');
+    expect(page).not.toContain('dnaStage');
   });
 
   it('the DNA hub offers three ways in', () => {

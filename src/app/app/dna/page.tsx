@@ -55,6 +55,18 @@ export default async function WatchDnaPage() {
       <section data-testid="dna-build">
         <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Build your Watch DNA</h2>
         <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {/* THE TASTE QUIZ LEADS. It is the first-run path (genre calibration
+              then the titles grid), so it holds the first slot; Showdown is a
+              trainer among trainers now, not the front of the line. */}
+          <Link href="/app/taste-quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-taste-quiz">
+            <div className="flex items-center gap-2 text-base font-bold text-white">
+              <span aria-hidden>🎬</span> Taste Quiz
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              Say how you feel about the big genres, then tap the real titles you recognise — good
+              or not. Ignoring one costs nothing.
+            </p>
+          </Link>
           {/* SHOWDOWN SITS UNDER "Build your Watch DNA", with the other
               calibration mechanisms, because that is what it is. The copy names
               the relationship rather than promising an outcome: it says the
@@ -69,22 +81,13 @@ export default async function WatchDnaPage() {
               reach for — and it gets sharper every time you play.
             </p>
           </Link>
-          <Link href="/app/taste-quiz" className="card p-4 transition hover:bg-white/10" data-testid="link-taste-quiz">
-            <div className="flex items-center gap-2 text-base font-bold text-white">
-              <span aria-hidden>🎬</span> Taste Quiz
-            </div>
-            <p className="mt-1 text-sm text-slate-400">
-              Tap the real titles you recognise — good or not — and say what you thought of the ones
-              you have already seen. Ignoring one costs nothing.
-            </p>
-          </Link>
           <Link href="/app/rapid-fire" className="card p-4 transition hover:bg-white/10" data-testid="link-rapid-fire">
             <div className="flex items-center gap-2 text-base font-bold text-white">
               <span aria-hidden>⚡️</span> Rapid Fire
             </div>
             <p className="mt-1 text-sm text-slate-400">
-              Import your history, then rate it at a tap a title. Turns &ldquo;you pressed play&rdquo; into
-              something worth ranking on. Try it on sample data first.
+              Rate what your real history says you watched, a tap a title. Turns &ldquo;you pressed
+              play&rdquo; into something worth ranking on.
             </p>
           </Link>
           <Link href="/import-taste" className="card p-4 transition hover:bg-white/10" data-testid="link-import-taste">

@@ -24,14 +24,14 @@ import { useStartCourt } from '@/lib/court/useStartCourt';
  * and `VotingFloor` genuinely render — not a stock illustration and not a
  * screenshot pasted behind glass. The whole screen is the composition.
  *
- * ── WHAT DID NOT CHANGE ───────────────────────────────────────────────────
- * Every behaviour is the one that shipped. `useStartCourt` still creates the
- * room (same RPC, same host token, same redirect); "Invite the Jury" still
- * opens that same room rather than a second implementation of it; "Quick
- * Pick" still discloses `TogetherPlanner` in place; crews still open
- * `CloudCrews`. The test ids the mobile suite drives — `start-court`,
- * `open-device`, `open-invite`, `open-crews`, `together-secondary` — are all
- * preserved. This is an experiential redesign, not a rewrite of the room.
+ * ── MODE BEFORE CREATION ──────────────────────────────────────────────────
+ * The mode question is the entrance. `useStartCourt` still creates the room
+ * (same RPC, same host token, same redirect), but ONLY from the Jury Room
+ * card — Quick Pick discloses `TogetherPlanner` in place and creates
+ * nothing, so a room can never be mislabeled. Crews still open `CloudCrews`.
+ * The mobile suite drives `open-device`, `open-invite`, `open-crews` and
+ * `together-secondary`; the old generic pre-mode create control is gone and
+ * its absence is itself asserted.
  */
 type Panel = 'device' | 'crews' | null;
 
@@ -74,11 +74,19 @@ export function VerdictRoomEntrance() {
               <br />
               Room
             </h1>
+            {/* THE MODE QUESTION LEADS. A generic room-creation button used
+                to sit here, ABOVE the two modes — which meant a room was
+                created before anyone said what kind of verdict this was. The question is the entrance now, and NOTHING is created
+                until a mode is chosen: Quick Pick opens the on-device planner
+                (no room, no invitation flow), Start Jury Room is the ONE
+                creation path — so a room can never be mislabeled, because a
+                room only ever exists as a Jury Room. */}
             <p
               className="wv-vr-enter mt-4 max-w-md text-base leading-relaxed text-slate-300 sm:text-lg"
+              data-testid="verdict-mode-question"
               style={{ '--wv-vr-step': 2 } as React.CSSProperties}
             >
-              Everyone weighs in. One title wins.
+              Everyone weighs in. One title wins. What kind of verdict are you running?
             </p>
 
             {/* A PHONE HAS NO GUTTERS, SO IT GETS A BAND. On a wide screen the
@@ -87,59 +95,34 @@ export function VerdictRoomEntrance() {
                 shows through it. Without this the shadow room is present and
                 invisible, which is the same as not having built it. */}
             <div
-              className="wv-vr-enter mt-[26vh] flex flex-col gap-3 sm:mt-7 sm:flex-row sm:items-center"
-              style={{ '--wv-vr-step': 3 } as React.CSSProperties}
-            >
-              <button
-                type="button"
-                onClick={() => void start()}
-                disabled={loading}
-                data-testid="start-court"
-                className="btn-enter-room"
-              >
-                {loading ? 'Opening the room…' : 'Start a Verdict Room'}
-                <span
-                  aria-hidden
-                  className="wv-enter-sheen pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-white/40 to-transparent"
-                />
-              </button>
-              <p className="text-[13px] text-slate-400 sm:max-w-[15rem]">
-                Opens a live room and a code to share.
-              </p>
-            </div>
-            {error && (
-              <p role="alert" className="mt-3 text-sm font-semibold text-red-300">
-                {error}
-              </p>
-            )}
-
-            {/* TWO DOORS INTO THE SAME SYSTEM, and they no longer look alike.
-                Quick Pick is a close, one-device huddle; Invite the Jury is
-                everyone on their own screen. The visual weight differs
-                accordingly — one is a warm compact tile, the other is wide and
-                cool with the room's own accent. */}
-            <div
-              className="wv-vr-enter mt-8 grid gap-3 sm:grid-cols-2"
+              className="wv-vr-enter mt-[26vh] grid gap-3 sm:mt-7 sm:grid-cols-2"
               data-testid="together-secondary"
-              style={{ '--wv-vr-step': 4 } as React.CSSProperties}
+              style={{ '--wv-vr-step': 3 } as React.CSSProperties}
             >
               <ModeCard
                 testId="open-device"
                 kind="here"
                 title="Quick Pick"
-                line="We're all here. Pass one phone around and settle it."
+                line="We're all here — pass one phone around and settle it now."
+                action="Start Quick Pick"
                 onClick={() => setOpen(open === 'device' ? null : 'device')}
                 expanded={open === 'device'}
               />
               <ModeCard
                 testId="open-invite"
                 kind="apart"
-                title="Invite the Jury"
-                line="Everyone votes from their own phone, wherever they are."
+                title="Jury Room"
+                line="Everyone on their own phone — opens a live room and a code to share."
+                action="Start Jury Room"
                 onClick={() => void start()}
                 busy={loading}
               />
             </div>
+            {error && (
+              <p role="alert" data-testid="room-error" className="mt-3 text-sm font-semibold text-red-300">
+                {error}
+              </p>
+            )}
           </div>
 
           {/* THE SUPPORTING COLUMN. Real crews, or a designed empty state. */}
@@ -189,6 +172,7 @@ function ModeCard({
   kind,
   title,
   line,
+  action,
   onClick,
   busy = false,
   expanded,
@@ -197,6 +181,8 @@ function ModeCard({
   kind: 'here' | 'apart';
   title: string;
   line: string;
+  /** The explicit start label — the card SAYS what pressing it begins. */
+  action: string;
   onClick: () => void;
   busy?: boolean;
   expanded?: boolean;
@@ -209,7 +195,7 @@ function ModeCard({
       disabled={busy}
       data-testid={testId}
       aria-expanded={expanded}
-      className={`group relative flex min-h-[92px] flex-col justify-between overflow-hidden rounded-2xl border p-4 text-left transition
+      className={`group relative flex min-h-[112px] flex-col justify-between overflow-hidden rounded-2xl border p-4 text-left transition
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950
         disabled:opacity-60 hover:-translate-y-0.5 ${
           here
@@ -221,9 +207,16 @@ function ModeCard({
         <span aria-hidden className={here ? 'text-amber-200/90' : 'text-brand-200'}>
           {here ? <HuddleGlyph /> : <ScreensGlyph />}
         </span>
-        <span className="text-base font-black tracking-tight text-white">{busy ? 'Opening…' : title}</span>
+        <span className="text-base font-black tracking-tight text-white">{title}</span>
       </span>
       <span className="mt-2 text-[13px] leading-snug text-slate-400">{line}</span>
+      <span
+        className={`mt-3 inline-flex items-center gap-1 text-sm font-black ${
+          here ? 'text-amber-200' : 'text-brand-200'
+        }`}
+      >
+        {busy ? 'Opening the room…' : action} <span aria-hidden>→</span>
+      </span>
       <span
         aria-hidden
         className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl transition-opacity group-hover:opacity-100 ${

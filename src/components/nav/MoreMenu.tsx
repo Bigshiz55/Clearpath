@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { navHref } from '@/lib/nav/returnTo';
 
 export interface NavLink {
   href: string;
@@ -45,7 +46,8 @@ export function MoreMenu({ links }: { links: NavLink[] }) {
             return (
               <Link
                 key={l.href}
-                href={l.href}
+                // The tour carries where you are now, so its Done returns here.
+                href={navHref(l.href, pathname)}
                 role="menuitem"
                 className={`block rounded-lg px-3 py-2 text-sm transition ${active ? 'bg-brand-500/20 text-brand-100' : 'text-slate-200 hover:bg-white/10'}`}
               >

@@ -5,6 +5,7 @@ import { AlarmClock, Bookmark, Check, Dna, Film, Tv } from 'lucide-react';
 import {
   GUIDE_CATEGORIES,
   buildChannelGuide,
+  diagnoseMoviesEmpty,
   filterGuide,
   filterGuideByCategory,
   filterGuideByMedia,
@@ -21,6 +22,7 @@ import { displayClock } from '@/lib/viewing/clock';
 import { setTvReminder } from '@/lib/actions/tvReminders';
 import { addToWatchlist } from '@/lib/actions/watchlist';
 import { ScoreBadge } from '@/components/tv/ScoreBadge';
+import { Verd1ctBadgePlaceholder } from '@/components/Verd1ctBadge';
 import type { Airing } from '@/lib/onTv';
 import { NetworkChip } from '@/components/media/ProviderChip';
 
@@ -233,10 +235,27 @@ export function ChannelGuide({
 
       {shown.length === 0 ? (
         <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-4" data-testid="guide-no-match">
-          <p className="text-sm text-slate-400">
+          {/* THE MOVIES ZERO IS THREE DIFFERENT TRUTHS (see diagnoseMoviesEmpty)
+              and each gets its own sentence: a genuine no-movies window is a
+              statement about the data; a category/search intersection names
+              the combination that removed them; and movie listings hidden by
+              a missing source runtime name the failing BOUNDARY out loud
+              instead of hiding behind a generic empty state. The chip is
+              never disabled, nothing auto-switches to All, and no unrelated
+              channel is padded in to avoid the zero. */}
+          <p className="text-sm text-slate-400" data-testid={media === 'movie' && !query.trim() ? `guide-movies-${diagnoseMoviesEmpty(rows, airings, nowMs).kind}` : undefined}>
             {query.trim()
               ? `Nothing in the guide matches “${query.trim()}” — by channel name or by what’s on.`
-              : 'No channel we can see matches those filters right now — that’s the schedule, not missing data.'}
+              : media === 'movie'
+                ? (() => {
+                    const d = diagnoseMoviesEmpty(rows, airings, nowMs);
+                    if (d.kind === 'filtered-out')
+                      return `Movies are on in this window — but none on ${cat ? `the ${GUIDE_CATEGORIES.find((c) => c.key === cat)?.label ?? cat} channels` : 'the channels these filters leave'}. Clear a filter to see them.`;
+                    if (d.kind === 'unprovable-now')
+                      return `${d.startedNoRuntime} movie listing${d.startedNoRuntime === 1 ? '' : 's'} started earlier but the source sent no runtime, so the guide can’t honestly claim ${d.startedNoRuntime === 1 ? 'it’s' : 'they’re'} still on. That’s a data gap at the source, not an empty schedule.`;
+                    return `No listing in this window is classified as a movie${d.channelsWithListings > 0 ? ` — ${d.channelsWithListings} channel${d.channelsWithListings === 1 ? ' has' : 's have'} listings, all shows` : ''}. That’s the schedule, not missing data.`;
+                  })()
+                : 'No channel we can see matches those filters right now — that’s the schedule, not missing data.'}
           </p>
           {filtersOn && (
             <button
@@ -359,10 +378,16 @@ export function ChannelGuide({
                         <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400" data-testid="guide-paid">
                           Paid programming
                         </span>
+                      ) : r.onNow.match != null ? (
+                        <ScoreBadge score={r.onNow.match} personalized={personalized} why={r.onNow.matchWhy ?? null} />
                       ) : (
-                        r.onNow.match != null && (
-                          <ScoreBadge score={r.onNow.match} personalized={personalized} why={r.onNow.matchWhy ?? null} />
-                        )
+                        /* The CANONICAL missing state — scoring targets what's
+                           on now first, so an unscored on-now really is a
+                           missing score, said the same way every card says it.
+                           (Up-next rows stay unmarked: only a bounded head of
+                           the window is scored BY DESIGN, and marking design
+                           as absence would be a false report.) */
+                        <Verd1ctBadgePlaceholder px={28} tv={false} className="flex-none self-center" />
                       )}
                     </div>
                     {/* Episode title / case name — the only way to tell one

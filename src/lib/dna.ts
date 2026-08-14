@@ -14,11 +14,7 @@ import { rerankNudge } from '@/lib/scoring/reranker';
 import { RERANK_MODEL } from '@/lib/scoring/rerankerWeights';
 import { loadPreference } from '@/lib/preference/store';
 import { preferenceNudge, hasPreferenceSignal } from '@/lib/preference/rank';
-
-/** TMDB genre names → the slug vocabulary the preference model stores. */
-function genreSlug(name: string): string {
-  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-}
+import { genreSlug } from '@/lib/preference/genreCalibration';
 
 const clampScore = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 

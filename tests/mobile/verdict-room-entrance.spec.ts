@@ -50,7 +50,7 @@ for (const { w, h, name } of WIDTHS) {
     await expect(shadow).toHaveAttribute('aria-hidden', 'true');
     const layering = await page.evaluate(() => {
       const s = document.querySelector('[data-testid="shadow-room"]') as HTMLElement;
-      const cta = document.querySelector('[data-testid="start-court"]') as HTMLElement;
+      const cta = document.querySelector('[data-testid="open-invite"]') as HTMLElement;
       return { shadowEvents: getComputedStyle(s).pointerEvents, ctaZ: getComputedStyle(cta.closest('div.relative.z-10')!).zIndex };
     });
     // Atmosphere must never eat a click meant for the room.
@@ -63,19 +63,38 @@ for (const { w, h, name } of WIDTHS) {
   });
 }
 
-test('the entrance keeps every behaviour the old screen had', async ({ page }) => {
+test('MODE SELECTION COMES BEFORE CREATION — the owner-stated hierarchy', async ({ page }) => {
   await open(page, 1440, 900);
-  // The primary action, by the id the rest of the suite drives.
-  const cta = page.getByTestId('start-court');
-  await expect(cta).toBeVisible();
-  await expect(cta).toContainText('Start a Verdict Room');
-  // Both modes, still distinct controls, still present.
+  // The question leads, and there is NO generic pre-mode create button left:
+  // a room cannot exist before someone says what kind of verdict this is.
+  await expect(page.getByTestId('verdict-mode-question')).toContainText('What kind of verdict are you running?');
+  await expect(page.getByTestId('start-court')).toHaveCount(0);
+  // The two modes, named as modes, each with its explicit start action.
   await expect(page.getByTestId('together-secondary')).toBeVisible();
-  await expect(page.getByTestId('open-device')).toBeVisible();
-  await expect(page.getByTestId('open-invite')).toBeVisible();
+  await expect(page.getByTestId('open-device')).toContainText('Quick Pick');
+  await expect(page.getByTestId('open-device')).toContainText('Start Quick Pick');
+  await expect(page.getByTestId('open-invite')).toContainText('Jury Room');
+  await expect(page.getByTestId('open-invite')).toContainText('Start Jury Room');
+  // Jury Room is the door that opens a live room with a code to share.
+  await expect(page.getByTestId('open-invite')).toContainText('code to share');
   // Crews are reachable — as a rail now, not a lone underlined link.
   await expect(page.getByTestId('crew-rail')).toBeVisible();
   await expect(page.getByTestId('open-crews')).toBeVisible();
+});
+
+test('Quick Pick never invokes the invitation flow — no room, no code', async ({ page }) => {
+  await open(page, 1440, 900);
+  // Creating a live room is an RPC; if Quick Pick reached it, the harness
+  // (which has no session) would surface the error alert. It must not:
+  // Quick Pick discloses the on-device planner in place and nothing else.
+  await page.getByTestId('open-device').click();
+  await expect(page.getByText('Quick, private juries stored just on this phone', { exact: false })).toBeVisible();
+  // The ROOM's own error slot stays empty — if Quick Pick had reached the
+  // create RPC, the sessionless harness would surface its failure here.
+  // (Scoped to the entrance's error: other harness widgets have their own
+  // alerts that are not evidence about room creation.)
+  await expect(page.getByTestId('room-error')).toHaveCount(0);
+  expect(page.url()).not.toContain('/court/');
 });
 
 test('Quick Pick still discloses the on-device planner in place', async ({ page }) => {
@@ -99,7 +118,7 @@ test('the two modes are visually distinct, not two of the same card', async ({ p
 
 test('every control is keyboard reachable with a visible focus ring', async ({ page }) => {
   await open(page, 1440, 900);
-  const ids = ['start-court', 'open-device', 'open-invite', 'open-crews'];
+  const ids = ['open-device', 'open-invite', 'open-crews'];
   for (const id of ids) {
     await page.getByTestId(id).focus();
     const focused = await page.evaluate((t) => document.activeElement?.getAttribute('data-testid'), id);
@@ -111,7 +130,7 @@ test('every control is keyboard reachable with a visible focus ring', async ({ p
 
 test('touch targets clear 44px on a phone', async ({ page }) => {
   await open(page, 390, 844);
-  for (const id of ['start-court', 'open-device', 'open-invite', 'open-crews']) {
+  for (const id of ['open-device', 'open-invite', 'open-crews']) {
     const b = (await page.getByTestId(id).boundingBox())!;
     expect(b.height, `${id} is ${b.height}px tall`).toBeGreaterThanOrEqual(44);
   }
@@ -123,7 +142,7 @@ test('reduced motion leaves a still, complete composition', async ({ page }) => 
   // Nothing is mid-animation and nothing is left invisible by an entrance
   // that never ran — the staged reveal must not be load-bearing.
   await expect(page.getByRole('heading', { name: 'The Verdict Room' })).toBeVisible();
-  await expect(page.getByTestId('start-court')).toBeVisible();
+  await expect(page.getByTestId('open-invite')).toBeVisible();
   await expect(page.getByTestId('crew-rail')).toBeVisible();
   const durations = await page.evaluate(() =>
     [
