@@ -1,5 +1,5 @@
 import 'server-only';
-import { EMPTY_QUERY } from '@/lib/finderParse';
+import { EMPTY_QUERY, GENRE_WORDS as PARSE_GENRE_IDS } from '@/lib/finderParse';
 import { genreIdFromName } from '@/lib/finderGenres';
 import { DEFAULT_RESULT_LIMIT, type FinderQuery } from '@/lib/finder';
 import { searchBySubject, resolveKeywordIds, resolveProvider } from '@/lib/ai/tools';
@@ -51,6 +51,9 @@ export interface MappedIntent {
   };
   /** The count the user actually asked for. `null` = unsaid; the caller defaults. */
   requestedCount: number | null;
+  /** Tones the sentence stated that no execution primitive can carry —
+   *  DISCLOSED to the user, never silently dropped. */
+  undeliverableTones: string[];
 }
 
 /**
@@ -63,6 +66,25 @@ export interface MappedIntent {
  * interpreter read the count from the REQUEST clause only, so the number in
  * "I watched 3 movies yesterday" was never a candidate.
  */
+/**
+ * The SHARED parsing vocabulary, then the canonical map. `finderParse`'s
+ * alias table is how the legacy parser executed "funny", "scary",
+ * "romantic" and "supernatural" — consuming it here preserves those exact
+ * readings instead of growing a second vocabulary that would drift.
+ */
+const genreIdFor = (name: string): number | null =>
+  PARSE_GENRE_IDS[name.trim().toLowerCase()] ?? genreIdFromName(name);
+
+/**
+ * TONES ONTO EXISTING PRIMITIVES — measured from the legacy parser, not
+ * invented: funny/scary/romantic execute as genres through the alias map
+ * above; fast-paced and slow execute as the finder's `pace`. Everything
+ * else had NO legacy execution; a wanted tone with no home is disclosed,
+ * and a vetoed one takes the same keyword-exclusion channel every other
+ * veto uses, because dropping a veto is ignoring one.
+ */
+const TONE_PACE: Record<string, number> = { 'fast-paced': 90, fastpaced: 90, slow: 15 };
+
 export function intentToQuery(intent: CanonicalIntent): MappedIntent {
   const wantedGenres = intent.genres.filter((g) => g.wanted);
   const vetoedGenres = intent.genres.filter((g) => !g.wanted);
@@ -78,16 +100,41 @@ export function intentToQuery(intent: CanonicalIntent): MappedIntent {
   const genreIds: number[] = [];
   const unmappedWanted: string[] = [];
   for (const g of wantedGenres) {
-    const id = genreIdFromName(g.span);
+    const id = genreIdFor(g.span);
     if (id != null) genreIds.push(id);
     else unmappedWanted.push(g.span);
   }
   const excludeGenreIds: number[] = [];
   const unmappedVetoed: string[] = [];
   for (const g of vetoedGenres) {
-    const id = genreIdFromName(g.span);
+    const id = genreIdFor(g.span);
     if (id != null) excludeGenreIds.push(id);
     else unmappedVetoed.push(g.span);
+  }
+
+  /* TONES — the same alias map and the pace primitive, split by polarity. */
+  let pace: number | null = null;
+  const undeliverableTones: string[] = [];
+  for (const t of intent.tones) {
+    const key = t.term.trim().toLowerCase();
+    const gid = genreIdFor(key);
+    if (t.wanted) {
+      if (gid != null) {
+        if (!genreIds.includes(gid)) genreIds.push(gid);
+      } else if (TONE_PACE[key] != null) {
+        if (pace == null) pace = TONE_PACE[key]!;
+      } else {
+        undeliverableTones.push(t.term);
+      }
+    } else {
+      if (gid != null) {
+        if (!excludeGenreIds.includes(gid)) excludeGenreIds.push(gid);
+      } else {
+        // A vetoed tone with no genre home joins the keyword-exclusion
+        // channel — same path as every other vetoed span.
+        unmappedVetoed.push(t.term);
+      }
+    }
   }
 
   const query: FinderQuery = {
@@ -96,6 +143,7 @@ export function intentToQuery(intent: CanonicalIntent): MappedIntent {
     genreIds,
     excludeGenreIds: excludeGenreIds.length ? excludeGenreIds : undefined,
     maxRuntime: intent.runtime.maxMinutes ?? null,
+    pace,
     minYear: intent.date.minYear ?? undefined,
     maxYear: intent.date.maxYear ?? undefined,
     finalCount: intent.requestedCount ?? undefined,
@@ -121,6 +169,7 @@ export function intentToQuery(intent: CanonicalIntent): MappedIntent {
       providers: [...intent.providers],
     },
     requestedCount: intent.requestedCount,
+    undeliverableTones,
   };
 }
 
@@ -208,6 +257,10 @@ export async function resolveCanonicalExecution(intent: CanonicalIntent): Promis
   for (const p of people) {
     if (p.kind === 'resolved') interpretation.push(`Filtering to titles featuring ${p.name}.`);
     if (p.kind === 'unresolved') interpretation.push(`I couldn’t find anyone called “${p.spokenAs}”.`);
+  }
+
+  for (const t of mapped.undeliverableTones) {
+    interpretation.push(`“${t}” isn’t a tone I can filter by yet — showing results without it.`);
   }
 
   return {

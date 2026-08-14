@@ -42,6 +42,8 @@ const searchKeywords = vi.fn(async (terms: string[]) => {
   if (terms.some((t) => /box|prizefight/i.test(t))) return [1234, 5678];
   if (terms.some((t) => /courtroom|trial|legal/i.test(t))) return [4321];
   if (terms.some((t) => /supernatural/i.test(t))) return [777];
+  if (terms.some((t) => /dark/i.test(t))) return [999];
+  if (terms.some((t) => /gor/i.test(t))) return [888];
   return [];
 });
 
@@ -169,16 +171,68 @@ describe('origin and audio are canonical fields, never a raw reparse', () => {
   });
 });
 
-describe('a veto the catalog has no genre for still executes', () => {
-  it('"no supernatural stuff" survives as a keyword exclusion, never a positive', async () => {
-    // TMDB has no `supernatural` genre id. Dropping the span silently would
-    // ignore a veto; the canonical mapping falls it back to the subject
-    // channel, where keyword resolution can still exclude it.
+describe('a veto the catalog has no canonical genre for still executes', () => {
+  it('"no supernatural stuff" excludes through the shared alias map, never a positive', async () => {
+    // `supernatural` is not a TMDB genre, but the shared PARSING alias map
+    // (finderParse) already reads it as fantasy — the same reading the legacy
+    // parser executed. The canonical mapping consumes that map, so the veto
+    // lands in excludeGenreIds instead of vanishing.
     const q = await ask('Give me a thriller but no supernatural stuff.');
     expect((q.genreIds as number[] | undefined) ?? []).toContain(53);
-    expect((q.excludeKeywordIds as number[] | undefined) ?? [], 'the supernatural veto vanished').toContain(777);
-    expect((q.genreIds as number[] | undefined) ?? []).not.toContain(777);
+    expect((q.excludeGenreIds as number[] | undefined) ?? [], 'the supernatural veto vanished').toContain(14);
+    expect((q.genreIds as number[] | undefined) ?? []).not.toContain(14);
     const surface = [q.subjectCanonical, ...((q.subjectLexemes as string[] | undefined) ?? [])].map((s) => String(s ?? '').toLowerCase());
     expect(surface.join(' ')).not.toMatch(/supernatural/);
+  });
+});
+
+describe('tones execute on the primitives the product already owns', () => {
+  it('funny → the comedy genre, exactly as legacy executed it', async () => {
+    const q = await ask('Give me a funny movie');
+    expect((q.genreIds as number[] | undefined) ?? []).toContain(35);
+  });
+
+  it('scary → the horror genre', async () => {
+    const q = await ask('Give me a scary movie');
+    expect((q.genreIds as number[] | undefined) ?? []).toContain(27);
+  });
+
+  it('fast-paced → the pace primitive at 90', async () => {
+    const q = await ask('Give me a fast-paced movie');
+    expect(q.pace).toBe(90);
+  });
+
+  it('slow-burn → the pace primitive at 15', async () => {
+    const q = await ask('Give me a slow-burn movie');
+    expect(q.pace).toBe(15);
+  });
+
+  it('a tone with no executable owner is DISCLOSED, never silently dropped', async () => {
+    const { query: q, body } = await askFull('Give me a dark movie');
+    expect((q.genreIds as number[] | undefined) ?? []).toEqual([]);
+    expect((body.interpretation ?? []).join(' ')).toMatch(/dark/i);
+  });
+
+  it('feel-good is disclosed the same way', async () => {
+    const { body } = await askFull('Give me a feel-good movie');
+    expect((body.interpretation ?? []).join(' ')).toMatch(/feel-?good/i);
+  });
+
+  it('NEGATED: "not too dark" becomes an exclusion, never a positive', async () => {
+    const q = await ask('Give me something not too dark');
+    expect((q.genreIds as number[] | undefined) ?? []).toEqual([]);
+    expect((q.excludeKeywordIds as number[] | undefined) ?? [], 'the dark veto vanished').toContain(999);
+  });
+
+  it('NEGATED: "nothing gory" becomes an exclusion, never a positive', async () => {
+    const q = await ask('Give me nothing gory');
+    expect((q.genreIds as number[] | undefined) ?? []).toEqual([]);
+    expect((q.excludeKeywordIds as number[] | undefined) ?? [], 'the gory veto vanished').toContain(888);
+  });
+
+  it('NEGATED non-tone: "without gore" keeps its keyword exclusion', async () => {
+    const q = await ask('Give me a boxing movie without gore');
+    expect((q.excludeKeywordIds as number[] | undefined) ?? []).toContain(888);
+    expect(q.subjectCanonical).toBe('boxing');
   });
 });
