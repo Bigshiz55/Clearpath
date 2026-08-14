@@ -2,7 +2,7 @@
 /**
  * BLACK-BOX CANONICAL INTERPRETATION GATE.
  *
- * Runs the four cases against a DEPLOYED preview over HTTP. It imports no
+ * Runs the five cases against a DEPLOYED preview over HTTP. It imports no
  * application module, calls no interpreter in process, and mocks nothing — if
  * this passes, the deployed route, real TMDB and real Supabase all did their
  * part. That constraint is the entire point: a green in-process test proved
@@ -22,9 +22,32 @@
  * was. A gate that cannot tell "the preview is unreachable" from "the product
  * is wrong" trains everyone to ignore it.
  *
+ * ── AND AN INFRASTRUCTURE FAILURE MUST SAY *WHICH ONE* ───────────────────
+ *
+ * This gate previously died with `/api/version unreachable: fetch failed` on a
+ * deployment that was up, with both secrets present, and that line named
+ * nothing: DNS, TLS, a refused socket, a timeout and a redirect loop all reach
+ * `err.message` as those same three words. The transport now lives in
+ * ./protection.mjs, which reads `err.cause`, leaves redirects UNFOLLOWED while
+ * it diagnoses, and reports the class of failure by name. See the header there
+ * for the two defects that produced that line and the measurements behind them.
+ *
  * SECRETS NEVER REACH THE LOG. Tokens and cookies are held in memory, never
- * printed, and never interpolated into a logged URL.
+ * printed, and never interpolated into a logged URL. Every diagnostic string
+ * additionally passes through a redactor built from the live secret values, and
+ * a redirect is described by hostname and path only — Vercel's SSO challenge
+ * carries the full protected URL and a nonce in its query string.
  */
+
+import {
+  PROTECTION,
+  bypassHeaders,
+  classifyLocation,
+  diagnoseProtection,
+  explainProtection,
+  makeRedactor,
+  request,
+} from './protection.mjs';
 
 const BASE_URL = process.env.BASE_URL;
 const EXPECT_SHA = process.env.EXPECT_SHA ?? '';
@@ -40,11 +63,15 @@ const EXPECT_SHA = process.env.EXPECT_SHA ?? '';
 const LOGIN_SECRET = process.env.PREVIEW_TEST_LOGIN_SECRET ?? '';
 const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? '';
 
+/** Nothing printed by this script may contain either secret. */
+const redact = makeRedactor([LOGIN_SECRET, BYPASS]);
+
 /** Exit codes the workflow reads to tell infrastructure from semantics apart. */
 const EXIT = { OK: 0, SEMANTIC: 1, INFRA: 2 };
 
-function infra(message) {
-  console.error(`\n❌ INFRASTRUCTURE: ${message}`);
+function infra(message, hint) {
+  console.error(`\n❌ INFRASTRUCTURE: ${redact(message)}`);
+  if (hint) console.error(`   → ${redact(hint)}`);
   console.error('   The black-box gate did not run. This is NOT a product verdict.');
   process.exit(EXIT.INFRA);
 }
@@ -53,31 +80,63 @@ const results = [];
 function check(caseName, layer, label, ok, detail) {
   results.push({ caseName, layer, label, ok, detail });
   const mark = ok ? '✓' : '✗';
-  console.log(`   ${mark} [${layer}] ${label}${detail ? ` — ${detail}` : ''}`);
+  console.log(`   ${mark} [${layer}] ${label}${detail ? ` — ${redact(detail)}` : ''}`);
 }
 
+/**
+ * Every call after protection is cleared carries the SAME single bypass header.
+ * `x-vercel-set-bypass-cookie` is deliberately absent — see ./protection.mjs.
+ */
 function headers(extra = {}) {
-  const h = { 'content-type': 'application/json', ...extra };
-  // Deployment Protection bypass, when the project has it enabled. Sent as a
-  // header so it never lands in a URL that might be logged.
-  if (BYPASS) h['x-vercel-protection-bypass'] = BYPASS;
-  if (BYPASS) h['x-vercel-set-bypass-cookie'] = 'true';
-  return h;
+  return bypassHeaders(BYPASS, { 'content-type': 'application/json', ...extra });
+}
+
+/**
+ * A redirect on an API route, once protection is known to be cleared, is not a
+ * result — it is protection reasserting itself or a route that has moved. Named
+ * rather than followed, for the same reason as the version probe: following it
+ * turns a challenge into somebody else's 200.
+ */
+function redirectIsInfra(label, status, location) {
+  if (status < 300 || status >= 400) return;
+  const where = classifyLocation(location, BASE_URL);
+  infra(
+    `${label} answered ${status} → ${where?.host ?? '?'}${where?.path ?? ''} (query withheld).`,
+    where && where.kind === 'vercel-sso'
+      ? 'Deployment Protection challenged a request that had already cleared /api/version. The bypass token may have expired mid-run.'
+      : 'An API route redirected. It is not supposed to.',
+  );
 }
 
 async function main() {
   if (!BASE_URL) infra('BASE_URL is not set.');
   console.log(`Preview: ${BASE_URL}`);
 
-  // ── PHASE A: is this the deployment we think it is? ──────────────────────
-  let version;
-  try {
-    const res = await fetch(`${BASE_URL}/api/version`, { headers: headers() });
-    if (!res.ok) infra(`/api/version returned ${res.status}. Deployment Protection may be blocking CI.`);
-    version = await res.json();
-  } catch (e) {
-    infra(`/api/version unreachable: ${e.message}`);
+  // ── PHASE A: CAN WE REACH IT AT ALL, AND IF NOT, WHAT IS IN THE WAY? ─────
+  //
+  // Protection is diagnosed before anything else and with the bypass header
+  // ALONE, so a green here is a positive proof of exactly one claim: this token
+  // opens this deployment. Everything downstream is allowed to assume it.
+  const protection = await diagnoseProtection(BASE_URL, BYPASS);
+  console.log(`  protection: ${protection.verdict} — ${redact(explainProtection(protection, redact))}`);
+
+  if (protection.verdict !== PROTECTION.PASSED) {
+    const hint = {
+      [PROTECTION.BYPASS_REJECTED]:
+        'This is the ONE case that justifies touching the secret. Vercel refused a request that carried the token, and a valid token answers 200 on this same route — so the value in VERCEL_AUTOMATION_BYPASS_SECRET is not the value the project holds. '
+        + 'Regenerate it in Vercel (Settings → Deployment Protection → Protection Bypass for Automation) and set the GitHub secret to match.',
+      [PROTECTION.PROTECTION_CHALLENGE]: 'Set VERCEL_AUTOMATION_BYPASS_SECRET in the repository secrets — the deployment is protected and nothing was sent.',
+      [PROTECTION.COOKIE_HANDSHAKE]: 'The deployment asked the client to store a cookie and come back. `fetch` has no cookie jar, so it cannot — this is the loop that used to surface as "fetch failed". Nothing here should be requesting a bypass COOKIE.',
+      [PROTECTION.UNAUTHORIZED]: 'A 401/403 with no Vercel protection signature on it, so the request cleared protection and the APPLICATION refused it. Look at app auth, not project settings.',
+      [PROTECTION.NOT_JSON]: 'An interstitial page answered instead of the endpoint. /api/version is a JSON route.',
+      [PROTECTION.FOREIGN_REDIRECT]: 'The deployment redirected somewhere unrelated to Vercel SSO. Check the deployment alias.',
+      [PROTECTION.TRANSPORT]: 'The request never reached the application at all — the class above says which layer failed.',
+      [PROTECTION.HTTP_ERROR]: 'The deployment answered, but not with a version.',
+    }[protection.verdict];
+    infra(`/api/version did not answer: ${explainProtection(protection, redact)}`, hint);
   }
+
+  const version = protection.json ?? {};
   console.log(`  env=${version.env ?? version.vercelEnv ?? '?'} branch=${version.branch ?? '?'} sha=${version.sha ?? '?'}`);
 
   if (EXPECT_SHA && version.sha && !EXPECT_SHA.startsWith(version.sha) && !version.sha.startsWith(EXPECT_SHA)) {
@@ -96,34 +155,48 @@ async function main() {
     infra('PREVIEW_TEST_LOGIN_SECRET is not set. /api/ask returns 401 without a real cookie session.');
   }
 
-  let cookieHeader = '';
-  try {
-    const res = await fetch(`${BASE_URL}/api/preview-test-login`, {
-      method: 'POST',
-      headers: headers({ 'x-preview-test-secret': LOGIN_SECRET }),
-    });
-    if (res.status === 404) {
-      infra('preview login answered 404 — the deployment is production, or its test identity is unconfigured.');
-    }
-    if (!res.ok) infra(`preview login failed with ${res.status}.`);
-    // Cookie VALUES are held here and never printed. Only the count is logged.
-    const raw = res.headers.getSetCookie?.() ?? [];
-    cookieHeader = raw.map((c) => c.split(';')[0]).join('; ');
-    if (!cookieHeader) infra('preview login set no cookies.');
-    console.log(`  authenticated with ${raw.length} session cookie(s) (values not logged)`);
-  } catch (e) {
-    infra(`preview login unreachable: ${e.message}`);
+  const login = await request(`${BASE_URL}/api/preview-test-login`, {
+    method: 'POST',
+    headers: headers({ 'x-preview-test-secret': LOGIN_SECRET }),
+  });
+  if (!login.ok) {
+    infra(
+      `preview login did not complete: ${explainProtection({ verdict: PROTECTION.TRANSPORT, bypassSent: Boolean(BYPASS), transport: login.error }, redact)}`,
+      'Protection cleared on /api/version, so this is the login route itself, not Deployment Protection.',
+    );
   }
+  redirectIsInfra('preview login', login.status, login.location);
+  if (login.status === 404) {
+    infra('preview login answered 404 — the deployment is production, or its test identity is unconfigured.');
+  }
+  if (login.status < 200 || login.status >= 300) infra(`preview login failed with ${login.status}.`);
+
+  // Cookie VALUES are held here and never printed. Only the count is logged.
+  const rawCookies = login.res.headers.getSetCookie?.() ?? [];
+  const cookieHeader = rawCookies.map((c) => c.split(';')[0]).join('; ');
+  if (!cookieHeader) infra('preview login set no cookies.');
+  console.log(`  authenticated with ${rawCookies.length} session cookie(s) (values not logged)`);
 
   const ask = async (text) => {
-    const res = await fetch(`${BASE_URL}/api/ask`, {
+    const res = await request(`${BASE_URL}/api/ask`, {
       method: 'POST',
       headers: headers({ cookie: cookieHeader }),
       body: JSON.stringify({ text }),
+      // A live ask does real TMDB and Supabase work, so it gets a longer leash
+      // than the version probe — but still a finite one, so a hung route is
+      // reported as a timeout instead of burning the job's whole budget.
+      timeoutMs: 60_000,
     });
+    if (!res.ok) {
+      infra(
+        `/api/ask did not complete: ${explainProtection({ verdict: PROTECTION.TRANSPORT, bypassSent: Boolean(BYPASS), transport: res.error }, redact)}`,
+        'The deployment was reachable a moment ago, so this is the route, not protection.',
+      );
+    }
+    redirectIsInfra('/api/ask', res.status, res.location);
     if (res.status === 401) infra('/api/ask returned 401 — the cookie session did not reach the route.');
     if (res.status >= 500) infra(`/api/ask returned ${res.status}.`);
-    return { status: res.status, body: await res.json().catch(() => ({})) };
+    return { status: res.status, body: await res.res.json().catch(() => ({})) };
   };
 
   // A best-effort read of whatever the route exposes about its understanding.
@@ -190,7 +263,7 @@ async function main() {
   console.log(`${results.length - failed.length}/${results.length} assertions passed`);
   if (failed.length > 0) {
     console.log('\nSEMANTIC FAILURES (the product, not the infrastructure):');
-    for (const f of failed) console.log(`  ✗ [${f.caseName}/${f.layer}] ${f.label}${f.detail ? ` — ${f.detail}` : ''}`);
+    for (const f of failed) console.log(`  ✗ [${f.caseName}/${f.layer}] ${f.label}${f.detail ? ` — ${redact(f.detail)}` : ''}`);
     process.exit(EXIT.SEMANTIC);
   }
   console.log('All canonical interpretation cases hold against the real preview.');
