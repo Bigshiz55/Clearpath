@@ -175,6 +175,38 @@ function spanMatches(text: string, re: RegExp): SpanMatch[] {
 const overlaps = (a: SpanMatch, b: SpanMatch) => a.start < b.end && b.start < a.end;
 
 /**
+ * ── A REQUESTED TITLE OCCURRENCE OWNS ITS SOURCE RANGE ─────────────────────
+ *
+ * "Show me The Lego movie" was measured emitting person ["Lego"], and
+ * "Show me The Lego Movie" / "Show me A Goofy Movie" emitting the subjects
+ * ["lego"] / ["goofy"] — a title's own words spent as if the user had
+ * described a theme or named a person. No list of titles can close that
+ * (the catalog is unbounded), and no stop word can either (the words are
+ * ordinary). The occurrence idiom the person/subject boundary already uses
+ * closes it structurally: locate WHERE a work was named, and nothing else may
+ * spend that range.
+ *
+ * The offline evidence that an article-led phrase names a work is the
+ * CAPITALISED ARTICLE: "The Lego movie" mid-request wears title
+ * capitalisation, while "a Stallone movie" and "a boxing movie" (lowercase
+ * article) are ordinary description and keep their person/subject readings —
+ * the same capitalisation evidence `titleSpans` already accepts as the only
+ * offline signal that a phrase names something. A miss costs a lost lookup,
+ * never a wrong claim.
+ *
+ * The span deliberately includes the media noun ("The Lego movie", not
+ * "The Lego"): the user's own words are the lookup key, and entity resolution
+ * downstream is what decides what they name.
+ */
+const REQUESTED_TITLE =
+  /\b((?:The|A|An)\s+(?:[A-Z][\w'’-]*\s+)*[A-Z][\w'’-]*\s+(?:[Mm]ovies?|[Ff]ilms?))\b/g;
+
+/** Requested-title occurrences in a clause, ranges retained. */
+function findRequestedTitles(clause: string): SpanMatch[] {
+  return spanMatches(clause, REQUESTED_TITLE);
+}
+
+/**
  * AN ARTICLE-LED CAPITALISED PHRASE IS TITLE-SHAPED, NOT A NAME.
  * "The Lego Movie" offers `The Lego` to a person matcher that only knows
  * "capitals before a media noun". No real name begins with an article, so this
@@ -212,13 +244,18 @@ const MONONYM_BEFORE_MEDIA =
 const NEVER_A_PERSON =
   /^(?:horror|comedy|comedies|drama|thriller|mystery|romance|documentary|documentaries|animation|animated|western|war|crime|fantasy|sci-?fi|musical|biography|history|sport|family|adventure|action|supernatural|funny|dark|scary|good|great|best|new|old|other|another|more|some|any|the|classic|foreign|indie|short|long|recent|popular)$/i;
 
-/** Every person occurrence in one clause, computed once, ranges retained. */
+/** Every person occurrence in one clause, computed once, ranges retained.
+ *  A requested-title occurrence owns its range first: any person candidate
+ *  overlapping one is the title's own words reaching a matcher, not a name. */
 function findPersonMatches(clause: string): SpanMatch[] {
+  const titleRanges = findRequestedTitles(clause);
+  const freeOfTitles = (m: SpanMatch) => !titleRanges.some((t) => overlaps(t, m));
+
   const named = [
     ...spanMatches(clause, AFTER_PERSON_CUE),
     ...spanMatches(clause, PERSON_BEFORE_MEDIA),
     ...spanMatches(clause, PERSON_WITH_MODIFIER),
-  ].filter((m) => !ARTICLE_LED.test(m.text));
+  ].filter((m) => !ARTICLE_LED.test(m.text) && freeOfTitles(m));
 
   /* Runs last and only where a fuller name did not already claim the ground, so
      "Stallone" inside "Sylvester Stallone" is the same person rather than a
@@ -227,6 +264,7 @@ function findPersonMatches(clause: string): SpanMatch[] {
     (m) =>
       !NEVER_A_PERSON.test(m.text) &&
       !ARTICLE_LED.test(m.text) &&
+      freeOfTitles(m) &&
       !named.some((n) => m.start >= n.start && m.end <= n.end),
   );
 
@@ -283,7 +321,16 @@ export function interpret(raw: string): CanonicalIntent {
   const executableClauses = clauses.filter((c) => c.role === 'request' || c.role === 'constraint');
 
   if (req) {
-    intent.kind = 'recommendation';
+    /* A request that NAMES the answer is a LOOKUP, not a recommendation.
+       "Show me The Lego movie" asks for that film — executing it as a search
+       for the theme "lego" (or the person "Lego") is the measured live
+       failure. The requested occurrence is recorded with its own relation so
+       downstream entity resolution can put THAT title on trial. */
+    const requestedTitles = findRequestedTitles(req.text);
+    for (const t of requestedTitles) {
+      pushUnique<TitleReference>(intent.titles, { span: t.text, relation: 'requested' });
+    }
+    intent.kind = requestedTitles.length > 0 ? 'lookup' : 'recommendation';
     intent.requestedCount = parseCount(req.text);
     intent.media = parseMedia(req.text);
   } else if (clauses.some((c) => c.role === 'taste' || c.role === 'companion')) {
@@ -400,8 +447,12 @@ export function interpret(raw: string): CanonicalIntent {
     // which neither string comparison nor "drop subjects when a person exists"
     // can achieve.
     const personRanges = findPersonMatches(req.text);
+    // A requested-title occurrence owns its range the same way a person does:
+    // "The Lego Movie" may not donate `lego` to the subject field.
+    const titleRanges = findRequestedTitles(req.text);
     for (const sm of findSubjectMatches(req.text)) {
       if (personRanges.some((p) => overlaps(p, sm))) continue;
+      if (titleRanges.some((t) => overlaps(t, sm))) continue;
       const span = sm.text;
       const known =
         intent.genres.some((g) => g.span === span) ||
