@@ -619,7 +619,20 @@ export async function POST(req: Request) {
     // 2a) CONVERSATION-DRIVEN DISCOVERY — the canonical state IS the query.
     // Deterministic by design: no LLM parse of the raw sentence; the state the
     // user can see as chips is exactly what runs.
-    if (conversational && convState) {
+    /*
+     * A FIRST TURN IS A FRESH SENTENCE, AND THE CANONICAL DOOR OWNS FRESH
+     * SENTENCES. The real UI sends `conversation` on EVERY request, so this
+     * arm — whose own turn parser is a THIRD reader of the raw utterance —
+     * was answering the original incident's exact ask from the browser while
+     * the canonical pipeline answered it for bare API calls: "3 Sylvester
+     * Stallone movies" typed into the product lost its person again
+     * (measured: castIds undefined on the page's own POST). The serving arm
+     * may not depend on which client asked. A conversation with NO prior
+     * constraints and an utterance the canonical layer recognises falls
+     * through to the canonical pipeline; the merged conversation state still
+     * rides back on withConv, so follow-up refinements keep their behavior.
+     */
+    if (conversational && convState && (prevHadConstraints || !canonicalRecognises)) {
       const s = convState;
       const limitConv = text ? parseRequestedCount(text) : DEFAULT_RESULT_LIMIT;
       // Hard constraints that the similarity path cannot enforce.
@@ -1154,7 +1167,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      {
+      withConv({
         kind: 'search',
         route: '/api/ask',
         requestId,
@@ -1166,7 +1179,7 @@ export async function POST(req: Request) {
         scoredFor: result.scoredFor,
         relaxed: result.relaxed,
         items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
-      },
+      }),
       { headers: { 'X-WatchVerd1ct-SHA': getBuildInfo().gitSha || 'unknown' } },
     );
   } catch {

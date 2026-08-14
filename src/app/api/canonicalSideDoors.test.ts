@@ -206,6 +206,30 @@ describe('the credit role travels typed from the intent (#68 on the canonical ar
   });
 });
 
+describe('the UI conversation envelope does not change which arm answers', () => {
+  /* The real UI sends `conversation` on EVERY request, so the conversational
+     arm — a THIRD reader of raw utterances — was answering fresh sentences
+     from the browser while bare API calls got the canonical pipeline: the
+     original incident typed into the product lost its person AGAIN (measured
+     live: castIds undefined on the page's own POST). A first turn with no
+     prior constraints and a canonically-recognised utterance must take the
+     canonical pipeline; refinements keep the conversational merge. */
+  it('a conversational FIRST TURN of the incident ask still executes canonically', async () => {
+    const { POST } = await import('./ask/route');
+    const res = await POST(new Request('https://local.test/api/ask', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: '3 Sylvester Stallone movies', conversation: {} }),
+    }));
+    const body = (await res.json()) as { kind?: string; query?: Record<string, unknown>; conversation?: unknown };
+    expect(body.kind).toBe('search');
+    const q = RAN.at(-1)!;
+    expect(q.castIds, 'the person survived the conversation envelope').toEqual([16483]);
+    expect(q.finalCount, 'the count survived the conversation envelope').toBe(3);
+    expect(body.conversation, 'the conversation still rides back for follow-ups').toBeDefined();
+  });
+});
+
 describe('a media contradiction is a question', () => {
   it('"no movies and no TV shows" clarifies instead of guessing', async () => {
     const { POST } = await import('./ask/route');

@@ -590,6 +590,7 @@ async function main() {
     for (const i of sample(directed.body)) facts.push(await castFact(BASE_URL, evidenceHeaders(), i, nolanId, 'Christopher Nolan'));
     checkFold('director', 'returned titles really carry the Nolan credit', foldFacts(facts), facts.length === 0 ? 'no candidates to verify' : undefined);
   }
+  await stalloneFunnel(directed.body);
 
   // ── VERDICT ──────────────────────────────────────────────────────────────
   const failed = results.filter((r) => !r.ok);
