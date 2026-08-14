@@ -148,6 +148,54 @@ function titleSpans(text: string, re: RegExp): string[] {
   return out;
 }
 
+/**
+ * ── ONE OCCURRENCE, ONE ROLE ────────────────────────────────────────────────
+ * Role decisions are made on the actual matched OCCURRENCE, not on strings.
+ * String equality cannot tell "Stallone" the person from "stallone" the
+ * subject when both come from the same three syllables of the same sentence —
+ * which is exactly how one occurrence was spent twice. Coordinates are an
+ * interpreter implementation detail and never reach `CanonicalIntent`.
+ */
+interface SpanMatch { text: string; start: number; end: number }
+
+/** `titleSpans`, but retaining where the capture actually sat. */
+function spanMatches(text: string, re: RegExp): SpanMatch[] {
+  const out: SpanMatch[] = [];
+  for (const m of text.matchAll(re)) {
+    const raw = m[1]!;
+    const rel = m[0]!.indexOf(raw);
+    const span = raw.trim().replace(/[.,;:!?]+$/, '');
+    if (span.length < 2) continue;
+    const start = m.index! + rel;
+    out.push({ text: span, start, end: start + span.length });
+  }
+  return out;
+}
+
+const overlaps = (a: SpanMatch, b: SpanMatch) => a.start < b.end && b.start < a.end;
+
+/**
+ * AN ARTICLE-LED CAPITALISED PHRASE IS TITLE-SHAPED, NOT A NAME.
+ * "The Lego Movie" offers `The Lego` to a person matcher that only knows
+ * "capitals before a media noun". No real name begins with an article, so this
+ * costs nothing and removes the whole class — structurally, with no title list.
+ */
+const ARTICLE_LED = /^(?:the|a|an)\s/i;
+
+/** "a Tom Hanks courtroom movie" — a name, then descriptive modifiers, then the
+ *  noun. Only the NAME is captured; the modifiers belong to the subject. */
+const PERSON_WITH_MODIFIER =
+  /\b((?:[A-Z][\w'’-]*)(?:\s+[A-Z][\w'’-]*){1,3})\s+(?:[a-z][\w-]{2,}\s+){1,2}(?:movies?|films?|flicks?)\b/g;
+
+/** Every person occurrence in one clause, computed once, ranges retained. */
+function findPersonMatches(clause: string): SpanMatch[] {
+  return [
+    ...spanMatches(clause, AFTER_PERSON_CUE),
+    ...spanMatches(clause, PERSON_BEFORE_MEDIA),
+    ...spanMatches(clause, PERSON_WITH_MODIFIER),
+  ].filter((m) => !ARTICLE_LED.test(m.text));
+}
+
 /** People are named spans too — never ids, never credits. */
 const AFTER_PERSON_CUE =
   /\b(?:with|starring|featuring|directed by|written by|created by|from)\s+((?:[A-Z][\w''-]*)(?:\s+[A-Z][\w''-]*){0,3})/g;
@@ -245,18 +293,11 @@ export function interpret(raw: string): CanonicalIntent {
       const rel: TitleReference['relation'] = /better than/i.test(c.text) ? 'betterThan' : 'similar';
       pushUnique<TitleReference>(intent.titles, { span, relation: rel });
     }
-    for (const span of titleSpans(c.text, AFTER_PERSON_CUE)) {
+    for (const m of findPersonMatches(c.text)) {
       pushUnique<PersonReference>(intent.people, {
-        span,
-        relation: isNegated(span.toLowerCase()) ? 'excluded' : 'required',
-        role: roleFor(c.text, span),
-      });
-    }
-    for (const span of titleSpans(c.text, PERSON_BEFORE_MEDIA)) {
-      pushUnique<PersonReference>(intent.people, {
-        span,
-        relation: isNegated(span.toLowerCase()) ? 'excluded' : 'required',
-        role: 'any',
+        span: m.text,
+        relation: isNegated(m.text.toLowerCase()) ? 'excluded' : 'required',
+        role: roleFor(c.text, m.text),
       });
     }
 
@@ -315,7 +356,16 @@ export function interpret(raw: string): CanonicalIntent {
   // A named subject in the request that is not a genre, tone or provider —
   // "boxing", "heist", "time travel". Taken from the request clause only.
   if (req) {
-    for (const span of subjectSpans(req.text)) {
+    // THE OVERLAP RULE. A subject candidate whose source range sits inside
+    // language already spent on a person is not a subject — it is the person's
+    // own name reaching the extractor a second time. Range-based, so `boxing`
+    // in "Sylvester Stallone boxing movie" survives while `stallone` does not,
+    // which neither string comparison nor "drop subjects when a person exists"
+    // can achieve.
+    const personRanges = findPersonMatches(req.text);
+    for (const sm of findSubjectMatches(req.text)) {
+      if (personRanges.some((p) => overlaps(p, sm))) continue;
+      const span = sm.text;
       const known =
         intent.genres.some((g) => g.span === span) ||
         intent.tones.some((t) => t.term === span) ||
@@ -335,8 +385,8 @@ export function interpret(raw: string): CanonicalIntent {
  * immediately before the media noun is the subject, so a topic nobody
  * anticipated still lands in the right field.
  */
-function subjectSpans(clause: string): string[] {
-  const out: string[] = [];
+function findSubjectMatches(clause: string): SpanMatch[] {
+  const out: SpanMatch[] = [];
   const re =
     /\b([a-z][\w-]{2,})\s+(?:movies?|films?|shows?|series|documentar(?:y|ies)|flicks?)\b/gi;
   const STRUCTURAL =
@@ -344,7 +394,8 @@ function subjectSpans(clause: string): string[] {
   for (const m of clause.matchAll(re)) {
     const w = m[1]!.toLowerCase();
     if (STRUCTURAL.test(w)) continue;
-    out.push(w);
+    const start = m.index! + m[0]!.indexOf(m[1]!);
+    out.push({ text: w, start, end: start + m[1]!.length });
   }
   return out;
 }

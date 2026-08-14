@@ -157,3 +157,20 @@ describe('1b — titles ending in a media noun are not recommendation noun phras
     });
   }
 });
+
+/**
+ * The person matcher must refuse article-led title-shaped language on its own,
+ * independently of the bare-clause rule — an explicit request frame promotes
+ * the clause, so the 1b classifier never sees it.
+ */
+describe('the person matcher refuses article-led title language', () => {
+  for (const q of ['Show me The Lego Movie', 'Give me A Goofy Movie']) {
+    it(`"${q}" invents no person`, () => {
+      const r = interpret(q);
+      const ppl = r.kind === 'recommendation' ? r.people.map((p) => p.span) : [];
+      for (const bad of ['The Lego', 'A Goofy', 'Lego', 'Goofy']) {
+        expect(ppl, `${q} produced person "${bad}"`).not.toContain(bad);
+      }
+    });
+  }
+});

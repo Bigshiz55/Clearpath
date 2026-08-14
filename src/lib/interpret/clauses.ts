@@ -135,7 +135,40 @@ const CONSTRAINT =
  * noun, and nothing else. `show`/`series` are excluded on purpose (see the call
  * site); the article requirement is what keeps capitalised titles out.
  */
-const BARE_MOVIE_NOUN_PHRASE = /^\s*(?:an?|the)\s+[\w'’-]+(?:\s+[\w'’-]+){0,4}\s+(?:movies?|films?|flicks?)\s*[.!?]?$/i;
+const BARE_MOVIE_PHRASE = /^\s*(?:an?|the)\s+(.+?)\s+(movies?|films?|flicks?)\s*[.!?]?$/i;
+/** Structural filler — present in every phrase, evidence for none. */
+const NOT_DESCRIPTIVE =
+  /^(?:good|great|best|new|newer|old|older|other|another|more|some|any|the|a|an|one|two|three|four|five|few|couple|nice|decent|solid|different|similar)$/i;
+
+/**
+ * IS THIS A DESCRIPTION, OR A TITLE THAT HAPPENS TO END IN "MOVIE"?
+ *
+ * `article + words + movie` cannot tell "a courtroom movie" from "The Lego
+ * Movie" — both fit. An earlier version of this rule claimed the leading
+ * article as the safety property; it is not one, it only excludes titles that
+ * happen to lack an article, which is why "Get Out" and "A Few Good Men"
+ * passed and gave false confidence while "A Goofy Movie" became a search for
+ * the subject `goofy`.
+ *
+ * The real evidence is DESCRIPTIVE language: the token immediately qualifying
+ * the media noun must be lowercase and carry meaning. "courtroom movie" and
+ * "boxing movie" qualify; "Lego Movie" and "Goofy Movie" do not, because a
+ * capitalised qualifier is title-shaped and this layer has no world knowledge
+ * to settle it.
+ *
+ * That is a deliberate loss of recall: a bare "a Tom Hanks movie" is left
+ * unexecuted rather than guessed at, because it is the same shape as "A Goofy
+ * Movie". The layer's own principle — a miss should lose a reference rather
+ * than confidently invent one. Explicit forms ("Give me a Tom Hanks movie",
+ * "3 Sylvester Stallone movies", "how about a Bruce Willis movie") are
+ * unaffected: they are promoted by request framing, not by this rule.
+ */
+function bareDescriptiveRequest(t: string): boolean {
+  const m = BARE_MOVIE_PHRASE.exec(t);
+  if (!m) return false;
+  const qualifier = m[1]!.trim().split(/\s+/).pop() ?? '';
+  return /^[a-z][\w-]{2,}$/.test(qualifier) && !NOT_DESCRIPTIVE.test(qualifier);
+}
 
 export function classifyClause(text: string): ClauseRole {
   const t = text.trim();
@@ -178,7 +211,7 @@ export function classifyClause(text: string): ClauseRole {
      an ordinary noun as well as a medium, and "a horror show" is a named
      regression that must not become an order. The leading article is required
      so a bare capitalised title ("A Few Good Men", "Get Out") cannot match. */
-  if (BARE_MOVIE_NOUN_PHRASE.test(t)) return 'request';
+  if (bareDescriptiveRequest(t)) return 'request';
   // A count only makes a request when it is counting the thing being asked for.
   // "I watched 3 movies yesterday" is past tense about the user, not an order.
   if (COUNT_LED.test(t) && media && !REACTION.test(t) && !FAMILIARITY.test(t) && !PAST_TENSE.test(t)) {
