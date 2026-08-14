@@ -8,45 +8,10 @@ import { GroupVerdictSection } from '@/components/landing/GroupVerdictSection';
 import { PacksSpotlight } from '@/components/landing/PacksSpotlight';
 import { NeedSomethingSpecific } from '@/components/landing/NeedSomethingSpecific';
 import { HomeArrivalBeacon } from '@/components/HomeArrivalBeacon';
-import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * How far along is this person's Watch DNA?
- *
- * Only enough to choose the wording of one button — deliberately cheap, and
- * deliberately fail-open: a signed-out visitor, or a database that will not
- * answer, gets the cold-start copy rather than an error page.
- */
-async function dnaStage(): Promise<'none' | 'started' | 'developed'> {
-  try {
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return 'none';
-    const { count } = await supabase
-      .from('preference_events')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id);
-    const n = count ?? 0;
-    if (n >= 15) return 'developed';
-    if (n > 0) return 'started';
-    return 'none';
-  } catch {
-    return 'none';
-  }
-}
-
-const DNA_CTA: Record<'none' | 'started' | 'developed', string> = {
-  none: 'Build my Watch DNA',
-  started: 'Keep building my Watch DNA',
-  developed: 'Sharpen my Watch DNA',
-};
-
 export default async function LandingPage() {
-  const stage = await dnaStage();
   return (
     <div className="min-h-dvh">
       <HomeArrivalBeacon />
@@ -105,32 +70,17 @@ export default async function LandingPage() {
             the process before the gold button below asks for a click. */}
         <VerdictProcessPreview />
 
-        {/* THE ONE WAY IN. The single brand entrance — blue→violet→magenta,
-            not the courtroom's gold (that ceremony is reserved for the Live
-            Jury / Verdict Room, never the front door). */}
+        {/* THE ONE WAY IN — and now genuinely one. The single brand entrance
+            (blue→violet→magenta, not the courtroom's gold; that ceremony is
+            reserved for the Live Jury / Verdict Room). The DNA quiz and
+            history import used to sit here as secondary pills, but three
+            doors is a decision the visitor hasn't earned yet — both remain
+            first-class INSIDE the app (the DNA hub and the nav carry them),
+            where the person choosing already knows what the product is. */}
         <section className="border-t border-white/10" data-testid="main-cta">
           <div className="container-page flex flex-col items-center py-8 text-center sm:py-8">
             <div className="flex flex-col items-center gap-2 sm:gap-3" data-testid="hero-ctas">
               <EnterWatchVerd1ctCta testId="cta-enter" />
-
-              <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
-                <Link
-                  href="/app/taste-quiz"
-                  className="btn-secondary text-sm transition hover:scale-[1.03] hover:border-white/25"
-                  data-testid="cta-dna"
-                >
-                  {DNA_CTA[stage]}
-                </Link>
-                <Link
-                  href="/import-taste"
-                  className="btn-secondary text-sm transition hover:scale-[1.03] hover:border-white/25"
-                  data-testid="cta-import"
-                >
-                  Import my history
-                </Link>
-              </div>
-
-              <p className="text-xs text-slate-500">No account needed to explore.</p>
             </div>
           </div>
         </section>

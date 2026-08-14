@@ -15,6 +15,7 @@ import { TonightHome } from '@/components/TonightHome';
 import { UpcomingTvRail } from '@/components/UpcomingTvRail';
 import { InstallHint } from '@/components/InstallHint';
 import { TourHint } from '@/components/onboarding/TourHint';
+import { FirstRunExplainer } from '@/components/onboarding/FirstRunExplainer';
 import { getTonight } from '@/lib/tonight';
 import type { VerdictTier } from '@/lib/types';
 
@@ -38,6 +39,23 @@ export default async function DiscoverPage() {
   const profile = user ? await getProfile(supabase, user.id) : null;
   const label = profile ? personalLabelFor(profile) : 'Your match';
   const tonight = await getTonight(supabase, user?.id ?? '', new Date());
+
+  /* FIRST-RUN IS A FACT, NOT A FLAG: a user with any real preference signal
+     has already run. Only the genuinely-unbuilt see the explainer, and the
+     component adds its own skip/don't-show-again on top. Fail-open to
+     "has DNA" so a database hiccup can never nag a veteran. */
+  let firstRun = false;
+  if (user) {
+    try {
+      const { count, error } = await supabase
+        .from('preference_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      firstRun = !error && (count ?? 0) === 0;
+    } catch {
+      firstRun = false;
+    }
+  }
 
   const { data: recent } = await supabase
     .from('verdicts')
@@ -69,6 +87,11 @@ export default async function DiscoverPage() {
           <SearchBar />
         </div>
       </section>
+
+      {/* First-run: "60 seconds — let's build your DNA." Server-gated to
+          users with no preference signal; the component carries Skip
+          (session) and Don't-show-again (permanent). */}
+      {firstRun && <FirstRunExplainer />}
 
       {/* App-install nudge for testers — self-hides once installed/dismissed. */}
       <InstallHint />
