@@ -199,21 +199,42 @@ async function main() {
     return { status: res.status, body: await res.res.json().catch(() => ({})) };
   };
 
-  // A best-effort read of whatever the route exposes about its understanding.
-  // Deliberately tolerant of shape: the receipt contract is not frozen yet, and
-  // a gate that dies on a renamed field teaches nothing about meaning.
-  const receipt = (body) => JSON.stringify(body.interpretation ?? body.query ?? {}).toLowerCase();
+  /*
+   * TWO READERS, BECAUSE THE ROUTE ANSWERS IN TWO FIELDS.
+   *
+   * The single reader this replaces was `body.interpretation ?? body.query`,
+   * and `??` falls through on null/undefined ONLY. `/api/ask` declares
+   * `askInterpretation: string[] = []` and returns it on every search response
+   * (route.ts:873, :951), so `interpretation` is an empty ARRAY — never
+   * nullish, never falling through — and `query`, the object that actually
+   * carries the executable constraints, was invisible to this gate. Every
+   * receipt assertion was therefore testing the literal string `[]`.
+   *
+   * That is the exact failure this file exists to prevent, pointed the other
+   * way: a gate reporting SEMANTIC failures the product did not commit is as
+   * useless as one that misses the ones it did. Fixed by reading the right
+   * field — the assertions below are unchanged, character for character.
+   *
+   *   EXECUTABLE  what the route will actually run: `query`.
+   *   UNDERSTOOD  that, plus what it says it understood: `interpretation`.
+   *
+   * Each assertion uses whichever its own label already claims. "the executable
+   * subject" and "the executable query" read EXECUTABLE; "understood as", "is
+   * requested" and "is the requested person" read UNDERSTOOD.
+   */
+  const executable = (body) => JSON.stringify(body.query ?? {}).toLowerCase();
+  const understood = (body) => JSON.stringify({ query: body.query ?? {}, interpretation: body.interpretation ?? [] }).toLowerCase();
   const titles = (body) => (body.items ?? []).map((i) => `${i.title ?? ''} ${i.name ?? ''}`.trim()).filter(Boolean);
 
   console.log('\n── CASE 1: burrito invariance ─────────────────────────────');
   const plain = await ask('Give me a boxing movie');
   const noisy = await ask('Had a burrito for dinner. Anyway, give me a boxing movie');
-  const plainR = receipt(plain.body);
-  const noisyR = receipt(noisy.body);
+  const plainR = understood(plain.body);
+  const noisyR = understood(noisy.body);
 
   check('burrito', 'receipt', 'plain request understood as boxing', /boxing/.test(plainR), plainR.slice(0, 120));
   check('burrito', 'receipt', 'noisy request understood as boxing', /boxing/.test(noisyR), noisyR.slice(0, 120));
-  check('burrito', 'receipt', 'no food term in the executable query', !/burrito|beef|dinner/.test(noisyR));
+  check('burrito', 'receipt', 'no food term in the executable query', !/burrito|beef|dinner/.test(executable(noisy.body)));
   check('burrito', 'world', 'plain returned candidates', titles(plain.body).length > 0);
   check('burrito', 'world', 'noisy returned candidates', titles(noisy.body).length > 0);
   {
@@ -230,13 +251,13 @@ async function main() {
   console.log('\n── CASE 2: count scoping ──────────────────────────────────');
   const count = await ask('I watched 3 movies yesterday. Give me a Stallone movie.');
   const countTitles = titles(count.body);
-  check('count', 'receipt', 'Stallone is the requested person', /stallone|\b16483\b/.test(receipt(count.body)));
+  check('count', 'receipt', 'Stallone is the requested person', /stallone|\b16483\b/.test(understood(count.body)));
   check('count', 'world', 'returned exactly one title', countTitles.length === 1, `got ${countTitles.length}`);
   check('count', 'world', 'the anecdote did not set the count', countTitles.length !== 3, `got ${countTitles.length}`);
 
   console.log('\n── CASE 3: reference vs current request ───────────────────');
   const ref = await ask('I watched Rocky three weeks ago, but tonight I want a baseball movie.');
-  const refR = receipt(ref.body);
+  const refR = executable(ref.body);
   check('reference', 'receipt', 'baseball is the executable subject', /baseball/.test(refR), refR.slice(0, 120));
   check('reference', 'receipt', 'Rocky is not a similarity requirement', !/similar|like/.test(refR) || /baseball/.test(refR));
   check('reference', 'world', 'returned candidates', titles(ref.body).length > 0);
@@ -244,9 +265,9 @@ async function main() {
 
   console.log('\n── CASE 4: negation ───────────────────────────────────────');
   const neg = await ask('Give me a thriller but no supernatural stuff.');
-  const negR = receipt(neg.body);
+  const negR = understood(neg.body);
   check('negation', 'receipt', 'thriller is requested', /thriller/.test(negR), negR.slice(0, 120));
-  check('negation', 'receipt', 'supernatural is not a positive constraint', !/"(?:genres?|subjects?|keywords?)"[^}]*supernatural/.test(negR));
+  check('negation', 'receipt', 'supernatural is not a positive constraint', !/"(?:genres?|subjects?|keywords?)"[^}]*supernatural/.test(executable(neg.body)));
   check('negation', 'world', 'returned candidates', titles(neg.body).length > 0);
 
   console.log('\n── CASE 5: the Critic comparative path still owns comparisons ─');
