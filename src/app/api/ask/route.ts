@@ -951,6 +951,7 @@ export async function POST(req: Request) {
       canonicalAmbiguity = exec.ambiguity;
       canonicalInterpretation = exec.interpretation;
       canonicalExcludedPersonIds = exec.excludePersonIds;
+      refusedRole = exec.refusedRole;
       /*
        * THE QUERY IS THE EXECUTION OF THE INTENT — wholesale, not a patch.
        * `exec.query` was built from `CanonicalIntent` (media, genres and

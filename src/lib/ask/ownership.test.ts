@@ -51,6 +51,10 @@ const RAW_LANGUAGE_HELPERS = [
   { name: 'parseTopicTerms', owns: 'topic keywords' },
   { name: 'extractExcludedPerson', owns: 'excluded people' },
   { name: 'buildQueryPlan', owns: 'coarse media filtering' },
+  // #68's raw credit-role reader: legitimate on the legacy arm during
+  // migration, forbidden after interpretation — CanonicalIntent.people[].role
+  // already carries the role, typed.
+  { name: 'requestedCreditRole', owns: 'credit role' },
 ] as const;
 
 /** Comments describe the fence; only executable text can breach it. */

@@ -51,6 +51,8 @@ vi.mock('@/lib/tmdb/client', () => ({
   searchPeople: vi.fn(async (q: string) => {
     if (/stal+one/i.test(q)) return [{ id: 16483, name: 'Sylvester Stallone', profilePath: null, knownFor: 'Rocky' }];
     if (/hanks/i.test(q)) return [{ id: 31, name: 'Tom Hanks', profilePath: null, knownFor: 'Forrest Gump' }];
+    if (/nolan/i.test(q)) return [{ id: 525, name: 'Christopher Nolan', profilePath: null, knownFor: 'Inception' }];
+    if (/gilligan/i.test(q)) return [{ id: 66633, name: 'Vince Gilligan', profilePath: null, knownFor: 'Breaking Bad' }];
     return [];
   }),
   searchKeywords: (terms: string[]) => searchKeywords(terms),
@@ -168,6 +170,39 @@ describe('origin and audio are canonical fields, never a raw reparse', () => {
     const q = await ask('Give me a foreign movie with English audio.');
     expect(Boolean(q.englishAudioOnly)).toBe(true);
     expect(Boolean(q.englishDubOnly)).toBe(false);
+  });
+});
+
+describe('the credit role travels typed from the intent (#68 on the canonical arm)', () => {
+  it('"movies directed by Christopher Nolan" executes as a DIRECTOR constraint, not with_cast', async () => {
+    const q = await ask('movies directed by Christopher Nolan');
+    expect(q.people).toEqual([{ personId: 525, role: 'director' }]);
+    expect((q.castIds as number[] | undefined) ?? [], 'a director ask leaked into with_cast').toEqual([]);
+  });
+
+  it('"movies with Christopher Nolan" executes as ACTOR semantics', async () => {
+    const q = await ask('movies with Christopher Nolan');
+    expect(q.people).toEqual([{ personId: 525, role: 'actor' }]);
+    expect(q.castIds).toEqual([525]);
+  });
+
+  it('the two requests are NOT byte-identical retrieval constraints', async () => {
+    const director = await ask('movies directed by Christopher Nolan');
+    const actor = await ask('movies with Christopher Nolan');
+    expect(JSON.stringify(director)).not.toEqual(JSON.stringify(actor));
+  });
+
+  it('an unsupported role is refused out loud, never downgraded to actor', async () => {
+    const { POST } = await import('./ask/route');
+    const res = await POST(new Request('https://local.test/api/ask', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'movies created by Vince Gilligan' }),
+    }));
+    const body = (await res.json()) as { kind?: string; unsupportedRole?: { requested?: string } };
+    expect(body.kind).toBe('unsupported-role');
+    expect(body.unsupportedRole?.requested).toBe('creator');
+    expect(RAN.length, 'a refused role must not run retrieval').toBe(0);
   });
 });
 

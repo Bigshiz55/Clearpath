@@ -4,6 +4,7 @@ import { genreIdFromName } from '@/lib/finderGenres';
 import { DEFAULT_RESULT_LIMIT, type FinderQuery } from '@/lib/finder';
 import { searchBySubject, resolveKeywordIds, resolveProvider } from '@/lib/ai/tools';
 import { resolvePersonReference, type PersonResolution } from './personReference';
+import { planPersonConstraint, type PersonConstraint, type PersonPlan } from '@/lib/people/constraint';
 import type { CanonicalIntent } from '@/lib/interpret/types';
 
 /**
@@ -185,6 +186,10 @@ export interface CanonicalExecution {
   ambiguity: Extract<PersonResolution, { kind: 'ambiguous' }> | null;
   /** "…but not another Stallone movie" — resolved ids, credit-filtered later. */
   excludePersonIds: number[];
+  /** A credit role the engine cannot run — the route answers with a refusal,
+   *  because films someone merely appeared in are a confidently wrong answer
+   *  to a question about their directing. Never silently downgraded. */
+  refusedRole: Extract<PersonPlan, { kind: 'refuse' }> | null;
   /** Disclosures the response shows, in the product's existing voice. */
   interpretation: string[];
 }
@@ -207,14 +212,39 @@ export async function resolveCanonicalExecution(intent: CanonicalIntent): Promis
 
   const ambiguity = people.find((p) => p.kind === 'ambiguous') ?? null;
 
-  const castIds = people
-    .filter((p): p is Extract<PersonResolution, { kind: 'resolved' }> => p.kind === 'resolved')
-    .map((p) => p.id);
-  if (castIds.length > 0) {
-    query.castIds = castIds;
-    /* Cast filtering is movie-only in the finder, and the sentence said
-       "movie" in every shape that reaches here. Stated media still wins when
-       the user asked for TV — this only fills an unstated one. */
+  /*
+   * THE ROLE TRAVELS FROM THE INTENT, NEVER FROM THE RAW SENTENCE.
+   * `CanonicalIntent.people[].role` was read once by the interpreter
+   * ("directed by" → director); here each resolved identity is planned into
+   * a TYPED PersonConstraint through the same `planPersonConstraint` the
+   * legacy arm uses. 'any' takes the actor reading — the pre-existing cast
+   * semantics of an unmarked name. A role the engine cannot execute for the
+   * requested medium comes back as a REFUSAL the route must answer with,
+   * never a silent downgrade to actor.
+   */
+  const constraints: PersonConstraint[] = [];
+  const castIds: number[] = [];
+  let refusedRole: CanonicalExecution['refusedRole'] = null;
+  people.forEach((p, i) => {
+    if (p.kind !== 'resolved') return;
+    const intentRole = mapped.pending.requiredPeople[i]!.role;
+    const plan = planPersonConstraint(
+      p.id,
+      intentRole === 'any' ? 'actor' : intentRole,
+      query.mediaType === 'tv' ? 'tv' : 'movie',
+    );
+    if (plan.kind === 'apply') {
+      constraints.push(plan.constraint);
+      if (plan.constraint.role === 'actor') castIds.push(p.id);
+    } else if (refusedRole === null) {
+      refusedRole = plan;
+    }
+  });
+  if (constraints.length > 0) {
+    query.people = constraints;
+    if (castIds.length > 0) query.castIds = castIds;
+    /* Cast/crew filtering is movie-only in the finder. Stated media still
+       wins when the user asked for TV — this only fills an unstated one. */
     if (query.mediaType === 'any') query.mediaType = 'movie';
   }
 
@@ -256,10 +286,17 @@ export async function resolveCanonicalExecution(intent: CanonicalIntent): Promis
     if (ids.length) query.providerIds = ids;
   }
 
-  for (const p of people) {
-    if (p.kind === 'resolved') interpretation.push(`Filtering to titles featuring ${p.name}.`);
+  people.forEach((p, i) => {
+    if (p.kind === 'resolved') {
+      const role = mapped.pending.requiredPeople[i]!.role;
+      interpretation.push(
+        role === 'director'
+          ? `Filtering to titles directed by ${p.name}.`
+          : `Filtering to titles featuring ${p.name}.`,
+      );
+    }
     if (p.kind === 'unresolved') interpretation.push(`I couldn’t find anyone called “${p.spokenAs}”.`);
-  }
+  });
 
   for (const t of mapped.undeliverableTones) {
     interpretation.push(`“${t}” isn’t a tone I can filter by yet — showing results without it.`);
@@ -271,6 +308,7 @@ export async function resolveCanonicalExecution(intent: CanonicalIntent): Promis
     people,
     ambiguity: ambiguity as CanonicalExecution['ambiguity'],
     excludePersonIds: excludedIds,
+    refusedRole,
     interpretation,
   };
 }
