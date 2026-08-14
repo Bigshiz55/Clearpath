@@ -187,13 +187,50 @@ const ARTICLE_LED = /^(?:the|a|an)\s/i;
 const PERSON_WITH_MODIFIER =
   /\b((?:[A-Z][\w'’-]*)(?:\s+[A-Z][\w'’-]*){1,3})\s+(?:[a-z][\w-]{2,}\s+){1,2}(?:movies?|films?|flicks?)\b/g;
 
+/**
+ * A LONE CAPITALISED WORD IN THE SAME POSITION — "a Stallone movie".
+ *
+ * The patterns above require two or more capitalised tokens, so a surname on
+ * its own was not a person at all and fell through to `subjectSpans`, which
+ * takes whatever qualifies the media noun. That is the live production failure
+ * in miniature: "stallone" left as a strict SUBJECT, and no film is about an
+ * actor, so the request returned zero titles.
+ *
+ * A surname is weaker evidence than a full name, and it is deliberately NOT
+ * resolved here — this layer emits the span and the identity contract is
+ * settled downstream against the real people catalog, which may answer with a
+ * person or with a clarification. What matters is that it leaves as a PERSON
+ * and can no longer be mistaken for a theme.
+ *
+ * Genre, tone and structural words are excluded by the caller, so a user who
+ * capitalises "a Horror movie" still gets a genre.
+ */
+const MONONYM_BEFORE_MEDIA =
+  /\b([A-Z][\w'’-]{2,})(?:'s)?\s+(?:[a-z][\w-]{2,}\s+){0,2}(?:movies?|films?|flicks?)\b/g;
+
+/** Words that are never a person, however they are capitalised. */
+const NEVER_A_PERSON =
+  /^(?:horror|comedy|comedies|drama|thriller|mystery|romance|documentary|documentaries|animation|animated|western|war|crime|fantasy|sci-?fi|musical|biography|history|sport|family|adventure|action|supernatural|funny|dark|scary|good|great|best|new|old|other|another|more|some|any|the|classic|foreign|indie|short|long|recent|popular)$/i;
+
 /** Every person occurrence in one clause, computed once, ranges retained. */
 function findPersonMatches(clause: string): SpanMatch[] {
-  return [
+  const named = [
     ...spanMatches(clause, AFTER_PERSON_CUE),
     ...spanMatches(clause, PERSON_BEFORE_MEDIA),
     ...spanMatches(clause, PERSON_WITH_MODIFIER),
   ].filter((m) => !ARTICLE_LED.test(m.text));
+
+  /* Runs last and only where a fuller name did not already claim the ground, so
+     "Stallone" inside "Sylvester Stallone" is the same person rather than a
+     second one. Ranges make that check exact instead of a substring guess. */
+  const mononyms = spanMatches(clause, MONONYM_BEFORE_MEDIA).filter(
+    (m) =>
+      !NEVER_A_PERSON.test(m.text) &&
+      !ARTICLE_LED.test(m.text) &&
+      !named.some((n) => m.start >= n.start && m.end <= n.end),
+  );
+
+  return [...named, ...mononyms];
 }
 
 /** People are named spans too — never ids, never credits. */
