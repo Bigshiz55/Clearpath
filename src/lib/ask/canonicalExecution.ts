@@ -139,7 +139,9 @@ export function intentToQuery(intent: CanonicalIntent): MappedIntent {
 
   const query: FinderQuery = {
     ...EMPTY_QUERY,
-    mediaType: intent.media === 'either' ? 'any' : intent.media,
+    // 'none' (a media contradiction) is the ROUTE's to clarify before
+    // execution; if it arrives here anyway, the honest widest reading is used.
+    mediaType: intent.media === 'either' || intent.media === 'none' ? 'any' : intent.media,
     genreIds,
     excludeGenreIds: excludeGenreIds.length ? excludeGenreIds : undefined,
     maxRuntime: intent.runtime.maxMinutes ?? null,

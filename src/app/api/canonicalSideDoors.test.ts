@@ -171,6 +171,19 @@ describe('origin and audio are canonical fields, never a raw reparse', () => {
   });
 });
 
+describe('a media contradiction is a question', () => {
+  it('"no movies and no TV shows" clarifies instead of guessing', async () => {
+    const { POST } = await import('./ask/route');
+    const res = await POST(new Request('https://local.test/api/ask', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'Give me no movies and no TV shows' }),
+    }));
+    const body = (await res.json()) as { kind?: string };
+    expect(body.kind).toBe('clarify');
+  });
+});
+
 describe('a veto the catalog has no canonical genre for still executes', () => {
   it('"no supernatural stuff" excludes through the shared alias map, never a positive', async () => {
     // `supernatural` is not a TMDB genre, but the shared PARSING alias map

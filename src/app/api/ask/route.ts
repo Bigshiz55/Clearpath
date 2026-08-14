@@ -967,6 +967,20 @@ export async function POST(req: Request) {
       }
     }
 
+    /* A MEDIA CONTRADICTION is a question too: "no movies and no TV" rules
+       out the whole universe this product can search. */
+    if (canonicalOwnsLanguage && canonical.media === 'none') {
+      return NextResponse.json({
+        kind: 'clarify',
+        requestId,
+        appliedText: text || null,
+        clarify: 'That rules out both movies and TV shows — which did you mean?',
+        options: ['Movies', 'TV shows'],
+        query: { ...EMPTY_QUERY },
+        items: [],
+      });
+    }
+
     /* A named person we could not pin down is a QUESTION, not a guess. */
     if (canonicalAmbiguity) {
       return NextResponse.json({

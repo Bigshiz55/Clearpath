@@ -25,7 +25,7 @@
  */
 
 /** What kind of thing is being asked for. */
-export type MediaIntent = 'movie' | 'tv' | 'either';
+export type MediaIntent = 'movie' | 'tv' | 'either' | 'none';
 
 /** How a named title relates to the request. */
 export type ReferenceRelation =

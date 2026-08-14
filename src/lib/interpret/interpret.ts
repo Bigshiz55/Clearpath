@@ -73,11 +73,39 @@ export function parseCount(clause: string): number | null {
 const TV_WORDS = /\b(?:shows?|series|tv|episodes?|seasons?|sitcoms?)\b/i;
 const MOVIE_WORDS = /\b(?:movies?|films?|flicks?)\b/i;
 
+/** A negator within a short window behind the token, stopping at clause
+ *  punctuation — the same idiom the subject layer's `isNegated` uses. */
+const MEDIA_NEGATOR_BEHIND = /\b(?:not|no|without|except|excluding|avoid|nothing|none|but not|anything but)\b[^,.;]{0,24}$/i;
+
+/**
+ * MEDIA HAS POLARITY — presence is not preference.
+ *
+ * Presence-only reading turned "movies but no TV shows" into `either`: the
+ * vetoed noun counted as a positive signal. Each occurrence is now classified
+ * by whether a negator governs it. With nothing stated positively, ruling one
+ * medium out means the other — `mediaType` is this product's exhaustive
+ * movie/tv universe — and ruling BOTH out is a contradiction the caller must
+ * turn into a question, never a guess.
+ */
 export function parseMedia(clause: string): MediaIntent {
-  const tv = TV_WORDS.test(clause);
-  const movie = MOVIE_WORDS.test(clause);
-  if (tv && !movie) return 'tv';
-  if (movie && !tv) return 'movie';
+  let tvPos = false;
+  let tvNeg = false;
+  let moviePos = false;
+  let movieNeg = false;
+  for (const m of clause.matchAll(new RegExp(TV_WORDS.source, 'gi'))) {
+    if (MEDIA_NEGATOR_BEHIND.test(clause.slice(0, m.index!))) tvNeg = true;
+    else tvPos = true;
+  }
+  for (const m of clause.matchAll(new RegExp(MOVIE_WORDS.source, 'gi'))) {
+    if (MEDIA_NEGATOR_BEHIND.test(clause.slice(0, m.index!))) movieNeg = true;
+    else moviePos = true;
+  }
+  if (moviePos && tvPos) return 'either';
+  if (moviePos) return 'movie';
+  if (tvPos) return 'tv';
+  if (tvNeg && movieNeg) return 'none';
+  if (tvNeg) return 'movie';
+  if (movieNeg) return 'tv';
   return 'either';
 }
 
