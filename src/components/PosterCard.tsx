@@ -6,7 +6,6 @@ import { CardVerdict } from './CardVerdict';
 import { WCheck } from './WCheck';
 import { CardSynopsis } from './CardSynopsis';
 import { CardFacts } from './CardFacts';
-import { CardFit } from './CardFit';
 import { WhereToWatch } from './watch/WhereToWatch';
 import { TrailerMedia } from './trailer/TrailerMedia';
 import { WhyThisTitle } from './watch/WhyThisTitle';
@@ -94,13 +93,26 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
   const heading = (
     <>
       {/* Full-width cards on a phone mean the title has room to be read rather
-          than scanned, so it is sized for reading. */}
-      <div className="line-clamp-2 text-base font-semibold leading-snug text-white sm:text-sm">{title}</div>
-      <div className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-400 sm:text-xs">
+          than scanned, so it is sized for reading.
+
+          IT RESERVES BOTH LINES WHETHER IT NEEDS THEM OR NOT. The clamp caps a
+          long title at two lines, but a SHORT one took only one — so in a row
+          of four cards, "A" and "Gōngfu Sūpermán 功夫超人 — Édition Spéciale"
+          started their facts, score, synopsis and provider row at different
+          heights, and nothing below lined up across the row. Reserving the
+          second line costs one line of space on short titles and buys a grid
+          whose rows scan straight across. */}
+      <div className="line-clamp-2 min-h-[2.75rem] text-base font-semibold leading-snug text-white sm:min-h-[2.5rem] sm:text-sm">{title}</div>
+      {/* ONE LINE, ALWAYS. "2022 · Acción · Comedia" wrapped onto a second
+          line at 390 while "1995" did not, so one card in the row stood 11px
+          taller than its neighbours. Metadata is the compact answer to "what
+          is it" — the full detail is on the title page — so it truncates
+          rather than growing the card. */}
+      <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] text-slate-400 sm:text-xs">
         <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">
           {mediaType === 'movie' ? 'Movie' : 'TV'}
         </span>
-        <span>
+        <span className="truncate">
           {year ?? '—'}
           {meta ? ` · ${meta}` : ''}
         </span>
@@ -229,7 +241,7 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             level with the poster instead of leaving the gap it was put there
             to fill. */}
         {saveId != null && (
-          <AlgorithmScore compact mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} objectiveScore={objectiveScore} className="mt-auto pt-2" />
+          <AlgorithmScore compact showRatings={false} mediaType={mediaType} tmdbId={saveId} title={title} year={year ?? null} objectiveScore={objectiveScore} className="mt-auto pt-2" />
         )}
       </div>
       </div>
@@ -245,24 +257,21 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
             every title ("…until Andy's…"), which tells you less than none. The
             reserved height grows with it, so nothing moves when the text
             lands. */}
-        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={2} className="mt-1" />}
+        {/* WHAT IS IT? A short, FIXED synopsis — enough context to answer that
+            question and nothing more. `expandable={false}`: the card must have
+            no control that can grow it, and the long read is behind More info. */}
+        {saveId != null && <CardSynopsis mediaType={mediaType} tmdbId={saveId} lines={2} expandable={false} className="mt-1" />}
 
-        {/* WHY THIS TITLE IS HERE — the first of the card's two questions,
-            answered before the second. Compact reasons, one or two shown, the
-            rest behind "Why?". Renders nothing when nothing can be
-            substantiated; see src/lib/reasons/whyThisTitle.ts. */}
+        {/* WHY THIS ONE, IN ONE LINE. `compact` shows the single strongest
+            grounded reason with no "Why?" expansion — the rest of the stack is
+            investigation and lives on the title page. The slot reserves its
+            height so a title with a reason and a title without one leave the
+            row at the same height. */}
         {saveId != null && (
-          <WhyThisTitle
-            mediaType={mediaType}
-            tmdbId={saveId}
-            className="mt-1.5"
-          />
+          <div className="mt-1.5 min-h-[1.5rem]">
+            <WhyThisTitle mediaType={mediaType} tmdbId={saveId} compact />
+          </div>
         )}
-
-        {/* The one-sentence taste explanation, when the rated history supports
-            one. Kept alongside the reason chips: the chips say WHAT matched,
-            this says it in the user's own terms. */}
-        {saveId != null && <CardFit mediaType={mediaType} tmdbId={saveId} className="mt-1.5" />}
 
         {/* WHERE TO WATCH — the question of FACT, kept separate from the
             question of TASTE answered by the verdict panel above it.
@@ -283,6 +292,40 @@ export function PosterCard({ href, title, year, mediaType, posterUrl, posterPath
         {/* Supporting evidence: the pills, the household verdict, and the
             "Why this Verd1ct?" panel. */}
         {evidence && <div className="space-y-2">{evidence}</div>}
+
+        {/* MORE INFO — WHERE THE DEEP DETAIL LIVES.
+            The card answers four questions: what is it, will I like it, where
+            can I watch it, what can I do about it. Everything beyond that —
+            the full synopsis, every reason, the cautions, the detailed
+            ratings, the expanded availability, the cast, the deeper DNA
+            explanation — belongs one level down, and one level down already
+            exists: the title page. This is a link to THAT, not a second
+            detail surface built beside it.
+            It also gives the card a deliberate end, which the foot did not
+            have — the last thing on it was whatever async block happened to
+            resolve last. */}
+        {saveId != null && (
+          <Link
+            /* Derived, not required from the caller. Every card that knows its
+               id knows where its title page is, and a card whose poster opens
+               a QuickLook (`onOpen`, no `href`) still needs a way through to
+               the full detail — that is precisely the card this affordance
+               exists for. */
+            href={href ?? `/app/title/${mediaType}/${saveId}`}
+            /* NO PREFETCH. `next/link` prefetches every link that enters the
+               viewport, and a browse grid is twenty of these at once — twenty
+               RSC payloads for dynamic title pages the reader may never open.
+               Measured, not theorised: with prefetch on, `/dev/visual-qa`
+               never reached `networkidle` within 20s. A grid is exactly the
+               place where prefetching everything is the wrong default. */
+            prefetch={false}
+            data-testid="card-more-info"
+            className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-semibold text-brand-200 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950"
+          >
+            More info
+            <span aria-hidden>→</span>
+          </Link>
+        )}
 
         {/* The FOR/AGAINST/SAVE row lives at the TOP of the card now — see the
             block above `.wv-card`. The foot ends on the evidence. */}

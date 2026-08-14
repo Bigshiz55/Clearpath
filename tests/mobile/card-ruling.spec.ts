@@ -230,7 +230,7 @@ test('the ratings row is one line at every width, so its height cannot vary', as
   for (const [w, h] of [[320, 800], [390, 900], [1024, 1200]] as const) {
     await openWithLateData(page, w, h);
     await page.waitForTimeout(2000);
-    const card = page.getByTestId('qa-grid').locator('> div').first();
+    const card = page.getByTestId('qa-ratings-card');
     const row = card.locator('.wv-ratings-row').first();
     const [cardBox, rowBox] = [await card.boundingBox(), await row.boundingBox()];
     heights.push(Math.round(rowBox!.height));

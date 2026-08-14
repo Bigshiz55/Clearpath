@@ -173,6 +173,28 @@ body {
     padding-bottom: 0.25rem;
   }
   .wv-rail::-webkit-scrollbar { display: none; }
+
+  /* ── TRAILER CONTROLS: THE TARGET AND THE MARK ARE DIFFERENT THINGS ──────
+     Every trailer control was its own visible chrome, so "▶ Trailer" measured
+     68×25 and each icon button 32×32 — all under the 44px interaction
+     minimum, on a control that sits over artwork where a mis-tap costs you
+     the card's own navigation. Growing the chrome to 44 would have put a slab
+     of black across the corner of every poster.
+     So the BUTTON is a transparent >=44px target and the SPAN inside it is
+     the mark. The extra area extends into the poster's own corner, which is
+     otherwise dead space, and the control looks exactly as light as before. */
+  .wv-tr-hit {
+    @apply inline-flex min-h-[44px] min-w-[44px] items-end justify-end
+           bg-transparent transition
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300
+           focus-visible:ring-offset-2 focus-visible:ring-offset-black/60;
+  }
+  .wv-tr-chip {
+    @apply pointer-events-none inline-flex items-center rounded-full bg-black/65
+           text-white backdrop-blur transition;
+  }
+  .wv-tr-hit:hover .wv-tr-chip { @apply bg-black/85; }
+  .wv-tr-hit:active .wv-tr-chip { transform: scale(0.94); }
   .wv-rail-item {
     flex: 0 0 auto;
     width: 8.5rem;

@@ -4,6 +4,29 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **Cards and trailers — `claude/card-trailer-premium` (PR #63, open, not
+  merged).** The 20 inherited mobile failures are 0 because the product was
+  fixed, not the specs: an unnamed provider was throwing during render and
+  taking the whole results page into the error boundary (8), and every trailer
+  control was under the 44px tap minimum (12). On top of that the trailer
+  interaction contract is now enforced by measurement — a trailer may never
+  change the outer dimensions of a card — Top Picks lost its second colour
+  language, and the browse card has an **information budget**: it decides, the
+  title page investigates. Ratings, the expandable synopsis, the full reason
+  stack and `CardFit` moved off it; a short fixed synopsis and one grounded
+  reason stayed. Measured 730px at 1440/1280 and 516px at 390 with a 0px spread.
+  Main merged in (Showdown, taste axes, Verdict Room interior, read-only eval
+  evidence); the one genuine disagreement with main's provider hotfix #65 is
+  resolved in `resolveProviderBrand` — an exact provider id is a key and still
+  names a brand, while name resemblance stays forbidden.
+  Gates green at `539753d`: typecheck 0, lint 0, vitest 0 (3823 passed),
+  build 0, searchrouting 0 (21 passed), full mobile 0 (**1113 passed, 1
+  feature-detected skip, 0 failed**).
+  **Discovered on the way, for the queue:** `CardFit` now has zero callers —
+  it is the "why YOU, specifically" sentence and belongs on the title page,
+  which is where the budget says it goes. Wiring it in there is its own small
+  work order, not this one.
+
 - **The Verdict Room — `claude/verdict-room-complete`.** PR #58's entrance
   reconciled onto current `main` and carried through the WHOLE room, so the
   interior no longer collapses back to a stack of `max-w-2xl` cards the moment

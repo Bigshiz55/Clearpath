@@ -291,7 +291,7 @@ for (const w of [320, 375, 390, 430, 768, 1024, 1440] as const) {
     // INSIDE A CARD. The harness also renders a standalone full-width strip,
     // which has room to spare and proves nothing — the first version of this
     // test measured that one and passed while "6.8" shipped as "6".
-    const row = page.getByTestId('qa-grid').locator('.wv-ratings-row').first();
+    const row = page.getByTestId('qa-ratings-card').locator('.wv-ratings-row').first();
     await expect(row).toBeVisible();
     const chips = row.locator('> span');
     expect(await chips.count()).toBe(3);
@@ -318,7 +318,7 @@ for (const w of [320, 375, 390, 430, 768, 1024, 1440] as const) {
 
 test('the ratings do not look like the actions', async ({ page }) => {
   await open(page);
-  const row = page.getByTestId('qa-grid').locator('.wv-ratings-row').first();
+  const row = page.getByTestId('qa-ratings-card').locator('.wv-ratings-row').first();
   const heights = await row.locator('> span').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
   // One consistent height across all three sources.
   expect(new Set(heights).size, `chip heights: ${heights.join(',')}`).toBe(1);

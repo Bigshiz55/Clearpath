@@ -49,8 +49,8 @@ const PLAN_WORDS =
   /\b(?:premium plus|premium|plus|essential|with ads|ad[- ]?supported|basic|standard|hd|uhd|4k|free)\b/g;
 
 /** The key both sides of the asset lookup are built with. */
-export function providerAssetKey(name: string): string {
-  return name
+export function providerAssetKey(name: string | null | undefined): string {
+  return (typeof name === 'string' ? name : '')
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ' ')
@@ -119,10 +119,30 @@ for (const a of PROVIDER_ASSETS) {
  * canonical name otherwise. Null when we hold nothing — which is the honest
  * answer and renders as the official NAME.
  */
-export function assetForProvider(name: string, providerId?: number | null): string | null {
+export function assetForProvider(name: string | null | undefined, providerId?: number | null): string | null {
   if (providerId != null) {
     const byId = BY_ID.get(providerId);
     if (byId) return byId.logoPath;
   }
-  return BY_KEY.get(providerAssetKey(name))?.logoPath ?? null;
+  // An empty key must never match a table entry — `''` is "no brand named",
+  // and returning some entry's asset for it would be inventing a provider.
+  const key = providerAssetKey(name);
+  if (!key) return null;
+  return BY_KEY.get(key)?.logoPath ?? null;
+}
+
+/**
+ * The brand a TMDB provider id names, or null.
+ *
+ * BY ID ONLY, AND THAT IS THE WHOLE POINT. A provider id is a primary key from
+ * the same source the name would have come from — id 8 IS Netflix — so reading
+ * a name back from it recovers a fact we already hold. It is the opposite of
+ * the name-resemblance lookup this file refuses: there is no fuzziness to get
+ * wrong, and an id we do not have in the table answers null rather than
+ * guessing. Deliberately NOT exposed for names, which is where invention would
+ * come from.
+ */
+export function providerNameForId(providerId?: number | null): string | null {
+  if (providerId == null) return null;
+  return BY_ID.get(providerId)?.name ?? null;
 }

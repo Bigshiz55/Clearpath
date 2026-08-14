@@ -9,6 +9,59 @@ import {
   resolveProviderBrand,
 } from './brand';
 
+/**
+ * A MISSING PROVIDER NAME IS A DATA GAP, NOT AN EXCEPTION.
+ *
+ * `officialProviderName(undefined)` called `.trim()` on it and threw, and
+ * because a throw during render unmounts the whole tree rather than one chip,
+ * a SINGLE result whose availability carried no resolved service dropped the
+ * entire Finder results page into the error boundary — "Something went wrong",
+ * no titles at all. That is what these guard.
+ */
+describe('a provider reference with no name', () => {
+  const absent = [undefined, null, '', '   '] as const;
+
+  it('never throws, whatever the payload left out', () => {
+    for (const v of absent) {
+      expect(() => normalizeProviderName(v)).not.toThrow();
+      expect(() => officialProviderName(v)).not.toThrow();
+      expect(() => providerBrandKey(v)).not.toThrow();
+      expect(() => resolveProviderBrand({ name: v })).not.toThrow();
+    }
+  });
+
+  it('resolves to "we do not know", never to a guessed brand', () => {
+    for (const v of absent) {
+      const brand = resolveProviderBrand({ name: v });
+      expect(brand.name).toBe('');
+      // The empty key must not collide with a real entry in the asset table.
+      expect(brand.logoPath).toBeNull();
+      expect(brand.textOnly).toBe(true);
+    }
+  });
+
+  it('still resolves the brand when only an id or a logo identifies it', () => {
+    // A row can arrive with no name but a TMDB provider id — that IS an
+    // identity, and dropping it would lose a fact we hold.
+    expect(resolveProviderBrand({ name: null, providerId: 8 }).logoPath).not.toBeNull();
+    expect(resolveProviderBrand({ name: undefined, logoPath: '/x.jpg' }).logoPath).toBe('/x.jpg');
+  });
+
+  it('names the brand from the id, because an id is a key and not a resemblance', () => {
+    // The distinction this module lives or dies by. Provider id 8 IS Netflix —
+    // same source, exact match, no judgement call — so recovering the name is
+    // reading a fact back, not guessing one. What stays forbidden is the other
+    // direction: a name we cannot match must never be talked into a brand.
+    expect(resolveProviderBrand({ name: null, providerId: 8 }).name).toBe('Netflix');
+    expect(resolveProviderBrand({ name: '   ', providerId: 15 }).name).toBe('Hulu');
+    // An id we do not hold is still nothing. No neighbour, no nearest match.
+    const unknown = resolveProviderBrand({ name: undefined, providerId: 999999 });
+    expect(unknown.name).toBe('');
+    expect(unknown.logoPath).toBeNull();
+    expect(unknown.textOnly).toBe(true);
+  });
+});
+
 describe('the provider-brand registry', () => {
   it('spells a brand the way the brand does', () => {
     expect(officialProviderName('fuboTV')).toBe('Fubo');

@@ -31,6 +31,9 @@ export interface WhyVerdictData {
   heldBack: string[];
   requirements: { label: string; satisfied: boolean; evidence: string }[];
   availability: {
+    /** The server's own grounded sentence, e.g. "Netflix · Rental". Always
+     *  present, and the fallback whenever the structured parts below are not:
+     *  see the availability row for why that fallback has to exist. */
     text: string;
     confidence: string;
     /**

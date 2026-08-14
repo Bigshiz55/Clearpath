@@ -95,7 +95,7 @@ test('the labels still fit — bigger text must not wrap the row', async ({ page
  * screen with room they should be read at a glance, not squinted at.
  */
 async function ratingsMetrics(page: Page) {
-  const row = page.getByTestId('qa-grid').locator('> div').first().locator('.wv-ratings-row').first();
+  const row = page.getByTestId('qa-ratings-card').locator('.wv-ratings-row').first();
   await expect(row).toBeVisible();
   return row.evaluate((el) => ({ fontSize: parseFloat(getComputedStyle(el).fontSize) }));
 }
@@ -127,7 +127,7 @@ test('and bigger again on a wide screen', async ({ page }) => {
 test('the bigger ratings still fit inside their panel at every width', async ({ page }) => {
   for (const [w, h] of [[1024, 1366], [1280, 900], [1440, 900]] as const) {
     await open(page, w, h);
-    const card = page.getByTestId('qa-grid').locator('> div').first();
+    const card = page.getByTestId('qa-ratings-card');
     const row = card.locator('.wv-ratings-row').first();
     const [cardBox, rowBox] = [await card.boundingBox(), await row.boundingBox()];
     // IMDb escaping the pink panel is the old bug this row already had once.
