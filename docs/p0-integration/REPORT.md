@@ -85,3 +85,22 @@ with the resolution above; neither supersedes the other (#64 never touches
   oracle tier; turns the GotG GAPs into proofs
 - `curl -s https://watchverdict.com/api/version` — production SHA is
   unverifiable from the sandboxed session (proxy 403)
+
+## Correction (2026-08-14, integration checkpoint 2)
+
+The blocker-B checkpoint (and the df386de commit message) described the
+preserved fuzzy resolution as:
+
+> "Sylvester Stalone still resolves — unique fuzzy match against Frank Stallone"
+
+That sentence is wrong as written. What the committed implementation and
+test prove is:
+
+> "Sylvester Stalone" → **Sylvester Stallone**, id **16483**,
+> evidence **unique-credited-name-match**.
+
+Frank Stallone is REJECTED as a candidate because the spoken token
+"Sylvester" cannot match any token of his name — he is the reason the
+match must be proven *unique*, not the thing matched against. No resolver
+behavior changed for this correction; the record is corrected to match
+the code.
