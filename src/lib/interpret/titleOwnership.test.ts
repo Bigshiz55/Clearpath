@@ -80,3 +80,45 @@ describe('controls — description keeps its meaning', () => {
     expect(r.subjects.filter((s) => s.wanted).map((s) => s.span)).toEqual(['courtroom']);
   });
 });
+
+/**
+ * CAPITALISATION MAY NOT TURN DESCRIPTION INTO A TITLE.
+ *
+ * The capitalised-article rule alone reads "Show me A Horror Movie" as a
+ * requested title — a user who capitalises their request would lose the
+ * horror constraint to a lookup for a film called "A Horror Movie". The
+ * principle: when every word inside a title-shaped candidate independently
+ * earns an executable DESCRIPTIVE role — a genre, a tone, a known subject
+ * from the shared lexicons the product already owns — descriptive ownership
+ * wins over the title heuristic. "Lego" and "Goofy" earn no such role, so the
+ * genuine titles stand. No title dictionary, no Lego/Goofy exception.
+ */
+describe('capitalised description stays description', () => {
+  it('"Show me A Horror Movie" → recommendation with the horror constraint, not a lookup', () => {
+    const r = interpret('Show me A Horror Movie');
+    expect(r.kind).toBe('recommendation');
+    expect(r.genres.filter((g) => g.wanted).map((g) => g.span)).toContain('horror');
+    expect(r.titles.filter((t) => t.relation === 'requested')).toEqual([]);
+  });
+
+  it('"Show me A Boxing Movie" → recommendation with the boxing subject, not a lookup', () => {
+    const r = interpret('Show me A Boxing Movie');
+    expect(r.kind).toBe('recommendation');
+    expect(r.subjects.filter((s) => s.wanted).map((s) => s.span)).toEqual(['boxing']);
+    expect(r.titles.filter((t) => t.relation === 'requested')).toEqual([]);
+  });
+
+  it('"Show me A Funny Movie" → recommendation, the tone survives, not a lookup', () => {
+    const r = interpret('Show me A Funny Movie');
+    expect(r.kind).toBe('recommendation');
+    expect(r.tones.filter((t) => t.wanted).map((t) => t.term)).toContain('funny');
+    expect(r.titles.filter((t) => t.relation === 'requested')).toEqual([]);
+  });
+
+  it('"Show me A Courtroom Movie" → recommendation with the courtroom subject, not a lookup', () => {
+    const r = interpret('Show me A Courtroom Movie');
+    expect(r.kind).toBe('recommendation');
+    expect(r.subjects.filter((s) => s.wanted).map((s) => s.span)).toEqual(['courtroom']);
+    expect(r.titles.filter((t) => t.relation === 'requested')).toEqual([]);
+  });
+});

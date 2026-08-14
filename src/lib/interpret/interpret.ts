@@ -23,6 +23,7 @@
  */
 
 import { parseClauses, requestClause, type Clause } from './clauses';
+import { SUBJECT_TERMS } from '@/lib/finderParse';
 import {
   EMPTY_INTENT,
   type CanonicalIntent,
@@ -201,9 +202,64 @@ const overlaps = (a: SpanMatch, b: SpanMatch) => a.start < b.end && b.start < a.
 const REQUESTED_TITLE =
   /\b((?:The|A|An)\s+(?:[A-Z][\w'’-]*\s+)*[A-Z][\w'’-]*\s+(?:[Mm]ovies?|[Ff]ilms?))\b/g;
 
-/** Requested-title occurrences in a clause, ranges retained. */
+/**
+ * CAPITALISATION IS EVIDENCE, NOT A VERDICT — DESCRIPTION WINS.
+ *
+ * "Show me A Horror Movie" fits the requested-title shape, and reading it as
+ * a lookup would trade the user's horror constraint for a search for a film
+ * called "A Horror Movie". The tiebreaker is not a title dictionary but the
+ * DESCRIPTIVE vocabularies the product already owns: when every word between
+ * the article and the media noun independently earns an executable
+ * descriptive role — a genre (`GENRE_WORDS`), a tone (`TONE_WORDS`), a known
+ * subject (`SUBJECT_TERMS`, the shared trope lexicon `parseTopicTerms`
+ * already reads), or structural filler ("good", "new") — the phrase is a
+ * capitalised description and keeps that meaning. "Lego" and "Goofy" earn no
+ * descriptive role anywhere, so the genuine titles stand. Nothing here names
+ * a title, and no vocabulary is duplicated — the three lexicons are the same
+ * objects the rest of the pipeline consumes.
+ */
+const STRUCTURAL_FILLER =
+  /^(?:good|great|best|new|newer|old|older|other|another|more|some|any|really|very|nice|decent|solid|different|similar|classic|little)$/i;
+
+/* The SAME regex sources the extraction below uses, anchored for a
+   single-token test — derived, never re-listed, so the vocabularies cannot
+   drift apart. */
+const GENRE_TOKEN = new RegExp(`^(?:${GENRE_WORDS.source.replace(/\\b/g, '')})$`, 'i');
+const TONE_TOKEN = new RegExp(`^(?:${TONE_WORDS.source.replace(/\\b/g, '')})$`, 'i');
+
+function isDescriptiveInterior(interior: string): boolean {
+  const tokens = interior.toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return false;
+  let i = 0;
+  outer: while (i < tokens.length) {
+    // Longest shared-lexicon phrase first, so "martial arts" and "time
+    // travel" consume as one term.
+    for (let len = Math.min(3, tokens.length - i); len >= 1; len--) {
+      const phrase = tokens.slice(i, i + len).join(' ');
+      if (SUBJECT_TERMS.includes(phrase)) {
+        i += len;
+        continue outer;
+      }
+    }
+    const t = tokens[i]!;
+    if (GENRE_TOKEN.test(t) || TONE_TOKEN.test(t) || STRUCTURAL_FILLER.test(t)) {
+      i += 1;
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+/** Requested-title occurrences in a clause, ranges retained. A candidate
+ *  whose interior is pure description is not a title and never claims one. */
 function findRequestedTitles(clause: string): SpanMatch[] {
-  return spanMatches(clause, REQUESTED_TITLE);
+  return spanMatches(clause, REQUESTED_TITLE).filter((m) => {
+    const interior = m.text
+      .replace(/^(?:The|A|An)\s+/i, '')
+      .replace(/\s+(?:[Mm]ovies?|[Ff]ilms?)$/i, '');
+    return !isDescriptiveInterior(interior);
+  });
 }
 
 /**
