@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `12fd137` · Branch: `claude/hotfix-provider-chip-crash`
+- Commit: `ef8fff3`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 

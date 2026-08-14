@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeEvaluationArtifact, evaluatedCommit } from '../runner/artifacts';
 import { join } from 'node:path';
 import { normalize } from '../normalize/normalize';
 import { CRITICAL_SUITE, IMPOSSIBLE_SUITE, type CriticalCase, type FailCategory } from './suite';
@@ -15,10 +14,6 @@ import { gradeCase, type CaseResult } from './grade';
  * media-type / exclusion) — the rest of the report surfaces deeper
  * retrieval/availability/trait-translation gaps honestly (never weakened).
  */
-
-function gitOr(cmd: string, fallback: string): string {
-  try { return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return fallback; }
-}
 
 function runCase(c: CriticalCase): CaseResult {
   // Multi-turn: refinements accumulate into one combined utterance the parser sees.
@@ -37,14 +32,13 @@ describe('curated critical search suite', () => {
   for (const r of all) for (const cat of r.failCategories) catCounts.set(cat, (catCounts.get(cat) ?? 0) + 1);
   const sortedCats = [...catCounts.entries()].sort((a, b) => b[1] - a[1]);
 
-  const sha = gitOr('git rev-parse --short HEAD', 'dev');
-  const branch = gitOr('git rev-parse --abbrev-ref HEAD', '');
+  const sha = evaluatedCommit();
 
-  it('writes the stamped critical-suite report', () => {
+  it('produces the critical-suite report (written only on an explicit refresh)', () => {
     const lines: string[] = [];
     lines.push('# Search Quality — Curated Critical Suite');
     lines.push('');
-    lines.push(`- Commit: \`${sha}\` · Branch: \`${branch}\``);
+    lines.push(`- Commit: \`${sha}\``);
     lines.push(`- Cases: ${all.length} (${CRITICAL_SUITE.length} curated + ${IMPOSSIBLE_SUITE.length} impossible)`);
     lines.push(`- **Passed: ${passed}/${all.length} (${Math.round((passed / all.length) * 100)}%)**`);
     lines.push('');
@@ -61,10 +55,11 @@ describe('curated critical search suite', () => {
       for (const ch of r.checks) lines.push(`- ${ch.ok ? '✓' : '✗'} ${ch.label}${ch.ok ? '' : ` — ${ch.category} (${ch.detail})`}`);
       lines.push('');
     }
-    const dir = join(process.cwd(), 'evaluation-results', 'critical');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'report.md'), lines.join('\n'), 'utf8');
-    writeFileSync(join(dir, 'summary.json'), JSON.stringify({ sha, branch, total: all.length, passed, categories: Object.fromEntries(sortedCats) }, null, 2), 'utf8');
+    // The report is COMPUTED every run — that is what proves it can be
+    // produced. It is only WRITTEN when a refresh was asked for.
+    expect(lines.length).toBeGreaterThan(0);
+    writeEvaluationArtifact('critical', 'report.md', lines.join('\n'));
+    writeEvaluationArtifact('critical', 'summary.json', JSON.stringify({ sha, total: all.length, passed, categories: Object.fromEntries(sortedCats) }, null, 2));
 
     // Narrator line for the console.
     // eslint-disable-next-line no-console

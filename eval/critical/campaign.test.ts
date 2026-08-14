@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeEvaluationArtifact, evaluatedCommit } from '../runner/artifacts';
 import { join } from 'node:path';
 import { normalize } from '../normalize/normalize';
 import { generateCases, DIMENSIONS } from './generate';
@@ -19,7 +18,6 @@ import type { FailCategory } from './suite';
 const N = Number(process.env.EVAL_CASES ?? 2000);
 const SEED = Number(process.env.EVAL_SEED ?? 7);
 
-function gitOr(cmd: string, fb: string) { try { return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return fb; } }
 
 describe(`search validation campaign (${N} cases)`, () => {
   const cases = generateCases(N, SEED);
@@ -42,12 +40,11 @@ describe(`search validation campaign (${N} cases)`, () => {
     ['reference', 'REFERENCE_SIMILARITY_WEAK'],
   ];
 
-  it('writes the stamped campaign report', () => {
-    const sha = gitOr('git rev-parse --short HEAD', 'dev');
-    const branch = gitOr('git rev-parse --abbrev-ref HEAD', '');
+  it('produces the campaign report (written only on an explicit refresh)', () => {
+    const sha = evaluatedCommit();
     const L: string[] = [];
     L.push('# Search Validation Campaign', '');
-    L.push(`- Commit \`${sha}\` · Branch \`${branch}\` · Seed ${SEED}`);
+    L.push(`- Commit \`${sha}\` · Seed ${SEED}`);
     L.push(`- **Total searches: ${N} · Passed ${passed} (${((passed / N) * 100).toFixed(1)}%) · Failed ${N - passed} (${(((N - passed) / N) * 100).toFixed(1)}%)**`);
     L.push('', '## Per-dimension pass rate (of cases naming that dimension)', '');
     for (const [label, cat] of dims) { const d = dimRate(cat); L.push(`- ${label}: ${(d.rate * 100).toFixed(1)}% (${d.clean}/${d.relevant})`); }
@@ -60,10 +57,9 @@ describe(`search validation campaign (${N} cases)`, () => {
     for (const r of results.filter((x) => !x.pass).slice(0, 15)) {
       L.push(`- ❌ ${r.prompt} → ${r.failCategories.join(', ')}`);
     }
-    const dir = join(process.cwd(), 'evaluation-results', 'campaign');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'report.md'), L.join('\n'), 'utf8');
-    writeFileSync(join(dir, 'summary.json'), JSON.stringify({ sha, branch, seed: SEED, total: N, passed, categories: Object.fromEntries(sortedCats), dims: Object.fromEntries(dims.map(([l, c]) => [l, dimRate(c)])) }, null, 2), 'utf8');
+    expect(L.length).toBeGreaterThan(0);
+    writeEvaluationArtifact('campaign', 'report.md', L.join('\n'));
+    writeEvaluationArtifact('campaign', 'summary.json', JSON.stringify({ sha, seed: SEED, total: N, passed, categories: Object.fromEntries(sortedCats), dims: Object.fromEntries(dims.map(([l, c]) => [l, dimRate(c)])) }, null, 2));
     // eslint-disable-next-line no-console
     console.log(`\nCAMPAIGN [${sha}] ${N} cases — ${((passed / N) * 100).toFixed(1)}% pass. Dims: ${dims.map(([l, c]) => `${l} ${(dimRate(c).rate * 100).toFixed(0)}%`).join(' · ')}\n`);
     expect(results.length).toBe(N);
