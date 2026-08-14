@@ -165,6 +165,51 @@ describe('the canonical path does not re-read the raw utterance', () => {
   });
 });
 
+describe('the origin/audio augmentation may never return to the canonical arm', () => {
+  /* The guard-walk above is mention-based and can be satisfied from a
+     distance, so for this one helper the check is structural and exact: the
+     CANONICAL BLOCKS themselves — every `if (canonicalOwnsLanguage) {` body,
+     extracted by forward brace-matching — must not contain the call. The
+     canonical arm used to call it and restore two owned fields afterwards; a
+     side door wearing a seatbelt. Origin and audio are canonical fields now
+     (CanonicalIntent.origin), so the whole-utterance reparse may exist only
+     on the legacy arm. */
+  function canonicalArmBodies(): string[] {
+    const src = stripComments(route);
+    const bodies: string[] = [];
+    const re = /if\s*\(\s*canonicalOwnsLanguage\s*\)\s*\{/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src)) !== null) {
+      let depth = 1;
+      let i = m.index + m[0].length;
+      while (i < src.length && depth > 0) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') depth--;
+        i++;
+      }
+      bodies.push(src.slice(m.index + m[0].length, i - 1));
+    }
+    return bodies;
+  }
+
+  it('the canonical blocks exist and contain no augmentInternational call', () => {
+    const bodies = canonicalArmBodies();
+    expect(bodies.length, 'no if (canonicalOwnsLanguage) block found — the arm moved').toBeGreaterThan(0);
+    for (const body of bodies) {
+      expect(
+        /\baugmentInternational\s*\(/.test(body),
+        'augmentInternational() is called on the CANONICAL arm. Origin/audio are canonical fields; a whole-utterance reparse underneath them is the side door this fence closed.',
+      ).toBe(false);
+    }
+  });
+
+  it('the legacy arm still calls it, guarded', () => {
+    // The helper must still exist somewhere (deleting it outright would break
+    // the legacy/finder paths this migration deliberately leaves alone).
+    expect(/\baugmentInternational\s*\(/.test(stripComments(route))).toBe(true);
+  });
+});
+
 describe('the canonical adapter reads canonical fields only', () => {
   /* Comments in these files NAME the helpers they replace, on purpose — that is
      the record of why the boundary exists. Only code can breach it. */

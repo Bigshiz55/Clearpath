@@ -24,6 +24,7 @@
 
 import { parseClauses, requestClause, type Clause } from './clauses';
 import { SUBJECT_TERMS } from '@/lib/finderParse';
+import { detectOrigin, detectAudio, detectRuntimeMaxMinutes } from '@/lib/nlu/detectors';
 import {
   EMPTY_INTENT,
   type CanonicalIntent,
@@ -300,6 +301,15 @@ const MONONYM_BEFORE_MEDIA =
 const NEVER_A_PERSON =
   /^(?:horror|comedy|comedies|drama|thriller|mystery|romance|documentary|documentaries|animation|animated|western|war|crime|fantasy|sci-?fi|musical|biography|history|sport|family|adventure|action|supernatural|funny|dark|scary|good|great|best|new|old|other|another|more|some|any|the|classic|foreign|indie|short|long|recent|popular)$/i;
 
+/** Every token of this phrase belongs to the shared ORIGIN vocabulary —
+ *  "Korean", "French Canadian". Origin language names a place a film comes
+ *  from, never a person, however it is capitalised. The check consumes the
+ *  same detector the execution layer uses, so the vocabularies cannot drift. */
+function isOriginPhrase(text: string): boolean {
+  const tokens = text.split(/\s+/).filter(Boolean);
+  return tokens.length > 0 && tokens.every((w) => detectOrigin(w).countries.length > 0);
+}
+
 /** Every person occurrence in one clause, computed once, ranges retained.
  *  A requested-title occurrence owns its range first: any person candidate
  *  overlapping one is the title's own words reaching a matcher, not a name. */
@@ -311,7 +321,7 @@ function findPersonMatches(clause: string): SpanMatch[] {
     ...spanMatches(clause, AFTER_PERSON_CUE),
     ...spanMatches(clause, PERSON_BEFORE_MEDIA),
     ...spanMatches(clause, PERSON_WITH_MODIFIER),
-  ].filter((m) => !ARTICLE_LED.test(m.text) && freeOfTitles(m));
+  ].filter((m) => !ARTICLE_LED.test(m.text) && freeOfTitles(m) && !isOriginPhrase(m.text));
 
   /* Runs last and only where a fuller name did not already claim the ground, so
      "Stallone" inside "Sylvester Stallone" is the same person rather than a
@@ -321,6 +331,7 @@ function findPersonMatches(clause: string): SpanMatch[] {
       !NEVER_A_PERSON.test(m.text) &&
       !ARTICLE_LED.test(m.text) &&
       freeOfTitles(m) &&
+      !isOriginPhrase(m.text) &&
       !named.some((n) => m.start >= n.start && m.end <= n.end),
   );
 
@@ -365,6 +376,7 @@ export function interpret(raw: string): CanonicalIntent {
     providers: [],
     date: {},
     runtime: {},
+    origin: { countries: [], languages: [], englishDubOnly: false, englishAudioOnly: false },
     background: [],
     requestClause: req?.text ?? '',
   };
@@ -449,6 +461,29 @@ export function interpret(raw: string): CanonicalIntent {
   }
 
   /*
+   * ORIGIN AND AUDIO — read from the EXECUTABLE CLAUSES ONLY, through the
+   * same shared detectors the legacy augmentation used on the whole
+   * utterance. Clause scoping is the entire fix: "I watched a French movie
+   * yesterday" is a taste clause and contributes nothing, while "a French
+   * thriller" is the request and does. The runtime ceiling detector also
+   * runs here (min-wins), because it knows wordings the local parser does
+   * not, and losing "no more than two hours" would be a behavior regression.
+   */
+  const executableText = executableClauses.map((c) => c.text).join('. ');
+  if (executableText) {
+    const origin = detectOrigin(executableText);
+    const audio = detectAudio(executableText);
+    intent.origin.countries = origin.countries;
+    intent.origin.languages = origin.languages;
+    intent.origin.englishDubOnly = audio.englishDubRequired;
+    intent.origin.englishAudioOnly = audio.englishAudioRequired && !audio.englishDubRequired;
+    const ceiling = detectRuntimeMaxMinutes(executableText);
+    if (ceiling != null && (intent.runtime.maxMinutes == null || ceiling < intent.runtime.maxMinutes)) {
+      intent.runtime.maxMinutes = ceiling;
+    }
+  }
+
+  /*
    * A REACTION REFERENCE IS RECOGNISED WHEREVER IT APPEARS.
    *
    * "I watched Rocky three weeks ago but tonight I want a baseball movie" is a
@@ -513,7 +548,8 @@ export function interpret(raw: string): CanonicalIntent {
       const known =
         intent.genres.some((g) => g.span === span) ||
         intent.tones.some((t) => t.term === span) ||
-        intent.providers.includes(span);
+        intent.providers.includes(span) ||
+        isOriginPhrase(span);
       if (!known) pushUnique<SubjectConstraint>(intent.subjects, { span, wanted: true });
     }
   }

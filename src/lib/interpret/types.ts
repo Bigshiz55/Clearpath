@@ -137,8 +137,26 @@ export interface CanonicalIntent {
   excludeSeen: boolean;
   /** Clauses recognised as conversational background and not executed on. */
   background: BackgroundClause[];
+  /**
+   * Origin / audio constraints, read ONLY from executable clauses through the
+   * SHARED detectors (`nlu/detectors`): ISO country codes and original-
+   * language codes from the same vocabulary the legacy augmentation used,
+   * plus the two English-audio strictness flags. Codes are deterministic
+   * vocabulary like a runtime's minutes — no catalog entity is resolved here.
+   */
+  origin: OriginConstraint;
+
   /** The clause the request itself was read from. Empty for a pure statement. */
   requestClause: string;
+}
+
+export interface OriginConstraint {
+  countries: string[];
+  languages: string[];
+  /** "dubbed in English" — a non-English original offering an English dub. */
+  englishDubOnly: boolean;
+  /** "in English / English audio" — native or dubbed English acceptable. */
+  englishAudioOnly: boolean;
 }
 
 export const EMPTY_INTENT: CanonicalIntent = {
@@ -153,6 +171,7 @@ export const EMPTY_INTENT: CanonicalIntent = {
   providers: [],
   date: {},
   runtime: {},
+  origin: { countries: [], languages: [], englishDubOnly: false, englishAudioOnly: false },
   excludeSeen: false,
   background: [],
   requestClause: '',
@@ -179,6 +198,7 @@ export interface ExecutableIntent {
   providers: string[];
   date: DateConstraint;
   runtime: RuntimeConstraint;
+  origin: OriginConstraint;
   excludeSeen: boolean;
 }
 

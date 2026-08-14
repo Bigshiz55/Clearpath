@@ -67,19 +67,23 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/preference/store', () => ({ loadPreferenceCached: async () => null }));
 vi.mock('@/lib/titleDimensions', () => ({ getCachedDimensions: async () => new Map() }));
 
-async function ask(text: string): Promise<Record<string, unknown>> {
+async function askFull(text: string): Promise<{ query: Record<string, unknown>; body: { kind?: string; interpretation?: string[] } }> {
   const { POST } = await import('./ask/route');
   const res = await POST(new Request('https://local.test/api/ask', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ text }),
   }));
-  const body = (await res.json()) as { kind?: string };
+  const body = (await res.json()) as { kind?: string; interpretation?: string[] };
   expect(body.kind, `route answered ${body.kind}, not a search`).toBe('search');
   const query = RAN.at(-1);
   expect(query, 'retrieval was never reached').toBeDefined();
   expect(Object.keys(query!).length).toBeGreaterThan(0);
-  return query!;
+  return { query: query!, body };
+}
+
+async function ask(text: string): Promise<Record<string, unknown>> {
+  return (await askFull(text)).query;
 }
 
 beforeEach(() => {
@@ -120,6 +124,48 @@ describe('background vocabulary cannot leak into executable fields', () => {
     for (const call of searchKeywords.mock.calls) {
       expect(call[0].join(' ')).not.toMatch(/burrito|beef|dinner/i);
     }
+  });
+});
+
+describe('origin and audio are canonical fields, never a raw reparse', () => {
+  it('ORIGIN: a background French anecdote does not constrain the request', async () => {
+    const q = await ask('I watched a French movie yesterday. Give me a boxing movie.');
+    expect((q.originCountries as string[] | undefined) ?? [], 'the anecdote origin leaked').toEqual([]);
+    expect((q.originalLanguages as string[] | undefined) ?? []).toEqual([]);
+  });
+
+  it('ORIGIN: a background Korean anecdote does not constrain the request', async () => {
+    const q = await ask('I watched a Korean movie yesterday. Give me a courtroom movie.');
+    expect((q.originCountries as string[] | undefined) ?? []).toEqual([]);
+    expect((q.originalLanguages as string[] | undefined) ?? []).toEqual([]);
+  });
+
+  it('AUDIO: background subtitles talk does not constrain the request', async () => {
+    const q = await ask('I used English subtitles yesterday. Anyway, give me a boxing movie.');
+    expect(Boolean(q.englishAudioOnly)).toBe(false);
+    expect(Boolean(q.englishDubOnly)).toBe(false);
+  });
+
+  it('POSITIVE: "Give me a French thriller." keeps the origin AND the genre', async () => {
+    const q = await ask('Give me a French thriller.');
+    expect((q.originCountries as string[] | undefined) ?? []).toContain('FR');
+    expect((q.genreIds as number[] | undefined) ?? []).toContain(53);
+  });
+
+  it('POSITIVE: "Give me a Korean movie dubbed in English." — origin, language, dub, and no Korean person', async () => {
+    const { query: q, body } = await askFull('Give me a Korean movie dubbed in English.');
+    expect((q.originCountries as string[] | undefined) ?? []).toContain('KR');
+    expect((q.originalLanguages as string[] | undefined) ?? []).toContain('ko');
+    expect(Boolean(q.englishDubOnly), 'dub strictness lost').toBe(true);
+    expect((q.castIds as number[] | undefined) ?? [], '"Korean" was read as a person').toEqual([]);
+    expect((body.interpretation ?? []).join(' ')).not.toMatch(/couldn.t find anyone/i);
+    expect(q.mediaType).toBe('movie');
+  });
+
+  it('POSITIVE: "Give me a foreign movie with English audio." keeps the audio requirement', async () => {
+    const q = await ask('Give me a foreign movie with English audio.');
+    expect(Boolean(q.englishAudioOnly)).toBe(true);
+    expect(Boolean(q.englishDubOnly)).toBe(false);
   });
 });
 

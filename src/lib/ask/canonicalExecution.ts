@@ -101,6 +101,14 @@ export function intentToQuery(intent: CanonicalIntent): MappedIntent {
     finalCount: intent.requestedCount ?? undefined,
   };
 
+  /* ORIGIN / AUDIO — canonical fields onto the query, replacing the legacy
+     whole-utterance augmentation on this path. Dub is stricter than audio and
+     wins, exactly as the augmentation ruled. */
+  if (intent.origin.countries.length) query.originCountries = [...intent.origin.countries];
+  if (intent.origin.languages.length) query.originalLanguages = [...intent.origin.languages];
+  if (intent.origin.englishDubOnly) query.englishDubOnly = true;
+  else if (intent.origin.englishAudioOnly) query.englishAudioOnly = true;
+
   return {
     query,
     pending: {

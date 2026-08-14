@@ -955,20 +955,6 @@ export async function POST(req: Request) {
        * raw sentence to build it, so nothing from the anecdote can be inside.
        */
       query = { ...exec.query };
-      /*
-       * TRANSITIONAL, EXPLICITLY NOT OWNED: foreign-origin and English-audio
-       * restriction. `CanonicalIntent` does not model origin/audio yet, and
-       * dropping the overlay would broaden every "french thriller" ask, so
-       * the overlay still reads the sentence FOR THOSE FIELDS ONLY — the
-       * canonical-owned media and runtime are restored so a whole-utterance
-       * reader cannot move them. Delete this the day the interpreter grows
-       * an origin field.
-       */
-      const ownedMediaType = query.mediaType;
-      const ownedMaxRuntime = query.maxRuntime;
-      query = augmentInternational(query, text);
-      query.mediaType = ownedMediaType;
-      query.maxRuntime = ownedMaxRuntime;
     } else if (text && (!query.castIds || query.castIds.length === 0) && !lex) {
       // LEGACY PATH ONLY. Guarantee the actor filter regardless of AI: if a
       // person is named and not already resolved, look them up (fuzzy, so
