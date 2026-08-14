@@ -482,3 +482,15 @@ unblocks.
   production since implementation — worth a quick real-world check next time
   someone touches auth. (`feat(auth): magic-link accounts and in-app feedback
   reporter`)
+
+## P0 integration freeze (2026-08-14, integration-owner session)
+
+- Moved: PR #70 opened for the transport branch (e97d00d) — CI 8/8 green.
+  PR #69 live-proven at exact semantic SHA (gate run 31800847138, 9/9).
+  PR #64 audited as it exists; stale title/body corrected on GitHub.
+  Ask-route conflict resolution trial-proven (docs/p0-integration/).
+- Discovered: PR #64 3A title-ownership REDs (Lego/Goofy) still open;
+  partial canonical ownership (genre/media side door); anthropic-mode bypass;
+  funnel "died at" renderer bug; oracle needs full credits (TMDB_API_KEY in CI).
+- Blocked: production SHA verification (sandbox egress); GotG credit proofs
+  (await TMDB_API_KEY secret). No merges executed — owner approval pending.
