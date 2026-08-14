@@ -37,11 +37,31 @@ import { test, expect, type Page, type Request } from '@playwright/test';
  * needed: a pure test alone is exactly the integration gap that let this ship.
  */
 
-/** The one utterance from the production report, plus the two that must not regress. */
+/**
+ * THE SIX SPOKEN-PERSON CASES. The first is the production incident verbatim;
+ * the rest are the phrasings a person actually uses for the same intent.
+ */
 const UTTERANCES = {
-  exact: '3 Sylvester Stallone movies',
+  incident: '3 Sylvester Stallone movies',
   personalized: "find me 3 Sylvester Stallone movies you think I'll like",
+  someEnjoy: 'show me some Tom Hanks movies I would enjoy',
+  countFilms: 'give me 5 Denzel Washington films',
+  tonightWith: 'what should I watch tonight with Tom Hanks',
   casual: 'how about a Bruce Willis movie',
+};
+
+/**
+ * METAMORPHIC TRANSPORT CASES. These carry clauses the router must NOT try to
+ * understand — irrelevant context, a past-tense reference, a negation. The only
+ * assertion is that the WHOLE utterance arrives at the canonical door intact.
+ * Clause relevance, reference handling and negation polarity belong downstream
+ * in `/api/ask`; re-implementing any of them here would recreate the second
+ * interpreter this work exists to remove.
+ */
+const METAMORPHIC = {
+  burrito: 'Had a burrito for dinner. Anyway, give me a boxing movie',
+  rockyBaseball: 'I watched Rocky three weeks ago, but tonight I want a baseball movie',
+  negation: 'Give me a thriller but no supernatural stuff',
 };
 
 /**
@@ -100,7 +120,7 @@ async function open(page: Page) {
 // THE CONTRACT
 // ───────────────────────────────────────────────────────────────────────────
 
-for (const [name, text] of Object.entries(UTTERANCES)) {
+for (const [name, text] of Object.entries({ ...UTTERANCES, ...METAMORPHIC })) {
   test(`[${name}] "${text}" reaches the canonical request route from the real UI`, async ({ page }) => {
     await stubUnroutedBuildCase(page);
     const seen = recordRequests(page);
@@ -147,6 +167,12 @@ for (const [name, text] of Object.entries(UTTERANCES)) {
     expect(
       urls(seen).filter((u) => u.includes('/api/browse')),
       'browse is structured catalog browsing and must not answer a request',
+    ).toEqual([]);
+    // NOR straight to the Finder surface: that is the second recommendation
+    // path, and routing conversational prose there was the earlier wrong fix.
+    expect(
+      urls(seen).filter((u) => u.includes('/app/finder')),
+      'a conversational request bypassed the canonical Ask door for Finder',
     ).toEqual([]);
   });
 }

@@ -72,6 +72,26 @@ const PERSON_SHAPED = /\b([A-Z][a-z’'-]{1,})\s+([A-Z][a-z’'-]{1,})\b/;
 const MEDIA_NOUN = /\b(movies?|films?|shows?|series|documentar(?:y|ies)|episodes?)\b/i;
 
 /**
+ * ASKING WHAT TO WATCH IS A MEDIA CONTEXT, EVEN WITH NO MEDIA NOUN.
+ *
+ * "what should I watch tonight with Tom Hanks" names no movie, film or show —
+ * the medium is carried by the verb. Without this it failed the media gate,
+ * fell through to `taste`, and landed on the generic feed: the SAME defect as
+ * the incident, one phrasing away.
+ *
+ * This asks only "is the user asking to be shown something to watch". It does
+ * not extract the person, the time, or the count — those stay downstream. The
+ * pattern is anchored on a first-person watch request so ordinary uses of the
+ * word ("I watched Rocky three weeks ago") do not qualify on their own.
+ */
+const WATCH_REQUEST = /\b(?:what|anything|something|some\s+things?)\b[^.?!]{0,40}?\b(?:should|can|could|do|to)\s+(?:i|we)?\s*watch\b|\bwhat\s+to\s+watch\b/i;
+
+/** A media context exists when a media noun is present OR the ask is "what to watch". */
+function hasMediaContext(text: string): boolean {
+  return MEDIA_NOUN.test(text) || WATCH_REQUEST.test(text);
+}
+
+/**
  * Decide where an utterance goes.
  *
  * `wantsTitleResults` stays the primary gate — it already encodes the
@@ -88,13 +108,14 @@ export function canonicalRequestRoute(raw: string): RequestRoute {
   // The existing gate first, unchanged in meaning.
   let isRequest = wantsTitleResults(text);
 
-  if (!isRequest && MEDIA_NOUN.test(text)) {
+  if (!isRequest && hasMediaContext(text)) {
     // "3 … movies" — a stated count of a media noun is a request for a list,
     // whatever qualifies it. Nobody states a quantity to describe their taste.
     if (frame.count != null) isRequest = true;
-    // "Sylvester Stallone movies", "a Bruce Willis movie" — a proper noun
-    // qualifying a media noun. Checked on the FRAMED text so the scaffolding
-    // ("find me", "how about") cannot supply the capitals.
+    // "Sylvester Stallone movies", "a Bruce Willis movie", "…watch tonight with
+    // Tom Hanks" — a proper noun qualifying the media context. Checked on the
+    // FRAMED text too, so scaffolding ("find me", "how about") cannot supply
+    // the capitals by itself.
     else if (PERSON_SHAPED.test(frame.text) || PERSON_SHAPED.test(text)) isRequest = true;
     // "…you think I'll like" — an explicit ask for something suited to them.
     else if (frame.personalized) isRequest = true;
