@@ -22,6 +22,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { CALIBRATION_GENRES } from '@/lib/preference/genreCalibration';
 import { recordGenreAnswer } from '@/lib/actions/genreCalibration';
+import { announceDnaChanged } from '@/components/onboarding/DnaProgressMeter';
 
 type Answer = { rating?: number; notForMe?: boolean };
 
@@ -42,7 +43,13 @@ export function GenreCalibration({
 
   function rate(slug: string, rating: number) {
     setAnswers((a) => ({ ...a, [slug]: { rating } }));
-    void recordGenreAnswer({ eventId: eventId(slug, String(rating)), slug, rating, sessionId }).catch(() => {});
+    void recordGenreAnswer({ eventId: eventId(slug, String(rating)), slug, rating, sessionId })
+      .then((r) => {
+        // The meter refreshes only on a PERSISTED write — an optimistic tap
+        // that never landed must never move it.
+        if (r.ok) announceDnaChanged();
+      })
+      .catch(() => {});
   }
 
   function ruleOut(slug: string) {
@@ -54,7 +61,11 @@ export function GenreCalibration({
       return;
     }
     setAnswers((a) => ({ ...a, [slug]: { notForMe: true } }));
-    void recordGenreAnswer({ eventId: eventId(slug, 'out'), slug, notForMe: true, sessionId }).catch(() => {});
+    void recordGenreAnswer({ eventId: eventId(slug, 'out'), slug, notForMe: true, sessionId })
+      .then((r) => {
+        if (r.ok) announceDnaChanged();
+      })
+      .catch(() => {});
   }
 
   const answered = Object.values(answers).filter((a) => a.rating != null || a.notForMe).length;

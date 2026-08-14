@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { TitleGridCalibration } from '@/components/TitleGridCalibration';
 import { GenreCalibration } from '@/components/onboarding/GenreCalibration';
+import { DnaProgressMeter } from '@/components/onboarding/DnaProgressMeter';
 import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -67,6 +68,11 @@ export default async function TasteQuizPage({
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
+      {/* Live DNA read-out — REAL metrics (DNA Confidence + quiz progress),
+          server-computed from persisted state, refreshed only when a write
+          lands. In-flow above the step content, so it can never cover a
+          card. Visible during BOTH steps. */}
+      <DnaProgressMeter sessionId={sessionId} />
       {showGenres ? (
         <GenreCalibration continueHref={continueHref} sessionId={sessionId} />
       ) : (

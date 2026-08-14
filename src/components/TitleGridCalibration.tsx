@@ -28,6 +28,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SeeRecommendations } from '@/components/SeeRecommendations';
 import { recordQuizAnswer } from '@/lib/actions/dnaQuiz';
+import { announceDnaChanged } from '@/components/onboarding/DnaProgressMeter';
 import { DnaBurst } from '@/components/DnaBurst';
 import { RecommendationSlate } from '@/components/RecommendationSlate';
 import { analysePicks, type AnalysedPick, type PickAnalysis } from '@/lib/preference/pickAnalysis';
@@ -393,6 +394,9 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
       }),
     );
     setSaving(false);
+    // The onboarding DNA meter refreshes only on PERSISTED writes — announce
+    // as soon as any of this batch actually landed.
+    if (results.some((r) => r.ok)) announceDnaChanged();
 
     const failed = results.filter((r) => !r.ok);
     if (failed.length > 0) {
