@@ -132,53 +132,74 @@ export function idsForRole(people: readonly PersonConstraint[], role: PersonRole
 }
 
 /**
- * The credit role a sentence names, read from the words in front of the name.
+ * WHAT TO DO ABOUT A NAMED PERSON — decided once, in one place.
  *
- * ONE READER, SHARED. `interpret/interpret.ts` has a `roleFor` of its own and
- * `nlu/queryRepair.ts` knows the same phrases for a different purpose; a third
- * copy here would be the parallel-system defect this codebase keeps paying for.
- * This is the one the EXECUTION path reads, and `interpret`'s `CreditRole`
- * should be adapted onto it when that layer is wired — see BACKLOG.
+ * A DISCRIMINATED PLAN, BECAUSE THE TWO OUTCOMES ARE NOT DEGREES OF EACH OTHER.
+ * The first cut refused a role by setting a flag, not applying the filter, and
+ * running the query anyway with a sentence appended to `interpretation`. That
+ * is a list of films with nothing to do with the person, plus a note — an
+ * answer to a different question, which a disclaimer does not convert back.
  *
- * Returns the requested role as WRITTEN, including roles this engine cannot
- * execute, because refusing them honestly is `roleSupport`'s job and it cannot
- * refuse what it was never told.
+ * `refuse` carries no constraint, so there is nothing for a caller to
+ * accidentally run: the shape makes "ran it anyway" unrepresentable rather than
+ * merely discouraged.
  */
-export function requestedRoleFor(text: string): 'actor' | 'director' | 'writer' | 'creator' | null {
-  const t = (text ?? '').toLowerCase();
-  if (/\bdirected\s+by\b|\bdirector\b|\bfilms?\s+of\b/.test(t)) return 'director';
-  if (/\bwritten\s+by\b|\bwriter\b|\bscreenplay\s+by\b/.test(t)) return 'writer';
-  if (/\bcreated\s+by\b|\bcreator\b/.test(t)) return 'creator';
-  if (/\bstarring\b|\bwith\b|\bfeaturing\b|\bactor\b|\bcast\s+of\b/.test(t)) return 'actor';
-  return null;
+export type PersonPlan =
+  | { kind: 'apply'; constraint: PersonConstraint }
+  | { kind: 'refuse'; requested: string; reason: string };
+
+export function planPersonConstraint(
+  personId: number,
+  requestedRole: string,
+  mediaType: 'movie' | 'tv',
+): PersonPlan {
+  const support = roleSupport(requestedRole, mediaType);
+  return support.supported
+    ? { kind: 'apply', constraint: { personId, role: support.role } }
+    : { kind: 'refuse', requested: support.requested, reason: support.reason };
 }
 
+/** How many candidates to verify per round. Bounded fan-out at the provider. */
+const QUALIFY_BATCH = 12;
+
 /**
- * Drop every candidate that does not actually hold the requested credit.
+ * Verify candidates against the role until enough qualify — or they run out.
  *
- * EXTRACTED SO IT CAN BE PROVEN. Inlined in the finder it was only reachable
- * through the whole ranking pipeline, and a test that cannot reach the code is
- * a test of something else. The credits fetcher is injected for the same
- * reason: the guarantee is about the DECISION, not about the network.
+ * ── THE DEFECT THIS REPLACES ──────────────────────────────────────────────
+ * Qualification ran over `items.slice(0, max(24, cap * 4))`. A director whose
+ * qualifying films ranked below that window was silently under-delivered: the
+ * count was cut to whatever happened to be inside the slice, not to what
+ * actually exists. "Three Nolan films" came back with one, for no reason the
+ * user could see and none the code could state.
  *
- * `with_crew` gets us titles the person worked on. This is what turns that into
- * titles they DIRECTED — and it is the difference between answering the
- * question and answering a nearby one.
+ * ── WHY NOT SIMPLY VERIFY EVERYTHING ──────────────────────────────────────
+ * Each verification is a credits fetch. Checking a hundred candidates to show
+ * three is real latency spent on titles nobody will see. So it walks in
+ * batches, in RANK ORDER, and stops the moment `need` is satisfied — the answer
+ * is complete, and the work is proportional to the answer rather than to the
+ * pool. When fewer qualify than were asked for, it reaches the end and returns
+ * what genuinely exists: a short answer that is true, never a padded one.
  */
-export async function filterByRole<T extends { id: number; mediaType: string }>(
+export async function qualifyByRole<T extends { id: number; mediaType: string }>(
   items: readonly T[],
   constraints: readonly PersonConstraint[],
   fetchCredits: (mediaType: 'movie' | 'tv', id: number) => Promise<CreditsView | null>,
+  opts: { need: number },
 ): Promise<T[]> {
   if (constraints.length === 0) return [...items];
-  const verdicts = await Promise.all(
-    items.map(async (i) => {
-      // Only movies can carry these constraints; see `roleSupport`.
-      if (i.mediaType !== 'movie') return false;
-      const credits = await fetchCredits('movie', i.id).catch(() => null);
-      // EVERY constraint must hold. Two named people means both, not either.
-      return constraints.every((c) => satisfiesRole(credits, c));
-    }),
-  );
-  return items.filter((_, n) => verdicts[n]!);
+  const kept: T[] = [];
+  for (let at = 0; at < items.length && kept.length < opts.need; at += QUALIFY_BATCH) {
+    const batch = items.slice(at, at + QUALIFY_BATCH);
+    const verdicts = await Promise.all(
+      batch.map(async (i) => {
+        if (i.mediaType !== 'movie') return false;
+        const credits = await fetchCredits('movie', i.id).catch(() => null);
+        return constraints.every((c) => satisfiesRole(credits, c));
+      }),
+    );
+    batch.forEach((i, n) => {
+      if (verdicts[n] && kept.length < opts.need) kept.push(i);
+    });
+  }
+  return kept;
 }

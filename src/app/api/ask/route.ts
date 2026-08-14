@@ -36,7 +36,8 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { serverEnv } from '@/lib/env';
 import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBridge';
-import { requestedRoleFor, roleSupport, type RoleSupport } from '@/lib/people/constraint';
+import { planPersonConstraint, type PersonPlan } from '@/lib/people/constraint';
+import { requestedCreditRole } from '@/lib/nlu/creditRole';
 
 /**
  * "Something like X" is best served by TMDB-similar ONLY when the reference is
@@ -844,7 +845,7 @@ export async function POST(req: Request) {
     }
 
     /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see below. */
-    let unsupportedRole: RoleSupport | null = null;
+    let refusedRole: Extract<PersonPlan, { kind: 'refuse' }> | null = null;
     // Guarantee the person filter regardless of AI: if a person is named and not
     // already resolved, look them up (fuzzy, so misspellings still match).
     if (text && (!query.castIds || query.castIds.length === 0) && (!query.people || query.people.length === 0) && !lex ) {
@@ -857,14 +858,17 @@ export async function POST(req: Request) {
            reported to the caller and the person constraint is simply not
            applied, because handing back films someone merely appeared in is a
            confidently wrong answer to a question about their directing. */
-        const requested = requestedRoleFor(text) ?? 'actor';
-        const support = roleSupport(requested, 'movie');
-        if (support.supported) {
-          query.people = [{ personId: pid, role: support.role }];
+        /* THE ROLE ARRIVES TYPED. Reading the sentence is `nlu/creditRole`'s
+           job; execution is handed a decision. An unsupported role produces a
+           REFUSAL rather than a query with the person quietly dropped — see
+           `planPersonConstraint`. */
+        const plan = planPersonConstraint(pid, requestedCreditRole(text) ?? 'actor', 'movie');
+        if (plan.kind === 'apply') {
+          query.people = [plan.constraint];
           query.mediaType = 'movie';
-          if (support.role === 'actor') query.castIds = [pid];
+          if (plan.constraint.role === 'actor') query.castIds = [pid];
         } else {
-          unsupportedRole = support;
+          refusedRole = plan;
         }
       }
     }
@@ -891,13 +895,28 @@ export async function POST(req: Request) {
     /* SAID OUT LOUD. A refused role that vanished silently would look exactly
        like a role that was applied, which is the failure mode this whole change
        exists to end. */
-    const roleNote = unsupportedRole
-      ? [`${unsupportedRole.reason} — showing results without that person filter`]
-      : [];
+    const roleNote = refusedRole ? [refusedRole.reason] : [];
     if (text) {
       const applied = await applyRequiredSubject(query, text);
       query = applied.query;
       askInterpretation = applied.interpretation;
+    }
+
+    /* ZERO QUALIFYING RECOMMENDATIONS, NOT A GENERIC LIST WITH A NOTE.
+       Running the query without the person the user named answers a different
+       question, and a disclaimer underneath does not convert it back. The
+       refusal is the whole response, and it is structured so the client can
+       render it as a refusal rather than as an empty result set. */
+    if (refusedRole) {
+      return NextResponse.json({
+        route: '/api/ask',
+        requestId,
+        kind: 'unsupported-role',
+        unsupportedRole: { requested: refusedRole.requested, reason: refusedRole.reason },
+        interpretation: roleNote,
+        query: { ...query },
+        items: [],
+      });
     }
 
     const result = await runFinder(supabase, user.id, query, household && household.length > 0 ? household : watcher, limit);

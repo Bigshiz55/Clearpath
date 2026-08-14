@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   discoverParamFor,
-  filterByRole,
+  qualifyByRole,
   fromCastIds,
   idsForRole,
-  requestedRoleFor,
   roleSupport,
   satisfiesRole,
   type CreditsView,
@@ -126,29 +125,6 @@ describe('unsupported roles are refused, never degraded', () => {
   });
 });
 
-describe('the role a sentence asks for', () => {
-  const CASES: Array<[string, string | null]> = [
-    ['movies directed by Christopher Nolan', 'director'],
-    ['films of Christopher Nolan', 'director'],
-    ['movies written by Aaron Sorkin', 'writer'],
-    ['shows created by Vince Gilligan', 'creator'],
-    ['what should I watch tonight with Tom Hanks', 'actor'],
-    ['movies starring Denzel Washington', 'actor'],
-    ['find me 3 Sylvester Stallone movies', null],
-  ];
-  for (const [said, role] of CASES) {
-    it(`"${said}" → ${role ?? 'unstated'}`, () => {
-      expect(requestedRoleFor(said)).toBe(role);
-    });
-  }
-
-  it('an unstated role is null, so the caller defaults deliberately', () => {
-    // "3 Stallone movies" names no role; the caller chooses `actor` explicitly
-    // rather than this function pretending the sentence said so.
-    expect(requestedRoleFor('find me 3 Sylvester Stallone movies')).toBeNull();
-  });
-});
-
 describe('the legacy castIds list still means exactly what it meant', () => {
   it('every legacy id is an actor', () => {
     expect(fromCastIds([WILLIS, 31])).toEqual([
@@ -171,7 +147,7 @@ describe('the legacy castIds list still means exactly what it meant', () => {
   });
 });
 
-describe('filterByRole — association is not the requested role', () => {
+describe('qualifyByRole — association is not the requested role', () => {
   const DIRECTED = { id: 27205, mediaType: 'movie', title: 'Inception' };
   const PRODUCED = { id: 141052, mediaType: 'movie', title: 'Man of Steel' };
   const ACTED_IN = { id: 1, mediaType: 'movie', title: 'A Cameo' };
@@ -188,37 +164,38 @@ describe('filterByRole — association is not the requested role', () => {
     /* THE WHOLE POINT, AND THE REASON `with_crew` IS NOT ENOUGH. Retrieval
        returns both — Nolan worked on both — and only one is an answer to
        "movies directed by Christopher Nolan". */
-    const out = await filterByRole([DIRECTED, PRODUCED], [{ personId: NOLAN, role: 'director' }], credits);
-    expect(out.map((i) => i.title)).toEqual(['Inception']);
+    const out = await qualifyByRole([DIRECTED, PRODUCED], [{ personId: NOLAN, role: 'director' }], credits, { need: 99 });
+    expect(out.map((i: { title?: string }) => i.title)).toEqual(['Inception']);
   });
 
   it('drops a film he merely APPEARED in', async () => {
-    const out = await filterByRole([ACTED_IN], [{ personId: NOLAN, role: 'director' }], credits);
+    const out = await qualifyByRole([ACTED_IN], [{ personId: NOLAN, role: 'director' }], credits, { need: 99 });
     expect(out).toEqual([]);
   });
 
   it('drops a title whose credits could not be read', async () => {
     // Unverifiable is not a pass — the guarantee is the whole point of the filter.
-    const out = await filterByRole([A_SERIES, { id: 404, mediaType: 'movie' }], [{ personId: NOLAN, role: 'director' }], credits);
+    const out = await qualifyByRole([A_SERIES, { id: 404, mediaType: 'movie' }], [{ personId: NOLAN, role: 'director' }], credits, { need: 99 });
     expect(out).toEqual([]);
   });
 
   it('a television title can never satisfy a movie-only constraint', async () => {
-    const out = await filterByRole([A_SERIES], [{ personId: NOLAN, role: 'director' }], credits);
+    const out = await qualifyByRole([A_SERIES], [{ personId: NOLAN, role: 'director' }], credits, { need: 99 });
     expect(out).toEqual([]);
   });
 
   it('two named people means BOTH, never either', async () => {
-    const out = await filterByRole(
+    const out = await qualifyByRole(
       [DIRECTED],
       [{ personId: NOLAN, role: 'director' }, { personId: 999, role: 'director' }],
       credits,
+      { need: 99 },
     );
     expect(out, 'the second director is not on this film').toEqual([]);
   });
 
   it('no constraints is a no-op — an ordinary request pays nothing', async () => {
     const items = [DIRECTED, PRODUCED, A_SERIES];
-    expect(await filterByRole(items, [], credits)).toEqual(items);
+    expect(await qualifyByRole(items, [], credits, { need: 99 })).toEqual(items);
   });
 });
