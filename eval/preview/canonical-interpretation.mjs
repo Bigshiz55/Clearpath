@@ -503,9 +503,15 @@ async function main() {
   const critic = await ask('Better than Furious or Widows Bay');
   // The Critic answers a comparative ask with a decision or a clarification —
   // both are legitimate. What must NOT happen is a generic feed.
-  const kind = critic.body.kind ?? 'items';
-  check('critic', 'receipt', 'answered as a comparison or a clarification', ['clarify', 'ruling', 'verdict', 'items'].includes(kind), `kind=${kind}`);
-  check('critic', 'world', 'did not answer with an empty generic response', kind === 'clarify' || titles(critic.body).length > 0);
+  /* Named `criticKind`, not `kind`: a local `const kind` here shadows the
+     imported reader for the WHOLE of main(), and every earlier call to it dies
+     in the temporal dead zone. That is exactly what happened — the gate exited
+     2 at CASE 2 with "Cannot access 'kind' before initialization", which the
+     workflow correctly reported as INFRASTRUCTURE rather than a product
+     verdict. `node --check` cannot see it; only running the file can. */
+  const criticKind = critic.body.kind ?? 'items';
+  check('critic', 'receipt', 'answered as a comparison or a clarification', ['clarify', 'ruling', 'verdict', 'items'].includes(criticKind), `kind=${criticKind}`);
+  check('critic', 'world', 'did not answer with an empty generic response', criticKind === 'clarify' || titles(critic.body).length > 0);
 
   // ── VERDICT ──────────────────────────────────────────────────────────────
   const failed = results.filter((r) => !r.ok);
