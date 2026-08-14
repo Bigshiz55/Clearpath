@@ -45,8 +45,21 @@ export interface ResolvedPerson {
   kind: 'resolved';
   id: number;
   name: string;
-  /** Why we believe this is the person — surfaced in the receipt, never invented. */
-  evidence: 'exact-name-match' | 'sole-credited-match';
+  /** Why we believe this is the person — surfaced in the receipt, never
+   *  invented, and each label states exactly what was proven:
+   *  - exact-name-match: the ONE catalog person with this normalized name
+   *  - sole-credited-exact-match: several share the exact name; only one has
+   *    any credits, and an uncredited stub is not a rival identity
+   *  - unique-credited-name-match: no exact hit, but every spoken token
+   *    matches this candidate's name in order (fuzzy per token) and NO other
+   *    credited candidate can say the same
+   *  - sole-credited-match: mononym — exactly one credited person bears the
+   *    token in their name */
+  evidence:
+    | 'exact-name-match'
+    | 'sole-credited-exact-match'
+    | 'unique-credited-name-match'
+    | 'sole-credited-match';
 }
 
 export interface AmbiguousPerson {
@@ -70,6 +83,63 @@ export interface PersonReferenceInput {
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
 
+/* Fuzzy identity, at the same bar the entity boundary uses
+   (lib/nlu/consumedEntities.ts): a token shorter than five characters must
+   match exactly — one edit in "tom" is a different word — while a longer
+   token tolerates a single edit, so "Stalone" still names Stallone. */
+const MIN_FUZZY_LEN = 5;
+
+function withinOneEdit(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      i++;
+      j++;
+      continue;
+    }
+    if (++edits > 1) return false;
+    if (a.length > b.length) i++;
+    else if (b.length > a.length) j++;
+    else {
+      i++;
+      j++;
+    }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+
+const tokenMatches = (spoken: string, candidate: string): boolean =>
+  spoken === candidate ||
+  (Math.max(spoken.length, candidate.length) >= MIN_FUZZY_LEN && withinOneEdit(spoken, candidate));
+
+/**
+ * Every spoken token names a token of the candidate's name, IN ORDER.
+ * "Robert Downy" matches both "Robert Downey" and "Robert Downey Jr." —
+ * which is exactly why matching alone is never resolution: it must also be
+ * UNIQUE among credited candidates before an identity is claimed.
+ */
+function nameMatchesSpoken(spokenTokens: readonly string[], candidateName: string): boolean {
+  if (spokenTokens.length === 0) return false;
+  const candidateTokens = norm(candidateName).split(' ');
+  let at = 0;
+  for (const spoken of spokenTokens) {
+    let found = -1;
+    for (let i = at; i < candidateTokens.length; i++) {
+      if (tokenMatches(spoken, candidateTokens[i]!)) {
+        found = i;
+        break;
+      }
+    }
+    if (found < 0) return false;
+    at = found + 1;
+  }
+  return true;
+}
+
 /**
  * Resolve one named person against the real catalog.
  *
@@ -88,13 +158,34 @@ export async function resolvePersonReference(input: PersonReferenceInput): Promi
   const wanted = norm(spokenAs);
   const isMononym = wanted.split(' ').length === 1;
 
-  const exact = hits.find((h) => norm(h.name) === wanted);
-  if (exact) return { kind: 'resolved', id: exact.id, name: exact.name, evidence: 'exact-name-match' };
+  const asAmbiguous = (candidates: typeof hits): AmbiguousPerson => ({
+    kind: 'ambiguous',
+    spokenAs,
+    candidates: candidates.slice(0, 5).map((h) => ({ id: h.id, name: h.name, knownFor: h.knownFor })),
+  });
 
   // Only people the catalog can actually show credits for are candidates. An
   // uncredited stub outranking a real actor on a fuzzy match is the failure
   // mode this filter exists for.
   const credited = hits.filter((h) => Boolean(h.knownFor));
+
+  /* EXACT, AND UNIQUE. Two people really can carry the same exact name, and
+     "the first one" is not an identity decision — it is response ordering.
+     One exact hit is decisive; several fall back to the credits filter, and
+     only a SOLE credited bearer of the exact name is uniquely defensible. */
+  const exacts = hits.filter((h) => norm(h.name) === wanted);
+  if (exacts.length === 1) {
+    const only = exacts[0]!;
+    return { kind: 'resolved', id: only.id, name: only.name, evidence: 'exact-name-match' };
+  }
+  if (exacts.length > 1) {
+    const creditedExacts = exacts.filter((h) => Boolean(h.knownFor));
+    if (creditedExacts.length === 1) {
+      const only = creditedExacts[0]!;
+      return { kind: 'resolved', id: only.id, name: only.name, evidence: 'sole-credited-exact-match' };
+    }
+    return asAmbiguous(creditedExacts.length > 0 ? creditedExacts : exacts);
+  }
 
   if (isMononym) {
     const bearing = credited.filter((h) => norm(h.name).split(' ').includes(wanted));
@@ -102,18 +193,22 @@ export async function resolvePersonReference(input: PersonReferenceInput): Promi
       const only = bearing[0]!;
       return { kind: 'resolved', id: only.id, name: only.name, evidence: 'sole-credited-match' };
     }
-    if (bearing.length > 1) {
-      return {
-        kind: 'ambiguous',
-        spokenAs,
-        candidates: bearing.slice(0, 5).map((h) => ({ id: h.id, name: h.name, knownFor: h.knownFor })),
-      };
-    }
+    if (bearing.length > 1) return asAmbiguous(bearing);
     return { kind: 'unresolved', spokenAs };
   }
 
-  const top = credited[0];
-  return top
-    ? { kind: 'resolved', id: top.id, name: top.name, evidence: 'sole-credited-match' }
-    : { kind: 'unresolved', spokenAs };
+  /* FULL NAME, NO EXACT MATCH. The old fallback took `credited[0]` here and
+     called it "sole-credited-match" — a false receipt: nothing sole had been
+     established, and response order (popularity) chose the human being. Now
+     resolution requires deterministic evidence that leaves exactly ONE
+     defensible candidate: every spoken token matches the candidate's name in
+     order, fuzzy per token, and no other credited candidate can say the same.
+     Several plausible candidates are a QUESTION; none is an honest miss. */
+  const matching = credited.filter((h) => nameMatchesSpoken(wanted.split(' '), h.name));
+  if (matching.length === 1) {
+    const only = matching[0]!;
+    return { kind: 'resolved', id: only.id, name: only.name, evidence: 'unique-credited-name-match' };
+  }
+  if (matching.length > 1) return asAmbiguous(matching);
+  return { kind: 'unresolved', spokenAs };
 }
