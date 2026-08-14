@@ -60,6 +60,7 @@ import {
   subjectIs,
 } from './receipt.mjs';
 import { castFact, foldFacts, genreFact, resolvePersonId, subjectFact } from './world.mjs';
+import { diedAt, funnelStages, renderFunnel } from './funnel.mjs';
 
 const BASE_URL = process.env.BASE_URL;
 const EXPECT_SHA = process.env.EXPECT_SHA ?? '';
@@ -133,21 +134,14 @@ async function stalloneFunnel(body) {
     console.log('   ▸ funnel: /api/ask returned no diagnostics — the boundary cannot be located from the response alone.');
     return;
   }
-  const stages = [
-    ['requested', d.requestedCount],
-    ['candidates discovered', d.candidateCount],
-    ['deterministic eligible', d.deterministicEligibleCount],
-    ['semantically evaluated', d.semanticEvaluatedCount],
-    ['subject eligible', d.centralSubjectEligibleCount],
-    ['quality eligible', d.qualityEligibleCount],
-    ['returned', d.finalReturnedCount],
-  ];
-  console.log(`   ▸ funnel: ${stages.map(([k, v]) => `${k}=${v ?? '?'}`).join(' → ')}`);
+  const stages = funnelStages(d);
+  console.log(`   ▸ funnel: ${renderFunnel(stages)}`);
 
-  // The boundary is the first stage that reaches zero. Named rather than
-  // inferred, so nobody has to read the counters and guess.
-  const firstZero = stages.find(([, v]) => v === 0);
-  if (firstZero) console.log(`   ▸ candidates died at: ${firstZero[0]}`);
+  // The boundary is the first APPLICABLE stage that reached zero — an n/a
+  // stage did not run and can never be where candidates died (tested in
+  // funnel.test.ts).
+  const boundary = diedAt(stages);
+  if (boundary) console.log(`   ▸ candidates died at: ${boundary}`);
 
   // Per-candidate rejection reasons, when the finder recorded them. This is the
   // difference between "0 results" and "these six titles were rejected, each

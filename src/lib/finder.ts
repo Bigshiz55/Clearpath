@@ -221,8 +221,12 @@ export interface FinderDiagnostics {
   candidateCount: number;
   /** Candidates that cleared every DETERMINISTIC hard filter (type, date, …). */
   deterministicEligibleCount: number;
-  /** Deterministic survivors run through the SEMANTIC evaluator (0 if no subject). */
-  semanticEvaluatedCount: number;
+  /** Deterministic survivors run through the SEMANTIC evaluator. NULL when no
+   *  subject was required — the stage did not run. A zero here would read as
+   *  "every candidate died at semantic evaluation" to any consumer that walks
+   *  the funnel for the first empty stage, which is exactly the misreading it
+   *  produced. Not-applicable is not a count. */
+  semanticEvaluatedCount: number | null;
   /** Survivors the evaluator judged eligible on subject centrality
    *  (CENTRAL for a strict request). Equals deterministic count when no subject. */
   centralSubjectEligibleCount: number;
@@ -742,7 +746,7 @@ export async function runFinder(
   // BEFORE ranking — Taste DNA never ranks a title the subject gate rejected.
   const candidateCount = candidates.length;
   const deterministicEligibleCount = survivors.length;
-  const semanticEvaluatedCount = subjectRequired ? survivors.length : 0;
+  const semanticEvaluatedCount = subjectRequired ? survivors.length : null;
   const eligibleSurvivors = subjectRequired ? survivors.filter(isEligible) : survivors;
   const centralSubjectEligibleCount = subjectRequired ? eligibleSurvivors.length : deterministicEligibleCount;
 
