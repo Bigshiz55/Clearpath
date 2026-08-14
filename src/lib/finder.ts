@@ -32,7 +32,7 @@ import {
   type CandidateEvidence,
 } from '@/lib/nlu/semanticEligibility';
 import { adjudicateSubjectCentrality, type SubjectAdjudicator } from '@/lib/nlu/subjectAdjudicator';
-import { filterByRole, type PersonConstraint } from '@/lib/people/constraint';
+import { qualifyByRole, type PersonConstraint } from '@/lib/people/constraint';
 
 const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
 const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
@@ -851,12 +851,19 @@ export async function runFinder(
      list, so a request that names nobody pays nothing. An unverifiable title is
      DROPPED rather than kept: this is the one filter whose whole purpose is the
      guarantee, and "we could not check" is not evidence that it holds. */
+  /* QUALIFICATION RUNS OVER THE WHOLE CANDIDATE SET, AHEAD OF COUNT SELECTION.
+     It used to verify a truncated head (`slice(0, max(24, cap*4))`), so a
+     director whose qualifying films ranked below that window was silently
+     under-delivered — "three Nolan films" came back with one, for no reason the
+     user could see. `qualifyByRole` walks the ranked list in batches and stops
+     the moment enough are verified, so the work is proportional to the answer
+     rather than to the pool, and a short answer means the catalogue really is
+     short rather than the window having been too small. */
   const directorConstraints = (q.people ?? []).filter((p) => p.role === 'director');
   if (directorConstraints.length > 0) {
-    const head = items.slice(0, Math.max(24, (q.finalCount ?? limit) * 4));
-    const kept = await filterByRole(head, directorConstraints, (mt, id) => getCredits(mt, id).catch(() => null));
-    const keep = new Set(kept.map((i) => `${i.mediaType}-${i.id}`));
-    items = items.filter((i) => keep.has(`${i.mediaType}-${i.id}`));
+    items = await qualifyByRole(items, directorConstraints, (mt, id) => getCredits(mt, id).catch(() => null), {
+      need: Math.max(1, Math.min(q.finalCount ?? limit, MAX_RESULT_LIMIT)),
+    });
   }
 
   // REQUESTED-COUNT SELECTION. "a boxing movie" asks for ONE — the final cap is

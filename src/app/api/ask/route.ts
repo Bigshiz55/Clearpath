@@ -39,7 +39,8 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { serverEnv } from '@/lib/env';
 import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBridge';
-import { requestedRoleFor, roleSupport, type RoleSupport } from '@/lib/people/constraint';
+import { planPersonConstraint, type PersonPlan } from '@/lib/people/constraint';
+import { requestedCreditRole } from '@/lib/nlu/creditRole';
 
 /**
  * "Something like X" is best served by TMDB-similar ONLY when the reference is
@@ -944,7 +945,7 @@ export async function POST(req: Request) {
     let canonicalAmbiguity: Awaited<ReturnType<typeof resolveCanonicalExecution>>['ambiguity'] = null;
     let canonicalExcludedPersonIds: number[] = [];
     /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see roleNote below. */
-    let unsupportedRole: RoleSupport | null = null;
+    let refusedRole: Extract<PersonPlan, { kind: 'refuse' }> | null = null;
     if (canonicalOwnsLanguage) {
       const exec = await resolveCanonicalExecution(canonical);
       canonicalAmbiguity = exec.ambiguity;
@@ -967,14 +968,17 @@ export async function POST(req: Request) {
         // The words were spent naming a person either way — the subject layer
         // may not re-read them even when the role is refused.
         consumedEntities.push({ spokenAs: person.spokenAs, resolvedName: person.name });
-        const requested = requestedRoleFor(text) ?? 'actor';
-        const support = roleSupport(requested, 'movie');
-        if (support.supported) {
-          query.people = [{ personId: person.id, role: support.role }];
+        /* THE ROLE ARRIVES TYPED. Reading the sentence is `nlu/creditRole`'s
+           job; execution is handed a decision. An unsupported role produces a
+           REFUSAL rather than a query with the person quietly dropped — see
+           `planPersonConstraint`. */
+        const plan = planPersonConstraint(person.id, requestedCreditRole(text) ?? 'actor', 'movie');
+        if (plan.kind === 'apply') {
+          query.people = [plan.constraint];
           query.mediaType = 'movie';
-          if (support.role === 'actor') query.castIds = [person.id];
+          if (plan.constraint.role === 'actor') query.castIds = [person.id];
         } else {
-          unsupportedRole = support;
+          refusedRole = plan;
         }
       }
     }
@@ -1037,13 +1041,28 @@ export async function POST(req: Request) {
     /* SAID OUT LOUD. A refused role that vanished silently would look exactly
        like a role that was applied, which is the failure mode this whole change
        exists to end. */
-    const roleNote = unsupportedRole
-      ? [`${unsupportedRole.reason} — showing results without that person filter`]
-      : [];
+    const roleNote = refusedRole ? [refusedRole.reason] : [];
     if (text && !canonicalOwnsLanguage) {
       const applied = await applyRequiredSubject(query, text, { consumedEntities });
       query = applied.query;
       askInterpretation = applied.interpretation;
+    }
+
+    /* ZERO QUALIFYING RECOMMENDATIONS, NOT A GENERIC LIST WITH A NOTE.
+       Running the query without the person the user named answers a different
+       question, and a disclaimer underneath does not convert it back. The
+       refusal is the whole response, and it is structured so the client can
+       render it as a refusal rather than as an empty result set. */
+    if (refusedRole) {
+      return NextResponse.json({
+        route: '/api/ask',
+        requestId,
+        kind: 'unsupported-role',
+        unsupportedRole: { requested: refusedRole.requested, reason: refusedRole.reason },
+        interpretation: roleNote,
+        query: { ...query },
+        items: [],
+      });
     }
 
     const result = await runFinder(supabase, user.id, query, household && household.length > 0 ? household : watcher, limit);
