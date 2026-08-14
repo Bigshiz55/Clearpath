@@ -179,10 +179,16 @@ test.describe('the product tour', () => {
     const legend = page.getByTestId('tour-legend');
     await expect(legend).toBeVisible();
     await expect(legend).toContainText('What you’re looking at');
-    // The "More" stop describes the control it actually is: an inline expand,
-    // not navigation.
-    await expect(legend).toContainText('Expand it in place');
+    // THE STOPS DESCRIBE CONTROLS THAT EXIST. This assertion used to pin the
+    // wording of the `More` stop — a synopsis expander the browse card no
+    // longer carries (the full synopsis moved to More Info when the card came
+    // down from 763px). A tour pointing at an absent control is worse than one
+    // stop fewer, so stop 1 now names the affordance that IS on the artwork:
+    // the trailer, playing in place. Same rule, re-pointed — and the old
+    // wording must not creep back either way.
+    await expect(legend).toContainText('inside the poster');
     await expect(legend).not.toContainText('Tap through for the full title page');
+    await expect(legend).not.toContainText('Expand it in place');
     await expect(legend.getByTestId('tour-legend-item')).toHaveCount(6);
     // Directly below the card, not floating over it.
     const cardBox = (await card(page).boundingBox())!;

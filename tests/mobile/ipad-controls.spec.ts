@@ -15,6 +15,16 @@ async function open(page: Page, w: number, h: number) {
   await page.route('**/api/ratings/**', (r) =>
     r.fulfill({ json: { ratings: { standardScore: 84, audience: 78 }, overview: 'A synopsis.' } }),
   );
+  await page.route('**/api/quicklook/**', (r) =>
+    r.fulfill({
+      json: {
+        id: 1000, mediaType: 'movie', title: 'Se7en', year: 1995, overview: 'A synopsis.',
+        backdropUrl: null, posterUrl: null, trailerUrl: null, genres: [], contentRating: null,
+        status: null, runtime: null, score: 84, standardScore: 84,
+        ratings: { standardScore: 84, audience: 78 }, where: [],
+      },
+    }),
+  );
   await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
   await expect(page.getByTestId('qa-grid')).toBeVisible();
 }
@@ -94,9 +104,24 @@ test('the labels still fit — bigger text must not wrap the row', async ({ page
  * wide. Those numbers are the reason to trust the VERD1CT above them, so on a
  * screen with room they should be read at a glance, not squinted at.
  */
-async function ratingsMetrics(page: Page) {
-  const row = page.getByTestId('qa-grid').locator('> div').first().locator('.wv-ratings-row').first();
+/**
+ * MOVED SURFACE, SAME RULE. The card-redesign pass took the source-rating chips
+ * off the browse card (they are the working behind the number, and on a grid
+ * column they wrapped to their own row) and into More Info. "Too small on iPad"
+ * applies wherever they are drawn, so the measurement follows them.
+ */
+async function ratingsRow(page: Page) {
+  await page.getByTestId('qa-grid').locator('> div').first().getByTestId('card-more-info').click();
+  const modal = page.getByTestId('quicklook');
+  await expect(modal).toBeVisible();
+  await page.waitForTimeout(300);
+  const row = modal.locator('.wv-ratings-row').first();
   await expect(row).toBeVisible();
+  return row;
+}
+
+async function ratingsMetrics(page: Page) {
+  const row = await ratingsRow(page);
   return row.evaluate((el) => ({ fontSize: parseFloat(getComputedStyle(el).fontSize) }));
 }
 
@@ -127,10 +152,11 @@ test('and bigger again on a wide screen', async ({ page }) => {
 test('the bigger ratings still fit inside their panel at every width', async ({ page }) => {
   for (const [w, h] of [[1024, 1366], [1280, 900], [1440, 900]] as const) {
     await open(page, w, h);
-    const card = page.getByTestId('qa-grid').locator('> div').first();
-    const row = card.locator('.wv-ratings-row').first();
-    const [cardBox, rowBox] = [await card.boundingBox(), await row.boundingBox()];
-    // IMDb escaping the pink panel is the old bug this row already had once.
-    expect(rowBox!.x + rowBox!.width, `ratings overflow the card at ${w}px`).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
+    const row = await ratingsRow(page);
+    const panel = page.getByTestId('quicklook').locator('> div').first();
+    const [panelBox, rowBox] = [await panel.boundingBox(), await row.boundingBox()];
+    // IMDb escaping its container is the old bug this row already had once.
+    expect(rowBox!.x + rowBox!.width, `ratings overflow their panel at ${w}px`)
+      .toBeLessThanOrEqual(panelBox!.x + panelBox!.width + 1);
   }
 });

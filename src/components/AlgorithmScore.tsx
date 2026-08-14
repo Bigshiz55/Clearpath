@@ -19,6 +19,7 @@ export function AlgorithmScore({
   year,
   objectiveScore = null,
   compact = false,
+  hideRatings = false,
   className = '',
 }: {
   mediaType: MediaType;
@@ -28,6 +29,15 @@ export function AlgorithmScore({
   objectiveScore?: number | null;
   /** Row cards are height-constrained: smaller badge, tighter box, one line. */
   compact?: boolean;
+  /**
+   * Drop the RT / audience / IMDb chips. The browse card answers "will I like
+   * it?" with the Verd1ct number and the call; the three source ratings that
+   * produced it are the working, and the working belongs in More Info. On a
+   * narrow grid column the chips wrapped to a second row anyway (see
+   * `.wv-score-ratings`), which is a whole row of card height spent restating
+   * evidence for a number the reader has not questioned yet.
+   */
+  hideRatings?: boolean;
   className?: string;
 }) {
   const [dna, setDna] = useState<DnaClientResult | null>(null);
@@ -66,7 +76,7 @@ export function AlgorithmScore({
           `.wv-score-ratings` in globals.css) rather than being squeezed. */}
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         {(() => {
-          const px = compact ? 38 : 42;
+          const px = compact ? 34 : 42;
           if (score != null) return <Verd1ctBadge score={score} px={px} />;
           // The canonical missing state, at the badge's REAL height (antennas
           // and feet included) so the card never grows when a score lands.
@@ -101,7 +111,9 @@ export function AlgorithmScore({
         </div>
 
         {/* The source ratings that feed the score. */}
-        <CardRatings mediaType={mediaType} tmdbId={tmdbId} title={title} year={year} hideCall className="wv-score-ratings" />
+        {!hideRatings && (
+          <CardRatings mediaType={mediaType} tmdbId={tmdbId} title={title} year={year} hideCall className="wv-score-ratings" />
+        )}
       </div>
     </div>
   );

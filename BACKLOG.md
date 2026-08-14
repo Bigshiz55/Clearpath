@@ -219,6 +219,22 @@ unblocks.
   left-2 bottom-…`, 44×44, sits on top of body copy on the Showdown results
   screen at 390px. Untouched by any recent work and product-wide, so it needs
   its own fix (a scroll-aware offset, or a safe gutter on long pages).
+- **Decide whether the card perimeter survives at all (owner call).** The work
+  order asked whether every card needs a bright full perimeter. Audited: the
+  halo is gone and the border dropped from 55% saturated brand blue to a quiet
+  38% desaturated blue, which is the floor `tests/mobile/tile-edge.spec.ts`
+  permits — that suite requires a visible BLUE edge at seven widths and exists
+  because a 7%-white hairline shipped once and left a column of cards reading as
+  one continuous scroll. Removing the perimeter entirely means retiring that
+  contract, which is an owner decision against a recorded complaint, not
+  something to do by lowering a threshold. Cards are now 527px rather than 763px
+  and there are far fewer stacked boxes, so the original problem is smaller than
+  when the rule was written; worth re-testing with real artwork.
+- **`RatingsStrip`'s empty label is one line taller than its chip row below
+  ~360px.** "Ratings not available yet" wraps to two lines rather than being
+  clipped mid-word (deliberate, and the right trade), which makes the row 27.5px
+  against the chips' 26px. Harmless now that the strip lives in a scrolling
+  modal rather than a grid cell; noted so it is not rediscovered as drift.
 - **Linear network brand asset registry.** Replace the 0/83 monogram fallback
   with verified network marks, using a separate provenance-backed canonical
   asset registry or a licensed authoritative source. NOT part of PR #54 — that
@@ -313,6 +329,28 @@ unblocks.
   travel (the flanking plates hung off both edges of a phone); and an
   `absolute inset-0` child escaping a container that lacked `position: relative`
   (a 36px thumbnail painting across a 340px panel).
+- **The browse card and the trailer interaction model — `claude/watchverd1ct-card-redesign-y802ho`.**
+  Root cause of the "cards cut off by the viewport" report, measured rather than
+  guessed: a desktop card was **763px** tall against ~265px of chrome above the
+  grid, so the first card's bottom edge landed at 1028px in a 900px viewport —
+  there was no scroll position showing a whole card. The trailer resized
+  nothing; it played inside a card that could not fit on screen.
+  Fixed by an information budget, not CSS: the card keeps poster, title,
+  metadata, Verd1ct, ONE reason, availability and the decision row, and the
+  synopsis / all "why it fits" reasons / Taste DNA sentence / source ratings /
+  full availability moved into a rebuilt **More Info** modal (portalled, focus
+  trap, Escape, focus restore, scroll lock, large video region). Card is now
+  **527px desktop / 393px mobile with zero height spread**. The media frame is
+  an `aspect-ratio` box with `contain: layout`, so a trailer provably cannot
+  change a card's outer size — asserted before/during/after at three viewports
+  by `tests/mobile/card-geometry.spec.ts`. Hover preview needs 550ms of resting
+  intent, honours the Autoplay pref and reduced motion, and the control set is
+  pause/mute/restart/close (fullscreen belongs to More Info now).
+  Top Picks rail rebuilt: rank is a small chip on the artwork, the score speaks
+  the Verd1ct badge + verdict word instead of a green `HOW?` box, and the
+  evidence panel opens BELOW the rail (it used to grow the rail by 230px).
+  Visual evidence: `docs/screenshots/card-redesign/`.
+  **PR open against `main`, not merged — awaiting screenshot review.**
 - **Streaming brand coverage is 14/15, and the last one is an upstream fact.**
   Starz, AMC+, Fubo, Tubi, Pluto TV and The Roku Channel now render their own
   marks. Their paths were not guessed: production's already-deployed

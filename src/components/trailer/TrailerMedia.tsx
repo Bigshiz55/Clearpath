@@ -1,7 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { reportVisibility, dropVisibility, useIsActiveTrailer, MIN_VISIBILITY } from './activeTrailer';
+import {
+  reportVisibility,
+  dropVisibility,
+  useIsActiveTrailer,
+  useIsPlayingSlot,
+  claimPlaying,
+  releasePlaying,
+  MIN_VISIBILITY,
+  DWELL_MS,
+} from './activeTrailer';
 import {
   getAutoplayPref,
   prefersReducedMotion,
@@ -14,21 +23,52 @@ import { recordAnalyticsEvent } from '@/lib/actions/passFeedback';
 /**
  * THE ONE TRAILER-PREVIEW MEDIA WRAPPER.
  *
+ * ── THE CORE RULE ───────────────────────────────────────────────────────────
+ * A TRAILER MAY NEVER CHANGE THE OUTER DIMENSIONS OF A CARD.
+ *
+ * This component fills its parent (`h-full w-full`) and paints EVERYTHING —
+ * poster, iframe, controls, the ▶ affordance — either in normal flow at that
+ * exact size or `absolute inset-0` on top of it. It has no intrinsic height of
+ * its own, adds no padding, and never mounts a sibling that could push. The
+ * frame it lives in (`.wv-card-art` / `.wv-rail-frame`) is sized by
+ * `aspect-ratio` and carries `contain: layout` + `overflow: hidden`, so even a
+ * future mistake in here cannot propagate out to the card.
+ *
+ * The complete card therefore stays visible before, during and after preview:
+ * poster crossfades to video inside the same box, and nothing below the media
+ * frame moves by a pixel. `tests/mobile/card-geometry.spec.ts` measures exactly
+ * that — card height and the top of every region below the frame, sampled
+ * before / during / after — at 1440×900, 1280×800 and 390×844.
+ *
  * Wraps a card's existing poster (passed as children) and adds an INLINE trailer
- * that plays in place — never a modal, never a new tab, never a navigation. Two
- * independent behaviours:
+ * that plays in place — never a modal, never a new tab, never a navigation.
+ * Three independent behaviours:
  *
  *   • MANUAL play is ALWAYS available (no feature flag): every movie/TV card
  *     shows a small "▶ Trailer" affordance. Tapping it resolves the title's own
  *     official trailer ON CLICK (zero network/iframe cost until then), mounts one
- *     muted YouTube iframe over the poster, and offers mute / restart /
- *     fullscreen / ✕-close. ✕ restores the poster. If the title has no verified
+ *     muted YouTube iframe over the poster, and offers pause/play, mute/unmute,
+ *     restart and ✕-close. ✕ restores the poster. If the title has no verified
  *     embeddable trailer it says so briefly and stays on the poster — trailer
- *     enrichment never blocks a title.
+ *     enrichment never blocks a title. (The old ⛶ fullscreen control is gone:
+ *     the card is not where the big experience lives — More Info is.)
+ *
+ *   • HOVER INTENT (pointer devices only). Crossing a card must not start a
+ *     video — moving a mouse across a grid would fire a dozen. The pointer has
+ *     to REST on the frame for `DWELL_MS` (550ms, the same proven delay the
+ *     scroll-dwell coordinator already uses) before anything resolves, and
+ *     leaving before that cancels it with no network cost. Gated by the same
+ *     Autoplay preference and reduced-motion check as scroll autoplay: a user
+ *     who turned autoplay off never gets video they did not ask for.
  *
  *   • AUTOMATIC dwell/autoplay is what the `?trailers=1` flag gates. Only the
  *     single most-visible ("active") card, and only when the user's Autoplay pref
  *     is on and reduced-motion is off, begins muted playback on its own.
+ *
+ * KEYBOARD parity: the ▶ Trailer affordance is a real button in the tab order,
+ * so Enter/Space starts the same preview a pointer would, and ✕ returns to the
+ * poster. Focus is never enough on its own — tabbing THROUGH a grid must not
+ * start video any more than sweeping a mouse across it should.
  *
  * SINGLE ACTIVE PLAYER: a module-level store holds the one card that is playing
  * (manual OR auto). Starting any card stops the previous one, so a grid of 50
@@ -45,35 +85,10 @@ import { recordAnalyticsEvent } from '@/lib/actions/passFeedback';
 // Client memo so scrolling a grid never re-resolves the same title.
 const cache = new Map<string, ResolvedTrailer | null>();
 
-// ---- Single-active PLAYING store (manual + auto share one slot) --------------
-type Listener = () => void;
-const playing = {
-  id: null as string | null,
-  listeners: new Set<Listener>(),
-  claim(id: string) {
-    if (this.id === id) return;
-    this.id = id;
-    this.listeners.forEach((l) => l());
-  },
-  release(id: string) {
-    if (this.id !== id) return;
-    this.id = null;
-    this.listeners.forEach((l) => l());
-  },
-};
-
-function useIsPlayingSlot(id: string): boolean {
-  const [isSlot, setIsSlot] = useState(() => playing.id === id);
-  useEffect(() => {
-    const on = () => setIsSlot(playing.id === id);
-    playing.listeners.add(on);
-    on();
-    return () => {
-      playing.listeners.delete(on);
-    };
-  }, [id]);
-  return isSlot;
-}
+// The single-active PLAYING store (manual + auto share one slot) now lives in
+// `./activeTrailer` — see `claimPlaying` / `releasePlaying` / `useIsPlayingSlot`
+// there. It moved out of this file so the More Info modal can stop a card
+// preview without importing a component.
 
 interface Props {
   tmdbId: number | null;
@@ -106,8 +121,10 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
   const [loading, setLoading] = useState(false);
   const [noTrailer, setNoTrailer] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [paused, setPaused] = useState(false);
   const impressionSent = useRef(false);
   const startedSent = useRef(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Feature flag now controls ONLY automatic dwell/autoplay, never manual play.
   const [autoplayFeature, setAutoplayFeature] = useState(false);
@@ -175,6 +192,7 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
     if (!isPlayingSlot && open) {
       setOpen(false);
       setMuted(true);
+      setPaused(false);
       startedSent.current = false;
     }
   }, [isPlayingSlot, open]);
@@ -191,7 +209,7 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
     let cancelled = false;
     void resolve().then((t) => {
       if (cancelled || !t || t.autoplayEligible !== true) return;
-      playing.claim(id);
+      claimPlaying(id);
       setMuted(true);
       setOpen(true);
     });
@@ -221,8 +239,9 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
     async (e: React.MouseEvent) => {
       stop(e);
       setNoTrailer(false);
-      playing.claim(id);
+      claimPlaying(id);
       setMuted(true);
+      setPaused(false);
       emit('trailer_manual_play');
       const t = cache.has(id) ? cache.get(id) ?? null : await resolve();
       if (t) {
@@ -240,12 +259,69 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
       stop(e);
       setOpen(false);
       setMuted(true);
+      setPaused(false);
       startedSent.current = false;
-      playing.release(id);
+      releasePlaying(id);
       emit('trailer_closed');
     },
     [id, emit],
   );
+
+  // ── HOVER INTENT ──────────────────────────────────────────────────────────
+  // Resting, not crossing. Nothing at all happens until the pointer has been
+  // still on this frame for DWELL_MS; leaving cancels the timer, so sweeping a
+  // mouse over a grid of forty cards costs zero requests and starts zero
+  // videos. Coarse pointers (touch) are excluded — there is no "hover" to have
+  // intent with, and the explicit ▶ control is the phone's path.
+  const hoverCapable = useMemo(() => {
+    try {
+      return typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const cancelHover = useCallback(() => {
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  }, []);
+
+  const onPointerEnter = useCallback(() => {
+    // The Autoplay preference and reduced-motion govern hover exactly as they
+    // govern scroll-dwell: a user who turned autoplay off is never handed video
+    // they did not press for.
+    if (!hoverCapable || !autoplayAllowed || open) return;
+    cancelHover();
+    hoverTimer.current = setTimeout(() => {
+      hoverTimer.current = null;
+      void (async () => {
+        const t = cache.has(id) ? cache.get(id) ?? null : await resolve();
+        if (!t) return; // no verified trailer: stay on the poster, say nothing
+        claimPlaying(id);
+        setMuted(true);
+        setPaused(false);
+        setOpen(true);
+        emit('trailer_hover_play');
+      })();
+    }, DWELL_MS);
+  }, [hoverCapable, autoplayAllowed, open, cancelHover, id, resolve, emit]);
+
+  // Leaving returns to the poster. A preview that follows you down the page is
+  // a video you have to go back and turn off.
+  const onPointerLeave = useCallback(() => {
+    cancelHover();
+    if (open && hoverCapable) {
+      setOpen(false);
+      setMuted(true);
+      setPaused(false);
+      startedSent.current = false;
+      releasePlaying(id);
+    }
+  }, [cancelHover, open, hoverCapable, id]);
+
+  useEffect(() => cancelHover, [cancelHover]);
 
   // Lightweight YouTube control via postMessage (no full SDK).
   const command = useCallback((func: string, args: unknown[] = []) => {
@@ -278,13 +354,20 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
     [command, emit],
   );
 
-  const fullscreen = useCallback(
+  // PAUSE/PLAY replaces the old ⛶ fullscreen control. Fullscreen was the card
+  // trying to be the big experience; that job belongs to More Info, which has
+  // room for it. What a preview actually needs is a way to hold the frame still.
+  const togglePause = useCallback(
     (e: React.MouseEvent) => {
       stop(e);
-      rootRef.current?.requestFullscreen?.().catch(() => {});
-      emit('trailer_fullscreen');
+      setPaused((p) => {
+        const next = !p;
+        command(next ? 'pauseVideo' : 'playVideo');
+        emit(next ? 'trailer_paused' : 'trailer_resumed');
+        return next;
+      });
     },
-    [emit],
+    [command, emit],
   );
 
   const embed = trailer ? youTubeEmbedUrl(trailer.videoId, { muted, autoplay: true }) : null;
@@ -292,18 +375,43 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
   return (
     <div
       ref={rootRef}
-      className="relative h-full w-full"
+      /* `absolute inset-0`, not `h-full w-full`. Filling the frame in normal
+         flow still lets the CHILDREN contribute intrinsic height on the day one
+         of them stops being `h-full`; taking the wrapper out of flow entirely
+         means this subtree cannot size its parent at all, whatever it holds.
+         That is the core rule made structural rather than conventional. */
+      className="absolute inset-0"
       data-testid="trailer-media"
+      data-media-frame="1"
       data-active={isActive ? '1' : '0'}
       data-playing={showIframe ? '1' : '0'}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
       {/* The poster (and the card's own click target) is always present underneath
           — the trailer crossfades over it, and is what remains if resolution
-          misses or the player is closed. */}
-      <div className={showIframe ? 'opacity-0 transition-opacity duration-500' : 'opacity-100'}>{children}</div>
+          misses or the player is closed. Reduced motion gets the swap with no
+          transition rather than a different layout: the contract is about
+          geometry, and geometry is identical either way. */}
+      <div
+        className={
+          showIframe
+            ? `absolute inset-0 opacity-0 ${reducedMotion ? '' : 'transition-opacity duration-500'}`
+            : 'absolute inset-0 opacity-100'
+        }
+      >
+        {children}
+      </div>
 
+      {/* THE PLAYER LAYER SITS AT z-4. Below it (z-2) are the frame's poster-
+          state affordances — the ⓘ Info chip and the ▶ Trailer control — which
+          the video is meant to cover: while a preview runs the frame belongs to
+          the video. Above it stay the two things that must remain readable
+          during playback: the rank chip (z-6, see `.wv-rank-chip`) and the
+          W/docket badge (z-10), because "rank remains visible" and "the docket
+          is one gesture everywhere" are both contracts. */}
       {showIframe && embed && (
-        <div className="absolute inset-0" data-testid="trailer-player">
+        <div className="absolute inset-0 z-[4]" data-testid="trailer-player">
           <iframe
             ref={iframeRef}
             src={embed}
@@ -312,23 +420,38 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
             allowFullScreen
             className="h-full w-full"
           />
-          {/* Close (✕) — top-LEFT, restores the poster. (Top-right is where the
-              card's own W/docket badge lives, so ✕ goes left to avoid it.) */}
+          {/* Close (✕) — BOTTOM-LEFT, restores the poster. Both top corners are
+              spoken for on every surface that mounts this: the W/docket badge
+              sits top-right, and the rank chip (browse card in a feed, and every
+              item in the Top Picks rail) sits top-LEFT. Rank must stay readable
+              while a trailer plays, so ✕ moved down rather than covering it. */}
           <button
             type="button"
             onClick={close}
             aria-label={`Close ${title} trailer`}
             data-testid="trailer-close"
-            className="absolute left-1 top-1 z-[3] grid h-8 w-8 place-items-center rounded-full bg-black/65 text-sm text-white backdrop-blur transition hover:bg-black/85"
+            className="absolute bottom-1 left-1 z-[5] grid h-8 w-8 place-items-center rounded-full bg-black/65 text-sm text-white backdrop-blur transition hover:bg-black/85"
           >
             ✕
           </button>
-          {/* Minimal control overlay — mute / restart / fullscreen. */}
-          <div className="absolute bottom-1 right-1 flex gap-1">
+          {/* RESTRAINED CONTROLS — pause/play, mute, restart. Three, on the
+              artwork, out of the way of the title block. The old ⛶ is gone:
+              the card is not where the big experience lives. */}
+          <div className="absolute bottom-1 right-1 z-[5] flex gap-1" data-testid="trailer-controls">
+            <button
+              type="button"
+              onClick={togglePause}
+              aria-label={paused ? `Play ${title} trailer` : `Pause ${title} trailer`}
+              data-testid="trailer-pause"
+              className="wv-trailer-optional grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
+            >
+              <span aria-hidden>{paused ? '▶' : '❚❚'}</span>
+            </button>
             <button
               type="button"
               onClick={toggleMute}
               aria-label={muted ? `Unmute ${title} trailer` : `Mute ${title} trailer`}
+              data-testid="trailer-mute"
               className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
             >
               {muted ? '🔇' : '🔊'}
@@ -337,17 +460,10 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
               type="button"
               onClick={restart}
               aria-label={`Restart ${title} trailer`}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
+              data-testid="trailer-restart"
+              className="wv-trailer-optional grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
             >
               ↺
-            </button>
-            <button
-              type="button"
-              onClick={fullscreen}
-              aria-label={`Play ${title} trailer fullscreen`}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
-            >
-              ⛶
             </button>
           </div>
         </div>
@@ -361,10 +477,19 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
           onClick={manualPlay}
           aria-label={`Play ${title} trailer`}
           data-testid="trailer-play"
-          className="absolute bottom-1 right-1 z-[2] flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80"
+          /* 44px ON BOTH AXES — the floor is a box, not a height. Collapsed to
+             its glyph in a narrow frame this measured 28×36 and failed the
+             tap-target sweep at all twelve viewports. */
+          className="absolute bottom-1 right-1 z-[2] inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full bg-black/60 px-2.5 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80"
         >
           <span aria-hidden>▶</span>
-          <span>{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
+          {/* The WORD goes before the control does. In a 86px media frame (a
+              320px phone's row card) this chip and the ⓘ Info chip opposite it
+              are 72px and 66px wide — they overlap, and whichever paints on top
+              makes the other unclickable. Collapsed to their glyphs both fit
+              with room; `aria-label` on the button carries the full name
+              either way, so nothing is lost to a screen reader. */}
+          <span className="wv-chip-label">{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
         </button>
       )}
     </div>

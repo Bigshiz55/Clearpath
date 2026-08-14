@@ -70,6 +70,59 @@ function evaluate(): void {
   if (pending) setTimeout(schedule, DWELL_MS);
 }
 
+// ── THE ONE PLAYING SLOT ────────────────────────────────────────────────────
+// `trailerCoordinator` above answers "which card is ELIGIBLE to autoplay".
+// This answers "which card IS playing", manual or automatic, and it lives here
+// rather than inside TrailerMedia so that something which is not a card — the
+// More Info modal, with its own large video region — can stop a preview
+// without importing a component and creating a cycle.
+type PlayListener = () => void;
+const playingListeners = new Set<PlayListener>();
+let playingId: string | null = null;
+
+export function claimPlaying(id: string): void {
+  if (playingId === id) return;
+  playingId = id;
+  playingListeners.forEach((l) => l());
+}
+
+export function releasePlaying(id: string): void {
+  if (playingId !== id) return;
+  playingId = null;
+  playingListeners.forEach((l) => l());
+}
+
+/**
+ * STOP EVERY CARD PREVIEW, NOW.
+ *
+ * The single-active rule is enforced between cards by the two stores above,
+ * but a modal is not a card: More Info opens its own trailer, and a card still
+ * previewing behind it is two videos at once. This clears both the playing slot
+ * (which stops whatever is open) and the autoplay-eligibility slot (which would
+ * otherwise immediately restart it).
+ */
+export function releaseAllTrailers(): void {
+  trailerCoordinator.setActive(null);
+  if (playingId !== null) {
+    playingId = null;
+    playingListeners.forEach((l) => l());
+  }
+}
+
+/** Subscribe a card to "am I the one card actually playing right now". */
+export function useIsPlayingSlot(id: string): boolean {
+  const [isSlot, setIsSlot] = useState(() => playingId === id);
+  useEffect(() => {
+    const on = () => setIsSlot(playingId === id);
+    playingListeners.add(on);
+    on();
+    return () => {
+      playingListeners.delete(on);
+    };
+  }, [id]);
+  return isSlot;
+}
+
 /** Subscribe a card to "am I the one active trailer right now". */
 export function useIsActiveTrailer(id: string): boolean {
   const [active, setActive] = useState<boolean>(false);

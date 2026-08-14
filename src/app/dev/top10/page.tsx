@@ -15,7 +15,7 @@ const ITEMS: RailItem[] = [
   {
     id: 501,
     mediaType: 'movie',
-    title: 'Reconciling Pick',
+    title: 'Reconciling Pick With A Title Long Enough To Need Clamping',
     year: 2024,
     posterUrl: null,
     score: 89,

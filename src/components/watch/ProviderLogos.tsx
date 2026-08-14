@@ -40,20 +40,27 @@ const BADGE_TONE: Record<string, string> = {
   Buy: 'bg-amber-500/25 text-amber-100',
 };
 
-export function ProviderLogos({ lines }: { lines: WatchLine[] }) {
+/** The browse card's row is ONE line tall and must never wrap: four tiles plus
+ *  a "+N" is what fits at the narrowest grid column. More Info shows the rest. */
+const DENSE_TILES = 4;
+
+export function ProviderLogos({ lines, dense = false }: { lines: WatchLine[]; dense?: boolean }) {
   const streaming = lines.filter((l) => l.kind === 'streaming');
   if (streaming.length === 0) return null;
 
   const deduped = dedupeByBrand(streaming);
-  const shown = deduped.slice(0, MAX_TILES);
+  const shown = deduped.slice(0, dense ? DENSE_TILES : MAX_TILES);
   const extra = deduped.length - shown.length;
 
   const tileClass =
-    'relative inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-lg ' +
+    `relative inline-flex ${dense ? 'h-8 min-w-[2rem]' : 'h-9 min-w-[2.25rem]'} items-center justify-center rounded-lg ` +
     'border border-white/10 bg-white/5 px-1.5 transition hover:border-brand-400/60 hover:bg-brand-500/15';
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5" data-testid="where-to-watch-providers">
+    <div
+      className={`flex items-center gap-1.5 ${dense ? 'flex-nowrap overflow-hidden' : 'flex-wrap'}`}
+      data-testid="where-to-watch-providers"
+    >
       {shown.map((l, i) => {
         // ONE REGISTRY DECIDES THE BRAND. The official name, the verified
         // asset and the accessible label all come from the same resolve, so
@@ -73,7 +80,7 @@ export function ProviderLogos({ lines }: { lines: WatchLine[] }) {
                 height={28}
                 loading="lazy"
                 data-testid="brand-mark"
-                className="h-7 w-7 rounded object-contain"
+                className={`${dense ? 'h-6 w-6' : 'h-7 w-7'} rounded object-contain`}
               />
             ) : (
               <span className="max-w-[8rem] truncate px-1 text-[11px] font-semibold text-slate-100">
@@ -121,7 +128,7 @@ export function ProviderLogos({ lines }: { lines: WatchLine[] }) {
       {extra > 0 && (
         <span
           data-testid="where-to-watch-more"
-          className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-white/5 px-2 text-[11px] font-bold text-slate-300"
+          className={`inline-flex ${dense ? 'h-8' : 'h-9'} flex-none items-center rounded-lg border border-white/10 bg-white/5 px-2 text-[11px] font-bold text-slate-300`}
           title={`${extra} more service${extra === 1 ? '' : 's'} also carry this title`}
           aria-label={`${extra} more services also carry this title`}
         >

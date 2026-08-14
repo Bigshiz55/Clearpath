@@ -84,7 +84,13 @@ export function WhyThisTitle({
           <li
             key={r.kind}
             data-testid="why-reason"
-            className="rounded-md border border-emerald-400/25 bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-100/90"
+            /* NOT emerald. Green is FOR, a live airing, and a "Watch It"
+               verdict — three claims a user acts on. A reason the system
+               surfaced a title is not one of them, and colouring every
+               favourable thing green is how the palette stopped meaning
+               anything. Brand blue, matching `CardReason` on the card, so the
+               same sentence does not change colour between the two surfaces. */
+            className="rounded-md border border-brand-400/25 bg-brand-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand-100/90"
           >
             {r.text}
           </li>

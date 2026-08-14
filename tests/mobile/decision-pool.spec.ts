@@ -22,6 +22,16 @@ async function open(page: Page, w = 390, h = 844) {
   await page.route('**/api/ratings/**', (r) =>
     r.fulfill({ json: { ratings: { standardScore: 84, audience: 78, tomatometer: 91, imdb: 7.8 }, overview: 'A synopsis.' } }),
   );
+  await page.route('**/api/quicklook/**', (r) =>
+    r.fulfill({
+      json: {
+        id: 1000, mediaType: 'movie', title: 'Se7en', year: 1995, overview: 'A synopsis.',
+        backdropUrl: null, posterUrl: null, trailerUrl: null, genres: [], contentRating: null,
+        status: null, runtime: null, score: 84, standardScore: 84,
+        ratings: { standardScore: 84, audience: 78, tomatometer: 91, imdb: 7.8 }, where: [],
+      },
+    }),
+  );
   await page.goto('/dev/visual-qa', { waitUntil: 'networkidle' });
   await expect(page.getByTestId('qa-grid')).toBeVisible();
   // A clean pool for every test — it lives in localStorage and would otherwise
@@ -284,14 +294,29 @@ test('a very long title does not break the card or the pool list', async ({ page
 /**
  * THE RATINGS ROW IS REFERENCE, NOT AN ACTION — and it must never lie by
  * truncation. "🍅 5…" looks like a value we hold and cannot show.
+ *
+ * MOVED SURFACE, SAME RULE. The card-redesign pass took the three source-rating
+ * chips off the browse card (they are the WORKING behind the number, and on a
+ * grid column they wrapped to their own row) and put them in More Info. The
+ * truncation rule follows them: measured inside the modal, at every width,
+ * exactly as it was measured inside the card.
  */
+/** Open More Info on the first card — where the rating chips live now. */
+async function ratingsRow(page: Page) {
+  await page.getByTestId('qa-grid').locator('> div').first().getByTestId('card-more-info').click();
+  const modal = page.getByTestId('quicklook');
+  await expect(modal).toBeVisible();
+  await page.waitForTimeout(300);
+  return modal.locator('.wv-ratings-row').first();
+}
 for (const w of [320, 375, 390, 430, 768, 1024, 1440] as const) {
   test(`no rating is clipped or truncated @ ${w}`, async ({ page }) => {
     await open(page, w, 900);
-    // INSIDE A CARD. The harness also renders a standalone full-width strip,
-    // which has room to spare and proves nothing — the first version of this
-    // test measured that one and passed while "6.8" shipped as "6".
-    const row = page.getByTestId('qa-grid').locator('.wv-ratings-row').first();
+    // INSIDE THE MODAL THE CARD OPENS. The harness also renders a standalone
+    // full-width strip, which has room to spare and proves nothing — the first
+    // version of this test measured that one and passed while "6.8" shipped
+    // as "6".
+    const row = await ratingsRow(page);
     await expect(row).toBeVisible();
     const chips = row.locator('> span');
     expect(await chips.count()).toBe(3);
@@ -318,12 +343,14 @@ for (const w of [320, 375, 390, 430, 768, 1024, 1440] as const) {
 
 test('the ratings do not look like the actions', async ({ page }) => {
   await open(page);
-  const row = page.getByTestId('qa-grid').locator('.wv-ratings-row').first();
+  // Measure the card's decision button BEFORE opening the modal — the modal
+  // renders its own FOR/AGAINST row, and `.first()` would then find that one.
+  const forBtn = (await page.getByTestId('card-verdict-for').first().boundingBox())!;
+  const row = await ratingsRow(page);
   const heights = await row.locator('> span').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
   // One consistent height across all three sources.
   expect(new Set(heights).size, `chip heights: ${heights.join(',')}`).toBe(1);
-  // And shorter than the real controls beside them.
-  const forBtn = (await page.getByTestId('card-verdict-for').first().boundingBox())!;
+  // And shorter than the real controls.
   expect(heights[0]!).toBeLessThan(forBtn.height);
 });
 
