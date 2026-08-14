@@ -9,6 +9,7 @@ import {
   type SubjectSpec,
 } from '@/lib/nlu/requiredSubject';
 import type { SubjectRequirement } from '@/lib/nlu/semanticEligibility';
+import { maskConsumedSpans } from '@/lib/nlu/consumedSpans';
 
 /**
  * Turn a named subject into a HARD constraint on a FinderQuery — the shared step
@@ -43,9 +44,30 @@ export interface SubjectApplication {
   requestedCount: number | null;
 }
 
-export async function applyRequiredSubject(query: FinderQuery, text: string): Promise<SubjectApplication> {
+export interface SubjectOptions {
+  /**
+   * Spans already consumed by entity resolution — a person the caller resolved
+   * to a real cast id from THIS sentence. Subject detection does not see them,
+   * so the same words cannot become a content subject as well. Optional and
+   * defaulting to none, so a caller that resolves no entities (the Forensic
+   * Search) behaves exactly as before. See lib/nlu/consumedSpans.ts.
+   */
+  consumedSpans?: readonly string[];
+}
+
+export async function applyRequiredSubject(
+  query: FinderQuery,
+  text: string,
+  opts: SubjectOptions = {},
+): Promise<SubjectApplication> {
   const interpretation: string[] = [];
-  const det = detectRequiredSubject(text);
+  /* SUBJECT DETECTION READS THE UNCONSUMED LANGUAGE ONLY.
+     Everything else below still reads the original `text`: the recency
+     boundary, the "made"→released disclosure and the singular-request test are
+     properties of the phrasing, not of the subject, and a resolved name has no
+     bearing on them. */
+  const subjectText = maskConsumedSpans(text, opts.consumedSpans);
+  const det = detectRequiredSubject(subjectText);
   let q: FinderQuery = { ...query };
   // A singular indefinite subject request ("a boxing movie") asks for ONE
   // title. This is a FINAL-selection count, applied after eligibility + ranking
@@ -83,7 +105,7 @@ export async function applyRequiredSubject(query: FinderQuery, text: string): Pr
     // any subject, driven only by the user's own words. Conservative: it fires
     // only on the explicit singular-subject shape, so a genre browse is
     // untouched.
-    const general = detectGeneralSubject(text);
+    const general = detectGeneralSubject(subjectText);
     if (general) {
       const gids = await searchKeywords(general.lexemes.slice(0, 6)).catch(() => []);
       q.subjectLabel = general.label;

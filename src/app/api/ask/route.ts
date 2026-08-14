@@ -5,7 +5,7 @@ import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY, parseTopicTerms, extractExcludedPerson } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
-import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
+import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
 import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
@@ -842,13 +842,18 @@ export async function POST(req: Request) {
       if (!query.monetization) query.monetization = 'flatrate|free|ads';
     }
 
-    // Guarantee the actor filter regardless of AI: if a person is named and not
-    // already resolved, look them up (fuzzy, so misspellings still match).
+    /* Guarantee the actor filter regardless of AI: if a person is named and not
+       already resolved, look them up (fuzzy, so misspellings still match) — and
+       record EVERY SPAN THIS REQUEST SPENT RESOLVING A PERSON, from whichever
+       path resolved one, so the subject layer cannot read the same words a
+       second time as a content subject. */
+    const consumedSpans: string[] = [...(ai?.resolvedPeople ?? [])];
     if (text && (!query.castIds || query.castIds.length === 0) && !lex) {
-      const pid = await resolvePersonId(text);
-      if (pid) {
-        query.castIds = [pid];
+      const person = await resolvePerson(text);
+      if (person) {
+        query.castIds = [person.id];
         query.mediaType = 'movie';
+        consumedSpans.push(person.name);
       }
     }
 
@@ -872,7 +877,7 @@ export async function POST(req: Request) {
     // subject can never be degraded into genres here either.
     let askInterpretation: string[] = [];
     if (text) {
-      const applied = await applyRequiredSubject(query, text);
+      const applied = await applyRequiredSubject(query, text, { consumedSpans });
       query = applied.query;
       askInterpretation = applied.interpretation;
     }

@@ -22,6 +22,13 @@ export interface AiAsk {
   /** A reference title the user compared to ("like Succession") — seeds a
    *  "more like this" search instead of a plain filter query. */
   similarTo?: string;
+  /**
+   * Name spans this parse SPENT resolving a cast id. Handed to the subject
+   * layer so the same words cannot also become a content subject — the defect
+   * that made "give me a Stallone movie" demand films about Stallone and return
+   * none. See lib/nlu/consumedSpans.ts.
+   */
+  resolvedPeople?: string[];
 }
 
 interface RawAi {
@@ -114,12 +121,17 @@ async function toQuery(raw: RawAi): Promise<AiAsk> {
 
   // Resolve the first named person to a TMDB cast id (cast filtering is movie-only).
   const firstPerson = Array.isArray(raw.people) ? raw.people[0] : undefined;
+  const resolvedPeople: string[] = [];
   if (firstPerson) {
     const people = await searchPeople(firstPerson).catch(() => []);
     const top = people[0];
     if (top) {
       q.castIds = [top.id];
       q.mediaType = 'movie';
+      // BOTH the name the user used and the name TMDB confirmed. The utterance
+      // may say only a surname while the catalog answers with the full name, and
+      // the span that must be marked consumed is the one actually spoken.
+      resolvedPeople.push(firstPerson, top.name);
     }
   }
 
@@ -132,7 +144,7 @@ async function toQuery(raw: RawAi): Promise<AiAsk> {
       ? Math.round(raw.count)
       : DEFAULT_RESULT_COUNT;
   const similarTo = typeof raw.similarTo === 'string' && raw.similarTo.trim() ? raw.similarTo.trim() : undefined;
-  return { query: q, limit, similarTo };
+  return { query: q, limit, similarTo, resolvedPeople };
 }
 
 /** A requested result count from the ask ("five …" → 5). Default 8.
@@ -158,6 +170,20 @@ const NON_NAME =
  * confident person, so a plain request isn't hijacked into an actor search.
  */
 export async function resolvePersonId(text: string): Promise<number | null> {
+  return (await resolvePerson(text))?.id ?? null;
+}
+
+/**
+ * The same resolution, KEEPING THE NAME.
+ *
+ * `resolvePersonId` threw the name away, which is why "Stallone" could be spent
+ * twice: the cast filter had the id, and nothing downstream knew which words
+ * had bought it, so subject detection read the surname again and demanded films
+ * ABOUT Stallone. The name TMDB confirmed is the evidence that marks that span
+ * consumed — see lib/nlu/consumedSpans.ts. Not a second parser: one extraction,
+ * one lookup, one answer, with the part that was being discarded now returned.
+ */
+export async function resolvePerson(text: string): Promise<{ id: number; name: string } | null> {
   /* PEEL THE REQUEST FRAME BEFORE THE STOPWORD LIST SEES IT.
      `NON_NAME` below is a good list of words that are never part of a name, and
      it was missing the entire class of words a person uses to say the answer
@@ -180,7 +206,7 @@ export async function resolvePersonId(text: string): Promise<number | null> {
   const people = await searchPeople(words.join(' ')).catch(() => []);
   const top = people[0];
   // Require a real, findable person (has known-for credits) to avoid false hits.
-  return top && top.knownFor ? top.id : null;
+  return top && top.knownFor ? { id: top.id, name: top.name } : null;
 }
 
 export async function parseAskWithAI(text: string): Promise<AiAsk | null> {
