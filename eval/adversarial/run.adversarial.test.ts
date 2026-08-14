@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeEvaluationArtifact, evaluatedCommit } from '../runner/artifacts';
 import { join } from 'node:path';
 import { normalize } from '../normalize/normalize';
 import type { NormalizedQuery } from '../contract';
@@ -205,7 +204,6 @@ const CASES: AdvCase[] = [
 
 interface AdvResult { id: string; category: string; prompt: string; pass: boolean; failures: string[]; note?: string }
 
-function gitOr(cmd: string, fb: string) { try { return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return fb; } }
 
 describe('independent adversarial semantic suite', () => {
   const results: AdvResult[] = CASES.map((c) => {
@@ -216,8 +214,8 @@ describe('independent adversarial semantic suite', () => {
     return { id: c.id, category: c.category, prompt: c.prompt, pass: failures.length === 0, failures, note: c.note };
   });
 
-  it('writes the stamped adversarial report', () => {
-    const sha = gitOr('git rev-parse --short HEAD', 'dev');
+  it('produces the adversarial report (written only on an explicit refresh)', () => {
+    const sha = evaluatedCommit();
     const passed = results.filter((r) => r.pass).length;
     const L: string[] = ['# Independent Adversarial Semantic Suite', ''];
     L.push(`- Commit \`${sha}\` · ${passed}/${results.length} passed`);
@@ -232,10 +230,9 @@ describe('independent adversarial semantic suite', () => {
       }
       L.push('');
     }
-    const dir = join(process.cwd(), 'evaluation-results', 'adversarial');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'report.md'), L.join('\n'), 'utf8');
-    writeFileSync(join(dir, 'summary.json'), JSON.stringify({ sha, total: results.length, passed, results }, null, 2), 'utf8');
+    expect(L.length).toBeGreaterThan(0);
+    writeEvaluationArtifact('adversarial', 'report.md', L.join('\n'));
+    writeEvaluationArtifact('adversarial', 'summary.json', JSON.stringify({ sha, total: results.length, passed, results }, null, 2));
     expect(results.length).toBe(CASES.length);
   });
 

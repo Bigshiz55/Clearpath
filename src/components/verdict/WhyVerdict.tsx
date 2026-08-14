@@ -36,7 +36,18 @@ export interface WhyVerdictData {
      *  see the availability row for why that fallback has to exist. */
     text: string;
     confidence: string;
-    /** Official brand name, from the provider registry. */
+    /**
+     * Official brand name, from the provider registry.
+     *
+     * OPTIONAL BECAUSE THIS IS DESERIALIZED JSON, NOT A CHECKED VALUE. The
+     * current producer (`explainVerdict`) always fills `service`, `logoPath`
+     * and `access` — but they were added to the payload after `availability`
+     * itself shipped, so an older deployment mid-rollout, a cached response or
+     * a replayed fixture can still hand this component the earlier shape.
+     * Declaring them required did not make them present; it only hid the
+     * question, and the answer was `name.trim()` on undefined — a render-time
+     * throw that took the whole results page down with it.
+     */
     service?: string | null;
     /** Verified logo path, or null → the name renders as restrained text. */
     logoPath?: string | null;
@@ -132,17 +143,7 @@ export function WhyVerdict({ data, className = '' }: { data: WhyVerdictData; cla
             level and the confidence as their own labelled parts.
             The DISTINCTION IS PRESERVED, and is the only thing that decides
             what may be claimed: `verified` is stated plainly, anything else
-            is marked as the softer claim it is.
-
-            AND IT DEGRADES TO THE SENTENCE THE SERVER ALREADY WROTE. The
-            structured parts are what `buildItemExplanation` produces today,
-            but this panel also renders payloads it did not just serialize —
-            a cached response, a client that has not reloaded, any surface that
-            carries availability without a resolved provider identity. When
-            `service`/`access` are missing, the row falls back to
-            `availability.text`, which is the SAME grounded fact from the SAME
-            builder, one field over. It is not a second explanation and it is
-            not invented copy — it is the sentence the engine wrote. */}
+            is marked as the softer claim it is. */}
         {data.availability && (
           <div
             className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] leading-relaxed text-slate-100"
@@ -150,16 +151,18 @@ export function WhyVerdict({ data, className = '' }: { data: WhyVerdictData; cla
             data-confidence={data.availability.confidence}
             aria-label={`${data.availability.text} — ${data.availability.confidence}`}
           >
-            {data.availability.service ? (
-              <>
-                <ProviderChip data={{ name: data.availability.service, logoPath: data.availability.logoPath }} withLabel />
-                {data.availability.access && (
-                  <span className="text-[13px] text-slate-300">{data.availability.access}</span>
-                )}
-              </>
-            ) : (
-              <span data-testid="why-availability-text">{data.availability.text}</span>
-            )}
+            <ProviderChip data={{ name: data.availability.service, logoPath: data.availability.logoPath }} withLabel />
+            {/* WHAT SURVIVES WHEN THERE IS NO BRAND TO DRAW.
+                `ProviderChip` renders nothing without a service name, and
+                `access` is part of the same later addition to the payload — so
+                a legacy shape would leave this row holding a bare confidence
+                badge and nothing to attach it to. `text` is the producer's own
+                resolved sentence ("Netflix · Included with subscription"), so
+                it is the honest fallback: fewer facts, none invented, and the
+                row still says something true. */}
+            <span className="text-[13px] text-slate-300">
+              {data.availability.access || (data.availability.service ? null : data.availability.text)}
+            </span>
             <span
               className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
                 data.availability.confidence === 'verified'

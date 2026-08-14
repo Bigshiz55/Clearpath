@@ -1,6 +1,6 @@
 # Search Quality — Curated Critical Suite
 
-- Commit: `949b879` · Branch: `claude/card-trailer-premium`
+- Commit: `ef8fff3`
 - Cases: 23 (20 curated + 3 impossible)
 - **Passed: 23/23 (100%)**
 

@@ -5,6 +5,7 @@ import { EMPTY_QUERY } from '@/lib/finderParse';
 import { genreIdFromName } from '@/lib/finderGenres';
 import { searchPeople, searchKeywords } from '@/lib/tmdb/client';
 import { DEFAULT_RESULT_COUNT, MAX_REQUESTED_COUNT } from '@/lib/nlu/count';
+import { stripRequestFrame } from '@/lib/nlu/requestFrame';
 
 /**
  * Turn a free-form ask into structured search filters using the LLM — so the
@@ -141,8 +142,14 @@ export { parseRequestedCount } from '@/lib/nlu/detectors';
 
 // Words that are never part of a person's name — stripped before we treat the
 // remainder as a candidate name to look up (TMDB's search fixes misspellings).
+//
+// The generic-noun fillers at the end ("something", "else", "to") were missing,
+// so "find me something to watch tonight" reduced to "something to" — two words,
+// which clears the 2-4 word guard — and spent a person lookup on it. Harmless in
+// production only because the `knownFor` check below refuses the result; a
+// wasted call on every plain request is still a wasted call.
 const NON_NAME =
-  /\b(show|me|find|get|give|recommend|want|looking|for|search|pull|up|list|please|the|some|a|an|of|in|on|with|starring|featuring|directed|by|top|best|great|good|movies?|films?|shows?|series|tv|episodes?|one|two|three|four|five|six|seven|eight|nine|ten|and|or|over|under|above|below|audience|score|rating|ratings|imdb|percent|match|new|recent|old|classic|latest|popular|trending|today|tonight|tomorrow|now|currently|this|that|week|weekend|night|right|playing|streaming|watch|funny|scary|sad|happy|short|long|bingeable|comedy|comedies|action|thriller|thrillers|drama|dramas|horror|romance|romantic|documentary|documentaries|sci|fi|fantasy|mystery|crime|western|war|animated|animation|kids|family)\b/g;
+  /\b(show|me|find|get|give|recommend|want|looking|for|search|pull|up|list|please|the|some|a|an|of|in|on|with|starring|featuring|directed|by|top|best|great|good|movies?|films?|shows?|series|tv|episodes?|one|two|three|four|five|six|seven|eight|nine|ten|and|or|over|under|above|below|audience|score|rating|ratings|imdb|percent|match|new|recent|old|classic|latest|popular|trending|today|tonight|tomorrow|now|currently|this|that|week|weekend|night|right|playing|streaming|watch|funny|scary|sad|happy|short|long|bingeable|comedy|comedies|action|thriller|thrillers|drama|dramas|horror|romance|romantic|documentary|documentaries|sci|fi|fantasy|mystery|crime|western|war|animated|animation|kids|family|something|anything|everything|nothing|thing|things|stuff|else|to|too|really|just|maybe)\b/g;
 
 /**
  * Resolve a person mentioned in the ask to a TMDB id — AI-independent. Strips
@@ -151,8 +158,16 @@ const NON_NAME =
  * confident person, so a plain request isn't hijacked into an actor search.
  */
 export async function resolvePersonId(text: string): Promise<number | null> {
-  const candidate = text
-    .toLowerCase()
+  /* PEEL THE REQUEST FRAME BEFORE THE STOPWORD LIST SEES IT.
+     `NON_NAME` below is a good list of words that are never part of a name, and
+     it was missing the entire class of words a person uses to say the answer
+     should suit THEM. Measured on the reported production failure: "find me 3
+     Sylvester Stallone movies you think I'll like" reduced to
+     "sylvester stallone you think i'll like" — six words — and the 2–4 word
+     guard, which exists for good reason, rejected it. The guard was right; it
+     was being handed the wrong string. */
+  const candidate = stripRequestFrame(text)
+    .text.toLowerCase()
     .replace(/[0-9]+%?/g, ' ')
     .replace(NON_NAME, ' ')
     .replace(/[^a-z\s'-]/g, ' ')

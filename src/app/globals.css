@@ -1256,3 +1256,123 @@ body {
 @media (min-width: 1280px) {
   .wv-ratings .wv-ratings-row { font-size: 1.125rem; }
 }
+
+/* ── THE VERDICT ROOM ENTRANCE ──────────────────────────────────────────────
+   Atmosphere for the shadow room behind /app/together. All of it is slow and
+   none of it loops tightly: the room should feel alive, not busy. The global
+   prefers-reduced-motion rule above collapses every duration here to ~0, which
+   leaves a still, fully legible composition rather than a broken one. */
+@keyframes wv-vr-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(2.5%, -2%, 0) scale(1.06); }
+}
+.wv-vr-drift { animation: wv-vr-drift 26s ease-in-out infinite; }
+
+/* The room waiting on somebody. Matches `ready` on State.participants. */
+@keyframes wv-vr-ready {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.35); opacity: 0.4; }
+  50%      { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); opacity: 0.75; }
+}
+.wv-vr-ready { animation: wv-vr-ready 3.4s ease-in-out infinite; }
+
+/* Winner-side energy crossing the leading plate. One pass, then a long rest. */
+@keyframes wv-vr-sheen {
+  0%       { transform: translateX(0); }
+  22%, 100% { transform: translateX(420%); }
+}
+.wv-vr-sheen > span { animation: wv-vr-sheen 9s ease-in-out infinite; }
+
+@keyframes wv-vr-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.95; transform: scale(1.09); }
+}
+.wv-vr-pulse { animation: wv-vr-pulse 5.5s ease-in-out infinite; }
+
+/* A reaction coming back from one of the seats — the key they just pressed,
+   arriving. Both ends of the cycle are the fully-drawn state, so the collapsed
+   reduced-motion version is a reaction that is simply THERE. */
+@keyframes wv-vr-react {
+  0%, 100% { transform: scale(1); opacity: 0.92; }
+  46%      { transform: scale(1.16); opacity: 1; }
+}
+.wv-vr-react { animation: wv-vr-react 4.2s ease-in-out infinite; }
+
+/* How far the room has swung. It breathes around its resting width rather
+   than filling from zero: a bar that animates in from empty would be claiming
+   a count is being tallied, and at the entrance nothing is. */
+@keyframes wv-vr-consensus {
+  0%, 100% { width: 66%; }
+  50%      { width: 73%; }
+}
+.wv-vr-consensus { width: 66%; animation: wv-vr-consensus 7.5s ease-in-out infinite; }
+
+/* The staged entrance. Foreground elements arrive in reading order rather than
+   all at once; `--wv-vr-step` is set per element. */
+@keyframes wv-vr-enter {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.wv-vr-enter {
+  animation: wv-vr-enter 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--wv-vr-step, 0) * 90ms);
+}
+
+/* THE ENTRANCE CTA. The brand's blue→violet→magenta, but calmer than the
+   landing button: this one sits on a lit stage and must not compete with it.
+   The light sweeps on hover rather than continuously. */
+.btn-enter-room {
+  @apply relative inline-flex min-h-[56px] w-full items-center justify-center gap-2.5
+         overflow-hidden whitespace-nowrap rounded-2xl border border-white/20 px-6 text-base
+         font-black uppercase tracking-[0.06em] text-white transition
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa2ff]
+         focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950
+         disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-9 sm:text-lg;
+  background: linear-gradient(120deg, #2f6bff 0%, #7c3aed 54%, #ff1493 100%);
+  box-shadow: 0 18px 48px -18px rgba(79, 134, 255, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.btn-enter-room:hover:not(:disabled) {
+  box-shadow: 0 22px 60px -16px rgba(124, 58, 237, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  filter: brightness(1.06);
+}
+.btn-enter-room:active:not(:disabled) { transform: translateY(1px) scale(0.995); filter: brightness(0.97); }
+.btn-enter-room > .wv-enter-sheen {
+  transform: translateX(-140%);
+  transition: transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-enter-room:hover > .wv-enter-sheen,
+.btn-enter-room:focus-visible > .wv-enter-sheen { transform: translateX(320%); }
+
+/* ── THE VERDICT ROOM INTERIOR ──────────────────────────────────────────────
+   The entrance's atmosphere, carried inside at a third of the strength and at
+   half the speed. The interior has ballots, veto counts and a verdict on top of
+   it; anything faster or brighter than this costs somebody a read, and
+   atmosphere that costs a read is not premium, it is broken.
+
+   The global prefers-reduced-motion rule collapses this to ~0, which leaves the
+   room lit and still rather than absent. */
+@keyframes wv-room-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(1.6%, -1.4%, 0) scale(1.04); }
+}
+.wv-room-drift { animation: wv-room-drift 42s ease-in-out infinite; }
+
+/* A stage landing. Used once per stage change, never on every render — a
+   transition that fires continuously is the screensaver this is against. */
+@keyframes wv-room-enter {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.wv-room-enter {
+  animation: wv-room-enter 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--wv-room-step, 0) * 70ms);
+}
+
+/* THE VERDICT LANDING. The one place in the room allowed a flourish, because
+   it is the only moment that is actually an event. A single slow bloom behind
+   the winning title — no loop. */
+@keyframes wv-room-verdict {
+  0%   { opacity: 0; transform: scale(0.94); }
+  55%  { opacity: 1; }
+  100% { opacity: 0.6; transform: scale(1); }
+}
+.wv-room-verdict { animation: wv-room-verdict 1400ms cubic-bezier(0.16, 1, 0.3, 1) both; }

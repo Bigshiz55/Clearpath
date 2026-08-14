@@ -16,6 +16,8 @@
  * never be autocorrected into an unrelated one that doesn't exist.
  */
 
+import { stripRequestFrame } from './requestFrame';
+
 // ── Title + year ──────────────────────────────────────────────────────────
 
 /**
@@ -142,7 +144,19 @@ export function splitTitleQualifiers(raw: string): QualifiedTitle {
 // ── Person phrasing ───────────────────────────────────────────────────────
 
 const PERSON_LEAD =
-  /^\s*(?:who\s+is|who'?s|movies?\s+(?:with|starring|featuring|by|of|from)|films?\s+(?:with|starring|featuring|by|of|from)|shows?\s+(?:with|starring|featuring|by|of|from)|everything\s+(?:with|by|from)|anything\s+(?:with|by)|starring|featuring|directed\s+by|written\s+by|created\s+by|filmography\s+of)\s+/i;
+  /^\s*(?:who\s+is|who'?s|(?:movies?|films?|shows?|series)\s+(?:with|starring|featuring|by|of|from|directed\s+by|written\s+by|created\s+by)|everything\s+(?:with|by|from)|anything\s+(?:with|by)|starring|featuring|directed\s+by|written\s+by|created\s+by|filmography\s+of)\s+/i;
+
+/**
+ * A bare preposition opening the remainder — "…with Tom Hanks".
+ *
+ * Split out from `PERSON_LEAD` because it is far weaker evidence: "With
+ * Honors" and "Starring Adam Bakri" are titles, so this one is only trusted
+ * when what follows looks like a full name (two words or more). It exists
+ * because peeling the request frame off "what should I watch tonight with Tom
+ * Hanks" leaves exactly this shape, and it is one of the commonest things
+ * anybody says to a microphone.
+ */
+const PERSON_PREP_LEAD = /^\s*(?:with|starring|featuring)\s+/i;
 const PERSON_TAIL =
   /\s+(?:movies?|films?|shows?|series|filmography|roles?|performances?|credits?|movies\s+and\s+shows)\s*[?!.]*\s*$/i;
 
@@ -158,10 +172,29 @@ const PERSON_TAIL =
 export function extractPersonName(raw: string): string | null {
   const q = (raw ?? '').trim();
   if (!q) return null;
-  let t = q;
+  /* THE REQUEST FRAME COMES OFF FIRST.
+     Measured on the reported production failure: "find me 3 Sylvester Stallone
+     movies you think I'll like" matched NEITHER pattern below — no leading
+     "movies with", and the sentence ends in "like" rather than in "movies" —
+     so the person index was searched for the whole sentence and found nobody.
+     With the framing peeled the remainder is "Sylvester Stallone movies", which
+     the TAIL pattern has always handled. A frame that strips nothing leaves
+     bare-name behaviour byte-identical. */
+  const frame = stripRequestFrame(q);
+  let t = frame.text;
+  /* `stripped` MUST STILL MEAN "PERSON PHRASING WAS FOUND".
+     Seeding it from the frame — my first draft — made every framed request look
+     like a person request, so "three comedies you think I will love" came back
+     with the person "comedies". Peeling the frame changes what the patterns
+     below are shown; it must not change what counts as evidence. */
   let stripped = false;
   const lead = t.replace(PERSON_LEAD, '');
   if (lead !== t) { t = lead; stripped = true; }
+  if (!stripped) {
+    const prep = t.replace(PERSON_PREP_LEAD, '');
+    // Two words minimum: a bare "with" is evidence only when a full name follows.
+    if (prep !== t && prep.trim().split(/\s+/).length >= 2) { t = prep.trim(); stripped = true; }
+  }
   const tail = t.replace(PERSON_TAIL, '');
   if (tail !== t) { t = tail; stripped = true; }
   t = t.replace(/[?!.]+\s*$/, '').trim();
@@ -169,6 +202,16 @@ export function extractPersonName(raw: string): string | null {
   // A name is a handful of words with no digits — "movies with 500 days" is
   // not a person, and letting it through would search people for a title.
   if (/\d/.test(t) || t.split(/\s+/).length > 4) return null;
+  /* AN ARTICLE IS DROPPED; A QUALITY WORD IS DISQUALIFYING.
+     These look alike and are not. "how about a Bruce Willis movie" reduces to
+     "a Bruce Willis" — a real name wearing an article, and rejecting it outright
+     (my first draft) lost a perfectly good query. "a good heist movie" reduces
+     to "a good heist", which is a SUBJECT wearing a name's shape; no article
+     removal saves that, and offering it to the person index can only return a
+     false match. So the article comes off and the quality word ends it. */
+  t = t.replace(/^(?:the|a|an)\s+/i, '').trim();
+  if (!t || /^(?:good|best|great|top|new|old|scary|funny|sad|classic|other|more)\b/i.test(t)) return null;
+  if (t.split(/\s+/).length > 4) return null;
   return t;
 }
 

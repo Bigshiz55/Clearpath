@@ -74,6 +74,38 @@ export const QUICK_TRAITS = {
   /** Watchable with children in the room — a scheduling constraint, not a taste. */
   family: 'Something the whole room can watch',
   reality: 'Unscripted & competition shows',
+
+  /*
+   * THE TEXTURE AXES — what a story FEELS like, not what shelf it sits on.
+   *
+   * Everything above still describes territory: crime, animation, westerns.
+   * Territory is where the cold-start sweep starts, but it is not where taste
+   * actually lives. Two people can both pick the serial-killer drama over the
+   * romance and want completely different things from it — one wants dread,
+   * one wants moral ambiguity, one wants a puzzle, one just wants something
+   * that moves fast. Genre cannot separate them; these can.
+   *
+   * They are also what makes the LATE session hard in the way the product
+   * requires. Once territory is settled, the only questions left worth asking
+   * are the ones that split two films the player likes equally on paper — and
+   * a pair can only be built like that if the catalogue is fingerprinted on the
+   * axes that remain.
+   */
+  suspense: 'Tension, dread and unease',
+  violence: 'Tolerance for graphic violence',
+  emotion: 'Emotional intensity',
+  warmth: 'Warmth and heart',
+  spectacle: 'Scale and visual spectacle',
+  weirdness: 'Strange, surreal, offbeat',
+  sentimentality: 'Sentiment worn openly',
+  cynicism: 'A cynical view of people',
+  ambiguity: 'Endings left unresolved',
+  characterFocus: 'Character over plot',
+  dialogue: 'Talky and dialogue-driven',
+  /** A long-running series over a self-contained film. A time commitment. */
+  episodic: 'Series over films',
+  mainstream: 'Mainstream over niche',
+  comfort: 'Comfort viewing over a challenge',
 } as const;
 
 export type TraitKey = keyof typeof QUICK_TRAITS;

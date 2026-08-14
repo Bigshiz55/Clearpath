@@ -4,6 +4,58 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **The Verdict Room — `claude/verdict-room-complete`.** PR #58's entrance
+  reconciled onto current `main` and carried through the WHOLE room, so the
+  interior no longer collapses back to a stack of `max-w-2xl` cards the moment
+  you walk in. `RoomShell` gives every stage the same floor, key light and
+  horizon; a five-node rail driven by real room state (never a per-device
+  counter, so a late joiner sees where the ROOM is); presence in the header at
+  every stage instead of only on JOIN; candidates lit by the engine's own
+  ranking with the group fit as a length; one bloom at the verdict and jurors'
+  scores as a histogram. Engine untouched — 78 existing court/together E2E tests
+  green, plus 15 new interior ones.
+  **Three real defects fixed on the way:** a 46px horizontal overflow at 320px
+  (the identity line), mood/avoid chips at 36px (the most-tapped controls in the
+  room, and the only ones in the app under the 44px minimum), and the sync chip
+  wrapping to three header lines on a phone.
+
+- **Owner action — run the fingerprint backfill so Showdown can move ranking
+  fully.** `/api/health/showdown` on production reports **73/113 covered,
+  ratio 0.646, threshold 0.67, `usable: false`** — 40 diagnostic titles have no
+  row in `title_dimensions`, so evidence about them records correctly and then
+  contributes nothing to the ranker. This is a DATA condition, not a code one,
+  and it predates the Showdown work; the new payoff reports `measured: false` /
+  `movement: 0` honestly rather than papering over it. The fix is the batch
+  classifier, which needs your `CRON_SECRET`:
+
+  ```
+  curl -s -X POST "https://clearpath-pearl-chi.vercel.app/api/cron/classify" \
+    -H "Authorization: Bearer $CRON_SECRET"
+  ```
+
+  Re-check with `curl -s https://clearpath-pearl-chi.vercel.app/api/health/showdown`
+  until `usable` is true.
+- **DNA Showdown — `claude/showdown-definitive`.** PR #53's recovery work
+  reconciled three-way onto current `main` (nothing newer reverted; the Critic
+  Layer's `criticNudge`/`planNudge` terms in `rank.ts` verified intact) and
+  narrowed to the game. Recovered: verified TMDB identity
+  (`identity.ts` + `catalogueResolver.ts` — a wrong hand-authored id is
+  corrected by search, never displayed), the three-phase adaptive scanner,
+  moments/discoveries derived from what the planner actually did, `Both`,
+  per-cluster meters, cross-session exposure memory, and the axis-level
+  crossing into canonical `preference_events`.
+  **Measured adaptivity: 7–10 of 20 shared questions across six personas**
+  (was 20/20 identical). Canonical vocabulary is a 28-axis SUPERSET of the
+  15 scoring dimensions — same keys, same storage, same copy, pinned by test.
+  `MIN_RANK_CONF` untouched at 0.25.
+  **Real payoff now WIRED, which it was not on #53** — `payoff.ts` shipped
+  there with no caller outside its own test while the results screen went on
+  ranking the diagnostic pool. `payoffPool.ts` + `measurePayoff` run the
+  production `preferenceNudge` over the same TMDB discover pool `/browse?sort=foryou`
+  ranks, with diagnostic titles excluded, folding one event read twice for an
+  exact counterfactual. Three honest outcomes: unmeasured / measured-and-flat /
+  measured-and-moved.
+
 - **Critic Layer — `claude/critic-layer`.** GC1–GC11 complete red-then-green
   (**250 critic tests**). A comparative
   Ask runs the full pipeline, **the CriticPlan orders the response the user
@@ -28,6 +80,72 @@ production and apply pending migrations with your `MIGRATE_SECRET` — see the
 unblocks.
 
 ## Next
+- **The 20 pre-existing mobile-suite failures — 8 now fixed, 12 in flight.**
+  Independently verified twice: by rebuilding the harness at `0b90f04` with the
+  working tree stashed (PR #58's visual pass), and by building `718987e` in a
+  scratch worktree (the card-redesign work). The same 20 fail with neither
+  branch applied, so they are inherited rather than caused.
+  - `wired-experience.spec.ts` × 8 — **FIXED** by the provider-chip hotfix.
+    Root cause was not a stale spec: `WhyVerdict` → `ProviderChip` →
+    `resolveProviderBrand` → `officialProviderName` called `name.trim()` on an
+    availability object with no `service`, which threw DURING RENDER, so React
+    unwound to the error boundary and the whole recommendation page became
+    "Something went wrong". The registry now treats absent identity as a state
+    rather than an error, the chip is suppressed instead of crashing, and the
+    legacy payload shape is pinned under test so it cannot come back.
+    (The suspicion recorded here — "worth checking against PR #54's WhyVerdict
+    availability-row change before assuming the spec is simply stale" — was
+    exactly right: #54 added `service`/`access`/`logoPath` and the fixture, and
+    the renderer, were never brought along.)
+  - `visual-qa.spec.ts` × 12 — the `▶ Trailer` affordance renders below the
+    suite's 44px tap-target minimum at every viewport in the matrix. Addressed
+    in the card + trailer redesign (PR #61), which gives both frame controls
+    44px on BOTH axes — the floor is a box, not a height.
+
+- **A typed runtime constraint never reaches the finder request (TEST E).**
+  Found while fixing the provider-chip crash: with that crash gone,
+  `wired-experience.spec.ts` TEST E reaches its assertion for the first time and
+  fails on its own merits. Asking "a fast mystery movie under 100 minutes" posts
+  `query.maxRuntime: null` — the cap the user typed is dropped, so the search
+  runs unconstrained while the UI behaves as though it applied.
+  NOT a parser bug and NOT a state race: `naiveParseQuery('a fast mystery movie
+  under 100 minutes')` returns `maxRuntime: 100` when called directly, and
+  inserting a 600ms settle between typing and Enter changes nothing — the
+  parsed query simply is not what `FinderUI` submits on the ask path
+  (`src/components/FinderUI.tsx`, `setQ(naiveParseQuery(v))` at ~208 vs
+  `effQuery` at ~284).
+  Deliberately NOT fixed in the provider-chip hotfix: this is finder/search
+  behaviour, and `docs/SEARCH-BASELINE-GOVERNANCE.md` requires any search-surface
+  change to be compared against baseline `68a5a93` with the frozen corpus and a
+  PASS→FAIL / FAIL→PASS delta reported. That is its own piece of work with its
+  own evidence, not a rider on a rendering fix.
+- **The ~50 non-Showdown files stranded on `claude/showdown-cold-start-scanner`.**
+  That branch accumulated real work with nothing to do with the game, and it was
+  reverted to `main` rather than smuggled through a Showdown PR. Each of these
+  needs its own scoped change, and the branch is the record of what was tried:
+  - **Watchlist provenance** (`src/lib/watchlist/provenance.ts`, migration
+    `0047`, and the `quiz.ts` / `postWatch.ts` / `feedback.ts` write paths).
+    Carries a genuine defect fix: onboarding's "what do you want to AVOID"
+    answers ran through the rating path at rating 2 and marked unseen films as
+    watched. Worth landing on its own, with the migration reviewed separately.
+  - **Pack eligibility + identity + mediaKind** (`src/lib/packs/eligibility.ts`,
+    `identity.ts`, `mediaKind.ts`, the admin eligibility route, the pack-enrich
+    cron and its `vercel.json` entry).
+  - **Admin migrate / reconcile-dry route changes** and
+    `adminProjectIdentity.test.ts`.
+  - Assorted component edits: `ChannelGuide`, `TheaterMode`, `PhotoAdd`,
+    `SaveButton`, `AvailabilityPanel`, `VerdictActions`, `Mentalist`,
+    `TasteGame`, `CaseBrowserView`, `ChecklistSection`.
+- **Showdown poster coverage is 0/113 in `poster.ts`.** Pre-existing on `main`,
+  not a regression: the static `POSTERS` map was never populated, so every tile
+  falls back to the typographic treatment unless `/api/showdown/catalogue`
+  resolves artwork live. That route now does resolve and verify it, so the
+  static map is dead weight — either populate it from a verified run or delete
+  it and let `PosterTile` read the catalogue response alone.
+- **The global 💬 `FeedbackButton` overlaps long scrolling pages.** `fixed
+  left-2 bottom-…`, 44×44, sits on top of body copy on the Showdown results
+  screen at 390px. Untouched by any recent work and product-wide, so it needs
+  its own fix (a scroll-aware offset, or a safe gutter on long pages).
 - **Linear network brand asset registry.** Replace the 0/83 monogram fallback
   with verified network marks, using a separate provenance-backed canonical
   asset registry or a licensed authoritative source. NOT part of PR #54 — that
@@ -111,6 +229,17 @@ unblocks.
   representative.
 
 ## Done
+- **The Verdict Room shadow room is dressed rather than sketched** (PR #58,
+  pending review). The plates carry three original drawn poster compositions,
+  the participants are silhouettes with real reaction states, the verdict board
+  shows the shape of a finished session, and a gavel inside a converging arc
+  marks the decision. Three positioning bugs surfaced and were fixed along the
+  way, each now pinned by a test: Tailwind `-translate-*` losing to an inline or
+  animated `transform` (the board was 250px off-position and invisible); a
+  `rotateY`-before-`translateZ` transform order adding `z·sin(θ)` of sideways
+  travel (the flanking plates hung off both edges of a phone); and an
+  `absolute inset-0` child escaping a container that lacked `position: relative`
+  (a 36px thumbnail painting across a 340px panel).
 - **Streaming brand coverage is 14/15, and the last one is an upstream fact.**
   Starz, AMC+, Fubo, Tubi, Pluto TV and The Roku Channel now render their own
   marks. Their paths were not guessed: production's already-deployed
