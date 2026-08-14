@@ -138,14 +138,21 @@ test.describe('Product journey — fresh user, real preview', () => {
     await expect(firstTopic).toBeVisible({ timeout: 20_000 });
     await firstTopic.click();
 
-    /* FOOTER COORDINATES ARE STABLE ACROSS SLIDES — the owner's defect. */
+    /* FOOTER COORDINATES ARE STABLE ACROSS SLIDES — the owner's defect.
+       Measured in DOCUMENT coordinates: on the deployed app the tour sits
+       under the app shell, and clicking Next can auto-scroll the page, so a
+       viewport-relative boundingBox would report the SCROLL as movement.
+       The claim under test is structural — the control does not move
+       relative to the page. */
     const footer = page.getByTestId('tour-footer');
     await expect(footer).toBeVisible();
-    const before = (await footer.boundingBox())!;
+    const docY = () =>
+      footer.evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+    const before = await docY();
     await page.getByTestId('tour-next-topic').click();
     await expect(footer).toBeVisible();
-    const after = (await footer.boundingBox())!;
-    expect(Math.abs(after.y - before.y), 'the footer must not move between slides').toBeLessThanOrEqual(1);
+    const after = await docY();
+    expect(Math.abs(after - before), 'the footer must not move between slides').toBeLessThanOrEqual(1);
 
     /* Walk to the last slide; the Next SLOT becomes Done and goes back to
        the page the user entered from — the VALIDATED returnTo. */
@@ -156,8 +163,8 @@ test.describe('Product journey — fresh user, real preview', () => {
     }
     const done = page.getByTestId('tour-final-done');
     await expect(done).toBeVisible();
-    const doneBox = (await done.boundingBox())!;
-    expect(Math.abs(doneBox.y - before.y), 'Done holds the Next slot').toBeLessThanOrEqual(24);
+    const doneY = await done.evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+    expect(Math.abs(doneY - before), 'Done holds the Next slot').toBeLessThanOrEqual(24);
     await done.click();
     await page.waitForURL(/\/app\/dna(?:$|[/?#])/, { timeout: 20_000 });
 
