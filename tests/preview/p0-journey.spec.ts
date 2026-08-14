@@ -34,19 +34,31 @@ test.describe('P0 journey — 3 Sylvester Stallone movies', () => {
       extraHTTPHeaders: { 'x-vercel-protection-bypass': BYPASS },
     });
 
-    // The app's own session, the way the app makes one. The API request
-    // context shares the browser context's cookie jar, so the SSR cookies the
-    // route sets are the ones the page navigates with.
-    const login = await context.request.post('/api/preview-test-login', {
-      headers: { 'x-preview-test-secret': LOGIN_SECRET },
-    });
-    expect(login.status(), 'preview test login must mint a session').toBe(200);
-
     const page = await context.newPage();
-    await page.goto('/app');
 
-    const box = page.getByTestId('statecase-card');
-    await expect(box, 'the real State Your Case entry').toBeVisible();
+    /* A GENUINELY FRESH USER, the way the product makes one: /newuser signs
+       in anonymously (FreshStart) and lands on /app with a guest profile that
+       skips the signed-up onboarding redirect. If anonymous sign-in is
+       disabled on this deployment, fall back to the preview test login — the
+       journey from the entry box onward is identical either way, and which
+       path authenticated is logged for the record. */
+    await page.goto('/newuser');
+    let box = page.getByTestId('statecase-card');
+    const guestWorked = await box.isVisible({ timeout: 20_000 }).catch(() => false)
+      || (await page.waitForURL(/\/app(?:$|[/?#])/, { timeout: 20_000 }).then(() => true).catch(() => false)
+          && await box.isVisible({ timeout: 10_000 }).catch(() => false));
+    if (guestWorked) {
+      console.log('AUTH PATH: anonymous guest via /newuser');
+    } else {
+      console.log('AUTH PATH: preview test login fallback');
+      const login = await context.request.post('/api/preview-test-login', {
+        headers: { 'x-preview-test-secret': LOGIN_SECRET },
+      });
+      expect(login.status(), 'preview test login must mint a session').toBe(200);
+      await page.goto('/app');
+      box = page.getByTestId('statecase-card');
+    }
+    await expect(box, 'the real State Your Case entry').toBeVisible({ timeout: 20_000 });
     await box.locator('textarea').fill('3 Sylvester Stallone movies');
 
     const askResponse = page.waitForResponse(

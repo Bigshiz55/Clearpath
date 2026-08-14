@@ -1,5 +1,5 @@
 import 'server-only';
-import { searchPeople } from '@/lib/tmdb/client';
+import { getPersonCreditCount, searchPeople } from '@/lib/tmdb/client';
 import type { CreditRole } from '@/lib/interpret/types';
 
 /**
@@ -58,6 +58,8 @@ export interface ResolvedPerson {
   evidence:
     | 'exact-name-match'
     | 'sole-credited-exact-match'
+    | 'sole-role-consistent-exact-match'
+    | 'dominant-filmography-exact-match'
     | 'unique-credited-name-match'
     | 'sole-credited-match';
 }
@@ -179,12 +181,51 @@ export async function resolvePersonReference(input: PersonReferenceInput): Promi
     return { kind: 'resolved', id: only.id, name: only.name, evidence: 'exact-name-match' };
   }
   if (exacts.length > 1) {
+    /* EXACT-NAME NAMESAKES ARE THE REAL WORLD, NOT AN EDGE CASE. The catalog
+       holds several credited people named exactly "Christopher Nolan"; asking
+       "which one?" for the director the sentence plainly meant is over-asking,
+       and taking the first is popularity. Two pieces of DETERMINISTIC catalog
+       evidence settle it before any clarification:
+
+       1. THE SENTENCE'S OWN ROLE. "directed by X" states a department. When
+          exactly one exact-name bearer's primary department is Directing (or
+          Writing for a creator ask), that bearer is uniquely defensible.
+          Deliberately NOT applied to actor/unmarked asks — "with X" is a weak
+          cue, and department-matching it would hand the ask to a namesake.
+
+       2. FILMOGRAPHY DOMINANCE. One bearer with a real body of work
+          (≥ 10 credits and ≥ 3× every rival) against namesake stubs is the
+          catalog saying who the public figure is — credit EVIDENCE, not
+          search order.
+
+       Rivals of comparable substance remain a genuine question → clarify. */
     const creditedExacts = exacts.filter((h) => Boolean(h.knownFor));
     if (creditedExacts.length === 1) {
       const only = creditedExacts[0]!;
       return { kind: 'resolved', id: only.id, name: only.name, evidence: 'sole-credited-exact-match' };
     }
-    return asAmbiguous(creditedExacts.length > 0 ? creditedExacts : exacts);
+    const pool = creditedExacts.length > 0 ? creditedExacts : exacts;
+
+    const wantedDept =
+      input.role === 'director' ? 'Directing' : input.role === 'creator' ? 'Writing' : null;
+    if (wantedDept) {
+      const roleConsistent = pool.filter((h) => h.knownForDepartment === wantedDept);
+      if (roleConsistent.length === 1) {
+        const only = roleConsistent[0]!;
+        return { kind: 'resolved', id: only.id, name: only.name, evidence: 'sole-role-consistent-exact-match' };
+      }
+    }
+
+    const counts = await Promise.all(pool.slice(0, 5).map((h) => getPersonCreditCount(h.id).catch(() => 0)));
+    const top = Math.max(...counts);
+    const topIdx = counts.indexOf(top);
+    const dominant =
+      top >= 10 && counts.every((c, i) => i === topIdx || top >= 3 * Math.max(c, 1));
+    if (dominant) {
+      const only = pool[topIdx]!;
+      return { kind: 'resolved', id: only.id, name: only.name, evidence: 'dominant-filmography-exact-match' };
+    }
+    return asAmbiguous(pool);
   }
 
   if (isMononym) {

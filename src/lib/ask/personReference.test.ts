@@ -25,7 +25,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  */
 
 const searchPeople = vi.fn();
-vi.mock('@/lib/tmdb/client', () => ({ searchPeople: (...a: unknown[]) => searchPeople(...a) }));
+const getPersonCreditCount = vi.fn<(id: number) => Promise<number>>(async () => 0);
+vi.mock('@/lib/tmdb/client', () => ({
+  searchPeople: (q: string) => searchPeople(q),
+  getPersonCreditCount: (id: number) => getPersonCreditCount(id),
+}));
 vi.mock('server-only', () => ({}));
 
 import { resolvePersonReference } from './personReference';
@@ -38,6 +42,8 @@ const DOWNEY_JR = { id: 3223, name: 'Robert Downey Jr.', profilePath: null, know
 beforeEach(() => {
   searchPeople.mockReset();
   searchPeople.mockResolvedValue([]);
+  getPersonCreditCount.mockReset();
+  getPersonCreditCount.mockResolvedValue(0);
 });
 
 const resolve = (spokenAs: string) => resolvePersonReference({ spokenAs, role: 'any' });
@@ -107,5 +113,34 @@ describe('what still resolves, and with truthful evidence', () => {
     searchPeople.mockResolvedValue([{ id: 5, name: 'Jane Bond', profilePath: null, knownFor: '' }]);
     const r = await resolve('Jane Bnod');
     expect(r.kind).toBe('unresolved');
+  });
+});
+
+describe('exact-name namesakes resolve on catalog evidence, never on order', () => {
+  const FAMOUS = { id: 525, name: 'Christopher Nolan', profilePath: null, knownFor: 'Inception, Oppenheimer', knownForDepartment: 'Directing' };
+  const NAMESAKE = { id: 9001, name: 'Christopher Nolan', profilePath: null, knownFor: 'Small Film', knownForDepartment: 'Acting' };
+
+  it('a DIRECTOR ask with one Directing-department bearer resolves that bearer', async () => {
+    searchPeople.mockResolvedValue([NAMESAKE, FAMOUS]);
+    const r = await resolvePersonReference({ spokenAs: 'Christopher Nolan', role: 'director' });
+    expect(r).toMatchObject({ kind: 'resolved', id: 525, evidence: 'sole-role-consistent-exact-match' });
+    expect(getPersonCreditCount, 'no filmography fetch needed — the role decided').not.toHaveBeenCalled();
+  });
+
+  it('an ACTOR ask never department-matches its way to a namesake — dominance decides', async () => {
+    searchPeople.mockResolvedValue([NAMESAKE, FAMOUS]);
+    getPersonCreditCount.mockImplementation(async (id) => (id === 525 ? 60 : 4));
+    const r = await resolvePersonReference({ spokenAs: 'Christopher Nolan', role: 'actor' });
+    expect(r).toMatchObject({ kind: 'resolved', id: 525, evidence: 'dominant-filmography-exact-match' });
+  });
+
+  it('rivals of comparable substance stay a question', async () => {
+    searchPeople.mockResolvedValue([
+      { id: 1, name: 'John Smith', profilePath: null, knownFor: 'A', knownForDepartment: 'Acting' },
+      { id: 2, name: 'John Smith', profilePath: null, knownFor: 'B', knownForDepartment: 'Acting' },
+    ]);
+    getPersonCreditCount.mockImplementation(async (id) => (id === 1 ? 12 : 9));
+    const r = await resolvePersonReference({ spokenAs: 'John Smith', role: 'any' });
+    expect(r.kind).toBe('ambiguous');
   });
 });

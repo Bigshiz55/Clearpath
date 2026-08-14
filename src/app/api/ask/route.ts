@@ -601,8 +601,18 @@ export async function POST(req: Request) {
     // Mid-conversation this is OFF: once constraints have accumulated, a short
     // follow-up ("Newer.", "Rocky") is a refinement of the case, not a fresh
     // title lookup.
+    /* THE CANONICAL LOOKUP HANDS ITS TITLE TO THE TITLE MACHINERY.
+       interpret() already decided "Show me The Lego Movie" is a LOOKUP and
+       isolated the span. Without the hand-off the legacy gate rejects the
+       phrasing ("show me" is on looksLikeTitleAsk's stoplist), the ask falls
+       through to discovery, and the title's own words come back as a person
+       or a subject — the measured live failure. */
+    const canonicalRequestedTitle =
+      canonical?.kind === 'lookup'
+        ? canonical.titles.find((t) => t.relation === 'requested')?.span ?? null
+        : null;
     if (text.trim() && cls?.mode !== 'similar_to' && !lex && !(conversational && prevHadConstraints)) {
-      const titled = await askJudgeTitle(supabase, user.id, text, cls ?? undefined);
+      const titled = await askJudgeTitle(supabase, user.id, text, cls ?? undefined, canonicalRequestedTitle);
       if (titled) return NextResponse.json(withConv({ kind: 'title', ...titled }));
     }
 

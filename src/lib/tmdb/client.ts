@@ -1126,6 +1126,9 @@ export interface PersonHit {
   name: string;
   profilePath: string | null;
   knownFor: string; // a couple of recognizable titles, for disambiguation
+  /** TMDB's primary-department attribution ("Directing", "Acting", …) —
+   *  catalog evidence for telling exact-name namesakes apart. */
+  knownForDepartment?: string;
 }
 
 /** Search TMDB people (actors/directors) by name — for the "favorite actors"
@@ -1134,7 +1137,7 @@ export async function searchPeople(query: string): Promise<PersonHit[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   interface KnownFor { title?: string; name?: string }
-  interface Row { id: number; name?: string; profile_path?: string | null; popularity?: number; known_for?: KnownFor[] }
+  interface Row { id: number; name?: string; profile_path?: string | null; popularity?: number; known_for?: KnownFor[]; known_for_department?: string }
   const data = await tmdbFetch<{ results?: Row[] }>('/search/person', { query: q, include_adult: 'false' }).catch(() => ({ results: [] as Row[] }));
   return (data.results ?? [])
     .slice(0, 8)
@@ -1143,7 +1146,20 @@ export async function searchPeople(query: string): Promise<PersonHit[]> {
       name: r.name ?? 'Unknown',
       profilePath: r.profile_path ?? null,
       knownFor: (r.known_for ?? []).map((k) => k.title ?? k.name).filter(Boolean).slice(0, 2).join(', '),
+      knownForDepartment: r.known_for_department,
     }));
+}
+
+/**
+ * The SIZE of a person's filmography — cast plus crew credits, one call.
+ * Catalog evidence for exact-name disambiguation: a public figure carries a
+ * body of work, a namesake stub carries a handful. Never popularity.
+ */
+export async function getPersonCreditCount(personId: number): Promise<number> {
+  const data = await tmdbFetch<TmdbPersonCredits>(`/person/${personId}/combined_credits`, {
+    language: 'en-US',
+  }).catch(() => ({} as TmdbPersonCredits));
+  return (data.cast?.length ?? 0) + (data.crew?.length ?? 0);
 }
 
 /**
