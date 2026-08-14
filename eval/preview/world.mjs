@@ -121,15 +121,52 @@ export async function topBilledFor(baseUrl, headers, item) {
   return Array.isArray(people) && people.length > 0 ? people : null;
 }
 
-/** This candidate really has that person in its credits. */
+/**
+ * The FULL credits for a title, straight from TMDB — cast AND crew, no
+ * billing cutoff. Only available when CI carries TMDB_API_KEY; the complete
+ * list is what makes both PROOF and REFUTATION possible. Guardians of the
+ * Galaxy Vol. 3 is the reference incident: a supporting credit sits below
+ * every top-billing window, so a top-billed reader called a true fact
+ * unprovable and a fold called that a failure.
+ */
+async function fullCreditsFor(item) {
+  const key = process.env.TMDB_API_KEY ?? '';
+  if (!key) return null;
+  const type = item.mediaType === 'tv' ? 'tv' : 'movie';
+  const res = await request(`https://api.themoviedb.org/3/${type}/${item.id}/credits?api_key=${key}`, { method: 'GET', headers: {} });
+  if (!res.ok || res.status !== 200) return null;
+  const body = await res.res.json().catch(() => null);
+  if (!body) return null;
+  return {
+    cast: Array.isArray(body.cast) ? body.cast : [],
+    crew: Array.isArray(body.crew) ? body.crew : [],
+  };
+}
+
+/**
+ * This candidate really has that person in its credits — two tiers:
+ *
+ *   1. FULL credits (TMDB_API_KEY in CI): can PROVE and can REFUTE.
+ *   2. The deployment's top billing: can prove presence, may NEVER prove
+ *      absence — a miss here is UNPROVABLE, and folding reports it as a GAP.
+ */
 export async function castFact(baseUrl, headers, item, personId, personName) {
+  const full = await fullCreditsFor(item);
+  if (full) {
+    const inCast = full.cast.find((p) => p.id === personId);
+    if (inCast) return proven(`"${item.title}" full cast — ${inCast.name}${inCast.character ? ` as ${inCast.character}` : ''}`);
+    const inCrew = full.crew.find((p) => p.id === personId);
+    if (inCrew) return proven(`"${item.title}" full crew — ${inCrew.name} (${inCrew.job ?? 'crew'})`);
+    return refuted(`"${item.title}" full credits (${full.cast.length} cast, ${full.crew.length} crew) do not include ${personName}`);
+  }
   const people = await topBilledFor(baseUrl, headers, item);
   if (!people) return unprovable(`no credit evidence available for "${item.title}"`);
   const hit = people.find((p) => p.id === personId);
   if (hit) return proven(`"${item.title}" — ${hit.name} (id ${hit.id})${hit.knownFor ? `, ${hit.knownFor}` : ''}`);
   return unprovable(
     `${personName} is not in the top-billed credits returned for "${item.title}" `
-    + `(${people.map((p) => p.name).join(', ')}). Top-billing can prove membership but cannot disprove it.`,
+    + `(${people.map((p) => p.name).join(', ')}). Top billing can prove membership but cannot disprove it; `
+    + `set TMDB_API_KEY in CI for the full-credits tier.`,
   );
 }
 
@@ -156,11 +193,17 @@ export function foldFacts(facts) {
   const provenFacts = facts.filter((f) => f.verdict === FACT.PROVEN);
   const unprovableFacts = facts.filter((f) => f.verdict === FACT.UNPROVABLE);
   const ok = refutedFacts.length === 0 && provenFacts.length > 0;
+  /* ALL-UNPROVABLE is a GAP, not a verdict. A refutation fails; a proof
+     passes; an oracle that could not see is neither — calling it a failure
+     blames the product for the oracle's blind spot (the Guardians of the
+     Galaxy ruling), and calling it a pass claims evidence that does not
+     exist. The caller records it as a named gap, loudly. */
+  const gap = refutedFacts.length === 0 && provenFacts.length === 0 && unprovableFacts.length > 0;
   const detail = [
     `${provenFacts.length} proven`,
     refutedFacts.length ? `${refutedFacts.length} REFUTED` : null,
     unprovableFacts.length ? `${unprovableFacts.length} unprovable` : null,
   ].filter(Boolean).join(', ');
   const firstProblem = refutedFacts[0] ?? (provenFacts.length === 0 ? unprovableFacts[0] : null);
-  return { ok, detail: firstProblem ? `${detail} — ${firstProblem.why}` : detail, facts };
+  return { ok, gap, detail: firstProblem ? `${detail} — ${firstProblem.why}` : detail, facts };
 }

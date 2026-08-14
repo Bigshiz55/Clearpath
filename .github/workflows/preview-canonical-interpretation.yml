@@ -65,6 +65,7 @@ jobs:
         env:
           HAS_LOGIN: ${{ secrets.PREVIEW_TEST_LOGIN_SECRET != '' }}
           HAS_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET != '' }}
+          HAS_TMDB: ${{ secrets.TMDB_API_KEY != '' }}
         run: |
           # TWO secrets, presence only, reported by NAME so a gap can be fixed
           # without anyone pasting a value. The Supabase config and the test
@@ -73,6 +74,7 @@ jobs:
           # of a leaked CI token for no gain.
           echo "PREVIEW_TEST_LOGIN_SECRET present:        $HAS_LOGIN"
           echo "VERCEL_AUTOMATION_BYPASS_SECRET present:  $HAS_BYPASS"
+          echo "TMDB_API_KEY present (full-credit tier):  $HAS_TMDB"
 
       - name: Black-box canonical interpretation
         if: steps.target.outputs.run == 'true'
@@ -81,6 +83,7 @@ jobs:
           EXPECT_SHA: ${{ steps.target.outputs.sha }}
           PREVIEW_TEST_LOGIN_SECRET: ${{ secrets.PREVIEW_TEST_LOGIN_SECRET }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
           set +e
           node eval/preview/canonical-interpretation.mjs

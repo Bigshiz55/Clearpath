@@ -74,9 +74,11 @@ const EXPECT_SHA = process.env.EXPECT_SHA ?? '';
  */
 const LOGIN_SECRET = process.env.PREVIEW_TEST_LOGIN_SECRET ?? '';
 const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? '';
+/** Optional: enables the full-credits tier of the cast oracle. */
+const TMDB_KEY = process.env.TMDB_API_KEY ?? '';
 
 /** Nothing printed by this script may contain either secret. */
-const redact = makeRedactor([LOGIN_SECRET, BYPASS]);
+const redact = makeRedactor([LOGIN_SECRET, BYPASS, TMDB_KEY]);
 
 /** Exit codes the workflow reads to tell infrastructure from semantics apart. */
 const EXIT = { OK: 0, SEMANTIC: 1, INFRA: 2 };
@@ -105,6 +107,11 @@ function check(caseName, layer, label, ok, detail) {
  * "all cases hold" while one is open.
  */
 const gaps = [];
+/** A folded world claim: refutation FAILS, proof PASSES, blindness is a GAP. */
+function checkFold(caseName, label, folded, emptyDetail) {
+  if (folded.gap) gap(caseName, label, folded.detail);
+  else check(caseName, 'world', label, folded.ok, emptyDetail ?? folded.detail);
+}
 function gap(caseName, label, why) {
   gaps.push({ caseName, label, why });
   console.log(`   ⚠ [world] ${label} — NOT PROVABLE: ${redact(why)}`);
@@ -378,7 +385,7 @@ async function main() {
     const facts = [];
     for (const i of sample(count.body)) facts.push(await castFact(BASE_URL, evidenceHeaders(), i, stalloneId, 'Sylvester Stallone'));
     const folded = foldFacts(facts);
-    check('count', 'world', 'the returned title really has Stallone in its cast', folded.ok, facts.length === 0 ? 'no candidates to verify' : folded.detail);
+    checkFold('count', 'the returned title really has Stallone in its cast', folded, facts.length === 0 ? 'no candidates to verify' : folded.detail);
   }
   await stalloneFunnel(count.body);
 
@@ -451,7 +458,7 @@ async function main() {
     const facts = [];
     for (const i of sample(three.body)) facts.push(await castFact(BASE_URL, evidenceHeaders(), i, stalloneId, 'Sylvester Stallone'));
     const folded = foldFacts(facts);
-    check('incident', 'world', 'every verified title really has Stallone in its cast', folded.ok, facts.length === 0 ? 'no candidates to verify' : folded.detail);
+    checkFold('incident', 'every verified title really has Stallone in its cast', folded, facts.length === 0 ? 'no candidates to verify' : folded.detail);
   }
   await stalloneFunnel(three.body);
 

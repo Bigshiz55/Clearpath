@@ -13,4 +13,4 @@ export declare function genreFact(baseUrl: string, headers: Record<string, strin
 export declare function topBilledFor(baseUrl: string, headers: Record<string, string>, item: WorldItem): Promise<{ id: number; name: string; knownFor?: string }[] | null>;
 export declare function castFact(baseUrl: string, headers: Record<string, string>, item: WorldItem, personId: number, personName: string): Promise<Fact>;
 export declare function resolvePersonId(baseUrl: string, headers: Record<string, string>, name: string): Promise<number | null>;
-export declare function foldFacts(facts: Fact[]): { ok: boolean; detail: string; facts: Fact[] };
+export declare function foldFacts(facts: Fact[]): { ok: boolean; gap: boolean; detail: string; facts: Fact[] };
