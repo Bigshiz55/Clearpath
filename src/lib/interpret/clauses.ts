@@ -130,6 +130,13 @@ const CONSTRAINT =
  * "I want something like Heat" is a request that happens to name a work, and it
  * should be executed rather than filed as taste history.
  */
+/**
+ * "a <description> movie" — an article, a description, an unambiguous movie
+ * noun, and nothing else. `show`/`series` are excluded on purpose (see the call
+ * site); the article requirement is what keeps capitalised titles out.
+ */
+const BARE_MOVIE_NOUN_PHRASE = /^\s*(?:an?|the)\s+[\w'’-]+(?:\s+[\w'’-]+){0,4}\s+(?:movies?|films?|flicks?)\s*[.!?]?$/i;
+
 export function classifyClause(text: string): ClauseRole {
   const t = text.trim();
   if (!t) return 'background';
@@ -156,6 +163,22 @@ export function classifyClause(text: string): ClauseRole {
      primitive: `requestFrame` may say what framing a sentence wears, never what
      the sentence is for. */
   if (MEDIA_PERSON_REQUEST.test(t)) return 'request';
+  /* A BARE NOUN PHRASE IS AN ORDER WHEN IT NAMES THE ANSWER.
+     "a courtroom movie", "a Tom Hanks courtroom movie", "a Sylvester Stallone
+     boxing movie" carry no verb, no count and no scaffolding — the request IS
+     the description of the thing wanted. Measured before this rule: all three
+     classified `background`, so media fell back to `either`, requestedCount to
+     null, and neither the person nor the subject was ever extracted.
+
+     This is a clause-ROLE judgement (what is this sentence for), which is why
+     it lives here and not in `requestFrame` — that primitive owns lexical
+     scaffolding, and a bare noun phrase has none to own.
+
+     LIMITED TO UNAMBIGUOUS MOVIE NOUNS. `show` is deliberately excluded: it is
+     an ordinary noun as well as a medium, and "a horror show" is a named
+     regression that must not become an order. The leading article is required
+     so a bare capitalised title ("A Few Good Men", "Get Out") cannot match. */
+  if (BARE_MOVIE_NOUN_PHRASE.test(t)) return 'request';
   // A count only makes a request when it is counting the thing being asked for.
   // "I watched 3 movies yesterday" is past tense about the user, not an order.
   if (COUNT_LED.test(t) && media && !REACTION.test(t) && !FAMILIARITY.test(t) && !PAST_TENSE.test(t)) {
