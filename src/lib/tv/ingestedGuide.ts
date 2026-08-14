@@ -48,6 +48,20 @@ const PROGRAMME_TYPE_TO_SHOW_TYPE: Record<string, string> = {
 };
 
 /**
+ * `tv_programmes.programme_type` → the guide's `showType`, NORMALIZED at the
+ * boundary. The writers' documented vocabulary is lowercase, but this reader
+ * outlives any one writer — and an exact-match lookup silently turned every
+ * case/whitespace variant a past or future ingest stored ('Movie', ' movie')
+ * into 'Special', which is invisible to the Movies filter, the movies count
+ * AND the movie-only selector at once. Trim + lowercase is normalization of
+ * the DECLARED vocabulary, not a guess at an undeclared one: an unknown type
+ * still lands on the documented 'Special' catch-all.
+ */
+export function showTypeForProgrammeType(programmeType: string | null | undefined): string {
+  return PROGRAMME_TYPE_TO_SHOW_TYPE[(programmeType ?? '').trim().toLowerCase()] ?? 'Special';
+}
+
+/**
  * Deterministic positive integer from a string (FNV-1a over a 32-bit space) —
  * stable across renders and page loads, so a "remind me" set on one visit
  * still reads as set on the next. `tv_airings` has no numeric id of its own
@@ -117,7 +131,7 @@ export function ingestedRowToAiring(row: IngestedAiringRow): Airing {
     episodeName: row.episodeTitle,
     season: row.seasonNumber,
     number: row.episodeNumber,
-    showType: PROGRAMME_TYPE_TO_SHOW_TYPE[row.programmeType] ?? 'Special',
+    showType: showTypeForProgrammeType(row.programmeType),
     genres: row.genres,
     rating: null,
     image: row.artworkUrl,
