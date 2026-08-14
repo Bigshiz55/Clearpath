@@ -4,6 +4,33 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **Recommendation P0 integration — PR #71 (`claude/recommendation-p0-integration`,
+  FINAL_P0_SHA `c0d7e0a`) awaits the owner's merge decision.** Zero semantic
+  FAILs on the authoritative exact-SHA preview gates (black-box 61/61 +
+  real-UI journey); three named oracle GAPs remain, all unlocked by adding
+  `TMDB_API_KEY` to CI secrets. PR #72 (`claude/product-feedback-2026-08-14`,
+  proven at `199c781`) stacks the owner's product batch on top and retargets
+  to `main` after #71 lands.
+- **Trial-account provisioning awaits the credential holder** — run
+  `scripts/provisionTrialAccounts.ts` with `TRIAL_ACCOUNTS_PASSWORD` and the
+  standard Supabase env; it enforces the owner's exact contract and prints
+  only the five allowed fields.
+
+## Next (discovered during the P0/product batch)
+- Add `TMDB_API_KEY` to CI secrets → converts the three preview-gate GAPs
+  (GotG cast membership, supernatural keyword exclusion grounding, Nolan
+  director credit) to PROVEN/REFUTED.
+- Expose a sanitized candidate-keywords receipt from `/api/ask` or
+  `/api/title-meta` so keyword-level EXCLUSIONS (e.g. "no supernatural") are
+  world-provable.
+- Live TV source runtime gaps: `diagnoseMoviesEmpty` now NAMES movie listings
+  hidden by a missing runtime (`unprovable-now`); consider a runtime fallback
+  at ingest so currently-running movies are claimable.
+- `src/lib/preference/strength.ts` (`dnaStrength(state)`, seven-category
+  StrengthResult) remains unconsumed by any product surface — wire it in or
+  retire it.
+
+## Old Now
 - **Canonical interpretation is wired into `/api/ask` — PR #64,
   `claude/canonical-interpretation`.** The route used to interpret the user's
   sentence and then interpret it AGAIN with a different instrument, and the two
