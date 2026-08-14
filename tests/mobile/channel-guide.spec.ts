@@ -204,11 +204,12 @@ test.describe('ranked by the programme itself', () => {
     const tcm = channels(page).filter({ hasText: /casablanca/i });
     const badge = tcm.getByTestId('score-badge').first();
     await expect(badge).toBeVisible();
-    // "88 fit", not "Your 88": the harness user has rated nothing, so the
-    // baseline wording is the honest one. Either way the number is the
-    // engine's, printed where the reorder happened.
+    // The CANONICAL Verd1ct badge now, not an ad-hoc pill: the number is the
+    // engine's, printed where the reorder happened, and the accessible name
+    // says what it is — a BASELINE Watch Verd1ct score, since the harness
+    // user has rated nothing and "Your" would be a false word.
     await expect(badge).toContainText('88');
-    await expect(badge).toContainText(/fit/i);
+    await expect(badge.locator('button')).toHaveAttribute('aria-label', /Watch Verd1ct score 88, baseline/);
   });
 
   test('unscored rows carry no number — no invented scores', async ({ page }) => {

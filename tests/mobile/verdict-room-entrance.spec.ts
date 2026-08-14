@@ -89,7 +89,11 @@ test('Quick Pick never invokes the invitation flow — no room, no code', async 
   // Quick Pick discloses the on-device planner in place and nothing else.
   await page.getByTestId('open-device').click();
   await expect(page.getByText('Quick, private juries stored just on this phone', { exact: false })).toBeVisible();
-  await expect(page.getByRole('alert')).toHaveCount(0);
+  // The ROOM's own error slot stays empty — if Quick Pick had reached the
+  // create RPC, the sessionless harness would surface its failure here.
+  // (Scoped to the entrance's error: other harness widgets have their own
+  // alerts that are not evidence about room creation.)
+  await expect(page.getByTestId('room-error')).toHaveCount(0);
   expect(page.url()).not.toContain('/court/');
 });
 

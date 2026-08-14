@@ -119,7 +119,7 @@ export function VerdictRoomEntrance() {
               />
             </div>
             {error && (
-              <p role="alert" className="mt-3 text-sm font-semibold text-red-300">
+              <p role="alert" data-testid="room-error" className="mt-3 text-sm font-semibold text-red-300">
                 {error}
               </p>
             )}
