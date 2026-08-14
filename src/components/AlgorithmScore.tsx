@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
-import { Verd1ctBadge, verd1ctBadgeHeight } from './Verd1ctBadge';
+import { Verd1ctBadge, Verd1ctBadgePlaceholder } from './Verd1ctBadge';
 import { CardRatings } from './CardRatings';
 
 /**
@@ -68,17 +68,9 @@ export function AlgorithmScore({
         {(() => {
           const px = compact ? 38 : 42;
           if (score != null) return <Verd1ctBadge score={score} px={px} />;
-          // THE PLACEHOLDER IS THE BADGE'S REAL HEIGHT, antennas and feet
-          // included — sized to `px` alone it is 17px short, and every card in
-          // the grid grew by that the moment a score landed.
-          return (
-            <span
-              className="grid flex-none place-items-center rounded-[24%] bg-white/10 text-xl font-black text-slate-400"
-              style={{ width: px, height: verd1ctBadgeHeight(px) }}
-            >
-              —
-            </span>
-          );
+          // The canonical missing state, at the badge's REAL height (antennas
+          // and feet included) so the card never grows when a score lands.
+          return <Verd1ctBadgePlaceholder px={px} />;
         })()}
         {/* THE LABEL GOES ABOVE THE CALL, NOT UNDER IT.
             "STREAM IT" on its own is an instruction, and it sat directly above

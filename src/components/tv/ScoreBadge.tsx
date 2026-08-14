@@ -1,28 +1,25 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Verd1ctBadge } from '@/components/Verd1ctBadge';
 
 /**
- * THE ONE SCORE BADGE. The guide previously printed the same number three
- * ways — "Your 93" in a channel header, a bare "93" on a schedule row, a
- * different pill on the highlight cards — and three renderings of one claim
- * read as three different claims. This is the single component now; `size`
- * changes geometry only, never meaning.
+ * THE GUIDE'S SCORE IS THE CANONICAL SCORE, DRAWN BY THE CANONICAL COMPONENT.
  *
- * TWO HONEST MODES, visually distinct so one is never mistaken for the other:
+ * This used to render its own "Your 93" / "93 fit" text pill — the same
+ * Watch Verd1ct number every card shows, wearing a third costume. The number
+ * itself comes from the SAME deterministic engine as every card
+ * (`scoreGuideAirings` — see the tv page), so the rendering now REUSES
+ * `Verd1ctBadge`, the one official score mark, at guide scale (`tv={false}`
+ * — the screen without the antennas, so a dense channel row keeps its
+ * height). No score math changes here; the number passes through untouched.
  *
- *   personalized — "Your 93", pink, the deterministic engine run against THIS
- *   user's own rules. Only rendered once the user has rated enough titles for
- *   "your" to be a true word (`DNA_PERSONAL_MIN` — the same floor every other
- *   personal claim in the app uses).
- *
- *   baseline — "93 fit", neutral slate. The same engine with starter rules; an
- *   honest community/quality number that has not learned this user yet. The
- *   tooltip and popover say exactly that.
- *
- * WHY, ON TAP. A score you can't interrogate is an assertion; the popover
- * shows the engine's own working (base quality + the adjustments that moved
- * this title), passed in from the server — never recomputed or invented here.
+ * What this wrapper adds — and all it adds — is the guide's interrogation
+ * layer: the tap-for-why popover carrying the engine's own one-line working,
+ * and the honesty split between "scored against YOUR taste" and "baseline —
+ * we haven't learned you yet" (gated by the same DNA_PERSONAL_MIN floor as
+ * every personal claim). The accessible name states what the number IS:
+ * a Watch Verd1ct score.
  */
 export function ScoreBadge({
   score,
@@ -49,14 +46,10 @@ export function ScoreBadge({
     return () => document.removeEventListener('pointerdown', onDoc);
   }, [open]);
 
-  const label = personalized ? `Your ${score}` : `${score} fit`;
   const meaning = personalized
-    ? 'Scored by the VERD1CT engine against your own taste rules.'
-    : 'A baseline fit score — we haven’t learned your taste yet. Rate 10 titles to make this yours.';
-  const tone = personalized
-    ? 'border-[#ff1493]/50 bg-[#ff1493]/15 text-pink-100'
-    : 'border-white/20 bg-white/[0.07] text-slate-300';
-  const pad = size === 'sm' ? 'px-1 text-[10px]' : 'px-1.5 py-0.5 text-[11px]';
+    ? 'Your Watch Verd1ct score — the VERD1CT engine run against your own taste rules.'
+    : 'A baseline Watch Verd1ct score — we haven’t learned your taste yet. Rate 10 titles to make this yours.';
+  const px = size === 'sm' ? 20 : 28;
 
   return (
     <span ref={ref} className="relative inline-flex" data-testid="score-badge">
@@ -64,11 +57,11 @@ export function ScoreBadge({
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-label={`${label} — what drove this score`}
+        aria-label={`Watch Verd1ct score ${score}${personalized ? ', scored for your taste' : ', baseline'} — what drove this score`}
         title={meaning}
-        className={`rounded-md border font-black tabular-nums transition hover:brightness-125 ${tone} ${pad}`}
+        className="inline-flex items-center transition hover:brightness-125"
       >
-        {label}
+        <Verd1ctBadge score={score} px={px} tv={false} title={meaning} />
       </button>
       {open && (
         <span
@@ -76,7 +69,9 @@ export function ScoreBadge({
           data-testid="score-why"
           className="absolute left-0 top-[calc(100%+0.375rem)] z-30 w-56 rounded-xl border border-white/15 bg-ink-950 p-2.5 text-left shadow-[0_12px_36px_-8px_rgba(0,0,0,0.9)]"
         >
-          <span className="block text-[11px] font-bold text-white">{label}</span>
+          <span className="block text-[11px] font-bold text-white">
+            {personalized ? `Your Watch Verd1ct: ${score}` : `Watch Verd1ct: ${score} (baseline)`}
+          </span>
           <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">{meaning}</span>
           {why && <span className="mt-1.5 block border-t border-white/10 pt-1.5 text-[11px] leading-snug text-slate-300">{why}</span>}
         </span>

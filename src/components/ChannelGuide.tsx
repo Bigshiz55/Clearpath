@@ -22,6 +22,7 @@ import { displayClock } from '@/lib/viewing/clock';
 import { setTvReminder } from '@/lib/actions/tvReminders';
 import { addToWatchlist } from '@/lib/actions/watchlist';
 import { ScoreBadge } from '@/components/tv/ScoreBadge';
+import { Verd1ctBadgePlaceholder } from '@/components/Verd1ctBadge';
 import type { Airing } from '@/lib/onTv';
 import { NetworkChip } from '@/components/media/ProviderChip';
 
@@ -377,10 +378,16 @@ export function ChannelGuide({
                         <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400" data-testid="guide-paid">
                           Paid programming
                         </span>
+                      ) : r.onNow.match != null ? (
+                        <ScoreBadge score={r.onNow.match} personalized={personalized} why={r.onNow.matchWhy ?? null} />
                       ) : (
-                        r.onNow.match != null && (
-                          <ScoreBadge score={r.onNow.match} personalized={personalized} why={r.onNow.matchWhy ?? null} />
-                        )
+                        /* The CANONICAL missing state — scoring targets what's
+                           on now first, so an unscored on-now really is a
+                           missing score, said the same way every card says it.
+                           (Up-next rows stay unmarked: only a bounded head of
+                           the window is scored BY DESIGN, and marking design
+                           as absence would be a false report.) */
+                        <Verd1ctBadgePlaceholder px={28} tv={false} className="flex-none self-center" />
                       )}
                     </div>
                     {/* Episode title / case name — the only way to tell one

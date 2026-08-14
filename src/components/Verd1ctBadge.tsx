@@ -14,6 +14,34 @@ export function verd1ctBadgeHeight(px: number, tv = true): number {
   return (tv ? Math.round(px * 0.32) : 0) + px + (tv ? Math.round(px * 0.14) : 0);
 }
 
+/**
+ * THE CANONICAL MISSING-SCORE STATE — one owner, every surface. This lived as
+ * inline markup in AlgorithmScore; the moment a second surface (the Live TV
+ * guide) needed the same "no score yet" rendering, copying that markup would
+ * have forked the meaning. Sized to the badge's REAL height so a layout never
+ * shifts when a score lands.
+ */
+export function Verd1ctBadgePlaceholder({
+  px = 44,
+  tv = true,
+  className = '',
+}: {
+  px?: number;
+  tv?: boolean;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`grid flex-none place-items-center rounded-[24%] bg-white/10 font-black text-slate-400 ${className}`}
+      style={{ width: px, height: verd1ctBadgeHeight(px, tv), fontSize: Math.round(px * 0.5) }}
+      title="No Watch Verd1ct score yet"
+      aria-label="Watch Verd1ct score not available yet"
+    >
+      —
+    </span>
+  );
+}
+
 export function Verd1ctBadge({
   score,
   px = 44,
