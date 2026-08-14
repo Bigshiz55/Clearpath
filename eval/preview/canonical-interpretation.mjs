@@ -59,7 +59,7 @@ import {
   requestedCount,
   subjectIs,
 } from './receipt.mjs';
-import { castFact, foldFacts, genreFact, resolvePersonId, subjectFact } from './world.mjs';
+import { castFact, foldFacts, genreFact, metaFor, resolvePersonId, subjectFact } from './world.mjs';
 import { diedAt, funnelStages, renderFunnel } from './funnel.mjs';
 
 const BASE_URL = process.env.BASE_URL;
@@ -513,6 +513,83 @@ async function main() {
   const criticKind = critic.body.kind ?? 'items';
   check('critic', 'receipt', 'answered as a comparison or a clarification', ['clarify', 'ruling', 'verdict', 'items'].includes(criticKind), `kind=${criticKind}`);
   check('critic', 'world', 'did not answer with an empty generic response', criticKind === 'clarify' || titles(critic.body).length > 0);
+
+  console.log('\n── CASE 6: person + subject — neither consumes the other ──');
+  const hanks = await ask('a Tom Hanks courtroom movie');
+  check('hanks', 'receipt', 'Hanks survives as a cast constraint (id 31)', hasCastId(hanks.body, 31), describeQuery(hanks.body));
+  check('hanks', 'receipt', 'courtroom survives as the strict subject', subjectIs(hanks.body, 'courtroom'), describeQuery(hanks.body));
+  {
+    const surface = JSON.stringify([hanks.body.query?.subjectCanonical, hanks.body.query?.subjectLabel, hanks.body.query?.subjectLexemes]).toLowerCase();
+    check('hanks', 'receipt', 'no hanks-derived subject', !surface.includes('hanks'));
+  }
+  const stbox = await ask('a Sylvester Stallone boxing movie');
+  check('stbox', 'receipt', 'Stallone is the cast constraint', hasCastId(stbox.body, TMDB_PERSON.SYLVESTER_STALLONE), describeQuery(stbox.body));
+  check('stbox', 'receipt', 'boxing survives as the subject', subjectIs(stbox.body, 'boxing'), describeQuery(stbox.body));
+
+  console.log('\n── CASE 7: a requested title is a LOOKUP ──────────────────');
+  const lego = await ask('Show me The Lego Movie');
+  const legoKind = lego.body.kind ?? '?';
+  check('lego', 'receipt', 'answered as a title lookup, not a search', legoKind === 'title', `kind=${legoKind}`);
+  check('lego', 'receipt', 'the looked-up work is the requested one', /lego movie/i.test(JSON.stringify(lego.body)), 'response names the title');
+  {
+    const surface = JSON.stringify([lego.body.query?.subjectCanonical, lego.body.query?.subjectLexemes, lego.body.query?.castIds]).toLowerCase();
+    check('lego', 'receipt', 'no lego person and no lego subject', !surface.includes('lego'));
+  }
+
+  console.log('\n── CASE 8: capitalised description stays description ──────');
+  const horror = await ask('Show me A Horror Movie');
+  check('descHorror', 'receipt', 'a recommendation, NOT a title lookup', horror.body.kind === 'search', `kind=${horror.body.kind}`);
+  check('descHorror', 'receipt', 'the horror constraint survives', hasGenreId(horror.body, 27), describeQuery(horror.body));
+  const boxCap = await ask('Show me A Boxing Movie');
+  check('descBoxing', 'receipt', 'a recommendation, NOT a title lookup', boxCap.body.kind === 'search', `kind=${boxCap.body.kind}`);
+  check('descBoxing', 'receipt', 'the boxing subject survives', subjectIs(boxCap.body, 'boxing'), describeQuery(boxCap.body));
+
+  console.log('\n── CASE 9: tone reaches real execution ────────────────────');
+  const funny = await ask('Give me a funny movie');
+  check('funny', 'receipt', 'funny executes as the Comedy genre (35)', hasGenreId(funny.body, 35), describeQuery(funny.body));
+  check('funny', 'world', 'returned candidates', titles(funny.body).length > 0);
+  {
+    const facts = [];
+    for (const i of sample(funny.body)) facts.push(await genreFact(BASE_URL, evidenceHeaders(), i, 'Comedy'));
+    checkFold('funny', 'candidates really are comedies (first sample)', foldFacts(facts), facts.length === 0 ? 'no candidates to verify' : undefined);
+  }
+
+  console.log('\n── CASE 10: media polarity ────────────────────────────────');
+  const noTv = await ask('Give me movies but no TV shows');
+  check('polarity', 'receipt', 'the medium is MOVIE — the veto is not a presence signal', mediaTypeIs(noTv.body, 'movie'), describeQuery(noTv.body));
+  check('polarity', 'world', 'every returned item is a movie', items(noTv.body).length === 0 || items(noTv.body).every((i) => i.mediaType === 'movie'), JSON.stringify(items(noTv.body).map((i) => i.mediaType)));
+
+  console.log('\n── CASE 11: canonical origin / language / audio ───────────');
+  const kdub = await ask('Give me a Korean movie dubbed in English');
+  check('kdub', 'receipt', 'origin KR reaches the query', JSON.stringify(kdub.body.query?.originCountries ?? []).includes('KR'), describeQuery(kdub.body));
+  check('kdub', 'receipt', 'original language ko reaches the query', JSON.stringify(kdub.body.query?.originalLanguages ?? []).includes('ko'));
+  check('kdub', 'receipt', 'English-dub strictness survives', kdub.body.query?.englishDubOnly === true);
+  check('kdub', 'receipt', '"Korean" never became a person', !(kdub.body.query?.castIds?.length), JSON.stringify(kdub.body.query?.castIds ?? []));
+  {
+    const facts = [];
+    for (const i of sample(kdub.body)) {
+      const meta = await metaFor(BASE_URL, evidenceHeaders(), i);
+      if (!meta) facts.push({ verdict: 'UNPROVABLE', why: `no metadata for "${i.title}"` });
+      else if (meta.originalLanguage === 'ko') facts.push({ verdict: 'PROVEN', why: `"${i.title}" originalLanguage=ko` });
+      else facts.push({ verdict: 'REFUTED', why: `"${i.title}" originalLanguage=${meta.originalLanguage}` });
+    }
+    checkFold('kdub', 'candidates really are Korean-language titles', foldFacts(facts), facts.length === 0 ? 'no candidates to verify' : undefined);
+  }
+
+  console.log('\n── CASE 12: the credit role is typed — director vs actor ──');
+  const nolanId = (await resolvePersonId(BASE_URL, evidenceHeaders(), 'Christopher Nolan')) ?? 525;
+  const directed = await ask('movies directed by Christopher Nolan');
+  const directedPeople = directed.body.query?.people ?? [];
+  check('director', 'receipt', 'the constraint is a typed DIRECTOR role', directedPeople.some((p) => p.personId === nolanId && p.role === 'director'), JSON.stringify(directedPeople));
+  check('director', 'receipt', 'a director ask never becomes with_cast', !(directed.body.query?.castIds?.length), JSON.stringify(directed.body.query?.castIds ?? []));
+  const withNolan = await ask('movies with Christopher Nolan');
+  check('director', 'receipt', 'the actor phrasing keeps actor semantics', hasCastId(withNolan.body, nolanId), describeQuery(withNolan.body));
+  check('director', 'receipt', 'director and actor asks are NOT the same retrieval constraint', JSON.stringify(directed.body.query) !== JSON.stringify(withNolan.body.query));
+  {
+    const facts = [];
+    for (const i of sample(directed.body)) facts.push(await castFact(BASE_URL, evidenceHeaders(), i, nolanId, 'Christopher Nolan'));
+    checkFold('director', 'returned titles really carry the Nolan credit', foldFacts(facts), facts.length === 0 ? 'no candidates to verify' : undefined);
+  }
 
   // ── VERDICT ──────────────────────────────────────────────────────────────
   const failed = results.filter((r) => !r.ok);

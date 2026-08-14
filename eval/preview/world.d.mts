@@ -8,6 +8,7 @@ export interface WorldItem { id: number; mediaType: string; title: string }
  *  subject proof needs no id, because it asks the deployment nothing. */
 export interface SubjectCandidate { title?: string; subjectEvidence?: Record<string, unknown> }
 export declare function subjectFact(item: SubjectCandidate, expectedSubject: string): Fact;
+export declare function metaFor(baseUrl: string, headers: Record<string, string>, item: WorldItem): Promise<Record<string, unknown> | null>;
 export declare function genresFor(baseUrl: string, headers: Record<string, string>, item: WorldItem): Promise<string[] | null>;
 export declare function genreFact(baseUrl: string, headers: Record<string, string>, item: WorldItem, genreName: string): Promise<Fact>;
 export declare function topBilledFor(baseUrl: string, headers: Record<string, string>, item: WorldItem): Promise<{ id: number; name: string; knownFor?: string }[] | null>;

@@ -93,6 +93,15 @@ export async function genresFor(baseUrl, headers, item) {
   return Array.isArray(genres) ? genres : null;
 }
 
+/** The deployment's own lite metadata record for a title (genres, year,
+ *  originalLanguage, …) — the same route the genre facts read. Null when the
+ *  route could not answer, which is UNPROVABLE, not false. */
+export async function metaFor(baseUrl, headers, item) {
+  const type = item.mediaType === 'tv' ? 'tv' : 'movie';
+  const body = await getJson(baseUrl, `/api/title-meta?type=${type}&id=${item.id}`, headers);
+  return body?.meta ?? null;
+}
+
 /** This candidate really carries the named genre. */
 export async function genreFact(baseUrl, headers, item, genreName) {
   const genres = await genresFor(baseUrl, headers, item);
