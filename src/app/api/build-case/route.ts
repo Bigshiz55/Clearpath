@@ -5,7 +5,7 @@ import { serverEnv } from '@/lib/env';
 import { DIMENSIONS, DIMENSION_KEYS } from '@/lib/scoring/dimensions';
 import { searchTitles } from '@/lib/tmdb/client';
 import { rateQuizTitle } from '@/lib/actions/quiz';
-import { wantsTitleResults } from '@/lib/nlu/requestIntent';
+import { canonicalRequestRoute } from '@/lib/nlu/requestRoute';
 import {
   detectAiringHorizon,
   detectTemporalHorizon,
@@ -305,9 +305,16 @@ export async function POST(request: Request) {
     // The two tests live in lib/nlu/requestIntent.ts so they can be unit-tested
     // — see that module for the "boxing movies I would like" regression that
     // motivated pulling them out of here.
-    if (wantsTitleResults(text)) {
-      const redirect = `/app/finder?q=${encodeURIComponent(text.slice(0, 200))}&run=1`;
-      await logCase('find', redirect, { axes: parsed.axes.length });
+    // ONE SHARED DECISION, server and client. `canonicalRequestRoute` keeps
+    // `wantsTitleResults` as its primary gate and adds the cases it could not
+    // see — a stated COUNT or a PERSON qualifying a media noun. Those were the
+    // live defect: "3 Sylvester Stallone movies" failed this gate, so no
+    // redirect came back and the box fell through to the generic Watch Now
+    // feed with the person and the count discarded.
+    const route = canonicalRequestRoute(text);
+    if (route.kind === 'request') {
+      const redirect = route.href;
+      await logCase('find', redirect, { axes: parsed.axes.length, count: route.count, personalized: route.personalized });
       return NextResponse.json({
         ok: true,
         learned,

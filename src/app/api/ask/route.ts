@@ -5,8 +5,11 @@ import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY, parseTopicTerms, extractExcludedPerson } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
-import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
+import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
+import { interpret } from '@/lib/interpret/interpret';
+import { resolveCanonicalExecution } from '@/lib/ask/canonicalExecution';
 import { augmentInternational } from '@/lib/askInternational';
+import type { ConsumedEntity } from '@/lib/nlu/consumedEntities';
 import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
 import { routeAsk } from '@/lib/critic/gate';
@@ -36,6 +39,8 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { serverEnv } from '@/lib/env';
 import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBridge';
+import { planPersonConstraint, type PersonPlan } from '@/lib/people/constraint';
+import { requestedCreditRole } from '@/lib/nlu/creditRole';
 
 /**
  * "Something like X" is best served by TMDB-similar ONLY when the reference is
@@ -294,6 +299,19 @@ export async function POST(req: Request) {
     // matter what happens to share the name.
     const lex = text.trim() ? lexicalIntent(text) : null;
 
+    // 0.62) INTERPRETATION PRECEDES MODE SELECTION.
+    //
+    // The canonical reading of the sentence is computed here — BEFORE any
+    // serving-mode branch — because serving mode may choose WHO executes a
+    // request, never WHAT it means. Before this ordering, `anthropic` mode
+    // returned a finished answer from the orchestrator without the canonical
+    // interpreter ever running, and read the count off the whole utterance:
+    // the same sentence meant different things under different deployment
+    // variables. The interpreter is pure and environment-blind (its own
+    // tests grep for env reads), so this single reading is what every mode
+    // downstream executes.
+    const canonical = text.trim() ? interpret(text) : null;
+
     // 0.65) THE COMPARATIVE INTENT BOUNDARY.
     //
     // UNDERSTANDING WHAT WAS ASKED PRECEDES CHOOSING WHO ANSWERS IT. This runs
@@ -321,7 +339,13 @@ export async function POST(req: Request) {
     //
     // Comparatives are NOT its to answer — that is `askDecision` above, and the
     // guard restates it here so the branch is self-explaining at the call site.
-    if (aiMode === 'anthropic' && !conversational && text.trim() && !criticRequest) {
+    // A request the canonical layer RECOGNISES — a recommendation or a title
+    // lookup — takes the canonical pipeline in every mode; the orchestrator
+    // may only be handed language the interpreter does not recognise as an
+    // executable request. Anything else lets a deployment variable change
+    // what the same sentence means.
+    const canonicalRecognises = canonical !== null && canonical.kind !== 'statement';
+    if (aiMode === 'anthropic' && !conversational && text.trim() && !criticRequest && !canonicalRecognises) {
       const ai = await runAiDiscovery({ supabase, userId: user.id, text, route: 'ask', limit: parseRequestedCount(text) });
       if (ai.kind === 'clarify') {
         return NextResponse.json({ kind: 'clarify', requestId, clarify: ai.question, options: ai.options, interpretation: ai.interpretation, query: { ...EMPTY_QUERY }, items: [] });
@@ -577,15 +601,38 @@ export async function POST(req: Request) {
     // Mid-conversation this is OFF: once constraints have accumulated, a short
     // follow-up ("Newer.", "Rocky") is a refinement of the case, not a fresh
     // title lookup.
+    /* THE CANONICAL LOOKUP HANDS ITS TITLE TO THE TITLE MACHINERY.
+       interpret() already decided "Show me The Lego Movie" is a LOOKUP and
+       isolated the span. Without the hand-off the legacy gate rejects the
+       phrasing ("show me" is on looksLikeTitleAsk's stoplist), the ask falls
+       through to discovery, and the title's own words come back as a person
+       or a subject — the measured live failure. */
+    const canonicalRequestedTitle =
+      canonical?.kind === 'lookup'
+        ? canonical.titles.find((t) => t.relation === 'requested')?.span ?? null
+        : null;
     if (text.trim() && cls?.mode !== 'similar_to' && !lex && !(conversational && prevHadConstraints)) {
-      const titled = await askJudgeTitle(supabase, user.id, text, cls ?? undefined);
+      const titled = await askJudgeTitle(supabase, user.id, text, cls ?? undefined, canonicalRequestedTitle);
       if (titled) return NextResponse.json(withConv({ kind: 'title', ...titled }));
     }
 
     // 2a) CONVERSATION-DRIVEN DISCOVERY — the canonical state IS the query.
     // Deterministic by design: no LLM parse of the raw sentence; the state the
     // user can see as chips is exactly what runs.
-    if (conversational && convState) {
+    /*
+     * A FIRST TURN IS A FRESH SENTENCE, AND THE CANONICAL DOOR OWNS FRESH
+     * SENTENCES. The real UI sends `conversation` on EVERY request, so this
+     * arm — whose own turn parser is a THIRD reader of the raw utterance —
+     * was answering the original incident's exact ask from the browser while
+     * the canonical pipeline answered it for bare API calls: "3 Sylvester
+     * Stallone movies" typed into the product lost its person again
+     * (measured: castIds undefined on the page's own POST). The serving arm
+     * may not depend on which client asked. A conversation with NO prior
+     * constraints and an utterance the canonical layer recognises falls
+     * through to the canonical pipeline; the merged conversation state still
+     * rides back on withConv, so follow-up refinements keep their behavior.
+     */
+    if (conversational && convState && (prevHadConstraints || !canonicalRecognises)) {
       const s = convState;
       const limitConv = text ? parseRequestedCount(text) : DEFAULT_RESULT_LIMIT;
       // Hard constraints that the similarity path cannot enforce.
@@ -779,21 +826,73 @@ export async function POST(req: Request) {
       }
     }
 
-    if (ai) {
+    /*
+     * ── THE CANONICAL PATH OWNS THE LANGUAGE ────────────────────────────
+     *
+     * One interpretation, not two. `interpret()` has already decided which
+     * words are the request and which are background, so on this path the
+     * PERSON, the COUNT and the SUBJECT are read from `CanonicalIntent` and the
+     * three full-utterance re-parsers below are not called at all.
+     *
+     * The defect that forced this: the deployed route interpreted the sentence
+     * twice and the readings disagreed. `applyRequiredSubject(query, text)`
+     * re-read "Give me a Stallone movie", `detectGeneralSubject` took the word
+     * before the media noun, and the actor's surname became a STRICT SUBJECT —
+     * "show only titles where *stallone* is genuinely central". No film is about
+     * an actor, so eligibility rejected every candidate and the live gate saw 0
+     * titles. Separately `resolvePersonId(text)` sent TMDB the string
+     * "watched yesterday stallone", the anecdote's residue glued to the name.
+     *
+     * Everything NOT owned by the canonical layer — international origin, the
+     * deterministic year/genre overlay, provider lexemes, watchers, ranking —
+     * is untouched and still built exactly as before. This step removes the
+     * duplicated language decisions; it does not rewrite the engine underneath.
+     */
+    // (`canonical` was computed at 0.62, before any serving-mode branch.)
+    const canonicalOwnsLanguage = canonical !== null && canonical.kind === 'recommendation';
+
+    if (canonicalOwnsLanguage) {
+      /*
+       * THE CANONICAL ARM STARTS EMPTY — no whole-utterance base to patch.
+       *
+       * The previous shape took the LLM/naive parse of the WHOLE SENTENCE as
+       * the base query and overwrote person/subject/count from the canonical
+       * reading. Every field the overwrite missed was a side door: measured,
+       * "I watched a horror movie yesterday. Give me a courtroom movie."
+       * executed with the anecdote's horror in `genreIds`, a background year
+       * landed in `minYear`, background TV moved `mediaType`. The burrito
+       * defect, one field over.
+       *
+       * So on this arm the query is BUILT from CanonicalIntent + world
+       * resolution (below, `resolveCanonicalExecution`) and from nothing
+       * else. The count is the request clause's; an unsaid count stays
+       * unsaid and the shared default applies.
+       */
+      query = { ...EMPTY_QUERY };
+      limit = canonical.requestedCount ?? DEFAULT_RESULT_LIMIT;
+    } else if (ai) {
       query = ai.query;
       limit = ai.limit;
     } else {
       query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
-      if (text) limit = parseRequestedCount(text);
+      // The arm already excludes the canonical path; the guard restates it so
+      // the fence is visible at the call site itself.
+      if (text && !canonicalOwnsLanguage) limit = parseRequestedCount(text);
     }
     // Foreign-origin / English-audio / runtime augmentation (deterministic; the
     // parser paths don't extract these) — restricts the pool to the real origin.
-    query = augmentInternational(query, text);
+    // LEGACY ARM ONLY here: the canonical arm applies the origin/audio overlay
+    // after its query is built, with the canonical-owned fields protected.
+    if (!canonicalOwnsLanguage) {
+      query = augmentInternational(query, text);
+    }
     // DETERMINISTIC CONSTRAINT OVERLAY. Stated years and genre exclusions are
     // facts of the sentence, not judgment calls — when the LLM parse dropped
     // one ("after 2020" arriving with no year bound), the regex parser's
-    // reading fills the gap. Overlay only, never override.
-    if (text.trim()) {
+    // reading fills the gap. Overlay only, never override. LEGACY ARM ONLY:
+    // on the canonical arm dates and genres are the interpreter's to state,
+    // and this overlay reads the whole utterance — anecdote included.
+    if (text.trim() && !canonicalOwnsLanguage) {
       const det = naiveParseQuery(text);
       if (det.minYear != null && query.minYear == null) query.minYear = det.minYear;
       if (det.maxYear != null && query.maxYear == null) query.maxYear = det.maxYear;
@@ -814,7 +913,8 @@ export async function POST(req: Request) {
       // the subject itself and answered with generic action. Keep only the
       // genres the sentence actually states whenever a subject keyword is
       // present; the subject is the request.
-      if ((query.keywordIds?.length ?? 0) > 0 || parseTopicTerms(text).length > 0) {
+      const statedTopics = parseTopicTerms(text);
+      if ((query.keywordIds?.length ?? 0) > 0 || statedTopics.length > 0) {
         const stated = new Set(det.genreIds);
         if (query.genreIds.length > 0) query.genreIds = query.genreIds.filter((g) => stated.has(g));
       }
@@ -826,7 +926,10 @@ export async function POST(req: Request) {
     // deterministically every time. Resolved through the same `searchKeywords`
     // the AI path uses. Best-effort: an unresolved term is skipped, never
     // guessed.
-    if (text) {
+    // LEGACY ARM ONLY: `parseTopicTerms` reads the whole utterance, so on the
+    // canonical arm it would hand the anecdote's nouns to keyword resolution —
+    // the canonical subject already reached the query through the interpreter.
+    if (text && !canonicalOwnsLanguage) {
       const topics = parseTopicTerms(text);
       if (topics.length) {
         const ids = await searchKeywords(topics).catch(() => []);
@@ -842,14 +945,93 @@ export async function POST(req: Request) {
       if (!query.monetization) query.monetization = 'flatrate|free|ads';
     }
 
-    // Guarantee the actor filter regardless of AI: if a person is named and not
-    // already resolved, look them up (fuzzy, so misspellings still match).
-    if (text && (!query.castIds || query.castIds.length === 0) && !lex) {
-      const pid = await resolvePersonId(text);
-      if (pid) {
-        query.castIds = [pid];
-        query.mediaType = 'movie';
+    /*
+     * PERSON + SUBJECT, FROM THE CANONICAL SPANS — WITH THE ENTITY BOUNDARY
+     * ON THE LEGACY ARM.
+     *
+     * On the canonical path `resolveCanonicalExecution` takes the spans the
+     * interpreter emitted and resolves them against the real catalog — never
+     * the raw sentence. A surname that cannot be pinned to one credited person
+     * comes back `ambiguous` and the route asks, because attaching the wrong
+     * human being to someone's evening is worse than a question.
+     *
+     * On the legacy arm (no canonical request — a lookup or a bare statement)
+     * the fuzzy whole-utterance resolver still runs, and EACH ENTITY IT
+     * RESOLVES is recorded so the subject layer cannot read the same
+     * occurrence a second time as a content subject — and the CREDIT ROLE the
+     * sentence asked for travels as a TYPED constraint (the #68 contract):
+     * "directed by Nolan" must never execute as "starring Nolan", and a role
+     * the engine cannot run is refused out loud, never degraded to actor.
+     */
+    const consumedEntities: ConsumedEntity[] = [...(ai?.resolvedPeople ?? [])];
+    let canonicalInterpretation: string[] = [];
+    let canonicalAmbiguity: Awaited<ReturnType<typeof resolveCanonicalExecution>>['ambiguity'] = null;
+    let canonicalExcludedPersonIds: number[] = [];
+    /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see roleNote below. */
+    let refusedRole: Extract<PersonPlan, { kind: 'refuse' }> | null = null;
+    if (canonicalOwnsLanguage) {
+      const exec = await resolveCanonicalExecution(canonical);
+      canonicalAmbiguity = exec.ambiguity;
+      canonicalInterpretation = exec.interpretation;
+      canonicalExcludedPersonIds = exec.excludePersonIds;
+      refusedRole = exec.refusedRole;
+      /*
+       * THE QUERY IS THE EXECUTION OF THE INTENT — wholesale, not a patch.
+       * `exec.query` was built from `CanonicalIntent` (media, genres and
+       * their vetoes, dates, runtime, count) plus world resolution (cast ids,
+       * subject keywords, excluded keywords, provider ids). Nothing read the
+       * raw sentence to build it, so nothing from the anecdote can be inside.
+       */
+      query = { ...exec.query };
+    } else if (text && (!query.castIds || query.castIds.length === 0) && (!query.people || query.people.length === 0) && !lex) {
+      // LEGACY PATH ONLY. Guarantee the person filter regardless of AI: if a
+      // person is named and not already resolved, look them up (fuzzy, so
+      // misspellings still match) — and record what that resolution spent.
+      const person = await resolvePerson(text);
+      if (person) {
+        // The words were spent naming a person either way — the subject layer
+        // may not re-read them even when the role is refused.
+        consumedEntities.push({ spokenAs: person.spokenAs, resolvedName: person.name });
+        /* THE ROLE ARRIVES TYPED. Reading the sentence is `nlu/creditRole`'s
+           job; execution is handed a decision. An unsupported role produces a
+           REFUSAL rather than a query with the person quietly dropped — see
+           `planPersonConstraint`. */
+        const plan = planPersonConstraint(person.id, requestedCreditRole(text) ?? 'actor', 'movie');
+        if (plan.kind === 'apply') {
+          query.people = [plan.constraint];
+          query.mediaType = 'movie';
+          if (plan.constraint.role === 'actor') query.castIds = [person.id];
+        } else {
+          refusedRole = plan;
+        }
       }
+    }
+
+    /* A MEDIA CONTRADICTION is a question too: "no movies and no TV" rules
+       out the whole universe this product can search. */
+    if (canonicalOwnsLanguage && canonical.media === 'none') {
+      return NextResponse.json({
+        kind: 'clarify',
+        requestId,
+        appliedText: text || null,
+        clarify: 'That rules out both movies and TV shows — which did you mean?',
+        options: ['Movies', 'TV shows'],
+        query: { ...EMPTY_QUERY },
+        items: [],
+      });
+    }
+
+    /* A named person we could not pin down is a QUESTION, not a guess. */
+    if (canonicalAmbiguity) {
+      return NextResponse.json({
+        kind: 'clarify',
+        requestId,
+        appliedText: text || null,
+        clarify: `There's more than one ${canonicalAmbiguity.spokenAs}. Which one did you mean?`,
+        options: canonicalAmbiguity.candidates.map((c) => `${c.name}${c.knownFor ? ` — ${c.knownFor}` : ''}`),
+        query: { ...EMPTY_QUERY },
+        items: [],
+      });
     }
 
     const coerceWatcher = (raw: unknown): Watcher | null => {
@@ -870,11 +1052,41 @@ export async function POST(req: Request) {
     // a hard constraint exactly as the Forensic Search does, from the one shared
     // helper — so "a boxing movie" means the same thing on both routes and the
     // subject can never be degraded into genres here either.
-    let askInterpretation: string[] = [];
-    if (text) {
-      const applied = await applyRequiredSubject(query, text);
+    /*
+     * The subject is settled above on the canonical path, so
+     * `applyRequiredSubject` — which exists to extract a subject from raw
+     * English — must not run and re-derive one there. On the legacy arm it
+     * runs behind the ENTITY BOUNDARY: occurrences already spent on a resolved
+     * person are masked, so they cannot come back as a content subject. It is
+     * still the owner for /api/finder and for asks that produced no canonical
+     * request.
+     */
+    let askInterpretation: string[] = canonicalInterpretation;
+    /* SAID OUT LOUD. A refused role that vanished silently would look exactly
+       like a role that was applied, which is the failure mode this whole change
+       exists to end. */
+    const roleNote = refusedRole ? [refusedRole.reason] : [];
+    if (text && !canonicalOwnsLanguage) {
+      const applied = await applyRequiredSubject(query, text, { consumedEntities });
       query = applied.query;
       askInterpretation = applied.interpretation;
+    }
+
+    /* ZERO QUALIFYING RECOMMENDATIONS, NOT A GENERIC LIST WITH A NOTE.
+       Running the query without the person the user named answers a different
+       question, and a disclaimer underneath does not convert it back. The
+       refusal is the whole response, and it is structured so the client can
+       render it as a refusal rather than as an empty result set. */
+    if (refusedRole) {
+      return NextResponse.json({
+        route: '/api/ask',
+        requestId,
+        kind: 'unsupported-role',
+        unsupportedRole: { requested: refusedRole.requested, reason: refusedRole.reason },
+        interpretation: roleNote,
+        query: { ...query },
+        items: [],
+      });
     }
 
     const result = await runFinder(supabase, user.id, query, household && household.length > 0 ? household : watcher, limit);
@@ -888,26 +1100,40 @@ export async function POST(req: Request) {
     // The same excluded-person hard constraint, on the discovery path. Enforced
     // on real credit evidence, only when the ask names someone to rule out; an
     // unverifiable candidate is kept rather than silently emptying the answer.
-    const finderExclName = text ? extractExcludedPerson(text) : null;
-    if (finderExclName) {
-      const pid = (await searchPeople(finderExclName).catch(() => []))[0]?.id ?? null;
-      if (pid != null) {
-        const verdicts = await Promise.all(
-          items.map((i) =>
-            getCredits(i.mediaType === 'tv' ? 'tv' : 'movie', i.id)
-              .then(
-                (c) =>
-                  !c.cast.some((p) => p.id === pid) &&
-                  !c.directors.some((p) => p.id === pid) &&
-                  !c.creators.some((p) => p.id === pid),
-              )
-              .catch(() => true),
-          ),
-        );
-        items = items.filter((_, idx) => verdicts[idx]);
+    // The canonical arm supplies ids the interpreter + world already resolved;
+    // the legacy arm still reads the raw sentence.
+    let excludedPersonIds: number[] = canonicalExcludedPersonIds;
+    if (text && !canonicalOwnsLanguage) {
+      const finderExclName = extractExcludedPerson(text);
+      if (finderExclName) {
+        const pid = (await searchPeople(finderExclName).catch(() => []))[0]?.id ?? null;
+        if (pid != null) excludedPersonIds = [pid];
       }
     }
-    const plan = text.trim() ? buildQueryPlan(text) : null;
+    if (excludedPersonIds.length > 0) {
+      const verdicts = await Promise.all(
+        items.map((i) =>
+          getCredits(i.mediaType === 'tv' ? 'tv' : 'movie', i.id)
+            .then(
+              (c) =>
+                !excludedPersonIds.some(
+                  (pid) =>
+                    c.cast.some((p) => p.id === pid) ||
+                    c.directors.some((p) => p.id === pid) ||
+                    c.creators.some((p) => p.id === pid),
+                ),
+            )
+            .catch(() => true),
+        ),
+      );
+      items = items.filter((_, idx) => verdicts[idx]);
+    }
+    // LEGACY ARM ONLY: the coarse media plan reads the whole utterance; the
+    // canonical arm's medium is already a hard constraint on discovery.
+    let plan: ReturnType<typeof buildQueryPlan> | null = null;
+    if (text.trim() && !canonicalOwnsLanguage) {
+      plan = buildQueryPlan(text);
+    }
     if (plan && plan.mediaTypes.length > 0) {
       items = items.filter((i) => plan.mediaTypes.some((mt) => mediaTypeSatisfies(mt, i.mediaType === 'tv' ? 'tv' : 'movie')));
     }
@@ -941,19 +1167,19 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      {
+      withConv({
         kind: 'search',
         route: '/api/ask',
         requestId,
         appliedText: text || null,
         sha: getBuildInfo().gitSha || 'unknown',
         query,
-        interpretation: askInterpretation,
+        interpretation: [...roleNote, ...askInterpretation],
         diagnostics: result.diagnostics,
         scoredFor: result.scoredFor,
         relaxed: result.relaxed,
         items: items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
-      },
+      }),
       { headers: { 'X-WatchVerd1ct-SHA': getBuildInfo().gitSha || 'unknown' } },
     );
   } catch {

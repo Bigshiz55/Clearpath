@@ -10,6 +10,7 @@ import type {
 } from '@/lib/types';
 import { computeEnglishAvailability } from './meta-helpers';
 import { rankAndLimit } from '@/lib/nlu/titleNormalize';
+import { discoverParamFor, fromCastIds, idsForRole, type PersonConstraint } from '@/lib/people/constraint';
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 export { TMDB_IMAGE_BASE, tmdbImage } from './image';
@@ -341,6 +342,13 @@ export interface DiscoverOptions {
   monetization?: string;
   /** Bias toward titles featuring these TMDB person ids (with_cast). */
   castIds?: number[];
+  /**
+   * Role-aware person constraints. Supersedes `castIds`, which is kept because
+   * several callers legitimately mean "these actors" and rewriting them all
+   * would be a refactor in a defect fix. Both are honoured; `castIds` is read
+   * as `actor`, which is what it has always meant.
+   */
+  people?: readonly PersonConstraint[];
   /** Only titles released up to and including this year. */
   maxYear?: number;
   /** Only titles released in or after this year. */
@@ -401,7 +409,21 @@ export async function discoverTitlesChecked(
   if (opts.minVotes != null) params['vote_count.gte'] = String(opts.minVotes);
   if (opts.minRating != null) params['vote_average.gte'] = String(opts.minRating);
   if (opts.maxRuntime != null) params['with_runtime.lte'] = String(opts.maxRuntime); // movies: feature length · tv: per-episode
-  if (opts.castIds && opts.castIds.length > 0 && mediaType === 'movie') params.with_cast = opts.castIds.join('|'); // OR — any favorite actor
+  /* PERSON CONSTRAINTS CARRY THEIR ROLE ONTO THE WIRE.
+     Before this, every person id — however the request described them — left as
+     `with_cast`, so "directed by Nolan" and "starring Nolan" produced
+     byte-identical queries and the product answered the wrong one. `with_crew`
+     is the retrieval primitive for a director; it is a CREW filter rather than a
+     director filter, so it narrows here and `satisfiesRole` verifies downstream.
+
+     Movie-only, unchanged: `/discover/tv` accepts neither parameter. */
+  if (mediaType === 'movie') {
+    const constraints = [...fromCastIds(opts.castIds), ...(opts.people ?? [])];
+    for (const role of ['actor', 'director'] as const) {
+      const ids = [...new Set(idsForRole(constraints, role))];
+      if (ids.length > 0) params[discoverParamFor(role)] = ids.join('|'); // OR within a role
+    }
+  }
   if (opts.minReleaseDate != null) {
     // Exact calendar boundary — e.g. "the last 20 years" resolves to a real
     // date (2006-08-06 on 2026-08-06), not months×30 which would wrongly drop
@@ -792,9 +814,31 @@ export interface CastCredit {
   profilePath: string | null;
 }
 
+export interface CrewCredit {
+  id: number;
+  name: string;
+  job: string | null;
+  department: string | null;
+}
+
 export interface TitleCredits {
   cast: CastCredit[];
-  /** Movie directors (crew job === Director). */
+  /**
+   * RAW crew credits — id, name, JOB — untruncated. This is the evidence role
+   * verification reads: `satisfiesRole` answers "is this person credited as
+   * the DIRECTOR of this title?" from `crew[].job`, and a summary cannot
+   * stand in for the testimony. `directors` below is a DERIVED display list;
+   * deriving is lossy (it drops the job strings, so a consumer can neither
+   * accept a Co-Director nor reject a Producer), and because `crew` is
+   * optional on the verifier's `CreditsView`, an object without it
+   * TYPE-CHECKS while making every director verification fail. That is not a
+   * hypothetical: "movies directed by Christopher Nolan" retrieved 24 correct
+   * candidates on the live preview and returned zero, because this interface
+   * had no `crew` and the verifier was handed a witness that structurally
+   * could not testify.
+   */
+  crew: CrewCredit[];
+  /** Movie directors (crew job === Director) — display convenience. */
   directors: Array<{ id: number; name: string }>;
   /** TV creators (created_by). */
   creators: Array<{ id: number; name: string }>;
@@ -824,14 +868,18 @@ export async function getCredits(mediaType: MediaType, id: number): Promise<Titl
       character: c.character && c.character.trim() !== '' ? c.character : null,
       profilePath: c.profile_path ?? null,
     }));
+  const crew = (detail.credits?.crew ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    job: c.job ?? null,
+    department: c.department ?? null,
+  }));
   const directors =
     mediaType === 'movie'
-      ? (detail.credits?.crew ?? [])
-          .filter((c) => c.job === 'Director')
-          .map((c) => ({ id: c.id, name: c.name }))
+      ? crew.filter((c) => c.job === 'Director').map((c) => ({ id: c.id, name: c.name }))
       : [];
   const creators = (detail.created_by ?? []).map((c) => ({ id: c.id, name: c.name }));
-  return { cast, directors, creators };
+  return { cast, crew, directors, creators };
 }
 
 export interface NotableCredit {
@@ -1104,6 +1152,9 @@ export interface PersonHit {
   name: string;
   profilePath: string | null;
   knownFor: string; // a couple of recognizable titles, for disambiguation
+  /** TMDB's primary-department attribution ("Directing", "Acting", …) —
+   *  catalog evidence for telling exact-name namesakes apart. */
+  knownForDepartment?: string;
 }
 
 /** Search TMDB people (actors/directors) by name — for the "favorite actors"
@@ -1112,7 +1163,7 @@ export async function searchPeople(query: string): Promise<PersonHit[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   interface KnownFor { title?: string; name?: string }
-  interface Row { id: number; name?: string; profile_path?: string | null; popularity?: number; known_for?: KnownFor[] }
+  interface Row { id: number; name?: string; profile_path?: string | null; popularity?: number; known_for?: KnownFor[]; known_for_department?: string }
   const data = await tmdbFetch<{ results?: Row[] }>('/search/person', { query: q, include_adult: 'false' }).catch(() => ({ results: [] as Row[] }));
   return (data.results ?? [])
     .slice(0, 8)
@@ -1121,7 +1172,20 @@ export async function searchPeople(query: string): Promise<PersonHit[]> {
       name: r.name ?? 'Unknown',
       profilePath: r.profile_path ?? null,
       knownFor: (r.known_for ?? []).map((k) => k.title ?? k.name).filter(Boolean).slice(0, 2).join(', '),
+      knownForDepartment: r.known_for_department,
     }));
+}
+
+/**
+ * The SIZE of a person's filmography — cast plus crew credits, one call.
+ * Catalog evidence for exact-name disambiguation: a public figure carries a
+ * body of work, a namesake stub carries a handful. Never popularity.
+ */
+export async function getPersonCreditCount(personId: number): Promise<number> {
+  const data = await tmdbFetch<TmdbPersonCredits>(`/person/${personId}/combined_credits`, {
+    language: 'en-US',
+  }).catch(() => ({} as TmdbPersonCredits));
+  return (data.cast?.length ?? 0) + (data.crew?.length ?? 0);
 }
 
 /**

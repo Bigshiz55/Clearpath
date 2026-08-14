@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { canonicalRequestRoute } from '@/lib/nlu/requestRoute';
 import { useToast } from '@/components/Toast';
 import { TileIcon, type TileIconName } from '@/components/TileIcon';
 
@@ -91,7 +92,22 @@ export function BuildCaseBox({ hero = false }: { hero?: boolean }) {
         router.push(d.redirect);
       } else {
         toast.show(d.summary ? `⚖️ ${d.summary}` : 'Got it — building your VERDICT DNA. 🧬', 'success');
-        if (!d.stay) router.push('/app/watch');
+        // NEVER SEND RECOMMENDATION LANGUAGE TO THE GENERIC FEED.
+        //
+        // This used to be an unconditional `router.push('/app/watch')` whenever
+        // the server returned no redirect — which is how "3 Sylvester Stallone
+        // movies" produced a feed starting with Cold Case. `/app/watch` cannot
+        // carry a request (its only search param is `type`), so the person, the
+        // count and the constraint were silently dropped.
+        //
+        // The client now asks the SAME shared decision the route asks. If this
+        // is a request it goes to the canonical front door; a server that
+        // failed to route one can no longer be papered over with a feed. A
+        // genuine taste statement still lands on Watch Now, which is the right
+        // destination for "I told you what I like, now show me things".
+        const route = canonicalRequestRoute(t);
+        if (route.kind === 'request') router.push(route.href);
+        else if (!d.stay) router.push('/app/watch');
       }
     } catch {
       toast.show('Could not read that — try again.', 'error');

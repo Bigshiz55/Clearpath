@@ -3,8 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from '@/lib/finder';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
-import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
+import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
+import type { ConsumedEntity } from '@/lib/nlu/consumedEntities';
 import { applyOverrides, sanitizeOverrides } from '@/lib/finderOverrides';
 import { askSimilarTo, extractReference } from '@/lib/askJudge';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
@@ -12,6 +13,8 @@ import { applyRequiredSubject } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
 import { serverEnv } from '@/lib/env';
 import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBridge';
+import { planPersonConstraint, type PersonPlan } from '@/lib/people/constraint';
+import { requestedCreditRole } from '@/lib/nlu/creditRole';
 
 const BUILD_SHA = getBuildInfo().gitSha || 'unknown';
 
@@ -169,12 +172,35 @@ export async function POST(req: Request) {
         query.providerIds = clientProviders;
       }
     }
-    // Guarantee the actor filter regardless of AI (fuzzy, so misspellings match).
-    if (text && (!query.castIds || query.castIds.length === 0)) {
-      const pid = await resolvePersonId(text);
-      if (pid) {
-        query.castIds = [pid];
-        query.mediaType = 'movie';
+    /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see below. */
+    /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see below. */
+    let refusedRole: Extract<PersonPlan, { kind: 'refuse' }> | null = null;
+    /* Guarantee the person filter regardless of AI (fuzzy, so misspellings
+       match) — and record which ENTITY that cost, so the subject layer cannot
+       spend the same occurrence again (the #69 boundary), while carrying the
+       CREDIT ROLE the sentence asked for as a TYPED constraint (the #68
+       contract): "directed by Nolan" must never execute as "starring Nolan",
+       and a role the engine cannot run is refused out loud, never silently
+       degraded to actor. */
+    const consumedEntities: ConsumedEntity[] = [...(ai?.resolvedPeople ?? [])];
+    if (text && (!query.castIds || query.castIds.length === 0) && (!query.people || query.people.length === 0)) {
+      const person = await resolvePerson(text);
+      if (person) {
+        // The words were spent naming a person either way — the subject layer
+        // may not re-read them even when the role is refused.
+        consumedEntities.push({ spokenAs: person.spokenAs, resolvedName: person.name });
+        /* THE ROLE ARRIVES TYPED. Reading the sentence is `nlu/creditRole`'s
+           job; execution is handed a decision. An unsupported role produces a
+           REFUSAL rather than a query with the person quietly dropped — see
+           `planPersonConstraint`. */
+        const plan = planPersonConstraint(person.id, requestedCreditRole(text) ?? 'actor', 'movie');
+        if (plan.kind === 'apply') {
+          query.people = [plan.constraint];
+          query.mediaType = 'movie';
+          if (plan.constraint.role === 'actor') query.castIds = [person.id];
+        } else {
+          refusedRole = plan;
+        }
       }
     }
 
@@ -199,12 +225,32 @@ export async function POST(req: Request) {
     // same thing. Runs on the free text after all other parsing, so it also
     // corrects an AI parse that degraded the subject into genres.
     let interpretation: string[] = [];
+    /* SAID OUT LOUD. A refused role that vanished silently would look exactly
+       like a role that was applied, which is the failure mode this whole change
+       exists to end. */
+    const roleNote = refusedRole ? [refusedRole.reason] : [];
     let subjectCanonical: string | null = null;
     if (text) {
-      const applied = await applyRequiredSubject(query, text);
+      const applied = await applyRequiredSubject(query, text, { consumedEntities });
       query = applied.query;
       interpretation = applied.interpretation;
       subjectCanonical = applied.subject?.canonical ?? null;
+    }
+
+    /* ZERO QUALIFYING RECOMMENDATIONS, NOT A GENERIC LIST WITH A NOTE.
+       Running the query without the person the user named answers a different
+       question, and a disclaimer underneath does not convert it back. The
+       refusal is the whole response, and it is structured so the client can
+       render it as a refusal rather than as an empty result set. */
+    if (refusedRole) {
+      return finderJson({
+        route: '/api/finder',
+        kind: 'unsupported-role',
+        unsupportedRole: { requested: refusedRole.requested, reason: refusedRole.reason },
+        interpretation: roleNote,
+        query: { ...query },
+        items: [],
+      });
     }
 
     const result = await runFinder(supabase, user.id, query, household && household.length > 0 ? household : watcher, limit);
@@ -246,7 +292,7 @@ export async function POST(req: Request) {
     return finderJson({
       route: '/api/finder',
       query,
-      interpretation,
+      interpretation: [...roleNote, ...interpretation],
       constraintReceipt,
       diagnostics: result.diagnostics,
       scoredFor: result.scoredFor,

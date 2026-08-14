@@ -55,7 +55,7 @@ interface Diagnostics {
   requestedCount: number | null;
   candidateCount: number;
   deterministicEligibleCount: number;
-  semanticEvaluatedCount: number;
+  semanticEvaluatedCount: number | null;
   centralSubjectEligibleCount: number;
   qualityEligibleCount: number;
   finalReturnedCount: number;
@@ -367,7 +367,7 @@ export default function SearchProofClient({ pageSha }: { pageSha: string }) {
                 {stat('requested', d.requestedCount, 'what was asked for')}
                 {stat('candidates', d.candidateCount, 'keyword/genre pool')}
                 {stat('deterministic', d.deterministicEligibleCount, 'passed hard filters')}
-                {stat('semantically evaluated', d.semanticEvaluatedCount)}
+                {stat('semantically evaluated', d.semanticEvaluatedCount, d.semanticEvaluatedCount == null ? 'no subject — stage not applicable' : undefined)}
                 {stat('subject-central', d.centralSubjectEligibleCount, 'genuinely eligible')}
                 {stat('quality-eligible', d.qualityEligibleCount)}
                 {stat('final returned', d.finalReturnedCount, 'shown to you')}

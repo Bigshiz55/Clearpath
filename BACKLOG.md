@@ -4,6 +4,30 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **Canonical interpretation is wired into `/api/ask` — PR #64,
+  `claude/canonical-interpretation`.** The route used to interpret the user's
+  sentence and then interpret it AGAIN with a different instrument, and the two
+  readings disagreed. Measured live on the Preview: `Give me a Stallone movie`
+  returned **0 titles**, because `applyRequiredSubject(query, rawText)` re-read
+  the sentence, `detectGeneralSubject` took the word before the media noun, and
+  the actor's surname reached the finder as `subjectStrict` with the lexeme
+  "stallone" — "show only titles where *stallone* is genuinely central". No film
+  is about an actor, so eligibility rejected every candidate. Two more readings
+  of the same sentence: `resolvePersonId(rawText)` sent TMDB the string
+  `"watched yesterday stallone"`, and `parseRequestedCount(rawText)` read
+  "I watched 3 movies yesterday…" as a request for three.
+  Now: `raw → interpret() → CanonicalIntent → entity resolution → FinderQuery`,
+  with the three raw-language re-parsers FENCED off the canonical path (not
+  merely preceded by it) and `src/lib/ask/ownership.test.ts` walking the route's
+  brace structure to keep them out. Identity is earned rather than assumed —
+  a bare surname resolves only when one credited person bears it, otherwise the
+  route asks. Deterministic engine, Critic, ranking, Taste DNA and provider
+  logic untouched; frozen corpus byte-identical to `68a5a93`.
+  **Two sessions converged on this branch concurrently** — the range-based role
+  ownership (`SpanMatch`) is the other session's and supersedes the token-set
+  approach; the adapter, the identity contract, the route wiring and the gate
+  cases are this one's.
+
 - **The Verdict Room — `claude/verdict-room-complete`.** PR #58's entrance
   reconciled onto current `main` and carried through the WHOLE room, so the
   interior no longer collapses back to a stack of `max-w-2xl` cards the moment
@@ -80,6 +104,28 @@ production and apply pending migrations with your `MIGRATE_SECRET` — see the
 unblocks.
 
 ## Next
+- **Credit roles the engine still cannot execute — refused, never degraded.**
+  `people/constraint.ts` supports exactly `actor` and `director`, movie-only.
+  Everything else is refused out loud with a reason that reaches the user's
+  `interpretation`, and `constraint.test.ts` pins that no unsupported role can
+  ever resolve to `actor`. Each of these needs its own change and its own
+  evidence — none may be "enabled" by widening the type:
+  - **`written by` (writer).** TMDB `/discover/movie` has no writer filter;
+    `with_crew` retrieves the person's crew credits and qualification would need
+    `job` in the Writing department. Doable on the same shape as director.
+  - **`created by` (creator).** A TV concept, and `/discover/tv` accepts neither
+    `with_cast` nor `with_crew`, so retrieval has no server-side narrowing at
+    all. Needs a different strategy (person credits first, then filter), not a
+    wider enum.
+  - **TV director, and TV cast.** Same provider limitation as above. `roleSupport`
+    already returns `supported: false` for both; the refusal is the correct
+    behaviour until a retrieval strategy exists.
+  - **`interpret`'s `CreditRole` must adapt onto `PersonRole`, not beside it.**
+    `CanonicalIntent.people[].role` can say `creator`; execution can say two
+    things. When PR #64 is wired, it must pass through `roleSupport` so an
+    unexecutable role is refused rather than silently dropped — and
+    `requestedRoleFor` in `people/constraint.ts` is the reader both should share
+    rather than a third copy.
 - **The 20 pre-existing mobile-suite failures — 8 now fixed, 12 in flight.**
   Independently verified twice: by rebuilding the harness at `0b90f04` with the
   working tree stashed (PR #58's visual pass), and by building `718987e` in a

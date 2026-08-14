@@ -93,6 +93,14 @@ export function normalizeQuery(q: FinderQuery): Record<string, unknown> {
     pace: q.pace ?? null,
     providerIds: sortNums(q.providerIds),
     castIds: sortNums(q.castIds),
+    /* THE ROLE IS PART OF THE CACHE KEY. Without it, "movies with Nolan" and
+       "movies directed by Nolan" would collapse onto the same entry and the
+       second asker would be served the first one's answer — the same
+       substitution this work exists to stop, arriving through the cache
+       instead of through the query. */
+    people: (q.people ?? [])
+      .map((p) => `${p.role}:${p.personId}`)
+      .sort(),
     keywordIds: sortNums(q.keywordIds),
     minYear: q.minYear ?? null,
     maxYear: q.maxYear ?? null,

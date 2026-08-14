@@ -358,12 +358,19 @@ export async function askJudgeTitle(
   userId: string,
   text: string,
   cls?: SearchClassification,
+  /** A title span the CANONICAL interpreter already isolated ("The Lego
+   *  Movie" out of "Show me The Lego Movie"). It bypasses looksLikeTitleAsk —
+   *  whose request-frame words ("show me") reject exactly these asks — and
+   *  the classifier's own extraction, which strips the media noun and turns
+   *  the name into "The Lego". The interpreter's reading is the evidence;
+   *  this function only takes it to the catalog. */
+  requestedOverride?: string | null,
 ): Promise<{ verdict: TitleVerdict; alternatives: AltItem[] } | null> {
-  if (!looksLikeTitleAsk(text)) return null;
+  if (!requestedOverride && !looksLikeTitleAsk(text)) return null;
   // Classify to isolate the REQUESTED title + provider (so "Gone on BritBox"
   // searches "Gone", not the raw string), then search on the clean title.
   const c = cls ?? classifySearch(text);
-  const requestedTitle = c.requestedTitle ?? cleanTitleText(text);
+  const requestedTitle = requestedOverride ?? c.requestedTitle ?? cleanTitleText(text);
   const cleaned = requestedTitle;
   const results = await searchTitles(cleaned).catch(() => []);
   if (results.length === 0) return null;

@@ -9,6 +9,7 @@ import {
   type SubjectSpec,
 } from '@/lib/nlu/requiredSubject';
 import type { SubjectRequirement } from '@/lib/nlu/semanticEligibility';
+import { maskConsumedEntities, type ConsumedEntity } from '@/lib/nlu/consumedEntities';
 
 /**
  * Turn a named subject into a HARD constraint on a FinderQuery — the shared step
@@ -43,9 +44,31 @@ export interface SubjectApplication {
   requestedCount: number | null;
 }
 
-export async function applyRequiredSubject(query: FinderQuery, text: string): Promise<SubjectApplication> {
+export interface SubjectOptions {
+  /**
+   * Entities resolution already paid for — a person the caller resolved to a
+   * real cast id from THIS sentence, carrying both the user's wording and the
+   * catalog's name. Subject detection does not see those occurrences, so the
+   * same words cannot become a content subject as well. Optional and defaulting
+   * to none, so a caller that resolves no entities behaves exactly as before.
+   * See lib/nlu/consumedEntities.ts.
+   */
+  consumedEntities?: readonly ConsumedEntity[];
+}
+
+export async function applyRequiredSubject(
+  query: FinderQuery,
+  text: string,
+  opts: SubjectOptions = {},
+): Promise<SubjectApplication> {
   const interpretation: string[] = [];
-  const det = detectRequiredSubject(text);
+  /* SUBJECT DETECTION READS THE UNCONSUMED LANGUAGE ONLY.
+     Everything else below still reads the original `text`: the recency
+     boundary, the "made"→released disclosure and the singular-request test are
+     properties of the phrasing, not of the subject, and a resolved name has no
+     bearing on them. */
+  const subjectText = maskConsumedEntities(text, opts.consumedEntities);
+  const det = detectRequiredSubject(subjectText);
   let q: FinderQuery = { ...query };
   // A singular indefinite subject request ("a boxing movie") asks for ONE
   // title. This is a FINAL-selection count, applied after eligibility + ranking
@@ -83,7 +106,7 @@ export async function applyRequiredSubject(query: FinderQuery, text: string): Pr
     // any subject, driven only by the user's own words. Conservative: it fires
     // only on the explicit singular-subject shape, so a genre browse is
     // untouched.
-    const general = detectGeneralSubject(text);
+    const general = detectGeneralSubject(subjectText);
     if (general) {
       const gids = await searchKeywords(general.lexemes.slice(0, 6)).catch(() => []);
       q.subjectLabel = general.label;
