@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { interpret } from './interpret';
+import { classifyClause } from './clauses';
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
@@ -110,4 +111,49 @@ describe('controls — the new rules must not over-reach', () => {
       expect(r.people.map((p) => p.span), `${t} was read as a person`).toEqual([]);
     }
   });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * DEFECT 1B — A TITLE THAT ENDS IN "MOVIE" IS NOT A NOUN PHRASE.
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * The bare noun-phrase rule matches `article + description + movie`. So does
+ * "The Lego Movie". The leading article was claimed as the safety property
+ * that kept titles out; it is not one — it only excludes titles that happen to
+ * lack an article, which is why "Get Out" and "A Few Good Men" passed and gave
+ * false confidence.
+ *
+ * Measured at f7eac49:
+ *   "The Lego Movie"  -> recommendation, subjects ["lego"]
+ *   "A Goofy Movie"   -> recommendation, count 1, subjects ["goofy"]
+ *
+ * Both would execute a content search for a word lifted out of a title. The
+ * canonical layer's own principle applies: a miss should lose a reference
+ * rather than confidently invent one.
+ *
+ * Asserted at BOTH levels, because they can diverge — the clause role is what
+ * the bare rule decides, and the emitted subject is what reaches execution.
+ * Fixing only the second would leave the wrong role in place for the adapter.
+ */
+describe('1b — titles ending in a media noun are not recommendation noun phrases', () => {
+  for (const title of ['The Lego Movie', 'A Goofy Movie']) {
+    it(`"${title}" is not promoted to a request clause`, () => {
+      expect(classifyClause(title), `${title} was classified as an order`).not.toBe('request');
+    });
+
+    it(`"${title}" never yields a subject lifted from its own name`, () => {
+      const r = interpret(title);
+      const subs = r.kind === 'recommendation' ? r.subjects.filter((s) => s.wanted).map((s) => s.span.toLowerCase()) : [];
+      for (const word of title.toLowerCase().replace(/\b(the|a|movie)\b/g, '').trim().split(/\s+/).filter(Boolean)) {
+        expect(subs, `"${word}" was lifted out of the title and made an executable subject`).not.toContain(word);
+      }
+    });
+
+    it(`"${title}" is not relabelled as a person`, () => {
+      const r = interpret(title);
+      const ppl = r.kind === 'recommendation' ? r.people.map((p) => p.span) : [];
+      expect(ppl, `${title} was read as a person`).toEqual([]);
+    });
+  }
 });
