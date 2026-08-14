@@ -57,7 +57,7 @@ vi.mock('@/lib/tmdb/client', () => ({
 import { applyRequiredSubject } from './finderSubject';
 import { EMPTY_QUERY } from './finderParse';
 import { evaluateSubjectCentrality } from '@/lib/nlu/semanticEligibility';
-import { maskConsumedSpans } from '@/lib/nlu/consumedSpans';
+import { maskConsumedEntities } from '@/lib/nlu/consumedEntities';
 import type { FinderQuery } from './finder';
 
 /** The query as /api/ask builds it BEFORE applyRequiredSubject: the person is
@@ -75,7 +75,7 @@ describe('the live zero: a resolved person must not become a strict subject', ()
 
   it('RED — the person survives subject application', async () => {
     const { query } = await applyRequiredSubject({ ...AFTER_PERSON_RESOLUTION }, STALLONE_ASK, {
-      consumedSpans: ['Sylvester Stallone'],
+      consumedEntities: [{ spokenAs: 'watched yesterday stallone', resolvedName: 'Sylvester Stallone' }],
     });
     // Never in dispute — stated so a future change that drops the cast filter
     // to fix the subject collision fails here instead of passing quietly.
@@ -86,7 +86,7 @@ describe('the live zero: a resolved person must not become a strict subject', ()
     const { query, requirement } = await applyRequiredSubject(
       { ...AFTER_PERSON_RESOLUTION },
       STALLONE_ASK,
-      { consumedSpans: ['Sylvester Stallone'] },
+      { consumedEntities: [{ spokenAs: 'watched yesterday stallone', resolvedName: 'Sylvester Stallone' }] },
     );
     expect(query.subjectCanonical).toBeUndefined();
     expect(query.subjectStrict).not.toBe(true);
@@ -146,7 +146,7 @@ describe('the surname family — none of them is a subject', () => {
       const { query, requirement } = await applyRequiredSubject(
         { ...EMPTY_QUERY, mediaType: 'movie', castIds: [1] },
         ask,
-        { consumedSpans: [person] },
+        { consumedEntities: [{ spokenAs: person, resolvedName: person }] },
       );
       expect(query.subjectCanonical).not.toBe(surname);
       expect(query.subjectLexemes ?? []).not.toContain(surname);
@@ -168,7 +168,7 @@ describe('the inverse must keep working — only the person is consumed', () => 
     const { query } = await applyRequiredSubject(
       { ...EMPTY_QUERY, mediaType: 'movie', castIds: [31] },
       'a Tom Hanks courtroom movie',
-      { consumedSpans: ['Tom Hanks'] },
+      { consumedEntities: [{ spokenAs: 'tom hanks courtroom', resolvedName: 'Tom Hanks' }] },
     );
     expect(query.castIds).toEqual([31]);
     expect(query.subjectCanonical).toBe('courtroom');
@@ -179,7 +179,7 @@ describe('the inverse must keep working — only the person is consumed', () => 
     const { query } = await applyRequiredSubject(
       { ...AFTER_PERSON_RESOLUTION },
       'a Stallone boxing movie',
-      { consumedSpans: ['Sylvester Stallone'] },
+      { consumedEntities: [{ spokenAs: 'stallone boxing', resolvedName: 'Sylvester Stallone' }] },
     );
     expect(query.castIds).toEqual([16483]);
     expect(query.subjectCanonical).toBe('boxing');
@@ -196,30 +196,107 @@ describe('the inverse must keep working — only the person is consumed', () => 
   });
 });
 
+describe('REVIEW BLOCKER — the mask must spend an OCCURRENCE, not a vocabulary', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  /* The first implementation tokenised the resolved name and deleted every
+     occurrence of every token across the whole utterance. That is broader than
+     the invariant, which is about the particular words that earned the entity —
+     and it is narrower than the invariant too, because the catalog's spelling
+     is not always the user's. Both directions are wrong, and each has a
+     regression below. */
+
+  it('RED 1 — a fuzzily-spelled person still becomes a subject', async () => {
+    // The resolver promises fuzzy identity: "Stalone" resolves to Sylvester
+    // Stallone. Masking the CATALOG spelling leaves the USER's spelling behind,
+    // so the misspelling walks straight into detectGeneralSubject.
+    const { query, requirement } = await applyRequiredSubject(
+      { ...EMPTY_QUERY, mediaType: 'movie', castIds: [16483] },
+      'give me a Sylvester Stalone movie',
+      { consumedEntities: [{ spokenAs: 'Sylvester Stalone', resolvedName: 'Sylvester Stallone' }] },
+    );
+    expect(query.subjectCanonical).toBeUndefined();
+    expect(query.subjectLexemes ?? []).not.toContain('stalone');
+    expect(query.subjectLexemes ?? []).not.toContain('stallone');
+    expect(query.castIds).toEqual([16483]);
+    expect(query.mediaType).toBe('movie');
+    expect(requirement).toBeNull();
+  });
+
+  it('RED 2 — a word that merely appears in the name is erased everywhere', async () => {
+    /* "Tom Cruise" spends `cruise` ONCE. The second `cruise` is the content
+       subject the user asked for, and a vocabulary-wide delete eats it: the
+       subject collapses from "cruise ship" to "ship". Nothing about a stop-word
+       list or a longer name list reaches this — the token is legitimate in one
+       position and consumed in the other. */
+    const { query } = await applyRequiredSubject(
+      { ...EMPTY_QUERY, mediaType: 'movie', castIds: [500] },
+      'a Tom Cruise cruise ship movie',
+      { consumedEntities: [{ spokenAs: 'Tom Cruise cruise ship', resolvedName: 'Tom Cruise' }] },
+    );
+    expect(query.castIds).toEqual([500]);
+    expect(query.subjectCanonical).toBe('cruise ship');
+  });
+
+  it('the anecdote residue the legacy extractor attributes is NOT name-like, so it survives', async () => {
+    /* The legacy extractor hands "watched yesterday stallone" to the catalog —
+       it cannot tell which of those words is the name. Only tokens that match
+       the RESOLVED IDENTITY are spent, so the residue is left exactly where it
+       was. That defect stays visible rather than being papered over here; it is
+       not this PR's to fix. */
+    const masked = maskConsumedEntities('I watched 3 movies yesterday. Give me a Stallone movie.', [
+      { spokenAs: 'watched yesterday stallone', resolvedName: 'Sylvester Stallone' },
+    ]);
+    expect(masked).toMatch(/watched/);
+    expect(masked).toMatch(/yesterday/);
+    expect(masked).not.toMatch(/stallone/i);
+  });
+});
+
 describe('the mask spends only what was actually claimed', () => {
   it('removes the spoken surname when the catalog answered with a full name', () => {
-    expect(maskConsumedSpans('give me a Stallone movie', ['Sylvester Stallone'])).not.toMatch(/stallone/i);
+    const out = maskConsumedEntities('give me a Stallone movie', [
+      { spokenAs: 'stallone', resolvedName: 'Sylvester Stallone' },
+    ]);
+    expect(out).not.toMatch(/stallone/i);
   });
 
   it('leaves the rest of the sentence intact', () => {
-    const out = maskConsumedSpans('a Tom Hanks courtroom movie', ['Tom Hanks']);
+    const out = maskConsumedEntities('a Tom Hanks courtroom movie', [
+      { spokenAs: 'tom hanks courtroom', resolvedName: 'Tom Hanks' },
+    ]);
     expect(out).toMatch(/courtroom/);
     expect(out).toMatch(/movie/);
     expect(out).not.toMatch(/hanks/i);
   });
 
   it('whole words only — a resolved "Hunt" cannot hollow out "manhunt"', () => {
-    expect(maskConsumedSpans('a manhunt movie', ['Helen Hunt'])).toMatch(/manhunt/);
+    const out = maskConsumedEntities('a manhunt movie', [
+      { spokenAs: 'manhunt', resolvedName: 'Helen Hunt' },
+    ]);
+    expect(out).toMatch(/manhunt/);
   });
 
   it('particles are too short to spend', () => {
     // Removing "de" as a whole word would eat ordinary language and can never
     // be the content noun the walk-back is looking for.
-    expect(maskConsumedSpans('a de facto standard movie', ['Robert De Niro'])).toMatch(/\bde\b/);
+    const out = maskConsumedEntities('a de facto standard movie', [
+      { spokenAs: 'de facto standard', resolvedName: 'Robert De Niro' },
+    ]);
+    expect(out).toMatch(/\bde\b/);
   });
 
-  it('no spans is the identity function', () => {
-    expect(maskConsumedSpans('a boxing movie', [])).toBe('a boxing movie');
-    expect(maskConsumedSpans('a boxing movie', undefined)).toBe('a boxing movie');
+  it('a word the extractor never attributed is never spent', () => {
+    // `cruise` is in the resolved name, but this utterance never offered it to
+    // the resolver, so the mask has no claim on it.
+    const out = maskConsumedEntities('a cruise ship movie', [
+      { spokenAs: 'tom hanks', resolvedName: 'Tom Cruise' },
+    ]);
+    expect(out).toMatch(/cruise ship/);
+  });
+
+  it('no entities is the identity function', () => {
+    expect(maskConsumedEntities('a boxing movie', [])).toBe('a boxing movie');
+    expect(maskConsumedEntities('a boxing movie', undefined)).toBe('a boxing movie');
   });
 });

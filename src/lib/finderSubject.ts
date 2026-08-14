@@ -9,7 +9,7 @@ import {
   type SubjectSpec,
 } from '@/lib/nlu/requiredSubject';
 import type { SubjectRequirement } from '@/lib/nlu/semanticEligibility';
-import { maskConsumedSpans } from '@/lib/nlu/consumedSpans';
+import { maskConsumedEntities, type ConsumedEntity } from '@/lib/nlu/consumedEntities';
 
 /**
  * Turn a named subject into a HARD constraint on a FinderQuery — the shared step
@@ -46,13 +46,14 @@ export interface SubjectApplication {
 
 export interface SubjectOptions {
   /**
-   * Spans already consumed by entity resolution — a person the caller resolved
-   * to a real cast id from THIS sentence. Subject detection does not see them,
-   * so the same words cannot become a content subject as well. Optional and
-   * defaulting to none, so a caller that resolves no entities (the Forensic
-   * Search) behaves exactly as before. See lib/nlu/consumedSpans.ts.
+   * Entities resolution already paid for — a person the caller resolved to a
+   * real cast id from THIS sentence, carrying both the user's wording and the
+   * catalog's name. Subject detection does not see those occurrences, so the
+   * same words cannot become a content subject as well. Optional and defaulting
+   * to none, so a caller that resolves no entities behaves exactly as before.
+   * See lib/nlu/consumedEntities.ts.
    */
-  consumedSpans?: readonly string[];
+  consumedEntities?: readonly ConsumedEntity[];
 }
 
 export async function applyRequiredSubject(
@@ -66,7 +67,7 @@ export async function applyRequiredSubject(
      boundary, the "made"→released disclosure and the singular-request test are
      properties of the phrasing, not of the subject, and a resolved name has no
      bearing on them. */
-  const subjectText = maskConsumedSpans(text, opts.consumedSpans);
+  const subjectText = maskConsumedEntities(text, opts.consumedEntities);
   const det = detectRequiredSubject(subjectText);
   let q: FinderQuery = { ...query };
   // A singular indefinite subject request ("a boxing movie") asks for ONE

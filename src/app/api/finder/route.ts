@@ -5,6 +5,7 @@ import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
+import type { ConsumedEntity } from '@/lib/nlu/consumedEntities';
 import { applyOverrides, sanitizeOverrides } from '@/lib/finderOverrides';
 import { askSimilarTo, extractReference } from '@/lib/askJudge';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
@@ -175,13 +176,13 @@ export async function POST(req: Request) {
        Judge does and shares one subject layer, so it shares the collision:
        leaving it out would be the cross-route drift finderSubject.ts exists to
        prevent. */
-    const consumedSpans: string[] = [...(ai?.resolvedPeople ?? [])];
+    const consumedEntities: ConsumedEntity[] = [...(ai?.resolvedPeople ?? [])];
     if (text && (!query.castIds || query.castIds.length === 0)) {
       const person = await resolvePerson(text);
       if (person) {
         query.castIds = [person.id];
         query.mediaType = 'movie';
-        consumedSpans.push(person.name);
+        consumedEntities.push({ spokenAs: person.spokenAs, resolvedName: person.name });
       }
     }
 
@@ -208,7 +209,7 @@ export async function POST(req: Request) {
     let interpretation: string[] = [];
     let subjectCanonical: string | null = null;
     if (text) {
-      const applied = await applyRequiredSubject(query, text, { consumedSpans });
+      const applied = await applyRequiredSubject(query, text, { consumedEntities });
       query = applied.query;
       interpretation = applied.interpretation;
       subjectCanonical = applied.subject?.canonical ?? null;

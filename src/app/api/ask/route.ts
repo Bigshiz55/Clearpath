@@ -7,6 +7,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
+import type { ConsumedEntity } from '@/lib/nlu/consumedEntities';
 import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
 import { routeAsk } from '@/lib/critic/gate';
@@ -847,13 +848,13 @@ export async function POST(req: Request) {
        record EVERY SPAN THIS REQUEST SPENT RESOLVING A PERSON, from whichever
        path resolved one, so the subject layer cannot read the same words a
        second time as a content subject. */
-    const consumedSpans: string[] = [...(ai?.resolvedPeople ?? [])];
+    const consumedEntities: ConsumedEntity[] = [...(ai?.resolvedPeople ?? [])];
     if (text && (!query.castIds || query.castIds.length === 0) && !lex) {
       const person = await resolvePerson(text);
       if (person) {
         query.castIds = [person.id];
         query.mediaType = 'movie';
-        consumedSpans.push(person.name);
+        consumedEntities.push({ spokenAs: person.spokenAs, resolvedName: person.name });
       }
     }
 
@@ -877,7 +878,7 @@ export async function POST(req: Request) {
     // subject can never be degraded into genres here either.
     let askInterpretation: string[] = [];
     if (text) {
-      const applied = await applyRequiredSubject(query, text, { consumedSpans });
+      const applied = await applyRequiredSubject(query, text, { consumedEntities });
       query = applied.query;
       askInterpretation = applied.interpretation;
     }
