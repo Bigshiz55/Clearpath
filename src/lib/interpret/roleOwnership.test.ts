@@ -174,3 +174,35 @@ describe('the person matcher refuses article-led title language', () => {
     });
   }
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * ARTICLE_LED'S ACTUAL CONTRACT — proven, not assumed.
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Removing ARTICLE_LED once killed zero tests, and the reason was not that the
+ * guard is useless — it was that the guard never ran. All three person matchers
+ * spell their media nouns lowercase with no `i` flag, so "The Lego Movie" with
+ * a capital M never reaches a person matcher at all. The capital-M cases are
+ * held by media-noun case sensitivity; ARTICLE_LED had no opportunity to act.
+ *
+ * These lowercase variants give it that opportunity, and it demonstrably acts:
+ *
+ *   "Show me The Lego movie"   with ARTICLE_LED -> people ["Lego"]
+ *                              without          -> people ["The Lego"]
+ *
+ * So the contract is narrow and real: ONCE an article-led capitalised phrase
+ * reaches a person matcher, reject it as title-shaped. It is not what protects
+ * the capital-M spellings, and this file no longer implies that it is.
+ */
+describe('ARTICLE_LED rejects article-led title language that reaches a matcher', () => {
+  for (const q of ['The Lego movie', 'A Goofy movie', 'Show me The Lego movie']) {
+    it(`"${q}" never emits the article-led phrase as a person`, () => {
+      const r = interpret(q);
+      const ppl = r.kind === 'recommendation' ? r.people.map((p) => p.span) : [];
+      for (const bad of ['The Lego', 'A Goofy']) {
+        expect(ppl, `${q} emitted article-led "${bad}" as a person`).not.toContain(bad);
+      }
+    });
+  }
+});
