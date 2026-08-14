@@ -3,8 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from '@/lib/finder';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
 import { tmdbImage } from '@/lib/tmdb/image';
-import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
+import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
+import type { ConsumedEntity } from '@/lib/nlu/consumedEntities';
 import { applyOverrides, sanitizeOverrides } from '@/lib/finderOverrides';
 import { askSimilarTo, extractReference } from '@/lib/askJudge';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
@@ -169,12 +170,19 @@ export async function POST(req: Request) {
         query.providerIds = clientProviders;
       }
     }
-    // Guarantee the actor filter regardless of AI (fuzzy, so misspellings match).
+    /* Guarantee the actor filter regardless of AI (fuzzy, so misspellings
+       match) — and record which ENTITY that cost, so the subject layer cannot
+       spend them again. The Forensic Search resolves people exactly as Ask the
+       Judge does and shares one subject layer, so it shares the collision:
+       leaving it out would be the cross-route drift finderSubject.ts exists to
+       prevent. */
+    const consumedEntities: ConsumedEntity[] = [...(ai?.resolvedPeople ?? [])];
     if (text && (!query.castIds || query.castIds.length === 0)) {
-      const pid = await resolvePersonId(text);
-      if (pid) {
-        query.castIds = [pid];
+      const person = await resolvePerson(text);
+      if (person) {
+        query.castIds = [person.id];
         query.mediaType = 'movie';
+        consumedEntities.push({ spokenAs: person.spokenAs, resolvedName: person.name });
       }
     }
 
@@ -201,7 +209,7 @@ export async function POST(req: Request) {
     let interpretation: string[] = [];
     let subjectCanonical: string | null = null;
     if (text) {
-      const applied = await applyRequiredSubject(query, text);
+      const applied = await applyRequiredSubject(query, text, { consumedEntities });
       query = applied.query;
       interpretation = applied.interpretation;
       subjectCanonical = applied.subject?.canonical ?? null;

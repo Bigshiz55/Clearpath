@@ -6,6 +6,7 @@ import { genreIdFromName } from '@/lib/finderGenres';
 import { searchPeople, searchKeywords } from '@/lib/tmdb/client';
 import { DEFAULT_RESULT_COUNT, MAX_REQUESTED_COUNT } from '@/lib/nlu/count';
 import { stripRequestFrame } from '@/lib/nlu/requestFrame';
+import type { ConsumedEntity } from '@/lib/nlu/consumedEntities';
 
 /**
  * Turn a free-form ask into structured search filters using the LLM — so the
@@ -22,6 +23,14 @@ export interface AiAsk {
   /** A reference title the user compared to ("like Succession") — seeds a
    *  "more like this" search instead of a plain filter query. */
   similarTo?: string;
+  /**
+   * Entities this parse SPENT resolving a cast id, each carrying the user's own
+   * wording alongside the catalog's name. Handed to the subject layer so those
+   * occurrences cannot also become a content subject — the defect that made
+   * "give me a Stallone movie" demand films about Stallone and return none.
+   * See lib/nlu/consumedEntities.ts.
+   */
+  resolvedPeople?: ConsumedEntity[];
 }
 
 interface RawAi {
@@ -114,12 +123,18 @@ async function toQuery(raw: RawAi): Promise<AiAsk> {
 
   // Resolve the first named person to a TMDB cast id (cast filtering is movie-only).
   const firstPerson = Array.isArray(raw.people) ? raw.people[0] : undefined;
+  const resolvedPeople: ConsumedEntity[] = [];
   if (firstPerson) {
     const people = await searchPeople(firstPerson).catch(() => []);
     const top = people[0];
     if (top) {
       q.castIds = [top.id];
       q.mediaType = 'movie';
+      // BOTH namings, because they are not interchangeable: the utterance may
+      // say only a surname, or spell it their own way, while the catalog answers
+      // with the canonical full name. The mask needs the user's wording to find
+      // the occurrence and the catalog's to know what was spent.
+      resolvedPeople.push({ spokenAs: firstPerson, resolvedName: top.name });
     }
   }
 
@@ -132,7 +147,7 @@ async function toQuery(raw: RawAi): Promise<AiAsk> {
       ? Math.round(raw.count)
       : DEFAULT_RESULT_COUNT;
   const similarTo = typeof raw.similarTo === 'string' && raw.similarTo.trim() ? raw.similarTo.trim() : undefined;
-  return { query: q, limit, similarTo };
+  return { query: q, limit, similarTo, resolvedPeople };
 }
 
 /** A requested result count from the ask ("five …" → 5). Default 8.
@@ -158,6 +173,35 @@ const NON_NAME =
  * confident person, so a plain request isn't hijacked into an actor search.
  */
 export async function resolvePersonId(text: string): Promise<number | null> {
+  return (await resolvePerson(text))?.id ?? null;
+}
+
+/**
+ * The same resolution, KEEPING BOTH NAMINGS.
+ *
+ * `resolvePersonId` threw away everything except the id, which is why
+ * "Stallone" could be spent twice: the cast filter had the number, and nothing
+ * downstream knew which words had bought it, so subject detection read the
+ * surname again and demanded films ABOUT Stallone.
+ *
+ * `spokenAs` IS NOT A SOURCE SPAN, AND MUST NOT BE READ AS ONE. It is the exact
+ * string this function handed to the catalog — the language this extractor
+ * ATTRIBUTED to the person — recovered from the same filtering pass, not a
+ * second parse. That is a filtered token bag, not a contiguous range: the
+ * stop-word list is imperfect, so for "I watched 3 movies yesterday. Give me a
+ * Stallone movie." it attributes "watched yesterday stallone" and cannot tell
+ * which of those three is the name. Calling that a span would be a lie, and
+ * masking all of it would delete anecdote the user did say.
+ *
+ * The mask closes that gap from the other side: it spends only the attributed
+ * words that also match the RESOLVED identity, so the residue survives and the
+ * separate extractor defect stays visible. When the canonical interpreter
+ * supplies a real `PersonReference.span`, it drops into the same field and the
+ * approximation goes away without touching the boundary.
+ */
+export async function resolvePerson(
+  text: string,
+): Promise<{ id: number; name: string; spokenAs: string } | null> {
   /* PEEL THE REQUEST FRAME BEFORE THE STOPWORD LIST SEES IT.
      `NON_NAME` below is a good list of words that are never part of a name, and
      it was missing the entire class of words a person uses to say the answer
@@ -177,10 +221,11 @@ export async function resolvePersonId(text: string): Promise<number | null> {
   // Require a full name (2–4 words) — a single leftover word like "today" or
   // "tonight" must never be treated as a person and hijack a plain request.
   if (words.length < 2 || words.length > 4) return null;
-  const people = await searchPeople(words.join(' ')).catch(() => []);
+  const attributed = words.join(' ');
+  const people = await searchPeople(attributed).catch(() => []);
   const top = people[0];
   // Require a real, findable person (has known-for credits) to avoid false hits.
-  return top && top.knownFor ? top.id : null;
+  return top && top.knownFor ? { id: top.id, name: top.name, spokenAs: attributed } : null;
 }
 
 export async function parseAskWithAI(text: string): Promise<AiAsk | null> {
