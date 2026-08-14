@@ -54,6 +54,8 @@ import {
   describeQuery,
   hasCastId,
   hasGenreId,
+  kind,
+  mediaTypeIs,
   requestedCount,
   subjectIs,
 } from './receipt.mjs';
@@ -345,12 +347,28 @@ async function main() {
     check('burrito', 'world', `noisy candidates really are boxing (first ${WORLD_SAMPLE})`, noisyFacts.ok, noisyFacts.detail);
   }
 
+  /*
+   * ── CASE 2 USES THE FULL NAME, ON PURPOSE ──────────────────────────────
+   *
+   * It used to say "a Stallone movie", which made one row answerable only by
+   * passing TWO independent contracts at once: count scoping (the anecdote's
+   * "3" must not become the requested count) and surname identity (which
+   * Stallone?). A failure could not say which had broken, and the second is a
+   * genuinely harder question that deserves its own row rather than the power
+   * to fail this one.
+   *
+   * So the invariant under test here is exactly one thing: a number spoken in
+   * BACKGROUND is not the number of results asked for. The surname lives in
+   * CASE 2b, and the real production incident in CASE 2c.
+   */
   console.log('\n── CASE 2: count scoping ──────────────────────────────────');
-  const count = await ask('I watched 3 movies yesterday. Give me a Stallone movie.');
+  const count = await ask('I watched 3 movies yesterday. Give me a Sylvester Stallone movie.');
   const countTitles = titles(count.body);
+  check('count', 'receipt', 'answered with a search, not a question', kind(count.body) === 'search', `kind=${kind(count.body)}`);
   check('count', 'receipt', 'Stallone is a RESOLVED cast constraint (id 16483)', hasCastId(count.body, TMDB_PERSON.SYLVESTER_STALLONE), describeQuery(count.body));
+  check('count', 'receipt', 'the actor is NOT also a strict subject', !subjectIs(count.body, 'stallone') && !subjectIs(count.body, 'sylvester stallone'), describeQuery(count.body));
   check('count', 'receipt', 'the route was asked for exactly one', requestedCount(count.body) === 1, `requestedCount=${requestedCount(count.body)}`);
-  check('count', 'world', 'returned exactly one title', countTitles.length === 1, `got ${countTitles.length}`);
+  check('count', 'world', 'returned exactly one title', countTitles.length === 1, `got ${countTitles.length} kind=${kind(count.body)}`);
   check('count', 'world', 'the anecdote did not set the count', countTitles.length !== 3, `got ${countTitles.length}`);
   {
     // THE PROOF THAT WAS MISSING: not "one title came back" but "the title that
@@ -363,6 +381,79 @@ async function main() {
     check('count', 'world', 'the returned title really has Stallone in its cast', folded.ok, facts.length === 0 ? 'no candidates to verify' : folded.detail);
   }
   await stalloneFunnel(count.body);
+
+  /*
+   * ── CASE 2b: A SURNAME IS AN IDENTITY QUESTION, NOT A COUNT QUESTION ────
+   *
+   * "Stallone" names Sylvester, Frank, Sage and Jennifer. Returning the most
+   * popular is not identification — it is a guess that attaches the wrong human
+   * being to someone's evening, and it is indistinguishable from success until
+   * the user notices. So exactly TWO answers are acceptable and the row accepts
+   * either: a person resolved on real evidence, or a clarifying question.
+   *
+   * What is NOT acceptable is the third thing the product used to do: turn the
+   * surname into a strict SUBJECT and return nothing at all.
+   */
+  console.log('\n── CASE 2b: surname-only identity ─────────────────────────');
+  const surname = await ask('Give me a Stallone movie.');
+  const surnameKind = kind(surname.body);
+  const resolvedOne = hasCastId(surname.body, TMDB_PERSON.SYLVESTER_STALLONE);
+  const askedWhich = surnameKind === 'clarify';
+  check(
+    'surname',
+    'receipt',
+    'either resolved a person on evidence, or asked which one',
+    resolvedOne || askedWhich,
+    `kind=${surnameKind} ${describeQuery(surname.body)}`,
+  );
+  check(
+    'surname',
+    'receipt',
+    'the surname never became a strict subject',
+    !subjectIs(surname.body, 'stallone'),
+    describeQuery(surname.body),
+  );
+  if (!askedWhich) {
+    check('surname', 'world', 'a resolved person returns at least one title', titles(surname.body).length > 0, `got ${titles(surname.body).length}`);
+  } else {
+    console.log('   ▸ answered with a clarification — the identity contract is satisfied without a search.');
+  }
+
+  /*
+   * ── CASE 2c: THE EXACT PRODUCTION INCIDENT ─────────────────────────────
+   *
+   * The sentence a real user typed. Every layer is asserted separately so a
+   * failure names the layer that broke rather than the sentence:
+   *
+   *   receipt   media, count, person-as-cast, and NO subject named Stallone
+   *   world     three titles, every one of them a MOVIE
+   *   cast      each returned title really has Stallone in it, by person id,
+   *             read from the deployment's own credits endpoint
+   */
+  console.log('\n── CASE 2c: "3 Sylvester Stallone movies" ─────────────────');
+  const three = await ask('3 Sylvester Stallone movies');
+  const threeTitles = titles(three.body);
+  check('incident', 'receipt', 'answered with a search', kind(three.body) === 'search', `kind=${kind(three.body)}`);
+  check('incident', 'receipt', 'the request is for MOVIES', mediaTypeIs(three.body, 'movie'), describeQuery(three.body));
+  check('incident', 'receipt', 'the route was asked for three', requestedCount(three.body) === 3, `requestedCount=${requestedCount(three.body)}`);
+  check('incident', 'receipt', 'Stallone is a RESOLVED cast constraint (id 16483)', hasCastId(three.body, TMDB_PERSON.SYLVESTER_STALLONE), describeQuery(three.body));
+  check('incident', 'receipt', 'no strict subject named Stallone', !subjectIs(three.body, 'stallone') && !subjectIs(three.body, 'sylvester stallone'), describeQuery(three.body));
+  check('incident', 'world', 'returned three titles', threeTitles.length === 3, `got ${threeTitles.length} kind=${kind(three.body)}`);
+  check(
+    'incident',
+    'world',
+    'every returned title is a movie (no TV padding)',
+    items(three.body).length > 0 && items(three.body).every((i) => i.mediaType === 'movie'),
+    JSON.stringify(items(three.body).map((i) => i.mediaType)),
+  );
+  {
+    const stalloneId = (await resolvePersonId(BASE_URL, evidenceHeaders(), 'Sylvester Stallone')) ?? TMDB_PERSON.SYLVESTER_STALLONE;
+    const facts = [];
+    for (const i of sample(three.body)) facts.push(await castFact(BASE_URL, evidenceHeaders(), i, stalloneId, 'Sylvester Stallone'));
+    const folded = foldFacts(facts);
+    check('incident', 'world', 'every verified title really has Stallone in its cast', folded.ok, facts.length === 0 ? 'no candidates to verify' : folded.detail);
+  }
+  await stalloneFunnel(three.body);
 
   console.log('\n── CASE 3: reference vs current request ───────────────────');
   const ref = await ask('I watched Rocky three weeks ago, but tonight I want a baseball movie.');

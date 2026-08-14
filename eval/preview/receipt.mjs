@@ -91,6 +91,21 @@ export function maxRuntimeIs(body, minutes) {
  * (see FinderDiagnostics), so the gate reads that rather than inferring intent
  * from how many items came back — which would be assuming the answer.
  */
+/**
+ * WHICH KIND OF ANSWER CAME BACK.
+ *
+ * Evidence, not an assertion. Three very different products return zero items
+ * — one that asked a clarifying question, one that never resolved the person
+ * and searched for nothing, and one that resolved them and then retrieved
+ * nothing — and until this was printed the count assertion could not tell them
+ * apart. Two runs went by with the ambiguity unresolved because the failure
+ * detail said only "got 0".
+ */
+export function kind(body) {
+  const k = body?.kind;
+  return typeof k === 'string' ? k : null;
+}
+
 export function requestedCount(body) {
   const d = body?.diagnostics;
   return d && typeof d === 'object' ? d.requestedCount ?? null : null;

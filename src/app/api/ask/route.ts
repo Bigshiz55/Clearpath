@@ -6,6 +6,8 @@ import { naiveParseQuery, EMPTY_QUERY, parseTopicTerms, extractExcludedPerson } 
 import { tmdbImage } from '@/lib/tmdb/image';
 import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePersonId, parseRequestedCount } from '@/lib/askParse';
+import { interpret } from '@/lib/interpret/interpret';
+import { resolveCanonicalExecution } from '@/lib/ask/canonicalExecution';
 import { augmentInternational } from '@/lib/askInternational';
 import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
@@ -779,12 +781,47 @@ export async function POST(req: Request) {
       }
     }
 
+    /*
+     * ── THE CANONICAL PATH OWNS THE LANGUAGE ────────────────────────────
+     *
+     * One interpretation, not two. `interpret()` has already decided which
+     * words are the request and which are background, so on this path the
+     * PERSON, the COUNT and the SUBJECT are read from `CanonicalIntent` and the
+     * three full-utterance re-parsers below are not called at all.
+     *
+     * The defect that forced this: the deployed route interpreted the sentence
+     * twice and the readings disagreed. `applyRequiredSubject(query, text)`
+     * re-read "Give me a Stallone movie", `detectGeneralSubject` took the word
+     * before the media noun, and the actor's surname became a STRICT SUBJECT —
+     * "show only titles where *stallone* is genuinely central". No film is about
+     * an actor, so eligibility rejected every candidate and the live gate saw 0
+     * titles. Separately `resolvePersonId(text)` sent TMDB the string
+     * "watched yesterday stallone", the anecdote's residue glued to the name.
+     *
+     * Everything NOT owned by the canonical layer — international origin, the
+     * deterministic year/genre overlay, provider lexemes, watchers, ranking —
+     * is untouched and still built exactly as before. This step removes the
+     * duplicated language decisions; it does not rewrite the engine underneath.
+     */
+    const canonical = text.trim() ? interpret(text) : null;
+    const canonicalOwnsLanguage = canonical !== null && canonical.kind === 'recommendation';
+
     if (ai) {
       query = ai.query;
       limit = ai.limit;
     } else {
       query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
-      if (text) limit = parseRequestedCount(text);
+      if (text && !canonicalOwnsLanguage) limit = parseRequestedCount(text);
+    }
+    /*
+     * The count the sentence carried, read from the request clause only —
+     * REPLACING both readings above rather than running alongside them. The
+     * whole-utterance reader took the "3" out of "I watched 3 movies yesterday"
+     * because it scanned the anecdote too, so on this path it is not called at
+     * all. An unsaid count stays unsaid and the shared default applies.
+     */
+    if (canonicalOwnsLanguage) {
+      limit = canonical.requestedCount ?? DEFAULT_RESULT_LIMIT;
     }
     // Foreign-origin / English-audio / runtime augmentation (deterministic; the
     // parser paths don't extract these) — restricts the pool to the real origin.
@@ -842,14 +879,63 @@ export async function POST(req: Request) {
       if (!query.monetization) query.monetization = 'flatrate|free|ads';
     }
 
-    // Guarantee the actor filter regardless of AI: if a person is named and not
-    // already resolved, look them up (fuzzy, so misspellings still match).
-    if (text && (!query.castIds || query.castIds.length === 0) && !lex) {
+    /*
+     * PERSON + SUBJECT, FROM THE CANONICAL SPANS.
+     *
+     * `resolveCanonicalExecution` takes the spans the interpreter emitted and
+     * resolves them against the real catalog — never the raw sentence. A
+     * surname that cannot be pinned to one credited person comes back
+     * `ambiguous` and the route asks, because attaching the wrong human being
+     * to someone's evening is worse than a question.
+     */
+    let canonicalInterpretation: string[] = [];
+    let canonicalAmbiguity: Awaited<ReturnType<typeof resolveCanonicalExecution>>['ambiguity'] = null;
+    if (canonicalOwnsLanguage) {
+      const exec = await resolveCanonicalExecution(canonical);
+      canonicalAmbiguity = exec.ambiguity;
+      canonicalInterpretation = exec.interpretation;
+      // The canonical reading REPLACES any person the AI parse guessed at, so
+      // the two can never both be live on the same request.
+      delete query.castIds;
+      if (exec.query.castIds?.length) {
+        query.castIds = exec.query.castIds;
+        query.mediaType = 'movie';
+      }
+      if (exec.query.subjectStrict) {
+        query.subjectKeywordIds = exec.query.subjectKeywordIds;
+        query.subjectLexemes = exec.query.subjectLexemes;
+        query.subjectStrict = true;
+        query.subjectLabel = exec.query.subjectLabel;
+        query.subjectCanonical = exec.query.subjectCanonical;
+      }
+      if (exec.query.excludeKeywordIds?.length) {
+        query.excludeKeywordIds = [
+          ...new Set([...(query.excludeKeywordIds ?? []), ...exec.query.excludeKeywordIds]),
+        ];
+      }
+      if (exec.query.finalCount != null) query.finalCount = exec.query.finalCount;
+    } else if (text && (!query.castIds || query.castIds.length === 0) && !lex) {
+      // LEGACY PATH ONLY (no canonical request — a lookup or a bare statement).
+      // Guarantee the actor filter regardless of AI: if a person is named and
+      // not already resolved, look them up (fuzzy, so misspellings still match).
       const pid = await resolvePersonId(text);
       if (pid) {
         query.castIds = [pid];
         query.mediaType = 'movie';
       }
+    }
+
+    /* A named person we could not pin down is a QUESTION, not a guess. */
+    if (canonicalAmbiguity) {
+      return NextResponse.json({
+        kind: 'clarify',
+        requestId,
+        appliedText: text || null,
+        clarify: `There's more than one ${canonicalAmbiguity.spokenAs}. Which one did you mean?`,
+        options: canonicalAmbiguity.candidates.map((c) => `${c.name}${c.knownFor ? ` — ${c.knownFor}` : ''}`),
+        query: { ...EMPTY_QUERY },
+        items: [],
+      });
     }
 
     const coerceWatcher = (raw: unknown): Watcher | null => {
@@ -870,8 +956,14 @@ export async function POST(req: Request) {
     // a hard constraint exactly as the Forensic Search does, from the one shared
     // helper — so "a boxing movie" means the same thing on both routes and the
     // subject can never be degraded into genres here either.
-    let askInterpretation: string[] = [];
-    if (text) {
+    /*
+     * The subject is settled above on the canonical path, so
+     * `applyRequiredSubject` — which exists to extract a subject from raw
+     * English — must not run and re-derive one. It is still the owner for
+     * /api/finder and for asks that produced no canonical request.
+     */
+    let askInterpretation: string[] = canonicalInterpretation;
+    if (text && !canonicalOwnsLanguage) {
       const applied = await applyRequiredSubject(query, text);
       query = applied.query;
       askInterpretation = applied.interpretation;

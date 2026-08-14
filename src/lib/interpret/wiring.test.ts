@@ -35,24 +35,29 @@ describe('the canonical layer exists', () => {
   });
 });
 
-describe('but it is NOT yet the front door of /api/ask', () => {
+describe('and it IS the front door of /api/ask', () => {
   /*
-   * RED, DELIBERATELY. Flip these to `it(...)` in the same commit that wires
-   * the route — and note that doing so is a claim about production behaviour,
-   * which needs real TMDB and Supabase to stand up. Green here means "the route
-   * calls the interpreter", never "the recommendation is correct".
+   * FLIPPED. These were `it.fails` while the interpreter was unwired; the route
+   * now derives person, count and subject from `CanonicalIntent`, so they are
+   * plain assertions and the file is green for the right reason.
+   *
+   * Green here means "the route calls the interpreter", never "the
+   * recommendation is correct". The behavioural claim is the black-box gate's,
+   * against a real deployment.
    */
-  it.fails('the ask route imports the canonical interpreter', () => {
+  it('the ask route imports the canonical interpreter', () => {
     expect(askRoute()).toContain('@/lib/interpret');
   });
 
-  it.fails('the ask route derives its request from canonical intent', () => {
+  it('the ask route derives its request from canonical intent', () => {
     expect(askRoute()).toMatch(/\binterpret\s*\(/);
   });
 
-  it('meanwhile the legacy parser is still what production reads', () => {
+  it('the legacy parser is still present for the paths that still own', () => {
     // Not a criticism of `askParse` — a statement of the current boundary, so
     // the report and the code cannot drift apart about where meaning is made.
+    // `ownership.test.ts` is what pins that those calls cannot reach the
+    // canonical path.
     expect(askRoute()).toMatch(/askParse|parseAskWithAI|resolvePersonId/);
   });
 });
