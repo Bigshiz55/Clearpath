@@ -32,7 +32,7 @@
  *
  * Pure and client-safe: no I/O, no server imports.
  */
-import { assetForProvider } from './assets';
+import { assetForProvider, providerNameForId } from './assets';
 
 
 /** Generic subscription-tier / channel qualifiers, identical for every service.
@@ -188,12 +188,17 @@ export interface ProviderBrand {
 
 /** Resolve one provider reference to its official presentation. */
 export function resolveProviderBrand(input: ProviderBrandInput): ProviderBrand {
-  const name = officialProviderName(input.name);
-  // NO IDENTITY, NO BRAND. Returned rather than thrown, and deliberately not
-  // filled in from `providerId` or the asset table: a lookup by resemblance is
-  // exactly the invention this module exists to refuse. `textOnly` with an
+  // A MISSING NAME IS NOT THE SAME AS A MISSING IDENTITY. A row can arrive
+  // with no `name` but a TMDB provider id, which is a primary key from the
+  // same source the name would have come from — reading the brand back out of
+  // the verified table recovers a fact we hold rather than inventing one, and
+  // dropping it would lose a provider we can name with certainty. Resolution
+  // by NAME RESEMBLANCE stays forbidden; this is an exact id match or nothing.
+  const name = officialProviderName(input.name) || (providerNameForId(input.providerId) ?? '');
+  // NO IDENTITY AT ALL, NO BRAND. Returned rather than thrown: nothing names
+  // this row, no id we know, and no logo the caller brought. `textOnly` with an
   // empty name is the signal a caller checks to render nothing at all.
-  if (!name) {
+  if (!name && !input.logoPath) {
     return { key: 'name:', name: '', logoPath: null, alt: '', textOnly: true };
   }
   // THE CALLER'S OWN ASSET WINS. It came with this exact provider row, so it is

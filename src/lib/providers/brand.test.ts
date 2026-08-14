@@ -46,6 +46,20 @@ describe('a provider reference with no name', () => {
     expect(resolveProviderBrand({ name: null, providerId: 8 }).logoPath).not.toBeNull();
     expect(resolveProviderBrand({ name: undefined, logoPath: '/x.jpg' }).logoPath).toBe('/x.jpg');
   });
+
+  it('names the brand from the id, because an id is a key and not a resemblance', () => {
+    // The distinction this module lives or dies by. Provider id 8 IS Netflix —
+    // same source, exact match, no judgement call — so recovering the name is
+    // reading a fact back, not guessing one. What stays forbidden is the other
+    // direction: a name we cannot match must never be talked into a brand.
+    expect(resolveProviderBrand({ name: null, providerId: 8 }).name).toBe('Netflix');
+    expect(resolveProviderBrand({ name: '   ', providerId: 15 }).name).toBe('Hulu');
+    // An id we do not hold is still nothing. No neighbour, no nearest match.
+    const unknown = resolveProviderBrand({ name: undefined, providerId: 999999 });
+    expect(unknown.name).toBe('');
+    expect(unknown.logoPath).toBeNull();
+    expect(unknown.textOnly).toBe(true);
+  });
 });
 
 describe('the provider-brand registry', () => {

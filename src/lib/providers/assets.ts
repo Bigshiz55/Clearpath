@@ -130,3 +130,19 @@ export function assetForProvider(name: string | null | undefined, providerId?: n
   if (!key) return null;
   return BY_KEY.get(key)?.logoPath ?? null;
 }
+
+/**
+ * The brand a TMDB provider id names, or null.
+ *
+ * BY ID ONLY, AND THAT IS THE WHOLE POINT. A provider id is a primary key from
+ * the same source the name would have come from — id 8 IS Netflix — so reading
+ * a name back from it recovers a fact we already hold. It is the opposite of
+ * the name-resemblance lookup this file refuses: there is no fuzziness to get
+ * wrong, and an id we do not have in the table answers null rather than
+ * guessing. Deliberately NOT exposed for names, which is where invention would
+ * come from.
+ */
+export function providerNameForId(providerId?: number | null): string | null {
+  if (providerId == null) return null;
+  return BY_ID.get(providerId)?.name ?? null;
+}
