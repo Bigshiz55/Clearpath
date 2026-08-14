@@ -48,6 +48,16 @@ import {
   makeRedactor,
   request,
 } from './protection.mjs';
+import {
+  TMDB_GENRE,
+  TMDB_PERSON,
+  describeQuery,
+  hasCastId,
+  hasGenreId,
+  requestedCount,
+  subjectIs,
+} from './receipt.mjs';
+import { castFact, foldFacts, genreFact, resolvePersonId, subjectFact } from './world.mjs';
 
 const BASE_URL = process.env.BASE_URL;
 const EXPECT_SHA = process.env.EXPECT_SHA ?? '';
@@ -81,6 +91,62 @@ function check(caseName, layer, label, ok, detail) {
   results.push({ caseName, layer, label, ok, detail });
   const mark = ok ? '✓' : '✗';
   console.log(`   ${mark} [${layer}] ${label}${detail ? ` — ${redact(detail)}` : ''}`);
+}
+
+/**
+ * A WORLD FACT THIS GATE CANNOT PROVE, RECORDED AS A GAP.
+ *
+ * Neither a pass nor a failure, because it is neither. Passing it would claim
+ * evidence that does not exist — the precise sin this file was written to
+ * catch. Failing it would blame the product for the oracle's blind spot. So it
+ * is named, counted, and printed in the verdict, and the gate never reports
+ * "all cases hold" while one is open.
+ */
+const gaps = [];
+function gap(caseName, label, why) {
+  gaps.push({ caseName, label, why });
+  console.log(`   ⚠ [world] ${label} — NOT PROVABLE: ${redact(why)}`);
+}
+
+/**
+ * WHERE A ZERO COMES FROM.
+ *
+ * A count of zero is a conclusion, not a diagnosis, and "the interpreter must
+ * be wrong" is a guess. `/api/ask` already returns the finder's own per-stage
+ * counters, so the funnel can be read straight off the deployed response — no
+ * new route, no new secret, nothing in the request path that only exists for a
+ * test. Printing it turns "returned 0" into the boundary where the candidates
+ * actually died.
+ */
+async function stalloneFunnel(body) {
+  const d = body?.diagnostics;
+  if (!d || typeof d !== 'object') {
+    console.log('   ▸ funnel: /api/ask returned no diagnostics — the boundary cannot be located from the response alone.');
+    return;
+  }
+  const stages = [
+    ['requested', d.requestedCount],
+    ['candidates discovered', d.candidateCount],
+    ['deterministic eligible', d.deterministicEligibleCount],
+    ['semantically evaluated', d.semanticEvaluatedCount],
+    ['subject eligible', d.centralSubjectEligibleCount],
+    ['quality eligible', d.qualityEligibleCount],
+    ['returned', d.finalReturnedCount],
+  ];
+  console.log(`   ▸ funnel: ${stages.map(([k, v]) => `${k}=${v ?? '?'}`).join(' → ')}`);
+
+  // The boundary is the first stage that reaches zero. Named rather than
+  // inferred, so nobody has to read the counters and guess.
+  const firstZero = stages.find(([, v]) => v === 0);
+  if (firstZero) console.log(`   ▸ candidates died at: ${firstZero[0]}`);
+
+  // Per-candidate rejection reasons, when the finder recorded them. This is the
+  // difference between "0 results" and "these six titles were rejected, each
+  // for this stated reason".
+  const evals = Array.isArray(d.evaluations) ? d.evaluations.slice(0, 6) : [];
+  for (const e of evals) {
+    console.log(`   ▸ ${e.title ?? '?'} (${e.year ?? '—'}): ${e.status}/${e.centrality} conf=${e.confidence}${e.rejectionReason ? ` — ${redact(e.rejectionReason)}` : ''}`);
+  }
 }
 
 /**
@@ -223,17 +289,31 @@ async function main() {
    * requested" and "is the requested person" read UNDERSTOOD.
    */
   const executable = (body) => JSON.stringify(body.query ?? {}).toLowerCase();
-  const understood = (body) => JSON.stringify({ query: body.query ?? {}, interpretation: body.interpretation ?? [] }).toLowerCase();
-  const titles = (body) => (body.items ?? []).map((i) => `${i.title ?? ''} ${i.name ?? ''}`.trim()).filter(Boolean);
+  const items = (body) => (body.items ?? []).filter((i) => i && typeof i === 'object');
+  const titles = (body) => items(body).map((i) => `${i.title ?? ''} ${i.name ?? ''}`.trim()).filter(Boolean);
+  /** Evidence lookups run against the deployment with the same session. */
+  const evidenceHeaders = () => headers({ cookie: cookieHeader, accept: 'application/json' });
+
+  /*
+   * WHY THE WORLD LAYER IS BOUNDED AT FOUR CANDIDATES.
+   *
+   * Each world fact costs a live HTTP round trip against real TMDB. Proving
+   * every candidate of every case would multiply the gate's runtime by the
+   * result-set size for no additional proof: a constraint that holds for the
+   * first four and fails on the fifth is still a failure the next run catches,
+   * and one refuted candidate fails the case outright. What is NOT bounded is
+   * honesty about it — the count checked is printed in every world detail, so
+   * "4 proven" can never be read as "all of them".
+   */
+  const WORLD_SAMPLE = 4;
+  const sample = (body) => items(body).slice(0, WORLD_SAMPLE);
 
   console.log('\n── CASE 1: burrito invariance ─────────────────────────────');
   const plain = await ask('Give me a boxing movie');
   const noisy = await ask('Had a burrito for dinner. Anyway, give me a boxing movie');
-  const plainR = understood(plain.body);
-  const noisyR = understood(noisy.body);
 
-  check('burrito', 'receipt', 'plain request understood as boxing', /boxing/.test(plainR), plainR.slice(0, 120));
-  check('burrito', 'receipt', 'noisy request understood as boxing', /boxing/.test(noisyR), noisyR.slice(0, 120));
+  check('burrito', 'receipt', 'boxing is the executable subject (plain)', subjectIs(plain.body, 'boxing'), describeQuery(plain.body));
+  check('burrito', 'receipt', 'boxing is the executable subject (noisy)', subjectIs(noisy.body, 'boxing'), describeQuery(noisy.body));
   check('burrito', 'receipt', 'no food term in the executable query', !/burrito|beef|dinner/.test(executable(noisy.body)));
   check('burrito', 'world', 'plain returned candidates', titles(plain.body).length > 0);
   check('burrito', 'world', 'noisy returned candidates', titles(noisy.body).length > 0);
@@ -247,28 +327,79 @@ async function main() {
     const ratio = b.length ? overlap / b.length : 0;
     check('burrito', 'world', 'noise did not move the recommendation domain', ratio >= 0.5, `overlap ${Math.round(ratio * 100)}%`);
   }
+  {
+    // THE PROOF THAT WAS MISSING. Existing is not satisfying: these are the
+    // product's own eligibility verdicts, which are true only when boxing is
+    // CENTRAL to the title — never because a keyword matched, and never
+    // because the title sounds like a fight picture.
+    const plainFacts = foldFacts(sample(plain.body).map((i) => subjectFact(i, 'boxing')));
+    check('burrito', 'world', `plain candidates really are boxing (first ${WORLD_SAMPLE})`, plainFacts.ok, plainFacts.detail);
+    const noisyFacts = foldFacts(sample(noisy.body).map((i) => subjectFact(i, 'boxing')));
+    check('burrito', 'world', `noisy candidates really are boxing (first ${WORLD_SAMPLE})`, noisyFacts.ok, noisyFacts.detail);
+  }
 
   console.log('\n── CASE 2: count scoping ──────────────────────────────────');
   const count = await ask('I watched 3 movies yesterday. Give me a Stallone movie.');
   const countTitles = titles(count.body);
-  check('count', 'receipt', 'Stallone is the requested person', /stallone|\b16483\b/.test(understood(count.body)));
+  check('count', 'receipt', 'Stallone is a RESOLVED cast constraint (id 16483)', hasCastId(count.body, TMDB_PERSON.SYLVESTER_STALLONE), describeQuery(count.body));
+  check('count', 'receipt', 'the route was asked for exactly one', requestedCount(count.body) === 1, `requestedCount=${requestedCount(count.body)}`);
   check('count', 'world', 'returned exactly one title', countTitles.length === 1, `got ${countTitles.length}`);
   check('count', 'world', 'the anecdote did not set the count', countTitles.length !== 3, `got ${countTitles.length}`);
+  {
+    // THE PROOF THAT WAS MISSING: not "one title came back" but "the title that
+    // came back actually has Stallone in it", by TMDB person id, from the
+    // deployment's own credits.
+    const stalloneId = (await resolvePersonId(BASE_URL, evidenceHeaders(), 'Sylvester Stallone')) ?? TMDB_PERSON.SYLVESTER_STALLONE;
+    const facts = [];
+    for (const i of sample(count.body)) facts.push(await castFact(BASE_URL, evidenceHeaders(), i, stalloneId, 'Sylvester Stallone'));
+    const folded = foldFacts(facts);
+    check('count', 'world', 'the returned title really has Stallone in its cast', folded.ok, facts.length === 0 ? 'no candidates to verify' : folded.detail);
+  }
+  await stalloneFunnel(count.body);
 
   console.log('\n── CASE 3: reference vs current request ───────────────────');
   const ref = await ask('I watched Rocky three weeks ago, but tonight I want a baseball movie.');
-  const refR = executable(ref.body);
-  check('reference', 'receipt', 'baseball is the executable subject', /baseball/.test(refR), refR.slice(0, 120));
-  check('reference', 'receipt', 'Rocky is not a similarity requirement', !/similar|like/.test(refR) || /baseball/.test(refR));
+  check('reference', 'receipt', 'baseball is the executable subject', subjectIs(ref.body, 'baseball'), describeQuery(ref.body));
+  check('reference', 'receipt', 'Rocky is not a similarity requirement', !/similar|like/.test(executable(ref.body)) || subjectIs(ref.body, 'baseball'));
   check('reference', 'world', 'returned candidates', titles(ref.body).length > 0);
   check('reference', 'world', 'Rocky itself is not the answer', !titles(ref.body).some((t) => /^rocky\b/i.test(t)));
+  {
+    const facts = foldFacts(sample(ref.body).map((i) => subjectFact(i, 'baseball')));
+    check('reference', 'world', `candidates really are baseball (first ${WORLD_SAMPLE})`, facts.ok, facts.detail);
+  }
 
   console.log('\n── CASE 4: negation ───────────────────────────────────────');
   const neg = await ask('Give me a thriller but no supernatural stuff.');
-  const negR = understood(neg.body);
-  check('negation', 'receipt', 'thriller is requested', /thriller/.test(negR), negR.slice(0, 120));
+  check('negation', 'receipt', 'TMDB Thriller genre id 53 is present in query.genreIds', hasGenreId(neg.body, TMDB_GENRE.THRILLER), describeQuery(neg.body));
   check('negation', 'receipt', 'supernatural is not a positive constraint', !/"(?:genres?|subjects?|keywords?)"[^}]*supernatural/.test(executable(neg.body)));
   check('negation', 'world', 'returned candidates', titles(neg.body).length > 0);
+  {
+    // THE PROOF THAT WAS MISSING: real TMDB genres for each returned id, from
+    // the deployment's own metadata route.
+    const facts = [];
+    for (const i of sample(neg.body)) facts.push(await genreFact(BASE_URL, evidenceHeaders(), i, 'Thriller'));
+    const folded = foldFacts(facts);
+    check('negation', 'world', `candidates really carry the Thriller genre (first ${WORLD_SAMPLE})`, folded.ok, folded.detail);
+  }
+  {
+    /*
+     * THE EXCLUSION IS NOT PROVABLE FROM WHAT THE DEPLOYMENT RETURNS, AND THAT
+     * IS REPORTED RATHER THAN PAPERED OVER.
+     *
+     * "Supernatural" is not a TMDB genre; it lives in keywords, and neither the
+     * ask response nor `/api/title-meta` carries a candidate's keywords. The
+     * two dishonest options are both refused: passing this silently would claim
+     * a proof that does not exist, and failing it would blame the product for
+     * the oracle's blind spot.
+     *
+     * What WOULD close it is a minimal sanitized grounding receipt on the
+     * candidate — the keyword ids that were checked and the exclusion verdict —
+     * which is its own piece of design work, not something to improvise here.
+     */
+    gap('negation', 'the supernatural EXCLUSION is honoured by the candidates',
+      'not a TMDB genre — it is a keyword, and neither /api/ask nor /api/title-meta returns candidate keywords. '
+      + 'Needs a sanitized grounding receipt on the candidate (keyword ids checked + exclusion verdict).');
+  }
 
   console.log('\n── CASE 5: the Critic comparative path still owns comparisons ─');
   const critic = await ask('Better than Furious or Widows Bay');
@@ -282,12 +413,22 @@ async function main() {
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${'─'.repeat(60)}`);
   console.log(`${results.length - failed.length}/${results.length} assertions passed`);
+  if (gaps.length > 0) {
+    // Printed whether the run is green or red. A gate that only mentions its
+    // blind spots when something else fails is hiding them.
+    console.log(`\nWORLD FACTS THIS GATE CANNOT YET PROVE (${gaps.length}) — the world layer is INCOMPLETE:`);
+    for (const g of gaps) console.log(`  ⚠ [${g.caseName}] ${g.label} — ${redact(g.why)}`);
+  }
   if (failed.length > 0) {
     console.log('\nSEMANTIC FAILURES (the product, not the infrastructure):');
     for (const f of failed) console.log(`  ✗ [${f.caseName}/${f.layer}] ${f.label}${f.detail ? ` — ${redact(f.detail)}` : ''}`);
     process.exit(EXIT.SEMANTIC);
   }
-  console.log('All canonical interpretation cases hold against the real preview.');
+  console.log(
+    gaps.length > 0
+      ? `Every case the world layer CAN prove holds against the real preview — with ${gaps.length} world fact(s) still unproven above.`
+      : 'All canonical interpretation cases hold against the real preview.',
+  );
   process.exit(EXIT.OK);
 }
 
