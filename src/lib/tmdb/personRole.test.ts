@@ -33,7 +33,8 @@ vi.mock('@/lib/env', () => ({
   serverEnv: { tmdbKey: () => 'test-key', tmdbToken: () => null },
 }));
 
-const { discoverTitles } = await import('./client');
+const { discoverTitles, getCredits } = await import('./client');
+const { satisfiesRole } = await import('@/lib/people/constraint');
 
 const NOLAN = 525;
 const WILLIS = 62;
@@ -111,6 +112,68 @@ describe('the legacy castIds path is untouched', () => {
       people: [{ personId: WILLIS, role: 'actor' }],
     });
     expect(lastParams().get('with_cast')).toBe(String(WILLIS));
+  });
+});
+
+describe('the credits the client returns can TESTIFY to the role', () => {
+  /* THE LIVE ZERO. "movies directed by Christopher Nolan" produced a perfect
+     receipt ([{personId: 525, role: 'director'}]), retrieved 24 candidates on
+     `with_crew`, every deterministic filter passed them — and the product
+     returned NONE. The funnel named the boundary: all 24 died at the final
+     role verification.
+
+     The verifier was handed a witness that structurally cannot testify.
+     `satisfiesRole` reads `credits.crew[].job`; `getCredits` returned
+     {cast, directors, creators} — no `crew` at all — and because `crew` is
+     OPTIONAL on `CreditsView`, the type system accepted an object in which
+     the answer to "did this person direct it?" is always no. Every genuinely
+     Nolan-directed film failed its own verification.
+
+     So this joins the two REAL halves — the real client mapping (HTTP
+     stubbed) and the real predicate — with no mock in between. The wiring
+     test in finder.personRole.test.ts once mocked getCredits in the
+     `CreditsView` shape the real function never produced, which is exactly
+     how this shipped green. */
+  it('a film the person DIRECTED satisfies the director constraint', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: 27205,
+        credits: {
+          cast: [{ id: 6193, name: 'Leonardo DiCaprio', character: 'Cobb', order: 0, profile_path: null }],
+          crew: [
+            { id: NOLAN, name: 'Christopher Nolan', job: 'Director', department: 'Directing' },
+            { id: NOLAN, name: 'Christopher Nolan', job: 'Writer', department: 'Writing' },
+            { id: 947, name: 'Hans Zimmer', job: 'Original Music Composer', department: 'Sound' },
+          ],
+        },
+      }),
+    });
+    const credits = await getCredits('movie', 27205);
+    expect(
+      satisfiesRole(credits, { personId: NOLAN, role: 'director' }),
+      'the real getCredits output must carry the crew evidence satisfiesRole reads',
+    ).toBe(true);
+  });
+
+  it('a film the person only PRODUCED still fails — jobs survive the mapping', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: 141052,
+        credits: {
+          cast: [],
+          crew: [{ id: NOLAN, name: 'Christopher Nolan', job: 'Producer', department: 'Production' }],
+        },
+      }),
+    });
+    const credits = await getCredits('movie', 141052);
+    expect(
+      satisfiesRole(credits, { personId: NOLAN, role: 'director' }),
+      'crew presence without the Director job must never verify a director ask',
+    ).toBe(false);
   });
 });
 

@@ -59,7 +59,7 @@ import {
   requestedCount,
   subjectIs,
 } from './receipt.mjs';
-import { castFact, foldFacts, genreFact, metaFor, resolvePersonId, subjectFact } from './world.mjs';
+import { castFact, directorFact, foldFacts, genreFact, metaFor, resolvePersonId, subjectFact } from './world.mjs';
 import { diedAt, funnelStages, renderFunnel } from './funnel.mjs';
 
 const BASE_URL = process.env.BASE_URL;
@@ -586,9 +586,16 @@ async function main() {
   check('director', 'receipt', 'the actor phrasing keeps actor semantics', hasCastId(withNolan.body, nolanId), describeQuery(withNolan.body));
   check('director', 'receipt', 'director and actor asks are NOT the same retrieval constraint', JSON.stringify(directed.body.query) !== JSON.stringify(withNolan.body.query));
   {
+    /* THE CLAIM IS "DIRECTED BY", SO THE FACT IS THE CREW'S JOB — `castFact`
+       proves membership anywhere in the credits, which would call a film
+       Nolan only produced a pass. `directorFact` proves/refutes on the
+       Director credit itself (full-credits tier) and is honestly UNPROVABLE
+       without TMDB_API_KEY, since top billing cannot speak to crew. An EMPTY
+       result stays an outright FAIL: zero candidates is the product refusing
+       the request it just receipted, not an oracle gap. */
     const facts = [];
-    for (const i of sample(directed.body)) facts.push(await castFact(BASE_URL, evidenceHeaders(), i, nolanId, 'Christopher Nolan'));
-    checkFold('director', 'returned titles really carry the Nolan credit', foldFacts(facts), facts.length === 0 ? 'no candidates to verify' : undefined);
+    for (const i of sample(directed.body)) facts.push(await directorFact(i, nolanId, 'Christopher Nolan'));
+    checkFold('director', 'returned titles really credit Nolan as DIRECTOR', foldFacts(facts), facts.length === 0 ? 'no candidates to verify' : undefined);
   }
   await stalloneFunnel(directed.body);
 

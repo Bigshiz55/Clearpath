@@ -179,6 +179,39 @@ export async function castFact(baseUrl, headers, item, personId, personName) {
   );
 }
 
+/**
+ * This candidate really credits that person AS ITS DIRECTOR.
+ *
+ * Membership is not the claim. `castFact`'s full-credit tier proves a person
+ * appears SOMEWHERE in the credits — which would call a film the person only
+ * PRODUCED a pass, the precise confusion the typed-role work exists to remove.
+ * A director ask is answered by the crew's JOB:
+ *
+ *   1. FULL credits (TMDB_API_KEY in CI): a crew credit with job Director or
+ *      Co-Director PROVES; a complete credit list without one REFUTES.
+ *   2. No key: a directing credit is CREW, and the deployment's only credit
+ *      evidence is top-billed CAST — it cannot speak to who directed the
+ *      title at all, so the fact is UNPROVABLE and folds to a named GAP.
+ */
+export async function directorFact(item, personId, personName) {
+  const full = await fullCreditsFor(item);
+  if (full) {
+    const directs = full.crew.find(
+      (p) => p.id === personId && (p.job === 'Director' || p.job === 'Co-Director'),
+    );
+    if (directs) return proven(`"${item.title}" full crew — ${directs.name} (${directs.job})`);
+    const otherJobs = full.crew.filter((p) => p.id === personId).map((p) => p.job).filter(Boolean);
+    return refuted(
+      `"${item.title}" full credits (${full.crew.length} crew) do not list ${personName} as Director`
+      + (otherJobs.length ? ` — credited as ${otherJobs.join(', ')}` : ''),
+    );
+  }
+  return unprovable(
+    `a directing credit is crew, and without TMDB_API_KEY the only deployment evidence is top-billed cast — `
+    + `it cannot say who directed "${item.title}". Set TMDB_API_KEY in CI for the full-credits tier.`,
+  );
+}
+
 /** Resolve a person NAME to a TMDB id through the deployment's own index, so
  *  the cast comparison is id-to-id and never name-to-name. */
 export async function resolvePersonId(baseUrl, headers, name) {

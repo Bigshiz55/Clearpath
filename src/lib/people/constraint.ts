@@ -90,10 +90,12 @@ export function discoverParamFor(role: PersonRole): 'with_cast' | 'with_crew' {
   return role === 'director' ? 'with_crew' : 'with_cast';
 }
 
-/** The credits shape this needs. Narrower than TMDB's, so tests can build one. */
+/** The credits shape this needs. Narrower than TMDB's, so tests can build one.
+ *  `job`/`department` admit null because the real client maps an absent TMDB
+ *  job to null — the view must fit the witness that actually testifies. */
 export interface CreditsView {
   cast: ReadonlyArray<{ id: number }>;
-  crew?: ReadonlyArray<{ id: number; job?: string; department?: string }>;
+  crew?: ReadonlyArray<{ id: number; job?: string | null; department?: string | null }>;
 }
 
 /**

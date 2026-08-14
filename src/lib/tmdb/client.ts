@@ -814,9 +814,31 @@ export interface CastCredit {
   profilePath: string | null;
 }
 
+export interface CrewCredit {
+  id: number;
+  name: string;
+  job: string | null;
+  department: string | null;
+}
+
 export interface TitleCredits {
   cast: CastCredit[];
-  /** Movie directors (crew job === Director). */
+  /**
+   * RAW crew credits — id, name, JOB — untruncated. This is the evidence role
+   * verification reads: `satisfiesRole` answers "is this person credited as
+   * the DIRECTOR of this title?" from `crew[].job`, and a summary cannot
+   * stand in for the testimony. `directors` below is a DERIVED display list;
+   * deriving is lossy (it drops the job strings, so a consumer can neither
+   * accept a Co-Director nor reject a Producer), and because `crew` is
+   * optional on the verifier's `CreditsView`, an object without it
+   * TYPE-CHECKS while making every director verification fail. That is not a
+   * hypothetical: "movies directed by Christopher Nolan" retrieved 24 correct
+   * candidates on the live preview and returned zero, because this interface
+   * had no `crew` and the verifier was handed a witness that structurally
+   * could not testify.
+   */
+  crew: CrewCredit[];
+  /** Movie directors (crew job === Director) — display convenience. */
   directors: Array<{ id: number; name: string }>;
   /** TV creators (created_by). */
   creators: Array<{ id: number; name: string }>;
@@ -846,14 +868,18 @@ export async function getCredits(mediaType: MediaType, id: number): Promise<Titl
       character: c.character && c.character.trim() !== '' ? c.character : null,
       profilePath: c.profile_path ?? null,
     }));
+  const crew = (detail.credits?.crew ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    job: c.job ?? null,
+    department: c.department ?? null,
+  }));
   const directors =
     mediaType === 'movie'
-      ? (detail.credits?.crew ?? [])
-          .filter((c) => c.job === 'Director')
-          .map((c) => ({ id: c.id, name: c.name }))
+      ? crew.filter((c) => c.job === 'Director').map((c) => ({ id: c.id, name: c.name }))
       : [];
   const creators = (detail.created_by ?? []).map((c) => ({ id: c.id, name: c.name }));
-  return { cast, directors, creators };
+  return { cast, crew, directors, creators };
 }
 
 export interface NotableCredit {
