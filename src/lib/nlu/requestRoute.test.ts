@@ -14,8 +14,11 @@ describe('the live defect, pinned', () => {
     if (r.kind !== 'request') return;
     expect(r.count, 'the stated count was lost').toBe(3);
     expect(decodeURIComponent(r.href)).toContain('Sylvester Stallone');
-    expect(r.href).toMatch(/^\/app\/finder\?q=/);
-    expect(r.href).toContain('run=1');
+    // The canonical front door — /app/ask seeds AskTheJudge, which POSTs
+    // /api/ask. NOT /app/finder: a third recommendation path is the thing this
+    // module exists to prevent.
+    expect(r.href).toMatch(/^\/app\/ask\?q=/);
+    expect(r.href).not.toContain('/app/finder');
     // Never the feed, never browse.
     expect(r.href).not.toContain('/app/watch');
     expect(r.href).not.toContain('/api/browse');

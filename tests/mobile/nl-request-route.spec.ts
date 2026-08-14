@@ -125,6 +125,13 @@ for (const [name, text] of Object.entries(UTTERANCES)) {
     // product to satisfy it.)
     const carried = decodeURIComponent(`${carrier?.url() ?? ''} ${carrier?.postData() ?? ''}`).replace(/\+/g, ' ');
     expect(carried, 'the request text did not survive the hop').toContain(text.slice(0, 20));
+
+    // ONE RECOMMENDATION TRUTH: the door is /api/ask (via /app/ask, which seeds
+    // AskTheJudge). Asserted by NAME, not merely "some semantic endpoint" — the
+    // loose version would stay green if a future change re-pointed this at
+    // /app/finder, which would recreate the second recommendation path this
+    // whole exercise exists to remove.
+    expect(new URL(carrier!.url()).pathname, 'the request did not enter the canonical /api/ask door').toBe('/app/ask');
   });
 
   test(`[${name}] "${text}" is never answered with the generic Watch Now feed`, async ({ page }) => {

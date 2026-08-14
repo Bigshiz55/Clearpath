@@ -1,5 +1,6 @@
 import { stripRequestFrame } from './requestFrame';
 import { wantsTitleResults } from './requestIntent';
+import { askHref } from '@/lib/search/searchIntent';
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
@@ -26,8 +27,10 @@ import { wantsTitleResults } from './requestIntent';
  * ── THE CONTRACT ─────────────────────────────────────────────────────────
  *
  *     raw utterance
- *       → canonical request route (here)
- *       → interpretation + entity resolution (Finder)
+ *       → this routing decision
+ *       → /app/ask  (seeds AskTheJudge)
+ *       → POST /api/ask   ← the ONE canonical interpretation/orchestration owner
+ *       → entity resolution → retrieval → eligibility → ranking
  *       → constrained results
  *
  * Browse stays structured catalog browsing. Watch Now stays a feed. Neither is
@@ -40,19 +43,16 @@ import { wantsTitleResults } from './requestIntent';
  * defect shipped: the server declined to route, the client silently invented a
  * destination, and no test looked at the two together.
  *
- * The count and person survive because the raw utterance is what travels — the
- * Finder re-interprets it with the full frame (`stripRequestFrame` gives the
- * count; entity resolution gives the person). Nothing is lossily pre-digested
- * into a filter here.
+ * The count and person survive because the RAW UTTERANCE is what travels.
+ * `/api/ask` re-interprets it in full. Nothing is lossily pre-digested here,
+ * and no second interpreter is introduced: this module decides only WHETHER an
+ * utterance is a recommendation request, never WHAT it means.
  */
 
 /** Where a submitted utterance belongs. */
 export type RequestRoute =
   | { kind: 'request'; href: string; count: number | null; personalized: boolean }
   | { kind: 'taste' };
-
-/** Matches the finder route's own cap, so what is sent is what is read. */
-const MAX_Q = 200;
 
 /**
  * A CAPITALISED MULTI-WORD NAME beside a media noun is a person request.
@@ -102,15 +102,26 @@ export function canonicalRequestRoute(raw: string): RequestRoute {
 
   if (!isRequest) return { kind: 'taste' };
 
-  // THE RAW UTTERANCE TRAVELS, not a pre-digested filter. The Finder owns
+  // ── THE ONE FRONT DOOR IS /api/ask, VIA /app/ask ────────────────────────
+  // Not /app/finder. Sending conversational text there would have created a
+  // THIRD recommendation path beside /api/ask and /api/finder, which is the
+  // architecture this exists to prevent — one recommendation truth, not a new
+  // one per entry point. `/app/ask?q=` seeds `AskTheJudge`, which POSTs
+  // `/api/ask`: the canonical interpretation/orchestration owner.
+  //
+  // The URL is built by `askHref` — the SAME builder SearchBar, QuickSearch and
+  // HomeGreeter already use — rather than a second string template here. Two
+  // builders that can drift about the cap or the encoding is the small version
+  // of the same defect.
+  //
+  // THE RAW UTTERANCE TRAVELS, not a pre-digested filter. `/api/ask` owns
   // interpretation and entity resolution; pre-parsing here would create a
-  // second, quietly divergent interpreter — the exact failure being fixed.
-  return {
-    kind: 'request',
-    href: `/app/finder?q=${encodeURIComponent(text.slice(0, MAX_Q))}&run=1`,
-    count: frame.count,
-    personalized: frame.personalized,
-  };
+  // second, quietly divergent interpreter. `count` and `personalized` are
+  // returned for callers that want to LOG or explain the routing decision —
+  // never to replace what the canonical interpreter derives.
+  const href = askHref(text);
+  if (!href) return { kind: 'taste' };
+  return { kind: 'request', href, count: frame.count, personalized: frame.personalized };
 }
 
 /** Convenience for callers that only need the yes/no. */
