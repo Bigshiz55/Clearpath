@@ -138,28 +138,52 @@ export function guideSummary(rows: readonly ChannelRow[]): { channels: number; o
 /**
  * WHY IS "MOVIES" EMPTY? — the smoke distinction the guide owes its reader.
  *
- * "0 channels with listings" under the Movies chip is three DIFFERENT truths
+ * "0 channels with listings" under the Movies chip is FOUR different truths
  * wearing one sentence, and only one of them is about the world:
  *
- *   true-empty      — the window genuinely holds no listing classified as a
- *                     movie. A statement about the data, not an error.
- *   filtered-out    — movie listings EXIST in the window, but the active
- *                     combination (a category chip, a search) removed the
- *                     channels carrying them. The media filter alone cannot
- *                     produce this: it keeps every channel with any movie.
- *   unprovable-now  — listings classified as movies exist, but every one of
- *                     them already started and carries NO runtime, so the
- *                     guide cannot honestly claim it is still on (`onNowOf`
- *                     refuses) and it appears nowhere. The failing boundary
- *                     is the SOURCE's runtime field — a pipeline gap, named,
- *                     never papered over by showing the row anyway.
+ *   true-empty          — a LICENSED FULL GRID is supplying and it holds no
+ *                         movie in the window. Only then is "that's the
+ *                         schedule" a claim the data can back.
+ *   coverage-unprovable — no licensed full-grid provider is supplying, so
+ *                         the absence of movie-classified listings proves
+ *                         NOTHING about the schedule. TVmaze is an episode
+ *                         database, not an EPG: measured live (see
+ *                         docs/tv-coverage/SOURCE_AND_CHANNEL_REPORT.md),
+ *                         Hallmark/LMN/TCM are absent from it ENTIRELY and
+ *                         movie blocks have near-zero coverage — a window
+ *                         with no visible movies is the SOURCE's blind spot,
+ *                         not an empty schedule, and saying otherwise was
+ *                         the production failure this kind exists to end.
+ *   filtered-out        — movie listings EXIST in the window, but the active
+ *                         combination (a category chip, a search) removed the
+ *                         channels carrying them. The media filter alone
+ *                         cannot produce this: it keeps every channel with
+ *                         any movie.
+ *   unprovable-now      — listings classified as movies exist, but every one
+ *                         already started and carries NO runtime, so the
+ *                         guide cannot honestly claim it is still on
+ *                         (`onNowOf` refuses) and it appears nowhere. The
+ *                         failing boundary is the SOURCE's runtime field — a
+ *                         pipeline gap, named, never papered over by showing
+ *                         the row anyway.
  *
  * Pure; the component renders the right sentence per kind and NEVER
  * auto-switches the filter, disables the chip, or pads with unrelated
- * channels to avoid a zero.
+ * channels to avoid a zero. The coverage input is the page's
+ * `hasLiveFullGridProvider()` — the same signal the coverage banner runs on,
+ * so the two can never disagree. STRUCTURALLY, `true-empty` cannot be
+ * produced without it: no copy change can bring "that's the schedule" back
+ * to an unproven window without failing the tests that pin this function.
  */
+export interface GuideCoverage {
+  /** True only while a licensed full-grid provider is actually supplying.
+   *  A premiere feed with rows is NOT coverage, however many rows it has. */
+  fullGridProviderLive: boolean;
+}
+
 export type MoviesEmptyDiagnosis =
   | { kind: 'true-empty'; channelsWithListings: number }
+  | { kind: 'coverage-unprovable'; channelsWithListings: number }
   | { kind: 'filtered-out'; moviesInWindow: number }
   | { kind: 'unprovable-now'; startedNoRuntime: number };
 
@@ -167,6 +191,7 @@ export function diagnoseMoviesEmpty(
   allRows: readonly ChannelRow[],
   airings: readonly Airing[],
   nowMs: number,
+  coverage: GuideCoverage,
 ): MoviesEmptyDiagnosis {
   const moviesInWindow = guideSummary(allRows).movies;
   if (moviesInWindow > 0) return { kind: 'filtered-out', moviesInWindow };
@@ -178,7 +203,61 @@ export function diagnoseMoviesEmpty(
       (a.runtime == null || a.runtime <= 0),
   ).length;
   if (startedNoRuntime > 0) return { kind: 'unprovable-now', startedNoRuntime };
+  if (!coverage.fullGridProviderLive) {
+    return { kind: 'coverage-unprovable', channelsWithListings: allRows.length };
+  }
   return { kind: 'true-empty', channelsWithListings: allRows.length };
+}
+
+/**
+ * STRUCTURED OBSERVABILITY for the Movies question — the numbers behind
+ * whichever sentence renders, kept queryable instead of buried in copy:
+ * where the listings came from (in coverage terms), what the window held,
+ * what was classified as what, and why anything classified as a movie is
+ * not on screen. Pure; rendered as data-attributes at the empty state and
+ * available to health surfaces.
+ */
+export interface MoviesDiagnostics {
+  /** Coverage status: a licensed grid, or an episode database only. */
+  coverage: 'licensed-grid' | 'episode-db-only';
+  channelsWithListings: number;
+  listingsInWindow: number;
+  /** Airings whose NORMALIZED type is Movie, before visibility rules. */
+  movieListings: number;
+  /** Movies actually visible through the guide (on now / up next). */
+  moviesVisible: number;
+  /** Movie listings hidden because they started with no runtime. */
+  startedNoRuntime: number;
+  /** Normalized showType → count, the raw-vs-normalized evidence trail. */
+  showTypeHistogram: Record<string, number>;
+}
+
+export function moviesDiagnostics(
+  allRows: readonly ChannelRow[],
+  airings: readonly Airing[],
+  nowMs: number,
+  coverage: GuideCoverage,
+): MoviesDiagnostics {
+  const showTypeHistogram: Record<string, number> = {};
+  for (const a of airings) {
+    const t = a.showType || '(none)';
+    showTypeHistogram[t] = (showTypeHistogram[t] ?? 0) + 1;
+  }
+  return {
+    coverage: coverage.fullGridProviderLive ? 'licensed-grid' : 'episode-db-only',
+    channelsWithListings: allRows.length,
+    listingsInWindow: airings.length,
+    movieListings: airings.filter((a) => a.showType === 'Movie').length,
+    moviesVisible: guideSummary(allRows).movies,
+    startedNoRuntime: airings.filter(
+      (a) =>
+        a.showType === 'Movie' &&
+        Number.isFinite(Date.parse(a.airstamp)) &&
+        Date.parse(a.airstamp) <= nowMs &&
+        (a.runtime == null || a.runtime <= 0),
+    ).length,
+    showTypeHistogram,
+  };
 }
 
 /**

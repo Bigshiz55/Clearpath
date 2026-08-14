@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfile, getPreferenceRules, regionFor } from '@/lib/profile';
 import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle, usBroadcastDate, type Airing } from '@/lib/onTv';
 import { scoreGuideAirings } from '@/lib/tv/scoreGuide';
-import { getIngestedGuideAirings, getOnTvTodayIngested, INGESTED_MIN } from '@/lib/tv/ingestedGuide';
+import { getIngestedGuideAirings, getOnTvTodayIngested, getUpcomingTvIngested, INGESTED_MIN } from '@/lib/tv/ingestedGuide';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
@@ -160,17 +160,29 @@ export default async function OnTvPage({
   // movie card a Save button and a DNA score, imdb id or not.
   const enrich = (a: Awaited<ReturnType<typeof getUpcomingTv>>) =>
     enrichAiringsWithCritics(a).then(enrichAiringsWithTmdb).then(enrichAiringsWithTmdbByTitle);
-  let windowed =
-    withinHours != null
-      ? await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, genre, network, movieOnly))
-      : null;
-  // Filters named but nothing matched in-window — fall back to everything on,
-  // labeled honestly, rather than an empty screen.
+  // INGESTED FIRST, live day-fetch as the fallback — the same canonical-source
+  // order Highlights and /api/easy-tv already use, so the windowed/Movies view
+  // stops being the one surface still reading only the live fetch.
+  const windowedSource = async () => {
+    const ingested = await getUpcomingTvIngested(supabase, region, now.getTime(), withinHours! * HOUR_MS, genre, network, movieOnly).catch(() => [] as Airing[]);
+    return ingested.length >= INGESTED_MIN
+      ? ingested
+      : getUpcomingTv(region, now.getTime(), withinHours! * HOUR_MS, genre, network, movieOnly);
+  };
+  let windowed = withinHours != null ? await enrich(await windowedSource()) : null;
+  /* THE MOVIES VIEW NEVER PADS. It used to: zero movie matches refetched the
+     UNFILTERED schedule and rendered it under "Meanwhile — what's actually on
+     live TV (not filtered to movies)" — a wall of unrelated shows as the
+     answer to a movies question. A Movies screen shows evidenced movie
+     airings or an honest empty state naming why (coverage vs schedule), and
+     NOTHING else. The genre/network fallback below survives for those
+     filters only; `movieOnly` is excluded from it entirely. */
   let genreEmpty = false;
-  if (withinHours != null && hasFilter && windowed && windowed.length === 0) {
+  if (withinHours != null && hasFilter && !movieOnly && windowed && windowed.length === 0) {
     genreEmpty = true;
     windowed = await enrich(await getUpcomingTv(region, now.getTime(), withinHours * HOUR_MS, null, null, false));
   }
+  const moviesEmpty = withinHours != null && movieOnly && windowed != null && windowed.length === 0;
 
   // Which airings this user already has a reminder for (guarded pre-migration),
   // plus the upcoming ones to list at the top.
@@ -264,11 +276,49 @@ export default async function OnTvPage({
 
       {upcoming.length > 0 && <MyReminders initial={upcoming} />}
 
-      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} remindedIds={remindedIds} taste={tasteRules} personalized={guidePersonalized} />}
+      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} remindedIds={remindedIds} taste={tasteRules} personalized={guidePersonalized} coverageProvable={gridLive} />}
 
       {guideView ? null : withinHours != null && windowed ? (
         <>
-          {genreEmpty ? (
+          {moviesEmpty ? (
+            /* THE MOVIES QUESTION, ANSWERED HONESTLY AND ALONE. Zero cards
+               follow this box — no "Meanwhile" schedule of unrelated shows.
+               The copy distinguishes the two truths a zero can carry: with a
+               licensed grid live it is the schedule; without one it is OUR
+               coverage, and the schedule is unknowable from here. */
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/[0.07] p-4 text-center sm:p-5" data-testid="movies-empty">
+              <h2 className="mt-1 text-lg font-bold text-white">
+                {gridLive
+                  ? `No movies on live TV in the next ${withinHours}h`
+                  : 'We can’t prove what movies are on right now'}
+              </h2>
+              <p className="mx-auto mt-1.5 max-w-md text-sm text-slate-300">
+                {gridLive ? (
+                  <>
+                    We checked every channel in your lineup for the next {withinHours} hours and no
+                    listing is a movie. That’s a real result from a full listings grid, not a gap in
+                    our data.
+                  </>
+                ) : (
+                  <>
+                    This deployment has no full TV listings provider connected. Our current source is
+                    an episode database that mostly cannot see movies on cable — Hallmark, Lifetime
+                    Movies and the classic-movie channels are absent from it entirely — so an empty
+                    result here is missing data on our side, not an empty schedule. Rather than show
+                    you unrelated shows, we show nothing until we can prove a movie is airing.
+                  </>
+                )}
+              </p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                <Link href="/app/finder" className="rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-400">
+                  Find movies by streaming service
+                </Link>
+                <Link href="/app/tv?view=guide" className="rounded-lg border border-white/15 px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+                  Browse the channel guide
+                </Link>
+              </div>
+            </div>
+          ) : genreEmpty ? (
             <>
               {/* Honest empty-state.
                   The distinction that matters: this is NOT "there is nothing on
