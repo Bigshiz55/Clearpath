@@ -80,6 +80,12 @@ type Pick =
   | { kind: 'not_interested'; id: string }
   | { kind: 'seen'; rating: Rating; id: string };
 
+/* LABELED CONTROLS, EMOJI IN SUPPORT. The rating chips used to render the
+   emoji ALONE with the word hidden in a hover tooltip — an emoji-first
+   control asks every user to translate 😐, and translation is exactly the
+   ambiguity a taste instrument cannot afford. The label is the control now;
+   the emoji rides along as a decorative icon (aria-hidden at the render
+   site). Keys and semantics are untouched — only the presentation grew up. */
 const RATINGS: Array<{ key: Rating; label: string; emoji: string }> = [
   { key: 'loved', label: 'Loved', emoji: '❤️' },
   { key: 'liked', label: 'Liked', emoji: '👍' },
@@ -686,7 +692,7 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
                         : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10',
                     ].join(' ')}
                   >
-                    👍 Looks good
+                    <span aria-hidden>👍</span>&nbsp;Looks good
                   </button>
                   <button
                     type="button"
@@ -700,24 +706,33 @@ export function TitleGridCalibration({ sessionId }: { sessionId?: string | undef
                         : 'border-white/12 bg-white/5 text-slate-300 hover:bg-white/10',
                     ].join(' ')}
                   >
-                    👎 Doesn&rsquo;t look good
+                    <span aria-hidden>👎</span>&nbsp;Doesn&rsquo;t look good
                   </button>
                 </div>
 
                 {openRating === k ? (
-                  <div className="mt-1 flex flex-wrap gap-1" data-testid={`grid-ratings-${i.id}`}>
-                    {RATINGS.map((r) => (
-                      <button
-                        key={r.key}
-                        type="button"
-                        onClick={(e) => setRating(i, r.key, e.currentTarget)}
-                        data-testid={`grid-rate-${i.id}-${r.key}`}
-                        className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg border border-white/12 bg-white/5 px-1 text-base text-slate-200 hover:bg-white/10"
-                        title={r.label}
-                      >
-                        {r.emoji}
-                      </button>
-                    ))}
+                  <div className="mt-1 grid grid-cols-2 gap-1" data-testid={`grid-ratings-${i.id}`}>
+                    {RATINGS.map((r) => {
+                      const selected = seen === r.key;
+                      return (
+                        <button
+                          key={r.key}
+                          type="button"
+                          onClick={(e) => setRating(i, r.key, e.currentTarget)}
+                          aria-pressed={selected}
+                          data-testid={`grid-rate-${i.id}-${r.key}`}
+                          className={[
+                            'inline-flex min-h-[40px] items-center justify-center gap-1 rounded-lg border px-1 text-[11px] font-bold leading-tight transition',
+                            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-300',
+                            selected
+                              ? 'border-brand-400 bg-brand-500/25 text-brand-100'
+                              : 'border-white/12 bg-white/5 text-slate-200 hover:bg-white/10',
+                          ].join(' ')}
+                        >
+                          <span aria-hidden>{r.emoji}</span> {r.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : (
                   <button
