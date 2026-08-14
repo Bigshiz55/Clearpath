@@ -171,7 +171,7 @@ export async function POST(req: Request) {
       }
     }
     /* Guarantee the actor filter regardless of AI (fuzzy, so misspellings
-       match) — and record which spans that cost, so the subject layer cannot
+       match) — and record which ENTITY that cost, so the subject layer cannot
        spend them again. The Forensic Search resolves people exactly as Ask the
        Judge does and shares one subject layer, so it shares the collision:
        leaving it out would be the cross-route drift finderSubject.ts exists to

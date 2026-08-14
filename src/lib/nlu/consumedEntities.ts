@@ -113,13 +113,103 @@ function namesTheSame(spoken: string, nameToken: string): boolean {
 const tokensOf = (s: string): string[] =>
   (String(s ?? '').toLowerCase().match(WORD) ?? []).filter((t) => t.length >= MIN_TOKEN);
 
+/** One word of the utterance, and where it sits. */
+interface Word {
+  value: string;
+  start: number;
+  end: number;
+}
+
 /**
- * Blank out the occurrences that entity resolution already spent, leaving the
+ * THE NAME AS A COHERENT OCCURRENCE — the contract this file actually owes.
+ *
+ * Locating each name token independently is what "first match" means, and it
+ * picks the wrong words the moment one of them appears earlier for an unrelated
+ * reason. Measured on "Cruise ships sound fun. Give me a Tom Cruise movie.": the
+ * `cruise` of "Cruise ships" was spent, the ACTOR's `cruise` survived beside
+ * `movie`, and `subjectCanonical` came back "cruise" — the exact defect this
+ * whole module exists to prevent, restored from the other direction.
+ *
+ * Searching from the end only reverses which sentence breaks. The fix is to
+ * stop treating the name as a bag of independent lookups: find WHERE the person
+ * was named, then spend only what is inside it.
+ */
+function locateOccurrence(
+  found: readonly Word[],
+  nameTokens: readonly string[],
+  attributed: ReadonlySet<string>,
+  consumed: ReadonlySet<number>,
+): number[] {
+  const free = (i: number) => !consumed.has(i) && found[i]!.value.length >= MIN_TOKEN;
+
+  /* 1. THE NAME, SAID AS A NAME. When the resolved name appears as a
+        contiguous run of words, that run IS the occurrence and needs no other
+        evidence — "Tom Cruise" adjacent is not a coincidence the way a lone
+        "cruise" is. Fuzzy per token, so a misspelling still matches here. */
+  if (nameTokens.length > 0) {
+    for (let i = 0; i + nameTokens.length <= found.length; i++) {
+      let all = true;
+      for (let k = 0; k < nameTokens.length; k++) {
+        if (!free(i + k) || !namesTheSame(found[i + k]!.value, nameTokens[k]!)) {
+          all = false;
+          break;
+        }
+      }
+      if (all) return Array.from({ length: nameTokens.length }, (_, k) => i + k);
+    }
+  }
+
+  /* 2. THE LEGACY BAG. `resolvePerson` hands over a filtered token bag, not a
+        span, and the words it attributed may be scattered ("watched yesterday
+        stallone") or partial (the utterance said only a surname). Here the
+        resolved identity is used as a SEQUENCE — matched in order, narrowest
+        window wins — never as independent global lookups, and always behind the
+        provenance gate. */
+  const eligible = (i: number, token: string) =>
+    free(i) && attributed.has(found[i]!.value) && namesTheSame(found[i]!.value, token);
+
+  // Drop name tokens the utterance never offered (a surname-only ask never says
+  // "sylvester"), then require the rest to appear in the name's own order.
+  const present = nameTokens
+    .map((t) => found.map((_, i) => i).filter((i) => eligible(i, t)))
+    .filter((positions) => positions.length > 0);
+
+  // Shrink from the FRONT on failure: a name's later parts are its identifying
+  // ones, so "…Stallone" survives an unmatchable "Sylvester" rather than the
+  // reverse.
+  for (let drop = 0; drop < present.length; drop++) {
+    const lists = present.slice(drop);
+    let best: number[] | null = null;
+    for (const start of lists[0]!) {
+      const picked = [start];
+      let cursor = start;
+      let ok = true;
+      for (let k = 1; k < lists.length; k++) {
+        const next = lists[k]!.find((p) => p > cursor);
+        if (next === undefined) {
+          ok = false;
+          break;
+        }
+        picked.push(next);
+        cursor = next;
+      }
+      if (!ok) continue;
+      const span = picked[picked.length - 1]! - picked[0]!;
+      if (best === null || span < best[best.length - 1]! - best[0]!) best = picked;
+    }
+    if (best !== null) return best;
+  }
+
+  return [];
+}
+
+/**
+ * Blank out the occurrence that entity resolution already spent, leaving the
  * rest of the sentence and its word order untouched.
  *
- * One occurrence per token of the resolved name: a person's name contributes
- * each of its parts once, so a second use of the same word is the user talking
- * about something else and survives.
+ * One occurrence per entity — not one per token, and not every match in the
+ * utterance. A second use of the same word is the user talking about something
+ * else and survives.
  *
  * Whole words only — a resolved "Hunt" cannot hollow out "manhunt".
  */
@@ -129,8 +219,7 @@ export function maskConsumedEntities(
 ): string {
   if (!text || !entities || entities.length === 0) return text;
 
-  // Every word of the utterance, with the position it occupies.
-  const found: Array<{ value: string; start: number; end: number }> = [];
+  const found: Word[] = [];
   for (const m of text.matchAll(WORD)) {
     found.push({ value: m[0]!.toLowerCase(), start: m.index!, end: m.index! + m[0]!.length });
   }
@@ -138,19 +227,13 @@ export function maskConsumedEntities(
 
   const consumed = new Set<number>();
   for (const entity of entities) {
-    // PROVENANCE GATE: only words the extractor actually attributed to this
-    // entity are eligible. Without it this would be a vocabulary delete again,
-    // just with extra steps.
-    const attributed = new Set(tokensOf(entity.spokenAs));
-    for (const nameToken of tokensOf(entity.resolvedName)) {
-      const hit = found.findIndex(
-        (w, i) =>
-          !consumed.has(i) &&
-          w.value.length >= MIN_TOKEN &&
-          attributed.has(w.value) &&
-          namesTheSame(w.value, nameToken),
-      );
-      if (hit !== -1) consumed.add(hit);
+    for (const i of locateOccurrence(
+      found,
+      tokensOf(entity.resolvedName),
+      new Set(tokensOf(entity.spokenAs)),
+      consumed,
+    )) {
+      consumed.add(i);
     }
   }
   if (consumed.size === 0) return text;

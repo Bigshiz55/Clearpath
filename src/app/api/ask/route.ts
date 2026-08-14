@@ -845,9 +845,16 @@ export async function POST(req: Request) {
 
     /* Guarantee the actor filter regardless of AI: if a person is named and not
        already resolved, look them up (fuzzy, so misspellings still match) — and
-       record EVERY SPAN THIS REQUEST SPENT RESOLVING A PERSON, from whichever
-       path resolved one, so the subject layer cannot read the same words a
-       second time as a content subject. */
+       record EACH ENTITY THIS REQUEST RESOLVED, from whichever path resolved
+       one, so the subject layer cannot read the same occurrence a second time
+       as a content subject.
+
+       Each carries both namings because they are not interchangeable: the user
+       may say only a surname, or spell it their own way, while the catalog
+       answers with the canonical full name. `spokenAs` is the language the
+       extractor ATTRIBUTED to the person, which for the legacy resolver is a
+       filtered token bag rather than a true source span — see
+       lib/nlu/consumedEntities.ts for what that does and does not license. */
     const consumedEntities: ConsumedEntity[] = [...(ai?.resolvedPeople ?? [])];
     if (text && (!query.castIds || query.castIds.length === 0) && !lex) {
       const person = await resolvePerson(text);

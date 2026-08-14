@@ -30,7 +30,7 @@
  * WHY THIS IS NOT A VOCABULARY BUG. Adding `stallone` to `NON_SUBJECT` fixes
  * one actor. The list would need every performer who has ever been asked for by
  * surname, and would still be wrong the day someone says "a Hunt movie". The
- * defect is that two consumers read the same span with neither aware of the
+ * defect is that two consumers read the same words with neither aware of the
  * other, so the invariant is structural:
  *
  *   Language already consumed as a RESOLVED ENTITY may not be reinterpreted
@@ -38,8 +38,8 @@
  *
  * And the inverse must keep working, which is why "disable subject detection
  * whenever castIds exists" is also wrong: "a Tom Hanks courtroom movie" means
- * person Hanks AND subject courtroom. Only the person's OWN span is consumed;
- * the rest of the sentence still speaks.
+ * person Hanks AND subject courtroom. Only the occurrence where the person was
+ * actually named is consumed; the rest of the sentence still speaks.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -187,7 +187,7 @@ describe('the inverse must keep working — only the person is consumed', () => 
     expect(query.subjectLexemes ?? []).not.toContain('stallone');
   });
 
-  it('with no consumed span nothing changes — the boundary is opt-in', async () => {
+  it('with no consumed entity nothing changes — the boundary is opt-in', async () => {
     // A caller that resolved no entity passes nothing and must behave exactly
     // as before, or the fix has widened past its own defect.
     const { query } = await applyRequiredSubject({ ...EMPTY_QUERY, mediaType: 'movie' }, 'a boxing movie');
@@ -250,6 +250,49 @@ describe('REVIEW BLOCKER — the mask must spend an OCCURRENCE, not a vocabulary
     expect(masked).toMatch(/watched/);
     expect(masked).toMatch(/yesterday/);
     expect(masked).not.toMatch(/stallone/i);
+  });
+});
+
+describe('REVIEW BLOCKER — the entity owns an OCCURRENCE, not the first match', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  /* `a Tom Cruise cruise ship movie` only proves person-first ordering: the
+     person is named before the repeated content word, so taking the first match
+     happens to be right. Reverse the order and first-match spends the wrong
+     one — measured on the previous implementation:
+
+       masked           "  ships sound fun. Give me a   Cruise movie."
+       subjectCanonical "cruise"
+
+     The `cruise` of "Cruise ships" was eaten and the ACTOR's `cruise` survived
+     next to `movie`, which is the original defect arriving from the other side.
+     Together the two directions pin ownership rather than ordering. */
+
+  const REVERSED = 'Cruise ships sound fun. Give me a Tom Cruise movie.';
+  const CRUISE = [{ spokenAs: 'Tom Cruise', resolvedName: 'Tom Cruise' }];
+
+  it('RED — the mask keeps the earlier content word and spends the later name', () => {
+    const masked = maskConsumedEntities(REVERSED, CRUISE);
+    // The sentence the user opened with is theirs and survives intact.
+    expect(masked).toMatch(/cruise ships/i);
+    // The person they actually asked for is gone — including the `Cruise` that
+    // was sitting next to `movie`, which is the one that could become a subject.
+    expect(masked).not.toMatch(/tom/i);
+    expect(masked).not.toMatch(/cruise\s+movie/i);
+  });
+
+  it('RED — and no subject survives to reach the finder', async () => {
+    // Asserted through applyRequiredSubject, not just the string, so the
+    // failure cannot hide behind a mask that looks plausible.
+    const { query, requirement } = await applyRequiredSubject(
+      { ...EMPTY_QUERY, mediaType: 'movie', castIds: [500] },
+      REVERSED,
+      { consumedEntities: CRUISE },
+    );
+    expect(query.castIds).toEqual([500]);
+    expect(query.subjectCanonical).toBeUndefined();
+    expect(query.subjectLexemes ?? []).not.toContain('cruise');
+    expect(requirement).toBeNull();
   });
 });
 
