@@ -8,6 +8,7 @@ import { streamingNames } from '@/lib/services';
 import { tileRatingsFromScore } from '@/lib/ratings';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { deciderSearchUrl } from '@/lib/tmdb/meta-helpers';
+import { isVerbLike } from '@/lib/nlu/likeGrammar';
 import { MAX_REQUESTED_COUNT } from '@/lib/nlu/count';
 import { candidateTarget, mapPool, HYDRATE_CONCURRENCY } from '@/lib/finderPool';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
@@ -64,7 +65,24 @@ function whereFrom(providers: { available: boolean; options: { providerName: str
 // Fargo". Ordered longest-first within each group; the bare "like" is last so a
 // specific cue wins when several are present.
 const REF_CUE =
-  /\b(?:in the vein of|in the style of|along the lines of|reminiscent of|reminds me of|same (?:feel|vibe|energy|tone|feeling|mood) as|if i (?:really )?(?:like|liked|enjoy|enjoyed|love|loved)|i (?:really )?(?:liked|enjoyed|loved)|similar to|(?:newer|older) than|(?:more|less) [a-z]+ than|(?:something|stuff|shows?|movies?|a show|a movie|more|kinda|kind of|sort of|just|a lot) like|like the (?:show|movie)|like watching|like)\b/gi;
+  /\b(?:in the vein of|in the style of|along the lines of|reminiscent of|reminds me of|same (?:feel|vibe|energy|tone|feeling|mood) as|if i (?:really )?(?:like|liked|enjoy|enjoyed|love|loved)|i (?:really )?(?:liked?|enjoy(?:ed)?|loved?)|similar to|(?:newer|older) than|(?:more|less) [a-z]+ than|(?:something|stuff|shows?|movies?|a show|a movie|more|kinda|kind of|sort of|just|a lot) like|like the (?:show|movie)|like watching|like)\b/gi;
+
+/**
+ * A preference verb's object is either a WORK or a CATEGORY, and only a work
+ * is a similarity seed. "I like Rocky" names a film — the stated taste is the
+ * best evidence in the sentence and it must survive as the reference
+ * (dropping it silently is the constraint-loss failure `constraintPreservation`
+ * pins). "I like Sylvester Stallone movies" names a CLASS of films: reading
+ * its words as a title manufactures an anchor for a film nobody has made,
+ * which is exactly how a preference sentence ended up in title clarification.
+ * The head test uses the media nouns this module already owns — never a
+ * person, a genre, or a title, so no name can be special-cased into either
+ * reading. Applies to the whole preference family, past and present tense.
+ */
+const PREFERENCE_CUE = /^(?:if\s+)?i\b/i;
+const CATEGORY_OBJECT = /\b(?:movies?|films?|shows?|series|tv|television|documentaries|docs|flicks)\s*$/i;
+const isCategoryObject = (tail: string): boolean =>
+  CATEGORY_OBJECT.test((tail.split(/[,.;!?]/, 1)[0] ?? '').trim());
 
 /**
  * Preference clauses people tack on the end: "…that I would like", "…I'd
@@ -129,11 +147,22 @@ export function extractReference(text: string): string | null {
   //
   // Among equally specific cues the last still wins, so "shows I'd enjoy if I
   // liked Fargo" resolves to Fargo.
+  //
+  // A bare "like" must also be the PREPOSITION, not the verb: "I would like
+  // 3 boxing movies" states a wish, and its object is not a seed title. The
+  // grammatical test is shared with the critic's comparison parser
+  // (likeGrammar.ts) so the two doors cannot disagree. Stated preferences
+  // that NAME A WORK remain explicit cues ("I like Rocky", "if I liked
+  // Fargo") — the taste is the best evidence in the sentence — but a
+  // preference whose object is a CATEGORY ("I like Sylvester Stallone
+  // movies") seeds nothing: there is no title in it to find.
   const specific = hits.filter((h) => /\s/.test(h[0]));
-  const bare = hits.filter((h) => !/\s/.test(h[0]));
+  const bare = hits.filter((h) => !/\s/.test(h[0]) && !isVerbLike(text, h.index));
   for (const group of [specific, bare]) {
     for (let i = group.length - 1; i >= 0; i--) {
-      const tail = tailOf(group[i]!);
+      const hit = group[i]!;
+      const tail = tailOf(hit);
+      if (PREFERENCE_CUE.test(hit[0]) && isCategoryObject(tail)) continue;
       // A bare year is a DATE, not a reference: "newer than 2015" states a
       // floor, and treating "2015" as a seed title would search for the film
       // called 2015 and compare against the wrong thing entirely.
