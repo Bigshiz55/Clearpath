@@ -277,13 +277,29 @@ test.describe('TEST E — temporary context never contaminates the next request'
     await ask.fill('a fast mystery movie under 100 minutes');
     await ask.press('Enter');
     await expect(page.getByText('The Night Detective').first()).toBeVisible();
-    expect((bodies[0]!.query as Record<string, unknown>).maxRuntime).toBe(100);
+    /* THE CURRENT TRANSPORT CONTRACT (this assertion used to expect
+       query.maxRuntime === 100 — the retired shape). A typed constraint now
+       travels in `text` and the SERVER parses it (parseAskWithAI /
+       naiveParseQuery + augmentInternational's min-wins runtime ceiling —
+       pinned in askInternational.test.ts), while an UNTOUCHED slider field
+       ships neutral and unclaimed by `overrides` so it can never constrain a
+       fresh keyword search (FinderUI's own documented rule; controls.spec.ts
+       pins the same null on this same first request). */
+    expect(bodies[0]!.text).toBe('a fast mystery movie under 100 minutes');
+    expect((bodies[0]!.query as Record<string, unknown>).maxRuntime).toBeNull();
+    expect((bodies[0]!.overrides as string[] | undefined) ?? []).not.toContain('maxRuntime');
 
     await ask.fill('something funny');
     await ask.press('Enter');
     await expect.poll(() => bodies.length).toBe(2);
+    /* THE GUARANTEE UNDER TEST, on every channel the cap could ride: nothing
+       of the first ask's temporary 100-minute ceiling survives into the
+       unrelated second ask — not in the query, not in the overrides list,
+       and not smuggled in the text the server would re-parse. */
     const q2 = bodies[1]!.query as Record<string, unknown>;
     expect(q2.maxRuntime).toBeNull(); // the temporary 100-min cap is gone
+    expect(bodies[1]!.text).toBe('something funny');
+    expect((bodies[1]!.overrides as string[] | undefined) ?? []).not.toContain('maxRuntime');
     expect(q2.mediaType).toBe('any');
   });
 });

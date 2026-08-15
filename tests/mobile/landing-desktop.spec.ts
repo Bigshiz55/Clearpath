@@ -50,14 +50,16 @@ test('never shows a header "Start watching" button alongside the gold entrance',
   await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
 });
 
-test('the DNA quiz and import history are still reachable, as quiet links under the button', async ({ page }) => {
+test('the hero is one door — no quiz/import pills compete with the entrance', async ({ page }) => {
+  // The quiet links moved INSIDE the app (page.tsx documents the decision:
+  // "three doors is a decision the visitor hasn't earned yet"), and their
+  // reachability is pinned at source level by quizReachable.test.ts — which
+  // asserts BOTH that the in-app entry points exist and that these landing
+  // pills are gone. This is the desktop-width browser half of that contract.
   await open(page, 1440);
-  const dna = page.getByTestId('cta-dna');
-  const imp = page.getByTestId('cta-import');
-  await expect(dna).toBeVisible();
-  await expect(dna).toHaveAttribute('href', '/app/taste-quiz');
-  await expect(imp).toBeVisible();
-  await expect(imp).toHaveAttribute('href', '/import-taste');
+  await expect(page.getByTestId('cta-dna')).toHaveCount(0);
+  await expect(page.getByTestId('cta-import')).toHaveCount(0);
+  await expect(page.getByTestId('hero-ctas').getByRole('link')).toHaveCount(1);
 });
 
 test('the logo grows further on a real desktop than it does on a tablet', async ({ page }) => {
