@@ -14,7 +14,7 @@ import { hasLiveFullGridProvider } from '@/lib/viewing/liveTv';
 import { tvMediaAttributionApplicable } from '@/lib/tv/providerRegistry';
 import { TvDetective } from '@/components/TvDetective';
 import { CoverageNote } from '@/components/tv/CoverageNote';
-import { Antenna, Film, Sparkles } from 'lucide-react';
+import { Antenna, Film, Newspaper, Sparkles } from 'lucide-react';
 import { DNA_PERSONAL_MIN } from '@/lib/verdict/confidence';
 
 export const dynamic = 'force-dynamic';
@@ -265,17 +265,19 @@ export default async function OnTvPage({
         </p>
       </section>
 
-      {/* THREE WAYS INTO THE SAME SCHEDULE. Highlights is the curated view;
-          the full guide is the cable box (every channel, by channel); movies
-          is the whole lineup filtered to films — the "there must be Hallmark
+      {/* FOUR WAYS INTO THE SAME SCHEDULE. The briefing is the editorial
+          front page (its own route); Highlights is the curated view; the
+          full guide is the cable box (every channel, by channel); movies is
+          the whole lineup filtered to films — the "there must be Hallmark
           movies on somewhere" question, answered as a tab instead of a typed
           query. US-only because the ingested grid is the US national lineup. */}
       {region === 'US' && (
         <nav className="flex flex-wrap gap-1.5" aria-label="Guide views" data-testid="tv-views">
           {[
+            { href: '/app/tv/briefing', label: 'Today’s Case Briefing', Icon: Newspaper, active: false },
             { href: '/app/tv', label: 'Highlights', Icon: Sparkles, active: !guideView && withinHours == null },
-            { href: '/app/tv?view=guide', label: 'Full guide', Icon: Antenna, active: guideView },
             { href: '/app/tv?within=12&type=movie', label: 'Movies on now', Icon: Film, active: !guideView && movieOnly },
+            { href: '/app/tv?view=guide', label: 'Full guide', Icon: Antenna, active: guideView },
           ].map((t) => (
             <Link
               key={t.href}
@@ -406,6 +408,25 @@ export default async function OnTvPage({
         </>
       ) : (
         <>
+          {/* THE FRONT-PAGE INVITATION — shown only while the same imported
+              coverage the briefing itself requires is live, so the tap never
+              lands on an empty edition from here. */}
+          {xmltv.live && (
+            <Link
+              href="/app/tv/briefing"
+              data-testid="briefing-entry"
+              className="flex items-center gap-3 rounded-2xl border border-pink-400/40 bg-gradient-to-r from-pink-500/[0.12] via-transparent to-brand-500/[0.10] p-4 transition hover:border-pink-400/70"
+            >
+              <Newspaper size={28} className="flex-none text-pink-300" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-black uppercase tracking-[0.18em] text-white">Today’s Case Briefing</span>
+                <span className="block truncate text-xs text-slate-300">
+                  Your personalized docket for today’s TV — from the stored schedule and your own verdicts.
+                </span>
+              </span>
+              <span className="flex-none text-sm font-semibold text-pink-300">Read it →</span>
+            </Link>
+          )}
           {whatsOnAirings.length > 0 && (
             <WhatsOnToday airings={whatsOnAirings} nowMs={now.getTime()} personalized={guidePersonalized} />
           )}

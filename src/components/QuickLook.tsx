@@ -42,7 +42,17 @@ function youTubeId(url: string | null): string | null {
   return m ? m[1]! : null;
 }
 
-export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClose: () => void }) {
+export function QuickLook({
+  target,
+  onClose,
+  airingLine,
+}: {
+  target: QuickLookTarget;
+  onClose: () => void;
+  /** Optional schedule context ("AIRING TODAY · TCM · 8:00 PM–10:30 PM") for
+   *  callers opening a title FROM a stored airing. Absent everywhere else. */
+  airingLine?: string | null;
+}) {
   const [data, setData] = useState<QuickLookData | null>(null);
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -153,6 +163,14 @@ export function QuickLook({ target, onClose }: { target: QuickLookTarget; onClos
               <SaveButton tmdbId={target.id} mediaType={target.mediaType} title={target.title} year={target.year} posterPath={target.posterPath} variant="inline" />
             </div>
           </div>
+
+          {/* Where this title sits on TODAY'S schedule, when a stored airing
+              opened it — provider truth, formatted, never computed here. */}
+          {airingLine && (
+            <p className="text-[11px] font-black uppercase tracking-wider text-gold-300" data-testid="quicklook-airing-line">
+              {airingLine}
+            </p>
+          )}
 
           {/* Ratings */}
           <RatingsStrip ratings={data?.ratings ?? EMPTY_TILE_RATINGS} title={target.title} year={target.year} standard loading={!data && !failed} />

@@ -28,6 +28,20 @@ Updated at the end of every work order per the Working Agreement in
   standard Supabase env; it enforces the owner's exact contract and prints
   only the five allowed fields.
 
+## Now (continued)
+- **TODAY'S CASE BRIEFING is BUILT (`claude/todays-case-briefing`, stacked
+  on the XMLTV PR):** first-class `/app/tv/briefing` route — editorial
+  front page over the stored imported day (paged whole-day reader
+  `getIngestedDayAirings`), scored ONCE by the existing `scoreGuideAirings`
+  engine, pure tested selector (`src/lib/tv/caseBriefing.ts`, viewer-local
+  calendar day via `?tz=` with a one-shot browser correction), `?channel=`
+  deep-linked channel editions off a horizontally-scrolling rail, matched
+  items → canonical QuickLook with an AIRING TODAY line, unmatched →
+  honest schedule-detail sheet, exact honest no-coverage/no-rows states.
+  OWNER ACCEPTANCE still requires the real XMLTV import against the
+  preview-accessible database (command in the PR) — until then the route
+  shows the honest absence state, by design.
+
 ## Next (discovered during the P0 repair)
 - **XMLTV file-fed grid is BUILT (`claude/xmltv-file-ingestion`, stacked on
   the P0 PR):** streaming importer → canonical 0032 tables, coverage
@@ -35,9 +49,14 @@ Updated at the end of every work order per the Working Agreement in
   the imported window covers now, What's On Today sections over stored rows.
   REMAINING: run the real import against a dev/prod database (needs
   `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`; command in the
-  PR), confirm TV Media file-delivery retention/redistribution terms in
-  writing, and obtain feed 10737 (543-channel file — referenced, never
-  supplied).
+  PR), and confirm TV Media file-delivery retention/redistribution terms in
+  writing. (A reduced copy of feed 10737 HAS since been supplied and drove
+  the multi-position station fix.)
+- Briefing follow-ups: persist a user's preferred briefing timezone on the
+  profile (today it rides `?tz=` per visit); consider station-logo ingest
+  (`tv_stations.logo_url` is declared but unwritten, so the rail draws
+  monograms); revisit `SCORE_BUDGET` for the briefing's whole-day set once
+  real import volumes are observed.
 - **INFRA — licensed full-grid provider activation** is the only path to
   provable movie coverage: TVmaze structurally cannot see movie blocks
   (Hallmark/LMN/TCM absent entirely; measured, `docs/tv-coverage/`). TV Media
