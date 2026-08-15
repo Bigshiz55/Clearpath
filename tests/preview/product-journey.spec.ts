@@ -19,7 +19,7 @@ import { test, expect, type Page, type BrowserContext } from '@playwright/test';
  *   /app/together → the mode question before any creation; Quick Pick and
  *                   Jury Room with explicit start actions
  *   /app/tv guide → filter chips visible; the Movies chip yields either real
- *                   channel rows or one of the three HONEST empty states —
+ *                   channel rows or one of the four HONEST empty states —
  *                   never a bare unexplained zero; scores wear the canonical
  *                   Verd1ct badge (or its canonical placeholder)
  *
@@ -240,9 +240,9 @@ test.describe('Product journey — fresh user, real preview', () => {
         expect(label ?? '').toContain('Watch Verd1ct score');
       }
     } else {
-      // ZERO IS ALWAYS EXPLAINED: exactly one of the three honest states.
+      // ZERO IS ALWAYS EXPLAINED: exactly one of the four honest states.
       const named = page.locator(
-        '[data-testid="guide-movies-true-empty"], [data-testid="guide-movies-filtered-out"], [data-testid="guide-movies-unprovable-now"]',
+        '[data-testid="guide-movies-true-empty"], [data-testid="guide-movies-filtered-out"], [data-testid="guide-movies-unprovable-now"], [data-testid="guide-movies-coverage-unprovable"]',
       );
       await expect(named.first(), 'a Movies zero must name which truth it is').toBeVisible();
       const id = await named.first().getAttribute('data-testid');
