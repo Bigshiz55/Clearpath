@@ -354,17 +354,23 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
       )}
 
       {/* MANUAL ▶ Trailer affordance — always present (no flag) while not playing.
-          Bottom-RIGHT so it clears bottom-left card labels (release date, etc.). */}
+          Bottom-RIGHT so it clears bottom-left card labels (release date, etc.).
+          The BUTTON is a 44×44-minimum tap target (the app-wide floor for
+          primary controls); the compact pill is a child span so the poster
+          keeps its small overlay while a thumb gets a real target. manualPlay
+          stops propagation, so the padded area still never opens QuickLook. */}
       {!showIframe && (
         <button
           type="button"
           onClick={manualPlay}
           aria-label={`Play ${title} trailer`}
           data-testid="trailer-play"
-          className="absolute bottom-1 right-1 z-[2] flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80"
+          className="absolute bottom-0 right-0 z-[2] flex min-h-[44px] min-w-[44px] items-end justify-end p-1"
         >
-          <span aria-hidden>▶</span>
-          <span>{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
+          <span className="flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80">
+            <span aria-hidden>▶</span>
+            <span>{loading ? '…' : noTrailer ? 'No trailer' : 'Trailer'}</span>
+          </span>
         </button>
       )}
     </div>

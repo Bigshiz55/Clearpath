@@ -57,6 +57,16 @@ describe('ask route international augmentation (live wiring)', () => {
     expect(q.maxRuntime).toBe(90);
   });
 
+  it('restores a typed runtime cap the client deliberately ships as neutral', () => {
+    // THE FINDER TRANSPORT CONTRACT (wired-experience TEST E's other half):
+    // FinderUI nulls untouched slider fields on a typed search so a stale
+    // slider can never constrain a fresh ask — the SENTENCE is the truth, and
+    // this augmentation step is where the server executes it. The exact
+    // browser-test utterance, through the exact legacy-path shape.
+    const q = augmentInternational(base(), 'a fast mystery movie under 100 minutes');
+    expect(q.maxRuntime).toBe(100);
+  });
+
   it('narrows an uncommitted query when a media type is explicitly ruled out', () => {
     const anyQ: FinderQuery = { ...base(), mediaType: 'any' };
     augmentInternational(anyQ, 'Fargo the movie, not the series');

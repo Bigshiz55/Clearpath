@@ -19,7 +19,9 @@ export default function JudgeHarness({ searchParams }: { searchParams: { q?: str
   // keystroke→results transport, not just an empty judge.
   const seed = typeof searchParams.q === 'string' ? searchParams.q.slice(0, 300) : null;
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6">
+    /* Same shell width as the real /app/ask host (`container-page`), so the
+       results grid's column count measured here is the column count shipped. */
+    <main className="container-page py-6">
       <h1 className="mb-4 text-lg font-bold text-white">Judge harness</h1>
       <AskTheJudge seedQuery={seed} />
     </main>

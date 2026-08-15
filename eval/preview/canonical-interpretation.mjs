@@ -599,6 +599,52 @@ async function main() {
   }
   await stalloneFunnel(directed.body);
 
+  /*
+   * ── CASE 13: A STATED PREFERENCE IS NEVER A TITLE ANCHOR ────────────────
+   *
+   * The exact production sentence. The comparison parser's bare like-cue read
+   * the VERB in "I like…" as the PREPOSITION in "movies like Rocky", minted
+   * "Sylvester Stallone movies" as a reference TITLE, failed to resolve it —
+   * no such film exists — and the user was asked "Which title did you mean?"
+   * for a sentence that never named one. The contract: a preference plus a
+   * recommendation request gets RECOMMENDATIONS. Never a title lookup, never
+   * a comparison, never a clarification.
+   */
+  console.log('\n── CASE 13: preference "like" is not a comparison ─────────');
+  const pref = await ask("I like Sylvester Stallone movies, what else do you think I'll like?");
+  const prefKind = kind(pref.body);
+  check('preference', 'receipt', 'answered with results, NEVER a clarification', prefKind !== 'clarify', `kind=${prefKind}`);
+  check(
+    'preference',
+    'receipt',
+    'no "which title did you mean" question anywhere in the response',
+    !/which .* did you mean/i.test(JSON.stringify(pref.body.clarify ?? '')),
+    String(pref.body.clarify ?? '(none)'),
+  );
+  check('preference', 'world', 'real recommendations came back', titles(pref.body).length > 0, `got ${titles(pref.body).length} kind=${prefKind}`);
+  await stalloneFunnel(pref.body);
+
+  /*
+   * ── CASE 14: "I WOULD LIKE 3 BOXING MOVIES" IS A WISH, NOT A COMPARISON ─
+   *
+   * The same mechanism turned this sentence into a comparison against a film
+   * called "3 boxing movies". The wish must execute as stated: three, movies,
+   * boxing — proven by the deployment's own eligibility verdicts.
+   */
+  console.log('\n── CASE 14: "I would like 3 boxing movies" ────────────────');
+  const wish = await ask('I would like 3 boxing movies');
+  const wishTitles = titles(wish.body);
+  check('wish', 'receipt', 'answered with a search, not a clarification', kind(wish.body) === 'search', `kind=${kind(wish.body)}`);
+  check('wish', 'receipt', 'boxing is the executable subject', subjectIs(wish.body, 'boxing'), describeQuery(wish.body));
+  check('wish', 'receipt', 'the request is for MOVIES', mediaTypeIs(wish.body, 'movie'), describeQuery(wish.body));
+  check('wish', 'receipt', 'the route was asked for three', requestedCount(wish.body) === 3, `requestedCount=${requestedCount(wish.body)}`);
+  check('wish', 'world', 'returned three titles', wishTitles.length === 3, `got ${wishTitles.length}`);
+  {
+    const facts = foldFacts(sample(wish.body).map((i) => subjectFact(i, 'boxing')));
+    check('wish', 'world', `returned titles really are boxing (first ${WORLD_SAMPLE})`, facts.ok, facts.detail);
+  }
+  await stalloneFunnel(wish.body);
+
   // ── VERDICT ──────────────────────────────────────────────────────────────
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${'─'.repeat(60)}`);

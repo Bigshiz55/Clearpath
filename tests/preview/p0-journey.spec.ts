@@ -107,3 +107,116 @@ test.describe('P0 journey — 3 Sylvester Stallone movies', () => {
     await context.close();
   });
 });
+
+/** One authenticated page against the preview, the same way the journey gets one. */
+async function authedPage(browser: import('@playwright/test').Browser) {
+  const context = await browser.newContext({
+    baseURL: BASE_URL,
+    extraHTTPHeaders: { 'x-vercel-protection-bypass': BYPASS },
+  });
+  const page = await context.newPage();
+  await page.goto('/newuser');
+  const landed = await page.waitForURL(/\/app(?:$|[/?#])/, { timeout: 20_000 }).then(() => true).catch(() => false);
+  if (!landed) {
+    const login = await context.request.post('/api/preview-test-login', {
+      headers: { 'x-preview-test-secret': LOGIN_SECRET },
+    });
+    expect(login.status(), 'preview test login must mint a session').toBe(200);
+  }
+  return { context, page };
+}
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * RELEASE-GATE CANARY · ASK — the P0 incident sentences on the real preview.
+ * ══════════════════════════════════════════════════════════════════════════
+ * FAIL conditions, verbatim from the work order: the preference sentence
+ * enters title clarification; results render inside a nested scrollbox; the
+ * count is not respected.
+ */
+test.describe('ASK canary', () => {
+  test.skip(!BASE_URL, 'BASE_URL (the exact-SHA preview) is required');
+
+  test('the preference sentence gets recommendations — no clarification, tiles in page flow', async ({ browser }) => {
+    const { context, page } = await authedPage(browser);
+    const q = "I like Sylvester Stallone movies, what else do you think I'll like?";
+    const askResponse = page.waitForResponse(
+      (r) => r.url().includes('/api/ask') && r.request().method() === 'POST',
+      { timeout: 60_000 },
+    );
+    await page.goto(`/app/ask?q=${encodeURIComponent(q)}`);
+    const res = await askResponse;
+    const body = (await res.json()) as { kind?: string; items?: unknown[] };
+    expect(body.kind, 'never a clarification').not.toBe('clarify');
+    await expect(page.getByText(/which title did you mean/i)).toHaveCount(0);
+    // Real recommendations rendered, in the page-flow grid.
+    await expect(page.getByTestId('ask-results')).toBeVisible({ timeout: 30_000 });
+    const flow = await page.getByTestId('ask-results').evaluate((el) => ({
+      scrolls: el.scrollHeight > el.clientHeight + 1,
+      overflowY: getComputedStyle(el).overflowY,
+    }));
+    expect(flow.scrolls, 'the results container must not scroll internally').toBe(false);
+    expect(['auto', 'scroll']).not.toContain(flow.overflowY);
+    await context.close();
+  });
+
+  test('"3 boxing movies I would like" respects the count and renders proper tiles', async ({ browser }) => {
+    const { context, page } = await authedPage(browser);
+    const askResponse = page.waitForResponse(
+      (r) => r.url().includes('/api/ask') && r.request().method() === 'POST',
+      { timeout: 60_000 },
+    );
+    await page.goto(`/app/ask?q=${encodeURIComponent('3 boxing movies I would like')}`);
+    const res = await askResponse;
+    const body = (await res.json()) as { kind?: string; items?: Array<{ title: string }> };
+    expect(body.kind, 'a search, not a comparison against "3 boxing movies"').toBe('search');
+    expect(body.items ?? [], 'the count is respected').toHaveLength(3);
+    await expect(page.getByTestId('ask-results-grid').locator('> *')).toHaveCount(3, { timeout: 30_000 });
+    const flow = await page.getByTestId('ask-results').evaluate((el) => ({
+      scrolls: el.scrollHeight > el.clientHeight + 1,
+    }));
+    expect(flow.scrolls, 'no nested scrollbar on the results').toBe(false);
+    await context.close();
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * RELEASE-GATE CANARY · LIVE TV MOVIES — truth or verified movies, never both
+ * absent, never unrelated cards.
+ * ══════════════════════════════════════════════════════════════════════════
+ * PASS: verified movie airings only, OR the truthful insufficient-coverage
+ * state with ZERO unrelated cards. FAIL: unrelated cards render under the
+ * movies view; a coverage gap is called an empty schedule.
+ */
+test.describe('LIVE TV MOVIES canary', () => {
+  test.skip(!BASE_URL, 'BASE_URL (the exact-SHA preview) is required');
+
+  test('the movies view shows evidenced movies or an honest coverage state — nothing else', async ({ browser }) => {
+    const { context, page } = await authedPage(browser);
+    await page.goto('/app/tv?within=12&type=movie', { waitUntil: 'domcontentloaded' });
+
+    // THE OLD FALLBACK MUST BE GONE in every outcome: a movies question is
+    // never answered with the unfiltered schedule.
+    await expect(page.getByText(/Meanwhile — what's actually on live TV/i)).toHaveCount(0);
+
+    const emptyBox = page.getByTestId('movies-empty');
+    const isEmpty = await emptyBox.isVisible({ timeout: 30_000 }).catch(() => false);
+    if (isEmpty) {
+      // The truthful shortfall: the copy must distinguish OUR coverage from
+      // the schedule, and zero airing cards may accompany it.
+      await expect(emptyBox).toContainText(/missing data on our side|can’t prove what movies/i);
+      await expect(emptyBox).not.toContainText(/that’s the schedule/i);
+      await expect(page.getByTestId('airing-row')).toHaveCount(0);
+      console.log('CANARY OUTCOME: honest insufficient-coverage state, zero cards');
+    } else {
+      // Movies rendered: the only card source on this view is the
+      // movie-filtered set (showType === "Movie", unit-pinned) — the canary
+      // records the count for the run log.
+      const cards = await page.getByTestId('airing-row').count();
+      expect(cards, 'movie airings rendered').toBeGreaterThan(0);
+      console.log(`CANARY OUTCOME: ${cards} evidenced movie airing card(s)`);
+    }
+    await context.close();
+  });
+});

@@ -94,10 +94,20 @@ test.describe('State 1: fresh anonymous visitor', () => {
 
   test('nothing on the homepage claims personalization a first visitor has not earned', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    // The DNA entry point invites a first visitor to BUILD a profile; it must
-    // not address them as though one already exists (see dnaStage()'s
-    // fail-open cold-start default).
-    await expect(page.getByTestId('cta-dna')).toContainText(/build my watch dna/i);
+    // The DNA entry point no longer sits on the landing at all — the hero is
+    // ONE door and the quiz lives inside the app (a deliberate design change,
+    // documented in page.tsx and pinned at source level by
+    // quizReachable.test.ts, which also asserts the in-app entry points
+    // exist). This browser test keeps the GUARANTEE the old assertion was
+    // for: a first visitor is never addressed as though a profile exists.
+    await expect(page.getByTestId('cta-dna')).toHaveCount(0);
+    // Inviting the visitor to BUILD a profile ("How you shape your Watch
+    // DNA") is the point of the landing; CLAIMING one already exists is the
+    // defect. Only existence-claims fail here.
+    const body = await page.locator('body').innerText();
+    expect(body, 'the landing must not speak as if a taste profile already exists').not.toMatch(
+      /your (watch )?dna (says|shows|knows)|based on your (ratings|history|taste)|your matches|picked for you|because you watched/i,
+    );
   });
 
   test('an unknown URL is a real 404 page with a way back, not a blank screen', async ({ page }) => {
@@ -351,8 +361,11 @@ test.describe('Journey A: homepage to a Verd1ct you can act on', () => {
     const enter = page.getByTestId('cta-enter');
     await expect(enter).toBeVisible();
     await expect(enter).toHaveAttribute('href', '/app');
-    // One gold entrance, not a menu of competing front doors.
-    await expect(page.getByTestId('hero-ctas').getByRole('link')).toHaveCount(3);
+    // One gold entrance, not a menu of competing front doors. (This finally
+    // matches the test's own name: the count was still pinned at 3 from the
+    // era when the DNA/import pills sat in the hero — those moved inside the
+    // app, and quizReachable.test.ts owns their reachability now.)
+    await expect(page.getByTestId('hero-ctas').getByRole('link')).toHaveCount(1);
   });
 
   test('putting candidates on the docket delivers a real Verd1ct with a way to act on it', async ({ page }) => {

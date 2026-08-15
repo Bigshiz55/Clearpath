@@ -4,17 +4,47 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-- **Recommendation P0 integration — PR #71 (`claude/recommendation-p0-integration`,
-  FINAL_P0_SHA `c0d7e0a`) awaits the owner's merge decision.** Zero semantic
-  FAILs on the authoritative exact-SHA preview gates (black-box 61/61 +
-  real-UI journey); three named oracle GAPs remain, all unlocked by adding
-  `TMDB_API_KEY` to CI secrets. PR #72 (`claude/product-feedback-2026-08-14`,
-  proven at `199c781`) stacks the owner's product batch on top and retargets
-  to `main` after #71 lands.
+- **Three-part P0 repair — `claude/p0-repair-semantic-ask-livetv` (one PR,
+  not merged), branched from `main` at `9e4e9ff` (post-#71/#72 merge).**
+  - **P0-A** preference "like" vs comparison: one grammatical owner
+    (`src/lib/nlu/likeGrammar.ts`) consulted by the critic parser AND the
+    legacy similarity extractor; the incident sentence and every required
+    exact query pinned in `src/lib/nlu/likeGrammar.test.ts`; a preference
+    naming a WORK still seeds similarity, a preference naming a CATEGORY
+    can never mint a title anchor.
+  - **P0-B** Ask results out of the chat scrollbox: normal-flow canonical
+    `.poster-grid` below the conversation, full shell width (3–4/2/1 tiles
+    per row), browser-measured in `tests/mobile/ask-results-flow.spec.ts`.
+  - **P0-C** Live TV Movies honesty: `diagnoseMoviesEmpty` is coverage-
+    gated ("that's the schedule" structurally unreachable without a
+    licensed grid), the movies view never pads with unrelated cards (the
+    "Meanwhile" fallback is gone for `type=movie`), RAW provider fixtures
+    cross the real classification boundary, and structured diagnostics
+    ride the empty state.
+  - Preview canaries added: CASE 13/14 in the black-box gate + ASK/LIVE TV
+    canaries in `tests/preview/p0-journey.spec.ts`.
 - **Trial-account provisioning awaits the credential holder** — run
   `scripts/provisionTrialAccounts.ts` with `TRIAL_ACCOUNTS_PASSWORD` and the
   standard Supabase env; it enforces the owner's exact contract and prints
   only the five allowed fields.
+
+## Next (discovered during the P0 repair)
+- **INFRA — licensed full-grid provider activation** is the only path to
+  provable movie coverage: TVmaze structurally cannot see movie blocks
+  (Hallmark/LMN/TCM absent entirely; measured, `docs/tv-coverage/`). TV Media
+  is registered, gated and ready (`TVMEDIA_ACTIVATION.md`); activating it
+  flips `hasLiveFullGridProvider()` and the guide's "true-empty" arm on with
+  zero code changes. Schedules Direct remains licensing-rejected.
+- The genre/network windowed fallback ("Meanwhile — actually coming on live
+  TV") still renders unfiltered airings for NON-movie filters; consider the
+  same zero-unrelated-cards treatment applied to `type=movie`.
+- `searchIntent.ts` (search-box routing, frozen-corpus governed) carries its
+  own copy of the bare like-cue; it is fenced from the ask pipeline but
+  should adopt `likeGrammar.isVerbLike` in a governed change with corpus
+  delta reporting.
+- `classifySearch`'s SIMILARITY_CUE (legacy ask arm) also matches bare
+  "like"; currently fenced by canonical ownership + strict resolution, but
+  the same one-owner adoption would close the door for good.
 
 ## Next (discovered during the P0/product batch)
 - Add `TMDB_API_KEY` to CI secrets → converts the three preview-gate GAPs

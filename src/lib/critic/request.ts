@@ -35,6 +35,7 @@
  */
 
 import { DIMENSION_KEYS } from '@/lib/scoring/dimensions';
+import { ADVERB_LED_LIKE, isVerbLike } from '@/lib/nlu/likeGrammar';
 import type { CriticRelation } from './objective';
 import type { Modifiers } from './plan';
 
@@ -78,6 +79,30 @@ const ANCHOR_STOP =
 /** Preference tails people append: "…that I would like", "…for me". */
 const TRAILING_FILLER =
   /\s*,?\s*\b(?:that\s+)?(?:i(?:'d|’d| would| will| might)?\s+(?:would\s+)?(?:like|enjoy|love|dig|go for)|for me|please)\b.*$/i;
+
+/**
+ * The first occurrence of the like-cue that is genuinely PREPOSITIONAL.
+ *
+ * The bare token "like" — and the adverb-led forms that can modify a verb
+ * just as well ("just like", "kinda like") — are only similarity cues when
+ * grammar says so: "I like Sylvester Stallone movies" is a stated
+ * preference, and reading its object as a title anchor is how a sentence
+ * that never named a film ended up in title clarification. The subject test
+ * lives in one place (`likeGrammar.ts`) and is shared with the legacy
+ * similarity extractor, so the verb reading cannot regress in one door and
+ * stay fixed in the other. Noun-led cues ("movies like", "something like")
+ * are untouched — a noun cannot be the subject of "to like" mid-phrase.
+ */
+function findPrepositionalLike(t: string): RegExpExecArray | null {
+  const re = new RegExp(LIKE_CUE.source, 'gi');
+  for (let m = re.exec(t); m !== null; m = re.exec(t)) {
+    const cueText = m[0];
+    const verbish = /^like$/i.test(cueText) || ADVERB_LED_LIKE.test(cueText);
+    if (verbish && isVerbLike(t, m.index)) continue; // the verb "to like" — a preference, not a relation
+    return m;
+  }
+  return null;
+}
 
 /* ── MODIFIERS ─────────────────────────────────────────────────────────────
    ONLY mappings that are semantically honest. Every target is a real member of
@@ -243,7 +268,7 @@ export function parseCriticRequest(text: string): CriticRequest | null {
 
   const blend = BLEND_CUE.exec(t);
   const better = BETTER_CUE.exec(t);
-  const like = LIKE_CUE.exec(t);
+  const like = findPrepositionalLike(t);
 
   if (blend) {
     /* "X meets Y" — the anchors sit on BOTH sides of the cue, which is why this

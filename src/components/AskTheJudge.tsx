@@ -41,7 +41,6 @@ interface Msg {
   id: number;
   role: 'you' | 'judge';
   text: string;
-  items?: ResultItem[];
   verdict?: TitleVerdict; // a named title put on trial
   /** A comparative anchor we could not place — the user picks which title. */
   clarify?: { question: string; options: AnchorOptionView[]; pending: unknown };
@@ -60,6 +59,21 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [assistantName] = useState('WatchVerd1ct');
+  /* THE RULING'S RESULTS LIVE OUTSIDE THE CONVERSATION BOX.
+     They used to render inside the chat thread — a fixed-height
+     (56vh/620px) box whose message area is `overflow-y-auto` — so every
+     tile was squeezed into a nested scroll viewport at 85% bubble width.
+     Results are a page-level answer, not a chat bubble: this state renders
+     them below the conversation as a normal-flow responsive grid the PAGE
+     scrolls, never an inner box. Always the LATEST ruling's items — a turn
+     that found nothing clears the grid rather than leaving stale tiles
+     under a header naming the new query. */
+  const [results, setResults] = useState<ResultItem[]>([]);
+  /** True when the grid is the "Better for you" alternatives beside a verdict. */
+  const [resultsAreAlternatives, setResultsAreAlternatives] = useState(false);
+  /** The last NON-EMPTY result set — what "newer" / "I saw those" refer to,
+   *  even after a later turn came back empty. */
+  const lastItemsRef = useRef<ResultItem[]>([]);
   // The canonical conversation state — the case as currently filed. Every turn
   // sends it, the server merges the new sentence into it, and the chips below
   // the thread ARE this object, each one removable.
@@ -119,8 +133,15 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
   const voiceSupported =
     typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
 
-  function say(text: string, items?: ResultItem[], role: 'you' | 'judge' = 'judge', verdict?: TitleVerdict) {
-    setMsgs((m) => [...m, { id: nextId.current++, role, text, items, verdict }]);
+  function say(text: string, role: 'you' | 'judge' = 'judge', verdict?: TitleVerdict) {
+    setMsgs((m) => [...m, { id: nextId.current++, role, text, verdict }]);
+  }
+
+  /** Show a ruling's titles in the page-level grid (never in the thread). */
+  function showResults(items: ResultItem[], asAlternatives: boolean) {
+    setResults(items);
+    setResultsAreAlternatives(asAlternatives);
+    if (items.length > 0) lastItemsRef.current = items;
   }
 
   /** Ask which title was meant, carrying the rest of the request untouched. */
@@ -149,16 +170,11 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
 
   /** Years + ids of the most recent results — what "newer"/"I saw those" refer to. */
   function lastShown(): { shownYears: number[]; shownIds: { mediaType: 'movie' | 'tv'; id: number }[] } {
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      const items = msgs[i]?.items;
-      if (items && items.length > 0) {
-        return {
-          shownYears: items.map((x) => x.year).filter((y): y is number => y != null),
-          shownIds: items.map((x) => ({ mediaType: x.mediaType, id: x.id })),
-        };
-      }
-    }
-    return { shownYears: [], shownIds: [] };
+    const items = lastItemsRef.current;
+    return {
+      shownYears: items.map((x) => x.year).filter((y): y is number => y != null),
+      shownIds: items.map((x) => ({ mediaType: x.mediaType, id: x.id })),
+    };
   }
 
   async function submit(
@@ -175,7 +191,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
     /* A clarification answer already showed the chosen title as the user's
        turn; re-echoing the original sentence would read as asking twice. */
     if (!clarifyAnswer && (text || !convOverride)) {
-      say(text || `Filed my case — ${describeQuery(query)}.`, undefined, 'you');
+      say(text || `Filed my case — ${describeQuery(query)}.`, 'you');
     }
     setLoading(true);
     const mySeq = ++turnSeq.current;
@@ -228,7 +244,8 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
         const ruling =
           `${v.title}${v.year ? ` (${v.year})` : ''} — my ruling: ${v.primaryCall} at ${v.matchScore} for you. ${v.oneLiner}` +
           (alts.length > 0 ? (skip ? ' Here’s why, and better picks below.' : ' Here’s the case — and a few more in the same lane.') : '');
-        say(ruling, alts, 'judge', v);
+        say(ruling, 'judge', v);
+        showResults(alts, true);
         return;
       }
 
@@ -264,7 +281,8 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
       }
       if (data.relaxed) ruling += ` ${data.relaxed}`;
       if (data.clarify) ruling += ` ${data.clarify}`;
-      say(ruling, items);
+      say(ruling);
+      showResults(items, false);
     } catch {
       say('The court hit a snag pulling candidates. Try re-filing that in a moment.');
     } finally {
@@ -327,27 +345,15 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
 
   return (
     <div className="space-y-4">
-      {/* RESULTS-FOR HEADER. A specific search always says what it searched for,
-          so it can never be confused with the generic recommendations feed.
-          Present only when a real query is being answered. */}
-      {answeringFor && (
-        <div
-          data-testid="search-results-header"
-          data-answering-for={answeringFor}
-          className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-xl border border-brand-400/30 bg-brand-500/10 px-3 py-2"
-        >
-          <span className="text-sm font-bold text-white">
-            Results for <span className="text-brand-200">“{answeringFor}”</span>
-          </span>
-          {requestId && (
-            <span className="text-[11px] text-slate-400" data-testid="search-request-id">
-              request {requestId}
-            </span>
-          )}
-        </div>
-      )}
-      {/* ============ The conversation ============ */}
-      <div className="card flex h-[56vh] max-h-[620px] flex-col overflow-hidden p-0">
+      {/* ============ The conversation ============
+          THE DIALOGUE ONLY. The card used to be a fixed 56vh/620px box that
+          also held every result tile, so the answer to a search lived inside
+          a nested scroll viewport. Now the card sizes to its content (the
+          thread scrolls itself only when the dialogue grows long) and the
+          results render BELOW it, full-width, in normal document flow. It
+          also stays at reading width — the grid underneath is what earns the
+          whole page's width. */}
+      <div className="card mx-auto flex w-full max-w-2xl flex-col overflow-hidden p-0">
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
           <span aria-hidden className="grid h-11 w-11 flex-none place-items-center rounded-xl border border-brand-400/40 bg-brand-500/15 text-sm font-black text-brand-100">V1</span>
           <div className="min-w-0 flex-1">
@@ -356,7 +362,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
           </div>
         </div>
 
-        <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+        <div ref={scrollRef} className="max-h-[40vh] space-y-3 overflow-y-auto px-4 py-4">
           {msgs.map((m) => (
             <div key={m.id} className={m.role === 'you' ? 'flex justify-end' : 'flex justify-start'}>
               <div className={`max-w-[85%] ${m.role === 'you' ? 'rounded-2xl rounded-br-sm bg-brand-500/25 px-3.5 py-2 text-sm text-brand-50' : 'w-full'}`}>
@@ -374,7 +380,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
                              resolved and every stated constraint, so nothing is
                              retyped and nothing is searched twice. */
                           const env = m.clarify!.pending as { text?: string; pending?: { spokenAs?: string }[] } | null;
-                          say(`${o.title}${o.year ? ` (${o.year})` : ''}`, undefined, 'you');
+                          say(`${o.title}${o.year ? ` (${o.year})` : ''}`, 'you');
                           void submit(env?.text ?? undefined, undefined, undefined, {
                             pendingComparison: m.clarify!.pending,
                             comparisonChoice: {
@@ -392,34 +398,6 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
                     {m.verdict && (
                       <div className="mt-3">
                         <JudgeVerdictCard v={m.verdict} />
-                      </div>
-                    )}
-                    {m.items && m.items.length > 0 && (
-                      <div className="mt-3">
-                        {m.verdict && (
-                          <div className="eyebrow mb-2 text-[11px]">Better for you</div>
-                        )}
-                        <div className="poster-grid">
-                          {m.items.map((it) => (
-                            <PosterCard
-                              key={`${it.mediaType}-${it.id}`}
-                              href={`/app/title/${it.mediaType}/${it.id}`}
-                              mediaType={it.mediaType}
-                              tmdbId={it.id}
-                              title={it.title}
-                              year={it.year}
-                              posterUrl={it.posterUrl}
-                              posterPath={it.posterPath}
-                            >
-                              {it.reason && <ReasonText text={it.reason} className="mt-1.5 text-[11px] text-slate-300" />}
-                              {it.where && (
-                                <div className="mt-1.5">
-                                  <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300"><ProviderNameList names={[it.where]} /></span>
-                                </div>
-                              )}
-                            </PosterCard>
-                          ))}
-                        </div>
                       </div>
                     )}
                   </div>
@@ -461,7 +439,7 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
                 onClick={() => {
                   const next = removeChip(conv, c.id);
                   setConv(next);
-                  say(`Struck "${c.label}" from the case.`, undefined, 'you');
+                  say(`Struck "${c.label}" from the case.`, 'you');
                   void submit('', undefined, next);
                 }}
                 className="group flex min-h-[32px] items-center gap-1 rounded-full border border-brand-400/30 bg-brand-500/15 px-2.5 py-1 text-xs text-brand-100 hover:border-red-400/40 hover:bg-red-500/15"
@@ -513,6 +491,57 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
           </div>
         </div>
       </div>
+
+      {/* ============ The ruling's results — NORMAL DOCUMENT FLOW ============
+          A specific search always says what it searched for (the header), and
+          its titles render as the same canonical PosterCard grid every other
+          surface uses: one column on a phone, auto-fill from `sm` (two on a
+          tablet, three-four on a desktop). THE PAGE SCROLLS; THIS SECTION
+          NEVER DOES — no fixed height, no max height, no overflow styling.
+          Putting these inside the chat box's scroll viewport is the exact
+          production defect this layout replaces. */}
+      {answeringFor && (
+        <div
+          data-testid="search-results-header"
+          data-answering-for={answeringFor}
+          className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-xl border border-brand-400/30 bg-brand-500/10 px-3 py-2"
+        >
+          <span className="text-sm font-bold text-white">
+            Results for <span className="text-brand-200">“{answeringFor}”</span>
+          </span>
+          {requestId && (
+            <span className="text-[11px] text-slate-400" data-testid="search-request-id">
+              request {requestId}
+            </span>
+          )}
+        </div>
+      )}
+      {results.length > 0 && (
+        <section data-testid="ask-results" aria-label={resultsAreAlternatives ? 'Better for you' : 'Results'}>
+          {resultsAreAlternatives && <div className="eyebrow mb-2">Better for you</div>}
+          <div className="poster-grid" data-testid="ask-results-grid">
+            {results.map((it) => (
+              <PosterCard
+                key={`${it.mediaType}-${it.id}`}
+                href={`/app/title/${it.mediaType}/${it.id}`}
+                mediaType={it.mediaType}
+                tmdbId={it.id}
+                title={it.title}
+                year={it.year}
+                posterUrl={it.posterUrl}
+                posterPath={it.posterPath}
+              >
+                {it.reason && <ReasonText text={it.reason} className="mt-1.5 text-[11px] text-slate-300" />}
+                {it.where && (
+                  <div className="mt-1.5">
+                    <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300"><ProviderNameList names={[it.where]} /></span>
+                  </div>
+                )}
+              </PosterCard>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

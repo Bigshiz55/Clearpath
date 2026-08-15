@@ -95,14 +95,27 @@ function withScores(grid: Airing[]): Airing[] {
   });
 }
 
-export default function ChannelGuideHarness({ searchParams }: { searchParams?: { taste?: string; scored?: string } }) {
+// `?grid=noMovies` — listings exist, none classified as a movie: the exact
+// window the Movies-zero honesty states describe. Drives the coverage
+// distinction end to end in a real browser.
+const NO_MOVIES_GRID: Airing[] = [
+  a({ network: 'Bravo', showName: 'Below Deck', airstamp: '2026-07-28T20:00:00Z', runtime: 60 }),
+  a({ network: 'CNN', showName: 'The Situation Room', airstamp: '2026-07-28T20:00:00Z', runtime: 60, showType: 'News' }),
+  a({ network: 'ESPN', showName: 'Monday Night Football', airstamp: '2026-07-28T20:00:00Z', runtime: 180, showType: 'Sports' }),
+];
+
+export default function ChannelGuideHarness({ searchParams }: { searchParams?: { taste?: string; scored?: string; grid?: string; coverage?: string } }) {
   if (process.env.MOBILE_HARNESS !== '1') notFound();
   const taste = searchParams?.taste === '1' ? TASTE : [];
-  const grid = searchParams?.scored === '1' ? withScores(GRID) : GRID;
+  const grid = searchParams?.grid === 'noMovies' ? NO_MOVIES_GRID : searchParams?.scored === '1' ? withScores(GRID) : GRID;
+  // `?coverage=1` — render as if a licensed full grid were supplying, so the
+  // "that's the schedule" arm is drivable too; default mirrors production
+  // reality (episode database only → coverage never provable).
+  const coverageProvable = searchParams?.coverage === '1';
   return (
     <main className="container-page space-y-4 py-6" data-testid="guide-harness">
       <h1 className="text-xl font-black text-white">Harness — full channel guide</h1>
-      <ChannelGuide airings={grid} nowMs={NOW} taste={taste} />
+      <ChannelGuide airings={grid} nowMs={NOW} taste={taste} coverageProvable={coverageProvable} />
     </main>
   );
 }

@@ -88,7 +88,7 @@ export function splitClauses(raw: string): string[] {
    named regression for an unnamed one. Narrowing them belongs in its own
    change, judged on its own evidence. */
 const REQUEST_VERB =
-  /^\s*(?:please\s+|just\s+|maybe\s+|ok(?:ay)?,?\s+)*(?:recommend|suggest|pull up|put on|queue up|play|hit me with)\b|\b(?:find|show|give|recommend|suggest|get)\s+(?:me|us)\b|\bi(?:'|’)?m looking for\b|\blooking for\b|\bi want\b|\bi'?d like\b|\bi would like\b|\bi wanna\b|\bwhat should (?:i|we) watch\b|\bwhat to watch\b|\bin the mood for\b|\bfeel like watching\b|\bsurprise me\b|\bhelp me (?:find|pick|choose)\b|\bany (?:good|recommendations?)\b/i;
+  /^\s*(?:please\s+|just\s+|maybe\s+|ok(?:ay)?,?\s+)*(?:recommend|suggest|pull up|put on|queue up|play|hit me with)\b|\b(?:find|show|give|recommend|suggest|get)\s+(?:me|us)\b|\bi(?:'|’)?m looking for\b|\blooking for\b|\bi want\b|\bi'?d like\b|\bi would like\b|\bi wanna\b|\bwhat (?:else )?should (?:i|we) watch\b|\bwhat to watch\b|\bin the mood for\b|\bfeel like watching\b|\bsurprise me\b|\bhelp me (?:find|pick|choose)\b|\bany (?:good|recommendations?)\b/i;
 
 /** The kind of thing one asks to be shown several of. */
 const MEDIA_NOUN =
