@@ -106,8 +106,31 @@ interface Findings {
   brokenImages: string[];
 }
 
+/** A real 1×1 PNG, served for well-formed TMDB image URLs (below). */
+const PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
+/** The only URL shapes the app may legitimately build against TMDB's CDN. */
+const TMDB_IMG_PATH = /^\/t\/p\/(?:w\d{2,4}|h\d{2,4}|original)\/[\w.-]+\.(?:jpe?g|png|svg)$/i;
+
 async function visit(page: Page, route: string): Promise<{ status: number | null; findings: Findings }> {
   const findings: Findings = { consoleErrors: [], pageErrors: [], brokenImages: [] };
+
+  // HERMETIC IMAGES. Every API call in this suite is intercepted by design
+  // ("no real project is contacted" — the config's own words); the TMDB image
+  // CDN was the one remaining live external dependency, so this crawl's
+  // verdict depended on the runner's network instead of the repo. The stub
+  // keeps the broken-image detector armed for everything the REPO controls:
+  // a malformed TMDB URL (wrong path shape — the URL-construction bug class)
+  // is still failed and reported, and every non-TMDB asset is still fetched
+  // for real. Only the third-party CDN's reachability stops mattering.
+  await page.route('https://image.tmdb.org/**', (r) => {
+    const path = new URL(r.request().url()).pathname;
+    return TMDB_IMG_PATH.test(path)
+      ? r.fulfill({ status: 200, contentType: 'image/png', body: PIXEL_PNG })
+      : r.abort('failed');
+  });
 
   page.on('console', (m: ConsoleMessage) => {
     if (m.type() !== 'error') return;

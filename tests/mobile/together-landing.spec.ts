@@ -26,39 +26,47 @@ test('no phrase from the page description appears twice', async ({ page }) => {
   expect(dupes, `repeated copy: ${[...new Set(dupes)].join(' | ')}`).toEqual([]);
 });
 
-test('one obvious primary action, above the fold, with two secondary cards', async ({ page }) => {
+test('the mode question is the entrance, above the fold, with two self-describing mode cards', async ({ page }) => {
+  // THE CURRENT ENTRANCE CONTRACT (the mode-selection redesign, documented in
+  // VerdictRoomEntrance: "The mode question leads… NOTHING is created until a
+  // mode is chosen"). The old generic `start-court` create button is gone on
+  // purpose — a room only ever exists as a Jury Room, so it can never be
+  // mislabeled. This test used to pin that retired button as the primary; the
+  // guarantee it exists for — one obvious way in, above the fold, with the
+  // choices as real tappable cards — is asserted against the real entrance.
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(ROUTE, { waitUntil: 'domcontentloaded' });
 
-  const start = page.getByTestId('start-court');
-  await expect(start).toBeVisible();
-  await expect(start).toHaveText('Start a Verdict Room');
-  // Above the fold at 1440×900.
-  const box = await start.boundingBox();
-  expect(box!.y + box!.height).toBeLessThan(900);
+  const question = page.getByTestId('verdict-mode-question');
+  await expect(question).toBeVisible();
+  await expect(question).toContainText('What kind of verdict are you running?');
 
-  // The two secondary options are real tappable cards, not underlined text.
+  // The two modes are real tappable cards, both above the fold at 1440×900 —
+  // they ARE the entrance's actions.
   const device = page.getByTestId('open-device');
   const invite = page.getByTestId('open-invite');
   await expect(device).toBeVisible();
   await expect(invite).toBeVisible();
-  // The card LABELS are the contract here — the supporting line was rewritten
-  // by the entrance redesign ("Choose together on this phone" → "We're all
-  // here…"), and this assertion was still pinning the retired wording. What
-  // this test is actually for is that each card names a distinct mode and says
-  // which screens it involves, so that is what it checks.
+  for (const card of [device, invite]) {
+    const box = await card.boundingBox();
+    expect(box!.y + box!.height, 'a mode card sits above the fold').toBeLessThan(900);
+  }
+
+  // Each card names a distinct mode, says which screens it involves, and SAYS
+  // what pressing it starts — no room is created by ambient copy.
   await expect(device).toContainText('Quick Pick');
   await expect(device).toContainText('one phone');
-  await expect(invite).toContainText('Invite the Jury');
+  await expect(device).toContainText('Start Quick Pick');
+  await expect(invite).toContainText('Jury Room');
   await expect(invite).toContainText('their own phone');
+  await expect(invite).toContainText('Start Jury Room');
 
-  // Hierarchy: the primary button is the brightest fill on the page; the
-  // secondary cards use a distinctly different (navy, not brand-blue) fill so
-  // they never compete with it for attention.
+  // Hierarchy: the two modes are deliberately DIFFERENT materials (warm
+  // "here" vs cool "apart" — the component's stated design), so a visitor
+  // can tell the choices apart at a glance.
   // READ THE FILL, NOT `backgroundColor`. Every surface on this screen is a
-  // gradient now, and a gradient lives in `background-image` — so all three
-  // controls reported `rgba(0, 0, 0, 0)` and the comparison below was passing
-  // transparent against transparent, which is no check at all.
+  // gradient, and a gradient lives in `background-image` — reading only
+  // `backgroundColor` compares transparent against transparent.
   const colors = await page.evaluate(() => {
     const read = (testId: string) => {
       const el = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
@@ -66,16 +74,14 @@ test('one obvious primary action, above the fold, with two secondary cards', asy
       const s = getComputedStyle(el);
       return s.backgroundImage !== 'none' ? s.backgroundImage : s.backgroundColor;
     };
-    return { primary: read('start-court'), device: read('open-device'), invite: read('open-invite') };
+    return { device: read('open-device'), invite: read('open-invite') };
   });
-  expect(colors.primary).not.toBeNull();
   expect(colors.device).not.toBeNull();
   expect(colors.invite).not.toBeNull();
-  expect(colors.device, 'secondary card must not reuse the primary fill').not.toBe(colors.primary);
-  expect(colors.invite, 'secondary card must not reuse the primary fill').not.toBe(colors.primary);
+  expect(colors.device, 'the two modes must not share one fill').not.toBe(colors.invite);
 
   // Every card is a comfortable tap target.
-  for (const testId of ['start-court', 'open-device', 'open-invite']) {
+  for (const testId of ['open-device', 'open-invite']) {
     const b = await page.getByTestId(testId).boundingBox();
     expect(b!.height, `${testId} tap target`).toBeGreaterThanOrEqual(44);
   }
@@ -114,7 +120,7 @@ test('fits a phone with no sideways scroll @ 390px', async ({ page }) => {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(over).toBeLessThanOrEqual(1);
-  await expect(page.getByTestId('start-court')).toBeVisible();
+  await expect(page.getByTestId('verdict-mode-question')).toBeVisible();
   await expect(page.getByTestId('open-device')).toBeVisible();
   await expect(page.getByTestId('open-invite')).toBeVisible();
 });
