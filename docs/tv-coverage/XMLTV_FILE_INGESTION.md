@@ -1,8 +1,35 @@
 # XMLTV file ingestion — the file-fed full-grid architecture
 
-Written 2026-08-15 against three REAL TV Media XMLTV deliveries (feeds
-10733 / 10734 / 10735; a fourth, 10737, was referenced but not supplied).
+Written 2026-08-15 against four REAL TV Media XMLTV deliveries: feeds
+10733 / 10734 / 10735 in full, plus a REDUCED copy of feed 10737 (the
+original ~45 MB file exceeded the session upload limit; the reduced sample
+preserves all 543 channel declarations — including the repeated-station /
+multi-channel-position edge case — and 10,279 programmes from 2026-08-15).
 Read `SOURCE_RIGHTS_REGISTRY.md` first — it remains authoritative on rights.
+
+## Station identity ≠ lineup-channel identity (the 10737 edge case)
+
+Measured on the reduced 10737 feed: 543 `<channel>` elements over **519
+unique station ids** — **20 stations are declared at multiple lineup
+positions** (QVC at channels 70, 275 AND 317; QVC2 at 76/79/315; NewsMax at
+71/349…), with identical metadata except the channel number, and 15 of the
+20 colliding inside a single 500-row write batch. The identities:
+
+| Concept | Identity | Table |
+|---|---|---|
+| STATION (the broadcaster) | `(provider_id, provider_station_id = <xmltv id>)` — one row, deduped before every batch | `tv_stations` |
+| LINEUP POSITION (how a lineup carries it) | `provider_channel_id = 'xmltv:<stationId>:<channelNumber>'` (`'xmltv:<stationId>'` when un-numbered), under the existing unique `(lineup_id, station_id, provider_channel_id)` | `tv_lineup_channels` |
+
+One station, many positions: never collapsed, never duplicated, no
+conflict-batch failures. A moved channel number reconciles (the stale
+position is pruned diff-based, per-lineup, only after a fully successful
+import). Airings stay per-station, so a thrice-carried station never
+produces duplicate programme cards.
+
+Programme identity on this feed: 5,463 distinct keys, **0 keys spanning
+multiple titles**; 33 keys (0.6%) carry differing descriptions under the
+same declared identity (shopping blocks, "Local Programming") — benign
+metadata variance, not identity collision.
 
 ## The architecture
 

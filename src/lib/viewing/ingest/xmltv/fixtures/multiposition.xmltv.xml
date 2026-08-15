@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tv SYSTEM "xmltv.dtd">
+<tv date="08/15/2026" source-info-url="http://www.example.invalid" source-info-name="Synthetic Fixture">
+  <channel id="900.stations.synthetic.test">
+    <display-name>Shoppers Fixture Network</display-name>
+    <display-name>SFN</display-name>
+    <display-name>70</display-name>
+    <icon src="https://cdn.example.invalid/sfn.png"/>
+  </channel>
+  <channel id="900.stations.synthetic.test">
+    <display-name>Shoppers Fixture Network</display-name>
+    <display-name>SFN</display-name>
+    <display-name>275</display-name>
+    <icon src="https://cdn.example.invalid/sfn.png"/>
+  </channel>
+  <channel id="900.stations.synthetic.test">
+    <display-name>Shoppers Fixture Network</display-name>
+    <display-name>SFN</display-name>
+    <display-name>317</display-name>
+    <icon src="https://cdn.example.invalid/sfn.png"/>
+  </channel>
+  <channel id="901.stations.synthetic.test">
+    <display-name>Single Position Net</display-name>
+    <display-name>SPN</display-name>
+    <display-name>12</display-name>
+  </channel>
+  <programme start="20260815010000 +0000" stop="20260815030000 +0000" channel="900.stations.synthetic.test">
+    <title lang="en">A Multiposition Movie</title>
+    <date>2001</date>
+    <category lang="en">Movie</category>
+    <rating><value>TVPG</value></rating>
+  </programme>
+  <programme start="20260815030000 +0000" stop="20260815040000 +0000" channel="900.stations.synthetic.test">
+    <title lang="en">Shopping Hour</title>
+    <category lang="en">Paid Program</category>
+  </programme>
+  <programme start="20260815010000 +0000" stop="20260815020000 +0000" channel="901.stations.synthetic.test">
+    <title lang="en">Single Position Show</title>
+    <category lang="en">Sitcom</category>
+  </programme>
+</tv>

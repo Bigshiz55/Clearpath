@@ -207,6 +207,7 @@ class MemDb implements DbClient {
         lt: (c, v) => { filters.push((r) => String(r[c]) < String(v)); return chain; },
         gte: (c, v) => { filters.push((r) => String(r[c]) >= String(v)); return chain; },
         lte: (c, v) => { filters.push((r) => String(r[c]) <= String(v)); return chain; },
+        in: (c, values) => { filters.push((r) => (values as unknown[]).includes(r[c])); return chain; },
         select: (_cols, o) => { head = o?.head ?? false; return chain; },
         then<TResult1 = DbResult, TResult2 = never>(
           onf?: ((v: DbResult) => TResult1 | PromiseLike<TResult1>) | null,
@@ -220,9 +221,27 @@ class MemDb implements DbClient {
             const rows = self.rows(table);
             if (op === 'upsert' || op === 'insert') {
               const list = (Array.isArray(payload) ? payload : [payload]) as Record<string, unknown>[];
+              // POSTGRES FIDELITY: one INSERT ... ON CONFLICT statement may not
+              // affect the same row twice. A payload carrying duplicate
+              // conflict keys fails the WHOLE batch — exactly the error the
+              // repeated-station edge case triggers in production. The mock
+              // used to merge silently, which is how the bug stayed masked.
+              const keyCols = opts?.onConflict?.split(',') ?? [];
+              if (keyCols.length > 0) {
+                const seen = new Set<string>();
+                for (const r of list) {
+                  const k = keyCols.map((c) => String(r[c])).join('|');
+                  if (seen.has(k)) {
+                    return {
+                      data: null,
+                      error: { message: `21000: ON CONFLICT DO UPDATE command cannot affect row a second time (key ${k})` },
+                    } as DbResult;
+                  }
+                  seen.add(k);
+                }
+              }
               const out: MemRow[] = [];
               for (const r of list) {
-                const keyCols = opts?.onConflict?.split(',') ?? [];
                 const found = keyCols.length > 0
                   ? rows.find((x) => keyCols.every((k) => x[k] === r[k]))
                   : undefined;
@@ -373,6 +392,87 @@ describe('importXmltv · the write path against the canonical tables', () => {
     expect(r.ok).toBe(false);
     expect(r.error).toContain('no channels or no programmes');
     expect(db.log).toHaveLength(0);
+  });
+});
+
+// ═══ MULTI-POSITION STATIONS — one station, many lineup channels ══════════
+
+/**
+ * THE 10737 EDGE CASE, measured on the real reduced feed: 543 channel
+ * elements over 519 station ids; 20 stations declared at MULTIPLE lineup
+ * positions (QVC at 70, 275 AND 317; QVC2 at 76/79/315 — identical metadata,
+ * different channel number), 15 of them colliding inside a single 500-row
+ * batch. Station identity is NOT lineup-channel identity:
+ *
+ *   ONE STATION MAY APPEAR IN MANY LINEUP POSITIONS.
+ *   The importer must never collapse the positions, never duplicate the
+ *   station, and never send one conflict key twice in one batch.
+ */
+const MULTIPOS = readFileSync(join(__dirname, 'fixtures', 'multiposition.xmltv.xml'), 'utf8');
+
+const multiposImport = (db: MemDb, over: Partial<Parameters<typeof importXmltv>[0]> = {}) =>
+  importXmltv({
+    feedId: '10737',
+    streamFactory: () => streamOf(MULTIPOS),
+    db,
+    dryRun: false,
+    nowMs: Date.parse('2026-08-15T12:00:00Z'),
+    ...over,
+  });
+
+describe('multi-position stations', () => {
+  it('one canonical station row; THREE lineup-channel rows; no conflict-batch failure', async () => {
+    const db = new MemDb();
+    const r = await multiposImport(db);
+    expect(r.error).toBeNull();
+    expect(r.ok).toBe(true);
+
+    const stations = db.rows('tv_stations').filter((s) => s.provider_station_id === '900.stations.synthetic.test');
+    expect(stations).toHaveLength(1); // never duplicated
+
+    const positions = db.rows('tv_lineup_channels').filter((c) => c.station_id === stations[0]!.id);
+    expect(positions.map((p) => p.channel_number).sort()).toEqual(['275', '317', '70']); // never collapsed
+    // Deterministic identity per position, derived from source facts.
+    expect(new Set(positions.map((p) => p.provider_channel_id)).size).toBe(3);
+
+    // Airings are per station, not per position — no duplicate programme cards.
+    const movieAirings = db.rows('tv_airings').filter((a) => String(a.provider_airing_id).includes('900.stations'));
+    expect(movieAirings).toHaveLength(2); // the movie + the shopping hour, once each
+    expect(r.movieAirings).toBe(1);
+  });
+
+  it('reimport is idempotent: same rows, same identities, nothing accumulates', async () => {
+    const db = new MemDb();
+    await multiposImport(db);
+    const idsBefore = db.rows('tv_lineup_channels').map((c) => c.provider_channel_id).sort();
+    const r2 = await multiposImport(db, { nowMs: Date.parse('2026-08-15T13:00:00Z') });
+    expect(r2.ok).toBe(true);
+    expect(db.rows('tv_stations').filter((s) => s.provider_station_id === '900.stations.synthetic.test')).toHaveLength(1);
+    expect(db.rows('tv_lineup_channels').map((c) => c.provider_channel_id).sort()).toEqual(idsBefore);
+  });
+
+  it('a MOVED channel number reconciles: the new position appears, the stale one goes, others survive', async () => {
+    const db = new MemDb();
+    await multiposImport(db);
+    const moved = MULTIPOS.replace('<display-name>275</display-name>', '<display-name>280</display-name>');
+    const r2 = await importXmltv({
+      feedId: '10737', streamFactory: () => streamOf(moved), db, dryRun: false,
+      nowMs: Date.parse('2026-08-15T14:00:00Z'),
+    });
+    expect(r2.ok).toBe(true);
+    const station = db.rows('tv_stations').find((s) => s.provider_station_id === '900.stations.synthetic.test')!;
+    const numbers = db.rows('tv_lineup_channels').filter((c) => c.station_id === station.id).map((c) => c.channel_number).sort();
+    expect(numbers).toEqual(['280', '317', '70']); // 275 → 280; 70 and 317 untouched
+    // The unrelated station's position was never deleted.
+    expect(db.rows('tv_lineup_channels').some((c) => c.channel_number === '12')).toBe(true);
+  });
+
+  it('Movies still classifies from the provider declaration on the multi-position station', async () => {
+    const db = new MemDb();
+    await multiposImport(db);
+    const movie = db.rows('tv_programmes').find((p) => p.title === 'A Multiposition Movie')!;
+    expect(movie.programme_type).toBe('movie');
+    expect(db.rows('tv_programmes').find((p) => p.title === 'Shopping Hour')!.programme_type).toBe('special');
   });
 });
 

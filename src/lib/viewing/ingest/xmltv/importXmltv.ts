@@ -81,6 +81,7 @@ export interface DbFilterChain<T = unknown> extends PromiseLike<DbResult<T>> {
   lt(col: string, v: unknown): DbFilterChain<T>;
   gte(col: string, v: unknown): DbFilterChain<T>;
   lte(col: string, v: unknown): DbFilterChain<T>;
+  in(col: string, values: readonly unknown[]): DbFilterChain<T>;
   select(cols: string, opts?: { count?: 'exact'; head?: boolean }): DbFilterChain<T>;
 }
 export interface DbTable {
@@ -416,9 +417,27 @@ export async function importXmltv(opts: XmltvImportOptions): Promise<XmltvImport
     const lineupId = lineupRes.data?.[0]?.id;
     if (!lineupId) throw new Error('tv_lineups upsert returned no id');
 
-    /* stations + lineup channels, batched. */
+    /* ── STATION IDENTITY ≠ LINEUP-CHANNEL IDENTITY ─────────────────────
+       Measured on the real 10737 feed: 543 channel elements over 519
+       station ids — 20 stations are declared at MULTIPLE lineup positions
+       (QVC at 70, 275 AND 317) with identical metadata, 15 of them inside
+       a single 500-row batch. One INSERT..ON CONFLICT statement may not
+       affect the same row twice, so writing one row per ELEMENT failed the
+       whole station batch (Postgres 21000) — and `provider_channel_id =
+       station id` would additionally have collapsed the three positions
+       into one. So:
+
+         STATION          one row per (provider_id, provider_station_id) —
+                          deduped BEFORE the batch, first declaration wins.
+         LINEUP POSITION  one row per distinct (station, channel number):
+                          provider_channel_id = 'xmltv:<station>:<number>'
+                          ('xmltv:<station>' when the feed carries no
+                          number) — deterministic from source facts, so the
+                          same file reimports onto the same identities and
+                          a MOVED number reconciles instead of piling up. */
     const stationIdBySrc = new Map<string, string>();
-    for (const batch of chunks(accepted, WRITE_BATCH)) {
+    const uniqueStations = [...new Map(accepted.map((c) => [c.id, c])).values()];
+    for (const batch of chunks(uniqueStations, WRITE_BATCH)) {
       const rows = batch.map((c) => {
         const f = channelFacts(c);
         return {
@@ -434,17 +453,21 @@ export async function importXmltv(opts: XmltvImportOptions): Promise<XmltvImport
       );
       for (const row of r.data ?? []) stationIdBySrc.set(row.provider_station_id, row.id);
     }
-    for (const batch of chunks(accepted, WRITE_BATCH)) {
-      const rows = batch.flatMap((c) => {
-        const sid = stationIdBySrc.get(c.id);
-        if (!sid) return [];
-        const f = channelFacts(c);
-        return [{
-          lineup_id: lineupId, station_id: sid, provider_channel_id: c.id,
-          channel_number: f.channelNumber, channel_name: f.name, enabled: true,
-        }];
+    // Every distinct carried position survives; verbatim re-declarations of
+    // the SAME (station, number) collapse to one row.
+    const positionRows = new Map<string, Record<string, unknown>>();
+    for (const c of accepted) {
+      const sid = stationIdBySrc.get(c.id);
+      if (!sid) continue;
+      const f = channelFacts(c);
+      const providerChannelId = f.channelNumber ? `xmltv:${c.id}:${f.channelNumber}` : `xmltv:${c.id}`;
+      positionRows.set(providerChannelId, {
+        lineup_id: lineupId, station_id: sid, provider_channel_id: providerChannelId,
+        channel_number: f.channelNumber, channel_name: f.name, enabled: true,
       });
-      await call(db.from('tv_lineup_channels').upsert(rows, { onConflict: 'lineup_id,station_id,provider_channel_id' }), 'tv_lineup_channels upsert');
+    }
+    for (const batch of chunks([...positionRows.values()], WRITE_BATCH)) {
+      await call(db.from('tv_lineup_channels').upsert(batch, { onConflict: 'lineup_id,station_id,provider_channel_id' }), 'tv_lineup_channels upsert');
     }
 
     /* programmes, batched. */
@@ -525,6 +548,22 @@ export async function importXmltv(opts: XmltvImportOptions): Promise<XmltvImport
           .lt('last_seen_at', runStartIso),
         'stale airing prune',
       );
+    }
+
+    /* lineup-position reconcile — ALSO only after full success, THIS lineup
+       only, xmltv-derived rows only: a station moved from channel 275 to 280
+       drops its stale 275 row while its other positions — and every other
+       station's — survive untouched. Diff-based (one read, chunked deletes),
+       never a blanket wipe. */
+    const existingPositions = await call<{ id: string; provider_channel_id: string | null }[]>(
+      db.from('tv_lineup_channels').select('id, provider_channel_id').eq('lineup_id', lineupId) as unknown as PromiseLike<DbResult<{ id: string; provider_channel_id: string | null }[]>>,
+      'lineup positions read',
+    );
+    const stalePositionIds = (existingPositions.data ?? [])
+      .filter((r) => r.provider_channel_id?.startsWith('xmltv:') && !positionRows.has(r.provider_channel_id))
+      .map((r) => r.id);
+    for (const batch of chunks(stalePositionIds, WRITE_BATCH)) {
+      await call(db.from('tv_lineup_channels').delete().in('id', batch), 'stale lineup position prune');
     }
 
     /* coverage + bookkeeping — the honest window is what the file proved. */
