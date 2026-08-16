@@ -29,6 +29,15 @@ Updated at the end of every work order per the Working Agreement in
   only the five allowed fields.
 
 ## Next (discovered during the P0 repair)
+- **XMLTV file-fed grid is BUILT (`claude/xmltv-file-ingestion`, stacked on
+  the P0 PR):** streaming importer → canonical 0032 tables, coverage
+  evidence (`xmltvCoverage.ts`) flips the guide's honesty signal only while
+  the imported window covers now, What's On Today sections over stored rows.
+  REMAINING: run the real import against a dev/prod database (needs
+  `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`; command in the
+  PR), confirm TV Media file-delivery retention/redistribution terms in
+  writing, and obtain feed 10737 (543-channel file — referenced, never
+  supplied).
 - **INFRA — licensed full-grid provider activation** is the only path to
   provable movie coverage: TVmaze structurally cannot see movie blocks
   (Hallmark/LMN/TCM absent entirely; measured, `docs/tv-coverage/`). TV Media

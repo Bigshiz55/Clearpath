@@ -96,6 +96,8 @@ function localTimeParts(iso: string): { time: string; minutes: number } {
 export interface IngestedAiringRow {
   startAtUtc: string;
   providerAiringId: string | null;
+  /** `tv_airings.is_premiere` — provider-flagged first showing, or null. */
+  isPremiere?: boolean | null;
   stationName: string;
   /** `tv_stations.logo_url` — a licensed station mark, or null. Never guessed. */
   stationLogoUrl?: string | null;
@@ -132,6 +134,7 @@ export function ingestedRowToAiring(row: IngestedAiringRow): Airing {
     season: row.seasonNumber,
     number: row.episodeNumber,
     showType: showTypeForProgrammeType(row.programmeType),
+    isPremiere: row.isPremiere ?? null,
     genres: row.genres,
     rating: null,
     image: row.artworkUrl,
@@ -145,6 +148,7 @@ interface RawAiring {
   programme_id: string;
   start_at_utc: string;
   provider_airing_id: string | null;
+  is_premiere: boolean | null;
 }
 interface RawStation {
   id: string;
@@ -186,7 +190,7 @@ export async function getIngestedGuideAirings(
 
   const { data: airings, error: airingsError } = await supabase
     .from('tv_airings')
-    .select('station_id, programme_id, start_at_utc, provider_airing_id')
+    .select('station_id, programme_id, start_at_utc, provider_airing_id, is_premiere')
     .gte('start_at_utc', rangeStart)
     .lt('start_at_utc', rangeEnd)
     .order('start_at_utc', { ascending: true })
@@ -223,6 +227,7 @@ export async function getIngestedGuideAirings(
       ingestedRowToAiring({
         startAtUtc: r.start_at_utc,
         providerAiringId: r.provider_airing_id,
+        isPremiere: r.is_premiere,
         stationName: station.name,
         stationLogoUrl: station.logo_url ?? null,
         programmeProviderId: programme.provider_programme_id,

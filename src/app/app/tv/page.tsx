@@ -7,6 +7,8 @@ import { scoreGuideAirings } from '@/lib/tv/scoreGuide';
 import { getIngestedGuideAirings, getOnTvTodayIngested, getUpcomingTvIngested, INGESTED_MIN } from '@/lib/tv/ingestedGuide';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
+import { WhatsOnToday } from '@/components/WhatsOnToday';
+import { xmltvCoverageEvidence } from '@/lib/tv/xmltvCoverage';
 import { MyReminders, type ReminderRow } from '@/components/MyReminders';
 import { hasLiveFullGridProvider } from '@/lib/viewing/liveTv';
 import { tvMediaAttributionApplicable } from '@/lib/tv/providerRegistry';
@@ -82,8 +84,12 @@ export default async function OnTvPage({
   const filterLabel = [network ? titleCase(network) : null, genre?.toLowerCase(), movieOnly ? 'movies' : null].filter(Boolean).join(' ');
   const official = officialScheduleFor(network);
   // Whether a full listings grid is connected. Drives both the coverage banner
-  // and the empty-state wording, so the two can never disagree.
-  const gridConnected = hasLiveFullGridProvider();
+  // and the empty-state wording, so the two can never disagree. Two transports
+  // can prove it: the metered API (env + egress) or an IMPORTED XMLTV delivery
+  // whose own coverage window includes now (file-fed evidence, ages out on its
+  // own — see xmltvCoverage.ts). Same provider, same honesty bar.
+  const xmltv = await xmltvCoverageEvidence(supabase, now.getTime());
+  const gridConnected = hasLiveFullGridProvider() || xmltv.live;
 
   // HIGHLIGHTS SOURCE — the ingested national guide is canonical; the live
   // TVmaze day-fetch is the never-blank fallback. `getOnTvTodayIngested` returns
@@ -125,12 +131,26 @@ export default async function OnTvPage({
     guideView && user
       ? (await getPreferenceRules(supabase, user.id).catch(() => [])).map((r) => ({ trait: r.trait as string, weight: r.weight }))
       : [];
+  // WHAT'S ON TODAY — sections over the SAME stored day the Highlights view
+  // already loaded, shown only while imported full-grid coverage is live.
+  // "Worth Watching for You" carries the engine's existing per-programme
+  // scores (scoreGuideAirings: bounded, cached, fail-open) — schedule truth
+  // from the import, taste from the canonical engine, never confused. Zero
+  // provider calls: everything here is a read of our own tables.
+  const highlightsView = !guideView && withinHours == null;
+  let whatsOnAirings: Airing[] = [];
+  if (highlightsView && xmltv.live && airings.length > 0) {
+    whatsOnAirings = user
+      ? await scoreGuideAirings(supabase, user.id, airings, now.getTime(), region).catch(() => airings)
+      : airings;
+  }
+
   // "YOUR 93" IS ONLY TRUE ONCE THE ENGINE HAS LEARNED YOU. Under the same
   // floor every personal claim uses (DNA_PERSONAL_MIN rated titles), guide
   // badges render as neutral baseline scores instead — never a personalized
   // label on a non-personalized number. Count query is cheap and fail-open.
   let guidePersonalized = false;
-  if (guideView && user) {
+  if ((guideView || whatsOnAirings.length > 0) && user) {
     const { count } = await supabase
       .from('watchlist_items')
       .select('id', { count: 'exact', head: true })
@@ -385,7 +405,12 @@ export default async function OnTvPage({
           </p>
         </>
       ) : (
-        <OnTvGuide airings={airings} dateLabel={friendlyDate(now)} dateIso={now.toISOString()} country={region} mode="broadcast" remindedIds={remindedIds} />
+        <>
+          {whatsOnAirings.length > 0 && (
+            <WhatsOnToday airings={whatsOnAirings} nowMs={now.getTime()} personalized={guidePersonalized} />
+          )}
+          <OnTvGuide airings={airings} dateLabel={friendlyDate(now)} dateIso={now.toISOString()} country={region} mode="broadcast" remindedIds={remindedIds} />
+        </>
       )}
 
       {/* THE DETECTIVE IS A TOOL, NOT THE PAGE. It sat between the heading and

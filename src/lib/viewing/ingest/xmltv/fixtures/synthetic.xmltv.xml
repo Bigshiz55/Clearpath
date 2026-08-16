@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tv SYSTEM "xmltv.dtd">
+<tv date="08/15/2026" source-info-url="http://www.example.invalid" source-info-name="Synthetic Fixture">
+  <channel id="1.stations.synthetic.test">
+    <display-name>Fixture Movies Network - Eastern Feed</display-name>
+    <display-name>FMN</display-name>
+    <display-name>12</display-name>
+    <icon src="http://cdn.example.invalid/fmn.png"/>
+    <url>www.example.invalid</url>
+  </channel>
+  <channel id="2.stations.synthetic.test">
+    <display-name>Fixture Broadcast (WFIX) Springfield</display-name>
+    <display-name>WFIX-TV</display-name>
+    <display-name>4-1</display-name>
+    <icon src="https://cdn.example.invalid/wfix.png"/>
+  </channel>
+  <channel id="3.stations.synthetic.test">
+    <display-name>Two Names Only</display-name>
+    <display-name>TNO</display-name>
+  </channel>
+  <programme start="20260815010000 +0000" stop="20260815030000 +0000" channel="1.stations.synthetic.test">
+    <title lang="en">A Fixture Film &amp; Its Sequel</title>
+    <desc lang="en">A synthetic movie row with <![CDATA[CDATA text & raw ampersand]]> inside.</desc>
+    <credits>
+      <director>Directy McDirect</director>
+      <actor>Actor One</actor>
+      <actor>Actor Two</actor>
+    </credits>
+    <date>1999</date>
+    <category lang="en">Movie</category>
+    <category lang="en">Drama</category>
+    <icon src="http://cdn.example.invalid/film.jpg"/>
+    <rating><value>TVPG</value></rating>
+    <star-rating><value>3 / 5</value></star-rating>
+  </programme>
+  <programme start="20260815030000 +0000" stop="20260815033000 +0000" channel="1.stations.synthetic.test">
+    <title lang="en">Fixture Sitcom</title>
+    <sub-title lang="en">The Pilot</sub-title>
+    <desc lang="en">Episodic row.</desc>
+    <category lang="en">Sitcom</category>
+    <episode-num system="xmltv_ns">7 . 9 . </episode-num>
+    <episode-num system="onscreen">S8/E10</episode-num>
+    <new/>
+  </programme>
+  <programme start="20260814200000 -0500" stop="20260814220000 -0500" channel="2.stations.synthetic.test">
+    <title lang="en">Fixture Kickoff</title>
+    <category lang="en">Sports</category>
+    <live/>
+  </programme>
+  <programme start="20260815040000 +0000" stop="20260815043000 +0000" channel="2.stations.synthetic.test">
+    <title lang="en">Fixture News at Nine</title>
+    <category lang="en">News</category>
+    <previously-shown/>
+  </programme>
+  <programme start="20260815050000 +0000" stop="20260815060000 +0000" channel="3.stations.synthetic.test">
+    <title lang="en">Bare Minimum</title>
+  </programme>
+  <programme start="20260815060000 +0000" stop="20260815070000 +0000" channel="3.stations.synthetic.test">
+    <title lang="en">No Stop Twin</title>
+    <category lang="en">Reality TV</category>
+  </programme>
+  <programme start="20260815060000 +0000" stop="20260815070000 +0000" channel="3.stations.synthetic.test">
+    <title lang="en">No Stop Twin</title>
+    <category lang="en">Reality TV</category>
+  </programme>
+  <programme start="20260815990000 +0000" stop="20260816000000 +0000" channel="3.stations.synthetic.test">
+    <title lang="en">Bad Clock</title>
+  </programme>
+  <programme start="20260815080000 +0000" stop="20260815090000 +0000" channel="3.stations.synthetic.test">
+    <desc lang="en">A row with no title is malformed.</desc>
+  </programme>
+</tv>

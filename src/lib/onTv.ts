@@ -46,6 +46,9 @@ export interface Airing {
   /** The user's personal match (0–100) from the deterministic engine, when the
    *  programme was confidently resolved to a title. Absent = not scored. */
   match?: number | null;
+  /** Provider-flagged first showing (XMLTV <premiere>/<new> via the ingest
+   *  tables' is_premiere). Absent = the source said nothing — never inferred. */
+  isPremiere?: boolean | null;
   /** One plain-language line of what drove `match` — the badge's "why". */
   matchWhy?: string | null;
   year?: number | null; // release year, when the source reports one — disambiguates the TMDB match
