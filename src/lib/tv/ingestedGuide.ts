@@ -172,52 +172,54 @@ interface RawProgramme {
   artwork_url: string | null;
 }
 
-/**
- * Every ingested airing whose start falls in a window that opens
- * `lookbackMs` before `nowMs` (so a movie already running still shows as
- * "on now" — the same reason the live path fetches whole days and lets
- * `buildChannelGuide`'s `onNowOf` do the real windowing from each airing's
- * own runtime) through `nowMs + windowMs`.
- */
-export async function getIngestedGuideAirings(
-  supabase: SupabaseClient,
-  nowMs: number,
-  windowMs: number,
-  lookbackMs = 6 * 60 * 60 * 1000,
-): Promise<Airing[]> {
-  const rangeStart = new Date(nowMs - lookbackMs).toISOString();
-  const rangeEnd = new Date(nowMs + windowMs).toISOString();
+/** `.in()` id-lookup batch size — keeps each PostgREST filter URL short and
+ *  every response under the server's own row cap, however many distinct
+ *  programmes a full national day carries. */
+const IN_CHUNK = 200;
+/** PostgREST caps any single response at 1000 rows; paging respects it. */
+const PAGE_ROWS = 1000;
+/** Hard ceiling on one day-read — far above any real lineup's day (~4,500
+ *  airings on the largest measured feed), a runaway backstop, not a budget. */
+const DAY_READ_CAP = 20_000;
 
-  const { data: airings, error: airingsError } = await supabase
-    .from('tv_airings')
-    .select('station_id, programme_id, start_at_utc, provider_airing_id, is_premiere')
-    .gte('start_at_utc', rangeStart)
-    .lt('start_at_utc', rangeEnd)
-    .order('start_at_utc', { ascending: true })
-    .limit(1000);
-  if (airingsError || !airings || airings.length === 0) {
-    if (airingsError) console.error('[ingestedGuide] tv_airings query failed', airingsError.message);
-    return [];
+/** Fetch rows for `ids` in IN_CHUNK batches. Null on any batch error — the
+ *  caller degrades to [] exactly as a single failed lookup always has. */
+async function chunkedByIds<T>(
+  ids: string[],
+  fetchChunk: (chunk: string[]) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<T[] | null> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const { data, error } = await fetchChunk(ids.slice(i, i + IN_CHUNK));
+    if (error) {
+      console.error('[ingestedGuide] id lookup chunk failed', error.message);
+      return null;
+    }
+    out.push(...((data as T[] | null) ?? []));
   }
-  const rows = airings as RawAiring[];
+  return out;
+}
 
+/** The shared join half of every reader here: raw airing rows → `Airing[]`
+ *  via their station and programme rows. Fail-open: any lookup error → []. */
+async function hydrateAiringRows(supabase: SupabaseClient, rows: RawAiring[]): Promise<Airing[]> {
+  if (rows.length === 0) return [];
   const stationIds = [...new Set(rows.map((r) => r.station_id))];
   const programmeIds = [...new Set(rows.map((r) => r.programme_id))];
 
-  const [{ data: stations, error: stationsError }, { data: programmes, error: programmesError }] = await Promise.all([
-    supabase.from('tv_stations').select('id, name, logo_url').in('id', stationIds),
-    supabase
-      .from('tv_programmes')
-      .select('id, provider_programme_id, title, episode_title, programme_type, season_number, episode_number, genres, description, runtime_minutes, artwork_url')
-      .in('id', programmeIds),
+  const [stations, programmes] = await Promise.all([
+    chunkedByIds<RawStation>(stationIds, (chunk) => supabase.from('tv_stations').select('id, name, logo_url').in('id', chunk)),
+    chunkedByIds<RawProgramme>(programmeIds, (chunk) =>
+      supabase
+        .from('tv_programmes')
+        .select('id, provider_programme_id, title, episode_title, programme_type, season_number, episode_number, genres, description, runtime_minutes, artwork_url')
+        .in('id', chunk),
+    ),
   ]);
-  if (stationsError || programmesError) {
-    console.error('[ingestedGuide] station/programme lookup failed', stationsError?.message, programmesError?.message);
-    return [];
-  }
+  if (!stations || !programmes) return [];
 
-  const stationById = new Map((stations as RawStation[] | null ?? []).map((s) => [s.id, s]));
-  const programmeById = new Map((programmes as RawProgramme[] | null ?? []).map((p) => [p.id, p]));
+  const stationById = new Map(stations.map((s) => [s.id, s]));
+  const programmeById = new Map(programmes.map((p) => [p.id, p]));
 
   return rows.flatMap((r) => {
     const station = stationById.get(r.station_id);
@@ -243,6 +245,77 @@ export async function getIngestedGuideAirings(
       }),
     ];
   });
+}
+
+/**
+ * Every ingested airing whose start falls in a window that opens
+ * `lookbackMs` before `nowMs` (so a movie already running still shows as
+ * "on now" — the same reason the live path fetches whole days and lets
+ * `buildChannelGuide`'s `onNowOf` do the real windowing from each airing's
+ * own runtime) through `nowMs + windowMs`. One page: the first 1000 rows of
+ * the window — the guide's 6-hour windows fit; whole-day reads over a full
+ * national lineup do not, and use `getIngestedDayAirings` below.
+ */
+export async function getIngestedGuideAirings(
+  supabase: SupabaseClient,
+  nowMs: number,
+  windowMs: number,
+  lookbackMs = 6 * 60 * 60 * 1000,
+): Promise<Airing[]> {
+  const rangeStart = new Date(nowMs - lookbackMs).toISOString();
+  const rangeEnd = new Date(nowMs + windowMs).toISOString();
+
+  const { data: airings, error: airingsError } = await supabase
+    .from('tv_airings')
+    .select('station_id, programme_id, start_at_utc, provider_airing_id, is_premiere')
+    .gte('start_at_utc', rangeStart)
+    .lt('start_at_utc', rangeEnd)
+    .order('start_at_utc', { ascending: true })
+    .limit(1000);
+  if (airingsError || !airings || airings.length === 0) {
+    if (airingsError) console.error('[ingestedGuide] tv_airings query failed', airingsError.message);
+    return [];
+  }
+  return hydrateAiringRows(supabase, airings as RawAiring[]);
+}
+
+/**
+ * EVERY ingested airing starting in [rangeStartMs, rangeEndMs) — paged, so a
+ * full national day (measured ~4,500 airings on the largest real feed) comes
+ * back whole instead of silently truncating at PostgREST's 1000-row response
+ * cap. Order is (start_at_utc, id) — the id tiebreak keeps page boundaries
+ * stable when hundreds of channels start programmes at the same instant.
+ * Fail-open: a failed page logs and returns what was already read.
+ */
+export async function getIngestedDayAirings(
+  supabase: SupabaseClient,
+  rangeStartMs: number,
+  rangeEndMs: number,
+): Promise<Airing[]> {
+  const rangeStart = new Date(rangeStartMs).toISOString();
+  const rangeEnd = new Date(rangeEndMs).toISOString();
+  const all: RawAiring[] = [];
+  for (let offset = 0; offset < DAY_READ_CAP; offset += PAGE_ROWS) {
+    const { data, error } = await supabase
+      .from('tv_airings')
+      .select('station_id, programme_id, start_at_utc, provider_airing_id, is_premiere')
+      .gte('start_at_utc', rangeStart)
+      .lt('start_at_utc', rangeEnd)
+      .order('start_at_utc', { ascending: true })
+      .order('id', { ascending: true })
+      .range(offset, offset + PAGE_ROWS - 1);
+    if (error) {
+      console.error('[ingestedGuide] day page read failed', error.message);
+      break;
+    }
+    const page = (data as RawAiring[] | null) ?? [];
+    all.push(...page);
+    if (page.length < PAGE_ROWS) break;
+  }
+  if (all.length >= DAY_READ_CAP) {
+    console.warn(`[ingestedGuide] day read hit the ${DAY_READ_CAP}-row backstop — tail truncated`);
+  }
+  return hydrateAiringRows(supabase, all);
 }
 
 /**

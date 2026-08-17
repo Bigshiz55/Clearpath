@@ -107,6 +107,13 @@ Nothing invents artwork.
 drop, object-storage download, upload endpoint or webhook is a new
 factory, not a new importer; parsing is not coupled to a filesystem path.
 
+A REAL (non-`--dry-run`) import additionally requires `--project-ref <ref>`
+and refuses unless it matches the project ref inside
+`NEXT_PUBLIC_SUPABASE_URL` (`targetRef.ts`, unit-tested): the import prunes
+stale rows on success, so the target database is declared by the operator
+and proven against the env — never inherited silently from a shell export.
+Only the public project ref is ever printed; keys never are.
+
 ## Health / coverage evidence (Phase 13)
 
 Imported lineups surface through the EXISTING health path (`/api/health/tv`

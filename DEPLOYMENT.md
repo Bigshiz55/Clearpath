@@ -39,6 +39,15 @@ From Supabase → **Project Settings → API**:
 - `anon`/`publishable` key → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` (⚠️ secret, server-only)
 
+**Preview isolation (recommended):** Vercel *Preview* deployments should
+point these three variables at a **separate, unmistakably-named Supabase
+project** (e.g. `WatchVerdict-Preview`, its own ref) with the same
+migrations applied (`supabase link --project-ref <preview-ref>` →
+`supabase db push`), so acceptance/test data — e.g. XMLTV guide imports —
+never lands in the production project. Production keeps the project above;
+only the Preview-scoped variables differ. The XMLTV import CLI enforces the
+declared-target rule either way (`--project-ref` must match the URL's ref).
+
 From TMDB → `TMDB_API_KEY` (v4 read-access token or v3 key both work).
 
 ## Step 3 — Deploy to Vercel
