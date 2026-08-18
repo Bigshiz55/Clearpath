@@ -20,6 +20,8 @@ vi.mock('@/lib/ai/tools', () => ({ searchBySubject, resolveKeywordIds, resolvePr
 
 const { interpret } = await import('@/lib/interpret/interpret');
 const { resolveCanonicalExecution, intentToQuery } = await import('./canonicalExecution');
+const { EMPTY_INTENT } = await import('@/lib/interpret/types');
+import type { CanonicalIntent, LookbackWindow } from '@/lib/interpret/types';
 
 const STALLONE = { id: 16483, name: 'Sylvester Stallone', profilePath: null, knownFor: 'Rocky, Rambo' };
 const HANKS = { id: 31, name: 'Tom Hanks', profilePath: null, knownFor: 'Forrest Gump, Big' };
@@ -149,5 +151,124 @@ describe('the pure mapping does no I/O', () => {
     expect(m.requestedCount).toBe(3);
     expect(m.query.genreIds).toContain(27);
     expect(searchPeople).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * RELATIVE DATES CROSS THE PURITY BOUNDARY EXACTLY ONCE.
+ *
+ * The interpreter records "5 years back" and never asks what today is; this
+ * layer owns the clock. The tests inject `now` so the conversion is pinned
+ * rather than drifting with the calendar — a suite whose expectations move
+ * every January proves nothing.
+ */
+describe('lookback windows become the Finder constraint', () => {
+  // 2026-08-18T00:00:00Z, injected — never the real clock.
+  const NOW = Date.parse('2026-08-18T00:00:00Z');
+  const withLookback = (lookback: LookbackWindow): CanonicalIntent => ({
+    ...EMPTY_INTENT,
+    kind: 'recommendation',
+    media: 'movie',
+    date: { lookback },
+  });
+
+  it('"the last 5 years" becomes a minReleaseDate five years back', () => {
+    const { query } = intentToQuery(withLookback({ amount: 5, unit: 'year', direction: 'past' }), { now: NOW });
+    expect(query.minReleaseDate).toBe('2021-08-18');
+  });
+
+  it('"the past decade" reaches ten years back', () => {
+    const { query } = intentToQuery(withLookback({ amount: 1, unit: 'decade', direction: 'past' }), { now: NOW });
+    expect(query.minReleaseDate).toBe('2016-08-18');
+  });
+
+  it('months and days are honoured in their own units', () => {
+    expect(intentToQuery(withLookback({ amount: 6, unit: 'month', direction: 'past' }), { now: NOW }).query.minReleaseDate).toBe('2026-02-18');
+    expect(intentToQuery(withLookback({ amount: 30, unit: 'day', direction: 'past' }), { now: NOW }).query.minReleaseDate).toBe('2026-07-19');
+  });
+
+  it('a FUTURE window yields no bound — an empty answer beats a wrong one', () => {
+    const { query } = intentToQuery(withLookback({ amount: 2, unit: 'year', direction: 'future' }), { now: NOW });
+    expect(query.minReleaseDate).toBeUndefined();
+  });
+
+  it('an explicit year is more specific and keeps precedence', () => {
+    const intent: CanonicalIntent = {
+      ...EMPTY_INTENT, kind: 'recommendation', media: 'movie',
+      date: { minYear: 1994, lookback: { amount: 5, unit: 'year', direction: 'past' } },
+    };
+    const { query } = intentToQuery(intent, { now: NOW });
+    expect(query.minYear).toBe(1994);
+    expect(query.minReleaseDate).toBeUndefined();
+  });
+
+  it('no lookback means no date constraint invented', () => {
+    const { query } = intentToQuery({ ...EMPTY_INTENT, kind: 'recommendation', media: 'movie' }, { now: NOW });
+    expect(query.minReleaseDate).toBeUndefined();
+  });
+
+  it('THE INTERPRETER ITSELF NEVER PRODUCES A DATE — only this layer does', () => {
+    const intent = interpret('movies from the last 5 years');
+    expect(intent.date.minYear).toBeUndefined();
+    expect(intent.date.lookback).toEqual({ amount: 5, unit: 'year', direction: 'past' });
+    expect(intentToQuery(intent, { now: NOW }).query.minReleaseDate).toBe('2021-08-18');
+  });
+});
+
+/**
+ * AN EXPLICIT BOUND OUTRANKS A VAGUE WINDOW — they must never both apply.
+ *
+ * Final pre-merge review caught this as a REGRESSION introduced by adding
+ * lookback support. "recent movies before 2020" set `maxYear = 2020` from the
+ * explicit clause AND a five-year lookback from the word "recent", so
+ * execution emitted `maxYear=2020` together with `minReleaseDate=2021-08-18`
+ * — a window with no interior. The query could only ever return nothing.
+ *
+ * Measured against `origin/main` for the same sentence: `maxYear=undefined,
+ * minReleaseDate=undefined` — unconstrained, and therefore ANSWERABLE. The
+ * branch made that sentence strictly worse, which is the definition of a
+ * regression rather than a gap.
+ */
+describe('an explicit year bound suppresses the vague lookback', () => {
+  const NOW2 = Date.parse('2026-08-18T00:00:00Z');
+
+  it('"recent movies before 2020" never emits a contradictory window', () => {
+    const { query } = intentToQuery(interpret('recent movies before 2020'), { now: NOW2 });
+    expect(query.maxYear).toBe(2020);
+    expect(query.minReleaseDate, 'a vague "recent" must not fight an explicit bound').toBeUndefined();
+  });
+
+  it('the interpreter records no lookback once an explicit bound exists', () => {
+    expect(interpret('recent movies before 2020').date.lookback).toBeUndefined();
+  });
+
+  it('an explicit LOWER bound still wins, as before', () => {
+    const i = interpret('recent movies after 2010');
+    expect(i.date.minYear).toBe(2010);
+    expect(i.date.lookback).toBeUndefined();
+  });
+
+  it('and a lookback with no explicit bound is untouched', () => {
+    const { query } = intentToQuery(interpret('movies from the last 5 years'), { now: NOW2 });
+    expect(query.minReleaseDate).toBe('2021-08-18');
+    expect(query.maxYear).toBeUndefined();
+  });
+
+  it('WHATEVER HAPPENS, THE WINDOW HAS AN INTERIOR', () => {
+    // The property that matters, stated once: no phrasing may produce a
+    // minimum later than its maximum.
+    for (const q of [
+      'recent movies before 2020',
+      'movies from the last 5 years',
+      'recent movies after 2010',
+      'movies in the past decade before 2015',
+      'recent movies',
+    ]) {
+      const { query } = intentToQuery(interpret(q), { now: NOW2 });
+      if (query.maxYear != null && query.minReleaseDate) {
+        const minYear = Number(query.minReleaseDate.slice(0, 4));
+        expect(minYear, `${q} produced an empty window`).toBeLessThanOrEqual(query.maxYear);
+      }
+    }
   });
 });

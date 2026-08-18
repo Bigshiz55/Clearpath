@@ -5,7 +5,7 @@ import { DEFAULT_RESULT_LIMIT, type FinderQuery } from '@/lib/finder';
 import { searchBySubject, resolveKeywordIds, resolveProvider } from '@/lib/ai/tools';
 import { resolvePersonReference, type PersonResolution } from './personReference';
 import { planPersonConstraint, type PersonConstraint, type PersonPlan } from '@/lib/people/constraint';
-import type { CanonicalIntent } from '@/lib/interpret/types';
+import type { CanonicalIntent, LookbackWindow } from '@/lib/interpret/types';
 
 /**
  * CANONICAL INTENT → A TYPED FINDER EXECUTION REQUEST.
@@ -86,7 +86,44 @@ const genreIdFor = (name: string): number | null =>
  */
 const TONE_PACE: Record<string, number> = { 'fast-paced': 90, fastpaced: 90, slow: 15 };
 
-export function intentToQuery(intent: CanonicalIntent): MappedIntent {
+/**
+ * A RELATIVE WINDOW BECOMES A CONCRETE BOUND — here, where the clock lives.
+ *
+ * The interpreter is pure and records "5 years back" as semantics; this is the
+ * only place allowed to know what today is. Keeping the arithmetic on this side
+ * of the boundary is what lets the same sentence be interpreted identically
+ * forever and still retrieve the right decade.
+ *
+ * Returns the `YYYY-MM-DD` the existing Finder constraint `minReleaseDate`
+ * already speaks. A `future` window yields nothing: the catalogue cannot answer
+ * "released in the next two years", and a silent lower bound would be a wrong
+ * answer rather than an empty one.
+ */
+const MS_PER_DAY = 86_400_000;
+
+export function lookbackToMinReleaseDate(w: LookbackWindow, nowMs: number): string | undefined {
+  if (w.direction !== 'past' || w.amount <= 0) return undefined;
+  const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const d = new Date(nowMs);
+  switch (w.unit) {
+    case 'day':
+      return iso(nowMs - w.amount * MS_PER_DAY);
+    case 'week':
+      return iso(nowMs - w.amount * 7 * MS_PER_DAY);
+    case 'month':
+      d.setUTCMonth(d.getUTCMonth() - w.amount);
+      return iso(d.getTime());
+    case 'decade':
+      d.setUTCFullYear(d.getUTCFullYear() - w.amount * 10);
+      return iso(d.getTime());
+    case 'year':
+    default:
+      d.setUTCFullYear(d.getUTCFullYear() - w.amount);
+      return iso(d.getTime());
+  }
+}
+
+export function intentToQuery(intent: CanonicalIntent, opts: { now?: number } = {}): MappedIntent {
   const wantedGenres = intent.genres.filter((g) => g.wanted);
   const vetoedGenres = intent.genres.filter((g) => !g.wanted);
 
@@ -151,6 +188,15 @@ export function intentToQuery(intent: CanonicalIntent): MappedIntent {
     maxYear: intent.date.maxYear ?? undefined,
     finalCount: intent.requestedCount ?? undefined,
   };
+
+  /* "movies from the last 5 years" — the semantic window the interpreter
+     recorded, resolved against the injected clock and handed to the constraint
+     the Finder already has. An explicit year is the more specific statement and
+     keeps precedence. */
+  if (intent.date.lookback && query.minYear == null) {
+    const from = lookbackToMinReleaseDate(intent.date.lookback, opts.now ?? Date.now());
+    if (from) query.minReleaseDate = from;
+  }
 
   /* ORIGIN / AUDIO — canonical fields onto the query, replacing the legacy
      whole-utterance augmentation on this path. Dub is stricter than audio and

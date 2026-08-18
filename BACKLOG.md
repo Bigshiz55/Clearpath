@@ -42,6 +42,28 @@ Updated at the end of every work order per the Working Agreement in
   preview-accessible database (command in the PR) — until then the route
   shows the honest absence state, by design.
 
+## Next (discovered during the canonical interpreter release review)
+
+- **`date.relative` is captured by the interpreter and never executed.**
+  - PROBLEM: `interpret()` sets `date.relative = 'newer' | 'older'` for phrases
+    like "movies older than 20 years", but `intentToQuery`
+    (`src/lib/ask/canonicalExecution.ts`) maps only `minYear`/`maxYear`, so the
+    constraint reaches no query field and the results come back unfiltered.
+  - WHY IT MATTERS: the user states a bound and silently gets everything. Same
+    class as the relative-date gap this workstream fixed, one field over.
+  - KNOWN EVIDENCE: verified absent on `origin/main` as well as on
+    `claude/canonical-interpreter-certification` — pre-existing, not a
+    regression. `interpret('movies older than 20 years').date` is
+    `{relative:'older'}`, and the resulting query has `minYear`, `maxYear` and
+    `minReleaseDate` all undefined.
+  - SAFE CONSTRAINTS: execution already owns the clock (`intentToQuery` takes an
+    injected `now`), so a bounded reading is a small addition there and needs no
+    interpreter change. Whatever is added must preserve the "window has an
+    interior" property the date tests now assert.
+  - DEPENDENCIES: none.
+  - NOT A BLOCKER FOR: the canonical interpreter merge — the phrase behaves
+    exactly as it does on `main` today.
+
 ## Next (discovered during the P0 repair)
 - **XMLTV file-fed grid is BUILT (`claude/xmltv-file-ingestion`, stacked on
   the P0 PR):** streaming importer → canonical 0032 tables, coverage
