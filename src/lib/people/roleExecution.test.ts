@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { planPersonConstraint, qualifyByRole } from './constraint';
+import { planPersonConstraint } from './constraint';
+import { qualifyCandidates } from '@/lib/ask/hardConstraints';
 
 /**
  * THREE DEFECTS IN THE FIRST CUT OF THE ROLE WORK — pinned red, then fixed.
@@ -73,28 +74,37 @@ describe('2 — execution may not read raw language', () => {
 });
 
 describe('3 — qualification covers the candidates, and stops when satisfied', () => {
-  const credits = async (_mt: 'movie' | 'tv', id: number) =>
-    id >= 30 ? { cast: [], crew: [{ id: NOLAN, job: 'Director' }] } : { cast: [], crew: [] };
-
+  /* These properties moved with the walker. `qualifyByRole` verified people
+     only and is retired; `qualifyCandidates` verifies every explicit
+     requirement through one predicate. The guarantees are unchanged and are
+     asserted here against the new owner. */
+  const NOLAN_C = { type: 'person' as const, entity: 'Christopher Nolan', personId: NOLAN, role: 'director' as const, required: true as const };
   const items = Array.from({ length: 40 }, (_, i) => ({ id: i, mediaType: 'movie' as const }));
+  const factsFor = async (i: { id: number; mediaType: 'movie' | 'tv' }) => ({
+    mediaType: i.mediaType,
+    castIds: [] as number[],
+    directorIds: i.id >= 30 ? [NOLAN] : [],
+    genreNames: [] as string[],
+    creditsKnown: true,
+  });
 
   it('finds qualifying titles that rank BELOW the old head window', async () => {
-    const out = await qualifyByRole(items, [{ personId: NOLAN, role: 'director' as const }], credits, { need: 3 });
-    expect(out.map((i: { id: number }) => i.id)).toEqual([30, 31, 32]);
+    const out = await qualifyCandidates(items, [NOLAN_C], factsFor, { need: 3 });
+    expect(out.map((r) => r.item.id)).toEqual([30, 31, 32]);
   });
 
   it('stops as soon as enough are verified rather than checking everything', async () => {
     let calls = 0;
-    const counted = async (mt: 'movie' | 'tv', id: number) => {
+    const counted = async (i: { id: number; mediaType: 'movie' | 'tv' }) => {
       calls += 1;
-      return credits(mt, id);
+      return factsFor(i);
     };
-    await qualifyByRole(items, [{ personId: NOLAN, role: 'director' as const }], counted, { need: 1 });
+    await qualifyCandidates(items, [NOLAN_C], counted, { need: 1 });
     expect(calls, 'verification is bounded by what the answer needs').toBeLessThan(items.length);
   });
 
   it('exhausts the candidates when fewer qualify than were asked for', async () => {
-    const out = await qualifyByRole(items, [{ personId: NOLAN, role: 'director' as const }], credits, { need: 50 });
+    const out = await qualifyCandidates(items, [NOLAN_C], factsFor, { need: 50 });
     expect(out).toHaveLength(10);
   });
 });

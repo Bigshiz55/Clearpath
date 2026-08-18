@@ -8,6 +8,8 @@ import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from
 import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
 import { interpret } from '@/lib/interpret/interpret';
 import { resolveCanonicalExecution } from '@/lib/ask/canonicalExecution';
+import { unresolvedClarification, type NearMisses } from '@/lib/ask/unresolvedResponse';
+import type { UnresolvedRequirement } from '@/lib/ask/hardConstraints';
 import { augmentInternational } from '@/lib/askInternational';
 import type { ConsumedEntity } from '@/lib/nlu/consumedEntities';
 import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
@@ -967,6 +969,9 @@ export async function POST(req: Request) {
     let canonicalInterpretation: string[] = [];
     let canonicalAmbiguity: Awaited<ReturnType<typeof resolveCanonicalExecution>>['ambiguity'] = null;
     let canonicalExcludedPersonIds: number[] = [];
+    let canonicalUnresolved: UnresolvedRequirement[] = [];
+    let exec0Query: FinderQuery = { ...EMPTY_QUERY };
+    let canonicalPeople: Awaited<ReturnType<typeof resolveCanonicalExecution>>['people'] = [];
     /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see roleNote below. */
     let refusedRole: Extract<PersonPlan, { kind: 'refuse' }> | null = null;
     if (canonicalOwnsLanguage) {
@@ -975,6 +980,9 @@ export async function POST(req: Request) {
       canonicalInterpretation = exec.interpretation;
       canonicalExcludedPersonIds = exec.excludePersonIds;
       refusedRole = exec.refusedRole;
+      canonicalUnresolved = exec.unresolvedRequirements;
+      canonicalPeople = exec.people;
+      exec0Query = exec.query;
       /*
        * THE QUERY IS THE EXECUTION OF THE INTENT — wholesale, not a patch.
        * `exec.query` was built from `CanonicalIntent` (media, genres and
@@ -1019,6 +1027,49 @@ export async function POST(req: Request) {
         query: { ...EMPTY_QUERY },
         items: [],
       });
+    }
+
+    /* A REQUIREMENT WE COULD NOT HONOUR IS SAID OUT LOUD, NOT WORKED AROUND.
+       The reported failure — "Looking for a good Samuel L Jackson movie"
+       answering with three 2026 films he is not in — was this exact gap: the
+       requirement was dropped and the query ran on. Returning nothing with a
+       question is a better answer than returning something unrelated with a
+       number attached. */
+    if (canonicalUnresolved.length > 0) {
+      const nearMisses: NearMisses = {};
+      for (const p of canonicalPeople) {
+        if (p.kind === 'unresolved' && p.nearMisses?.length) nearMisses[p.spokenAs] = p.nearMisses;
+      }
+      /* Did anything else survive to execute? If so the request still has
+         substance and runs on it, with the miss disclosed rather than hidden. */
+      const q0 = exec0Query;
+      const requestHasOtherConstraints =
+        (q0.genreIds?.length ?? 0) > 0 ||
+        (q0.keywordIds?.length ?? 0) > 0 ||
+        (q0.castIds?.length ?? 0) > 0 ||
+        (q0.people?.length ?? 0) > 0 ||
+        (q0.providerIds?.length ?? 0) > 0 ||
+        (q0.originCountries?.length ?? 0) > 0 ||
+        (q0.originalLanguages?.length ?? 0) > 0 ||
+        q0.englishAudioOnly === true ||
+        q0.englishDubOnly === true ||
+        q0.minYear != null ||
+        q0.maxYear != null ||
+        q0.maxRuntime != null ||
+        Boolean(q0.subjectLabel) ||
+        Boolean(q0.subjectCanonical);
+      const c = unresolvedClarification(canonicalUnresolved, nearMisses, { requestHasOtherConstraints });
+      if (c) {
+        return NextResponse.json({
+          kind: 'clarify',
+          requestId,
+          appliedText: text || null,
+          clarify: c.clarify,
+          options: c.options,
+          query: { ...EMPTY_QUERY },
+          items: [],
+        });
+      }
     }
 
     /* A named person we could not pin down is a QUESTION, not a guess. */

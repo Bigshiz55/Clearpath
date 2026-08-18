@@ -272,3 +272,49 @@ describe('an explicit year bound suppresses the vague lookback', () => {
     }
   });
 });
+
+/**
+ * A REQUIREMENT THAT CANNOT BE RESOLVED IS NEVER SILENTLY DROPPED.
+ *
+ * ── THE PRODUCTION FAILURE ────────────────────────────────────────────────
+ * "Looking for a good Samuel L Jackson movie I may not have seen" returned
+ * three unrelated 2026 films at "100 match". The interpreter had extracted the
+ * person correctly; resolution missed on punctuation; and then this line
+ *
+ *     if (p.kind !== 'resolved') return;
+ *
+ * threw the requirement away. No constraint, no refusal, no signal — the query
+ * ran on as though the user had asked for nothing in particular, and every
+ * later stage did its job perfectly on a request that no longer existed.
+ *
+ * `ambiguous` was always handled (the route asks). `unresolved` simply vanished.
+ */
+describe('an unresolvable required person is reported, not discarded', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchPeople.mockResolvedValue([]); // nobody by that name
+  });
+
+  it('execution reports the unresolved requirement', async () => {
+    const exec = await resolveCanonicalExecution(interpret('Looking for a good Zzyzx Nobody movie'));
+    expect(exec.unresolvedRequirements.map((u) => u.entity)).toContain('Zzyzx Nobody');
+  });
+
+  it('and does NOT hand back a query that quietly dropped it', async () => {
+    const exec = await resolveCanonicalExecution(interpret('Looking for a good Zzyzx Nobody movie'));
+    // The old behaviour: no castIds, no people, no signal — indistinguishable
+    // from a request that never named anyone.
+    const silentlyUnconstrained =
+      (exec.query.castIds ?? []).length === 0 &&
+      (exec.query.people ?? []).length === 0 &&
+      exec.unresolvedRequirements.length === 0;
+    expect(silentlyUnconstrained, 'the requirement must leave a trace').toBe(false);
+  });
+
+  it('a resolvable person still applies cleanly — nothing regressed', async () => {
+    searchPeople.mockResolvedValue([STALLONE]);
+    const exec = await resolveCanonicalExecution(interpret('Sylvester Stallone movies'));
+    expect(exec.query.castIds).toContain(STALLONE.id);
+    expect(exec.unresolvedRequirements).toEqual([]);
+  });
+})

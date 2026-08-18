@@ -249,6 +249,34 @@ function maskFraming(text: string): string {
  * Masked (not deleted) so every other offset in the clause is unchanged, and
  * only the possessive form is owned — a bare "family movies" is untouched.
  */
+/**
+ * WATCH HISTORY, IN EVERY FORM PEOPLE SAY IT.
+ *
+ * The old pattern covered "have not seen", "haven't seen" and "already
+ * watched" but not the MODAL form — and "I may not have seen" is exactly the
+ * phrase in the reported failing sentence, so the one phrasing it missed was
+ * the one that mattered. The auxiliary sitting between the negator and the
+ * verb ("may not HAVE seen", "probably have not seen") is the whole gap.
+ */
+const SEEN_PHRASE =
+  /\b(?:already\s+(?:seen|watched)|(?:haven'?t|hasn'?t)\s+(?:\w+\s+){0,2}?(?:seen|watched)|(?:may|might|probably|possibly)?\s*(?:have\s+)?not\s+(?:\w+\s+){0,2}?(?:seen|watched))\b/i;
+
+/**
+ * The same words, masked before any SUBJECT extractor reads the clause.
+ *
+ * `excludeSeen` owns this meaning. Leaving the words in place let them reach
+ * `subjects` as a NEGATED subject ("have seen", "seen", "seen yet"), and
+ * negated subjects become EXCLUDED KEYWORDS downstream — so "a movie I have
+ * not seen" could quietly exclude titles tagged with an unrelated keyword.
+ * One occurrence, one meaning.
+ */
+const SEEN_SPAN =
+  /\b(?:already\s+|(?:haven'?t|hasn'?t)\s+|(?:may|might|probably|possibly)\s+|have\s+|not\s+){0,4}(?:seen|watched)(?:\s+yet)?\b/gi;
+
+function maskSeen(text: string): string {
+  return text.replace(SEEN_SPAN, (m) => ' '.repeat(m.length));
+}
+
 const COMPANION_PHRASE =
   /\b(?:my|our)\s+(?:wife|husband|partner|girlfriend|boyfriend|kids?|son|daughter|mum|mom|dad|roommate|friend|family)\b/gi;
 
@@ -569,7 +597,7 @@ export function interpret(raw: string): CanonicalIntent {
   }
 
   for (const c of executableClauses) {
-    const negated = negatedSpans(c.text).map((s) => s.toLowerCase());
+    const negated = negatedSpans(maskSeen(c.text)).map((s) => s.toLowerCase());
     const isNegated = (term: string) => negated.some((n) => n.includes(term) || term.includes(n));
 
     // Companion references are owned by the companion, not by the genre
@@ -637,7 +665,7 @@ export function interpret(raw: string): CanonicalIntent {
       });
     }
 
-    if (/\b(?:already (?:seen|watched)|haven'?t (?:seen|watched)|i have not seen|not seen)\b/i.test(c.text)) {
+    if (SEEN_PHRASE.test(c.text)) {
       intent.excludeSeen = true;
     }
     // "another boxing movie" asks for one that is NOT the one just named.
@@ -699,7 +727,7 @@ export function interpret(raw: string): CanonicalIntent {
   // COMPANION clauses: a veto belonging to someone else. It constrains tonight
   // and is attributed to them, so it can never be folded into the user's taste.
   for (const c of clauses.filter((x) => x.role === 'companion')) {
-    const negated = negatedSpans(c.text).map((s) => s.toLowerCase());
+    const negated = negatedSpans(maskSeen(c.text)).map((s) => s.toLowerCase());
     for (const g of uniqueMatches(c.text, GENRE_WORDS)) {
       const vetoed = negated.some((n) => n.includes(g)) || /\bhates?\b|\bwon'?t watch\b/i.test(c.text);
       pushUnique<GenreConstraint>(intent.genres, { span: g, wanted: !vetoed, holder: 'companion' });
@@ -729,7 +757,7 @@ export function interpret(raw: string): CanonicalIntent {
        <media noun>", and "shows" is a media noun, so "only show me one" handed
        back `only` as the SUBJECT of the request. Masking blanks in place, so
        every range still lines up with the person and title ranges above. */
-    const subjectText = maskCompanions(maskFraming(req.text));
+    const subjectText = maskSeen(maskCompanions(maskFraming(req.text)));
     for (const sm of findSubjectMatches(subjectText)) {
       if (personRanges.some((p) => overlaps(p, sm))) continue;
       if (titleRanges.some((t) => overlaps(t, sm))) continue;

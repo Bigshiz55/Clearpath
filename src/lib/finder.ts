@@ -32,7 +32,13 @@ import {
   type CandidateEvidence,
 } from '@/lib/nlu/semanticEligibility';
 import { adjudicateSubjectCentrality, type SubjectAdjudicator } from '@/lib/nlu/subjectAdjudicator';
-import { qualifyByRole, type PersonConstraint } from '@/lib/people/constraint';
+import { type PersonConstraint } from '@/lib/people/constraint';
+import {
+  constraintsFromQuery,
+  constraintsSatisfied,
+  qualifyCandidates,
+  type HardConstraint,
+} from '@/lib/ask/hardConstraints';
 
 const FAST_GENRES = ['action', 'thriller', 'adventure', 'crime', 'war', 'horror', 'science fiction'];
 const SLOW_GENRES = ['drama', 'romance', 'history', 'documentary', 'mystery', 'music'];
@@ -677,8 +683,26 @@ export async function runFinder(
   // "enough", so we keep hydrating past keyword matches that turn out to be
   // incidental instead of stopping early on a pool of look-alikes.
   const subjectRequired = !!(q.subjectLexemes && q.subjectLexemes.length > 0);
+  /* THE SUBJECT VERDICT GOES THROUGH THE SAME EVALUATOR AS EVERY OTHER
+     REQUIREMENT. This used to be its own inline predicate, which is how
+     "eligible" came to mean one thing for subjects and nothing at all for
+     people. The centrality JUDGEMENT is still the evaluator's upstream — this
+     only decides what that judgement means for eligibility, in one place. */
+  const subjectConstraints: HardConstraint[] = subjectRequired
+    ? [{ type: 'subject', value: q.subjectCanonical ?? q.subjectLabel ?? 'subject', required: true }]
+    : [];
   const isEligible = (i: FinderItem): boolean =>
-    !subjectRequired || i.subjectEvidence?.satisfied === true;
+    constraintsSatisfied(
+      {
+        mediaType: i.mediaType,
+        castIds: [],
+        directorIds: [],
+        genreNames: [],
+        creditsKnown: true,
+        subjectSatisfied: i.subjectEvidence?.satisfied ?? null,
+      },
+      subjectConstraints,
+    );
 
   const survivors: FinderItem[] = [];
   const enough = q.liveOnly ? Number.POSITIVE_INFINITY : enoughSurvivors(limit);
@@ -863,11 +887,51 @@ export async function runFinder(
      the moment enough are verified, so the work is proportional to the answer
      rather than to the pool, and a short answer means the catalogue really is
      short rather than the window having been too small. */
-  const directorConstraints = (q.people ?? []).filter((p) => p.role === 'director');
-  if (directorConstraints.length > 0) {
-    items = await qualifyByRole(items, directorConstraints, (mt, id) => getCredits(mt, id).catch(() => null), {
-      need: Math.max(1, Math.min(q.finalCount ?? limit, MAX_RESULT_LIMIT)),
-    });
+  /* EVERY NAMED PERSON IS VERIFIED, NOT JUST DIRECTORS.
+     This filtered `role === 'director'` only, on the reasoning that an actor
+     was already guaranteed by TMDB's `with_cast`. That guarantee holds for the
+     discover strands and for nothing else: subject search, lexical routes,
+     the vibe-keyword relaxation and the zero-result fallback all contribute
+     candidates that never passed through a cast-filtered query.
+
+     That is the seam the reported failure came through. "Looking for a good
+     Samuel L Jackson movie" answered with three 2026 films he is not in,
+     because nothing between retrieval and ranking ever asked whether he was.
+     A person the user NAMED is a hard requirement whatever path a candidate
+     arrived by, so the check is per-candidate and role-aware — `satisfiesRole`
+     reads the cast for an actor and the crew for a director, and an
+     unverifiable title is dropped rather than kept. */
+  /* ONE GATE, ONE ANSWER. `qualifyByRole` verified people and nothing else,
+     while media and genre exclusions were enforced only at the provider and
+     subject centrality only in the pre-filter above. Every explicit
+     requirement now passes through `qualifyCandidates`, which asks the same
+     `evaluateCandidate` predicate the subject pre-filter uses. An ineligible
+     candidate cannot reach ranking or be scored, because it does not survive
+     this call. */
+  const hardConstraints = constraintsFromQuery({ ...q, subjectRequired });
+  if (hardConstraints.length > 0) {
+    const needsCredits = hardConstraints.some((c) => c.type === 'person');
+    const qualified = await qualifyCandidates(
+      items,
+      hardConstraints,
+      async (i) => {
+        // Credits are fetched ONLY when a person was actually named, so an
+        // ordinary request still pays nothing.
+        const credits = needsCredits ? await getCredits(i.mediaType, i.id).catch(() => null) : null;
+        return {
+          mediaType: i.mediaType,
+          castIds: (credits?.cast ?? []).map((p) => p.id),
+          directorIds: (credits?.crew ?? [])
+            .filter((p) => p.job === 'Director' || p.job === 'Co-Director')
+            .map((p) => p.id),
+          genreNames: [],
+          creditsKnown: !needsCredits || credits != null,
+          subjectSatisfied: i.subjectEvidence?.satisfied ?? null,
+        };
+      },
+      { need: Math.max(1, Math.min(q.finalCount ?? limit, MAX_RESULT_LIMIT)) },
+    );
+    items = qualified.map((r) => r.item);
   }
 
   // REQUESTED-COUNT SELECTION. "a boxing movie" asks for ONE — the final cap is
