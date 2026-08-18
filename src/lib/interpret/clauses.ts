@@ -101,6 +101,28 @@ const COUNT_LED = /^\s*(?:\d+|a couple of|a few|one|two|three|four|five|six|seve
 const MEDIA_PERSON_REQUEST =
   /^\s*(?:movies?|films?|shows?|series)\s+(?:with|starring|featuring|directed\s+by|written\s+by|created\s+by|by|from)\b/i;
 
+/**
+ * A PRESENT-TENSE STATEMENT OF TASTE: "I like Stallone movies".
+ *
+ * `REACTION` covers the past forms ("I loved", "I hated") because those are how
+ * a verdict on a specific work is phrased. A standing preference is present
+ * tense, ends in a plural media noun, and is NOT an order — the difference
+ * between "I like Stallone movies" (tell me about my taste) and "Stallone
+ * movies" (fetch some).
+ *
+ * Guarding the rule below with this is load-bearing: without it "I like
+ * Sylvester Stallone movies" became a request clause, ran through the
+ * similarity spans, and manufactured "Sylvester Stallone" as a TITLE to
+ * resolve — the fake-anchor defect that produced "Which title did you mean?".
+ */
+const PREFERENCE_LEAD =
+  /\b(?:i|we)\s+(?:really\s+|kind\s+of\s+|sort\s+of\s+|generally\s+|usually\s+)?(?:like|love|enjoy|prefer|dig|am\s+into)\b/i;
+
+/** A clause ENDING in a plural media noun: "recent crime movies". Plural is
+ *  load-bearing — film titles use the singular ("Scary Movie"). */
+const PLURAL_MEDIA_TAIL =
+  /\b(?:movies|films|shows|series|documentaries|flicks|sitcoms|thrillers|dramas|comedies|mysteries)\s*$/i;
+
 /** "Something funny", "anything but horror" — a description standing in for a request. */
 const LEADING_SOMETHING = /^\s*(?:something|anything)\b/i;
 
@@ -174,7 +196,14 @@ export function classifyClause(text: string): ClauseRole {
   const t = text.trim();
   if (!t) return 'background';
 
-  if (COMPANION.test(t)) return 'companion';
+  /* A COMPANION MENTION INSIDE A FRAMED REQUEST IS A CONSTRAINT, NOT THE
+     PURPOSE OF THE CLAUSE. "Pull up three TNT movies … something my family can
+     watch" was classified `companion` outright, so `requestClause` returned
+     null and the whole request was thrown away — no count, no media, no
+     network. Measured: that single pattern is the largest remaining source of
+     dropped counts. A clause that carries explicit request framing is a
+     request; who it is for is carried by the companion constraint fields. */
+  if (COMPANION.test(t) && !stripRequestFrame(t).stripped && !REQUEST_VERB.test(t)) return 'companion';
 
   const media = MEDIA_NOUN.test(t);
   /* THE LEXICAL FRAME IS CONSUMED, NOT RE-DERIVED.
@@ -212,6 +241,28 @@ export function classifyClause(text: string): ClauseRole {
      regression that must not become an order. The leading article is required
      so a bare capitalised title ("A Few Good Men", "Get Out") cannot match. */
   if (bareDescriptiveRequest(t)) return 'request';
+  /* AN ARTICLE-LESS NOUN PHRASE ENDING IN A PLURAL MEDIA NOUN IS AN ORDER.
+     "recent crime movies", "Apple TV+ movies", "Find Morgan Freeman movies"
+     all classified `background` before this rule, so `requestClause` returned
+     null and NOTHING was extracted from them — no media, no count, no person,
+     no date. That is the single largest source of canonical-interpreter
+     failures: a bare noun phrase is how people actually type, and the rule
+     above only fires when a leading ARTICLE is present ("a courtroom movie").
+
+     PLURAL IS THE DISCRIMINATOR, and it is what keeps titles safe. A film is
+     named "Scary Movie", "The Lego Movie", "Silent Movie" — singular, always —
+     while a person asking for several says "movies". Combined with the
+     existing guards, "Get Out", "A Few Good Men" and "Two Weeks Notice" carry
+     no media noun at all and cannot reach this line. */
+  if (
+    PLURAL_MEDIA_TAIL.test(t) &&
+    !REACTION.test(t) &&
+    !FAMILIARITY.test(t) &&
+    !PAST_TENSE.test(t) &&
+    !PREFERENCE_LEAD.test(t)
+  ) {
+    return 'request';
+  }
   // A count only makes a request when it is counting the thing being asked for.
   // "I watched 3 movies yesterday" is past tense about the user, not an order.
   if (COUNT_LED.test(t) && media && !REACTION.test(t) && !FAMILIARITY.test(t) && !PAST_TENSE.test(t)) {

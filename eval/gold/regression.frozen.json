@@ -1,0 +1,1249 @@
+[
+  {
+    "id": "reg-date-001",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "relative_dates",
+    "profileKey": "scott",
+    "rawQuery": "movies from the last 5 years",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "movies from the last 5 years",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "relative_dates"
+    ],
+    "canonical": {
+      "media": "movie",
+      "lookback": {
+        "amount": 5,
+        "unit": "year",
+        "direction": "past"
+      },
+      "minYearAbsent": true
+    }
+  },
+  {
+    "id": "reg-date-002",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "relative_dates",
+    "profileKey": "scott",
+    "rawQuery": "shows from the past decade",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "shows from the past decade",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "tv"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "relative_dates"
+    ],
+    "canonical": {
+      "media": "tv",
+      "lookback": {
+        "amount": 1,
+        "unit": "decade",
+        "direction": "past"
+      },
+      "minYearAbsent": true
+    }
+  },
+  {
+    "id": "reg-date-003",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "relative_dates",
+    "profileKey": "scott",
+    "rawQuery": "recent crime movies",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "recent crime movies",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [
+        "crime"
+      ],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "relative_dates"
+    ],
+    "canonical": {
+      "media": "movie",
+      "lookbackUnit": "year",
+      "lookbackDirection": "past",
+      "minYearAbsent": true
+    }
+  },
+  {
+    "id": "reg-date-004",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "relative_dates",
+    "profileKey": "scott",
+    "rawQuery": "movies from 1994",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "movies from 1994",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "relative_dates"
+    ],
+    "canonical": {
+      "media": "movie",
+      "lookbackAbsent": true
+    }
+  },
+  {
+    "id": "reg-media-001",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "media_ownership",
+    "profileKey": "scott",
+    "rawQuery": "show me movies",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "show me movies",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "media_ownership"
+    ],
+    "canonical": {
+      "media": "movie"
+    }
+  },
+  {
+    "id": "reg-media-002",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "media_ownership",
+    "profileKey": "scott",
+    "rawQuery": "show me some action films",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "show me some action films",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [
+        "action"
+      ],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "media_ownership"
+    ],
+    "canonical": {
+      "media": "movie"
+    }
+  },
+  {
+    "id": "reg-media-003",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "media_ownership",
+    "profileKey": "scott",
+    "rawQuery": "show me shows",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "show me shows",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "tv"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "media_ownership"
+    ],
+    "canonical": {
+      "media": "tv"
+    }
+  },
+  {
+    "id": "reg-media-004",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "media_ownership",
+    "profileKey": "scott",
+    "rawQuery": "give me some shows",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "give me some shows",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "tv"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "media_ownership"
+    ],
+    "canonical": {
+      "media": "tv"
+    }
+  },
+  {
+    "id": "reg-media-005",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "media_ownership",
+    "profileKey": "scott",
+    "rawQuery": "movies but no TV shows",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "movies but no TV shows",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "media_ownership"
+    ],
+    "canonical": {
+      "media": "movie"
+    }
+  },
+  {
+    "id": "reg-provider-001",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "provider_ownership",
+    "profileKey": "scott",
+    "rawQuery": "Apple TV+ movies",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "Apple TV+ movies",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "provider_ownership"
+    ],
+    "canonical": {
+      "media": "movie",
+      "providerContains": "apple tv"
+    }
+  },
+  {
+    "id": "reg-provider-002",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "provider_ownership",
+    "profileKey": "scott",
+    "rawQuery": "Apple TV+ shows",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "Apple TV+ shows",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "tv"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "provider_ownership"
+    ],
+    "canonical": {
+      "media": "tv",
+      "providerContains": "apple tv"
+    }
+  },
+  {
+    "id": "reg-count-001",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "count_ownership",
+    "profileKey": "scott",
+    "rawQuery": "give me 4 sci-fi movies",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "give me 4 sci-fi movies",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": 4,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": 4
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "count_ownership"
+    ],
+    "canonical": {
+      "media": "movie",
+      "requestedCount": 4
+    }
+  },
+  {
+    "id": "reg-count-002",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "count_ownership",
+    "profileKey": "scott",
+    "rawQuery": "find me three Stallone movies",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "find me three Stallone movies",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": 3,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": 3
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "count_ownership"
+    ],
+    "canonical": {
+      "media": "movie",
+      "requestedCount": 3,
+      "personContains": "Stallone"
+    }
+  },
+  {
+    "id": "reg-count-003",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "count_ownership",
+    "profileKey": "scott",
+    "rawQuery": "show me 5 really good sci-fi movies",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "show me 5 really good sci-fi movies",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": 5,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": 5
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "count_ownership"
+    ],
+    "canonical": {
+      "media": "movie",
+      "requestedCount": 5
+    }
+  },
+  {
+    "id": "reg-count-004",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "count_ownership",
+    "profileKey": "scott",
+    "rawQuery": "show me action movies",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "show me action movies",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [
+        "action"
+      ],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "count_ownership"
+    ],
+    "canonical": {
+      "media": "movie",
+      "requestedCountNull": true
+    }
+  },
+  {
+    "id": "reg-person-001",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "person_ownership",
+    "profileKey": "scott",
+    "rawQuery": "Find Morgan Freeman movies",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "Find Morgan Freeman movies",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "person_ownership"
+    ],
+    "canonical": {
+      "media": "movie",
+      "personContains": "Morgan Freeman",
+      "personNeverContains": "find"
+    }
+  },
+  {
+    "id": "reg-person-002",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "person_ownership",
+    "profileKey": "scott",
+    "rawQuery": "Show me Stallone movies",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "Show me Stallone movies",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [
+        "movie"
+      ],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "person_ownership"
+    ],
+    "canonical": {
+      "media": "movie",
+      "personContains": "Stallone",
+      "personNeverContains": "show"
+    }
+  },
+  {
+    "id": "reg-title-001",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "title_protection",
+    "profileKey": "scott",
+    "rawQuery": "Get Out",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "Get Out",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "title_protection"
+    ],
+    "canonical": {
+      "notRecommendation": true,
+      "noPeople": true
+    }
+  },
+  {
+    "id": "reg-title-002",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "title_protection",
+    "profileKey": "scott",
+    "rawQuery": "A Few Good Men",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "A Few Good Men",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "title_protection"
+    ],
+    "canonical": {
+      "notRecommendation": true,
+      "noPeople": true
+    }
+  },
+  {
+    "id": "reg-title-003",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "title_protection",
+    "profileKey": "scott",
+    "rawQuery": "Two Weeks Notice",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "Two Weeks Notice",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "title_protection"
+    ],
+    "canonical": {
+      "notRecommendation": true,
+      "noPeople": true
+    }
+  },
+  {
+    "id": "reg-title-004",
+    "seed": 0,
+    "source": "regression",
+    "archetype": "title_protection",
+    "profileKey": "scott",
+    "rawQuery": "Scary Movie",
+    "noise": "clean",
+    "intended": {
+      "rawQuery": "Scary Movie",
+      "normalizedIntent": "personalized_content_discovery",
+      "contentTypes": [],
+      "networks": [],
+      "platforms": [],
+      "genres": [],
+      "moods": [],
+      "themes": [],
+      "excludedAttributes": [],
+      "requestedCount": null,
+      "availability": {
+        "type": "any",
+        "startOffsetHours": null,
+        "endOffsetHours": null,
+        "timezone": "USER_TIMEZONE"
+      },
+      "personalizationRequested": false,
+      "householdProfile": null,
+      "watchTitle": null,
+      "sortPriority": [
+        "constraint_satisfaction",
+        "personalized_match",
+        "availability_time"
+      ],
+      "ambiguities": [],
+      "confidence": {},
+      "originCountries": [],
+      "originalLanguages": [],
+      "foreignOrigin": false,
+      "englishAudioRequired": false,
+      "englishDubRequired": false,
+      "runtimeMaxMinutes": null
+    },
+    "expected": {
+      "intent": "personalized_content_discovery",
+      "hardConstraints": [],
+      "maxResults": null
+    },
+    "tags": [
+      "regression",
+      "canonical-interpreter",
+      "title_protection"
+    ],
+    "canonical": {
+      "notRecommendation": true,
+      "noPeople": true
+    }
+  }
+]

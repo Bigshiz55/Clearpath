@@ -18,15 +18,38 @@ export const SEEDS = {
 
 const REGRESSION_STORE = path.resolve('eval/gold/regression.json');
 
+/**
+ * THE FROZEN HALF OF THE REGRESSION SET — versioned, never machine-written.
+ *
+ * `REGRESSION_STORE` is an OUTPUT: the optimizer appends confirmed failures to
+ * it, and `.gitignore` excludes it as a run artifact. That makes it the wrong
+ * home for fixtures that must be permanent — a fresh clone or a CI runner has
+ * no copy, so a case "frozen" there would silently stop being checked.
+ *
+ * Cases that must never be lost live here instead, in the same `EvalCase`
+ * shape, read by the same loader so there is one regression set rather than
+ * two competing ones.
+ */
+const REGRESSION_FROZEN = path.resolve('eval/gold/regression.frozen.json');
+
 /** Confirmed failures promoted to permanent regression cases (Phase 8/9).
  *  Never deleted after a fix. */
 export function loadRegressionExtras(): EvalCase[] {
-  try {
-    if (fs.existsSync(REGRESSION_STORE)) return JSON.parse(fs.readFileSync(REGRESSION_STORE, 'utf8')) as EvalCase[];
-  } catch {
-    /* ignore */
-  }
-  return [];
+  const read = (file: string): EvalCase[] => {
+    try {
+      if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8')) as EvalCase[];
+    } catch {
+      /* a malformed store must not take the whole run down */
+    }
+    return [];
+  };
+  // Frozen first, then the optimizer's store; an id in both resolves to the
+  // frozen definition, so a machine-appended case can never quietly redefine
+  // one that was pinned on purpose.
+  const merged = new Map<string, EvalCase>();
+  for (const c of read(REGRESSION_STORE)) merged.set(c.id, c);
+  for (const c of read(REGRESSION_FROZEN)) merged.set(c.id, c);
+  return [...merged.values()];
 }
 
 export function saveRegressionExtras(cases: EvalCase[]): void {

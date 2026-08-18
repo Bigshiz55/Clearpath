@@ -98,12 +98,42 @@ export interface BackgroundClause {
   reason: 'no-request-signal';
 }
 
+/** The unit a relative window is counted in, exactly as people say it. */
+export type LookbackUnit = 'year' | 'decade' | 'month' | 'week' | 'day';
+
+/**
+ * "the last 5 years", "the past decade", "recent" — a window expressed
+ * RELATIVE to now.
+ *
+ * SEMANTICS, NOT ARITHMETIC. The interpreter is pure and has no clock, so it
+ * records what the sentence MEANT — how far back, in what unit, in which
+ * direction — and `canonicalExecution` turns that into a concrete
+ * `minReleaseDate` against an injected `now`. Computing a year here would bake
+ * a date into a pure function and make the same sentence mean different things
+ * on different days, which is exactly the kind of hidden clock the engine
+ * forbids.
+ *
+ * Before this slot existed, "movies from the last 5 years" produced an EMPTY
+ * `DateConstraint`: the meaning was understood by any reader and had nowhere
+ * to go, the architecture defect this file's header names.
+ */
+export interface LookbackWindow {
+  /** How many units back. "the past decade" is `{ amount: 1, unit: 'decade' }`. */
+  amount: number;
+  unit: LookbackUnit;
+  /** Which way from now. Only `past` is expressible today; the field exists so
+   *  "in the next two years" cannot be silently read as a lookback. */
+  direction: 'past' | 'future';
+}
+
 export interface DateConstraint {
   /** Inclusive release-year bounds, when the sentence states or implies them. */
   minYear?: number;
   maxYear?: number;
   /** "newer" / "older" with no anchor — resolved later against a reference. */
   relative?: 'newer' | 'older';
+  /** "the last 5 years" / "recent" — converted to a bound at execution time. */
+  lookback?: LookbackWindow;
 }
 
 export interface RuntimeConstraint {

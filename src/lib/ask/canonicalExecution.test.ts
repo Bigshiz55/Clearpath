@@ -20,6 +20,8 @@ vi.mock('@/lib/ai/tools', () => ({ searchBySubject, resolveKeywordIds, resolvePr
 
 const { interpret } = await import('@/lib/interpret/interpret');
 const { resolveCanonicalExecution, intentToQuery } = await import('./canonicalExecution');
+const { EMPTY_INTENT } = await import('@/lib/interpret/types');
+import type { CanonicalIntent, LookbackWindow } from '@/lib/interpret/types';
 
 const STALLONE = { id: 16483, name: 'Sylvester Stallone', profilePath: null, knownFor: 'Rocky, Rambo' };
 const HANKS = { id: 31, name: 'Tom Hanks', profilePath: null, knownFor: 'Forrest Gump, Big' };
@@ -149,5 +151,66 @@ describe('the pure mapping does no I/O', () => {
     expect(m.requestedCount).toBe(3);
     expect(m.query.genreIds).toContain(27);
     expect(searchPeople).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * RELATIVE DATES CROSS THE PURITY BOUNDARY EXACTLY ONCE.
+ *
+ * The interpreter records "5 years back" and never asks what today is; this
+ * layer owns the clock. The tests inject `now` so the conversion is pinned
+ * rather than drifting with the calendar — a suite whose expectations move
+ * every January proves nothing.
+ */
+describe('lookback windows become the Finder constraint', () => {
+  // 2026-08-18T00:00:00Z, injected — never the real clock.
+  const NOW = Date.parse('2026-08-18T00:00:00Z');
+  const withLookback = (lookback: LookbackWindow): CanonicalIntent => ({
+    ...EMPTY_INTENT,
+    kind: 'recommendation',
+    media: 'movie',
+    date: { lookback },
+  });
+
+  it('"the last 5 years" becomes a minReleaseDate five years back', () => {
+    const { query } = intentToQuery(withLookback({ amount: 5, unit: 'year', direction: 'past' }), { now: NOW });
+    expect(query.minReleaseDate).toBe('2021-08-18');
+  });
+
+  it('"the past decade" reaches ten years back', () => {
+    const { query } = intentToQuery(withLookback({ amount: 1, unit: 'decade', direction: 'past' }), { now: NOW });
+    expect(query.minReleaseDate).toBe('2016-08-18');
+  });
+
+  it('months and days are honoured in their own units', () => {
+    expect(intentToQuery(withLookback({ amount: 6, unit: 'month', direction: 'past' }), { now: NOW }).query.minReleaseDate).toBe('2026-02-18');
+    expect(intentToQuery(withLookback({ amount: 30, unit: 'day', direction: 'past' }), { now: NOW }).query.minReleaseDate).toBe('2026-07-19');
+  });
+
+  it('a FUTURE window yields no bound — an empty answer beats a wrong one', () => {
+    const { query } = intentToQuery(withLookback({ amount: 2, unit: 'year', direction: 'future' }), { now: NOW });
+    expect(query.minReleaseDate).toBeUndefined();
+  });
+
+  it('an explicit year is more specific and keeps precedence', () => {
+    const intent: CanonicalIntent = {
+      ...EMPTY_INTENT, kind: 'recommendation', media: 'movie',
+      date: { minYear: 1994, lookback: { amount: 5, unit: 'year', direction: 'past' } },
+    };
+    const { query } = intentToQuery(intent, { now: NOW });
+    expect(query.minYear).toBe(1994);
+    expect(query.minReleaseDate).toBeUndefined();
+  });
+
+  it('no lookback means no date constraint invented', () => {
+    const { query } = intentToQuery({ ...EMPTY_INTENT, kind: 'recommendation', media: 'movie' }, { now: NOW });
+    expect(query.minReleaseDate).toBeUndefined();
+  });
+
+  it('THE INTERPRETER ITSELF NEVER PRODUCES A DATE — only this layer does', () => {
+    const intent = interpret('movies from the last 5 years');
+    expect(intent.date.minYear).toBeUndefined();
+    expect(intent.date.lookback).toEqual({ amount: 5, unit: 'year', direction: 'past' });
+    expect(intentToQuery(intent, { now: NOW }).query.minReleaseDate).toBe('2021-08-18');
   });
 });
