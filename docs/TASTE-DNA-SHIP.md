@@ -209,6 +209,25 @@ Per the work order: no diversity memory, no critic personalities, no Verdict
 Room redesign. Those wait until Taste DNA is proven to affect production
 recommendations.
 
+## PRODUCTION PROOF — **NOT DONE**, and why
+
+`/api/ask` requires a session (`route.ts:179`), verified against production:
+an anonymous POST returns `{"error":"Not signed in."}` / HTTP 401. This session
+holds no production credentials — no `.env`, no `SUPABASE_*`/`TMDB_*`/`OPENAI_*`
+in its environment — so it cannot sign in, cannot enumerate accounts to find one
+with sufficient DNA, and must not create one (that writes production data).
+
+Every sub-item of the requested proof needs a session, **including the control**:
+there is no signed-out Ask ordering, only a 401, so the "no DNA" control must be
+a signed-in account without DNA.
+
+`docs/TASTE-DNA-PRODUCTION-PROOF.md` carries the exact commands for the owner to
+run. It is a single authenticated call, because the response spreads the whole
+`FinderItem`: each item exposes `matchScore` (order before taste) next to
+`personal.rankScore` (order after) and the evidence that moved it.
+
+**Phase 1 is merged and deployed. It is NOT production-proven.**
+
 ## NEXT ACTION
 
 Owner decision. The branch is pushed and complete; no merge authorization has
