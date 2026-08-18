@@ -174,3 +174,49 @@ describe('actor requests pay nothing and behave exactly as before', () => {
     for (const o of opts) expect(o.castIds).toEqual([62]);
   });
 });
+
+/**
+ * THE REPORTED PRODUCTION FAILURE, PINNED AT THE FINDER.
+ *
+ * "Looking for a good Samuel L Jackson movie I may not have seen" returned The
+ * Furious (2026), Backrooms (2026) and The End of Oak Street (2026) at "100
+ * match". None of them has him in it.
+ *
+ * Verification ran for `role === 'director'` only, on the reasoning that an
+ * actor was already guaranteed by TMDB's `with_cast`. That guarantee covers
+ * the discover strands and nothing else — subject search, lexical routes, the
+ * vibe-keyword relaxation and the zero-result fallback all inject candidates
+ * that never passed a cast-filtered query, and every one of them reached
+ * ranking unchecked.
+ */
+describe('an ACTOR constraint is verified per candidate, not merely retrieved', () => {
+  const SLJ = 2231;
+  const IN_IT = { id: 111, mediaType: 'movie' as const, title: 'A Jackson Film', year: 2014, posterPath: null, voteAverage: 7.5, overview: '' };
+  const NOT_IN_IT = { id: 222, mediaType: 'movie' as const, title: 'The Furious', year: 2026, posterPath: null, voteAverage: 8.9, overview: '' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Both arrive as candidates — exactly as a fallback strand would deliver them.
+    discoverTitles.mockResolvedValue([NOT_IN_IT, IN_IT]);
+    getCredits.mockImplementation(async (_mt: string, id: number) =>
+      id === IN_IT.id ? { cast: [{ id: SLJ }], crew: [] } : { cast: [{ id: 99999 }], crew: [] },
+    );
+  });
+
+  it('drops the high-quality film he is NOT in, and keeps the one he is', async () => {
+    const r = await run({ mediaType: 'movie', people: [{ personId: SLJ, role: 'actor' }] });
+    const titles = (r?.items ?? []).map((i: { title: string }) => i.title);
+    expect(titles, 'the reported failure: a 2026 film he is not in must not survive').not.toContain('The Furious');
+  });
+
+  it('an unverifiable candidate is dropped — "we could not check" is not a pass', async () => {
+    getCredits.mockResolvedValue(null);
+    const r = await run({ mediaType: 'movie', people: [{ personId: SLJ, role: 'actor' }] });
+    expect((r?.items ?? []).length).toBe(0);
+  });
+
+  it('a request naming nobody still pays nothing', async () => {
+    await run({ mediaType: 'movie' });
+    expect(getCredits).not.toHaveBeenCalled();
+  });
+});

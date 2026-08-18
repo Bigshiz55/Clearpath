@@ -83,7 +83,38 @@ export interface PersonReferenceInput {
   role: CreditRole;
 }
 
-const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+/**
+ * A NAME, WITH THE CHARACTERS THAT CARRY NO IDENTITY REMOVED.
+ *
+ * ── THE PRODUCTION FAILURE THIS FIXES ─────────────────────────────────────
+ * This collapsed whitespace and lowercased, and did nothing else. TMDB spells
+ * him "Samuel L. Jackson"; a person types "Samuel L Jackson". Those normalized
+ * to different strings, the exact-match branch missed, and the resolver
+ * returned UNRESOLVED — after which the required constraint was silently
+ * dropped and the query ran as a generic recommendation. Three unrelated 2026
+ * films came back at "100 match".
+ *
+ * A period is not evidence about who someone is. Neither is an apostrophe, a
+ * hyphen, or an accent — "Gordon-Levitt" and "Gordon Levitt" are one person,
+ * as are "D'Amico" and "DAmico", "Peña" and "Pena".
+ *
+ * WHAT IS DELIBERATELY NOT DONE HERE: nothing fuzzy. Letters are never
+ * changed, dropped or transposed, so two genuinely different names stay
+ * different — the exactness of the exact-match branch is preserved, it is
+ * simply computed over the part of the string that means something.
+ */
+const norm = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    // Periods and apostrophes join what they separate: "l." -> "l",
+    // "d'amico" -> "damico".
+    .replace(/[.\u2018\u2019']/g, '')
+    // Hyphens and dashes separate what they join: "gordon-levitt" -> two words.
+    .replace(/[-\u2010-\u2015]/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 
 /* Fuzzy identity, at the same bar the entity boundary uses
    (lib/nlu/consumedEntities.ts): a token shorter than five characters must

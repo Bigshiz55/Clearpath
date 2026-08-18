@@ -5,6 +5,7 @@ import { DEFAULT_RESULT_LIMIT, type FinderQuery } from '@/lib/finder';
 import { searchBySubject, resolveKeywordIds, resolveProvider } from '@/lib/ai/tools';
 import { resolvePersonReference, type PersonResolution } from './personReference';
 import { planPersonConstraint, type PersonConstraint, type PersonPlan } from '@/lib/people/constraint';
+import type { UnresolvedRequirement } from './hardConstraints';
 import type { CanonicalIntent, LookbackWindow } from '@/lib/interpret/types';
 
 /**
@@ -238,6 +239,17 @@ export interface CanonicalExecution {
   refusedRole: Extract<PersonPlan, { kind: 'refuse' }> | null;
   /** Disclosures the response shows, in the product's existing voice. */
   interpretation: string[];
+  /**
+   * REQUIREMENTS THE SENTENCE MADE THAT COULD NOT BE TURNED INTO A CONSTRAINT.
+   *
+   * The reported production failure: an unresolvable person was skipped by
+   * `if (p.kind !== 'resolved') return;` and the query proceeded as though the
+   * user had asked for nothing. Nothing downstream could notice, because
+   * nothing downstream was told. An empty array means every stated requirement
+   * became a real constraint; a non-empty one means the caller must say so
+   * rather than answer a different question.
+   */
+  unresolvedRequirements: UnresolvedRequirement[];
 }
 
 /**
@@ -271,7 +283,15 @@ export async function resolveCanonicalExecution(intent: CanonicalIntent): Promis
   const constraints: PersonConstraint[] = [];
   const castIds: number[] = [];
   let refusedRole: CanonicalExecution['refusedRole'] = null;
+  const unresolvedRequirements: UnresolvedRequirement[] = [];
   people.forEach((p, i) => {
+    if (p.kind === 'unresolved') {
+      /* NEVER SILENTLY DROPPED. This is the reported defect: the requirement
+         used to disappear here, leaving a query indistinguishable from one that
+         never named anybody. */
+      unresolvedRequirements.push({ type: 'person', entity: p.spokenAs, reason: 'unresolved' });
+      return;
+    }
     if (p.kind !== 'resolved') return;
     const intentRole = mapped.pending.requiredPeople[i]!.role;
     const plan = planPersonConstraint(
@@ -282,8 +302,9 @@ export async function resolveCanonicalExecution(intent: CanonicalIntent): Promis
     if (plan.kind === 'apply') {
       constraints.push(plan.constraint);
       if (plan.constraint.role === 'actor') castIds.push(p.id);
-    } else if (refusedRole === null) {
-      refusedRole = plan;
+    } else {
+      if (refusedRole === null) refusedRole = plan;
+      unresolvedRequirements.push({ type: 'person', entity: p.name, reason: 'unsupported-role' });
     }
   });
   if (constraints.length > 0) {
@@ -356,5 +377,6 @@ export async function resolveCanonicalExecution(intent: CanonicalIntent): Promis
     excludePersonIds: excludedIds,
     refusedRole,
     interpretation,
+    unresolvedRequirements,
   };
 }

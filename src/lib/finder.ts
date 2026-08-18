@@ -863,9 +863,23 @@ export async function runFinder(
      the moment enough are verified, so the work is proportional to the answer
      rather than to the pool, and a short answer means the catalogue really is
      short rather than the window having been too small. */
-  const directorConstraints = (q.people ?? []).filter((p) => p.role === 'director');
-  if (directorConstraints.length > 0) {
-    items = await qualifyByRole(items, directorConstraints, (mt, id) => getCredits(mt, id).catch(() => null), {
+  /* EVERY NAMED PERSON IS VERIFIED, NOT JUST DIRECTORS.
+     This filtered `role === 'director'` only, on the reasoning that an actor
+     was already guaranteed by TMDB's `with_cast`. That guarantee holds for the
+     discover strands and for nothing else: subject search, lexical routes,
+     the vibe-keyword relaxation and the zero-result fallback all contribute
+     candidates that never passed through a cast-filtered query.
+
+     That is the seam the reported failure came through. "Looking for a good
+     Samuel L Jackson movie" answered with three 2026 films he is not in,
+     because nothing between retrieval and ranking ever asked whether he was.
+     A person the user NAMED is a hard requirement whatever path a candidate
+     arrived by, so the check is per-candidate and role-aware — `satisfiesRole`
+     reads the cast for an actor and the crew for a director, and an
+     unverifiable title is dropped rather than kept. */
+  const personConstraints = q.people ?? [];
+  if (personConstraints.length > 0) {
+    items = await qualifyByRole(items, personConstraints, (mt, id) => getCredits(mt, id).catch(() => null), {
       need: Math.max(1, Math.min(q.finalCount ?? limit, MAX_RESULT_LIMIT)),
     });
   }
