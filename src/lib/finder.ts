@@ -783,11 +783,15 @@ export async function runFinder(
   const eligibleSurvivors = subjectRequired ? survivors.filter(isEligible) : survivors;
   const centralSubjectEligibleCount = subjectRequired ? eligibleSurvivors.length : deterministicEligibleCount;
 
-  /* TASTE DECIDES THE ORDER OF WHAT SURVIVED, NEVER WHO SURVIVED.
-     `eligibleSurvivors` has already passed the hard-constraint gate, so a
-     candidate the request ruled out is not here to be re-ranked — the ordering
-     of these two stages IS the guarantee that personalization cannot overrule
-     an explicit requirement.
+  /* TASTE DECIDES THE ORDER, NEVER THE MEMBERSHIP.
+     Read the pipeline before trusting the obvious story: only the SUBJECT
+     pre-filter has run at this point. The person/media gate is
+     `qualifyCandidates` further down, so a candidate the request rules out is
+     still in this list and taste may rank it first. What makes that safe is
+     that the gate is a downstream FILTER judging each candidate on its own
+     facts — position is not an input — so ranking sets which candidates get
+     verified first and never whether one qualifies. Reverse the pool and the
+     survivors are identical (`hardConstraints.test.ts`).
 
      The signal is the cache-only half of the existing DNA stack (dimension
      fingerprints + explicit preference), bounded to ±PERSONAL_NUDGE_CEILING and

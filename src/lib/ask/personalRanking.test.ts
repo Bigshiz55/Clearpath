@@ -87,9 +87,12 @@ describe('1 — DNA CHANGES RANKING', () => {
 
 describe('2 — HARD CONSTRAINTS REMAIN PROTECTED', () => {
   it('personalization returns exactly the candidates it was given — never more', async () => {
-    /* The structural guarantee: this runs on the survivors of the eligibility
-       gate, so an ineligible title is not present to be promoted. Taste can
-       reorder the pool; it cannot add to it. */
+    /* The structural guarantee, stated exactly: this MAPS, it never filters,
+       so the set it returns is the set it was handed. It cannot add a title to
+       the answer and cannot save one from the downstream gate. (It does NOT
+       run after the person/media gate — see the note in personalSignal.ts —
+       which is why this property, not that ordering, is what protects
+       membership.) */
     getUserDimensionProfile.mockResolvedValue(profileFor({ darkness: 99 }));
     loadPreferenceCached.mockResolvedValue(null);
     const out = await personalizeCandidates(supabase, 'user-b', ITEMS);
@@ -201,5 +204,33 @@ describe('COST — O(1) queries, never O(candidates)', () => {
     expect(getUserDimensionProfile).toHaveBeenCalledTimes(1);
     expect(getCachedDimensions, 'the fingerprint lookup is batched, not per title').toHaveBeenCalledTimes(1);
     expect(getCachedDimensions.mock.calls[0]![0]).toHaveLength(60);
+  });
+});
+
+describe('7 — NO PAID CLASSIFICATION FROM A BULK PATH', () => {
+  it('asks for the profile with the backfill DISABLED', async () => {
+    getUserDimensionProfile.mockResolvedValue(profileFor({ realism: 90 }));
+    loadPreferenceCached.mockResolvedValue(null);
+    await personalizeCandidates(supabase, 'user-a', ITEMS);
+
+    /* The default profile build classifies missing fingerprints with a paid
+       gpt-4o-mini call inside the request. Ask must never opt into that, and
+       `titleDimensions.backfill.test.ts` proves the flag actually suppresses
+       the network call rather than merely being passed along. */
+    expect(getUserDimensionProfile).toHaveBeenCalledWith(
+      supabase,
+      'user-a',
+      expect.anything(),
+      expect.objectContaining({ backfill: false }),
+    );
+  });
+
+  it('reads fingerprints in ONE batched call, never per candidate', async () => {
+    getUserDimensionProfile.mockResolvedValue(profileFor({ realism: 90 }));
+    loadPreferenceCached.mockResolvedValue(null);
+    await personalizeCandidates(supabase, 'user-a', ITEMS);
+
+    expect(getCachedDimensions).toHaveBeenCalledTimes(1);
+    expect(getCachedDimensions.mock.calls[0]![0]).toHaveLength(ITEMS.length);
   });
 });

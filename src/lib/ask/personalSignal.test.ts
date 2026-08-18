@@ -127,3 +127,24 @@ describe('determinism', () => {
     expect(personalSignal(i)).toEqual(personalSignal(i));
   });
 });
+
+describe('THE CEILING IS A FACT, NOT A COMMENT', () => {
+  it('accounts for the preference bound the preference layer actually uses', async () => {
+    const { PREF_NUDGE_MAX } = await import('@/lib/preference/rank');
+    // Widen the preference nudge without widening this, and the ceiling lies.
+    expect(PERSONAL_NUDGE_CEILING).toBe(8 + PREF_NUDGE_MAX);
+  });
+
+  it('is the real empirical maximum movement, in both directions', () => {
+    const up = personalSignal({
+      objective: 50, dimMatch: 100, prefNudge: 999,
+      reasons: [], concerns: [], explainConfidence: 0,
+    });
+    const down = personalSignal({
+      objective: 50, dimMatch: 0, prefNudge: -999,
+      reasons: [], concerns: [], explainConfidence: 0,
+    });
+    expect(up.rankScore - 50).toBe(PERSONAL_NUDGE_CEILING);
+    expect(50 - down.rankScore).toBe(PERSONAL_NUDGE_CEILING);
+  });
+});

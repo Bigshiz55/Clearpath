@@ -44,12 +44,25 @@ paid channel into a grid path.
 
 ### Finding 2 — eligibility and ordering were already separated
 
-The hard-constraint work (PR #78) left `runFinder` with a clean seam:
-`survivors` → `eligibleSurvivors` → sort. Taste only ever needed to replace the
-comparator, never the filter. **The ordering of those two stages IS the
-guarantee** that Taste DNA cannot override a hard constraint — a candidate the
-request ruled out is not present to be re-ranked. No new enforcement logic was
-added; none was needed.
+The hard-constraint work (PR #78) left `runFinder` with a clean seam: taste only
+ever needed to replace the comparator, never the filter. No new enforcement
+logic was added; none was needed.
+
+**Be precise about WHY that is safe, because the obvious story is wrong.** The
+forensic review found that personalization runs at `finder.ts:797`, while the
+person/media gate (`constraintsFromQuery` + `qualifyCandidates`) runs at
+`finder.ts:938` — *after* it. Only the subject-centrality pre-filter precedes
+the ranking. So a candidate the request rules out IS in the list when taste
+ranks it, and taste may put it first.
+
+What makes that safe is not absence but direction: the gate is a downstream
+FILTER over the ranked list, and `evaluateCandidate` reads a candidate's own
+facts, never its position. Ranking therefore decides which candidates get
+verified first — a genuine product benefit, since taste-preferred eligible
+titles surface ahead of the `need` early-stop — and never whether one qualifies.
+
+That order-independence is now pinned: reverse the pool and `qualifyCandidates`
+returns the same survivors (`hardConstraints.test.ts`).
 
 ### Finding 3 — genres were already in hand at hydration
 
@@ -128,6 +141,54 @@ Plus: an O(1)-query cost test (query count does not grow with pool size).
 - **Database queries: 3 per request, independent of pool size.** No N+1.
 - **Per-title work: pure arithmetic** over already-cached fingerprints.
 - Titles with no cached fingerprint are a no-op, never a blocking fetch.
+
+## FORENSIC PR REVIEW (PR #79) — TWO REAL DEFECTS FOUND AND FIXED
+
+The review was run against the shipped code, not the PR description. Two of the
+seven checks failed.
+
+### DEFECT 1 — a paid OpenAI call was reachable from Ask · **FIXED**
+
+The audit's whole premise was that Ask touches only the free channel. The
+import trace said otherwise: `personalizeCandidates` calls
+`getUserDimensionProfile`, and `computeUserProfile` backfills up to
+`BACKFILL_CAP = 12` missing fingerprints by calling `getTitleDimensions` →
+`classify()` → `https://api.openai.com/v1/chat/completions`, each with a 9s
+timeout, **inside the request**. Worse, Ask passed `sampleSize = 0`, which is
+part of the `unstable_cache` key while being unused in the computation — so Ask
+got its own cold cache entry that no warmed surface shared, and Ask was the one
+paying for the backfill.
+
+This violated two explicit rules: "no paid AI calls in bulk ranking" and
+CLAUDE.md's "never call an LLM in a user request path".
+
+The unit tests could not have caught it: they mock `@/lib/titleDimensions`
+wholesale.
+
+FIX: `getUserDimensionProfile` gained an opt-out, `{ backfill?: boolean }`,
+default `true` so every existing caller is byte-identical — including its cache
+key, which is extended only in the no-backfill case. Ask passes
+`{ backfill: false }` and accepts a thinner profile rather than an unpriced
+request. `src/lib/titleDimensions.backfill.test.ts` exercises the REAL module
+with a key present and watches the network: default classifies, `backfill:false`
+reaches `api.openai.com` **zero** times.
+
+### DEFECT 2 — the documented mechanism was false · **FIXED**
+
+See Finding 2 above. The PR body, three code comments and this ledger all
+claimed personalization runs after the hard-constraint gate. It does not. The
+safety conclusion survives, but for a different reason, and the reason is now
+stated correctly and pinned by an order-independence test.
+
+### The other five checks passed
+
+| check | evidence |
+|---|---|
+| no eligibility logic duplicated or weakened | neither new module contains `.filter`/`.slice`/`.splice` or any eligibility symbol; `personalizeCandidates` maps 1:1 |
+| DB query count constant with pool size | 3 reads/request; `getCachedDimensions` called once with the whole pool (pinned) |
+| `PERSONAL_NUDGE_CEILING` bounded by existing DNA constants | `PREF_NUDGE_MAX` is now IMPORTED from `preference/rank.ts` rather than copied; ceiling pinned as the empirical max movement, ±18 |
+| missing DNA / missing fingerprints stay honest no-ops | `personalScore: null`, `participated: false`, order unchanged |
+| no unrelated behavior or corpus files changed | see the diff scope below |
 
 ## GATES — actual exit codes
 

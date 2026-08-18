@@ -33,10 +33,10 @@ import { personalSignal, type PersonalSignal } from './personalSignal';
  *
  * ── COST: O(1) QUERIES, NOT O(CANDIDATES) ─────────────────────────────────
  * Three reads per REQUEST, regardless of pool size — the preference log (one
- * indexed query, memoized), the user's dimension profile (memoized 60s), and
- * one batched fingerprint lookup for the whole pool. Everything after that is
- * pure arithmetic on data the finder already fetched. No N+1, no per-title
- * network call, no embedding.
+ * indexed query, memoized), the user's dimension profile (memoized), and one
+ * batched fingerprint lookup for the whole pool. Everything after that is pure
+ * arithmetic on data the finder already fetched. No N+1, no per-title network
+ * call, no embedding, and — see `backfill: false` below — no classification.
  */
 
 /** What a candidate must expose for the free channel to read it. */
@@ -67,13 +67,14 @@ function inert<T extends PersonalizableItem>(items: readonly T[]): Personalized<
 }
 
 /**
- * Attach a personal signal to every ELIGIBLE candidate.
+ * Attach a personal signal to every candidate handed over.
  *
- * Callers pass the survivors of the hard-constraint gate and nothing else, so
- * this cannot promote a title the request ruled out — the rejected candidate is
- * not in `items` to be re-ranked. That ordering is the guarantee; it is not
- * re-checked here, because a second copy of the eligibility rule is exactly the
- * duplication the last phase removed.
+ * This returns exactly the items it was given — it maps, it never filters — so
+ * it cannot add a title to the answer or save one from being dropped. That is
+ * the whole of its relationship to eligibility, and it is deliberate: the
+ * person/media gate (`qualifyCandidates`) runs downstream of the ranking and
+ * judges each candidate on its own facts, so a second copy of the eligibility
+ * rule here would be the duplication the last phase removed.
  */
 export async function personalizeCandidates<T extends PersonalizableItem>(
   supabase: SupabaseClient,
@@ -89,7 +90,13 @@ export async function personalizeCandidates<T extends PersonalizableItem>(
     const hasPref = pref != null && hasPreferenceSignal(pref.dna);
 
     const [profile, dimsMap] = await Promise.all([
-      getUserDimensionProfile(supabase, userId, 0).catch(() => null),
+      /* `backfill: false` IS THE POINT, not a tuning knob. The default profile
+         build classifies up to BACKFILL_CAP missing fingerprints with a paid
+         gpt-4o-mini call, inside the request. That is fine on /app/dna, which
+         builds a profile deliberately; it is exactly the LLM-in-a-listing-path
+         CLAUDE.md forbids. Ask reads the fingerprints that are already cached
+         and accepts a thinner profile rather than an unpriced request. */
+      getUserDimensionProfile(supabase, userId, 0, { backfill: false }).catch(() => null),
       getCachedDimensions(items.map((i) => ({ tmdb_id: i.id, media_type: i.mediaType }))).catch(
         () => new Map(),
       ),

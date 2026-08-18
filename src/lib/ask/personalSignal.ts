@@ -1,15 +1,21 @@
 /**
  * WHICH ELIGIBLE ANSWER THIS PERSON IS MOST LIKELY TO LOVE.
  *
- * ── WHERE THIS SITS, AND WHY THAT ORDER IS THE WHOLE POINT ────────────────
- * Hard constraints have already decided WHO MAY BE AN ANSWER. This layer only
- * decides the ORDER of those answers. It runs strictly after the eligibility
- * gate, on the survivors, so there is no path by which taste can resurrect a
- * candidate the request ruled out — the rejected title is simply not here to
- * be re-ranked.
- *
+ * ── WHERE THIS SITS, AND WHY MEMBERSHIP IS SAFE ───────────────────────────
  *     hard constraints  →  who may be an answer      (membership)
  *     taste             →  which answer comes first  (order)
+ *
+ * Be precise about the mechanism, because the obvious story is the wrong one.
+ * In `runFinder` this ranks the pool BEFORE `qualifyCandidates` enforces the
+ * person/media requirements — so a title the request rules out IS present here
+ * and can be ranked first. What makes that safe is not absence but direction:
+ * the gate is a downstream FILTER over the ranked list, and `evaluateCandidate`
+ * reads a candidate's own facts, never its position. Ranking therefore decides
+ * which candidates are verified first, and never whether one qualifies. Only
+ * the subject-centrality pre-filter runs ahead of this layer.
+ *
+ * That order-independence is pinned in `hardConstraints.test.ts`: reverse the
+ * pool and the survivors are identical.
  *
  * ── BOUNDED ON PURPOSE ────────────────────────────────────────────────────
  * The whole personal term is capped at PERSONAL_NUDGE_CEILING. Taste re-orders
@@ -29,12 +35,16 @@
  * PURE. No I/O, no clock. The gathering happens in `personalRanking.ts`.
  */
 import type { ExplainReason } from '@/lib/preference/explain';
+/* IMPORTED, NOT RESTATED. A copied bound is a bound that drifts: the day
+   someone widens the preference nudge, this ceiling must widen with it or
+   PERSONAL_NUDGE_CEILING quietly becomes a lie. */
+import { PREF_NUDGE_MAX } from '@/lib/preference/rank';
 
-/** Matches `dna.ts` — the fingerprint nudge is bounded to ±8. */
+/* `dna.ts` does not export its fingerprint bound, so these two are mirrored
+   rather than imported. `personalSignal.test.ts` pins the agreement so the
+   mirror cannot rot silently. */
 const DIM_NUDGE_MAX = 8;
 const DIM_NUDGE_SLOPE = 0.16;
-/** Matches `preference/rank.ts` — the explicit-preference nudge is bounded to ±10. */
-const PREF_NUDGE_MAX = 10;
 
 /**
  * The most the personal term may move a title, in either direction.
