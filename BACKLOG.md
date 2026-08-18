@@ -4,9 +4,9 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-- **Phase 1 — Taste DNA → production recommendation ranking
-  (`claude/phase1-taste-dna-ranking`, branch only, NOT merged), cut from `main`
-  at `1b014f2` (post-#78, the hard-constraint architecture).** Ask's ordering
+- **Phase 1 — Taste DNA → production recommendation ranking. **MERGED** as PR
+  #79 (`ae4d751`), cut from `main` at `1b014f2` (post-#78). Deployed but
+  **NOT production-proven** — see `docs/TASTE-DNA-PRODUCTION-PROOF.md`.** Ask's ordering
   is no longer user-independent. `eligibleSurvivors` now pass through
   `personalizeCandidates` (`src/lib/ask/personalRanking.ts`) before the sort,
   and the comparator reads `personal.rankScore` instead of the objective
@@ -21,10 +21,23 @@ Updated at the end of every work order per the Working Agreement in
     per request, independent of pool size (pinned by an O(1)-cost test).
   - With no DNA on file it is an honest no-op: `participated: false`,
     `personalScore: null`, and an order byte-identical to the objective sort.
-  - Ledger: `docs/TASTE-DNA-SHIP.md`. Gates all green, frozen corpus untouched
-    (P0 635/635, P1 515/515). **Awaiting owner merge authorization** — and the
-    phase is not proven until a merged SHA demonstrably reorders production Ask
-    for a signed-in account with DNA on file.
+  - Ledger: `docs/TASTE-DNA-SHIP.md`. Gates all green on the merged SHA, frozen
+    corpus untouched (P0 635/635, P1 515/515), corpus sha256 verified against
+    the recorded baseline.
+  - **The forensic review found two real defects and fixed both:** a paid
+    gpt-4o-mini call was reachable from Ask through the profile backfill
+    (`getUserDimensionProfile` now takes `{ backfill: false }`, proven by a test
+    that watches the network on the real module), and the documented ordering
+    of ranking vs the eligibility gate was simply wrong — corrected, with the
+    real property (order-independence of `qualifyCandidates`) now pinned.
+  - **BLOCKED — production proof.** `/api/ask` requires a session (401 for
+    anonymous, verified against production) and this environment holds no
+    production credentials, so no signed-in query could be run. Every sub-item
+    of the proof needs a session, including the control: there is no signed-out
+    Ask ordering to compare against. `docs/TASTE-DNA-PRODUCTION-PROOF.md` has
+    the exact commands for the owner — one authenticated call suffices, because
+    each item carries `matchScore` (order before taste) next to
+    `personal.rankScore` (order after) and the evidence that moved it.
   - **Held until then, by the work order:** diversity memory, critic
     personalities, Verdict Room redesign.
 - **Three-part P0 repair — `claude/p0-repair-semantic-ask-livetv` (one PR,
