@@ -196,7 +196,12 @@ production.
    `layerBext` corpus was run instead and is at baseline.
 3. **Residual canonical loss is real but small:** media 4.2%, count 0.7%,
    dates 1.1%. Not zero, and not claimed as zero.
-4. **A bare title is still not captured as a lookup.** `interpret('Get Out')`
+4. **`date.relative` ('newer' / 'older') is captured but never executed** —
+   `canonicalExecution` maps only `minYear`/`maxYear`. Pre-existing on `main`;
+   "movies older than 20 years" is understood and approximate, not filtered.
+5. **Residual canonical loss is speech-noise, not ownership**: 0.2% media and
+   0.1% count, all from injected homophone/repeat/filler artifacts.
+6. **A bare title is still not captured as a lookup.** `interpret('Get Out')`
    yields no title reference — before and after, verified identical. The
    protection asserted here is only that it is never read as an ORDER.
 
@@ -246,8 +251,70 @@ not merely green:
 - The frozen corpus is proven git-tracked, inside the root vitest `include`,
   and reached by the CI `vitest run` step.
 
+## FINAL PRE-MERGE REVIEW
+
+### Diff review
+4 production files changed (`interpret.ts`, `clauses.ts`, `types.ts`,
+`canonicalExecution.ts`) plus `eval/runner/datasets.ts`. Everything else is
+tests, fixtures and docs. **`src/app/api/ask/route.ts` is UNCHANGED** — no new
+interpretation path was introduced, because the route already called
+`interpret()`. No second parser, no unrelated refactor. Every mask blanks
+in place, so the range-based ownership rules keep their offsets.
+
+### Production path — verified
+`user text → /api/ask → interpret() → CanonicalIntent → resolveCanonicalExecution
+→ FinderQuery → runFinder`. At `route.ts:995` the query is replaced WHOLESALE
+(`query = { ...exec.query }`), not patched, so on the canonical arm nothing from
+the raw sentence survives into it. Every legacy-parser call site on the request
+path is fenced behind `!canonicalOwnsLanguage` (`route.ts` lines 880, 886, 894,
+933, 990). The two unfenced sites (139, 807) belong to the `similar_to` arm, a
+separate serving mode this branch does not touch.
+
+**Ownership coverage measured over the same 20,000 utterances: 79.7% → 83.6%**
+(+778 requests moved off the legacy raw-text path onto the canonical owner).
+
+### Risk A — PLURAL_MEDIA broadening: SUFFICIENT, no change made
+Tested `Find movies`, `Find shows`, `Find The Movies`, `Find Movies (2025)` and
+every known title carrying a media word. All real singular titles remain
+`statement` and extract no person: **Scary Movie, Silent Movie, The Lego Movie,
+The Player, Get Shorty, Sullivan's Travels, Living in Oblivion, Tropic Thunder,
+Two Weeks Notice, A Few Good Men, Get Out.** The singular/plural discriminator
+holds; no actual collision found, so the rule was NOT broadened further.
+(`The Movies` — a 2019 docuseries and a 2005 game — is the only theoretical
+case, and reading a bare "The Movies" as a request for movies is defensible.)
+
+### Risk B — "movies older than 20 years": DOCUMENTED, not executed
+The interpreter records `date.relative = 'older'`. `canonicalExecution` maps
+`minYear`/`maxYear` only, so `relative` reaches no query field — **verified
+absent on `origin/main` too, so this is pre-existing and unchanged by this
+branch.** The phrase is therefore captured but approximate: it does not narrow
+results today. Logged to BACKLOG rather than fixed here, because expanding
+execution semantics at a merge gate is out of scope for verification.
+
+### Risk C — residual 0.2% media / 0.1% count: NOT ownership failures
+Sampled the survivors. They are injected SPEECH-NOISE artifacts from the
+generator, not ownership leaks: `net flicks` (homophone corruption of Netflix,
+which genuinely contains the word "flicks"), `only show show me one` (repeated
+word), `what's on uh tv` and `Show like me ten movies` (filler between verb and
+object). The ownership model is correct; the lexical patterns simply do not
+absorb disfluency. Not chased, per instruction.
+
+### DEFECT FOUND AND FIXED — contradictory date window
+`"recent movies before 2020"` emitted `maxYear=2020` together with
+`minReleaseDate=2021-08-18` — a window with no interior, answerable only with
+nothing. The lookback guard tested `minYear` but not `maxYear`. Measured
+against `origin/main`: `maxYear=undefined, minReleaseDate=undefined`, i.e.
+unconstrained and ANSWERABLE — so this branch had made that sentence strictly
+worse. **A regression introduced by this branch, now fixed**: an explicit bound
+at either end outranks a vague window.
+
+The frozen corpus had frozen the DEFECT as expected behaviour
+(`adv-date-003` asserted a lookback alongside the explicit `maxYear`); the
+certification caught the correction and the fixture was corrected to the
+non-contradictory truth.
+
 ## NEXT ACTION
 
-SHIP review. Owner asked for branch work only — no PR opened, nothing merged.
+Owner decision on merge. Branch only — no PR opened, nothing merged.
 
 LAST UPDATED SHA: recorded at commit.

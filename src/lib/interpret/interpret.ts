@@ -825,7 +825,15 @@ function parseDateInto(intent: CanonicalIntent, clause: string): void {
      a clock inside a pure function and make one sentence mean different things
      on different days. An explicit year already found wins — it is the more
      specific statement. */
-  if (intent.date.minYear != null || intent.date.lookback != null) return;
+  /* AN EXPLICIT BOUND — EITHER END — OUTRANKS A VAGUE WINDOW.
+     `maxYear` was missing from this guard, so "recent movies before 2020"
+     recorded BOTH `maxYear: 2020` and a five-year lookback, and execution
+     emitted a minimum later than its maximum: a query that could only return
+     nothing. Measured against `origin/main` for the same sentence:
+     `maxYear=undefined, minReleaseDate=undefined` — unconstrained and
+     therefore answerable, so the branch had made it strictly worse. A year the
+     user actually said is the more specific statement. */
+  if (intent.date.minYear != null || intent.date.maxYear != null || intent.date.lookback != null) return;
   const n = clause.match(LOOKBACK_N);
   if (n) {
     const raw = n[1]!.toLowerCase().replace(/\s+/g, ' ');

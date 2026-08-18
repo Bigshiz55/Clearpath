@@ -214,3 +214,61 @@ describe('lookback windows become the Finder constraint', () => {
     expect(intentToQuery(intent, { now: NOW }).query.minReleaseDate).toBe('2021-08-18');
   });
 });
+
+/**
+ * AN EXPLICIT BOUND OUTRANKS A VAGUE WINDOW — they must never both apply.
+ *
+ * Final pre-merge review caught this as a REGRESSION introduced by adding
+ * lookback support. "recent movies before 2020" set `maxYear = 2020` from the
+ * explicit clause AND a five-year lookback from the word "recent", so
+ * execution emitted `maxYear=2020` together with `minReleaseDate=2021-08-18`
+ * — a window with no interior. The query could only ever return nothing.
+ *
+ * Measured against `origin/main` for the same sentence: `maxYear=undefined,
+ * minReleaseDate=undefined` — unconstrained, and therefore ANSWERABLE. The
+ * branch made that sentence strictly worse, which is the definition of a
+ * regression rather than a gap.
+ */
+describe('an explicit year bound suppresses the vague lookback', () => {
+  const NOW2 = Date.parse('2026-08-18T00:00:00Z');
+
+  it('"recent movies before 2020" never emits a contradictory window', () => {
+    const { query } = intentToQuery(interpret('recent movies before 2020'), { now: NOW2 });
+    expect(query.maxYear).toBe(2020);
+    expect(query.minReleaseDate, 'a vague "recent" must not fight an explicit bound').toBeUndefined();
+  });
+
+  it('the interpreter records no lookback once an explicit bound exists', () => {
+    expect(interpret('recent movies before 2020').date.lookback).toBeUndefined();
+  });
+
+  it('an explicit LOWER bound still wins, as before', () => {
+    const i = interpret('recent movies after 2010');
+    expect(i.date.minYear).toBe(2010);
+    expect(i.date.lookback).toBeUndefined();
+  });
+
+  it('and a lookback with no explicit bound is untouched', () => {
+    const { query } = intentToQuery(interpret('movies from the last 5 years'), { now: NOW2 });
+    expect(query.minReleaseDate).toBe('2021-08-18');
+    expect(query.maxYear).toBeUndefined();
+  });
+
+  it('WHATEVER HAPPENS, THE WINDOW HAS AN INTERIOR', () => {
+    // The property that matters, stated once: no phrasing may produce a
+    // minimum later than its maximum.
+    for (const q of [
+      'recent movies before 2020',
+      'movies from the last 5 years',
+      'recent movies after 2010',
+      'movies in the past decade before 2015',
+      'recent movies',
+    ]) {
+      const { query } = intentToQuery(interpret(q), { now: NOW2 });
+      if (query.maxYear != null && query.minReleaseDate) {
+        const minYear = Number(query.minReleaseDate.slice(0, 4));
+        expect(minYear, `${q} produced an empty window`).toBeLessThanOrEqual(query.maxYear);
+      }
+    }
+  });
+});

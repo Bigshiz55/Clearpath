@@ -1543,7 +1543,7 @@
     "canonical": {
       "media": "movie",
       "maxYear": 2020,
-      "lookbackUnit": "year",
+      "lookbackAbsent": true,
       "subjectsEmpty": true
     }
   },
