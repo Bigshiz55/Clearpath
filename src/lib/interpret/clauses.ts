@@ -118,10 +118,30 @@ const MEDIA_PERSON_REQUEST =
 const PREFERENCE_LEAD =
   /\b(?:i|we)\s+(?:really\s+|kind\s+of\s+|sort\s+of\s+|generally\s+|usually\s+)?(?:like|love|enjoy|prefer|dig|am\s+into)\b/i;
 
-/** A clause ENDING in a plural media noun: "recent crime movies". Plural is
- *  load-bearing — film titles use the singular ("Scary Movie"). */
-const PLURAL_MEDIA_TAIL =
-  /\b(?:movies|films|shows|series|documentaries|flicks|sitcoms|thrillers|dramas|comedies|mysteries)\s*$/i;
+/** A plural media noun ANYWHERE in the clause: "recent crime movies", "Apple
+ *  TV+ shows with crime". Plural is load-bearing — film titles use the
+ *  singular ("Scary Movie", "The Lego Movie"). */
+const PLURAL_MEDIA =
+  /\b(?:movies|films|shows|series|documentaries|flicks|sitcoms|thrillers|dramas|comedies|mysteries)\b/i;
+
+/** A clause that opens by talking about the speaker is autobiography until
+ *  something else proves otherwise — and every genuine first-person request
+ *  ("I want…", "I'm looking for…") is already caught by `REQUEST_VERB` above. */
+const FIRST_PERSON_LEAD = /^\s*(?:i|we)\b/i;
+
+/**
+ * "my top 5 favorite movies are X" — the speaker DESCRIBING their own list.
+ *
+ * Adversarial review caught this as a regression the moment the plural rule
+ * stopped being tail-anchored: the clause names a medium and does not open
+ * with "I", so it read as an order and donated its **5** to `requestedCount`.
+ * A count from someone's list of favourites is an example, not an instruction,
+ * and that is precisely the contamination the count field must refuse.
+ *
+ * The signature is a possessive subject joined to a copula — a sentence ABOUT
+ * something the speaker has, rather than a request for something they want.
+ */
+const POSSESSIVE_STATEMENT = /^\s*(?:my|our)\b[^.;]*\b(?:are|is|were|was)\b/i;
 
 /** "Something funny", "anything but horror" — a description standing in for a request. */
 const LEADING_SOMETHING = /^\s*(?:something|anything)\b/i;
@@ -196,14 +216,32 @@ export function classifyClause(text: string): ClauseRole {
   const t = text.trim();
   if (!t) return 'background';
 
-  /* A COMPANION MENTION INSIDE A FRAMED REQUEST IS A CONSTRAINT, NOT THE
-     PURPOSE OF THE CLAUSE. "Pull up three TNT movies … something my family can
-     watch" was classified `companion` outright, so `requestClause` returned
-     null and the whole request was thrown away — no count, no media, no
-     network. Measured: that single pattern is the largest remaining source of
-     dropped counts. A clause that carries explicit request framing is a
-     request; who it is for is carried by the companion constraint fields. */
-  if (COMPANION.test(t) && !stripRequestFrame(t).stripped && !REQUEST_VERB.test(t)) return 'companion';
+  /* THE BARE-NOUN-PHRASE REQUEST TEST, HOISTED — because companion language
+     must not be allowed to claim a clause that is plainly an order. Evaluated
+     here and consumed twice: once to stop `COMPANION` swallowing a request,
+     and once as the classification itself further down. */
+  const bareRequest =
+    PLURAL_MEDIA.test(t) &&
+    !FIRST_PERSON_LEAD.test(t) &&
+    !POSSESSIVE_STATEMENT.test(t) &&
+    !REACTION.test(t) &&
+    !FAMILIARITY.test(t) &&
+    !PAST_TENSE.test(t) &&
+    !PREFERENCE_LEAD.test(t);
+
+  /* A COMPANION MENTION INSIDE A REQUEST IS A CONSTRAINT, NOT THE PURPOSE OF
+     THE CLAUSE. "Pull up three TNT movies … something my family can watch"
+     classified `companion` outright, so `requestClause` returned null and the
+     whole request was thrown away — no count, no media, no network. Measured:
+     the largest remaining source of dropped counts. Adversarial review then
+     found the same swallow one step further out: "Find movies for my family
+     after dinner" carries no "find ME", so neither the frame nor
+     `REQUEST_VERB` recognised it and the request vanished again. Who a request
+     is FOR travels in the companion constraint fields; it is not the clause's
+     reason for existing. */
+  if (COMPANION.test(t) && !bareRequest && !stripRequestFrame(t).stripped && !REQUEST_VERB.test(t)) {
+    return 'companion';
+  }
 
   const media = MEDIA_NOUN.test(t);
   /* THE LEXICAL FRAME IS CONSUMED, NOT RE-DERIVED.
@@ -253,16 +291,15 @@ export function classifyClause(text: string): ClauseRole {
      named "Scary Movie", "The Lego Movie", "Silent Movie" — singular, always —
      while a person asking for several says "movies". Combined with the
      existing guards, "Get Out", "A Few Good Men" and "Two Weeks Notice" carry
-     no media noun at all and cannot reach this line. */
-  if (
-    PLURAL_MEDIA_TAIL.test(t) &&
-    !REACTION.test(t) &&
-    !FAMILIARITY.test(t) &&
-    !PAST_TENSE.test(t) &&
-    !PREFERENCE_LEAD.test(t)
-  ) {
-    return 'request';
-  }
+     no media noun at all and cannot reach this line.
+
+     THE NOUN MAY SIT ANYWHERE. The first cut anchored it to the END of the
+     clause, which adversarial review broke immediately: "Apple TV+ shows with
+     crime", "movies in the past decade", "movies older than 20 years" and
+     "movies like Stallone" all push the noun off the end, and every one of them
+     fell straight back to `background` with nothing extracted. A trailing
+     qualifier is the normal shape of a request, not an exception to it. */
+  if (bareRequest) return 'request';
   // A count only makes a request when it is counting the thing being asked for.
   // "I watched 3 movies yesterday" is past tense about the user, not an order.
   if (COUNT_LED.test(t) && media && !REACTION.test(t) && !FAMILIARITY.test(t) && !PAST_TENSE.test(t)) {

@@ -97,31 +97,36 @@ describe('canonical interpreter health over 20,000 generated utterances', () => 
 
   /* THRESHOLDS ARE RATCHETS, set just above the MEASURED post-repair rate.
      They exist to stop the losses coming back, not to flatter the run.
-     Both columns were measured on this same corpus by checking out the shipped
-     interpreter and re-running this file — not estimated:
+     Every column was measured on this same corpus by checking out the relevant
+     interpreter and re-running this file — none is estimated:
 
-                        before   after
-       media unresolved  42.9%    4.2%
-       request dropped    0.2%    0.0%
-       date dropped     100.0%    1.1%
-       count dropped     17.8%    0.7%
+                        shipped   build   after adversarial review
+       media unresolved   42.9%    4.2%    0.2%
+       request dropped     0.2%    0.0%    0.0%
+       date dropped      100.0%    1.1%    0.0%
+       count dropped      17.8%    0.7%    0.1%
 
-     "date dropped 100%" is the honest headline: `DateConstraint` had no slot
-     for a relative window, so every single one of the 378 utterances that
-     stated one lost it entirely. */
+     "date dropped 100%" is the honest headline of the original defect:
+     `DateConstraint` had no slot for a relative window, so every one of the 378
+     utterances that stated one lost it entirely.
+
+     The third column is what adversarial review bought. The first build fixed
+     the families it was aimed at; attacking it found that the bare-noun-phrase
+     rule was anchored to the END of the clause, so any trailing qualifier
+     ("Apple TV+ shows WITH CRIME") still discarded the whole request. */
   it('a stated medium reaches the intent', () => {
-    expect(pct(H.mediaUnresolved, H.denom['media']!)).toBeLessThan(6);
+    expect(pct(H.mediaUnresolved, H.denom['media']!)).toBeLessThan(1);
   });
 
   it('a framed request is never dropped entirely', () => {
-    expect(pct(H.requestDropped, H.denom['request']!)).toBeLessThan(1);
+    expect(pct(H.requestDropped, H.denom['request']!)).toBeLessThan(0.5);
   });
 
   it('a relative window is captured rather than discarded', () => {
-    expect(pct(H.dateDropped, H.denom['date']!)).toBeLessThan(3);
+    expect(pct(H.dateDropped, H.denom['date']!)).toBeLessThan(0.5);
   });
 
   it('a stated count reaches requestedCount', () => {
-    expect(pct(H.countDropped, H.denom['count']!)).toBeLessThan(2);
+    expect(pct(H.countDropped, H.denom['count']!)).toBeLessThan(0.5);
   });
 });

@@ -202,12 +202,30 @@ function maskProviders(text: string): string {
 const AVAILABILITY_TV = /\b(?:what(?:'|’)?s\s+on\s+)?on\s+(?:tv|television)\b|\bwhat(?:'|’)?s\s+on\s+(?:tv|television)\b/gi;
 const LEADING_SHOW_VERB = /^\s*(?:show\s+)+(?=\w)/i;
 
+/**
+ * "show me", "give me", "pull up for us" — the verb ANYWHERE, not just leading.
+ *
+ * Adversarial review: "give me five movies, but only show me one" answered with
+ * TELEVISION, because the corrective clause's "show" was mid-sentence and only
+ * a leading occurrence was being owned. A request verb is framing wherever it
+ * stands.
+ */
+const REQUEST_VERB_OBJ = /\b(?:show|give|find|get|pull\s+up)\s+(?:me|us)\b/gi;
+
+const MEDIA_VOCAB = /\b(?:movies?|films?|flicks?|shows?|series|tv|episodes?|seasons?|sitcoms?)\b/i;
+
 function maskFraming(text: string): string {
-  const masked = text
-    .replace(LEADING_SHOW_VERB, (m) => ' '.repeat(m.length))
-    .replace(AVAILABILITY_TV, (m) => ' '.repeat(m.length));
-  const stillStates = /\b(?:movies?|films?|flicks?|shows?|series|tv|episodes?|seasons?|sitcoms?)\b/i.test(masked);
-  return stillStates ? masked : text;
+  const blank = (m: string) => ' '.repeat(m.length);
+  /* A REQUEST VERB IS NEVER A MEDIUM, so it is masked unconditionally.
+     The first cut guarded the whole mask with "unless nothing is left", which
+     RESTORED the verb in exactly the clause that needed it owned: "only show me
+     one" states no medium, so the guard handed "show" back and the request
+     answered TELEVISION. */
+  const verbMasked = text.replace(LEADING_SHOW_VERB, blank).replace(REQUEST_VERB_OBJ, blank);
+  /* "what's on tv" CAN be the only medium a sentence states, so that phrase is
+     only owned while something else still states one. */
+  const availMasked = verbMasked.replace(AVAILABILITY_TV, blank);
+  return MEDIA_VOCAB.test(availMasked) ? availMasked : verbMasked;
 }
 
 /**
@@ -219,6 +237,25 @@ function maskFraming(text: string): string {
  * one owner of the question "what here is framing" and this is how the semantic
  * layer consumes it instead of growing a second copy.
  */
+/**
+ * "my family", "our kids" — WHO the request is for, not WHAT it is about.
+ *
+ * `family` is a real genre, so "family movies" must keep it; but "movies for my
+ * family" names a companion, and letting that occurrence reach the genre
+ * vocabulary invents a content constraint the user never asked for. Adversarial
+ * review surfaced this the moment companion clauses stopped being discarded
+ * wholesale: the request was finally read, and promptly grew a `family` genre.
+ *
+ * Masked (not deleted) so every other offset in the clause is unchanged, and
+ * only the possessive form is owned — a bare "family movies" is untouched.
+ */
+const COMPANION_PHRASE =
+  /\b(?:my|our)\s+(?:wife|husband|partner|girlfriend|boyfriend|kids?|son|daughter|mum|mom|dad|roommate|friend|family)\b/gi;
+
+function maskCompanions(text: string): string {
+  return text.replace(COMPANION_PHRASE, (m) => ' '.repeat(m.length));
+}
+
 function requestSubstance(text: string): string {
   const stripped = stripRequestFrame(text).text.replace(LEADING_BARE_VERB, '').trim();
   return stripped.length > 0 ? stripped : text;
@@ -513,7 +550,20 @@ export function interpret(raw: string): CanonicalIntent {
     }
     intent.kind = requestedTitles.length > 0 ? 'lookup' : 'recommendation';
     intent.requestedCount = frame.count ?? parseCount(substance);
-    intent.media = parseMedia(maskFraming(maskProviders(substance)));
+    /* MEDIA IS A PROPERTY OF THE WHOLE REQUEST, NOT OF ONE CLAUSE.
+       `requestClause` returns a single clause, so "give me five movies, but
+       only show me one" read its medium from the corrective half — which names
+       no medium at all — and answered TELEVISION off the stray verb. Every
+       request clause is considered, joined by a full stop so the negation
+       window (which stops at punctuation) cannot reach across them. */
+    const requestText = clauses
+      .filter((c) => c.role === 'request')
+      .map((c) => maskFraming(maskProviders(requestSubstance(c.text))))
+      .join(' . ');
+    /* The availability fallback is applied to the WHOLE request, not per
+       clause: a medium stated in one half legitimately settles the other. */
+    const joined = requestText.trim().length > 0 ? requestText : maskFraming(maskProviders(substance));
+    intent.media = parseMedia(joined);
   } else if (clauses.some((c) => c.role === 'taste' || c.role === 'companion')) {
     intent.kind = 'statement';
   }
@@ -522,11 +572,14 @@ export function interpret(raw: string): CanonicalIntent {
     const negated = negatedSpans(c.text).map((s) => s.toLowerCase());
     const isNegated = (term: string) => negated.some((n) => n.includes(term) || term.includes(n));
 
-    for (const g of uniqueMatches(c.text, GENRE_WORDS)) {
+    // Companion references are owned by the companion, not by the genre
+    // vocabulary — see `maskCompanions`.
+    const contentText = maskCompanions(c.text);
+    for (const g of uniqueMatches(contentText, GENRE_WORDS)) {
       const wanted = !isNegated(g);
       pushUnique<GenreConstraint>(intent.genres, { span: g, wanted, holder: 'user' });
     }
-    for (const t of uniqueMatches(c.text, TONE_WORDS)) {
+    for (const t of uniqueMatches(contentText, TONE_WORDS)) {
       const wanted = !isNegated(t);
       if (!intent.tones.some((x) => x.term === t)) {
         intent.tones.push({ term: t, wanted, holder: 'user' } satisfies ToneConstraint);
@@ -540,10 +593,22 @@ export function interpret(raw: string): CanonicalIntent {
     // — "no serial killers", "without supernatural stuff". Keeping it rather
     // than dropping it is the difference between honouring a veto and ignoring
     // one, and it must never land in a positive field.
+    /* THE OVERLAP RULE APPLIES TO VETOES TOO — one occurrence, one meaning.
+       Positive subjects already refuse a span that a person owns; the negated
+       branch did not, so "not another Stallone movie" recorded Stallone BOTH
+       as an excluded person and as an excluded SUBJECT. The same three words
+       then argued twice, once as a credit filter and once as a theme, and a
+       downstream reader has no way to tell it was one veto. */
+    const clausePeople = findPersonMatches(c.role === 'request' ? requestSubstance(c.text) : c.text).map((m) =>
+      m.text.toLowerCase(),
+    );
+    const ownedByPerson = (span: string) =>
+      clausePeople.some((p) => p === span || p.includes(span) || span.includes(p));
+
     for (const n of negated) {
       const known =
         intent.genres.some((g) => n.includes(g.span)) || intent.tones.some((t) => n.includes(t.term));
-      if (!known && n.length > 2) {
+      if (!known && n.length > 2 && !ownedByPerson(n)) {
         pushUnique<SubjectConstraint>(intent.subjects, { span: n, wanted: false });
       }
     }
@@ -660,7 +725,12 @@ export function interpret(raw: string): CanonicalIntent {
     // A requested-title occurrence owns its range the same way a person does:
     // "The Lego Movie" may not donate `lego` to the subject field.
     const titleRanges = findRequestedTitles(req.text);
-    for (const sm of findSubjectMatches(req.text)) {
+    /* AND SO DOES THE REQUEST FRAME. `findSubjectMatches` looks for "<word>
+       <media noun>", and "shows" is a media noun, so "only show me one" handed
+       back `only` as the SUBJECT of the request. Masking blanks in place, so
+       every range still lines up with the person and title ranges above. */
+    const subjectText = maskCompanions(maskFraming(req.text));
+    for (const sm of findSubjectMatches(subjectText)) {
       if (personRanges.some((p) => overlaps(p, sm))) continue;
       if (titleRanges.some((t) => overlaps(t, sm))) continue;
       const span = sm.text;
@@ -688,8 +758,12 @@ function findSubjectMatches(clause: string): SpanMatch[] {
   const out: SpanMatch[] = [];
   const re =
     /\b([a-z][\w-]{2,})\s+(?:movies?|films?|shows?|series|documentar(?:y|ies)|flicks?)\b/gi;
+  /* Words that QUALIFY a medium without describing its content. `recent` and
+     `favorite` reached the subject field during adversarial review — the first
+     is a date word the lookback layer already owns, the second belongs to a
+     preference statement. Neither is a theme anyone could search for. */
   const STRUCTURAL =
-    /^(?:good|great|best|new|newer|old|older|other|another|more|some|any|the|a|an|three|two|four|five|six|seven|eight|nine|ten|one|few|couple|nice|decent|solid|different|similar|watch|see|want|like|find|show|give)$/i;
+    /^(?:good|great|best|new|newer|old|older|other|another|more|some|any|the|a|an|three|two|four|five|six|seven|eight|nine|ten|one|few|couple|nice|decent|solid|different|similar|watch|see|want|like|find|show|give|only|just|recent|recently|latest|favorite|favourite|top|first|last|past|previous)$/i;
   for (const m of clause.matchAll(re)) {
     const w = m[1]!.toLowerCase();
     if (STRUCTURAL.test(w)) continue;
@@ -714,6 +788,10 @@ const LOOKBACK_N =
 
 /** "the past decade", "the last year" — one, implied. */
 const LOOKBACK_BARE = /\b(?:the\s+)?(?:last|past|previous)\s+(year|decade|month|week|day)\b/i;
+
+/** "5 years ago", "a decade ago" — a window stated from its far end. */
+const LOOKBACK_AGO =
+  /\b(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(years?|decades?|months?|weeks?|days?)\s+ago\b/i;
 
 /** "recent", "lately" — vague, but a real and very common request. */
 const RECENCY = /\brecent(?:ly)?\b|\blately\b/i;
@@ -753,6 +831,17 @@ function parseDateInto(intent: CanonicalIntent, clause: string): void {
     const raw = n[1]!.toLowerCase().replace(/\s+/g, ' ');
     const amount = /^\d+$/.test(raw) ? Number(raw) : (raw === 'few' ? 3 : raw === 'couple of' ? 2 : WORD_NUMBERS[raw] ?? null);
     const unit = LOOKBACK_UNITS[n[2]!.toLowerCase()];
+    if (amount != null && amount > 0 && unit) {
+      intent.date.lookback = { amount, unit, direction: 'past' };
+      return;
+    }
+  }
+  /* "movies from 5 years ago" — the same window said the other way round. */
+  const ago = clause.match(LOOKBACK_AGO);
+  if (ago) {
+    const raw = ago[1]!.toLowerCase();
+    const amount = /^\d+$/.test(raw) ? Number(raw) : (WORD_NUMBERS[raw] ?? null);
+    const unit = LOOKBACK_UNITS[ago[2]!.toLowerCase()];
     if (amount != null && amount > 0 && unit) {
       intent.date.lookback = { amount, unit, direction: 'past' };
       return;

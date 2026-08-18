@@ -11,8 +11,10 @@ CURRENT BRANCH: `claude/canonical-interpreter-certification`
 CURRENT SHA: see LAST UPDATED SHA
 CURRENT MAIN SHA: `314623ef0e2e17492708830ebe1afeb308846be6`
 BASE / MERGE-BASE: `314623e` — cut from CURRENT main.
-STATUS: ARCHITECT + BUILDER complete. All gates green. Branch only — NOT
-merged, no PR opened (owner asked for branch work).
+STATUS: ARCHITECT + BUILDER + **ADVERSARIAL REVIEW** complete. Review found 9
+real defects (all pre-existing, none introduced by the first build) plus 2
+regressions the review itself caused and then fixed. All gates green. Branch
+only — NOT merged, no PR opened.
 
 ---
 
@@ -134,7 +136,7 @@ UNCERTIFIED.
 |---|---|---|
 | G1 typecheck | clean | 0 |
 | G2 lint | no warnings or errors | 0 |
-| G3 full vitest | 4737 passed, 24 skipped, 0 failed (339 files) | 0 |
+| G3 full vitest | 4769 passed, 24 skipped, 0 failed (340 files) | 0 |
 | G4 canonical health, 20,000 utterances | 4 probes, all under ratchet | 0 |
 | G5 legacy eval, 20,000 cases | composite 92.6% (flat by construction) | 0 |
 | G6 frozen corpus `layerBext` | P0 635/635, P1 515/515, 0 failures | 0 |
@@ -155,12 +157,12 @@ checking out the shipped interpreter and re-running the same file. Each probe's
 denominator is defined by what the SENTENCE contains, never by what the
 interpreter returned, so the fix cannot move its own denominator.
 
-| probe | before | after | delta |
+| probe | shipped | first build | after adversarial review |
 |---|---|---|---|
-| media unresolved | 3257/7584 (**42.9%**) | 317/7584 (**4.2%**) | −2,940 |
-| request dropped | 20/11021 (0.2%) | 0/11021 (**0%**) | −20 |
-| date dropped | 378/378 (**100%**) | 4/378 (**1.1%**) | −374 |
-| count dropped | 612/3432 (**17.8%**) | 23/3432 (**0.7%**) | −589 |
+| media unresolved | 3257/7584 (**42.9%**) | 317/7584 (4.2%) | 14/7584 (**0.2%**) |
+| request dropped | 20/11021 (0.2%) | 0/11021 (0%) | 0/11021 (**0%**) |
+| date dropped | 378/378 (**100%**) | 4/378 (1.1%) | 0/378 (**0%**) |
+| count dropped | 612/3432 (**17.8%**) | 23/3432 (0.7%) | 4/3432 (**0.1%**) |
 
 "date dropped 100%" is the honest headline: every single utterance stating a
 relative window lost it, because the type had no slot to put it in.
@@ -202,14 +204,50 @@ production.
 
 None.
 
+## ADVERSARIAL REVIEW — findings
+
+Every defect below was found by ATTACKING the branch, then confirmed
+pre-existing by re-running the same probe against `origin/main`. The first
+build introduced none of them; it simply had not reached them.
+
+| # | Attack | Defect | Root cause |
+|---|---|---|---|
+| 1 | `Apple TV+ shows with crime` | whole request discarded | `PLURAL_MEDIA_TAIL` anchored the media noun to the END of the clause, so any trailing qualifier fell back to `background` |
+| 2 | `movies in the past decade` | date lost | same anchoring |
+| 3 | `movies older than 20 years` | date lost | same anchoring |
+| 4 | `recent movies before 2020` | date lost | same anchoring |
+| 5 | `movies like Stallone` | nothing extracted | same anchoring |
+| 6 | `movies from 5 years ago` | date lost | no "N ago" form |
+| 7 | `give me five movies, but only show me one` | media **tv** | request verb mid-clause voted for television; `maskFraming`'s fallback RESTORED the masked verb |
+| 8 | `Find movies for my family after dinner` | request discarded | `COMPANION` outranked the bare-request test |
+| 9 | `not another Stallone movie` | Stallone recorded as person AND subject | the overlap rule guarded positive subjects only, not vetoes |
+
+**Two regressions the review itself caused, and fixed:**
+
+- Relaxing the anchoring made `my top 5 favorite movies are X` an ORDER, which
+  donated its **5** to `requestedCount` — exactly the example-contamination the
+  count field must refuse. Fixed with a possessive-statement guard.
+- Reclassifying companion clauses as requests made `my family` a **Family
+  genre**. Fixed by masking possessive companion phrases from the content
+  vocabulary; the control `family movies` still yields the genre.
+
+### Certification integrity — negative evidence
+
+`eval/canonical/certificationIntegrity.test.ts` proves the suite is SENSITIVE,
+not merely green:
+
+- 7 mutants, each deleting one canonical repair (media, dates, count, person,
+  provider, interpreter-computed year, everything). Each is caught by at least
+  one frozen case, every frozen family is covered by at least one mutant, and a
+  control asserts the unmutated interpreter passes all 38.
+- `naiveParseQuery` structurally CANNOT satisfy certification: the legacy query
+  object has no `lookback` field and no credit `role`, so improving it can
+  never populate what certification asserts on.
+- The frozen corpus is proven git-tracked, inside the root vitest `include`,
+  and reached by the CI `vitest run` step.
+
 ## NEXT ACTION
 
-VERIFIER / ADVERSARIAL REVIEW of this branch. Attack specifically: whether
-`PLURAL_MEDIA_TAIL` can capture a real title; whether the companion-ownership
-change loses a companion constraint that used to be extracted; whether
-`maskFraming`'s fallback can mask a genuinely-stated medium; and whether the
-self-correction count rule can read a year or runtime as a count.
-
-Owner asked for branch work only — no PR opened, nothing merged.
+SHIP review. Owner asked for branch work only — no PR opened, nothing merged.
 
 LAST UPDATED SHA: recorded at commit.

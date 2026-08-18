@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { interpret } from '@/lib/interpret/interpret';
 import { intentToQuery } from '@/lib/ask/canonicalExecution';
+import { violations, type FrozenCase } from './check';
 
 /**
  * CERTIFICATION FOR THE OWNER PRODUCTION ACTUALLY RUNS.
@@ -29,13 +30,6 @@ import { intentToQuery } from '@/lib/ask/canonicalExecution';
  * `naiveParseQuery` remains legitimate for LEGACY FINDER paths. What it may not
  * be is the thing that certifies /api/ask.
  */
-
-interface FrozenCase {
-  id: string;
-  rawQuery: string;
-  archetype: string;
-  canonical?: Record<string, unknown>;
-}
 
 const CASES: FrozenCase[] = JSON.parse(
   fs.readFileSync(path.resolve('eval/gold/regression.frozen.json'), 'utf8'),
@@ -73,36 +67,8 @@ describe('the frozen corpus is intact', () => {
 describe('CanonicalIntent certification — every frozen case', () => {
   for (const c of CASES) {
     it(`${c.id} — ${c.rawQuery}`, () => {
-      const intent = interpret(c.rawQuery);
-      const e = (c.canonical ?? {}) as Record<string, never>;
-      const has = (k: string) => Object.prototype.hasOwnProperty.call(c.canonical ?? {}, k);
-
-      if (has('media')) expect(intent.media, 'media').toBe(e['media']);
-      if (has('requestedCount')) expect(intent.requestedCount, 'requestedCount').toBe(e['requestedCount']);
-      if (has('requestedCountNull')) expect(intent.requestedCount, 'requestedCount').toBeNull();
-
-      if (has('lookback')) expect(intent.date.lookback, 'date.lookback').toEqual(e['lookback']);
-      if (has('lookbackUnit')) expect(intent.date.lookback?.unit, 'lookback unit').toBe(e['lookbackUnit']);
-      if (has('lookbackDirection')) expect(intent.date.lookback?.direction, 'lookback direction').toBe(e['lookbackDirection']);
-      if (has('lookbackAbsent')) expect(intent.date.lookback, 'lookback must be absent').toBeUndefined();
-      // THE PURITY BOUNDARY: the interpreter never resolves a year itself.
-      if (has('minYearAbsent')) expect(intent.date.minYear, 'interpreter must not compute a year').toBeUndefined();
-
-      if (has('providerContains')) {
-        expect(intent.providers.join('|').toLowerCase(), 'providers').toContain(String(e['providerContains']));
-      }
-      if (has('personContains')) {
-        expect(intent.people.map((p) => p.span).join('|'), 'people').toContain(String(e['personContains']));
-      }
-      if (has('personNeverContains')) {
-        for (const p of intent.people) {
-          expect(p.span.toLowerCase(), 'a request verb leaked into a person span').not.toContain(
-            String(e['personNeverContains']).toLowerCase(),
-          );
-        }
-      }
-      if (has('notRecommendation')) expect(intent.kind, 'a title is not an order').not.toBe('recommendation');
-      if (has('noPeople')) expect(intent.people.map((p) => p.span), 'no person named').toEqual([]);
+      const found = violations(interpret(c.rawQuery), c.canonical ?? {});
+      expect(found, `${c.id} violated: ${found.join(', ')}`).toEqual([]);
     });
   }
 });
