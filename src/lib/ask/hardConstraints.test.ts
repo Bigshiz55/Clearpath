@@ -240,6 +240,29 @@ describe('qualifyCandidates — the one gate, batched and bounded', () => {
     expect(out.map((r) => r.item.title)).toEqual(['In It', 'Also In It']);
   });
 
+  /* THE PROPERTY THAT PROTECTS THE REAL PIPELINE ORDER.
+     In `runFinder` the personal ranker sorts the pool BEFORE this gate runs,
+     so the gate sees a taste-ordered list. That is safe only if position is
+     irrelevant to the verdict — if a title the reader would adore is dropped
+     just as readily as one they would not. This pins that: the same pool,
+     reversed, yields the same survivors. Taste chooses the ORDER, and thereby
+     which candidates get verified first; it never buys a place in the answer. */
+  it('an INELIGIBLE candidate ranked FIRST is still dropped', async () => {
+    const tasteFirst: Item[] = [
+      { id: 2, mediaType: 'movie', title: 'Not In It' }, // taste's favourite
+      { id: 1, mediaType: 'movie', title: 'In It' },
+      { id: 3, mediaType: 'movie', title: 'Also In It' },
+    ];
+    const out = await qualifyCandidates(tasteFirst, [requireSLJ], fetchFacts, { need: 10 });
+    expect(out.map((r) => r.item.title)).toEqual(['In It', 'Also In It']);
+  });
+
+  it('survivors are identical whatever order the ranker hands over', async () => {
+    const forward = await qualifyCandidates(items, [requireSLJ], fetchFacts, { need: 10 });
+    const backward = await qualifyCandidates([...items].reverse(), [requireSLJ], fetchFacts, { need: 10 });
+    expect(new Set(backward.map((r) => r.item.id))).toEqual(new Set(forward.map((r) => r.item.id)));
+  });
+
   it('carries the evidence forward, so nothing has to recompute it', async () => {
     const out = await qualifyCandidates(items, [requireSLJ], fetchFacts, { need: 10 });
     expect(out[0]!.evidence.hardConstraintsSatisfied).toHaveLength(1);

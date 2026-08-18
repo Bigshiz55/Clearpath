@@ -4,6 +4,29 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **Phase 1 — Taste DNA → production recommendation ranking
+  (`claude/phase1-taste-dna-ranking`, branch only, NOT merged), cut from `main`
+  at `1b014f2` (post-#78, the hard-constraint architecture).** Ask's ordering
+  is no longer user-independent. `eligibleSurvivors` now pass through
+  `personalizeCandidates` (`src/lib/ask/personalRanking.ts`) before the sort,
+  and the comparator reads `personal.rankScore` instead of the objective
+  `matchScore`. The signal is the **cache-only** half of the existing DNA stack
+  (dimension fingerprints + explicit preference), bounded to ±18 by
+  `PERSONAL_NUDGE_CEILING` in the pure `src/lib/ask/personalSignal.ts`.
+  - **Taste never overrides a hard constraint** — personalization runs strictly
+    AFTER the eligibility gate, so a candidate the request ruled out is not
+    present to be re-ranked. No second enforcement path was added.
+  - **No paid AI in bulk ranking**: `getTitleVector`/`embed()` — the paid half
+    of `rankByDna` — is deliberately never reached from Ask. Three DB queries
+    per request, independent of pool size (pinned by an O(1)-cost test).
+  - With no DNA on file it is an honest no-op: `participated: false`,
+    `personalScore: null`, and an order byte-identical to the objective sort.
+  - Ledger: `docs/TASTE-DNA-SHIP.md`. Gates all green, frozen corpus untouched
+    (P0 635/635, P1 515/515). **Awaiting owner merge authorization** — and the
+    phase is not proven until a merged SHA demonstrably reorders production Ask
+    for a signed-in account with DNA on file.
+  - **Held until then, by the work order:** diversity memory, critic
+    personalities, Verdict Room redesign.
 - **Three-part P0 repair — `claude/p0-repair-semantic-ask-livetv` (one PR,
   not merged), branched from `main` at `9e4e9ff` (post-#71/#72 merge).**
   - **P0-A** preference "like" vs comparison: one grammatical owner

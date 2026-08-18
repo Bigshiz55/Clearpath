@@ -33,6 +33,7 @@ import {
 } from '@/lib/nlu/semanticEligibility';
 import { adjudicateSubjectCentrality, type SubjectAdjudicator } from '@/lib/nlu/subjectAdjudicator';
 import { type PersonConstraint } from '@/lib/people/constraint';
+import { personalizeCandidates } from '@/lib/ask/personalRanking';
 import {
   constraintsFromQuery,
   constraintsSatisfied,
@@ -190,6 +191,11 @@ export interface FinderItem {
   deciderUrl: string;
   ratings: TileRatings;
   imdbId?: string | null;
+  /** TMDB genre names, captured at hydration for the personal channel. */
+  genreNames?: string[];
+  /** The taste signal that ordered this candidate, with its evidence.
+   *  Absent/inert when nothing about this user participated. */
+  personal?: import('@/lib/ask/personalSignal').PersonalSignal;
   /** TV only: the next real broadcast/stream airing (channel + time), if any. */
   airing?: NextAiring | null;
   /** "Why this Verd1ct?" — real reasons/requirements/confidence for the card. */
@@ -662,6 +668,9 @@ export async function runFinder(
         explain,
         household,
         subjectEvidence,
+        // Carried, not refetched: the personal channel needs genres and this
+        // hydration already holds them.
+        genreNames: meta.genres,
       } as FinderItem;
     } catch {
       return null;
@@ -774,7 +783,29 @@ export async function runFinder(
   const eligibleSurvivors = subjectRequired ? survivors.filter(isEligible) : survivors;
   const centralSubjectEligibleCount = subjectRequired ? eligibleSurvivors.length : deterministicEligibleCount;
 
-  let items = eligibleSurvivors.sort((a, b) => b.matchScore - a.matchScore);
+  /* TASTE DECIDES THE ORDER, NEVER THE MEMBERSHIP.
+     Read the pipeline before trusting the obvious story: only the SUBJECT
+     pre-filter has run at this point. The person/media gate is
+     `qualifyCandidates` further down, so a candidate the request rules out is
+     still in this list and taste may rank it first. What makes that safe is
+     that the gate is a downstream FILTER judging each candidate on its own
+     facts — position is not an input — so ranking sets which candidates get
+     verified first and never whether one qualifies. Reverse the pool and the
+     survivors are identical (`hardConstraints.test.ts`).
+
+     The signal is the cache-only half of the existing DNA stack (dimension
+     fingerprints + explicit preference), bounded to ±PERSONAL_NUDGE_CEILING and
+     costing O(1) queries for the whole pool. With nothing on file it is an
+     honest no-op and this sort is byte-identical to the quality sort it
+     replaces. */
+  const personalizedSurvivors = await personalizeCandidates(supabase, userId, eligibleSurvivors);
+  let items: FinderItem[] = personalizedSurvivors
+    .slice()
+    .sort((a, b) => b.personal.rankScore - a.personal.rankScore)
+    .map((i) => {
+      const { personal, ...rest } = i;
+      return { ...(rest as FinderItem), personal };
+    });
   let relaxed: string | null = null;
 
   // Honest fallback #1: a fuzzy vibe/trope word ("feel-good", "cozy") resolves

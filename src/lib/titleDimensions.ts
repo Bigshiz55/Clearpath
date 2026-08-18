@@ -173,7 +173,7 @@ async function getOverrides(admin: ReturnType<typeof createAdminClient>, userId:
   }
 }
 
-async function computeUserProfile(userId: string): Promise<DimensionProfile> {
+async function computeUserProfile(userId: string, backfill: boolean): Promise<DimensionProfile> {
   const empty = buildProfile([]);
   if (!userId) return empty;
   let admin: ReturnType<typeof createAdminClient>;
@@ -229,7 +229,16 @@ async function computeUserProfile(userId: string): Promise<DimensionProfile> {
   // a bounded few per build so a user's DNA repopulates quickly after an axis-set
   // change, instead of thinning until each title is re-viewed elsewhere. Cached
   // globally once classified, so this cost is paid at most once per title.
-  const missing = rows.filter((r) => !dimsByKey.has(`${r.media_type}-${r.tmdb_id}`)).slice(0, BACKFILL_CAP);
+  //
+  // BULK REQUEST PATHS PASS `backfill: false`. This block is a paid gpt-4o-mini
+  // call inside whatever request builds the profile — correct for /app/dna and
+  // the title page, which build a profile deliberately, and forbidden by
+  // CLAUDE.md for a listing path like Ask. With it off the profile is built from
+  // whatever fingerprints are already cached, which is a smaller profile, never
+  // a wrong one.
+  const missing = backfill
+    ? rows.filter((r) => !dimsByKey.has(`${r.media_type}-${r.tmdb_id}`)).slice(0, BACKFILL_CAP)
+    : [];
   if (missing.length > 0) {
     const filled = await Promise.all(
       missing.map(async (r) => {
@@ -309,9 +318,17 @@ export function getUserDimensionProfile(
   _supabase: SupabaseClient,
   userId: string,
   sampleSize: number,
+  opts: { backfill?: boolean } = {},
 ): Promise<DimensionProfile> {
   if (!userId) return Promise.resolve(buildProfile([]));
-  return unstable_cache(() => computeUserProfile(userId), ['dim-profile', userId, String(sampleSize)], {
+  const backfill = opts.backfill !== false;
+  /* The no-backfill variant computes something different, so it gets its own
+     cache entry. The key is EXTENDED rather than rewritten: every existing
+     caller keeps the exact key it has today and its warm cache with it. */
+  const key = backfill
+    ? ['dim-profile', userId, String(sampleSize)]
+    : ['dim-profile', userId, String(sampleSize), 'nobackfill'];
+  return unstable_cache(() => computeUserProfile(userId, backfill), key, {
     revalidate: 60 * 60 * 6,
     tags: [`dim-profile:${userId}`],
   })();
