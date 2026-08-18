@@ -15,6 +15,16 @@ export interface DnaClientResult {
   /** Axes of this title that agree/clash with what the user rates highly.
    *  Null when there is no profile or no cached fingerprint — never faked. */
   fit?: { agree: { label: string; note: string }[]; clash: { label: string; note: string }[] } | null;
+  /** THE HEADLINE NUMBER — the one canonical score every surface prints.
+   *  `score` above is the taste view and drives the DNA panel; this is what
+   *  the card, QuickLook, the briefing and the full verdict all show. */
+  canonical?: {
+    score: number;
+    objective: number;
+    personalized: boolean;
+    label: 'Your Verdict' | 'Standard Score';
+    why: string;
+  } | null;
 }
 
 // One in-flight fetch per title, shared across every component on the page (the

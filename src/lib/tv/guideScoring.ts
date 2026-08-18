@@ -75,11 +75,23 @@ export function pickScoringCandidates(airings: readonly Airing[], nowMs: number,
  */
 export function applyScores(
   airings: readonly Airing[],
-  scores: ReadonlyMap<string, { tmdbId: number; mediaType: 'movie' | 'tv'; match: number; why?: string | null }>,
+  scores: ReadonlyMap<
+    string,
+    { tmdbId: number; mediaType: 'movie' | 'tv'; match: number; why?: string | null; personalized?: boolean }
+  >,
 ): Airing[] {
   return airings.map((a) => {
     const s = scores.get(titleKey(a));
-    return s ? { ...a, tmdbId: s.tmdbId, mediaType: s.mediaType, match: s.match, matchWhy: s.why ?? null } : a;
+    return s
+      ? {
+          ...a,
+          tmdbId: s.tmdbId,
+          mediaType: s.mediaType,
+          match: s.match,
+          matchWhy: s.why ?? null,
+          matchPersonalized: s.personalized ?? false,
+        }
+      : a;
   });
 }
 

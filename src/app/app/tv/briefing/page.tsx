@@ -4,7 +4,6 @@ import { getProfile, regionFor } from '@/lib/profile';
 import { getIngestedDayAirings } from '@/lib/tv/ingestedGuide';
 import { scoreGuideAirings } from '@/lib/tv/scoreGuide';
 import { xmltvCoverageEvidence } from '@/lib/tv/xmltvCoverage';
-import { DNA_PERSONAL_MIN } from '@/lib/verdict/confidence';
 import { CaseBriefing, BriefingUnavailable } from '@/components/CaseBriefing';
 import {
   DEFAULT_BRIEFING_TZ,
@@ -107,23 +106,23 @@ export default async function BriefingPage({
     airings = await scoreGuideAirings(supabase, user.id, airings, now, region);
   }
 
-  // "YOUR VERDICT" is only claimed once the engine has actually learned this
-  // user — the same DNA floor every personal surface applies.
-  let personalized = false;
-  if (user) {
-    const { count } = await supabase
-      .from('watchlist_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .not('rating', 'is', null);
-    personalized = (count ?? 0) >= DNA_PERSONAL_MIN;
-  }
+  // SECTIONS COME FROM REAL SCORES; LABELS COME FROM REAL SIGNAL.
+  //
+  // One account-level query used to decide BOTH — "has this user rated at least
+  // DNA_PERSONAL_MIN titles" gated the editorial sections AND licensed the
+  // words "Your verdict" on every badge in them. That is how an objective score
+  // reached production as "Your Verdict 79" explained by "Quality base 79":
+  // having rated things somewhere is not evidence that THIS title's number
+  // moved. The engine now attaches per-title evidence (`matchPersonalized`), so
+  // the page reads it instead of inferring it.
+  const hasScores = airings.some((a) => a.match != null);
+  const anyPersonal = airings.some((a) => a.matchPersonalized === true);
 
-  const briefing = trimBriefing(selectCaseBriefing(airings, now, tz, { channel, personalized }));
+  const briefing = trimBriefing(selectCaseBriefing(airings, now, tz, { channel, personalized: hasScores }));
 
   return (
     <div className="space-y-5">
-      <CaseBriefing briefing={briefing} tz={tz} nowMs={now} personalized={personalized} dateLine={dateLine} />
+      <CaseBriefing briefing={briefing} tz={tz} nowMs={now} personalized={anyPersonal} dateLine={dateLine} />
       <p className="text-[11px] text-slate-500">
         Full channel listings from{' '}
         <a href="https://www.tvmedia.ca" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">

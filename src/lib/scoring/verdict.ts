@@ -251,7 +251,13 @@ function buildOneLiner(
 export function buildVerdict(input: BuildVerdictInput): VerdictReport {
   const { meta, providers, personal } = input;
   const general = computeGeneralScore(meta, providers);
-  const match = computePersonalMatch(meta, general.score, personal);
+  // THE OBJECTIVE FOUNDATION IS THE STANDARD SCORE — the calibrated number
+  // `/api/quicklook`, `/api/dna`, `/api/ratings` and `rankByDna` all already
+  // read. This line used to pass `general.score` (the legacy blend), which is
+  // why Today's Case Briefing and QuickLook printed different headline numbers
+  // for the same user and title. See `canonical.ts` for the whole contract.
+  const objective = general.standardScore ?? general.score;
+  const match = computePersonalMatch(meta, objective, personal);
   const tier = tierFromScore(match.score);
   const disposition = dispositionFromScore(match.score);
 

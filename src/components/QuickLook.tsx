@@ -173,7 +173,20 @@ export function QuickLook({
           )}
 
           {/* Ratings */}
-          <RatingsStrip ratings={data?.ratings ?? EMPTY_TILE_RATINGS} title={target.title} year={target.year} standard loading={!data && !failed} />
+          <RatingsStrip
+            /* mediaType + tmdbId are what make this the CARD's call rather than
+               a second one: with them RatingsStrip renders <WatchCall>, which
+               resolves the canonical user-aware headline. Without them it
+               printed `ratings.standardScore` straight — the objective 83 that
+               disagreed with the briefing's 79 for the same title. */
+            mediaType={target.mediaType}
+            tmdbId={target.id}
+            ratings={data?.ratings ?? EMPTY_TILE_RATINGS}
+            title={target.title}
+            year={target.year}
+            standard
+            loading={!data && !failed}
+          />
 
           {/* Genres */}
           {data && data.genres.length > 0 && (

@@ -126,3 +126,48 @@ describe('the whole blend, end to end', () => {
     expect(ranked.every((r) => r.rankScore === NEUTRAL)).toBe(true);
   });
 });
+
+/**
+ * THE PERSONALIZATION EVIDENCE TRAVELS WITH THE SCORE.
+ *
+ * The briefing decided "Your verdict" from an account-level fact and printed it
+ * over objective numbers. The engine now states, per title, whether real
+ * title-specific signal participated — and `applyScores` is the seam where that
+ * verdict reaches every airing of the title, so it is pinned here.
+ */
+describe('applyScores carries the personalization verdict, not just the number', () => {
+  const airing = (over: Partial<Airing> & Pick<Airing, 'showName' | 'airstamp'>): Airing =>
+    ({
+      id: 1, time: '20:00', minutes: 1200, runtime: 60, network: 'N', showId: 1,
+      episodeName: null, season: null, number: null, showType: 'Scripted',
+      genres: [], rating: null, image: null, summary: null, imdb: null, ...over,
+    }) as Airing;
+
+  it('a personalized score arrives labelled personalized', () => {
+    const a = airing({ showName: 'X', airstamp: '2026-08-15T20:00:00Z' });
+    const out = applyScores(
+      [a],
+      new Map([[scoreKeyFor(a), { tmdbId: 5, mediaType: 'tv' as const, match: 63, why: 'w', personalized: true }]]),
+    );
+    expect(out[0]!.match).toBe(63);
+    expect(out[0]!.matchPersonalized).toBe(true);
+  });
+
+  it('an objective-only score arrives labelled NOT personalized', () => {
+    const a = airing({ showName: 'X', airstamp: '2026-08-15T20:00:00Z' });
+    const out = applyScores(
+      [a],
+      new Map([[scoreKeyFor(a), { tmdbId: 5, mediaType: 'tv' as const, match: 83, why: 'w', personalized: false }]]),
+    );
+    expect(out[0]!.matchPersonalized).toBe(false);
+  });
+
+  it('an omitted verdict defaults to NOT personalized — never the flattering guess', () => {
+    const a = airing({ showName: 'X', airstamp: '2026-08-15T20:00:00Z' });
+    const out = applyScores(
+      [a],
+      new Map([[scoreKeyFor(a), { tmdbId: 5, mediaType: 'tv' as const, match: 83, why: null }]]),
+    );
+    expect(out[0]!.matchPersonalized).toBe(false);
+  });
+});

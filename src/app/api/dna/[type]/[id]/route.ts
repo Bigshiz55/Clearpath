@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { getScoringData } from '@/lib/titleData';
 import { computeGeneralScore } from '@/lib/scoring/general';
 import { getUserDnaForTitle, dimensionFitFor } from '@/lib/dna';
+import { getPersonalContext } from '@/lib/profile';
+import { computePersonalMatch } from '@/lib/scoring/personal';
+import { canonicalScore } from '@/lib/scoring/canonical';
 import type { MediaType } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -43,7 +46,26 @@ export async function GET(req: Request, { params }: { params: { type: string; id
     // not fingerprinted yet gets no fit, and the UI says so rather than
     // inventing one.
     const fit = await dimensionFitFor(supabase, user.id, mediaType, id, dna.sampleSize).catch(() => null);
-    return NextResponse.json({ dna: { ...dna, fit } });
+
+    // THE CANONICAL HEADLINE, from the one contract every surface reads.
+    //
+    // `dna.score` is the TASTE view of this title and stays exactly what it
+    // was — the DNA panel, the fit axes and the progress meter all still mean
+    // it. What it is NOT is the headline number, because the briefing and the
+    // title page compute theirs from the Standard Score plus this user's
+    // explicit deterministic rules, and a card that showed the taste blend
+    // instead was the other half of "Your Verdict 79" vs "83 · STREAM IT".
+    //
+    // Taste is deliberately not folded into the headline here: resolving it
+    // costs a per-title embedding, which the briefing's bulk path may never
+    // spend, so a headline that included it would be a number one surface
+    // could produce and another could not. The deterministic contract is the
+    // one every surface can honour identically.
+    const personal = await getPersonalContext(supabase, user.id, null).catch(() => null);
+    const match = personal ? computePersonalMatch(meta, objective, personal) : null;
+    const canonical = canonicalScore({ objective, adjustments: match?.adjustments ?? [] });
+
+    return NextResponse.json({ dna: { ...dna, fit, canonical } });
   } catch {
     return NextResponse.json({ dna: null });
   }
