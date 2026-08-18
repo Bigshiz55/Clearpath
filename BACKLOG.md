@@ -67,6 +67,43 @@ Updated at the end of every work order per the Working Agreement in
   preview-accessible database (command in the PR) — until then the route
   shows the honest absence state, by design.
 
+## Next (discovered during the P0 scoring-consistency repair)
+
+- **The Live TV guide still claims personalization from an account threshold.**
+  - PROBLEM: `src/app/app/tv/page.tsx:159` computes
+    `guidePersonalized = (count ?? 0) >= DNA_PERSONAL_MIN` and passes that one
+    page-level boolean to `ChannelGuide` (`:414`, `:487`) and `WhatsOnToday`,
+    which use it to label per-title score badges. This is the SAME defect class
+    fixed in Today's Case Briefing: an account-level fact ("has this user rated
+    enough titles") licensing a per-title personal claim.
+  - WHY IT MATTERS: the same objective score can render as a personal one on the
+    Live TV guide, which is exactly the dishonesty the briefing repair removed.
+    It also means two TV surfaces disagree about what "yours" means.
+  - KNOWN EVIDENCE: `scoreGuideAirings` already attaches per-title
+    `matchPersonalized` to every scored airing (`guideScoring.ts:92`), so the
+    evidence these components need is present and unread. Verified by grep on
+    branch `claude/p0-briefing-score-consistency` @ `e4488f6`.
+  - SAFE CONSTRAINTS: read `a.matchPersonalized === true` per row exactly as
+    `CaseBriefing.ScoreBadge` now does; do not alter scoring; keep the badge's
+    existing size variants; `ChannelGuide` has its own `ScoreBadge`, so this is
+    a local change plus a fixture refresh.
+  - DEPENDENCIES: none — ships on current `main` once PR #76 merges.
+  - NOT A BLOCKER FOR: PR #76. The four contracted surfaces (Briefing,
+    QuickLook, card WatchCall, full verdict) are consistent without it.
+
+- **"STANDARD SCORE nn" is a wide badge on narrow screens.**
+  - PROBLEM: the objective badge is ~60% wider than the old "Verdict nn", so
+    Top Cases titles truncate a few characters earlier at 390px.
+  - WHY IT MATTERS: scanability in the densest column of the briefing.
+  - KNOWN EVIDENCE: rendered at 1440/1280/834/390 on `/dev/case-briefing`;
+    no horizontal overflow (≤1px), titles still identifiable, tap opens the
+    full sheet.
+  - SAFE CONSTRAINTS: "Standard score" is the wording the acceptance contract
+    named; any change must stay honest and stay consistent with
+    `RatingsStrip`'s existing "WatchVerd1ct Standard Score" language.
+  - DEPENDENCIES: none.
+  - NOT A BLOCKER FOR: PR #76.
+
 ## Next (discovered during the P0 repair)
 - **XMLTV file-fed grid is BUILT (`claude/xmltv-file-ingestion`, stacked on
   the P0 PR):** streaming importer → canonical 0032 tables, coverage

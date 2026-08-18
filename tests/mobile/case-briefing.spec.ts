@@ -41,7 +41,7 @@ test('the front page renders: masthead, rail, lead case, supported sections only
   await expect(lead).toContainText('Your verdict');
   await expect(lead).toContainText('94');
   // The "why" is the engine's own working, passed through verbatim.
-  await expect(page.getByTestId('briefing-why')).toContainText('Quality base 81');
+  await expect(page.getByTestId('briefing-why')).toContainText('Standard score 81');
   await expect(page.getByTestId('briefing-why')).toContainText('Courtroom dramas');
 
   for (const id of ['top-cases', 'tonight', 'movies', 'sports', 'premieres', 'worth', 'late', 'wildcard']) {
@@ -53,6 +53,33 @@ test('the front page renders: masthead, rail, lead case, supported sections only
   await expect(
     page.getByTestId('briefing-item').filter({ hasText: 'Afternoon Matinee' }).first(),
   ).toContainText('ON NOW');
+});
+
+test('a badge never claims more than its own arithmetic supports', async ({ page }) => {
+  /* THE RENDERED HALF OF THE P0. Production showed "Your Verdict 79" over a
+     score with no personal contribution, explained only by its objective base.
+     Unit tests cannot see a screen that contradicts itself, so the claim and
+     the arithmetic are compared here, in the browser, on a page that carries
+     BOTH kinds of row at once. */
+  await open(page);
+
+  const personal = page.getByTestId('briefing-score').filter({ hasText: 'Your verdict' });
+  const objective = page.getByTestId('briefing-score').filter({ hasText: 'Standard score' });
+  // The mixed page is the realistic one: if either kind is missing, this test
+  // is not exercising the distinction it exists to protect.
+  expect(await personal.count()).toBeGreaterThan(0);
+  expect(await objective.count()).toBeGreaterThan(0);
+
+  // A personalized badge is backed by an adjustment that actually fired.
+  const lead = page.getByTestId('briefing-lead');
+  await expect(lead).toContainText('Your verdict');
+  await expect(page.getByTestId('briefing-why')).toContainText('+8 Courtroom dramas');
+
+  // An objective-only row says so, and never borrows the personal wording.
+  const row = page.getByTestId('briefing-item').filter({ hasText: 'The Long Cross-Examination' }).first();
+  await expect(row.getByTestId('briefing-score')).toContainText('Standard score');
+  await expect(row.getByTestId('briefing-score')).not.toContainText('Your');
+  await expect(row.getByTestId('briefing-score')).toHaveAttribute('data-personalized', 'false');
 });
 
 test('verdict numbers wear only on engine-matched titles', async ({ page }) => {
