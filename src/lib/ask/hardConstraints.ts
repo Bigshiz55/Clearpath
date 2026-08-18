@@ -39,6 +39,7 @@
  * PURE. No I/O, no clock. Resolution happens before this and arrives as ids.
  */
 import type { CanonicalIntent } from '@/lib/interpret/types';
+import { satisfiesRole } from '@/lib/people/constraint';
 
 /** The credit roles this engine can actually enforce. */
 export type ConstraintRole = 'actor' | 'director';
@@ -47,7 +48,17 @@ export type HardConstraint =
   | { type: 'person'; entity: string; personId: number; role: ConstraintRole; required: true }
   | { type: 'person'; entity: string; personId: number; role: ConstraintRole; excluded: true }
   | { type: 'genre'; value: string; excluded: true }
-  | { type: 'media'; value: 'movie' | 'tv'; required: true };
+  | { type: 'media'; value: 'movie' | 'tv'; required: true }
+  /**
+   * A SUBJECT THE REQUEST IS ABOUT ("a boxing movie").
+   *
+   * Whether the subject is genuinely CENTRAL to a title is a semantic
+   * judgement made upstream by the finder's evaluator, not a fact this module
+   * can compute. It arrives as `CandidateFacts.subjectSatisfied` and is
+   * enforced here so that subject centrality stops being a second, separate
+   * eligibility mechanism with its own filter and its own leak guard.
+   */
+  | { type: 'subject'; value: string; required: true };
 
 /** A requirement the sentence made that could not be turned into a constraint. */
 export interface UnresolvedRequirement {
@@ -122,6 +133,8 @@ export interface CandidateFacts {
   directorIds: number[];
   genreNames: string[];
   creditsKnown: boolean;
+  /** The upstream evaluator's centrality verdict. `null` = never judged. */
+  subjectSatisfied?: boolean | null;
 }
 
 /**
@@ -145,11 +158,22 @@ function holds(facts: CandidateFacts, c: HardConstraint): boolean {
     case 'genre':
       // Excluded: the candidate must NOT carry it.
       return !facts.genreNames.some((g) => g.toLowerCase() === c.value.toLowerCase());
+    case 'subject':
+      // REJECT ON UNCERTAINTY — the rule the finder already applied. An
+      // unjudged candidate is not an eligible one.
+      return facts.subjectSatisfied === true;
     case 'person': {
-      // UNVERIFIABLE IS NOT A PASS.
+      /* THE ROLE PREDICATE IS OWNED BY `people/constraint.ts` AND ASKED, NOT
+         REIMPLEMENTED. It already knows that a director is credited by JOB
+         ("Director"/"Co-Director") rather than by department, which is the
+         distinction that keeps an assistant director out — a second copy here
+         would drift from it the first time either changed. */
       if (!facts.creditsKnown) return false;
-      const pool = c.role === 'director' ? facts.directorIds : facts.castIds;
-      const present = pool.includes(c.personId);
+      const credits = {
+        cast: facts.castIds.map((id) => ({ id })),
+        crew: facts.directorIds.map((id) => ({ id, job: 'Director' })),
+      };
+      const present = satisfiesRole(credits, { personId: c.personId, role: c.role });
       return 'excluded' in c ? !present : present;
     }
     default:
@@ -181,6 +205,8 @@ export function describeConstraint(c: HardConstraint): string {
       return c.value === 'movie' ? 'a movie' : 'a TV series';
     case 'genre':
       return `no ${c.value}`;
+    case 'subject':
+      return `about ${c.value}`;
     case 'person':
       return 'excluded' in c
         ? `without ${c.entity}`
@@ -190,4 +216,101 @@ export function describeConstraint(c: HardConstraint): string {
     default:
       return 'a stated requirement';
   }
+}
+
+/** How many candidates to check per round. Bounded fan-out at the provider. */
+const QUALIFY_BATCH = 12;
+
+export interface QualifiedCandidate<T> {
+  item: T;
+  evidence: ConstraintEvidence;
+}
+
+/**
+ * THE ONE GATE. Walks candidates in RANK ORDER, gathering the facts each needs
+ * and asking `evaluateCandidate` — the single decision function — whether it
+ * satisfies the request.
+ *
+ * ── WHY THIS EXISTS RATHER THAN THREE FILTERS ─────────────────────────────
+ * Enforcement used to be split: subject centrality filtered in `finder.ts`,
+ * person credits verified in `qualifyByRole`, media and genre exclusions
+ * applied at the provider. Three mechanisms, three shapes, and only one of them
+ * had a guard against leaks — the same architecture mistake just removed from
+ * interpretation. "Eligible" now means one thing, computed in one place.
+ *
+ * ── BOUNDED, AND NO N+1 ───────────────────────────────────────────────────
+ * A request naming nothing fetches nothing: with no constraints this returns
+ * the pool untouched and never calls `fetchFacts` at all. Otherwise it works in
+ * batches of `QUALIFY_BATCH` and STOPS the moment `need` candidates qualify, so
+ * the cost is proportional to the answer rather than to the pool. Reaching the
+ * end means the catalogue really is short, not that a window was too small.
+ *
+ * A fact lookup that throws drops that candidate — never the whole request, and
+ * never a silent pass, because unverifiable is not a pass.
+ */
+export async function qualifyCandidates<T>(
+  items: readonly T[],
+  constraints: readonly HardConstraint[],
+  fetchFacts: (item: T) => Promise<CandidateFacts>,
+  opts: { need: number },
+): Promise<QualifiedCandidate<T>[]> {
+  if (constraints.length === 0) {
+    return items.map((item) => ({
+      item,
+      evidence: { hardConstraintsSatisfied: [], hardConstraintsMissing: [], positiveSignals: [], negativeSignals: [] },
+    }));
+  }
+  const kept: QualifiedCandidate<T>[] = [];
+  for (let at = 0; at < items.length && kept.length < opts.need; at += QUALIFY_BATCH) {
+    const batch = items.slice(at, at + QUALIFY_BATCH);
+    const evaluated = await Promise.all(
+      batch.map(async (item) => {
+        const facts = await fetchFacts(item).catch(() => null);
+        if (!facts) return null;
+        return { item, evidence: evaluateCandidate(facts, constraints) };
+      }),
+    );
+    for (const e of evaluated) {
+      if (e && isEligible(e.evidence) && kept.length < opts.need) kept.push(e);
+    }
+  }
+  return kept;
+}
+
+/** The pure predicate, for callers that already hold the facts. */
+export function constraintsSatisfied(facts: CandidateFacts, constraints: readonly HardConstraint[]): boolean {
+  return isEligible(evaluateCandidate(facts, constraints));
+}
+
+/**
+ * The requirements the FINDER can verify per candidate.
+ *
+ * ── WHY NOT EVERY CONSTRAINT ──────────────────────────────────────────────
+ * A gate may only enforce what it can actually check. `FinderItem` carries no
+ * genre names, so a genre exclusion evaluated here would be UNVERIFIABLE for
+ * every candidate — and since unverifiable is not a pass, adding it would
+ * silently empty every result set. Genre exclusion is already enforced where
+ * the evidence exists: `excludeGenreIds` on the provider query.
+ *
+ * Claiming a constraint one cannot check is the same class of dishonesty as
+ * dropping one, so this returns only person, media and subject.
+ */
+export function constraintsFromQuery(q: {
+  mediaType?: string;
+  people?: readonly { personId: number; role: ConstraintRole }[];
+  subjectCanonical?: string | null;
+  subjectLabel?: string | null;
+  subjectRequired?: boolean;
+}): HardConstraint[] {
+  const out: HardConstraint[] = [];
+  if (q.mediaType === 'movie' || q.mediaType === 'tv') {
+    out.push({ type: 'media', value: q.mediaType, required: true });
+  }
+  for (const p of q.people ?? []) {
+    out.push({ type: 'person', entity: String(p.personId), personId: p.personId, role: p.role, required: true });
+  }
+  if (q.subjectRequired) {
+    out.push({ type: 'subject', value: q.subjectCanonical ?? q.subjectLabel ?? 'subject', required: true });
+  }
+  return out;
 }

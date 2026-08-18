@@ -168,3 +168,70 @@ describe('relative dates — semantics captured, arithmetic deferred', () => {
     expect(interpret('movies from the last 5 years')).toEqual(interpret('movies from the last 5 years'));
   });
 });
+
+/**
+ * WATCH-HISTORY LANGUAGE BELONGS TO `excludeSeen`, NOT TO THE SUBJECT FIELD.
+ *
+ * Found while testing the reported production query. Two gaps, one owner:
+ *
+ *  A. "I may not have seen" did not set `excludeSeen`. The pattern covered
+ *     "have not seen", "haven't seen" and "already watched" but not the modal
+ *     form — so the one phrase in the reported failing sentence was the one it
+ *     missed.
+ *
+ *  B. The same words then leaked into `subjects` as a NEGATED subject
+ *     ("have seen", "seen", "seen yet"), and negated subjects become excluded
+ *     keywords downstream — so a request to avoid films you have seen could
+ *     quietly exclude titles tagged with an unrelated keyword.
+ *
+ * One occurrence, one meaning: these words state watch history, and
+ * `excludeSeen` is where that meaning lives.
+ */
+describe('watch history is owned by excludeSeen', () => {
+  it('THE REPORTED SENTENCE — "may not have seen" excludes what you have seen', () => {
+    expect(interpret('Looking for a good Samuel L Jackson movie I may not have seen').excludeSeen).toBe(true);
+  });
+
+  it('the modal forms all count', () => {
+    for (const q of [
+      'a movie I may not have seen',
+      'a movie I might not have seen',
+      'a movie I probably have not seen',
+      "movies I haven't seen",
+      'a movie I have not seen',
+      'something I already watched',
+    ]) {
+      expect(interpret(q).excludeSeen, q).toBe(true);
+    }
+  });
+
+  it('and never leaves a watch-history word in the SUBJECT field', () => {
+    for (const q of [
+      'Looking for a good Samuel L Jackson movie I may not have seen',
+      'a movie I have not seen',
+      'a Stallone movie I have not seen yet',
+    ]) {
+      const subjects = interpret(q).subjects.map((s) => s.span);
+      for (const s of subjects) {
+        expect(s, `"${q}" leaked a watch-history word as a subject`).not.toMatch(/\b(?:seen|watched)\b/);
+      }
+    }
+  });
+
+  it('a genuine subject still survives beside it', () => {
+    /* The masking must remove watch-history words WITHOUT taking the request
+       with them. Phrased as an actual request, the subject is still read.
+
+       ("a boxing movie I have not seen" — no request framing — classifies as a
+       statement and yields no positive subject both before and after this
+       change; that is a separate, pre-existing gap in bare-phrase handling and
+       is not what this masking touches.) */
+    const i = interpret('Find me a boxing movie I have not seen');
+    expect(i.excludeSeen).toBe(true);
+    expect(i.subjects.some((s) => s.span === 'boxing' && s.wanted)).toBe(true);
+  });
+
+  it('an ordinary request sets nothing', () => {
+    expect(interpret('show me action movies').excludeSeen).toBe(false);
+  });
+});

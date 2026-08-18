@@ -4,6 +4,7 @@ import {
   evaluateCandidate,
   isEligible,
   describeConstraint,
+  qualifyCandidates,
   type CandidateFacts,
   type HardConstraint,
 } from './hardConstraints';
@@ -189,5 +190,131 @@ describe('eligibility — a candidate either satisfies the request or it does no
   it('a constraint can be described in words, for the explanation layer', () => {
     expect(describeConstraint(requireSLJ).toLowerCase()).toContain('samuel l. jackson');
     expect(describeConstraint(noHorror).toLowerCase()).toContain('horror');
+  });
+});
+
+/**
+ * ONE ANSWER TO "CAN THIS CANDIDATE SATISFY THE REQUEST?"
+ *
+ * Enforcement was split three ways: subject centrality filtered in `finder.ts`,
+ * person credits verified inside `qualifyByRole`, media and genre exclusions
+ * applied at the provider. Three places, three shapes, and only the subject one
+ * had a leak guard — which is precisely the architecture mistake just removed
+ * from interpretation, one layer down.
+ *
+ * The decision now lives here for every explicit requirement. I/O still lives
+ * outside (credits must be fetched), but the VERDICT is computed in one pure
+ * function, so "eligible" cannot mean two different things in two files.
+ */
+describe('subject centrality is a constraint like any other', () => {
+  const needsBoxing: HardConstraint = { type: 'subject', value: 'boxing', required: true };
+
+  it('a candidate the evaluator judged central satisfies it', () => {
+    expect(isEligible(evaluateCandidate(facts({ subjectSatisfied: true }), [needsBoxing]))).toBe(true);
+  });
+
+  it('one it judged peripheral does not', () => {
+    expect(isEligible(evaluateCandidate(facts({ subjectSatisfied: false }), [needsBoxing]))).toBe(false);
+  });
+
+  it('REJECT ON UNCERTAINTY — an unjudged candidate is not eligible', () => {
+    // The same rule the finder already applied: no verdict means it stays out.
+    expect(isEligible(evaluateCandidate(facts({ subjectSatisfied: null }), [needsBoxing]))).toBe(false);
+  });
+});
+
+describe('qualifyCandidates — the one gate, batched and bounded', () => {
+  const SLJ2 = 2231;
+  const requireSLJ: HardConstraint = { type: 'person', entity: 'Samuel L. Jackson', personId: SLJ2, role: 'actor', required: true };
+  type Item = { id: number; mediaType: 'movie' | 'tv'; title: string };
+  const items: Item[] = [
+    { id: 1, mediaType: 'movie', title: 'In It' },
+    { id: 2, mediaType: 'movie', title: 'Not In It' },
+    { id: 3, mediaType: 'movie', title: 'Also In It' },
+  ];
+  const fetchFacts = async (i: Item) =>
+    facts({ castIds: i.id === 2 ? [999] : [SLJ2], mediaType: i.mediaType });
+
+  it('keeps only the candidates that satisfy every requirement', async () => {
+    const out = await qualifyCandidates(items, [requireSLJ], fetchFacts, { need: 10 });
+    expect(out.map((r) => r.item.title)).toEqual(['In It', 'Also In It']);
+  });
+
+  it('carries the evidence forward, so nothing has to recompute it', async () => {
+    const out = await qualifyCandidates(items, [requireSLJ], fetchFacts, { need: 10 });
+    expect(out[0]!.evidence.hardConstraintsSatisfied).toHaveLength(1);
+    expect(out[0]!.evidence.positiveSignals.join(' ')).toContain('Samuel L. Jackson');
+  });
+
+  it('NO N+1 — work stops once enough candidates qualify', async () => {
+    /* The pool must exceed one batch for this to prove anything: within a
+       single round every candidate is fetched concurrently on purpose, and the
+       bound being asserted is that later ROUNDS never happen once `need` is
+       met. A 3-item pool fits in one batch and would pass vacuously. */
+    const big: Item[] = Array.from({ length: 40 }, (_, n) => ({ id: n + 10, mediaType: 'movie', title: `T${n}` }));
+    const seen: number[] = [];
+    const counted = async (i: Item) => {
+      seen.push(i.id);
+      return facts({ castIds: [SLJ2] });
+    };
+    await qualifyCandidates(big, [requireSLJ], counted, { need: 1 });
+    expect(seen.length, 'must not walk the whole pool to return one').toBeLessThan(big.length);
+    expect(seen.length, 'and must not exceed a single bounded round').toBeLessThanOrEqual(12);
+  });
+
+  it('a request with NO constraints fetches nothing at all', async () => {
+    const seen: number[] = [];
+    const counted = async (i: Item) => {
+      seen.push(i.id);
+      return fetchFacts(i);
+    };
+    const out = await qualifyCandidates(items, [], counted, { need: 10 });
+    expect(seen).toEqual([]);
+    expect(out).toHaveLength(items.length);
+  });
+
+  it('a fact lookup that throws drops the candidate rather than the request', async () => {
+    const flaky = async (i: Item) => {
+      if (i.id === 1) throw new Error('tmdb down');
+      return fetchFacts(i);
+    };
+    const out = await qualifyCandidates(items, [requireSLJ], flaky, { need: 10 });
+    expect(out.map((r) => r.item.title)).toEqual(['Also In It']);
+  });
+});
+
+describe('AN INELIGIBLE CANDIDATE CAN NEVER BE SCORED', () => {
+  it('the gate returns only eligible candidates, so ranking never sees the rest', async () => {
+    /* The property the split enforcement could not state: there is no path from
+       a failed requirement to a recommendation score, because the rejected
+       candidate does not survive the gate to be scored at all. */
+    const requireSLJ: HardConstraint = { type: 'person', entity: 'Samuel L. Jackson', personId: 2231, role: 'actor', required: true };
+    const pool = [{ id: 7, mediaType: 'movie' as const }];
+    const out = await qualifyCandidates(pool, [requireSLJ], async () => facts({ castIds: [] }), { need: 5 });
+    expect(out).toEqual([]);
+  });
+});
+
+describe('properties inherited from the retired qualifyByRole walker', () => {
+  /* `qualifyByRole` was the person-only predecessor of `qualifyCandidates`. It
+     is retired, and the properties its suite pinned are asserted here so
+     nothing was lost in the consolidation. */
+  const NOLAN = 525;
+  const dirNolan: HardConstraint = { type: 'person', entity: 'Christopher Nolan', personId: NOLAN, role: 'director', required: true };
+
+  it('TWO NAMED PEOPLE MEANS BOTH, NEVER EITHER', async () => {
+    const other: HardConstraint = { type: 'person', entity: 'Someone Else', personId: 999, role: 'director', required: true };
+    const ev = evaluateCandidate(facts({ directorIds: [NOLAN] }), [dirNolan, other]);
+    expect(isEligible(ev), 'the second director is not on this film').toBe(false);
+  });
+
+  it('a film he only PRODUCED does not satisfy "directed by"', () => {
+    // Produced credits never reach directorIds, so association is not the role.
+    expect(isEligible(evaluateCandidate(facts({ directorIds: [], castIds: [] }), [dirNolan]))).toBe(false);
+  });
+
+  it('a television title can never satisfy a movie-only person request', () => {
+    const movieOnly: HardConstraint = { type: 'media', value: 'movie', required: true };
+    expect(isEligible(evaluateCandidate(facts({ mediaType: 'tv', directorIds: [NOLAN] }), [dirNolan, movieOnly]))).toBe(false);
   });
 });

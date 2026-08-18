@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   discoverParamFor,
-  qualifyByRole,
   fromCastIds,
   idsForRole,
   roleSupport,
@@ -144,58 +143,5 @@ describe('the legacy castIds list still means exactly what it meant', () => {
     ];
     expect(idsForRole(people, 'director')).toEqual([NOLAN]);
     expect(idsForRole(people, 'actor')).toEqual([WILLIS]);
-  });
-});
-
-describe('qualifyByRole — association is not the requested role', () => {
-  const DIRECTED = { id: 27205, mediaType: 'movie', title: 'Inception' };
-  const PRODUCED = { id: 141052, mediaType: 'movie', title: 'Man of Steel' };
-  const ACTED_IN = { id: 1, mediaType: 'movie', title: 'A Cameo' };
-  const A_SERIES = { id: 2, mediaType: 'tv', title: 'Some Series' };
-
-  const credits = async (_mt: 'movie' | 'tv', id: number): Promise<CreditsView | null> => {
-    if (id === DIRECTED.id) return { cast: [], crew: [{ id: NOLAN, job: 'Director' }] };
-    if (id === PRODUCED.id) return { cast: [], crew: [{ id: NOLAN, job: 'Producer' }] };
-    if (id === ACTED_IN.id) return { cast: [{ id: NOLAN }], crew: [] };
-    return null;
-  };
-
-  it('keeps the film he DIRECTED and drops the one he only produced', async () => {
-    /* THE WHOLE POINT, AND THE REASON `with_crew` IS NOT ENOUGH. Retrieval
-       returns both — Nolan worked on both — and only one is an answer to
-       "movies directed by Christopher Nolan". */
-    const out = await qualifyByRole([DIRECTED, PRODUCED], [{ personId: NOLAN, role: 'director' }], credits, { need: 99 });
-    expect(out.map((i: { title?: string }) => i.title)).toEqual(['Inception']);
-  });
-
-  it('drops a film he merely APPEARED in', async () => {
-    const out = await qualifyByRole([ACTED_IN], [{ personId: NOLAN, role: 'director' }], credits, { need: 99 });
-    expect(out).toEqual([]);
-  });
-
-  it('drops a title whose credits could not be read', async () => {
-    // Unverifiable is not a pass — the guarantee is the whole point of the filter.
-    const out = await qualifyByRole([A_SERIES, { id: 404, mediaType: 'movie' }], [{ personId: NOLAN, role: 'director' }], credits, { need: 99 });
-    expect(out).toEqual([]);
-  });
-
-  it('a television title can never satisfy a movie-only constraint', async () => {
-    const out = await qualifyByRole([A_SERIES], [{ personId: NOLAN, role: 'director' }], credits, { need: 99 });
-    expect(out).toEqual([]);
-  });
-
-  it('two named people means BOTH, never either', async () => {
-    const out = await qualifyByRole(
-      [DIRECTED],
-      [{ personId: NOLAN, role: 'director' }, { personId: 999, role: 'director' }],
-      credits,
-      { need: 99 },
-    );
-    expect(out, 'the second director is not on this film').toEqual([]);
-  });
-
-  it('no constraints is a no-op — an ordinary request pays nothing', async () => {
-    const items = [DIRECTED, PRODUCED, A_SERIES];
-    expect(await qualifyByRole(items, [], credits, { need: 99 })).toEqual(items);
   });
 });

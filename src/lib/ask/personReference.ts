@@ -73,6 +73,14 @@ export interface AmbiguousPerson {
 export interface UnresolvedPerson {
   kind: 'unresolved';
   spokenAs: string;
+  /**
+   * Catalog names that came back but were not defensible as THIS person.
+   *
+   * Carried so the route can ask "did you mean…?" instead of dead-ending. They
+   * are near misses, never answers: nothing here has been accepted, and the
+   * caller must not treat them as a resolution.
+   */
+  nearMisses?: Array<{ id: number; name: string; knownFor: string }>;
 }
 
 export type PersonResolution = ResolvedPerson | AmbiguousPerson | UnresolvedPerson;
@@ -266,7 +274,7 @@ export async function resolvePersonReference(input: PersonReferenceInput): Promi
       return { kind: 'resolved', id: only.id, name: only.name, evidence: 'sole-credited-match' };
     }
     if (bearing.length > 1) return asAmbiguous(bearing);
-    return { kind: 'unresolved', spokenAs };
+    return { kind: 'unresolved', spokenAs, nearMisses: nearMissesFrom(credited) };
   }
 
   /* FULL NAME, NO EXACT MATCH. The old fallback took `credited[0]` here and
@@ -283,4 +291,11 @@ export async function resolvePersonReference(input: PersonReferenceInput): Promi
   }
   if (matching.length > 1) return asAmbiguous(matching);
   return { kind: 'unresolved', spokenAs };
+}
+
+/** The closest credited names we saw, capped — evidence for a question. */
+function nearMissesFrom(
+  hits: ReadonlyArray<{ id: number; name: string; knownFor?: string | null }>,
+): Array<{ id: number; name: string; knownFor: string }> {
+  return hits.slice(0, 3).map((h) => ({ id: h.id, name: h.name, knownFor: h.knownFor ?? '' }));
 }

@@ -161,47 +161,18 @@ export function planPersonConstraint(
     : { kind: 'refuse', requested: support.requested, reason: support.reason };
 }
 
-/** How many candidates to verify per round. Bounded fan-out at the provider. */
-const QUALIFY_BATCH = 12;
-
-/**
- * Verify candidates against the role until enough qualify — or they run out.
+/*
+ * `qualifyByRole` USED TO LIVE HERE AND IS RETIRED.
  *
- * ── THE DEFECT THIS REPLACES ──────────────────────────────────────────────
- * Qualification ran over `items.slice(0, max(24, cap * 4))`. A director whose
- * qualifying films ranked below that window was silently under-delivered: the
- * count was cut to whatever happened to be inside the slice, not to what
- * actually exists. "Three Nolan films" came back with one, for no reason the
- * user could see and none the code could state.
+ * It walked a ranked list verifying ONE kind of requirement — a person's credit
+ * role — while subject centrality was filtered in `finder.ts` and media and
+ * genre exclusions were applied at the provider. Three mechanisms answering one
+ * question is the architecture mistake that let "a Samuel L Jackson movie"
+ * reach ranking with no person check at all.
  *
- * ── WHY NOT SIMPLY VERIFY EVERYTHING ──────────────────────────────────────
- * Each verification is a credits fetch. Checking a hundred candidates to show
- * three is real latency spent on titles nobody will see. So it walks in
- * batches, in RANK ORDER, and stops the moment `need` is satisfied — the answer
- * is complete, and the work is proportional to the answer rather than to the
- * pool. When fewer qualify than were asked for, it reaches the end and returns
- * what genuinely exists: a short answer that is true, never a padded one.
+ * Its replacement is `qualifyCandidates` in `@/lib/ask/hardConstraints`, which
+ * walks the same way — rank order, bounded batches, stopping once enough
+ * qualify — but asks `evaluateCandidate` about EVERY explicit requirement.
+ * `satisfiesRole` above is unchanged and is what that evaluator calls, so the
+ * role predicate still has exactly one definition.
  */
-export async function qualifyByRole<T extends { id: number; mediaType: string }>(
-  items: readonly T[],
-  constraints: readonly PersonConstraint[],
-  fetchCredits: (mediaType: 'movie' | 'tv', id: number) => Promise<CreditsView | null>,
-  opts: { need: number },
-): Promise<T[]> {
-  if (constraints.length === 0) return [...items];
-  const kept: T[] = [];
-  for (let at = 0; at < items.length && kept.length < opts.need; at += QUALIFY_BATCH) {
-    const batch = items.slice(at, at + QUALIFY_BATCH);
-    const verdicts = await Promise.all(
-      batch.map(async (i) => {
-        if (i.mediaType !== 'movie') return false;
-        const credits = await fetchCredits('movie', i.id).catch(() => null);
-        return constraints.every((c) => satisfiesRole(credits, c));
-      }),
-    );
-    batch.forEach((i, n) => {
-      if (verdicts[n] && kept.length < opts.need) kept.push(i);
-    });
-  }
-  return kept;
-}
