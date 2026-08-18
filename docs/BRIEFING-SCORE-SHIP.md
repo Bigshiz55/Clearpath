@@ -14,8 +14,9 @@ CURRENT SHA: see LAST UPDATED SHA below
 CURRENT MAIN SHA: `314623ef0e2e17492708830ebe1afeb308846be6` (PR #75 merge)
 BASE / MERGE-BASE: `314623e` — the branch is cut from CURRENT main, 1 ahead,
 0 behind. No rollback risk; no integration required.
-STATUS: PR #76 open against `main`, all CI green, NOT merged. Verifier role
-complete including rendered QA. Awaiting Adversarial Review.
+STATUS: PR #76 open against `main`, all CI green, NOT merged. **VERIFIER ROLE
+COMPLETE** — behavioural, causal and rendered proof done; all ten gates green.
+Awaiting ADVERSARIAL REVIEW.
 
 ---
 
@@ -90,7 +91,7 @@ sections keep individual airings.
 | G6 `npm run build` | production build completed | 0 |
 | G7 `playwright.searchrouting` | 21 passed | 0 |
 | G8 `playwright.mobile` — `case-briefing.spec.ts` | 13 passed | 0 |
-| G9 `playwright.mobile` — FULL suite | see NEXT ACTION | — |
+| G9 `playwright.mobile` — FULL suite | **1153 passed, 1 skipped, 0 failed** (1154 tests, 46.2m) | 0 |
 | G10 GitHub CI on PR #76 | 10/10 checks success | 0 |
 
 ## COMPLETED PROOF
@@ -155,9 +156,12 @@ None.
 
 ## NEXT ACTION
 
-Complete G9 (full `playwright.mobile` suite) and record its exact result here.
-Then proceed to ADVERSARIAL REVIEW of PR #76 at its head SHA. Do not merge
-without explicit owner authorization.
+**ADVERSARIAL REVIEW of PR #76** at head SHA below. Attack, specifically: the
+one-writer claim for `matchWhy`/`matchPersonalized`; whether any surface can
+still reach a headline number that is not `canonicalScore`'s; whether the
+dedupe can drop a title that should have appeared; whether `hasScores` widened
+the editorial sections for a reader who should see none; and whether the
+`/api/dna` `canonical` field can be null in a way that silently falls back to
+the taste score. Do not merge without explicit owner authorization.
 
-LAST UPDATED SHA: `e4488f678a51cf27d9cf778e9c56828e4a0b1684` (+ uncommitted
-harness-fixture and rendered-proof changes pending commit)
+LAST UPDATED SHA: `e18572aabfcc826eda8563d0ec8df858d23b67f7`
