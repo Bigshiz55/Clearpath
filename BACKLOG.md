@@ -4,6 +4,31 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **P0 scoring consistency — `claude/p0-briefing-score-consistency` (PR open,
+  NOT merged), branched from `main` at `314623e` (post-#75 merge).** One user +
+  one title now resolves to ONE headline WatchVerd1ct score on Today's Case
+  Briefing, QuickLook, the card WatchCall and the full title verdict.
+  - Root cause 1: `buildVerdict` personalized off `general.score` (the legacy
+    blend) while `/api/quicklook`, `/api/dna`, `/api/ratings` and `rankByDna`
+    all read `general.standardScore ?? general.score`. Reproduced at 82 vs 87
+    on a Golden Girls fixture — the reported "Your Verdict 79" vs "83".
+  - Root cause 2: the briefing claimed "Your Verdict" from an ACCOUNT-level
+    rating count, so objective scores explained only as "Quality base 79" were
+    printed as personal. Personalization is now per-title evidence
+    (`Airing.matchPersonalized`) computed beside the arithmetic.
+  - Root cause 3: editorial sections deduped by airing (`airstamp|showName`)
+    and tracked used rows by TVmaze EPISODE id, so several episodes of one
+    series flooded Lead Case / Top Cases. Dedupe is now title-level
+    (`mediaType:tmdbId`, conservative normalized-name fallback) with an
+    on-now-else-earliest representative airing.
+  - New canonical contract: `src/lib/scoring/canonical.ts` (pure) —
+    Standard Score → qualifying Taste-DNA blend → deterministic preference /
+    hard-rule adjustments → final score, plus the honest label and "why".
+  - KNOWN LIMITATION carried forward: the headline deliberately excludes the
+    per-title Taste-DNA embedding blend, because resolving it costs a paid
+    per-title call the briefing's bulk path may not spend — a headline that
+    included it could not be produced identically on every surface. Taste
+    remains the DNA panel's own number and still drives ranking.
 - **Three-part P0 repair — `claude/p0-repair-semantic-ask-livetv` (one PR,
   not merged), branched from `main` at `9e4e9ff` (post-#71/#72 merge).**
   - **P0-A** preference "like" vs comparison: one grammatical owner

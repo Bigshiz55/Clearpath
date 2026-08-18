@@ -129,14 +129,30 @@ function ChannelChip({ c, tz, active }: { c: BriefingChannel; tz: string; active
   );
 }
 
-function ScoreBadge({ a, personalized }: { a: Airing; personalized: boolean }) {
+/**
+ * THE BADGE SAYS WHAT THE NUMBER ACTUALLY IS.
+ *
+ * It used to read a page-level `personalized` flag derived from an ACCOUNT
+ * fact — "has this user rated enough titles" — and print "Your verdict 79"
+ * over scores that had received no personal contribution whatsoever. The
+ * engine now attaches the evidence to the score itself, so the badge reports
+ * rather than infers, and an objective score is called what it is.
+ */
+function ScoreBadge({ a }: { a: Airing }) {
   if (a.match == null) return null;
+  const personal = a.matchPersonalized === true;
   return (
     <span
-      className="flex-none rounded-md border border-pink-400/50 bg-pink-500/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-pink-200"
+      className={`flex-none rounded-md border px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+        personal
+          ? 'border-pink-400/50 bg-pink-500/15 text-pink-200'
+          : 'border-white/20 bg-white/10 text-slate-300'
+      }`}
       data-testid="briefing-score"
+      data-personalized={personal ? 'true' : 'false'}
+      title={a.matchWhy ?? undefined}
     >
-      {personalized ? 'Your verdict' : 'Verdict'} <span className="tabular-nums text-sm">{a.match}</span>
+      {personal ? 'Your verdict' : 'Standard score'} <span className="tabular-nums text-sm">{a.match}</span>
     </span>
   );
 }
@@ -145,13 +161,11 @@ function ItemRow({
   a,
   tz,
   nowMs,
-  personalized,
   onOpen,
 }: {
   a: Airing;
   tz: string;
   nowMs: number;
-  personalized: boolean;
   onOpen: (a: Airing) => void;
 }) {
   const s = Date.parse(a.airstamp);
@@ -184,7 +198,7 @@ function ItemRow({
             {[channelIdentity(a.network).name, a.episodeName, a.genres[0]].filter(Boolean).join(' · ')}
           </span>
         </span>
-        <ScoreBadge a={a} personalized={personalized} />
+        <ScoreBadge a={a} />
       </button>
     </li>
   );
@@ -197,7 +211,6 @@ function Section({
   rows,
   tz,
   nowMs,
-  personalized,
   onOpen,
 }: {
   id: string;
@@ -206,7 +219,6 @@ function Section({
   rows: Airing[];
   tz: string;
   nowMs: number;
-  personalized: boolean;
   onOpen: (a: Airing) => void;
 }) {
   if (rows.length === 0) return null;
@@ -221,7 +233,7 @@ function Section({
       </h2>
       <ul className="mt-1.5 space-y-0.5">
         {rows.map((a) => (
-          <ItemRow key={a.id} a={a} tz={tz} nowMs={nowMs} personalized={personalized} onOpen={onOpen} />
+          <ItemRow key={a.id} a={a} tz={tz} nowMs={nowMs} onOpen={onOpen} />
         ))}
       </ul>
     </section>
@@ -415,7 +427,7 @@ export function CaseBriefing({
                   <h2 className="mt-1 text-2xl font-black leading-tight text-white sm:text-3xl">{lead.showName}</h2>
                   <p className="mt-1 text-[11px] font-black uppercase tracking-wider text-gold-300">{airingTodayLine(lead, tz)}</p>
                   <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                    <ScoreBadge a={lead} personalized={personalized} />
+                    <ScoreBadge a={lead} />
                     {lead.genres.slice(0, 3).map((g) => (
                       <span key={g} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-slate-300">
                         {g}
@@ -449,9 +461,9 @@ export function CaseBriefing({
               max-content and overflows narrow phones; minmax(0,1fr) doesn't. */}
           <div className="grid grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-3">
             <div className="space-y-5 lg:col-span-2">
-              <Section id="top-cases" kicker="Top cases today" personal rows={briefing.topCases} tz={tz} nowMs={nowMs} personalized={personalized} onOpen={open} />
-              <Section id="tonight" kicker="Tonight’s docket" rows={briefing.tonightsDocket} tz={tz} nowMs={nowMs} personalized={personalized} onOpen={open} />
-              <Section id="movies" kicker="Movies on the docket" rows={briefing.moviesOnTheDocket} tz={tz} nowMs={nowMs} personalized={personalized} onOpen={open} />
+              <Section id="top-cases" kicker="Top cases today" personal rows={briefing.topCases} tz={tz} nowMs={nowMs} onOpen={open} />
+              <Section id="tonight" kicker="Tonight’s docket" rows={briefing.tonightsDocket} tz={tz} nowMs={nowMs} onOpen={open} />
+              <Section id="movies" kicker="Movies on the docket" rows={briefing.moviesOnTheDocket} tz={tz} nowMs={nowMs} onOpen={open} />
             </div>
             <div className="space-y-5">
               {briefing.wildcard && (
@@ -461,14 +473,23 @@ export function CaseBriefing({
                   </h2>
                   <p className="mt-1 text-[11px] text-slate-500">Scored for you, outside your usual genres.</p>
                   <ul className="mt-1 space-y-0.5">
-                    <ItemRow a={briefing.wildcard} tz={tz} nowMs={nowMs} personalized={personalized} onOpen={open} />
+                    <ItemRow a={briefing.wildcard} tz={tz} nowMs={nowMs} onOpen={open} />
                   </ul>
                 </section>
               )}
-              <Section id="worth" kicker="Worth watching for you" personal rows={briefing.worthWatching} tz={tz} nowMs={nowMs} personalized={personalized} onOpen={open} />
-              <Section id="sports" kicker="Live & sports" rows={briefing.liveAndSports} tz={tz} nowMs={nowMs} personalized={personalized} onOpen={open} />
-              <Section id="premieres" kicker="New & premieres" rows={briefing.newAndPremieres} tz={tz} nowMs={nowMs} personalized={personalized} onOpen={open} />
-              <Section id="late" kicker="The late-night file" rows={briefing.lateNightFile} tz={tz} nowMs={nowMs} personalized={personalized} onOpen={open} />
+              <Section
+                id="worth"
+                kicker={
+                  // THE HEADING MAKES THE SAME CLAIM THE BADGES DO. "for you" is
+                  // earned by the rows underneath it, never by the account.
+                  briefing.worthWatching.some((x) => x.matchPersonalized === true)
+                    ? 'Worth watching for you'
+                    : 'Worth watching'
+                }
+                personal rows={briefing.worthWatching} tz={tz} nowMs={nowMs} onOpen={open} />
+              <Section id="sports" kicker="Live & sports" rows={briefing.liveAndSports} tz={tz} nowMs={nowMs} onOpen={open} />
+              <Section id="premieres" kicker="New & premieres" rows={briefing.newAndPremieres} tz={tz} nowMs={nowMs} onOpen={open} />
+              <Section id="late" kicker="The late-night file" rows={briefing.lateNightFile} tz={tz} nowMs={nowMs} onOpen={open} />
             </div>
           </div>
         </>

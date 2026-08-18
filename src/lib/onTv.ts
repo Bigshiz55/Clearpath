@@ -51,6 +51,12 @@ export interface Airing {
   isPremiere?: boolean | null;
   /** One plain-language line of what drove `match` — the badge's "why". */
   matchWhy?: string | null;
+  /** Whether REAL TITLE-SPECIFIC personal signal participated in `match`.
+   *  The briefing used to infer this from an account-level fact ("has this
+   *  user rated enough titles"), which is how an objective score ended up
+   *  printed as "Your Verdict 79". Personalization is a property of how the
+   *  number was computed, so it travels WITH the number. */
+  matchPersonalized?: boolean | null;
   year?: number | null; // release year, when the source reports one — disambiguates the TMDB match
 }
 
