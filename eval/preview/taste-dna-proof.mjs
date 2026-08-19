@@ -76,7 +76,7 @@ const QUERIES = [
      failure and pressured the product into guessing. So the contract is the
      WHOLE exchange: answer immediately when the anchor is unambiguous, or ask
      one question with REAL options and deliver results once it is answered. */
-  { id: 'Q9', text: 'I want something darker than Taken.', kind: 'comparative anchor + axis', expect: { minItems: 1, comparativeRoundTrip: true } },
+  { id: 'Q9', text: 'I want something darker than Taken.', kind: 'comparative anchor + axis', expect: { minItems: 1, comparativeRoundTrip: true, mustDifferFromFloor: true } },
   { id: 'Q10', text: 'I had a burrito and want something fun tonight.', kind: 'multi-clause', expect: { minItems: 2 } },
   { id: 'Q11', text: 'I like Yellowstone. What should I watch?', kind: 'cross-clause taste', expect: { minItems: 2 } },
   { id: 'Q12', text: 'I want a thriller, nothing scary', kind: 'trailing negative fragment', expect: { minItems: 2 } },
@@ -87,7 +87,7 @@ const QUERIES = [
      result count. This anchor is unambiguous, so no question intervenes, and
      the answer is measured against the floor this same deployment returns for
      a request that constrains nothing. */
-  { id: 'Q13', text: 'I want something darker than Whiplash.', kind: 'comparative, unambiguous anchor', expect: { minItems: 2, mustDifferFromFloor: true } },
+  { id: 'Q13', text: 'I want something darker than Whiplash.', kind: 'comparative, the answer must differ', expect: { minItems: 2, comparativeRoundTrip: true, mustDifferFromFloor: true } },
 ];
 
 const key = (i) => `${i.mediaType}:${i.id}`;

@@ -201,11 +201,21 @@ export function planNudge(
 ): CriticContribution {
   if (!plan || plan.instructions.length === 0) return INERT;
   const authority = Math.max(0, Math.min(1, plan.authority));
-  if (authority <= 0 || !candidate.dims) return INERT;
+  if (!candidate.dims) return INERT;
+  /* AUTHORITY IS ABOUT THE ANCHOR, NOT ABOUT THE SENTENCE.
+     `objectiveAuthority` is zero whenever no anchor carries a cached
+     fingerprint, and this used to return INERT on that alone — silencing the
+     axis the user STATED along with everything inferred from the anchor.
+     Measured against a real deployment: "I want something darker than Taken."
+     resolved its anchor, ran the whole pipeline, and returned that build's
+     unconstrained popularity head. "Darker than X" is two claims and only one
+     of them needs to know anything about X. A plan with nothing but anchor
+     inference and no authority is still completely inert — see below. */
+  if (authority <= 0 && !plan.instructions.some((i) => i.evidence.includes('request'))) return INERT;
 
   const cand = candidate.dims as Record<string, number | undefined>;
   const axes: string[] = [];
-  const parts: { ins: (typeof plan.instructions)[number]; value: number; agreement: number }[] = [];
+  const parts: { ins: (typeof plan.instructions)[number]; value: number; agreement: number; weight: number }[] = [];
   let weighted = 0;
   let mass = 0;
 
@@ -220,27 +230,31 @@ export function planNudge(
        that only ever rewarded would shift every candidate equally and reorder
        nothing, which is the failure mode that makes a signal decorative. */
     const agreement = 1 - (2 * Math.abs(v - ins.target)) / 100;
-    weighted += agreement * ins.strength;
+    /* PER-TERM AUTHORITY. An instruction the user stated carries its own full
+       weight; one inferred from the anchor is worth what the anchor is worth.
+       When EVERY instruction is anchor-evidenced this is identical arithmetic
+       to scaling the finished sum — `statedAxisAuthority.test.ts` pins that to
+       nine decimals, because a fix that quietly re-weighted every existing
+       comparison would be a different change wearing this one's clothes. */
+    const weight = ins.evidence.includes('request') ? 1 : authority;
+    weighted += agreement * ins.strength * weight;
     mass += ins.strength;
-    parts.push({ ins, value: v, agreement });
+    parts.push({ ins, value: v, agreement, weight });
   }
 
   if (mass <= 0) return INERT;
   const score = weighted / mass; // -1 .. +1
-  const scale = (CRITIC_NUDGE_MAX * authority) / mass;
+  const scale = CRITIC_NUDGE_MAX / mass;
 
   return {
-    nudge: Math.max(
-      -CRITIC_NUDGE_MAX,
-      Math.min(CRITIC_NUDGE_MAX, score * CRITIC_NUDGE_MAX * authority),
-    ),
+    nudge: Math.max(-CRITIC_NUDGE_MAX, Math.min(CRITIC_NUDGE_MAX, score * CRITIC_NUDGE_MAX)),
     distance: (1 - score) / 2,
     axes,
     /* THE SAME ARITHMETIC, SPLIT PER AXIS. `agreement * strength * scale` is
        literally the term this axis added to `weighted / mass * MAX * authority`,
        so these points sum to `nudge` whenever the clamp does not bite. GC7
        explains from these and nothing else. */
-    contributions: parts.map(({ ins, value, agreement }) => ({
+    contributions: parts.map(({ ins, value, agreement, weight }) => ({
       axis: ins.axis,
       kind: ins.kind,
       candidateValue: value,
@@ -249,7 +263,7 @@ export function planNudge(
       strength: ins.strength,
       evidence: [...ins.evidence],
       agreement,
-      points: agreement * ins.strength * scale,
+      points: agreement * ins.strength * weight * scale,
     })),
   };
 }

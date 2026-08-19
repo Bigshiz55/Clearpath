@@ -153,7 +153,14 @@ export function rankCriticCandidates(
   /* NOTHING TO SAY → EXACT EXISTING BEHAVIOUR. Not "a very small nudge", not a
      re-sort that happens to agree: the incoming order is returned untouched, so
      a request with no objective is byte-identical to what shipped before. */
-  const eligible = !!plan && plan.instructions.length > 0 && authority > 0;
+  /* ELIGIBLE ON WHAT THE REQUEST SAID, OR ON WHAT THE ANCHOR IS WORTH.
+     Anchor authority is zero whenever the classifier has not reached the named
+     title yet, and gating the whole request on it threw away the axis the user
+     typed — see `nudge.ts` and `statedAxisAuthority.test.ts`. A plan built only
+     from anchor inference is still inert at zero authority. */
+  const statesAnAxis =
+    !!plan && plan.instructions.some((i) => i.evidence.includes('request'));
+  const eligible = !!plan && plan.instructions.length > 0 && (authority > 0 || statesAnAxis);
   if (!eligible) {
     return {
       decisions: candidates.map((c) => base(c, 0, [], c.dims != null)),
