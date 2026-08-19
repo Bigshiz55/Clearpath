@@ -217,9 +217,10 @@ async function main() {
    *  the comparison then completes. Returns a list of failures (empty = good). */
   const proveComparativeRoundTrip = async (body, ask2) => {
     const problems = [];
+    let settled = [];
     if (body.kind !== 'clarify') {
       problems.push(`expected either results or one clarifying question, got kind=${body.kind ?? '?'}`);
-      return problems;
+      return { problems, settled };
     }
     const options = Array.isArray(body.comparisonOptions) ? body.comparisonOptions : [];
     const envelope = body.pendingComparison ?? null;
@@ -233,7 +234,7 @@ async function main() {
         break;
       }
     }
-    if (problems.length > 0) return problems;
+    if (problems.length > 0) return { problems, settled };
     const chosen = options[0];
     const spokenAs = envelope?.pending?.[0]?.spokenAs ?? chosen.title;
     const resumed = await ask2(envelope?.text ?? undefined, {
@@ -241,13 +242,14 @@ async function main() {
       comparisonChoice: { spokenAs, tmdbId: chosen.tmdbId, mediaType: chosen.mediaType },
     });
     const back = Array.isArray(resumed.body.items) ? resumed.body.items : [];
+    settled = back;
     console.log(`  ROUND TRIP step 2 — answered "${spokenAs}" → ${chosen.title}: ${back.length} item(s) · ${resumed.ms}ms · kind=${resumed.body.kind ?? '?'}`);
     for (const i of back.slice(0, 5)) console.log(`      ${String(i.title).slice(0, 34).padEnd(35)} match=${i.matchScore}`);
     if (back.length === 0) {
       problems.push('the settled comparison still returned nothing');
       explainShortfall(resumed.body);
     }
-    return problems;
+    return { problems, settled };
   };
 
   /* THE FLOOR — what this deployment returns when the request constrains
@@ -271,9 +273,19 @@ async function main() {
          comedy grid has misread it. */
       if ((q.expect ?? {}).notASearch) console.log('  CONTRACT not-a-search: PASS (no result set)');
       else if ((q.expect ?? {}).comparativeRoundTrip) {
-        const problems = await proveComparativeRoundTrip(body, ask);
+        const { problems, settled } = await proveComparativeRoundTrip(body, ask);
         console.log(`  CONTRACT comparative round trip: ${problems.length === 0 ? 'PASS' : 'FAIL'}`);
         for (const pr of problems) fail(`${q.id} "${q.text}": ${pr}`);
+        /* A comparison that COMPLETED still has to have MATTERED. The floor
+           check belongs on whichever response finally carried items, which for
+           an ambiguous anchor is the settled one. */
+        if ((q.expect ?? {}).mustDifferFromFloor && settled.length > 0) {
+          const head = settled.slice(0, 5).map(key);
+          const shared = head.filter((k) => floor.has(k));
+          const ok = floor.size === 0 || shared.length <= 2;
+          console.log(`  CONTRACT the settled comparison is not the unconstrained floor: ${ok ? 'PASS' : `FAIL (${shared.length} of the top ${head.length} are floor titles)`}`);
+          if (!ok) fail(`${q.id} "${q.text}": the settled comparison returned the titles an unconstrained ask returns.`);
+        }
       } else {
         explainShortfall(body);
         fail(`${q.id} "${q.text}": returned no results at all.`);

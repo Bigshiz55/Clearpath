@@ -438,6 +438,8 @@ export async function POST(req: Request) {
             title: c.title,
             mediaType: c.mediaType,
             year: c.year ?? null,
+            // Display order for the clarification only — never identity.
+            recognisability: c.popularity ?? null,
           })),
         // GC3, cache-only. A miss costs the anchor its authority, nothing more.
         loadDimensions: getCachedDimensions,

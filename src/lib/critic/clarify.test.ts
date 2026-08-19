@@ -138,8 +138,37 @@ describe('clarify · ambiguity never becomes a guess', () => {
     const ranked = rankOptions(
       FURIOUS.map((f) => ({ tmdbId: f.id, title: f.title, mediaType: f.mediaType, year: f.year })),
     );
-    expect(ranked[0]!.year).toBe(2026); // newest first, for scanning
+    // With no recognisability on any candidate the year tie-break stands, so a
+    // build whose search payload carries no popularity behaves as it always did.
+    expect(ranked[0]!.year).toBe(2026);
     expect(ranked).toHaveLength(MAX_CLARIFY_OPTIONS);
+  });
+
+  /* C4 · THE DEPLOYED PROOF'S FINDING. Asked "Which Taken did you mean?", the
+     room led with TAKEN (2025) and buried Taken (2008). Recency is not what
+     predicts which work a bare name refers to; recognisability is. */
+  it('C4 · the best-known candidate is offered first, not the newest', () => {
+    const taken = [
+      { tmdbId: 1327794, title: 'TAKEN', mediaType: 'movie' as const, year: 2025, recognisability: 1.4 },
+      { tmdbId: 68006, title: 'Taken', mediaType: 'tv' as const, year: 2017, recognisability: 12 },
+      { tmdbId: 8681, title: 'Taken', mediaType: 'movie' as const, year: 2008, recognisability: 96 },
+    ];
+    const ranked = rankOptions(taken);
+    expect(ranked[0]!.tmdbId).toBe(8681);
+    expect(ranked[0]!.year).toBe(2008);
+    // Every candidate is still offered — ordering a question is not answering it.
+    expect(ranked.map((o) => o.tmdbId).sort()).toEqual([8681, 68006, 1327794].sort());
+  });
+
+  it('C5 · recognisability orders the question and never decides identity', () => {
+    // A popular near-match must NOT become the resolved anchor; the matcher is
+    // untouched and still refuses, which is why there is a list to order at all.
+    const ranked = rankOptions([
+      { tmdbId: 1, title: 'Taken', mediaType: 'movie', year: 2008, recognisability: 96 },
+      { tmdbId: 2, title: 'Taken', mediaType: 'tv', year: 2017, recognisability: 12 },
+    ]);
+    expect(ranked).toHaveLength(2);
+    expect(ranked.every((o) => o.title === 'Taken')).toBe(true);
   });
 });
 

@@ -38,8 +38,19 @@ import { pickMatch, normalizeTitle, type TmdbCandidate } from '@/lib/packs/tmdbM
 import type { CriticObjective, CriticRelation, ResolvedAnchor } from './objective';
 import { objectiveAuthority } from './objective';
 
-/** A search result, in the shape identity resolution needs. */
-export type AnchorCandidate = TmdbCandidate;
+/**
+ * A search result, in the shape identity resolution needs.
+ *
+ * `recognisability` is carried but NEVER consulted by the matcher — identity is
+ * decided by title, media type and year, and popularity-as-identity is the
+ * defect this file's header names. It exists solely so that WHEN the matcher
+ * refuses and the user has to be asked, the alternatives can be listed with the
+ * best-known one first. Ordering a question is not answering it.
+ */
+export type AnchorCandidate = TmdbCandidate & {
+  /** TMDB popularity, when the search payload carried it. Display order only. */
+  recognisability?: number | null;
+};
 
 export interface AnchorRequest {
   /** Exactly what the user typed. */
@@ -56,6 +67,8 @@ export interface AnchorOption {
   title: string;
   mediaType: 'movie' | 'tv';
   year: number | null;
+  /** Display order only — see AnchorCandidate. Absent when unknown. */
+  recognisability?: number | null;
 }
 
 export type AnchorResolution =
@@ -127,6 +140,7 @@ export function resolveAnchor(
         title: c.title,
         mediaType: c.mediaType,
         year: c.year,
+        recognisability: c.recognisability ?? null,
       })),
     };
   }
