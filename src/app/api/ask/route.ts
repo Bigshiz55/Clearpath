@@ -573,6 +573,25 @@ export async function POST(req: Request) {
 
       criticState.attribution.finalRankingConsumesPlan = ranked.applied;
 
+      /* AN EMPTY COMPARISON IS WORSE THAN AN UNCOMPARED ANSWER.
+         Measured on a real deployment: once `<axis> than <anchor>` began
+         routing here, "I want something darker than Taken" returned ZERO items
+         where it had previously returned a general list. Understanding the
+         sentence better made the answer worse, which is the one outcome a
+         routing change may not produce.
+
+         This mirrors the unresolved-anchor branch above: when the critic cannot
+         fulfil a comparison it hands the request back to ordinary discovery and
+         SAYS SO, rather than presenting emptiness as a verdict. Not a silent
+         fall-through — the note is customer-facing, and the comparison is
+         reported as unmet rather than quietly dropped. */
+      if (criticItems.length === 0) {
+        convInterpretation.push(
+          criticState.objective.anchors.length > 0
+            ? `I couldn't find anything to compare with ${criticRequest.referenceTitles.join(' or ')} — answering without the comparison.`
+            : `I couldn't fulfil that comparison — answering without it.`,
+        );
+      } else
       return NextResponse.json(
         withConv({
           kind: 'search',
