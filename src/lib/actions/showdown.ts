@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { loadPreference, recordEvents } from '@/lib/preference/store';
 import { PAYOFF_TOP, measurePayoff } from '@/lib/showdown/payoffPool';
 import { getCachedDimensions } from '@/lib/titleDimensions';
+import { fingerprintKey } from '@/lib/taste/fingerprint';
 import { TITLES } from '@/lib/voice/quickdna/definition';
 import { canonicalTitleId, mediaTypeFor } from '@/lib/showdown/mediaType';
 import { resolveCatalogue } from '@/lib/showdown/catalogueResolver';
@@ -178,9 +179,13 @@ export async function recordShowdownSession(
       return { tmdb_id: Number(id), media_type: mt as 'movie' | 'tv' };
     });
     const dims = await getCachedDimensions(wanted);
-    for (const e of events) {
-      const [mt, id] = e.titleId.split(':');
-      const d = dims.get(`${mt}-${id}`);
+    /* Indexed against `wanted`, which already parsed each `titleId` — the loop
+       used to re-split it and hand the two halves straight into a template
+       literal, so a malformed id stringified to "undefined-NaN" and missed
+       silently. The typed key will not accept that. */
+    events.forEach((e, idx) => {
+      const w = wanted[idx]!;
+      const d = dims.get(fingerprintKey({ mediaType: w.media_type, tmdbId: w.tmdb_id }));
       /* THE CLASSIFIER NO LONGER OVERWRITES THE COMPARATIVE VECTOR. It used to
          replace `dims` wholesale, which would now discard the axis-level claim
          this decision actually made and put the title's absolute fingerprint
@@ -189,7 +194,7 @@ export async function recordShowdownSession(
          comparative claim wins where the two overlap, because it is a statement
          about the CHOICE and the other is a statement about the film. */
       if (d) e.dims = { ...d, ...e.dims };
-    }
+    });
   } catch {
     /* enrichment is a bonus; never block the write on it */
   }

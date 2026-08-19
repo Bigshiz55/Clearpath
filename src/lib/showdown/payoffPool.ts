@@ -46,6 +46,7 @@ import { deriveDna } from '@/lib/preference/engine';
 import type { PreferenceEvent } from '@/lib/preference/types';
 import { discoverTitles } from '@/lib/tmdb/client';
 import { getCachedDimensions } from '@/lib/titleDimensions';
+import { fingerprintKey } from '@/lib/taste/fingerprint';
 import { TITLES } from '@/lib/voice/quickdna/definition';
 import { mediaTypeFor } from './mediaType';
 import { computePayoff, type Payoff, type PayoffCandidate } from './payoff';
@@ -130,7 +131,9 @@ export async function measurePayoff(input: PayoffInput): Promise<Payoff | null> 
     title: t.title,
     year: t.year,
     objective: baselineScore(i, pool.length),
-    ...(dims.get(`movie-${t.id}`) ? { dims: dims.get(`movie-${t.id}`) } : {}),
+    ...(dims.get(fingerprintKey({ mediaType: 'movie', tmdbId: t.id }))
+      ? { dims: dims.get(fingerprintKey({ mediaType: 'movie', tmdbId: t.id })) }
+      : {}),
   }));
   if (!candidates.some((c) => c.dims)) return null;
 

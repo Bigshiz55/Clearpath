@@ -265,6 +265,94 @@ Updated at the end of every work order per the Working Agreement in
   standard Supabase env; it enforces the owner's exact contract and prints
   only the five allowed fields.
 
+## Now — final product closure (branch `claude/p0-evidence-anchor-separation`)
+
+Four gaps closed as general mechanisms. Every one was "computed correctly, then
+dropped one layer down", which is why the unit suites were green throughout.
+
+- **P0-A · evidence coverage was unmeasurable and could state a falsehood.**
+  Two causes, one symptom. (a) Vercel crons run on PRODUCTION deployments only,
+  so the nightly `/api/cron/classify` backfill never runs on the preview where
+  0/43 coverage was measured — the preview was never wrong, it was never fed.
+  (b) A real defect: `getCachedDimensions` collapsed three outcomes into one
+  empty Map — the catalog holds nothing, the table is missing, the service-role
+  client could not be built — so the comparative path could tell a reader "none
+  of them has a profile on file yet" with total confidence when it had simply
+  not looked. `readCachedDimensions` now reports `status: 'ok' | 'unavailable'`
+  and `requested`; `/api/ask` discloses the three cases differently and
+  `diagnostics.critic.evidence` carries the status.
+  `/api/cron/classify?report=1` measures coverage without classifying anything
+  and works with no `OPENAI_API_KEY`, behind the same `CRON_SECRET` gate.
+- **P0-B · a bare title resolved by decaying popularity.** `AnchorRequest.year`
+  had existed since GC2 and nothing ever filled it, so "darker than Taken 2008"
+  asked which Taken while holding the answer — and sent the string "Taken 2008"
+  to TMDB, which is no title at all. `src/lib/critic/anchorSpan.ts` reads the
+  cues the sentence already carried (year, and the framed medium "the X movie"
+  / "the X series"), composed from the existing `splitTitleQualifiers` so no
+  search-baseline module changes. Clarification order now leads on CUMULATIVE
+  audience (`vote_count`) with TMDB's decaying weekly popularity demoted to a
+  tie-break — display only; `resolveAnchor` still never reads either, and still
+  refuses when the evidence genuinely does not separate two works.
+- **P0-C · the ranking had no term for what was asked.** Measured, not assumed:
+  over sixty scenario×profile cells the base field spans a median of 18 points
+  and three quarters of the order is a near tie — but the real finding was that
+  `evaluateSubjectCentrality` had been producing a per-candidate 0..100 on
+  request fit and the pipeline used it to FILTER and to DISPLAY and never to
+  ORDER. `src/lib/ask/relevanceSignal.ts` adds it as a bounded ±12 channel
+  centred on the field's own mean, so the set's average movement is zero by
+  construction and a plain genre browse (every candidate satisfies the request
+  identically) produces no movement at all. Measured on 15 subject-bearing
+  cells: winning margin min 0 / p25 0 / median 2 / p75 3 → min 1 / p25 2.5 /
+  median 11.68 / p75 20; winner changed in 47%; |max| exactly 12; non-subject
+  cells untouched.
+- **P0-E · the card's "Why it fits" was dead everywhere, always.**
+  `dimensionFitFor` — the sole source of the card's taste agreements and
+  "Heads up" cautions — looked its fingerprint up under `${mediaType}:${id}`
+  while the cache writes `${mediaType}-${id}`. A colon where the map has a
+  hyphen: the lookup missed on every title for every user, `fit` came back
+  null, and both `WhyThisTitle` and `CardFit` rendered nothing personal —
+  while `personalRanking.ts` read the same cache correctly and moved the rank.
+  The ranking was personalized and the explanation was silent. The key is now
+  stated once (`fingerprintKey`) and derived by all ten readers/writers, with
+  `dimensionCacheKey.test.ts` as the contract. Second half: the card gated
+  every "your …" claim on `ratedCount > 0` while the repo declares
+  `MIN_SAMPLES_FOR_FIT = 3` and the ranker scales the same channel by
+  `samples / 20` — the claim was loudest exactly where the ranking trusted it
+  least. One floor, both surfaces.
+- **A closed-class word is never a subject.** "anything except horror" bound the
+  SUBJECT "except"; so did "anything BUT horror", "something BESIDES comedy",
+  "a movie WITH drama", and — worst — "movies AND shows about chess", which
+  demanded every title be about both `and` and `chess`. The pre-nominal rule
+  assumes an attributive modifier, which only open-class words can be. The
+  closed classes are finite, so the guard states them; the exclusion members are
+  DERIVED from the `NEGATORS` vocabulary this file already declares. Also:
+  `dumb`, `cerebral` and `challenging` were tone words and `smart` was not, so
+  "a smart thriller" became an aboutness filter on "smart" — the axis is
+  completed, and a tone with no execution home is disclosed rather than invented
+  as a topic.
+
+### Discovered here, not fixed (deliberately out of scope)
+- **`/api/search` leads with the 2017 Taken series on production right now.**
+  Verified unauthenticated against `clearpath-pearl-chi.vercel.app` at
+  `256a898`: `?q=Taken` returns tv/2017, then movie/2008. This is NOT the
+  anchor path P0-B fixed — for a bare, unqualified query `/api/search`
+  deliberately returns "the catalog's own order untouched" (TMDB's), and
+  changing that is a frozen-search-baseline change requiring a layerA delta
+  against `68a5a93`. The `prominence()` rule in `src/lib/critic/clarify.ts` is
+  the mechanism if the owner wants it applied there too.
+- **The negator vocabulary exists in three hand-kept copies** in
+  `src/lib/interpret/interpret.ts` — `MEDIA_NEGATOR_BEHIND` (line ~114),
+  `NEGATORS` (~165) and `negatedSpans`'s own regex (~171) — and they have
+  already drifted (`hate[sd]?` vs `hates?|hated`; the first carries no
+  contractions at all). The subject guard now DERIVES from `NEGATORS` rather
+  than adding a fourth copy, but the three remain. Consolidating them changes
+  media-polarity and negation-scope behaviour, so it wants its own work order
+  with the metamorphic suite as the gate.
+- **`/api/cron/classify` has never run on a preview deployment** and cannot —
+  `vercel.json` schedules it and Vercel fires crons on production only. Any
+  preview coverage measurement is a measurement of an unfed cache. Use
+  `?report=1` to state the number honestly rather than inferring a defect.
+
 ## Now (continued)
 - **TODAY'S CASE BRIEFING is BUILT (`claude/todays-case-briefing`, stacked
   on the XMLTV PR):** first-class `/app/tv/briefing` route — editorial

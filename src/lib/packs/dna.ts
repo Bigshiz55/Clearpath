@@ -2,6 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCachedDimensions, getUserDimensionProfile } from '@/lib/titleDimensions';
+import { fingerprintKey } from '@/lib/taste/fingerprint';
 import { dimensionMatch, profileConfidence, topDials } from '@/lib/scoring/dimensions';
 import type { MediaType } from '@/lib/types';
 
@@ -37,7 +38,7 @@ export async function getPackDnaScores(
   const dimsByKey = await getCachedDimensions(titles.map((t) => ({ tmdb_id: t.tmdbId, media_type: t.mediaType })));
 
   for (const t of titles) {
-    const dims = dimsByKey.get(`${t.mediaType}-${t.tmdbId}`);
+    const dims = dimsByKey.get(fingerprintKey(t));
     if (!dims) continue;
     const score = dimensionMatch(dims, profile);
     const dials = topDials(profile, 1);

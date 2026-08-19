@@ -91,7 +91,7 @@ export interface ClarificationChoice {
  * decides ORDER and trims a long tail nobody can scan. Ordering a question is
  * not answering it, which is why nothing here picks.
  *
- * BEST-KNOWN FIRST, NOT NEWEST FIRST. Recency was the original prior and the
+ * BEST-KNOWN FIRST, NOT NEWEST FIRST, AND BEST-KNOWN MEANS CUMULATIVE. Recency was the original prior and the
  * deployed proof showed what it costs: asked "Which Taken did you mean?", the
  * room led with TAKEN (2025) and buried Taken (2008), the film the sentence
  * almost certainly meant. A reader who takes the first option then anchors a
@@ -103,14 +103,32 @@ export interface ClarificationChoice {
  * tie-break, so a build whose search payload carries no popularity behaves
  * exactly as it did before.
  */
+/**
+ * How much of a claim a candidate has on a bare name. Higher is better known.
+ *
+ * AUDIENCE FIRST, POPULARITY SECOND. TMDB popularity is a decaying
+ * this-week number, so a running series outranks the film an unqualified name
+ * overwhelmingly refers to — deployed, "Which Taken did you mean?" offered the
+ * 2017 series ahead of the 2008 film for exactly that reason. Vote count is
+ * cumulative: it measures how many people have ever had an opinion, which is
+ * what "the one people mean" actually is. Popularity stays as the tie-break
+ * because it is the only signal some payloads carry, and year stays beneath it
+ * so a build with neither behaves as it always did.
+ *
+ * Both are DISPLAY signals. Neither is consulted by `resolveAnchor`, where
+ * popularity-as-identity is the defect `anchor.ts` exists to prevent.
+ */
+function prominence(o: AnchorOption): [number, number, number] {
+  return [o.audience ?? 0, o.recognisability ?? 0, o.year ?? 0];
+}
+
 export function rankOptions(options: readonly AnchorOption[]): AnchorOption[] {
   return [...options]
-    .sort(
-      (a, b) =>
-        (b.recognisability ?? 0) - (a.recognisability ?? 0) ||
-        (b.year ?? 0) - (a.year ?? 0) ||
-        a.tmdbId - b.tmdbId,
-    )
+    .sort((a, b) => {
+      const [aa, ar, ay] = prominence(a);
+      const [ba, br, by] = prominence(b);
+      return ba - aa || br - ar || by - ay || a.tmdbId - b.tmdbId;
+    })
     .slice(0, MAX_CLARIFY_OPTIONS);
 }
 

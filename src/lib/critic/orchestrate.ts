@@ -32,6 +32,7 @@
 
 import type { DnaState } from '@/lib/preference/types';
 import { resolveAnchor, anchorsToObjective, canonicalKey, type AnchorCandidate, type AnchorResolution } from './anchor';
+import { readAnchorSpan } from './anchorSpan';
 import { hydrateAnchors, type DimensionLoader } from './hydrate';
 import { buildPlan, type CriticPlan } from './plan';
 import { planToHints, type CriticRetrievalHints, type HardConstraints } from './retrieval';
@@ -164,8 +165,20 @@ export async function buildCriticState(input: OrchestrateInput): Promise<CriticS
           },
         };
       }
-      const candidates = await searchCandidates(spokenAs).catch(() => [] as AnchorCandidate[]);
-      return resolveAnchor({ spokenAs, mediaType }, candidates);
+      /* THE CUES THE SENTENCE ALREADY CARRIED.
+         `AnchorRequest` has had `year` since GC2 and nothing ever filled it, so
+         "darker than Taken 2008" asked which Taken while holding the answer —
+         and searched TMDB for the string "Taken 2008", which is no title at
+         all. `readAnchorSpan` separates the NAME from the cues wrapped around
+         it; the span-local medium wins over the request's, because "something
+         darker than the Taken movie" says something about the anchor, not
+         about what the user wants back. */
+      const span = readAnchorSpan(spokenAs);
+      const candidates = await searchCandidates(span.title).catch(() => [] as AnchorCandidate[]);
+      return resolveAnchor(
+        { spokenAs, matchTitle: span.title, mediaType: span.mediaType ?? mediaType, year: span.year },
+        candidates,
+      );
     }),
   );
 

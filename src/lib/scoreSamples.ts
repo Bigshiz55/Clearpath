@@ -7,6 +7,7 @@ import { computeStandardScore, type SourceReading } from '@/lib/scoring/standard
 import { STANDARD_WEIGHTS } from '@/lib/scoring/standardWeights';
 import type { CalibrationSample } from '@/lib/scoring/calibrateStandardScore';
 import { getCachedDimensions } from '@/lib/titleDimensions';
+import { fingerprintKey } from '@/lib/taste/fingerprint';
 import { buildProfile, dimensionMatch, type TitleDimensions } from '@/lib/scoring/dimensions';
 import type { RerankSample } from '@/lib/scoring/reranker';
 
@@ -147,7 +148,7 @@ export async function collectRerankSamples(
   if (rows.length === 0) return { samples: [], stats: { total: 0, usable: 0, users: 0, liked: 0 } };
 
   const dims = await getCachedDimensions(rows.map((r) => ({ tmdb_id: r.tmdbId, media_type: r.mediaType })));
-  const keyOf = (r: { mediaType: MediaType; tmdbId: number }) => `${r.mediaType}-${r.tmdbId}`;
+  const keyOf = (r: { mediaType: MediaType; tmdbId: number }) => fingerprintKey(r);
 
   // A dimension profile per user, from THEIR fingerprinted rated titles.
   const byUser = new Map<string, Row[]>();

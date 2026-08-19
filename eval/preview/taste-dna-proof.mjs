@@ -134,6 +134,23 @@ const QUERIES = [
      cannot be the same list. */
   { id: 'Q23', text: 'I want a thriller that drags', kind: 'pace · stated slow', expect: { minItems: 2 } },
   { id: 'Q24', text: 'I want a thriller, nothing that drags', kind: 'pace · vetoed slow', expect: { minItems: 2, differsFrom: 'Q23' } },
+
+  /* ── THE CONVERSATIONAL FRONT DOOR, AS PEOPLE ACTUALLY TYPE ───────────
+     Not new mechanisms — the same ones, reached through sentences that carry
+     background, a stated preference, someone else's opinion, or an explicit
+     disambiguating cue. A hand-authored expected answer would prove nothing
+     here; what is checked is that the real path still produces an answer of
+     the right SHAPE. */
+  { id: 'Q25', text: 'I liked Rocky a few weeks ago. I’m looking for another boxing movie.', kind: 'NL · taste + request', expect: { minItems: 2, media: 'movie' } },
+  { id: 'Q26', text: 'I had a beef burrito for dinner and I want a smart thriller.', kind: 'NL · background + request', expect: { minItems: 2 } },
+  /* THE CUE HAS TO REACH THE ANSWER, not merely produce one. "some verdict came
+     back" would pass even if the medium and the year were thrown away, which is
+     precisely the defect: `AnchorRequest.year` existed for two releases and
+     nothing filled it. So the contract names the field the cue governs. */
+  { id: 'Q27', text: 'the Taken movie', kind: 'NL · explicit medium cue', expect: { verdict: { mediaType: 'movie' } } },
+  { id: 'Q28', text: 'Taken 2008', kind: 'NL · explicit year cue', expect: { verdict: { year: 2008 } } },
+  { id: 'Q29', text: 'anything except horror', kind: 'NL · bare exclusion', expect: { minItems: 2 } },
+  { id: 'Q30', text: 'my wife hated it but I liked it', kind: 'NL · third-party opinion, not the user’s taste', expect: { notASearch: true } },
 ];
 
 /** Cross-query contracts, evaluated once every answer is in hand. */
@@ -149,6 +166,13 @@ const pct = (xs, p) => {
   const s = [...xs].sort((a, b) => a - b);
   return s[Math.min(s.length - 1, Math.max(0, Math.ceil((p / 100) * s.length) - 1))];
 };
+
+/** Request-fit: the channel that orders by how squarely a title answers the ask. */
+function relevanceOf(item) {
+  const r = item.relevance;
+  if (!r) return { participated: false, nudge: 0, reason: null };
+  return { participated: Boolean(r.participated), nudge: r.nudge ?? 0, reason: r.reason ?? null };
+}
 
 function evidenceOf(item) {
   const p = item.personal;
@@ -339,11 +363,26 @@ async function main() {
          a regression, not a fix, if it silenced these. */
       else if ((q.expect ?? {}).verdict) {
         const v = body.verdict ?? null;
-        const ok = body.kind === 'title' && v != null && typeof v.title === 'string';
-        console.log(`  CONTRACT a verdict on the named title: ${ok ? `PASS (${v?.title}${v?.year ? ` (${v.year})` : ''} — ${v?.primaryCall ?? '?'} at ${v?.matchScore ?? '?'})` : `FAIL (kind=${body.kind ?? '?'})`}`);
+        const want = (q.expect ?? {}).verdict;
+        const shape = body.kind === 'title' && v != null && typeof v.title === 'string';
+        /* An object expectation names the FIELDS the sentence's cues govern.
+           `true` keeps the original contract: a named title comes back as a
+           verdict rather than a grid. */
+        const cues = typeof want === 'object'
+          ? Object.entries(want).filter(([k, expected]) => v?.[k] !== expected)
+          : [];
+        const ok = shape && cues.length === 0;
+        const cueNote = typeof want === 'object'
+          ? ` · cues ${cues.length === 0 ? 'honoured' : `IGNORED: ${cues.map(([k, e]) => `${k} wanted ${e}, got ${JSON.stringify(v?.[k])}`).join('; ')}`}`
+          : '';
+        console.log(`  CONTRACT a verdict on the named title: ${ok ? `PASS (${v?.title}${v?.year ? ` (${v.year})` : ''} — ${v?.primaryCall ?? '?'} at ${v?.matchScore ?? '?'})${cueNote}` : `FAIL (kind=${body.kind ?? '?'})${cueNote}`}`);
         if (!ok) {
           explainShortfall(body);
-          fail(`${q.id} "${q.text}": a named title did not come back as a verdict.`);
+          fail(
+            shape
+              ? `${q.id} "${q.text}": the verdict ignored a cue the sentence carried — ${cues.map(([k, e]) => `${k} wanted ${e}, got ${JSON.stringify(v?.[k])}`).join('; ')}.`
+              : `${q.id} "${q.text}": a named title did not come back as a verdict.`,
+          );
         }
       }
       else if ((q.expect ?? {}).comparativeRoundTrip) {
@@ -410,7 +449,24 @@ async function main() {
       };
     });
 
+    /* EVIDENCE COVERAGE, EVERY QUERY. The prior closure measured "0 of 43
+       fingerprinted" once, by hand, on one comparative request. Coverage is an
+       operational fact that moves, so it is reported for every answer: how many
+       titles the personal channel could say anything about, and how many the
+       request-fit channel could. */
+    const personalCovered = items.filter((i) => i.personal?.participated).length;
+    const relevanceCovered = items.filter((i) => i.relevance?.participated).length;
     console.log(`  ${items.length} items · ${ms}ms · kind=${body.kind ?? '?'}`);
+    console.log(
+      `  EVIDENCE COVERAGE  personal ${personalCovered}/${items.length}` +
+      ` · request-fit ${relevanceCovered}/${items.length}` +
+      `${body.diagnostics?.critic ? ` · critic fingerprints ${body.diagnostics.critic.fingerprinted}/${body.diagnostics.critic.candidates} (read: ${body.diagnostics.critic.evidence ?? '?'})` : ''}`,
+    );
+    const relMoved = items.filter((i) => (i.relevance?.nudge ?? 0) !== 0);
+    if (relMoved.length > 0) {
+      console.log(`  REQUEST FIT moved ${relMoved.length} title(s); strongest: ${relMoved.slice(0, 3).map((i) => `${String(i.title).slice(0, 26)} ${i.relevance.nudge > 0 ? '+' : ''}${i.relevance.nudge}`).join(' · ')}`);
+      for (const i of relMoved.slice(0, 2)) if (i.relevance.reason) console.log(`    said: ${i.relevance.reason}`);
+    }
     console.log(`  ${'title'.padEnd(34)} ${'obj#'.padStart(4)} ${'objSc'.padStart(6)} ${'per#'.padStart(4)} ${'perSc'.padStart(6)} ${'move'.padStart(5)}  evidence`);
     for (const r of rows) {
       const e = r.evidence;
@@ -482,9 +538,20 @@ async function main() {
     // ── NO-DNA CONTROL, when this account turns out to have no DNA ─────────
     const participation = rows.filter((r) => r.evidence.participated).length;
     if (participation === 0) {
+      /* TWO THINGS MAY LEGITIMATELY REORDER AN ANSWER, and both must declare
+         themselves. Taste is one; how squarely a title answers the request is
+         the other, and it reports `relevance.participated` per item exactly so
+         that a reorder can never be unattributed. Anything else moving the
+         order with nothing claiming responsibility is the failure this control
+         exists to catch. */
       const identical = objective.every((k, i) => k === personalized[i]);
-      console.log(`  NO-DNA CONTROL: participated=false on all ${rows.length}; order identical to objective: ${identical ? 'PASS' : 'FAIL'}`);
-      if (!identical) fail(`${q.id}: no DNA participated, yet the order differs from the objective sort.`);
+      const attributed = relevanceCovered > 0;
+      const ok = identical || attributed;
+      console.log(
+        `  UNATTRIBUTED-REORDER CONTROL: no taste participated; order ${identical ? 'identical to objective' : 'differs'}` +
+        `${identical ? '' : ` and request-fit claims ${relevanceCovered}/${items.length}`}: ${ok ? 'PASS' : 'FAIL'}`,
+      );
+      if (!ok) fail(`${q.id}: the order changed and nothing claimed responsibility for it.`);
     }
 
     report.queries.push({

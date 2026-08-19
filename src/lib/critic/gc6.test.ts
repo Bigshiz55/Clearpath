@@ -334,7 +334,14 @@ describe('GC6 · identity and the real call site', () => {
   it('20 · the production Ask path hydrates candidate dims cache-only', () => {
     const route = readFileSync('src/app/api/ask/route.ts', 'utf8');
     const criticBlock = route.slice(route.indexOf('runStrands('), route.indexOf('// 1) Named-title'));
-    expect(criticBlock).toContain('getCachedDimensions');
+    /* CACHE-ONLY IS THE CONTRACT, and it is stated as the two halves that
+       matter rather than as one function's name: a reader that never
+       classifies, and no classifying call anywhere in the block. `readCached
+       Dimensions` is that reader — `getCachedDimensions` is now a thin wrapper
+       over it — and it additionally reports whether the read HAPPENED, so a
+       count of zero fingerprints cannot be mistaken for an empty catalog. */
+    expect(criticBlock).toMatch(/\b(read|get)CachedDimensions\b/);
+    expect(criticBlock, 'a classifying call on the request path').not.toMatch(/getTitleDimensions|classify\(/);
     expect(criticBlock).toContain('rankCriticCandidates');
   });
 

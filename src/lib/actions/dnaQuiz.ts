@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { recordEvents, undoEvent } from '@/lib/preference/store';
 import { getCachedDimensions } from '@/lib/titleDimensions';
+import { fingerprintKey } from '@/lib/taste/fingerprint';
 import { quizAnswerToEvent, legacyRatingFor, savesToWatchlist, type QuizAnswer } from '@/lib/preference/quizMap';
 import { rateQuizTitle } from '@/lib/actions/quiz';
 import { addToWatchlist } from '@/lib/actions/watchlist';
@@ -49,7 +50,7 @@ export async function recordQuizAnswer(input: z.infer<typeof schema>): Promise<{
   let dims: Record<string, number> | undefined;
   try {
     const map = await getCachedDimensions([{ tmdb_id: a.tmdbId, media_type: a.mediaType }]);
-    dims = map.get(`${a.mediaType}-${a.tmdbId}`) ?? undefined;
+    dims = map.get(fingerprintKey(a)) ?? undefined;
   } catch {
     dims = undefined;
   }

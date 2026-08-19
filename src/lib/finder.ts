@@ -34,6 +34,7 @@ import {
 import { adjudicateSubjectCentrality, type SubjectAdjudicator } from '@/lib/nlu/subjectAdjudicator';
 import { type PersonConstraint } from '@/lib/people/constraint';
 import { personalizeCandidates } from '@/lib/ask/personalRanking';
+import { relevanceSignals } from '@/lib/ask/relevanceSignal';
 import {
   constraintsFromQuery,
   constraintsSatisfied,
@@ -207,6 +208,9 @@ export interface FinderItem {
    *  subject is genuinely eligible (CENTRAL for a strict request), NOT merely
    *  because a keyword matched. Carries the centrality class, confidence, the
    *  real evidence summary, and the rejection reason when it did not qualify. */
+  /** Request-fit movement applied to the ORDER only — never a quality claim.
+   *  Absent/zero whenever the request drew no distinction between candidates. */
+  relevance?: { nudge: number; participated: boolean; reason: string | null };
   subjectEvidence?: {
     constraint: string;
     satisfied: boolean;
@@ -799,12 +803,46 @@ export async function runFinder(
      honest no-op and this sort is byte-identical to the quality sort it
      replaces. */
   const personalizedSurvivors = await personalizeCandidates(supabase, userId, eligibleSurvivors);
-  let items: FinderItem[] = personalizedSurvivors
+
+  /* ── REQUEST FIT JOINS THE ORDER ───────────────────────────────────────
+     `rankScore` was quality plus what we know about the reader, and nothing
+     about what they ASKED. `evaluateSubjectCentrality` has been producing a
+     per-candidate 0..100 on exactly that — is the requested subject central to
+     this title, or merely present — and it was used to filter and to display
+     and never to rank. Two boxing films can be equally good and still differ
+     enormously in how much they are about boxing.
+
+     Centred on this field's own mean, so the average movement is zero: it can
+     promote one candidate over another and cannot lift a whole answer. A field
+     that answers the request equally well produces no movement at all, which
+     for a plain genre browse is the honest outcome — every eligible title
+     satisfies it identically. The card still shows the Match it earned;
+     `relevance` orders and is reported, never displayed as quality. */
+  const relevance = relevanceSignals(
+    personalizedSurvivors.map((i) => ({
+      confidence: i.subjectEvidence ? i.subjectEvidence.confidence : null,
+      centrality: i.subjectEvidence ? i.subjectEvidence.centrality : null,
+    })),
+  );
+  const withRelevance = personalizedSurvivors.map((i, idx) => ({ item: i, rel: relevance[idx]! }));
+  let items: FinderItem[] = withRelevance
     .slice()
-    .sort((a, b) => b.personal.rankScore - a.personal.rankScore)
-    .map((i) => {
-      const { personal, ...rest } = i;
-      return { ...(rest as FinderItem), personal };
+    .sort((a, b) => b.item.personal.rankScore + b.rel.nudge - (a.item.personal.rankScore + a.rel.nudge))
+    .map(({ item, rel }) => {
+      const { personal, ...rest } = item;
+      /* THE COPY FOLLOWS THE ORDER, NOT THE OTHER WAY ROUND. A candidate the
+         request-fit channel actually moved says so, in the reader's terms, on
+         the same receipt strip that already explains why it is here. One a
+         channel did not move claims nothing — an explanation that appears
+         whenever a mechanism exists is decoration, and the reader learns to
+         ignore it. */
+      const receipts = rel.reason ? [...item.receipts, rel.reason] : item.receipts;
+      return {
+        ...(rest as FinderItem),
+        receipts,
+        personal,
+        relevance: { nudge: +rel.nudge.toFixed(2), participated: rel.participated, reason: rel.reason },
+      };
     });
   let relaxed: string | null = null;
 

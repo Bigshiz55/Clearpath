@@ -4,6 +4,11 @@ import { unstable_cache } from 'next/cache';
 import { serverEnv } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTitle } from '@/lib/tmdb/client';
+/* THE KEY THIS MAP IS READ BY, STATED ONCE. Eight modules look titles up in
+   what this function writes, and each of them used to spell the key out. Seven
+   agreed by luck; the eighth wrote a colon where the rest wrote a hyphen and
+   missed on every lookup it ever made. See `dimensionCacheKey.test.ts`. */
+import { fingerprintKey } from '@/lib/taste/fingerprint';
 import {
   DIMENSIONS,
   DIMENSION_KEYS,
@@ -126,34 +131,92 @@ export async function getTitleDimensions(meta: TitleMetadata): Promise<TitleDime
   return dims;
 }
 
+/**
+ * WHETHER THE ANSWER IS "NOTHING IS THERE" OR "WE COULD NOT LOOK".
+ *
+ * Every read below used to collapse three different outcomes into one empty
+ * Map: the table holds no row for these titles, the table does not exist, and
+ * the service-role client could not be built at all. The caller then reports
+ * zero fingerprints, and the comparative path tells the reader "none of them
+ * has a profile on file yet" — which is a statement of FACT about the catalog
+ * that we may have no standing to make. A product that cannot tell a miss from
+ * an outage will eventually say something false with complete confidence.
+ *
+ * `ok` means the read happened and this is what the catalog holds. `unavailable`
+ * means it did not happen; the count is not evidence of anything.
+ */
+export type DimensionCacheStatus = 'ok' | 'unavailable';
+
+export interface CachedDimensionsResult {
+  dims: Map<string, TitleDimensions>;
+  status: DimensionCacheStatus;
+  /** How many distinct titles were asked about — the denominator for coverage. */
+  requested: number;
+}
+
 /** Read a cached fingerprint only (never classifies) — for building profiles cheaply. */
 async function getCachedDimsBatch(
   admin: ReturnType<typeof createAdminClient>,
   keys: { tmdb_id: number; media_type: MediaType }[],
 ): Promise<Map<string, TitleDimensions>> {
+  return (await readCachedDimsBatch(admin, keys)).dims;
+}
+
+async function readCachedDimsBatch(
+  admin: ReturnType<typeof createAdminClient>,
+  keys: { tmdb_id: number; media_type: MediaType }[],
+): Promise<CachedDimensionsResult> {
   const out = new Map<string, TitleDimensions>();
-  if (keys.length === 0) return out;
+  const requested = new Set(keys.map((k) => fingerprintKey({ mediaType: k.media_type, tmdbId: k.tmdb_id }))).size;
+  if (keys.length === 0) return { dims: out, status: 'ok', requested };
   try {
     const ids = Array.from(new Set(keys.map((k) => k.tmdb_id)));
-    const { data } = await admin.from('title_dimensions').select('tmdb_id, media_type, dims').in('tmdb_id', ids);
+    const { data, error } = await admin.from('title_dimensions').select('tmdb_id, media_type, dims').in('tmdb_id', ids);
+    /* A postgrest ERROR is not an empty catalog. The table can be missing, the
+       key can be wrong, RLS can refuse — all of which arrive here as `error`
+       with `data` null, and all of which used to read as "no title has a
+       fingerprint". */
+    if (error) return { dims: out, status: 'unavailable', requested };
     for (const row of data ?? []) {
-      if (isValidDimensions(row.dims)) out.set(`${row.media_type}-${row.tmdb_id}`, row.dims as TitleDimensions);
+      if (isValidDimensions(row.dims))
+        out.set(
+          fingerprintKey({ mediaType: row.media_type as MediaType, tmdbId: row.tmdb_id as number }),
+          row.dims as TitleDimensions,
+        );
     }
   } catch {
-    /* table missing → empty */
+    return { dims: out, status: 'unavailable', requested };
   }
-  return out;
+  return { dims: out, status: 'ok', requested };
+}
+
+/**
+ * Read cached fingerprints for a set of titles (never classifies), reporting
+ * whether the read actually happened. Prefer this wherever the ABSENCE of a
+ * fingerprint is about to be told to a user or counted as a measurement.
+ */
+export async function readCachedDimensions(
+  keys: { tmdb_id: number; media_type: MediaType }[],
+): Promise<CachedDimensionsResult> {
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    // No service-role key on this deployment: we did not look.
+    return {
+      dims: new Map(),
+      status: 'unavailable',
+      requested: new Set(keys.map((k) => fingerprintKey({ mediaType: k.media_type, tmdbId: k.tmdb_id }))).size,
+    };
+  }
+  return readCachedDimsBatch(admin, keys);
 }
 
 /** Read cached fingerprints for a set of titles (never classifies). Empty on any miss. */
 export async function getCachedDimensions(
   keys: { tmdb_id: number; media_type: MediaType }[],
 ): Promise<Map<string, TitleDimensions>> {
-  try {
-    return await getCachedDimsBatch(createAdminClient(), keys);
-  } catch {
-    return new Map();
-  }
+  return (await readCachedDimensions(keys)).dims;
 }
 
 /** Read the user's manual dial corrections (guarded — table missing = none). */
@@ -237,7 +300,9 @@ async function computeUserProfile(userId: string, backfill: boolean): Promise<Di
   // whatever fingerprints are already cached, which is a smaller profile, never
   // a wrong one.
   const missing = backfill
-    ? rows.filter((r) => !dimsByKey.has(`${r.media_type}-${r.tmdb_id}`)).slice(0, BACKFILL_CAP)
+    ? rows
+        .filter((r) => !dimsByKey.has(fingerprintKey({ mediaType: r.media_type as MediaType, tmdbId: r.tmdb_id as number })))
+        .slice(0, BACKFILL_CAP)
     : [];
   if (missing.length > 0) {
     const filled = await Promise.all(
@@ -256,7 +321,7 @@ async function computeUserProfile(userId: string, backfill: boolean): Promise<Di
 
   const pairs = rows
     .map((r) => {
-      const dims = dimsByKey.get(`${r.media_type}-${r.tmdb_id}`);
+      const dims = dimsByKey.get(fingerprintKey({ mediaType: r.media_type as MediaType, tmdbId: r.tmdb_id as number }));
       return dims ? { dims, rating: r.rating } : null;
     })
     .filter((x): x is { dims: TitleDimensions; rating: number } => x !== null);

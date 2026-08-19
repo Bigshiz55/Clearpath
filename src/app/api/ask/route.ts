@@ -24,7 +24,7 @@ import { resolveAnchor } from '@/lib/critic/anchor';
 import { runStrands } from '@/lib/critic/strands';
 import { rankCriticCandidates } from '@/lib/critic/decide';
 import { buildComparativeExplanation } from '@/lib/critic/explain';
-import { getCachedDimensions } from '@/lib/titleDimensions';
+import { getCachedDimensions, readCachedDimensions } from '@/lib/titleDimensions';
 import { loadPreferenceCached } from '@/lib/preference/store';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
@@ -461,6 +461,7 @@ export async function POST(req: Request) {
             year: c.year ?? null,
             // Display order for the clarification only — never identity.
             recognisability: c.popularity ?? null,
+            audience: c.voteCount ?? null,
           })),
         // GC3, cache-only. A miss costs the anchor its authority, nothing more.
         loadDimensions: getCachedDimensions,
@@ -538,9 +539,10 @@ export async function POST(req: Request) {
          `mediaType + tmdbId`. No classifier, no per-title AI call, no title
          string. A candidate the classifier has not reached yet simply
          contributes nothing — it is never read as a neutral 50. */
-      const candidateDims = await getCachedDimensions(
+      const candidateEvidence = await readCachedDimensions(
         strandRun.items.map((i) => ({ tmdb_id: i.id, media_type: i.mediaType })),
       );
+      const candidateDims = candidateEvidence.dims;
 
       /* decisionScore = matchScore + planNudge, and nothing else.
          `matchScore` already carries general quality + the user's DURABLE
@@ -631,10 +633,19 @@ export async function POST(req: Request) {
          was asked for. */
       const fingerprinted = ranked.decisions.filter((d) => d.fingerprinted).length;
       if (!ranked.applied) {
+        /* THREE DIFFERENT TRUTHS, AND ONLY ONE OF THEM IS ABOUT THE CATALOG.
+           "None of these has a profile yet" is a claim about what we HOLD, and
+           we may have no standing to make it: an unreachable service-role
+           client and a missing table both used to arrive here as zero
+           fingerprints, indistinguishable from an honest miss. `readCached
+           Dimensions` now reports whether the read happened, so a system that
+           could not look says so instead of asserting an absence. */
         criticNotes.push(
-          fingerprinted === 0
-            ? `I couldn't apply "${criticRequest.referenceTitles.join(' or ')}" to these — none of them has a profile on file yet, so this is ranked by quality.`
-            : `That comparison didn't separate these titles — this is ranked by quality.`,
+          candidateEvidence.status === 'unavailable'
+            ? `I couldn't check what I know about these titles just now, so this is ranked by quality rather than by your comparison.`
+            : fingerprinted === 0
+              ? `I couldn't apply "${criticRequest.referenceTitles.join(' or ')}" to these — none of them has a profile on file yet, so this is ranked by quality.`
+              : `That comparison didn't separate these titles — this is ranked by quality.`,
         );
       }
       return NextResponse.json(
@@ -658,6 +669,9 @@ export async function POST(req: Request) {
             critic: {
               candidates: ranked.decisions.length,
               fingerprinted,
+              /* `ok` = this is what the catalog holds. `unavailable` = we did
+                 not look, so `fingerprinted` measures nothing. */
+              evidence: candidateEvidence.status,
               eligible: ranked.eligible,
               applied: ranked.applied,
               authority: ranked.authority,

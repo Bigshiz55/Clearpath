@@ -168,7 +168,17 @@ describe('the card does not repeat its own metadata', () => {
   });
 
   it('the fallback needs a real profile behind it', () => {
-    expect(reasons).toContain("(input.ratedCount ?? 0) > 0");
+    /* PINNED TO THE CONTRACT, NOT TO THE SPELLING. This read
+       `(input.ratedCount ?? 0) > 0` verbatim, so it broke the moment the gate
+       got STRICTER — the floor moved from "has rated anything" to the repo's
+       declared `MIN_SAMPLES_FOR_FIT`, which is the same requirement stated
+       properly. A structural test that names an expression instead of the rule
+       it enforces fails on improvements as loudly as on regressions. */
+    expect(reasons).toMatch(/MIN_SAMPLES_FOR_FIT/);
+    expect(reasons, 'the "your …" claims must all answer to one gate').toMatch(
+      /const profiled = \(input\.ratedCount \?\? 0\) >= MIN_SAMPLES_FOR_FIT/,
+    );
+    expect(reasons).not.toMatch(/\(input\.ratedCount \?\? 0\) > 0/);
   });
 
   it('the card no longer needs an exclusion list to avoid duplicating itself', () => {
