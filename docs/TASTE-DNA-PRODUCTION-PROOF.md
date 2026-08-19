@@ -1,11 +1,45 @@
 # PHASE 1 PRODUCTION PROOF — THE PROCEDURE, AND WHY THIS SESSION COULD NOT RUN IT
 
-## STATUS: **NOT PRODUCTION-PROVEN.** Blocked on authentication.
+## STATUS: **NOT PRODUCTION-PROVEN.** Two halves; one is closed.
 
-Phase 1 is merged and deployed. Whether it *changes what a real reader sees* is
-unproven, and nothing in this document should be read as claiming otherwise.
+Phase 1 is merged and deployed. A real deployment has now been measured as a
+real signed-in user (see **DEPLOYED-RUNTIME EVIDENCE** below), which closes the
+safety and control half. What remains unproven is the half that matters most to
+the product: that a reader with stored Taste DNA gets a *different order*.
+Nothing here should be read as claiming otherwise.
 
 ---
+
+## DEPLOYED-RUNTIME EVIDENCE — captured, and what it does not cover
+
+`eval/preview/taste-dna-proof.mjs`, run by the `taste-dna-proof` CI job against
+a **preview deployment at the same code**, signed in as the real preview
+identity through the existing `preview-test-login` route. Real Supabase, real
+TMDB, real `/api/ask`. No application module is imported and nothing is mocked.
+
+**No production surface was added to do this.** `/api/ask` already spreads the
+whole `FinderItem`, so `matchScore` — the objective score, which personalization
+never modifies — rides in the same response as `personal.rankScore` and
+`personal.evidence`. A founder diagnostic route would only have re-exposed
+fields the product already returns, and would then have had to be removed.
+
+Run at `3f9547c`, 28 items over 3 queries:
+
+| claim | result |
+|---|---|
+| membership unchanged before vs after taste | **PASS** on all three queries |
+| no movement outside the ±18 ceiling | **PASS** |
+| no-DNA control preserves the objective order | **PASS** — `participated:false` on all 28, order byte-identical |
+| hard constraint holds | `three Sylvester Stallone movies` → exactly 3, all Stallone (Rocky, Creed, The Suicide Squad — he voices King Shark) |
+| latency, steady state | 1.2–1.8s p95 per query; only the first (cold) call was 5.5–6.7s |
+
+**What this does NOT cover, and why:**
+
+1. **No reordering was observed**, because the preview identity has no stored
+   Taste DNA. That is an honest no-op, not a failure — but it means the feature's
+   *effect* is still unobserved on any deployment. Seeding DNA is forbidden and
+   would prove nothing about real readers anyway.
+2. **It is preview, not production.** Same code, different deployment.
 
 ## THE BLOCKER, EXACTLY
 
@@ -144,4 +178,6 @@ is Phase 1 production-proven.
 | taste cannot change membership | proven | `personalizeCandidates` maps 1:1; `qualifyCandidates` order-independence pinned in `hardConstraints.test.ts` |
 | no paid AI call from Ask | proven | `titleDimensions.backfill.test.ts` watches the network on the real module |
 | the ±18 ceiling | proven | pinned as the empirical maximum movement |
-| **a real reader's production results change** | **UNPROVEN** | needs step 3 above |
+| membership/ceiling/no-DNA control on a real deployment | proven | `taste-dna-proof` CI job, preview @ `3f9547c` |
+| **a reader with DNA gets a different order** | **UNPROVEN** | no account with stored DNA was reachable |
+| **any of it on PRODUCTION** | **UNPROVEN** | needs step 3 above |
