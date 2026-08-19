@@ -242,18 +242,37 @@ export async function POST(req: Request) {
       convInterpretation = [...convInterpretation, ...turn.interpretation];
       convClarify = turn.clarify;
     }
-    /** Attach the conversation envelope to any response in conversation mode. */
-    const withConv = (payload: Record<string, unknown>) =>
-      conversational && convState
-        ? {
-            ...payload,
-            conversation: convState,
-            chips: chipsFor(convState),
-            interpretation: convInterpretation,
-            clarify: convClarify,
-            userKey,
-          }
-        : payload;
+    /**
+     * Attach the conversation envelope to any response in conversation mode.
+     *
+     * IT MERGES; IT DOES NOT CLOBBER. Both `interpretation` and `clarify` used
+     * to sit AFTER the spread, so the envelope silently overwrote whatever the
+     * branch had decided — and review caught two live consequences of that at
+     * once. A statement's acknowledgement was replaced by `convClarify` (null),
+     * so mid-conversation "My wife likes comedies." answered with the client's
+     * fallback question, "Which title did you mean?". And the critic's "this is
+     * ranked by quality" note was replaced by the conversation's own lines, so
+     * the disclosure this branch exists to make vanished in exactly the mode a
+     * real user is most likely to be in.
+     *
+     * The envelope's job is to ADD conversation context. What a branch chose to
+     * say is not context, so the branch's own words win: its interpretation
+     * lines are appended (deduped, because the critic path deliberately builds
+     * a list that already contains the conversation's), and its `clarify` is
+     * used when it set one at all.
+     */
+    const withConv = (payload: Record<string, unknown>) => {
+      if (!(conversational && convState)) return payload;
+      const own = Array.isArray(payload.interpretation) ? (payload.interpretation as string[]) : [];
+      return {
+        ...payload,
+        conversation: convState,
+        chips: chipsFor(convState),
+        interpretation: [...convInterpretation, ...own.filter((line) => !convInterpretation.includes(line))],
+        clarify: payload.clarify ?? convClarify,
+        userKey,
+      };
+    };
 
     // 0.5) A question about the USER'S OWN history is answered from their list,
     // never from the general catalog — "What haven't I finished?" was returning
