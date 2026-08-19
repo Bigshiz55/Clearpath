@@ -47,6 +47,18 @@ const DIM_NUDGE_MAX = 8;
 const DIM_NUDGE_SLOPE = 0.16;
 
 /**
+ * Ratings at which the fingerprint channel is trusted in full.
+ *
+ * Chosen from the measurement, not from taste: the harness showed the ceiling
+ * was never the binding constraint (the widest base gap a weaker title crossed
+ * was 7 points against a cap of 18), while evidence DEPTH was not consulted at
+ * all. A linear ramp to twenty ratings keeps a first-session profile from
+ * reordering a field as hard as a long-established one, and leaves an
+ * established reader exactly where they were.
+ */
+const FULL_CONFIDENCE_SAMPLES = 20;
+
+/**
  * The most the personal term may move a title, in either direction.
  *
  * Deliberately smaller than a decisive quality gap: a 90 the user dislikes must
@@ -71,6 +83,16 @@ export interface PersonalInputs {
   concerns: ExplainReason[];
   /** 0..100 — how one-sided and well-evidenced the explanation is. */
   explainConfidence: number;
+  /**
+   * How many rated titles the dimension profile was built from.
+   *
+   * MEASURED DEFECT: this was consulted only as a binary gate, so a profile
+   * built from ONE rating moved a title exactly as far as one built from four
+   * hundred — `scripts/measure/scoreDistribution.ts` produced byte-identical
+   * distributions at samples=3 and samples=40. Omitted means "already
+   * confident", which preserves every caller that predates this.
+   */
+  profileSamples?: number;
 }
 
 export interface PersonalEvidence {
@@ -94,10 +116,17 @@ export interface PersonalSignal {
 }
 
 export function personalSignal(input: PersonalInputs): PersonalSignal {
+  /* Evidence depth scales the fingerprint channel. The explicit-preference
+     channel is NOT scaled: a preference the reader stated outright is not a
+     statistical estimate that needs more samples to be trusted. */
+  const depth =
+    input.profileSamples == null
+      ? 1
+      : Math.max(0, Math.min(1, input.profileSamples / FULL_CONFIDENCE_SAMPLES));
   const dimN =
     input.dimMatch == null
       ? 0
-      : Math.max(-DIM_NUDGE_MAX, Math.min(DIM_NUDGE_MAX, (input.dimMatch - 50) * DIM_NUDGE_SLOPE));
+      : Math.max(-DIM_NUDGE_MAX, Math.min(DIM_NUDGE_MAX, (input.dimMatch - 50) * DIM_NUDGE_SLOPE)) * depth;
   const prefN = Math.max(-PREF_NUDGE_MAX, Math.min(PREF_NUDGE_MAX, input.prefNudge));
 
   /* PARTICIPATION IS EVIDENCE, NOT VOLUME. A fingerprint we hold, a preference
