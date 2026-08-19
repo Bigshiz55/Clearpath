@@ -27,6 +27,10 @@
 export interface WhyInput {
   /** Dimensions the user's rated history agrees with, strongest first. */
   tasteAgreements?: string[];
+  /** Axes of this title that CLASH with what the reader rates highly. The
+   *  honest half of the same evidence — `/api/dna` has always returned it as
+   *  `fit.clash`, and the card dropped it on the floor. */
+  tasteConcerns?: string[];
   /** The title's own genres — used ONLY for the honest general fallback. */
   genres?: string[];
   /**
@@ -68,6 +72,7 @@ export interface WhyInput {
 
 export type ReasonKind =
   | 'taste'
+  | 'concern'
   | 'household'
   | 'similar'
   | 'person'
@@ -102,6 +107,11 @@ const RANK: Record<ReasonKind, number> = {
   airing: 9,
   trending: 10,
   new: 11,
+  /* A concern QUALIFIES the case for a title; it never leads it. Ranked after
+     every positive reason so the reader sees why it fits before why it might
+     not, and ahead of the generic fallback so a real caution is never crowded
+     out by "matches your general drama preferences". */
+  concern: 12,
   general: 99,
 };
 
@@ -184,6 +194,15 @@ export function buildWhyReasons(input: WhyInput): Reason[] {
       kind: 'general',
       text: `Matches your general ${joinNatural(genres.map((g) => g.toLowerCase()))} preferences`,
     });
+  }
+
+  /* THE HONEST HALF. Capped at one — a card is a summary, not an audit — and
+     gated on real rated history for the same reason the taste reason is: with
+     nothing on file there is no personal ground to stand a caution on, and
+     inventing one is the same dishonesty as inventing praise. */
+  const concerns = (input.tasteConcerns ?? []).filter(Boolean);
+  if (concerns.length > 0 && (input.ratedCount ?? 0) > 0) {
+    out.push({ kind: 'concern', text: `Heads up: ${concerns[0]}` });
   }
 
   return out.sort((a, b) => RANK[a.kind] - RANK[b.kind]);

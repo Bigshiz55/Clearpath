@@ -52,6 +52,10 @@ export function WhyThisTitle({
           buildWhyReasons({
             // `agree` is already ordered strongest-first by the DNA engine.
             tasteAgreements: (dna?.fit?.agree ?? []).map((a) => a.label),
+            /* `clash` has always come back beside `agree` and was dropped here,
+               so a reader saw only the case FOR a title. A recommender that can
+               only praise is one people learn not to trust. */
+            tasteConcerns: (dna?.fit?.clash ?? []).map((c) => c.label),
             // `episodeRuntimeMinutes` FIRST. A series carries its per-episode
             // length there and leaves `runtimeMinutes` null — CSI: NY and
             // Harrow both do — so reading only the latter silently dropped the
@@ -83,8 +87,15 @@ export function WhyThisTitle({
         {shown.map((r) => (
           <li
             key={r.kind}
-            data-testid="why-reason"
-            className="rounded-md border border-emerald-400/25 bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-100/90"
+            data-testid={r.kind === 'concern' ? 'why-concern' : 'why-reason'}
+            className={
+              /* A caution must not wear the colour of an endorsement. Amber,
+                 not emerald, and the same compact chip so it qualifies the row
+                 rather than dominating the card. */
+              r.kind === 'concern'
+                ? 'rounded-md border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-100/90'
+                : 'rounded-md border border-emerald-400/25 bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-100/90'
+            }
           >
             {r.text}
           </li>
@@ -106,8 +117,12 @@ export function WhyThisTitle({
           rest.map((r) => (
             <li
               key={r.kind}
-              data-testid="why-reason"
-              className="rounded-md border border-white/12 bg-white/5 px-1.5 py-0.5 text-[11px] text-slate-300"
+              data-testid={r.kind === 'concern' ? 'why-concern' : 'why-reason'}
+              className={
+                r.kind === 'concern'
+                  ? 'rounded-md border border-amber-400/25 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-100/90'
+                  : 'rounded-md border border-white/12 bg-white/5 px-1.5 py-0.5 text-[11px] text-slate-300'
+              }
             >
               {r.text}
             </li>
