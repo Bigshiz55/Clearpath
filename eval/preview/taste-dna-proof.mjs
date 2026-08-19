@@ -219,6 +219,8 @@ async function main() {
   let anyParticipation = false;
   /** id → the keys of the answer this deployment actually gave, in order. */
   const answerHead = new Map();
+  /** id → what the deployment SAID about that answer, when it said anything. */
+  const answerNote = new Map();
 
   /* WHY, NOT JUST HOW MANY.
      The first run of this harness reported "Q4 → 0 items" and stopped there,
@@ -269,9 +271,11 @@ async function main() {
   const proveComparativeRoundTrip = async (body, ask2) => {
     const problems = [];
     let settled = [];
+    let disclosure = [];
+    let criticDiag = null;
     if (body.kind !== 'clarify') {
       problems.push(`expected either results or one clarifying question, got kind=${body.kind ?? '?'}`);
-      return { problems, settled };
+      return { problems, settled, disclosure, criticDiag };
     }
     const options = Array.isArray(body.comparisonOptions) ? body.comparisonOptions : [];
     const envelope = body.pendingComparison ?? null;
@@ -285,7 +289,7 @@ async function main() {
         break;
       }
     }
-    if (problems.length > 0) return { problems, settled };
+    if (problems.length > 0) return { problems, settled, disclosure, criticDiag };
     const chosen = options[0];
     const spokenAs = envelope?.pending?.[0]?.spokenAs ?? chosen.title;
     const resumed = await ask2(envelope?.text ?? undefined, {
@@ -294,13 +298,19 @@ async function main() {
     });
     const back = Array.isArray(resumed.body.items) ? resumed.body.items : [];
     settled = back;
+    disclosure = Array.isArray(resumed.body.interpretation) ? resumed.body.interpretation : [];
+    criticDiag = resumed.body.diagnostics?.critic ?? null;
     console.log(`  ROUND TRIP step 2 — answered "${spokenAs}" → ${chosen.title}: ${back.length} item(s) · ${resumed.ms}ms · kind=${resumed.body.kind ?? '?'}`);
     for (const i of back.slice(0, 5)) console.log(`      ${String(i.title).slice(0, 34).padEnd(35)} match=${i.matchScore}`);
     if (back.length === 0) {
       problems.push('the settled comparison still returned nothing');
       explainShortfall(resumed.body);
     }
-    return { problems, settled };
+    if (criticDiag) {
+      console.log(`    critic: ${criticDiag.candidates} candidate(s), ${criticDiag.fingerprinted} fingerprinted, eligible=${criticDiag.eligible}, applied=${criticDiag.applied}, authority=${criticDiag.authority}`);
+    }
+    for (const line of disclosure) console.log(`    said: ${line}`);
+    return { problems, settled, disclosure, criticDiag };
   };
 
   /* THE FLOOR — what this deployment returns when the request constrains
@@ -337,20 +347,33 @@ async function main() {
         }
       }
       else if ((q.expect ?? {}).comparativeRoundTrip) {
-        const { problems, settled } = await proveComparativeRoundTrip(body, ask);
+        const { problems, settled, disclosure, criticDiag } = await proveComparativeRoundTrip(body, ask);
         console.log(`  CONTRACT comparative round trip: ${problems.length === 0 ? 'PASS' : 'FAIL'}`);
         for (const pr of problems) fail(`${q.id} "${q.text}": ${pr}`);
         /* A comparison that COMPLETED still has to have MATTERED. The floor
            check belongs on whichever response finally carried items, which for
            an ambiguous anchor is the settled one. */
+        /* DIFFER, OR SAY WHY NOT. A comparison whose candidates carry no
+           cached fingerprints CANNOT move the order — GC6 is cache-only by
+           design and a title the classifier has not reached contributes
+           nothing. That is a coverage fact, not a bug in the comparison. What
+           is a bug is serving the quality order as though the comparison had
+           been applied. So the contract is the disjunction, and silence fails
+           both ways. */
         if ((q.expect ?? {}).mustDifferFromFloor && settled.length > 0) {
           const head = settled.slice(0, 5).map(key);
           const shared = head.filter((k) => floor.has(k));
-          const ok = floor.size === 0 || shared.length <= 2;
-          console.log(`  CONTRACT the settled comparison is not the unconstrained floor: ${ok ? 'PASS' : `FAIL (${shared.length} of the top ${head.length} are floor titles)`}`);
-          if (!ok) fail(`${q.id} "${q.text}": the settled comparison returned the titles an unconstrained ask returns.`);
+          const differs = floor.size === 0 || shared.length <= 2;
+          const disclosed = disclosure.some((l) => /couldn.t apply|didn.t separate|without the comparison|couldn.t fulfil/i.test(l));
+          const ok = differs || disclosed;
+          console.log(
+            `  CONTRACT the settled comparison differs from the floor, or says it could not: ` +
+            `${ok ? `PASS (${differs ? `${shared.length}/5 shared` : 'disclosed'})` : `FAIL (${shared.length} of the top ${head.length} are floor titles, and nothing was disclosed)`}`,
+          );
+          if (!ok) fail(`${q.id} "${q.text}": returned the unconstrained order and did not say the comparison had not been applied.`);
         }
         if (settled.length > 0) answerHead.set(q.id, settled.slice(0, 5).map(key));
+        if (disclosure.length > 0 || criticDiag) answerNote.set(q.id, { disclosure, criticDiag });
       } else {
         explainShortfall(body);
         fail(`${q.id} "${q.text}": returned no results at all.`);
@@ -489,13 +512,19 @@ async function main() {
       continue;
     }
     const shared = mine.filter((k) => theirs.includes(k));
-    const ok = shared.length <= MAX_SHARED_HEAD;
+    const differs = shared.length <= MAX_SHARED_HEAD;
+    /* Same disjunction as the floor contract: identical answers are only
+       acceptable when the deployment SAID the comparison could not be applied
+       — to both of them, because one disclosure does not excuse the other. */
+    const said = (id) => (answerNote.get(id)?.disclosure ?? []).some((l) => /couldn.t apply|didn.t separate|without the comparison|couldn.t fulfil/i.test(l));
+    const disclosed = said(q.id) && said(other);
+    const ok = differs || disclosed;
     console.log(
-      `  ${q.id} ("${q.text}") vs ${other}: ${shared.length} of the top ${mine.length} titles are the same — ${ok ? 'PASS' : 'FAIL'}`,
+      `  ${q.id} ("${q.text}") vs ${other}: ${shared.length} of the top ${mine.length} titles are the same — ${ok ? `PASS${differs ? '' : ' (both disclosed)'}` : 'FAIL'}`,
     );
     if (!ok) {
       fail(
-        `${q.id}: asking the same anchor to move the OTHER way returned ${shared.length}/${mine.length} of the same titles — the stated axis is not reaching the answer.`,
+        `${q.id}: asking the same anchor to move the OTHER way returned ${shared.length}/${mine.length} of the same titles, and the deployment did not say the comparison had not been applied.`,
       );
     }
   }

@@ -396,6 +396,8 @@ export async function POST(req: Request) {
          promises an inference can never do. Genres the user genuinely stated
          ("better than X, but a comedy") survive, because only the known title
          spans are removed. */
+      /** Disclosures this comparison owes the reader, whatever the mode. */
+      const criticNotes: string[] = [];
       const constraintText = stripAnchorSpans(text, criticRequest.referenceTitles);
       const criticBase: FinderQuery = conversational && convState
         ? stateToQuery(convState)
@@ -595,7 +597,27 @@ export async function POST(req: Request) {
             ? `I couldn't find anything to compare with ${criticRequest.referenceTitles.join(' or ')} — answering without the comparison.`
             : `I couldn't fulfil that comparison — answering without it.`,
         );
-      } else
+      } else {
+      /* ── A COMPARISON THAT RAN AND MOVED NOTHING MUST SAY SO ───────────
+         The branch above covers the comparison that produced no candidates.
+         This covers the one that produced plenty and changed none of their
+         order — which looks identical to success from the outside and is the
+         failure the deployed proof caught: "darker than X" and "lighter than
+         X" came back as the same 24 titles, in the same order, because not one
+         candidate carried a cached fingerprint for the plan to judge. GC6 is
+         cache-only by design and a title the classifier has not reached
+         contributes nothing; that is correct, and serving the result as though
+         the comparison had been applied is not. Same principle as everywhere
+         else in this route: never present a degraded answer as the thing that
+         was asked for. */
+      const fingerprinted = ranked.decisions.filter((d) => d.fingerprinted).length;
+      if (!ranked.applied) {
+        criticNotes.push(
+          fingerprinted === 0
+            ? `I couldn't apply "${criticRequest.referenceTitles.join(' or ')}" to these — none of them has a profile on file yet, so this is ranked by quality.`
+            : `That comparison didn't separate these titles — this is ranked by quality.`,
+        );
+      }
       return NextResponse.json(
         withConv({
           kind: 'search',
@@ -604,6 +626,24 @@ export async function POST(req: Request) {
           query: criticBase,
           scoredFor: strandRun.scoredFor || 'Your match',
           relaxed: strandRun.relaxed,
+          /* THE NOTES RIDE EVERY RESPONSE, NOT JUST A CONVERSATIONAL ONE.
+             `withConv` attaches `interpretation` only in conversation mode, so
+             a single-shot caller — the deployed proof, and any client that does
+             not send a conversation — never saw the disclosures above at all. A
+             note nobody receives is not a disclosure. */
+          interpretation: [...convInterpretation, ...criticNotes],
+          /* COUNTS ONLY. No prompt, no reasoning, no title strings — the same
+             shape as the finder's funnel, so a comparison that did nothing can
+             be diagnosed from the response instead of from a guess. */
+          diagnostics: {
+            critic: {
+              candidates: ranked.decisions.length,
+              fingerprinted,
+              eligible: ranked.eligible,
+              applied: ranked.applied,
+              authority: ranked.authority,
+            },
+          },
           items: criticItems.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
           // Structured evidence for development — enums, ids, labels and
           // numbers. Never a prompt, never free-text reasoning.
@@ -618,6 +658,7 @@ export async function POST(req: Request) {
               }),
         }),
       );
+      }
       }
     }
 
