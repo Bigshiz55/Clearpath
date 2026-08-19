@@ -114,8 +114,12 @@ describe('B · "movies about X" binds X as a required subject', () => {
      into here, because loosening bare-request classification to accept singular
      nouns is exactly the change that previously turned preference statements
      ("I like Sylvester Stallone movies") into requests. */
-  it('KNOWN LIMIT: an unframed singular request is still read as a statement', () => {
-    expect(interpret('a film about grief').kind).toBe('statement');
+  /* RESOLVED. This was pinned here as a known limit when the aboutness fix
+     landed; the unframed-request work in `unframedRequests.test.ts` closed it.
+     Kept as a regression so the singular form cannot quietly revert. */
+  it('an unframed SINGULAR request now reaches subject extraction too', () => {
+    expect(interpret('a film about grief').kind).toBe('recommendation');
+    expect(interpret('a film about grief').subjects.map((s) => s.span)).toContain('grief');
     expect(interpret('films about grief').kind).toBe('recommendation');
     expect(interpret('show me a film about grief').kind).toBe('recommendation');
   });

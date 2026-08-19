@@ -124,6 +124,50 @@ const PREFERENCE_LEAD =
 const PLURAL_MEDIA =
   /\b(?:movies|films|shows|series|documentaries|flicks|sitcoms|thrillers|dramas|comedies|mysteries)\b/i;
 
+/**
+ * THE SINGULAR UNFRAMED REQUEST — "another boxing movie", "a good mystery".
+ *
+ * `PLURAL_MEDIA` above deliberately refuses the singular, because film titles
+ * ARE singular: accepting "<a> <word> movie" naively turns "A Goofy Movie" into
+ * an order for goofy films. That guard is right, and it also silently discarded
+ * half of ordinary consumer phrasing — measured against the deployed product,
+ * "another boxing movie" and "a thriller that isn't slow" both classified as
+ * statements and reached the finder as background noise.
+ *
+ * The discriminator is not number, it is THREE things at once:
+ *
+ *   1. the clause OPENS with an indefinite determiner  — anchored, so
+ *      "Rocky is a boxing movie", where the identical noun phrase is a
+ *      predicate nominative, is untouched;
+ *   2. it names a medium or a genre;
+ *   3. it is written as ORDINARY PROSE, not as a title.
+ *
+ * (3) is what replaces a title list. A typed title reference carries a Title
+ * Case run ("A Goofy Movie", "The Dark Knight"); a request does not ("a good
+ * mystery"). Single capitals are ignored so "a movie my wife and I would both
+ * like" is unaffected.
+ */
+const INDEFINITE_LEAD = /^\s*(?:another|a|an)\s+/i;
+
+/** Singular OR plural — the thing being asked for, medium or genre. */
+const UNAMBIGUOUS_HEAD =
+  /\b(?:movie|film|series|documentary|documentaries|flick|sitcom|thriller|drama|comedy|comedies|mystery|mysteries|western|musical|romcom)s?\b/i;
+
+/* `show` is NOT in that list, and that exclusion is an existing named
+   regression guard: "a horror show" is ordinary English for a disaster, and
+   `show` is also the request verb. It is admitted only when a relative or
+   modifier clause disambiguates it — "a show MY FAMILY CAN WATCH" is a
+   request in a way "a horror show" is not. */
+const AMBIGUOUS_HEAD = /\bshows?\b/i;
+const QUALIFYING_CLAUSE =
+  /\b(?:that|which|who|whom)\b|\b(?:my|our)\s+[\w-]+\s+(?:can|could|would|will|might)\b/i;
+
+const namesAMediumOrGenre = (t: string): boolean =>
+  UNAMBIGUOUS_HEAD.test(t) || (AMBIGUOUS_HEAD.test(t) && QUALIFYING_CLAUSE.test(t));
+
+/** Two or more capitalised words in a row — how a title is written. */
+const TITLE_CASE_RUN = /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/;
+
 /** A clause that opens by talking about the speaker is autobiography until
  *  something else proves otherwise — and every genuine first-person request
  *  ("I want…", "I'm looking for…") is already caught by `REQUEST_VERB` above. */
@@ -220,8 +264,15 @@ export function classifyClause(text: string): ClauseRole {
      must not be allowed to claim a clause that is plainly an order. Evaluated
      here and consumed twice: once to stop `COMPANION` swallowing a request,
      and once as the classification itself further down. */
+  /* Two shapes of the same thing: a plural media noun anywhere, or an
+     indefinite phrase in clause-initial position. They share every guard
+     below, so neither can bypass preference/reaction/familiarity detection. */
+  const namesWhatIsWanted =
+    PLURAL_MEDIA.test(t) ||
+    (INDEFINITE_LEAD.test(t) && namesAMediumOrGenre(t) && !TITLE_CASE_RUN.test(t));
+
   const bareRequest =
-    PLURAL_MEDIA.test(t) &&
+    namesWhatIsWanted &&
     !FIRST_PERSON_LEAD.test(t) &&
     !POSSESSIVE_STATEMENT.test(t) &&
     !REACTION.test(t) &&
