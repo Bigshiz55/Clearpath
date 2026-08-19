@@ -74,8 +74,36 @@ export interface MappedIntent {
  * "romantic" and "supernatural" — consuming it here preserves those exact
  * readings instead of growing a second vocabulary that would drift.
  */
-const genreIdFor = (name: string): number | null =>
-  PARSE_GENRE_IDS[name.trim().toLowerCase()] ?? genreIdFromName(name);
+/**
+ * ENGLISH PLURALS, ONCE, AT THE VOCABULARY BOUNDARY.
+ *
+ * TMDB's genre names are singular and `genreIdFromName` matches them, but the
+ * interpreter emits the user's own span — so "comedies", "thrillers" and
+ * "documentaries" all resolved to null and fell through the unmapped-genre
+ * fallback below into `requiredSubjects`. That is not a near miss: a subject is
+ * a STRICT requirement that the word be CENTRAL to a title's own evidence, so
+ * "I want comedies" asked the catalog for films ABOUT comedies instead of for
+ * comedies. Found by the deployed harness while extending it.
+ *
+ * A bounded morphological rule, not a table of plurals: try what was said, then
+ * `-ies → -y`, then a trailing `-s`. Nothing is invented — a stem that resolves
+ * to no genre is still handed to the subject fallback exactly as before.
+ */
+function singularCandidates(name: string): string[] {
+  const w = name.trim().toLowerCase();
+  const out = [w];
+  if (w.length > 4 && w.endsWith('ies')) out.push(`${w.slice(0, -3)}y`);
+  else if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) out.push(w.slice(0, -1));
+  return out;
+}
+
+const genreIdFor = (name: string): number | null => {
+  for (const candidate of singularCandidates(name)) {
+    const id = PARSE_GENRE_IDS[candidate] ?? genreIdFromName(candidate);
+    if (id != null) return id;
+  }
+  return null;
+};
 
 /**
  * TONES ONTO EXISTING PRIMITIVES — measured from the legacy parser, not
@@ -85,7 +113,12 @@ const genreIdFor = (name: string): number | null =>
  * and a vetoed one takes the same keyword-exclusion channel every other
  * veto uses, because dropping a veto is ignoring one.
  */
-const TONE_PACE: Record<string, number> = { 'fast-paced': 90, fastpaced: 90, slow: 15 };
+/**
+ * Tone words that name a POSITION ON THE PACE BAND, which the finder filters on
+ * in both directions. `drag` is the same axis said as a verb — the vocabulary
+ * already declares it a tone; this is where it executes.
+ */
+const TONE_PACE: Record<string, number> = { 'fast-paced': 90, fastpaced: 90, slow: 15, drag: 15 };
 
 /**
  * A RELATIVE WINDOW BECOMES A CONCRETE BOUND — here, where the clock lives.
@@ -168,9 +201,21 @@ export function intentToQuery(intent: CanonicalIntent, opts: { now?: number } = 
     } else {
       if (gid != null) {
         if (!excludeGenreIds.includes(gid)) excludeGenreIds.push(gid);
+      } else if (TONE_PACE[key] != null) {
+        /* A VETOED PACE WORD IS A PACE, NOT A KEYWORD.
+           P0-C taught the parser that "a thriller that isn't slow" negates
+           `slow` rather than requesting it; this is where that reading was
+           being lost again. The veto used to leave as a `without_keywords`
+           exclusion on the word "slow", and almost nothing in a catalogue is
+           TAGGED slow, so the request executed as a bare genre browse. `pace`
+           is a band the finder already filters in both directions, so the
+           opposite end is the same primitive read the way the sentence meant
+           it — not a new signal. An explicitly stated pace still wins, because
+           a veto may only fill a band nobody claimed. */
+        if (pace == null) pace = 100 - TONE_PACE[key]!;
       } else {
-        // A vetoed tone with no genre home joins the keyword-exclusion
-        // channel — same path as every other vetoed span.
+        // A vetoed tone with no genre and no pace home joins the
+        // keyword-exclusion channel — same path as every other vetoed span.
         unmappedVetoed.push(t.term);
       }
     }

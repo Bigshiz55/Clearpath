@@ -29,14 +29,45 @@ export const IMMERSIVE_ROUTES: readonly string[] = [
   '/app/tonight',
   '/dev/dna-showdown',
   '/app/taste-quiz',
+  // The Verdict Room interiors, as their harnesses mount them, so what QA
+  // photographs is what a juror gets.
+  '/dev/court',
+  '/dev/court-vote',
 ];
 
-/** Does this path own the whole screen? Exact match — never a prefix. */
+/**
+ * Full-bleed surfaces whose path carries an identifier, so no exact string can
+ * name them.
+ *
+ * ONE ENTRY, AND IT IS ANCHORED AT BOTH ENDS. A Verdict Room is `/court/<code>`
+ * and nothing else: `^/court/[^/]+$` matches a room and cannot match a
+ * descendant, which is the same guarantee the exact list gives and the reason
+ * this is a list of anchored patterns rather than a prefix test.
+ *
+ * WHY THE ROOM BELONGS HERE. It renders its own header, its own chat and no app
+ * nav — it owns the screen exactly as Showdown does. The collision is measured,
+ * not asserted: `tests/mobile/court-fab-collision.spec.ts` walks the room at
+ * 320, 390 and 430 and reads the rectangles. The feedback button sat on the
+ * tonight-setup genre chips, and the QA screenshots caught it on "Watch it" on
+ * the voting floor. A tap that lands on feedback when a juror meant to vote is
+ * the room's primary action silently intercepted.
+ *
+ * The trade is the one this file already argues for: a room gives up the global
+ * feedback affordance and gets it back the moment anyone leaves it. It keeps
+ * every diagnostic — the version pill is `BuildVersionBadge`, which has its own
+ * visibility rules and is not gated on this predicate, and the room prints its
+ * own code in its header — so nothing a support report needs is lost. Only the
+ * overlay is.
+ */
+export const IMMERSIVE_ROUTE_PATTERNS: readonly RegExp[] = [/^\/court\/[^/]+$/];
+
+/** Does this path own the whole screen? Exact match, or one anchored pattern. */
 export function isImmersiveRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
   /* EXACT, because a prefix test would swallow descendants that are ordinary
      pages. `/app` is a prefix of every signed-in route; the same mistake one
      level down would silently strip chrome from a whole subtree, and nobody
      would notice until someone went looking for the feedback button. */
-  return IMMERSIVE_ROUTES.includes(pathname);
+  if (IMMERSIVE_ROUTES.includes(pathname)) return true;
+  return IMMERSIVE_ROUTE_PATTERNS.some((re) => re.test(pathname));
 }

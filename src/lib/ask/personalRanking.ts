@@ -130,6 +130,9 @@ export async function personalizeCandidates<T extends PersonalizableItem>(
           reasons: explained.reasons,
           concerns: explained.concerns,
           explainConfidence: explained.confidence,
+          /* Evidence depth, so a first-session profile does not reorder a field
+             as hard as a long-established one. */
+          profileSamples: profile?.samples ?? 0,
         }),
       };
     });

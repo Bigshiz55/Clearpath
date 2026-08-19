@@ -64,13 +64,29 @@ describe('unframed requests — POSITIVE: these are requests', () => {
     expect(interpret('a short movie for tonight').media).toBe('movie');
   });
 
-  /* KNOWN GAP, pinned so it is tracked rather than mistaken for this fix
-     failing: with a GENRE head the qualifier is not also captured as a subject,
-     so "courtroom" in "another courtroom drama" is currently dropped. The
-     subject extractor's media-noun list is deliberately media-only. Logged in
-     BACKLOG.md. */
-  it('KNOWN GAP: a genre head does not also yield the qualifier as a subject', () => {
-    expect(interpret('another courtroom drama').subjects.map((s) => s.span)).not.toContain('courtroom');
+  /* RESOLVED — this was pinned as a known gap when the unframed-request fix
+     landed. A genre can head the phrase just as a medium can, and dropping the
+     qualifier lost the entire topic of the request. */
+  it('a GENRE head also yields its qualifier as a subject', () => {
+    const cases: Array<[string, string, string]> = [
+      ['another courtroom drama', 'courtroom', 'drama'],
+      ['a political thriller', 'political', 'thriller'],
+      ['a boxing drama', 'boxing', 'drama'],
+      ['a prison drama', 'prison', 'drama'],
+      ['a psychological thriller', 'psychological', 'thriller'],
+      ['a legal thriller', 'legal', 'thriller'],
+    ];
+    for (const [text, subject, genre] of cases) {
+      expect(interpret(text).subjects.map((s) => s.span), text).toContain(subject);
+      expect(interpret(text).genres.map((g) => g.span), text).toContain(genre);
+    }
+  });
+
+  it('but a qualifier that is ITSELF a genre stays a genre', () => {
+    // "crime comedy" and "family comedy" name two genres, not a topic.
+    expect(interpret('a crime comedy').subjects.map((s) => s.span)).toHaveLength(0);
+    expect(interpret('a crime comedy').genres.map((g) => g.span)).toContain('crime');
+    expect(interpret('a family comedy').subjects.map((s) => s.span)).toHaveLength(0);
   });
 });
 

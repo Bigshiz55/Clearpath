@@ -8,6 +8,8 @@ import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from
 import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
 import { interpret } from '@/lib/interpret/interpret';
 import { resolveCanonicalExecution } from '@/lib/ask/canonicalExecution';
+import { acknowledgeStatement, isBareStatement } from '@/lib/ask/statementBoundary';
+import { canonicalClaimsSpan } from '@/lib/ask/titleSpanOwnership';
 import { unresolvedClarification, type NearMisses } from '@/lib/ask/unresolvedResponse';
 import type { UnresolvedRequirement } from '@/lib/ask/hardConstraints';
 import { augmentInternational } from '@/lib/askInternational';
@@ -240,18 +242,37 @@ export async function POST(req: Request) {
       convInterpretation = [...convInterpretation, ...turn.interpretation];
       convClarify = turn.clarify;
     }
-    /** Attach the conversation envelope to any response in conversation mode. */
-    const withConv = (payload: Record<string, unknown>) =>
-      conversational && convState
-        ? {
-            ...payload,
-            conversation: convState,
-            chips: chipsFor(convState),
-            interpretation: convInterpretation,
-            clarify: convClarify,
-            userKey,
-          }
-        : payload;
+    /**
+     * Attach the conversation envelope to any response in conversation mode.
+     *
+     * IT MERGES; IT DOES NOT CLOBBER. Both `interpretation` and `clarify` used
+     * to sit AFTER the spread, so the envelope silently overwrote whatever the
+     * branch had decided — and review caught two live consequences of that at
+     * once. A statement's acknowledgement was replaced by `convClarify` (null),
+     * so mid-conversation "My wife likes comedies." answered with the client's
+     * fallback question, "Which title did you mean?". And the critic's "this is
+     * ranked by quality" note was replaced by the conversation's own lines, so
+     * the disclosure this branch exists to make vanished in exactly the mode a
+     * real user is most likely to be in.
+     *
+     * The envelope's job is to ADD conversation context. What a branch chose to
+     * say is not context, so the branch's own words win: its interpretation
+     * lines are appended (deduped, because the critic path deliberately builds
+     * a list that already contains the conversation's), and its `clarify` is
+     * used when it set one at all.
+     */
+    const withConv = (payload: Record<string, unknown>) => {
+      if (!(conversational && convState)) return payload;
+      const own = Array.isArray(payload.interpretation) ? (payload.interpretation as string[]) : [];
+      return {
+        ...payload,
+        conversation: convState,
+        chips: chipsFor(convState),
+        interpretation: [...convInterpretation, ...own.filter((line) => !convInterpretation.includes(line))],
+        clarify: payload.clarify ?? convClarify,
+        userKey,
+      };
+    };
 
     // 0.5) A question about the USER'S OWN history is answered from their list,
     // never from the general catalog — "What haven't I finished?" was returning
@@ -394,6 +415,8 @@ export async function POST(req: Request) {
          promises an inference can never do. Genres the user genuinely stated
          ("better than X, but a comedy") survive, because only the known title
          spans are removed. */
+      /** Disclosures this comparison owes the reader, whatever the mode. */
+      const criticNotes: string[] = [];
       const constraintText = stripAnchorSpans(text, criticRequest.referenceTitles);
       const criticBase: FinderQuery = conversational && convState
         ? stateToQuery(convState)
@@ -436,6 +459,8 @@ export async function POST(req: Request) {
             title: c.title,
             mediaType: c.mediaType,
             year: c.year ?? null,
+            // Display order for the clarification only — never identity.
+            recognisability: c.popularity ?? null,
           })),
         // GC3, cache-only. A miss costs the anchor its authority, nothing more.
         loadDimensions: getCachedDimensions,
@@ -573,6 +598,45 @@ export async function POST(req: Request) {
 
       criticState.attribution.finalRankingConsumesPlan = ranked.applied;
 
+      /* AN EMPTY COMPARISON IS WORSE THAN AN UNCOMPARED ANSWER.
+         Measured on a real deployment: once `<axis> than <anchor>` began
+         routing here, "I want something darker than Taken" returned ZERO items
+         where it had previously returned a general list. Understanding the
+         sentence better made the answer worse, which is the one outcome a
+         routing change may not produce.
+
+         This mirrors the unresolved-anchor branch above: when the critic cannot
+         fulfil a comparison it hands the request back to ordinary discovery and
+         SAYS SO, rather than presenting emptiness as a verdict. Not a silent
+         fall-through — the note is customer-facing, and the comparison is
+         reported as unmet rather than quietly dropped. */
+      if (criticItems.length === 0) {
+        convInterpretation.push(
+          criticState.objective.anchors.length > 0
+            ? `I couldn't find anything to compare with ${criticRequest.referenceTitles.join(' or ')} — answering without the comparison.`
+            : `I couldn't fulfil that comparison — answering without it.`,
+        );
+      } else {
+      /* ── A COMPARISON THAT RAN AND MOVED NOTHING MUST SAY SO ───────────
+         The branch above covers the comparison that produced no candidates.
+         This covers the one that produced plenty and changed none of their
+         order — which looks identical to success from the outside and is the
+         failure the deployed proof caught: "darker than X" and "lighter than
+         X" came back as the same 24 titles, in the same order, because not one
+         candidate carried a cached fingerprint for the plan to judge. GC6 is
+         cache-only by design and a title the classifier has not reached
+         contributes nothing; that is correct, and serving the result as though
+         the comparison had been applied is not. Same principle as everywhere
+         else in this route: never present a degraded answer as the thing that
+         was asked for. */
+      const fingerprinted = ranked.decisions.filter((d) => d.fingerprinted).length;
+      if (!ranked.applied) {
+        criticNotes.push(
+          fingerprinted === 0
+            ? `I couldn't apply "${criticRequest.referenceTitles.join(' or ')}" to these — none of them has a profile on file yet, so this is ranked by quality.`
+            : `That comparison didn't separate these titles — this is ranked by quality.`,
+        );
+      }
       return NextResponse.json(
         withConv({
           kind: 'search',
@@ -581,6 +645,24 @@ export async function POST(req: Request) {
           query: criticBase,
           scoredFor: strandRun.scoredFor || 'Your match',
           relaxed: strandRun.relaxed,
+          /* THE NOTES RIDE EVERY RESPONSE, NOT JUST A CONVERSATIONAL ONE.
+             `withConv` attaches `interpretation` only in conversation mode, so
+             a single-shot caller — the deployed proof, and any client that does
+             not send a conversation — never saw the disclosures above at all. A
+             note nobody receives is not a disclosure. */
+          interpretation: [...convInterpretation, ...criticNotes],
+          /* COUNTS ONLY. No prompt, no reasoning, no title strings — the same
+             shape as the finder's funnel, so a comparison that did nothing can
+             be diagnosed from the response instead of from a guess. */
+          diagnostics: {
+            critic: {
+              candidates: ranked.decisions.length,
+              fingerprinted,
+              eligible: ranked.eligible,
+              applied: ranked.applied,
+              authority: ranked.authority,
+            },
+          },
           items: criticItems.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
           // Structured evidence for development — enums, ids, labels and
           // numbers. Never a prompt, never free-text reasoning.
@@ -595,6 +677,7 @@ export async function POST(req: Request) {
               }),
         }),
       );
+      }
       }
     }
 
@@ -613,9 +696,69 @@ export async function POST(req: Request) {
       canonical?.kind === 'lookup'
         ? canonical.titles.find((t) => t.relation === 'requested')?.span ?? null
         : null;
-    if (text.trim() && cls?.mode !== 'similar_to' && !lex && !(conversational && prevHadConstraints)) {
+    /* THE EXTRACTOR MAY NOT RE-BIND WHAT INTERPRETATION ALREADY BOUND.
+       When the canonical layer did NOT call this a lookup, this arm falls back
+       to `looksLikeTitleAsk` + `classifySearch` — a second, independent reader
+       of the same sentence. On "another boxing movie" that reader strips the
+       media noun and produces the phantom title "another boxing", so the ask
+       goes to the title machinery and discovery never runs; the deployed
+       harness measured it as zero results. `canonicalClaimsSpan` asks the one
+       question that settles it: has every identity-bearing word of the span
+       already been bound to a subject, genre, tone, person or provider? If so
+       the sentence named no title. A canonical TITLE span is never a claim, so
+       "Rocky", "Snake Eyes" and "Show me The Lego Movie" still come here. */
+    const legacyTitleSpan = canonicalRequestedTitle ?? cls?.requestedTitle ?? text;
+    const titleSpanBelongsElsewhere =
+      canonicalRequestedTitle == null && canonicalClaimsSpan(canonical, legacyTitleSpan);
+    if (
+      text.trim() &&
+      cls?.mode !== 'similar_to' &&
+      !lex &&
+      !titleSpanBelongsElsewhere &&
+      !(conversational && prevHadConstraints)
+    ) {
       const titled = await askJudgeTitle(supabase, user.id, text, cls ?? undefined, canonicalRequestedTitle);
       if (titled) return NextResponse.json(withConv({ kind: 'title', ...titled }));
+    }
+
+    // 1.5) THE STATEMENT BOUNDARY — a remark is not an order.
+    //
+    // `interpret()` had already read "My wife likes comedies." correctly:
+    // `kind: 'statement'`, an empty `requestClause`, the genre recorded against
+    // the COMPANION. But `kind` was only ever consulted to fence OTHER readers
+    // off the sentence (`canonicalRecognises` above, `canonicalOwnsLanguage`
+    // below) — no branch ever asked "was this a request at all?". So the
+    // statement fell through to the discovery arms, a legacy parser found the
+    // word "comedies", and the deployment answered a remark about someone
+    // else's taste with a 24-title grid. Interpretation was right and had
+    // nowhere to go.
+    //
+    // This is that missing question, asked once, from the canonical reading
+    // alone — not from the wording, the holder, or any particular genre. A
+    // statement executes nothing: no discovery, no title trial, no
+    // conversational search. In conversation the taste is still MERGED and
+    // ridden back on `withConv`, so the next turn spends it; only the search is
+    // withheld. A bare catalog word ("boxing") is a browse request settled at
+    // 0.6 and a comparison is settled at 0.9, so both are excluded here by the
+    // decisions those branches already made, never by re-reading the text.
+    //
+    // IT SITS AFTER THE TITLE ARM, NOT BEFORE IT. A bare title — "Rocky",
+    // "Severance" — is a `statement` to the interpreter too: it asserts a name
+    // and frames no request. Those are the title machinery's to answer, and it
+    // has already answered them by the time control reaches here. What is left
+    // is a statement that named no title, which is the case with nothing to run.
+    if (isBareStatement(canonical) && !criticRequest && !lex) {
+      return NextResponse.json(
+        withConv({
+          kind: 'clarify',
+          route: '/api/ask',
+          requestId,
+          appliedText: text || null,
+          clarify: acknowledgeStatement(canonical),
+          query: { ...EMPTY_QUERY },
+          items: [],
+        }),
+      );
     }
 
     // 2a) CONVERSATION-DRIVEN DISCOVERY — the canonical state IS the query.

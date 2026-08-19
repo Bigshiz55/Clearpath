@@ -4,6 +4,130 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **P0 closure on `claude/p0bcd-language` (PR #86) — the deployed proof is now
+  the gate, and it found four defects the whole unit suite was blind to.**
+  Every one lives where interpretation meets orchestration, which is exactly
+  where an in-process test cannot look.
+  - **"another boxing movie" returned nothing.** `interpret()` read it
+    perfectly — recommendation, movie, subject `boxing`, no title. `/api/ask`'s
+    named-title arm consults that reading only when it says `lookup`; otherwise
+    it re-reads the raw sentence with `looksLikeTitleAsk` + `classifySearch`,
+    strips the media noun, and looks up the phantom title "another boxing".
+    Generalized: any `<determiner> <subject> <medium>` ask took the same wrong
+    door. `src/lib/ask/titleSpanOwnership.ts` states the rule `ownership.test.ts`
+    already implied. **0 → 24 boxing films deployed.**
+  - **"My wife likes comedies." answered with 24 comedies.** `kind:
+    'statement'` was only ever read to fence OTHER readers off the sentence; no
+    branch asked whether the utterance contained a request at all.
+    `src/lib/ask/statementBoundary.ts` asks it once, after the title arm (a bare
+    title is a statement too). **24 items → `kind: clarify`, no result set.**
+  - **The card named the dial instead of reading it.** `matchHighlights`
+    returns `{ label, note }`; both chips were built from the label, so a real
+    card said "Heads up: Pace". Every unit test passed because every unit test
+    was written with prose no caller produces. Fixed with
+    `agreementPhrase`/`concernPhrase` and tests built from the real `DIMENSIONS`
+    table. Found by the browser proof (`tests/mobile/why-reasons.spec.ts`).
+  - **A comparison completed and did not matter.** "darker than Taken" returned
+    this deployment's unconstrained popularity head. `plan.authority` measures
+    the ANCHOR, and it scaled the instruction the USER stated too — so an
+    anchor the classifier has not fingerprinted silenced the axis the person
+    typed. Authority now scales only anchor-evidenced terms; the pure-anchor
+    case is identical to nine decimals (pinned).
+  - **The clarification led with the wrong film.** "Which Taken did you mean?"
+    offered TAKEN (2025) first. Recency was the documented prior; recognisability
+    is what predicts which work a bare name means, and TMDB returns it on every
+    search result. Used to ORDER the question, never in identity.
+  - **P0-G, first pass: nothing fixed may sit on a vote.** The global feedback
+    FAB is fixed bottom-left and landed on "Watch it" on the Verdict Room's
+    voting floor at phone widths. `isImmersiveRoute` gains one anchored pattern
+    (`^/court/[^/]+$`) plus the two harness routes; a collision spec measures
+    the rectangles at 320/390/430 rather than describing them.
+  - **Three half-covered vocabularies, found while extending the harness.**
+    Each was invisible because the neighbouring case worked.
+    - **Plural genre names bound nothing, or bound a strict subject.**
+      `genreIdFromName` matches TMDB's singular names, so "comedies" resolved
+      to null and fell through the unmapped-genre fallback into
+      `requiredSubjects` — a STRICT centrality requirement. One bounded
+      morphological rule at the canonical vocabulary boundary.
+    - **`GENRE_WORDS` carried `comedies` but not `thrillers`.** "recommend
+      thrillers" bound no genre at all. Plurals are now derived from the
+      singulars, so a genre cannot be half-covered again.
+    - **A request verb became the search topic.** "recommend thrillers" bound
+      the SUBJECT "recommend": the subject extractor's guard was a second
+      hand-kept copy of vocabulary `clauses.ts` owns. One list now
+      (`REQUEST_VERBS`), read by both.
+    - **A tone verb was recognised in one form only.** `drag` was listed,
+      `drags` was not, so "nothing that drags" dropped the constraint while
+      "does not drag" kept it. Verbs carry their inflections by construction
+      and normalise to the base term.
+  - **A negation that was understood, recorded, disclosed and discarded.**
+    P0-C taught the parser that "a thriller that isn't slow" NEGATES slow; the
+    mapper sent the veto to `without_keywords` on the word "slow", which almost
+    nothing is tagged with, so the request ran as a bare genre browse. A vetoed
+    pace word now sets the opposite end of the pace band the finder already
+    filters on. An explicitly stated pace still wins.
+  - **P0-G forensic sweep — `court-geometry.spec.ts`.** join → lobby →
+    advanced → chat → verdict → appeal → voting floor, at 320/390/430/1440,
+    reading real geometry. Found one defect: the chat quick replies were 27px
+    tall against the room's own 44px standard, at every width. Everything else
+    sound; both off-screen strips are genuinely scrollable and are reported
+    rather than squeezed.
+  - **P0-H part 2 — dynamic range measured, nothing changed on the strength of
+    it.** Neither personalization family is decorative (fingerprint moves 72.1%
+    of titles at |max| 8; stated preference 88.6% at |max| 10) and neither
+    swamps quality (widest base gap a weaker title crossed: 7, ceiling 18). The
+    binding constraint is the BASE scale: 18 points across ~24 candidates leaves
+    under a point between neighbours, so 74% of adjacent pairs are near ties and
+    the median winning margin is 1. **The top-N set is meaningful; the order
+    inside it is not.** Widening the base spread is a scoring-engine change
+    gated by the 7 spec scenarios — recorded, not attempted.
+  - **DISCOVERED — the anchor clarification's option order is only as good as
+    TMDB popularity.** After the fix, "Taken" offers the 2017 series ahead of
+    the 2008 film, because TMDB's popularity metric decays and currently ranks
+    the series higher. Better than leading with an obscure 2025 title, but not
+    the same as "what people mean". A durable fix needs vote-count or a
+    recognisability blend, and belongs with a wider identity pass.
+  - **DISCOVERED — `npm run build` clobbers the Playwright harness bundle.**
+    `NEXT_PUBLIC_*` values are inlined at build time by `build:harness`; a plain
+    build afterwards leaves the mobile suite serving a bundle with no Supabase
+    config, and every court test fails with a React error boundary that looks
+    exactly like a product regression. Always re-run `npm run build:harness`
+    immediately before a `playwright.mobile.config.ts` run.
+- **P0-B/C/D + qualifier + multi-clause (`claude/p0bcd-language`).** Five
+  generalized interpreter repairs, each with its cause named:
+  - **Axis comparatives reached nobody.** `parseCriticRequest` knew blend,
+    better_than and like, but not `<axis> than <anchor>` — the commonest
+    comparison in English. "darker than Taken" produced null and routed to
+    legacy discovery. `MODIFIER_MAP` already grounded `darker`; only the cue was
+    missing. Now `like_but` with anchor + axis. Ungrounded axes ("more intense")
+    still route, carrying the phrase as `unresolvedModifiers` rather than being
+    forced onto a wrong axis.
+  - **Contracted negation INVERTED the request.** "a thriller that isn't slow"
+    recorded `slow: wanted` and reached execution as a positive filter. The
+    negator vocabulary had "not" and "no" but no `isn't`/`doesn't`/`won't`.
+  - **Third-party preference became an order.** "My wife likes comedies."
+    classified as a recommendation. Preference detection now covers the
+    third-party possessive subject, reusing COMPANION's relationship nouns
+    rather than re-listing them.
+  - **Requests on someone's behalf were lost.** "Find a comedy my wife would
+    like." and "What should my husband and I watch?" fell to the companion
+    branch. Request vocabulary gained the bare imperative and the interrogative
+    with an intervening subject.
+  - **A coordinating "and" swallowed the question.** "I had a burrito and want
+    something fun tonight" stayed one clause. Split only when a request verb
+    phrase follows, so noun coordination ("cops and robbers") is untouched.
+  - **Qualifier loss RESOLVED:** a genre can head the phrase, so "another
+    courtroom drama" now binds subject `courtroom` + genre `drama`. A qualifier
+    that is itself a genre ("crime comedy") stays a genre.
+- **DISCOVERED — a trailing negative fragment does not bind.** "…, nothing
+  scary" splits off and classifies as a statement. Attached forms work. Pinned
+  in `companionAndThirdParty.test.ts`.
+- **DISCOVERED — taste memory across clauses.** "I like Yellowstone. What
+  should I watch?" is now a recommendation but retains no anchor for
+  Yellowstone; the taste clause is background only.
+- **OBSERVED — "a movie my wife and I would both like" caps to 1 result**,
+  because "a movie" names a unit of media and the pinned contract reads that as
+  a count. Correct per the rule, arguably wrong for a companion request.
 - **Natural unframed requests are now requests (`claude/p0a-natural-requests`).**
   Measured against the deployed product, half of ordinary consumer phrasing was
   discarded: "another boxing movie", "a thriller that isn't slow" and "a movie

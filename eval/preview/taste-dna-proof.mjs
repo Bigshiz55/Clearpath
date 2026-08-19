@@ -52,11 +52,92 @@ function fail(msg) {
 }
 
 /** The three queries the closure asked for. */
+/**
+ * The deployed language contract. Each case carries what the DEPLOYED response
+ * must show, so this proves behaviour rather than merely exercising a route.
+ *
+ * `expect` is checked against the route's own echoed interpretation (`query`,
+ * `interpretation`, `kind`) and the returned items — never against parser
+ * internals, which is the whole point of running it over HTTP.
+ */
 const QUERIES = [
-  { id: 'Q1', text: 'Looking for a good thriller', kind: 'broad taste-sensitive' },
-  { id: 'Q2', text: 'movies about chess', kind: 'subject' },
-  { id: 'Q3', text: 'three Sylvester Stallone movies', kind: 'hard constraint' },
+  { id: 'Q1', text: 'Looking for a good thriller', kind: 'broad taste-sensitive', expect: { minItems: 2 } },
+  { id: 'Q2', text: 'movies about chess', kind: 'subject', expect: { minItems: 2, media: 'movie' } },
+  { id: 'Q3', text: 'three Sylvester Stallone movies', kind: 'hard constraint', expect: { exactItems: 3, media: 'movie' } },
+  { id: 'Q4', text: 'another boxing movie', kind: 'unframed + qualifier', expect: { minItems: 2, media: 'movie' } },
+  { id: 'Q5', text: 'another courtroom drama', kind: 'genre-head qualifier', expect: { minItems: 2 } },
+  { id: 'Q6', text: "a thriller that isn't slow", kind: 'contracted negation', expect: { minItems: 2 } },
+  { id: 'Q7', text: 'My wife likes comedies.', kind: 'third-party statement', expect: { notASearch: true } },
+  { id: 'Q8', text: 'a movie my wife and I would both like', kind: 'companion request', expect: { minItems: 2, media: 'movie' } },
+  /* A COMPARISON IS A ROUND TRIP WHEN ITS ANCHOR IS AMBIGUOUS. "Taken" names a
+     2008 film, a 2017 series and a 2002 miniseries; the critic layer refuses to
+     guess between them and asks one question instead. Contracting this on "at
+     least 1 item in the first response" would have scored that refusal as a
+     failure and pressured the product into guessing. So the contract is the
+     WHOLE exchange: answer immediately when the anchor is unambiguous, or ask
+     one question with REAL options and deliver results once it is answered. */
+  { id: 'Q9', text: 'I want something darker than Taken.', kind: 'comparative anchor + axis', expect: { minItems: 1, comparativeRoundTrip: true, mustDifferFromFloor: true } },
+  { id: 'Q10', text: 'I had a burrito and want something fun tonight.', kind: 'multi-clause', expect: { minItems: 2 } },
+  { id: 'Q11', text: 'I like Yellowstone. What should I watch?', kind: 'cross-clause taste', expect: { minItems: 2 } },
+  { id: 'Q12', text: 'I want a thriller, nothing scary', kind: 'trailing negative fragment', expect: { minItems: 2 } },
+  /* DID THE COMPARISON ACTUALLY SHAPE THE ANSWER? Q9 proves the round trip
+     completes; completing is not the same as mattering. A comparative request
+     that quietly degrades to the platform's popularity head is the failure the
+     critic layer exists to prevent, and it looks identical to success from a
+     result count. This anchor is unambiguous, so no question intervenes, and
+     the answer is measured against the floor this same deployment returns for
+     a request that constrains nothing. */
+  { id: 'Q13', text: 'I want something darker than Whiplash.', kind: 'comparative, the answer must differ', expect: { minItems: 2, comparativeRoundTrip: true, mustDifferFromFloor: true } },
+
+  /* ── TITLE vs DISCOVERY OWNERSHIP ──────────────────────────────────────
+     The defect these exist to stop: `/api/ask` re-reading a discovery
+     sentence with the legacy title extractor, which strips the media noun
+     and looks up a phantom title. Deployed, that returned zero for "another
+     boxing movie". These are the same grammar with different subjects, so a
+     regression cannot hide behind one lucky catalog gap. */
+  { id: 'Q14', text: 'a chess movie', kind: 'ownership · determiner + subject + medium', expect: { minItems: 1, media: 'movie' } },
+  { id: 'Q15', text: 'another western', kind: 'ownership · determiner + genre', expect: { minItems: 2 } },
+  { id: 'Q16', text: 'two space movies', kind: 'ownership · count + subject + medium', expect: { exactItems: 2, media: 'movie' } },
+  /* …and the other half of the rule: a sentence that really does name a
+     title must still reach the title machinery and come back as a VERDICT,
+     not as a discovery grid. A fence that silenced these would have traded
+     one defect for a worse one. */
+  { id: 'Q17', text: 'Rocky', kind: 'ownership control · bare title', expect: { verdict: true } },
+  { id: 'Q18', text: 'Snake Eyes', kind: 'ownership control · bare title', expect: { verdict: true } },
+  { id: 'Q19', text: 'Show me The Lego Movie', kind: 'ownership control · canonical lookup', expect: { verdict: true } },
+
+  /* ── STATEMENT vs REQUEST ──────────────────────────────────────────────
+     Q7 pins the bare statement. This pins the boundary's other side: the
+     same companion taste, followed by an actual request, must search. */
+  { id: 'Q20', text: 'My wife likes comedies. What should we watch?', kind: 'statement + request', expect: { minItems: 2 } },
+
+  /* ── THE COMPARISON MUST BE ABOUT WHAT WAS ASKED ───────────────────────
+     Q13 asks the SAME anchor to move the OTHER way. If the stated axis is
+     doing any work at all the two answers cannot be the same list, and no
+     hard-coded titles are needed to say so. This is the sharpest available
+     test of the authority repair: `plan.authority` describes the anchor, and
+     both of these share an anchor — only the axis differs. */
+  { id: 'Q21', text: 'I want something lighter than Whiplash.', kind: 'comparative, opposite axis', expect: { minItems: 2, comparativeRoundTrip: true, differsFrom: 'Q13' } },
+
+  /* ── VOCABULARY THAT WAS HALF-COVERED ─────────────────────────────────
+     "recommend thrillers" bound NO genre (the plural was missing from the
+     genre vocabulary) and bound the SUBJECT "recommend" (the verb was missing
+     from the qualifier guard). Both were invisible because the singular and
+     the other verbs worked. */
+  { id: 'Q22', text: 'recommend thrillers', kind: 'vocabulary · plural genre + bare imperative', expect: { minItems: 2 } },
+
+  /* ── A NEGATED PACE WORD IS A PACE ────────────────────────────────────
+     "nothing that drags" was recorded with the right polarity and then
+     executed as a keyword exclusion on a word almost nothing is tagged with,
+     so the request ran as a bare genre browse. These two ask the SAME genre
+     for OPPOSITE ends of the pace band; if the veto reaches execution they
+     cannot be the same list. */
+  { id: 'Q23', text: 'I want a thriller that drags', kind: 'pace · stated slow', expect: { minItems: 2 } },
+  { id: 'Q24', text: 'I want a thriller, nothing that drags', kind: 'pace · vetoed slow', expect: { minItems: 2, differsFrom: 'Q23' } },
 ];
+
+/** Cross-query contracts, evaluated once every answer is in hand. */
+const MAX_SHARED_HEAD = 2;
 
 const key = (i) => `${i.mediaType}:${i.id}`;
 const median = (xs) => {
@@ -118,12 +199,12 @@ async function main() {
   if (!cookie) infra('preview login set no cookies.');
   console.log(`  authenticated with ${rawCookies.length} session cookie(s) (values not logged)`);
 
-  const ask = async (text) => {
+  const ask = async (text, extra = {}) => {
     const started = Date.now();
     const res = await request(`${BASE_URL}/api/ask`, {
       method: 'POST',
       headers: headers({ cookie }),
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, ...extra }),
       timeoutMs: 90_000,
     });
     const ms = Date.now() - started;
@@ -136,6 +217,111 @@ async function main() {
 
   const report = { sha: v.sha ?? null, env: v.vercelEnv ?? null, at: new Date().toISOString(), queries: [] };
   let anyParticipation = false;
+  /** id → the keys of the answer this deployment actually gave, in order. */
+  const answerHead = new Map();
+  /** id → what the deployment SAID about that answer, when it said anything. */
+  const answerNote = new Map();
+
+  /* WHY, NOT JUST HOW MANY.
+     The first run of this harness reported "Q4 → 0 items" and stopped there,
+     which is a symptom, not evidence: zero can mean the subject never resolved
+     to a catalog keyword, or that discovery returned nothing, or that every
+     candidate was judged non-central. `/api/ask` already returns the whole
+     funnel (`diagnostics`) and the query it actually executed, so a failing
+     case can name its own cause instead of sending someone back to the source
+     to guess. Printed for any query that returns nothing or misses its
+     contract — never for a healthy one, which would just be noise. */
+  const explainShortfall = (body) => {
+    const d = body.diagnostics ?? null;
+    const q = body.query ?? {};
+    console.log(`  WHY: kind=${body.kind ?? '?'}`);
+    if (body.relaxed) console.log(`    relaxed: ${body.relaxed}`);
+    const interp = Array.isArray(body.interpretation) ? body.interpretation : [];
+    for (const line of interp.slice(0, 4)) console.log(`    interpretation: ${line}`);
+    console.log(
+      `    executed query: media=${q.mediaType ?? '?'} genreIds=${JSON.stringify(q.genreIds ?? [])} ` +
+      `subject=${q.subjectLabel ?? 'none'} strict=${q.subjectStrict ?? false} ` +
+      `subjectKeywordIds=${JSON.stringify(q.subjectKeywordIds ?? [])} ` +
+      `subjectLexemes=${JSON.stringify(q.subjectLexemes ?? [])} ` +
+      `castIds=${JSON.stringify(q.castIds ?? [])} finalCount=${q.finalCount ?? null}`,
+    );
+    if (!d) {
+      console.log('    no diagnostics on the response — this arm does not report a funnel.');
+      return;
+    }
+    console.log(
+      `    funnel: candidates=${d.candidateCount} → deterministic=${d.deterministicEligibleCount} → ` +
+      `semanticEvaluated=${d.semanticEvaluatedCount ?? '-'} → subjectCentral=${d.centralSubjectEligibleCount} → ` +
+      `quality=${d.qualityEligibleCount} → returned=${d.finalReturnedCount}`,
+    );
+    const eva = Array.isArray(d.evaluations) ? d.evaluations : [];
+    if (eva.length > 0) {
+      console.log(`    ${eva.length} candidate verdict(s); the 8 strongest:`);
+      for (const e of eva.slice(0, 8)) {
+        console.log(
+          `      ${String(e.title).slice(0, 30).padEnd(31)} ${e.eligible ? 'PASS' : 'FAIL'} ` +
+          `${String(e.centrality).padEnd(11)} conf=${String(e.confidence).padStart(3)}  ${e.rejectionReason ?? e.evidence ?? ''}`,
+        );
+      }
+    }
+  };
+
+  /** Answer a clarification the way the product's own UI answers it, and prove
+   *  the comparison then completes. Returns a list of failures (empty = good). */
+  const proveComparativeRoundTrip = async (body, ask2) => {
+    const problems = [];
+    let settled = [];
+    let disclosure = [];
+    let criticDiag = null;
+    if (body.kind !== 'clarify') {
+      problems.push(`expected either results or one clarifying question, got kind=${body.kind ?? '?'}`);
+      return { problems, settled, disclosure, criticDiag };
+    }
+    const options = Array.isArray(body.comparisonOptions) ? body.comparisonOptions : [];
+    const envelope = body.pendingComparison ?? null;
+    console.log(`  ROUND TRIP step 1 — asked: ${JSON.stringify(body.clarify ?? null)}`);
+    console.log(`    ${options.length} real option(s): ${options.slice(0, 4).map((o) => `${o.title}${o.year ? ` (${o.year})` : ''} [${o.mediaType} ${o.tmdbId}]`).join(' · ') || 'none'}`);
+    if (options.length === 0) problems.push('the clarification offered no options, so it cannot be answered');
+    if (!envelope) problems.push('no pendingComparison envelope — the original request cannot be resumed');
+    for (const o of options) {
+      if (typeof o.tmdbId !== 'number' || !o.mediaType || !o.title) {
+        problems.push(`an option is not a real catalog identity: ${JSON.stringify(o)}`);
+        break;
+      }
+    }
+    if (problems.length > 0) return { problems, settled, disclosure, criticDiag };
+    const chosen = options[0];
+    const spokenAs = envelope?.pending?.[0]?.spokenAs ?? chosen.title;
+    const resumed = await ask2(envelope?.text ?? undefined, {
+      pendingComparison: envelope,
+      comparisonChoice: { spokenAs, tmdbId: chosen.tmdbId, mediaType: chosen.mediaType },
+    });
+    const back = Array.isArray(resumed.body.items) ? resumed.body.items : [];
+    settled = back;
+    disclosure = Array.isArray(resumed.body.interpretation) ? resumed.body.interpretation : [];
+    criticDiag = resumed.body.diagnostics?.critic ?? null;
+    console.log(`  ROUND TRIP step 2 — answered "${spokenAs}" → ${chosen.title}: ${back.length} item(s) · ${resumed.ms}ms · kind=${resumed.body.kind ?? '?'}`);
+    for (const i of back.slice(0, 5)) console.log(`      ${String(i.title).slice(0, 34).padEnd(35)} match=${i.matchScore}`);
+    if (back.length === 0) {
+      problems.push('the settled comparison still returned nothing');
+      explainShortfall(resumed.body);
+    }
+    if (criticDiag) {
+      console.log(`    critic: ${criticDiag.candidates} candidate(s), ${criticDiag.fingerprinted} fingerprinted, eligible=${criticDiag.eligible}, applied=${criticDiag.applied}, authority=${criticDiag.authority}`);
+    }
+    for (const line of disclosure) console.log(`    said: ${line}`);
+    return { problems, settled, disclosure, criticDiag };
+  };
+
+  /* THE FLOOR — what this deployment returns when the request constrains
+     nothing. Measured, never hard-coded: a list of famous titles written into
+     this file would rot, and would also be a judgement about which films are
+     "generic" rather than an observation about this build. */
+  const floorRes = await ask('recommend something');
+  const floorItems = Array.isArray(floorRes.body.items) ? floorRes.body.items : [];
+  const floor = new Set(floorItems.slice(0, 8).map(key));
+  console.log(`\n──────── FLOOR (an unconstrained ask): ${floor.size} title(s)`);
+  console.log(`  ${floorItems.slice(0, 8).map((i) => i.title).join(' · ') || 'none'}`);
 
   for (const q of QUERIES) {
     console.log(`\n──────── ${q.id} (${q.kind}): "${q.text}"`);
@@ -143,12 +329,66 @@ async function main() {
     const items = Array.isArray(body.items) ? body.items : [];
     if (items.length === 0) {
       console.log(`  no items returned (kind=${body.kind ?? '?'}) — nothing to order.`);
-      report.queries.push({ ...q, items: 0, latencyMs: ms, kind: body.kind ?? null });
+      /* For a third-party STATEMENT that is the correct outcome: "My wife likes
+         comedies." is not an order, and a deployment that answers it with a
+         comedy grid has misread it. */
+      if ((q.expect ?? {}).notASearch) console.log('  CONTRACT not-a-search: PASS (no result set)');
+      /* A NAMED TITLE COMES BACK AS A VERDICT, NOT A GRID. `kind: 'title'`
+         carries `verdict` + `alternatives` rather than `items`, so an empty
+         `items` is the CORRECT shape here — and the ownership fence would be
+         a regression, not a fix, if it silenced these. */
+      else if ((q.expect ?? {}).verdict) {
+        const v = body.verdict ?? null;
+        const ok = body.kind === 'title' && v != null && typeof v.title === 'string';
+        console.log(`  CONTRACT a verdict on the named title: ${ok ? `PASS (${v?.title}${v?.year ? ` (${v.year})` : ''} — ${v?.primaryCall ?? '?'} at ${v?.matchScore ?? '?'})` : `FAIL (kind=${body.kind ?? '?'})`}`);
+        if (!ok) {
+          explainShortfall(body);
+          fail(`${q.id} "${q.text}": a named title did not come back as a verdict.`);
+        }
+      }
+      else if ((q.expect ?? {}).comparativeRoundTrip) {
+        const { problems, settled, disclosure, criticDiag } = await proveComparativeRoundTrip(body, ask);
+        console.log(`  CONTRACT comparative round trip: ${problems.length === 0 ? 'PASS' : 'FAIL'}`);
+        for (const pr of problems) fail(`${q.id} "${q.text}": ${pr}`);
+        /* A comparison that COMPLETED still has to have MATTERED. The floor
+           check belongs on whichever response finally carried items, which for
+           an ambiguous anchor is the settled one. */
+        /* DIFFER, OR SAY WHY NOT. A comparison whose candidates carry no
+           cached fingerprints CANNOT move the order — GC6 is cache-only by
+           design and a title the classifier has not reached contributes
+           nothing. That is a coverage fact, not a bug in the comparison. What
+           is a bug is serving the quality order as though the comparison had
+           been applied. So the contract is the disjunction, and silence fails
+           both ways. */
+        if ((q.expect ?? {}).mustDifferFromFloor && settled.length > 0) {
+          const head = settled.slice(0, 5).map(key);
+          const shared = head.filter((k) => floor.has(k));
+          const differs = floor.size === 0 || shared.length <= 2;
+          const disclosed = disclosure.some((l) => /couldn.t apply|didn.t separate|without the comparison|couldn.t fulfil/i.test(l));
+          const ok = differs || disclosed;
+          console.log(
+            `  CONTRACT the settled comparison differs from the floor, or says it could not: ` +
+            `${ok ? `PASS (${differs ? `${shared.length}/5 shared` : 'disclosed'})` : `FAIL (${shared.length} of the top ${head.length} are floor titles, and nothing was disclosed)`}`,
+          );
+          if (!ok) fail(`${q.id} "${q.text}": returned the unconstrained order and did not say the comparison had not been applied.`);
+        }
+        if (settled.length > 0) answerHead.set(q.id, settled.slice(0, 5).map(key));
+        if (disclosure.length > 0 || criticDiag) answerNote.set(q.id, { disclosure, criticDiag });
+      } else {
+        explainShortfall(body);
+        fail(`${q.id} "${q.text}": returned no results at all.`);
+      }
+      report.queries.push({
+        ...q, items: 0, latencyMs: ms, kind: body.kind ?? null,
+        diagnostics: body.diagnostics ?? null, executedQuery: body.query ?? null,
+        interpretation: body.interpretation ?? null, relaxed: body.relaxed ?? null,
+      });
       continue;
     }
 
     // PERSONALIZED order is the order the route returned.
     const personalized = items.map(key);
+    answerHead.set(q.id, personalized.slice(0, 5));
     // OBJECTIVE order is the pre-Phase-1 comparator, applied to the same set.
     const objective = [...items].sort((a, b) => b.matchScore - a.matchScore).map(key);
 
@@ -183,6 +423,47 @@ async function main() {
       );
     }
 
+    /* ── THE LANGUAGE CONTRACT, CHECKED ON THE DEPLOYED RESPONSE ──────────
+       A route that returns 200 with a plausible-looking list has proved
+       nothing; these are the behaviours the P0 language work repaired, read
+       back from what the deployment actually returned. */
+    const exp = q.expect ?? {};
+    if (exp.notASearch) {
+      const ok = items.length === 0;
+      console.log(`  CONTRACT not-a-search: ${ok ? 'PASS' : `FAIL (${items.length} items returned)`}`);
+      if (!ok) fail(`${q.id} "${q.text}": a third-party statement returned a result set.`);
+    }
+    const checks = [];
+    if (exp.exactItems != null) {
+      checks.push([`exactly ${exp.exactItems} items`, items.length === exp.exactItems, `got ${items.length}`]);
+    }
+    if (exp.minItems != null) {
+      checks.push([`at least ${exp.minItems} items`, items.length >= exp.minItems, `got ${items.length}`]);
+    }
+    if (exp.media != null) {
+      const wrong = items.filter((i) => i.mediaType !== exp.media);
+      checks.push([`every item is ${exp.media}`, wrong.length === 0, `${wrong.length} of the wrong type`]);
+    }
+    if (exp.mustDifferFromFloor) {
+      const head = items.slice(0, 5).map(key);
+      const shared = head.filter((k) => floor.has(k));
+      console.log(`  overlap with the unconstrained floor: ${shared.length} of the top ${head.length}`);
+      checks.push([
+        'the answer is not the unconstrained floor',
+        floor.size === 0 || shared.length <= 2,
+        `${shared.length} of the top 5 are the titles an unconstrained ask returns`,
+      ]);
+    }
+    let contractMissed = false;
+    for (const [label, ok, detail] of checks) {
+      console.log(`  CONTRACT ${label}: ${ok ? 'PASS' : `FAIL (${detail})`}`);
+      if (!ok) {
+        contractMissed = true;
+        fail(`${q.id} "${q.text}": expected ${label}, ${detail}.`);
+      }
+    }
+    if (contractMissed) explainShortfall(body);
+
     // ── SET EQUALITY: ordering may change, membership may not ──────────────
     const sameSet =
       objective.length === personalized.length && new Set(objective).size === new Set(personalized).size &&
@@ -206,7 +487,46 @@ async function main() {
       if (!identical) fail(`${q.id}: no DNA participated, yet the order differs from the objective sort.`);
     }
 
-    report.queries.push({ ...q, items: items.length, latencyMs: ms, kind: body.kind ?? null, rows, sameSet, movements: moved.length, participation });
+    report.queries.push({
+      ...q, items: items.length, latencyMs: ms, kind: body.kind ?? null, rows, sameSet,
+      movements: moved.length, participation,
+      diagnostics: body.diagnostics ?? null, executedQuery: body.query ?? null,
+    });
+  }
+
+  /* ── CROSS-QUERY CONTRACTS ────────────────────────────────────────────────
+     The sharpest question a single query cannot answer: did the thing the user
+     ASKED FOR shape the answer? Two requests that share an anchor and differ
+     only in the axis must not come back as the same list. No hard-coded titles
+     are needed to say so, and no judgement about which films are "generic" —
+     the deployment is compared against itself. */
+  console.log('\n──────── CROSS-QUERY CONTRACTS');
+  for (const q of QUERIES) {
+    const other = (q.expect ?? {}).differsFrom;
+    if (!other) continue;
+    const mine = answerHead.get(q.id);
+    const theirs = answerHead.get(other);
+    if (!mine || !theirs) {
+      console.log(`  ${q.id} vs ${other}: SKIPPED — one side produced no answer to compare`);
+      fail(`${q.id}: could not compare with ${other} because one of them returned nothing.`);
+      continue;
+    }
+    const shared = mine.filter((k) => theirs.includes(k));
+    const differs = shared.length <= MAX_SHARED_HEAD;
+    /* Same disjunction as the floor contract: identical answers are only
+       acceptable when the deployment SAID the comparison could not be applied
+       — to both of them, because one disclosure does not excuse the other. */
+    const said = (id) => (answerNote.get(id)?.disclosure ?? []).some((l) => /couldn.t apply|didn.t separate|without the comparison|couldn.t fulfil/i.test(l));
+    const disclosed = said(q.id) && said(other);
+    const ok = differs || disclosed;
+    console.log(
+      `  ${q.id} ("${q.text}") vs ${other}: ${shared.length} of the top ${mine.length} titles are the same — ${ok ? `PASS${differs ? '' : ' (both disclosed)'}` : 'FAIL'}`,
+    );
+    if (!ok) {
+      fail(
+        `${q.id}: asking the same anchor to move the OTHER way returned ${shared.length}/${mine.length} of the same titles, and the deployment did not say the comparison had not been applied.`,
+      );
+    }
   }
 
   // ── LATENCY: repeat each query so a single sample cannot mislead ─────────

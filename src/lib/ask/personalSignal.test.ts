@@ -148,3 +148,59 @@ describe('THE CEILING IS A FACT, NOT A COMMENT', () => {
     expect(50 - down.rankScore).toBe(PERSONAL_NUDGE_CEILING);
   });
 });
+
+describe('CONFIDENCE — a thin profile must not push as hard as a rich one', () => {
+  /* MEASURED, not assumed. `scripts/measure/scoreDistribution.ts` ran the real
+     transform across 60 scenario x profile cells at samples=3 and samples=40
+     and produced BYTE-IDENTICAL distributions: rank-change rate, top-1 change
+     rate, nudge spread, all the same. `samples` was consulted only as a binary
+     gate (`samples > 0`), so a profile built from one rating moved a title
+     exactly as far as one built from four hundred.
+
+     That is the defect the measurement found. The CEILING was not the problem:
+     the widest base gap any weaker title crossed was 7 points, against a cap of
+     18 that the dimension channel alone can never reach. */
+  const base = { objective: 70, prefNudge: 0, reasons: [], concerns: [], explainConfidence: 0 };
+
+  it('a one-rating profile moves a title less than a well-evidenced one', () => {
+    const thin = personalSignal({ ...base, dimMatch: 100, profileSamples: 1 });
+    const rich = personalSignal({ ...base, dimMatch: 100, profileSamples: 40 });
+    expect(thin.rankScore - 70, 'a single rating moved as hard as forty').toBeLessThan(rich.rankScore - 70);
+  });
+
+  it('confidence scales monotonically with evidence', () => {
+    const at = (n: number) => personalSignal({ ...base, dimMatch: 100, profileSamples: n }).rankScore;
+    expect(at(1)).toBeLessThanOrEqual(at(5));
+    expect(at(5)).toBeLessThanOrEqual(at(20));
+    expect(at(20)).toBeLessThanOrEqual(at(60));
+  });
+
+  it('a well-evidenced profile still reaches the documented bound', () => {
+    const full = personalSignal({
+      objective: 50, dimMatch: 100, prefNudge: 999,
+      reasons: [], concerns: [], explainConfidence: 0, profileSamples: 100,
+    });
+    expect(full.rankScore - 50).toBe(PERSONAL_NUDGE_CEILING);
+  });
+
+  it('the ceiling is never exceeded at any evidence level', () => {
+    for (const n of [0, 1, 3, 10, 40, 400]) {
+      const up = personalSignal({
+        objective: 50, dimMatch: 100, prefNudge: 999,
+        reasons: [], concerns: [], explainConfidence: 0, profileSamples: n,
+      });
+      const down = personalSignal({
+        objective: 50, dimMatch: 0, prefNudge: -999,
+        reasons: [], concerns: [], explainConfidence: 0, profileSamples: n,
+      });
+      expect(Math.abs(up.rankScore - 50), `samples=${n}`).toBeLessThanOrEqual(PERSONAL_NUDGE_CEILING);
+      expect(Math.abs(down.rankScore - 50), `samples=${n}`).toBeLessThanOrEqual(PERSONAL_NUDGE_CEILING);
+    }
+  });
+
+  it('omitting the sample count keeps the previous behaviour', () => {
+    const legacy = personalSignal({ ...base, dimMatch: 100 });
+    expect(legacy.participated).toBe(true);
+    expect(legacy.rankScore).toBeGreaterThan(70);
+  });
+});

@@ -27,6 +27,10 @@
 export interface WhyInput {
   /** Dimensions the user's rated history agrees with, strongest first. */
   tasteAgreements?: string[];
+  /** Axes of this title that CLASH with what the reader rates highly. The
+   *  honest half of the same evidence — `/api/dna` has always returned it as
+   *  `fit.clash`, and the card dropped it on the floor. */
+  tasteConcerns?: string[];
   /** The title's own genres — used ONLY for the honest general fallback. */
   genres?: string[];
   /**
@@ -68,6 +72,7 @@ export interface WhyInput {
 
 export type ReasonKind =
   | 'taste'
+  | 'concern'
   | 'household'
   | 'similar'
   | 'person'
@@ -102,6 +107,11 @@ const RANK: Record<ReasonKind, number> = {
   airing: 9,
   trending: 10,
   new: 11,
+  /* A concern QUALIFIES the case for a title; it never leads it. Ranked after
+     every positive reason so the reader sees why it fits before why it might
+     not, and ahead of the generic fallback so a real caution is never crowded
+     out by "matches your general drama preferences". */
+  concern: 12,
   general: 99,
 };
 
@@ -111,6 +121,42 @@ export function joinNatural(items: string[]): string {
   if (xs.length === 0) return '';
   if (xs.length === 1) return xs[0]!;
   return `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]!}`;
+}
+
+/**
+ * A FIT AXIS, IN WORDS A READER CAN USE.
+ *
+ * `matchHighlights` returns axes as `{ label, note }` — the label is the AXIS
+ * NAME ("Pace", "Tone", "Content edge") and the note is what it actually says
+ * ("slow burn", "you lean fast-paced"). Passing the label alone produced chips
+ * that named the dial without reading it: "Heads up: Pace" tells a reader
+ * nothing, and the unit tests never caught it because they were written with
+ * prose that no caller ever supplies. The browser proof did.
+ *
+ * So the note is the sentence and the label is the subject, and each phrase
+ * uses whichever of the two actually carries meaning.
+ */
+const trimmed = (s: string | null | undefined): string => (s ?? '').trim();
+
+/** "slow burn" — what the title IS, since agreement notes name the axis end. */
+export function agreementPhrase(a: { label: string; note?: string | null }): string {
+  const note = trimmed(a.note);
+  return note.length > 0 ? note.toLowerCase() : trimmed(a.label).toLowerCase();
+}
+
+/** "pace — you lean fast-paced": the axis, then the direction the reader leans. */
+export function concernPhrase(c: { label: string; note?: string | null }): string {
+  const label = trimmed(c.label).toLowerCase();
+  const note = trimmed(c.note);
+  if (note.length === 0) return label;
+  if (label.length === 0) return note;
+  /* A note that already contains the axis name says it once, not twice — and
+     WHOLE-WORD, because "pace" is a substring of "fast-paced" and a plain
+     `includes` silently swallowed the axis on the commonest dial of all. */
+  const saidAlready = new RegExp(`(?:^|\\W)${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\W|$)`).test(
+    note.toLowerCase(),
+  );
+  return saidAlready ? note : `${label} — ${note}`;
 }
 
 export function buildWhyReasons(input: WhyInput): Reason[] {
@@ -184,6 +230,15 @@ export function buildWhyReasons(input: WhyInput): Reason[] {
       kind: 'general',
       text: `Matches your general ${joinNatural(genres.map((g) => g.toLowerCase()))} preferences`,
     });
+  }
+
+  /* THE HONEST HALF. Capped at one — a card is a summary, not an audit — and
+     gated on real rated history for the same reason the taste reason is: with
+     nothing on file there is no personal ground to stand a caution on, and
+     inventing one is the same dishonesty as inventing praise. */
+  const concerns = (input.tasteConcerns ?? []).filter(Boolean);
+  if (concerns.length > 0 && (input.ratedCount ?? 0) > 0) {
+    out.push({ kind: 'concern', text: `Heads up: ${concerns[0]}` });
   }
 
   return out.sort((a, b) => RANK[a.kind] - RANK[b.kind]);

@@ -56,6 +56,30 @@ export interface CriticRequest {
   cue: string;
 }
 
+/**
+ * A COMPARATIVE BASELINE IS NOT A FILM.
+ *
+ * "darker than usual", "funnier than normal", "better than average" compare
+ * against a NORM, not against a work. Treating the tail as a title sends a
+ * nonsense anchor to resolution and loses the axis the user actually stated —
+ * caught in review on the axis-comparative branch, and true of the pre-existing
+ * `better than` path for exactly as long as it has existed.
+ *
+ * Filtered at the point every relation extracts its anchors, so no future cue
+ * has to remember. The axis survives: with no anchor the sentence is not a
+ * critic request at all, and the ordinary tone layer already owns "darker".
+ */
+const COMPARATIVE_BASELINE = new Set([
+  'usual', 'the usual', 'normal', 'average', 'expected', 'most', 'most movies',
+  'most films', 'most shows', 'typical', 'standard', 'the norm', 'norm',
+  'others', 'other stuff', 'that', 'this', 'before', 'usual fare', 'anything else',
+]);
+
+/** Anchors with the norms removed. Empty means "no work was named". */
+function realAnchors(spans: readonly string[]): string[] {
+  return spans.filter((a) => !COMPARATIVE_BASELINE.has(a.trim().toLowerCase()));
+}
+
 /** At most two anchors, matching what production already carries end to end. */
 const MAX_ANCHORS = 2;
 
@@ -287,7 +311,7 @@ export function parseCriticRequest(text: string): CriticRequest | null {
 
   if (!base && better) {
     const tail = t.slice(better.index + better[0].length);
-    anchors = splitAnchors(tail);
+    anchors = realAnchors(splitAnchors(tail));
     if (anchors.length > 0) {
       base = 'better_than';
       cue = better[0];
@@ -295,9 +319,51 @@ export function parseCriticRequest(text: string): CriticRequest | null {
     }
   }
 
+  /* ── AXIS COMPARATIVE: "<shift> than <anchor>" ───────────────────────────
+     The most natural comparison in English, and the one cue this parser did
+     not have: "darker than Taken" produced null, so `routeAsk` sent it to
+     legacy discovery and BOTH the anchor and the axis were lost.
+
+     Nothing new is invented here. `MODIFIER_MAP` already grounds the shift,
+     `splitAnchors` already reads the title, and `like_but` already means "this
+     title, shifted on that axis". Only the detection was missing.
+
+     Gated on the head carrying a comparative — grounded, or at least
+     comparative-SHAPED — for the same reason the bare "X but <shift>" path is:
+     without one, the text after `than` is just prose and calling it an anchor
+     would invent a comparison nobody made. That gate is what keeps "more than
+     three movies" and "no longer than 90 minutes" out.
+
+     Checked AFTER `better` so "better than X" keeps its stronger claim. */
+  if (!base) {
+    const thanAt = t.search(/\bthan\b/i);
+    if (thanAt > 0) {
+      const head = t.slice(0, thanAt);
+      const tail = t.slice(thanAt + 4);
+      const probe = readModifiers(head);
+      const headIsComparative =
+        Object.keys(probe.modifiers).length > 0 || probe.unresolved.length > 0;
+      if (headIsComparative) {
+        const found = realAnchors(splitAnchors(tail));
+        /* A number or a duration is not a film either. `splitAnchors` reads
+           spans, not entities, so this is where "90 minutes" is refused. */
+        const titles = found.filter((a) => !/^\d/.test(a.trim()));
+        if (titles.length > 0) {
+          return {
+            relation: 'like_but',
+            referenceTitles: titles.slice(0, MAX_ANCHORS),
+            modifiers: probe.modifiers,
+            unresolvedModifiers: probe.unresolved,
+            cue: 'than',
+          };
+        }
+      }
+    }
+  }
+
   if (!base && like) {
     const tail = t.slice(like.index + like[0].length);
-    anchors = splitAnchors(tail);
+    anchors = realAnchors(splitAnchors(tail));
     if (anchors.length > 0) {
       base = 'like';
       cue = like[0];

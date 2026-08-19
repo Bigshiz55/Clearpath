@@ -22,7 +22,7 @@
  * PURE. No I/O, no clock, no randomness, no entity resolution.
  */
 
-import { parseClauses, requestClause, type Clause } from './clauses';
+import { parseClauses, requestClause, type Clause, REQUEST_VERBS } from './clauses';
 import { SUBJECT_TERMS } from '@/lib/finderParse';
 import { detectOrigin, detectAudio, detectRuntimeMaxMinutes } from '@/lib/nlu/detectors';
 import {
@@ -72,13 +72,23 @@ export function parseCount(clause: string): number | null {
      really does ask for one of them, and that reading is kept.
 
      Numerals are unaffected either way: "give me 5 thrillers" is five. */
-  const m =
-    clause.match(
-      /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|comed(?:y|ies)|thrillers?|dramas?|myster(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
-    ) ??
-    clause.match(
-      /\b(an?)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
-    );
+  const numeral = clause.match(
+    /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|comed(?:y|ies)|thrillers?|dramas?|myster(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
+  );
+  /* A DESCRIBED REQUEST IS A SPECIFICATION, NOT AN ENUMERATION.
+     "a boxing movie" names one unit and really does ask for one. "a movie my
+     wife and I would both like", "a movie that is not too long" and "a movie
+     without gore" name one unit and then SPECIFY it — the article is grammar
+     carrying the description, and capping those to a single result answers a
+     question nobody asked. A qualifier after the noun is the difference. */
+  const DESCRIBED =
+    /\b(?:that|which|who|whom|without|with)\b|\b(?:my|our)\b[^.;!?]{0,30}?\b(?:can|could|would|will|might)\b/i;
+  const article = numeral ? null : DESCRIBED.test(clause)
+    ? null
+    : clause.match(
+        /\b(an?)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
+      );
+  const m = numeral ?? article;
   /* THE NUMBER IS THE OBJECT OF THE REQUEST VERB: "only show me one".
      A self-correction states its count without repeating the noun, and the
      bridge above requires one, so the corrected request came back with NO count
@@ -142,19 +152,27 @@ export function parseMedia(clause: string): MediaIntent {
  * breaks is stripping the negator as a stop word and keeping the noun, which
  * turns "no horror" into a horror search — the exact inversion of what was
  * asked. So negation is detected FIRST and carries the term into an exclusion.
+ *
+ * CONTRACTED AUXILIARIES COUNT. The list held "not" and "no" but none of
+ * "isn't", "doesn't", "won't", so "a thriller that isn't slow" recorded
+ * `slow: wanted` — not a dropped constraint but a REVERSED one, and the
+ * exclusion reached execution as a positive genre filter. "not slow" and
+ * "isn't slow" mean the same thing and now read the same way. The light verb
+ * an auxiliary drags along ("doesn't GET gory", "won't BE violent") is
+ * stripped with the determiners, so the span is the adjective the user meant.
  */
 const NEGATORS =
-  /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hate[sd]?|can'?t stand|but not|other than|anything but)\b/i;
+  /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hate[sd]?|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t)\b/i;
 
 /** The span a negator governs: from the negator to the next boundary. */
 function negatedSpans(clause: string): string[] {
   const out: string[] = [];
   const re =
-    /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hates?|hated|can'?t stand|but not|other than|anything but)\b\s+((?:too\s+|any\s+|another\s+|more\s+)?[a-z][\w'-]*(?:\s+[a-z][\w'-]*){0,3})/gi;
+    /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hates?|hated|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t)\b\s+((?:too\s+|any\s+|another\s+|more\s+|be\s+|get\s+|feel\s+|too\s+)?[a-z][\w'-]*(?:\s+[a-z][\w'-]*){0,3})/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(clause)) !== null) {
     const span = m[1]!
-      .replace(/\b(?:too|any|another|more|stuff|things?|movies?|films?|shows?|series)\b/gi, ' ')
+      .replace(/\b(?:too|any|another|more|stuff|things?|movies?|films?|shows?|series|be|get|feel|seem|look|turn)\b/gi, ' ')
       .replace(/\s+/g, ' ')
       .trim();
     if (span) out.push(span);
@@ -162,13 +180,78 @@ function negatedSpans(clause: string): string[] {
   return out;
 }
 
-/** Tone words a person actually reaches for. Matched, never invented. */
-const TONE_WORDS =
-  /\b(funny|hilarious|light|lighthearted|dark|bleak|depressing|weird|strange|uplifting|feel-?good|tense|scary|frightening|gory|violent|easy|challenging|cerebral|slow|fast-?paced|romantic|sad|cosy|cozy|gritty|wholesome)\b/gi;
+/**
+ * Tone words a person actually reaches for. Matched, never invented.
+ *
+ * INFLECTIONS FOR THE VERBS, BY CONSTRUCTION. `drag` was listed and `drags`
+ * was not, so "I want a thriller, nothing that drags" — the way anyone
+ * actually says it — dropped the constraint entirely while "a comedy that does
+ * not drag" kept it. Adjectives are matched as written; a word that describes
+ * what a film DOES gets the ordinary English inflections, so the same gap
+ * cannot open under the next verb someone adds.
+ */
+const TONE_ADJECTIVES = [
+  'funny', 'hilarious', 'light', 'lighthearted', 'dark', 'bleak', 'depressing',
+  'weird', 'strange', 'uplifting', 'feel-?good', 'tense', 'scary', 'frightening',
+  'gory', 'violent', 'easy', 'challenging', 'cerebral', 'slow', 'fast-?paced',
+  'romantic', 'sad', 'cosy', 'cozy', 'gritty', 'wholesome', 'dumb', 'gore', 'long',
+];
 
-/** Genre names, as said. Ids are resolved downstream, never here. */
-const GENRE_WORDS =
-  /\b(horror|comedy|comedies|drama|thriller|mystery|romance|documentary|documentaries|animation|animated|western|war|crime|fantasy|sci-?fi|science fiction|musical|biography|history|sport|family|adventure|action|supernatural)\b/gi;
+/** Tone words that are VERBS — what a film does to the viewer's patience. */
+const TONE_VERBS = ['drag'];
+
+/** he drags · it is dragging · it dragged · a draggy hour. */
+function verbForms(stem: string): string[] {
+  const doubled = /[^aeiou][aeiou][^aeiouwxy]$/.test(stem) ? `${stem}${stem.slice(-1)}` : stem;
+  return [stem, `${stem}s`, `${doubled}ing`, `${doubled}ed`, `${doubled}y`];
+}
+
+/** The base form a matched inflection stands for, so downstream sees one term. */
+const TONE_STEM = new Map<string, string>(
+  TONE_VERBS.flatMap((v) => verbForms(v).map((f) => [f, v] as const)),
+);
+
+/** Normalise a matched tone span to the term the vocabulary declares. */
+export const toneTerm = (matched: string): string =>
+  TONE_STEM.get(matched.toLowerCase()) ?? matched.toLowerCase();
+
+const TONE_WORDS = new RegExp(
+  `\\b(${[...TONE_ADJECTIVES, ...TONE_VERBS.flatMap(verbForms)].join('|')})\\b`,
+  'gi',
+);
+
+/**
+ * Genre names, as said. Ids are resolved downstream, never here.
+ *
+ * PLURALS BY CONSTRUCTION, NOT BY HAND. The alternation used to be written out
+ * and had covered `comedies` and `documentaries` while missing `thrillers`,
+ * `dramas`, `mysteries`, `westerns` and the rest — so "recommend thrillers"
+ * bound no genre at all and the request executed as an unconstrained browse.
+ * Half a vocabulary is worse than none, because the gap is invisible: the
+ * sentences that work make the ones that do not look like a different problem.
+ * The plural is derived from the singular by the ordinary English rule, so a
+ * genre cannot be half-covered again.
+ */
+const GENRE_BASE = [
+  'horror', 'comedy', 'drama', 'thriller', 'mystery', 'romance', 'documentary',
+  'animation', 'animated', 'western', 'war', 'crime', 'fantasy', 'sci-?fi',
+  'science fiction', 'musical', 'biography', 'history', 'sport', 'family',
+  'adventure', 'action', 'supernatural',
+];
+
+/** The ordinary English plural: consonant + y → ies, otherwise + s. */
+function pluralOf(word: string): string | null {
+  if (/[^aeiou]y$/.test(word)) return `${word.slice(0, -1)}ies`;
+  if (/[a-z]$/.test(word)) return `${word}s`;
+  return null; // a pattern, not a word — leave it alone
+}
+
+const GENRE_WORDS = new RegExp(
+  `\\b(${Array.from(
+    new Set(GENRE_BASE.flatMap((w) => [w, pluralOf(w)]).filter((w): w is string => w !== null)),
+  ).join('|')})\\b`,
+  'gi',
+);
 
 /** Provider/network names, as said. */
 const PROVIDER_WORDS =
@@ -321,6 +404,16 @@ function uniqueMatches(text: string, re: RegExp): string[] {
 const QUOTED = /["“']([^"”']{2,60})["”']/g;
 const AFTER_REACTION =
   /\b(?:loved|liked|enjoyed|hated|disliked|watched|saw|seen|finished|binged|rewatched)\s+((?:[A-Z][\w''-]*)(?:\s+(?:of|the|and|a|de|la)?\s*[A-Z0-9][\w''-]*){0,4})/g;
+/**
+ * A STANDING PREFERENCE THAT NAMES A WORK — "I like Yellowstone".
+ *
+ * `AFTER_REACTION` covers the past tense, which is how a verdict on one viewing
+ * is phrased. A standing preference is present tense, and without this the
+ * reader's only piece of evidence was dropped before the request that followed
+ * it could use it. Recorded as `liked`, i.e. TASTE — never as a requested
+ * title, because "I like Yellowstone. What should I watch?" is not a request
+ * for Yellowstone.
+ */
 const AFTER_SIMILARITY =
   /\b(?:like|similar to|in the vein of|in the style of|reminds me of|same (?:feel|vibe) as|better than|newer than|older than)\s+((?:[A-Z][\w''-]*)(?:\s+(?:of|the|and|a)?\s*[A-Z0-9][\w''-]*){0,4})/g;
 
@@ -621,8 +714,11 @@ export function interpret(raw: string): CanonicalIntent {
       const wanted = !isNegated(g);
       pushUnique<GenreConstraint>(intent.genres, { span: g, wanted, holder: 'user' });
     }
-    for (const t of uniqueMatches(contentText, TONE_WORDS)) {
-      const wanted = !isNegated(t);
+    for (const raw of uniqueMatches(contentText, TONE_WORDS)) {
+      const t = toneTerm(raw);
+      // Negation is judged on the SPAN the sentence used ("that drags"), the
+      // term recorded is the one the vocabulary declares ("drag").
+      const wanted = !isNegated(raw) && !isNegated(t);
       if (!intent.tones.some((x) => x.term === t)) {
         intent.tones.push({ term: t, wanted, holder: 'user' } satisfies ToneConstraint);
       }
@@ -746,8 +842,11 @@ export function interpret(raw: string): CanonicalIntent {
       const vetoed = negated.some((n) => n.includes(g)) || /\bhates?\b|\bwon'?t watch\b/i.test(c.text);
       pushUnique<GenreConstraint>(intent.genres, { span: g, wanted: !vetoed, holder: 'companion' });
     }
-    for (const t of uniqueMatches(c.text, TONE_WORDS)) {
-      const vetoed = negated.some((n) => n.includes(t)) || /\bhates?\b|\bwon'?t watch\b/i.test(c.text);
+    for (const raw of uniqueMatches(c.text, TONE_WORDS)) {
+      const t = toneTerm(raw);
+      const vetoed =
+        negated.some((n) => n.includes(raw) || n.includes(t)) ||
+        /\bhates?\b|\bwon'?t watch\b/i.test(c.text);
       if (!intent.tones.some((x) => x.term === t)) {
         intent.tones.push({ term: t, wanted: !vetoed, holder: 'companion' });
       }
@@ -809,7 +908,14 @@ export function interpret(raw: string): CanonicalIntent {
 function findSubjectMatches(clause: string): SpanMatch[] {
   const out: SpanMatch[] = [];
   const MEDIA = String.raw`movies?|films?|shows?|series|documentar(?:y|ies)|flicks?`;
-  const re = new RegExp(String.raw`\b([a-z][\w-]{2,})\s+(?:${MEDIA})\b`, 'gi');
+  /* A GENRE can head the phrase too: "courtroom DRAMA", "political THRILLER".
+     Without these the qualifier was silently dropped — "another courtroom
+     drama" bound the genre and lost `courtroom`, which is the entire topic of
+     the request. The caller already discards a qualifier that is itself a
+     genre or tone, so "crime comedy" and "family comedy" do not donate their
+     own genre word back as a subject. */
+  const GENRE_HEAD = String.raw`dramas?|thrillers?|comed(?:y|ies)|myster(?:y|ies)|horrors?|westerns?|musicals?|romances?|documentaries`;
+  const re = new RegExp(String.raw`\b([a-z][\w-]{2,})\s+(?:${MEDIA}|${GENRE_HEAD})\b`, 'gi');
   /* "<media> about <topic>", optionally through a determiner: "movies about
      THE holocaust". Anchored to the media noun so "how about a Bruce Willis
      movie" — where `about` belongs to the request frame, not to a topic —
@@ -822,8 +928,19 @@ function findSubjectMatches(clause: string): SpanMatch[] {
      `favorite` reached the subject field during adversarial review — the first
      is a date word the lookback layer already owns, the second belongs to a
      preference statement. Neither is a theme anyone could search for. */
-  const STRUCTURAL =
-    /^(?:good|great|best|new|newer|old|older|other|another|more|some|any|the|a|an|three|two|four|five|six|seven|eight|nine|ten|one|few|couple|nice|decent|solid|different|similar|watch|see|want|like|find|show|give|only|just|recent|recently|latest|favorite|favourite|top|first|last|past|previous)$/i;
+  /* THE REQUEST VERBS COME FROM THE CLAUSE ARCHITECTURE, NOT FROM HERE.
+     This list used to name `want`, `find` and `show` on its own and had drifted
+     from the vocabulary `clauses.ts` uses to recognise a request — it never
+     learned `recommend`, `suggest`, `need` or `get`. So "recommend thrillers"
+     bound the subject "recommend": the verb asking for the search became the
+     topic of it. Two hand-kept copies of one vocabulary will always drift, so
+     there is now one copy and this reads it. */
+  const STRUCTURAL = new RegExp(
+    `^(?:good|great|best|new|newer|old|older|other|another|more|some|any|the|a|an|three|two|four|five|six|seven|eight|nine|ten|one|few|couple|nice|decent|solid|different|similar|only|just|recent|recently|latest|favorite|favourite|top|first|last|past|previous|${REQUEST_VERBS.filter(
+      (w) => !w.includes(' '),
+    ).join('|')})$`,
+    'i',
+  );
   const push = (m: RegExpMatchArray): void => {
     const w = m[1]!.toLowerCase();
     if (STRUCTURAL.test(w)) return;

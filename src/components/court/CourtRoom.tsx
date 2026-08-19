@@ -1456,9 +1456,21 @@ function ChatPanel({
         </div>
       )}
       <div className="border-t border-white/10 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
-        <div className="mb-2 flex gap-1.5 overflow-x-auto">
+        {/* THE SAME 44px THE SEND BUTTON BESIDE THEM ALREADY USES. These were
+            27px tall — the one place a juror types on a phone, at half the
+            room's own touch standard. The pill stays compact: the height comes
+            from padding, not from a bigger typeface, so the strip reads the
+            same and is merely hittable. `court-geometry.spec.ts` measures it. */}
+        <div className="mb-2 flex items-center gap-1.5 overflow-x-auto">
           {QUICK_REPLIES.map((qr) => (
-            <button key={qr} onClick={() => onSend(qr)} className="flex-none rounded-full border border-white/12 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-white/10">{qr}</button>
+            <button
+              key={qr}
+              onClick={() => onSend(qr)}
+              data-testid="chat-quick-reply"
+              className="inline-flex min-h-[44px] flex-none items-center rounded-full border border-white/12 px-3 py-2 text-[11px] text-slate-300 hover:bg-white/10"
+            >
+              {qr}
+            </button>
           ))}
         </div>
         <form

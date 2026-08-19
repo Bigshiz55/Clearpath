@@ -88,13 +88,29 @@ export interface ClarificationChoice {
  * Rank the candidates a person is asked to choose between.
  *
  * NOT a guess and not a tie-break — every option shown is returned, this only
- * decides ORDER and trims a long tail nobody can scan. Newest first because a
- * recency prior is a defensible way to order a LIST; it would be indefensible
- * as a way to pick one, which is why nothing here picks.
+ * decides ORDER and trims a long tail nobody can scan. Ordering a question is
+ * not answering it, which is why nothing here picks.
+ *
+ * BEST-KNOWN FIRST, NOT NEWEST FIRST. Recency was the original prior and the
+ * deployed proof showed what it costs: asked "Which Taken did you mean?", the
+ * room led with TAKEN (2025) and buried Taken (2008), the film the sentence
+ * almost certainly meant. A reader who takes the first option then anchors a
+ * comparison on a work nobody has a fingerprint for, and the answer degrades to
+ * the platform's popularity head — a wrong answer that arrived looking like a
+ * right one. Recognisability is what actually predicts which work a bare name
+ * refers to; it is used here and NOWHERE in identity, where popularity-as-
+ * identity is the defect `anchor.ts` exists to prevent. Year remains the
+ * tie-break, so a build whose search payload carries no popularity behaves
+ * exactly as it did before.
  */
 export function rankOptions(options: readonly AnchorOption[]): AnchorOption[] {
   return [...options]
-    .sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.tmdbId - b.tmdbId)
+    .sort(
+      (a, b) =>
+        (b.recognisability ?? 0) - (a.recognisability ?? 0) ||
+        (b.year ?? 0) - (a.year ?? 0) ||
+        a.tmdbId - b.tmdbId,
+    )
     .slice(0, MAX_CLARIFY_OPTIONS);
 }
 
