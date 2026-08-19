@@ -4,9 +4,9 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
-- **Phase 1 — Taste DNA → production recommendation ranking
-  (`claude/phase1-taste-dna-ranking`, branch only, NOT merged), cut from `main`
-  at `1b014f2` (post-#78, the hard-constraint architecture).** Ask's ordering
+- **Phase 1 — Taste DNA → production recommendation ranking. **MERGED** as PR
+  #79 (`ae4d751`), cut from `main` at `1b014f2` (post-#78). Deployed but
+  **NOT production-proven** — see `docs/TASTE-DNA-PRODUCTION-PROOF.md`.** Ask's ordering
   is no longer user-independent. `eligibleSurvivors` now pass through
   `personalizeCandidates` (`src/lib/ask/personalRanking.ts`) before the sort,
   and the comparator reads `personal.rankScore` instead of the objective
@@ -21,10 +21,44 @@ Updated at the end of every work order per the Working Agreement in
     per request, independent of pool size (pinned by an O(1)-cost test).
   - With no DNA on file it is an honest no-op: `participated: false`,
     `personalScore: null`, and an order byte-identical to the objective sort.
-  - Ledger: `docs/TASTE-DNA-SHIP.md`. Gates all green, frozen corpus untouched
-    (P0 635/635, P1 515/515). **Awaiting owner merge authorization** — and the
-    phase is not proven until a merged SHA demonstrably reorders production Ask
-    for a signed-in account with DNA on file.
+  - Ledger: `docs/TASTE-DNA-SHIP.md`. Gates all green on the merged SHA, frozen
+    corpus untouched (P0 635/635, P1 515/515), corpus sha256 verified against
+    the recorded baseline.
+  - **The forensic review found two real defects and fixed both:** a paid
+    gpt-4o-mini call was reachable from Ask through the profile backfill
+    (`getUserDimensionProfile` now takes `{ backfill: false }`, proven by a test
+    that watches the network on the real module), and the documented ordering
+    of ranking vs the eligibility gate was simply wrong — corrected, with the
+    real property (order-independence of `qualifyCandidates`) now pinned.
+  - **PARTLY PROVEN on a real deployment; the DNA-movement half is still open.**
+    `eval/preview/taste-dna-proof.mjs` (run by the `taste-dna-proof` CI job)
+    signs in as the real preview identity through the existing
+    `preview-test-login` route and asks the deployed `/api/ask` three closure
+    queries. No production surface was added: `/api/ask` already spreads the
+    whole `FinderItem`, so `matchScore` (the pre-Phase-1 objective score) rides
+    next to `personal.rankScore` and the evidence, and before/after arrive in
+    the same response.
+    - **PROVEN against a real deployment** (preview @ `3f9547c`, real Supabase,
+      real signed-in user, 28 items over 3 queries): membership unchanged before
+      vs after taste (set equality PASS on all three); no movement outside the
+      ±18 ceiling; and a genuine **no-DNA control** — the preview account has no
+      stored DNA, so `participated:false` on every item and the personalized
+      order was byte-identical to the objective sort. The hard-constraint query
+      returned exactly three Stallone films (Rocky, Creed, The Suicide Squad —
+      he voices King Shark), so the count and person constraints held.
+    - **STILL OPEN:** no account with stored Taste DNA was available, so real
+      *reordering* has not been observed on any deployment. Seeding DNA is
+      forbidden and would prove nothing anyway.
+    - **STILL OPEN:** everything above is PREVIEW. Production `/api/ask` is 401
+      without a session, `preview-test-login` is inert on production by platform
+      design (`VERCEL_ENV`), and the founder gate needs a server secret. No
+      credential path exists that does not require a secret this session must
+      not hold. `docs/TASTE-DNA-PRODUCTION-PROOF.md` has the owner's commands —
+      one authenticated call suffices.
+  - Measured latency on the deployed build is far better than the frozen
+    corpus's production p95 suggested: 1.2–1.8s p95 per query steady-state, with
+    only the first (cold) call at 5.5–6.7s. The 6.6s figure recorded earlier was
+    a cold-cache effect, not a steady-state cost.
   - **Held until then, by the work order:** diversity memory, critic
     personalities, Verdict Room redesign.
 - **Three-part P0 repair — `claude/p0-repair-semantic-ask-livetv` (one PR,
