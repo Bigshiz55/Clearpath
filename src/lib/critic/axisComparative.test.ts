@@ -97,3 +97,40 @@ describe('controls — "than" is not always a comparison', () => {
     expect(routeAsk('I like Sylvester Stallone movies', 'legacy', {}).consumer).not.toBe('critic');
   });
 });
+
+describe('a comparative BASELINE is not a film', () => {
+  /* Caught in review on this branch, and true of the pre-existing better_than
+     path too: the word after `than` is not always a work. "darker than usual"
+     compares against a NORM, and treating "usual" as a title sends a nonsense
+     anchor to resolution and loses the axis the user actually stated.
+
+     The axis is still real, so the sentence is not a critic request — it is an
+     ordinary tone preference, and the tone layer already owns that. */
+  const BASELINES = [
+    'something darker than usual',
+    'funnier than normal',
+    'better than average',
+    'darker than expected',
+    'scarier than most',
+    'longer than usual',
+    'less violent than typical',
+  ];
+  for (const text of BASELINES) {
+    it(`"${text}" produces no title anchor`, () => {
+      const r = parseCriticRequest(text);
+      if (r) {
+        for (const a of r.referenceTitles) {
+          expect(
+            ['usual', 'normal', 'average', 'expected', 'most', 'typical', 'standard'],
+            `"${text}" anchored on the baseline "${a}"`,
+          ).not.toContain(a.toLowerCase());
+        }
+      }
+    });
+  }
+
+  it('a real anchor after the same shape still resolves', () => {
+    expect(parseCriticRequest('darker than Taken')?.referenceTitles).toContain('Taken');
+    expect(parseCriticRequest('something better than Heat')?.referenceTitles).toContain('Heat');
+  });
+});
