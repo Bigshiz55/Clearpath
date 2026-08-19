@@ -154,6 +154,50 @@ async function main() {
   const report = { sha: v.sha ?? null, env: v.vercelEnv ?? null, at: new Date().toISOString(), queries: [] };
   let anyParticipation = false;
 
+  /* WHY, NOT JUST HOW MANY.
+     The first run of this harness reported "Q4 → 0 items" and stopped there,
+     which is a symptom, not evidence: zero can mean the subject never resolved
+     to a catalog keyword, or that discovery returned nothing, or that every
+     candidate was judged non-central. `/api/ask` already returns the whole
+     funnel (`diagnostics`) and the query it actually executed, so a failing
+     case can name its own cause instead of sending someone back to the source
+     to guess. Printed for any query that returns nothing or misses its
+     contract — never for a healthy one, which would just be noise. */
+  const explainShortfall = (body) => {
+    const d = body.diagnostics ?? null;
+    const q = body.query ?? {};
+    console.log(`  WHY: kind=${body.kind ?? '?'}`);
+    if (body.relaxed) console.log(`    relaxed: ${body.relaxed}`);
+    const interp = Array.isArray(body.interpretation) ? body.interpretation : [];
+    for (const line of interp.slice(0, 4)) console.log(`    interpretation: ${line}`);
+    console.log(
+      `    executed query: media=${q.mediaType ?? '?'} genreIds=${JSON.stringify(q.genreIds ?? [])} ` +
+      `subject=${q.subjectLabel ?? 'none'} strict=${q.subjectStrict ?? false} ` +
+      `subjectKeywordIds=${JSON.stringify(q.subjectKeywordIds ?? [])} ` +
+      `subjectLexemes=${JSON.stringify(q.subjectLexemes ?? [])} ` +
+      `castIds=${JSON.stringify(q.castIds ?? [])} finalCount=${q.finalCount ?? null}`,
+    );
+    if (!d) {
+      console.log('    no diagnostics on the response — this arm does not report a funnel.');
+      return;
+    }
+    console.log(
+      `    funnel: candidates=${d.candidateCount} → deterministic=${d.deterministicEligibleCount} → ` +
+      `semanticEvaluated=${d.semanticEvaluatedCount ?? '-'} → subjectCentral=${d.centralSubjectEligibleCount} → ` +
+      `quality=${d.qualityEligibleCount} → returned=${d.finalReturnedCount}`,
+    );
+    const eva = Array.isArray(d.evaluations) ? d.evaluations : [];
+    if (eva.length > 0) {
+      console.log(`    ${eva.length} candidate verdict(s); the 8 strongest:`);
+      for (const e of eva.slice(0, 8)) {
+        console.log(
+          `      ${String(e.title).slice(0, 30).padEnd(31)} ${e.eligible ? 'PASS' : 'FAIL'} ` +
+          `${String(e.centrality).padEnd(11)} conf=${String(e.confidence).padStart(3)}  ${e.rejectionReason ?? e.evidence ?? ''}`,
+        );
+      }
+    }
+  };
+
   for (const q of QUERIES) {
     console.log(`\n──────── ${q.id} (${q.kind}): "${q.text}"`);
     const { ms, body } = await ask(q.text);
@@ -164,7 +208,15 @@ async function main() {
          comedies." is not an order, and a deployment that answers it with a
          comedy grid has misread it. */
       if ((q.expect ?? {}).notASearch) console.log('  CONTRACT not-a-search: PASS (no result set)');
-      report.queries.push({ ...q, items: 0, latencyMs: ms, kind: body.kind ?? null });
+      else {
+        explainShortfall(body);
+        fail(`${q.id} "${q.text}": returned no results at all.`);
+      }
+      report.queries.push({
+        ...q, items: 0, latencyMs: ms, kind: body.kind ?? null,
+        diagnostics: body.diagnostics ?? null, executedQuery: body.query ?? null,
+        interpretation: body.interpretation ?? null, relaxed: body.relaxed ?? null,
+      });
       continue;
     }
 
@@ -225,10 +277,15 @@ async function main() {
       const wrong = items.filter((i) => i.mediaType !== exp.media);
       checks.push([`every item is ${exp.media}`, wrong.length === 0, `${wrong.length} of the wrong type`]);
     }
+    let contractMissed = false;
     for (const [label, ok, detail] of checks) {
       console.log(`  CONTRACT ${label}: ${ok ? 'PASS' : `FAIL (${detail})`}`);
-      if (!ok) fail(`${q.id} "${q.text}": expected ${label}, ${detail}.`);
+      if (!ok) {
+        contractMissed = true;
+        fail(`${q.id} "${q.text}": expected ${label}, ${detail}.`);
+      }
     }
+    if (contractMissed) explainShortfall(body);
 
     // ── SET EQUALITY: ordering may change, membership may not ──────────────
     const sameSet =
@@ -253,7 +310,11 @@ async function main() {
       if (!identical) fail(`${q.id}: no DNA participated, yet the order differs from the objective sort.`);
     }
 
-    report.queries.push({ ...q, items: items.length, latencyMs: ms, kind: body.kind ?? null, rows, sameSet, movements: moved.length, participation });
+    report.queries.push({
+      ...q, items: items.length, latencyMs: ms, kind: body.kind ?? null, rows, sameSet,
+      movements: moved.length, participation,
+      diagnostics: body.diagnostics ?? null, executedQuery: body.query ?? null,
+    });
   }
 
   // ── LATENCY: repeat each query so a single sample cannot mislead ─────────

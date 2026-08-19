@@ -8,6 +8,8 @@ import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from
 import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
 import { interpret } from '@/lib/interpret/interpret';
 import { resolveCanonicalExecution } from '@/lib/ask/canonicalExecution';
+import { acknowledgeStatement, isBareStatement } from '@/lib/ask/statementBoundary';
+import { canonicalClaimsSpan } from '@/lib/ask/titleSpanOwnership';
 import { unresolvedClarification, type NearMisses } from '@/lib/ask/unresolvedResponse';
 import type { UnresolvedRequirement } from '@/lib/ask/hardConstraints';
 import { augmentInternational } from '@/lib/askInternational';
@@ -632,9 +634,69 @@ export async function POST(req: Request) {
       canonical?.kind === 'lookup'
         ? canonical.titles.find((t) => t.relation === 'requested')?.span ?? null
         : null;
-    if (text.trim() && cls?.mode !== 'similar_to' && !lex && !(conversational && prevHadConstraints)) {
+    /* THE EXTRACTOR MAY NOT RE-BIND WHAT INTERPRETATION ALREADY BOUND.
+       When the canonical layer did NOT call this a lookup, this arm falls back
+       to `looksLikeTitleAsk` + `classifySearch` — a second, independent reader
+       of the same sentence. On "another boxing movie" that reader strips the
+       media noun and produces the phantom title "another boxing", so the ask
+       goes to the title machinery and discovery never runs; the deployed
+       harness measured it as zero results. `canonicalClaimsSpan` asks the one
+       question that settles it: has every identity-bearing word of the span
+       already been bound to a subject, genre, tone, person or provider? If so
+       the sentence named no title. A canonical TITLE span is never a claim, so
+       "Rocky", "Snake Eyes" and "Show me The Lego Movie" still come here. */
+    const legacyTitleSpan = canonicalRequestedTitle ?? cls?.requestedTitle ?? text;
+    const titleSpanBelongsElsewhere =
+      canonicalRequestedTitle == null && canonicalClaimsSpan(canonical, legacyTitleSpan);
+    if (
+      text.trim() &&
+      cls?.mode !== 'similar_to' &&
+      !lex &&
+      !titleSpanBelongsElsewhere &&
+      !(conversational && prevHadConstraints)
+    ) {
       const titled = await askJudgeTitle(supabase, user.id, text, cls ?? undefined, canonicalRequestedTitle);
       if (titled) return NextResponse.json(withConv({ kind: 'title', ...titled }));
+    }
+
+    // 1.5) THE STATEMENT BOUNDARY — a remark is not an order.
+    //
+    // `interpret()` had already read "My wife likes comedies." correctly:
+    // `kind: 'statement'`, an empty `requestClause`, the genre recorded against
+    // the COMPANION. But `kind` was only ever consulted to fence OTHER readers
+    // off the sentence (`canonicalRecognises` above, `canonicalOwnsLanguage`
+    // below) — no branch ever asked "was this a request at all?". So the
+    // statement fell through to the discovery arms, a legacy parser found the
+    // word "comedies", and the deployment answered a remark about someone
+    // else's taste with a 24-title grid. Interpretation was right and had
+    // nowhere to go.
+    //
+    // This is that missing question, asked once, from the canonical reading
+    // alone — not from the wording, the holder, or any particular genre. A
+    // statement executes nothing: no discovery, no title trial, no
+    // conversational search. In conversation the taste is still MERGED and
+    // ridden back on `withConv`, so the next turn spends it; only the search is
+    // withheld. A bare catalog word ("boxing") is a browse request settled at
+    // 0.6 and a comparison is settled at 0.9, so both are excluded here by the
+    // decisions those branches already made, never by re-reading the text.
+    //
+    // IT SITS AFTER THE TITLE ARM, NOT BEFORE IT. A bare title — "Rocky",
+    // "Severance" — is a `statement` to the interpreter too: it asserts a name
+    // and frames no request. Those are the title machinery's to answer, and it
+    // has already answered them by the time control reaches here. What is left
+    // is a statement that named no title, which is the case with nothing to run.
+    if (isBareStatement(canonical) && !criticRequest && !lex) {
+      return NextResponse.json(
+        withConv({
+          kind: 'clarify',
+          route: '/api/ask',
+          requestId,
+          appliedText: text || null,
+          clarify: acknowledgeStatement(canonical),
+          query: { ...EMPTY_QUERY },
+          items: [],
+        }),
+      );
     }
 
     // 2a) CONVERSATION-DRIVEN DISCOVERY — the canonical state IS the query.
