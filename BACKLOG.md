@@ -4,6 +4,56 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **P0 closure on `claude/p0bcd-language` (PR #86) — the deployed proof is now
+  the gate, and it found four defects the whole unit suite was blind to.**
+  Every one lives where interpretation meets orchestration, which is exactly
+  where an in-process test cannot look.
+  - **"another boxing movie" returned nothing.** `interpret()` read it
+    perfectly — recommendation, movie, subject `boxing`, no title. `/api/ask`'s
+    named-title arm consults that reading only when it says `lookup`; otherwise
+    it re-reads the raw sentence with `looksLikeTitleAsk` + `classifySearch`,
+    strips the media noun, and looks up the phantom title "another boxing".
+    Generalized: any `<determiner> <subject> <medium>` ask took the same wrong
+    door. `src/lib/ask/titleSpanOwnership.ts` states the rule `ownership.test.ts`
+    already implied. **0 → 24 boxing films deployed.**
+  - **"My wife likes comedies." answered with 24 comedies.** `kind:
+    'statement'` was only ever read to fence OTHER readers off the sentence; no
+    branch asked whether the utterance contained a request at all.
+    `src/lib/ask/statementBoundary.ts` asks it once, after the title arm (a bare
+    title is a statement too). **24 items → `kind: clarify`, no result set.**
+  - **The card named the dial instead of reading it.** `matchHighlights`
+    returns `{ label, note }`; both chips were built from the label, so a real
+    card said "Heads up: Pace". Every unit test passed because every unit test
+    was written with prose no caller produces. Fixed with
+    `agreementPhrase`/`concernPhrase` and tests built from the real `DIMENSIONS`
+    table. Found by the browser proof (`tests/mobile/why-reasons.spec.ts`).
+  - **A comparison completed and did not matter.** "darker than Taken" returned
+    this deployment's unconstrained popularity head. `plan.authority` measures
+    the ANCHOR, and it scaled the instruction the USER stated too — so an
+    anchor the classifier has not fingerprinted silenced the axis the person
+    typed. Authority now scales only anchor-evidenced terms; the pure-anchor
+    case is identical to nine decimals (pinned).
+  - **The clarification led with the wrong film.** "Which Taken did you mean?"
+    offered TAKEN (2025) first. Recency was the documented prior; recognisability
+    is what predicts which work a bare name means, and TMDB returns it on every
+    search result. Used to ORDER the question, never in identity.
+  - **P0-G, first pass: nothing fixed may sit on a vote.** The global feedback
+    FAB is fixed bottom-left and landed on "Watch it" on the Verdict Room's
+    voting floor at phone widths. `isImmersiveRoute` gains one anchored pattern
+    (`^/court/[^/]+$`) plus the two harness routes; a collision spec measures
+    the rectangles at 320/390/430 rather than describing them.
+  - **DISCOVERED — the anchor clarification's option order is only as good as
+    TMDB popularity.** After the fix, "Taken" offers the 2017 series ahead of
+    the 2008 film, because TMDB's popularity metric decays and currently ranks
+    the series higher. Better than leading with an obscure 2025 title, but not
+    the same as "what people mean". A durable fix needs vote-count or a
+    recognisability blend, and belongs with a wider identity pass.
+  - **DISCOVERED — `npm run build` clobbers the Playwright harness bundle.**
+    `NEXT_PUBLIC_*` values are inlined at build time by `build:harness`; a plain
+    build afterwards leaves the mobile suite serving a bundle with no Supabase
+    config, and every court test fails with a React error boundary that looks
+    exactly like a product regression. Always re-run `npm run build:harness`
+    immediately before a `playwright.mobile.config.ts` run.
 - **P0-B/C/D + qualifier + multi-clause (`claude/p0bcd-language`).** Five
   generalized interpreter repairs, each with its cause named:
   - **Axis comparatives reached nobody.** `parseCriticRequest` knew blend,
