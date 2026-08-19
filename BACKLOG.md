@@ -42,6 +42,45 @@ Updated at the end of every work order per the Working Agreement in
     voting floor at phone widths. `isImmersiveRoute` gains one anchored pattern
     (`^/court/[^/]+$`) plus the two harness routes; a collision spec measures
     the rectangles at 320/390/430 rather than describing them.
+  - **Three half-covered vocabularies, found while extending the harness.**
+    Each was invisible because the neighbouring case worked.
+    - **Plural genre names bound nothing, or bound a strict subject.**
+      `genreIdFromName` matches TMDB's singular names, so "comedies" resolved
+      to null and fell through the unmapped-genre fallback into
+      `requiredSubjects` — a STRICT centrality requirement. One bounded
+      morphological rule at the canonical vocabulary boundary.
+    - **`GENRE_WORDS` carried `comedies` but not `thrillers`.** "recommend
+      thrillers" bound no genre at all. Plurals are now derived from the
+      singulars, so a genre cannot be half-covered again.
+    - **A request verb became the search topic.** "recommend thrillers" bound
+      the SUBJECT "recommend": the subject extractor's guard was a second
+      hand-kept copy of vocabulary `clauses.ts` owns. One list now
+      (`REQUEST_VERBS`), read by both.
+    - **A tone verb was recognised in one form only.** `drag` was listed,
+      `drags` was not, so "nothing that drags" dropped the constraint while
+      "does not drag" kept it. Verbs carry their inflections by construction
+      and normalise to the base term.
+  - **A negation that was understood, recorded, disclosed and discarded.**
+    P0-C taught the parser that "a thriller that isn't slow" NEGATES slow; the
+    mapper sent the veto to `without_keywords` on the word "slow", which almost
+    nothing is tagged with, so the request ran as a bare genre browse. A vetoed
+    pace word now sets the opposite end of the pace band the finder already
+    filters on. An explicitly stated pace still wins.
+  - **P0-G forensic sweep — `court-geometry.spec.ts`.** join → lobby →
+    advanced → chat → verdict → appeal → voting floor, at 320/390/430/1440,
+    reading real geometry. Found one defect: the chat quick replies were 27px
+    tall against the room's own 44px standard, at every width. Everything else
+    sound; both off-screen strips are genuinely scrollable and are reported
+    rather than squeezed.
+  - **P0-H part 2 — dynamic range measured, nothing changed on the strength of
+    it.** Neither personalization family is decorative (fingerprint moves 72.1%
+    of titles at |max| 8; stated preference 88.6% at |max| 10) and neither
+    swamps quality (widest base gap a weaker title crossed: 7, ceiling 18). The
+    binding constraint is the BASE scale: 18 points across ~24 candidates leaves
+    under a point between neighbours, so 74% of adjacent pairs are near ties and
+    the median winning margin is 1. **The top-N set is meaningful; the order
+    inside it is not.** Widening the base spread is a scoring-engine change
+    gated by the 7 spec scenarios — recorded, not attempted.
   - **DISCOVERED — the anchor clarification's option order is only as good as
     TMDB popularity.** After the fix, "Taken" offers the 2017 series ahead of
     the 2008 film, because TMDB's popularity metric decays and currently ranks
