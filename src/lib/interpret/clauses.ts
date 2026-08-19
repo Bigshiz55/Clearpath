@@ -57,8 +57,31 @@ export interface Clause {
  * safe here: a request clause is identified by its own signals, so a request
  * cut in half still shows them in one of the halves.
  */
+/**
+ * A COORDINATING "and" THAT JOINS A REQUEST TO A STORY.
+ *
+ * "I had a burrito and want something fun tonight" is two independent clauses,
+ * and only the second is actionable. Unsplit, the whole utterance leads with
+ * "I had", trips the first-person and past-tense guards, and the request half
+ * disappears — the burrito swallows the question.
+ *
+ * Split ONLY when what follows the conjunction opens a request verb phrase.
+ * That is what keeps noun coordination intact: "cops and robbers", "a comedy
+ * and a thriller" and "Rocky and Creed" name things, they do not ask for one,
+ * and splitting them would shred the very spans the extractors depend on.
+ *
+ * The half this produces is ELLIPTICAL — "…and want something fun" becomes the
+ * subjectless "want something fun", because English drops the repeated subject
+ * across a conjunction. `REQUEST_VERB` therefore also accepts a clause-INITIAL
+ * desire verb, which is only reachable for a clause that began this way or was
+ * typed that way, both of which are requests.
+ */
+const AND_BEFORE_REQUEST =
+  /\s+\band\s+(?=(?:then\s+|now\s+|also\s+)?(?:i\s+|we\s+)?(?:want|need|would\s+like|am\s+looking\s+for|are\s+looking\s+for|looking\s+for|find|give|show|recommend|suggest|get)\b)/i;
+
 export function splitClauses(raw: string): string[] {
   return (raw ?? '')
+    .replace(AND_BEFORE_REQUEST, '. ')
     .split(/(?<=[.!?])\s+|[;\n]+|,\s+(?=(?:and\s+)?[a-z0-9"'“]|[A-Z])/u)
     .map((s) => s.trim().replace(/^(?:and|but|so|anyway|also|then|well|ok(?:ay)?)\b[\s,]*/i, '').trim())
     .filter((s) => s.length > 0);
@@ -88,7 +111,7 @@ export function splitClauses(raw: string): string[] {
    named regression for an unnamed one. Narrowing them belongs in its own
    change, judged on its own evidence. */
 const REQUEST_VERB =
-  /^\s*(?:please\s+|just\s+|maybe\s+|ok(?:ay)?,?\s+)*(?:recommend|suggest|pull up|put on|queue up|play|hit me with)\b|\b(?:find|show|give|recommend|suggest|get)\s+(?:me|us)\b|\bi(?:'|’)?m looking for\b|\blooking for\b|\bi want\b|\bi'?d like\b|\bi would like\b|\bi wanna\b|\bwhat (?:else )?should (?:i|we) watch\b|\bwhat to watch\b|\bin the mood for\b|\bfeel like watching\b|\bsurprise me\b|\bhelp me (?:find|pick|choose)\b|\bany (?:good|recommendations?)\b/i;
+  /^\s*(?:please\s+|just\s+|maybe\s+|ok(?:ay)?,?\s+)*(?:recommend|suggest|pull up|put on|queue up|play|hit me with)\b|\b(?:find|show|give|recommend|suggest|get)\s+(?:me|us)\b|\bi(?:'|’)?m looking for\b|\blooking for\b|\b(?:i|we)\s+want\b|\bi'?d like\b|\bi would like\b|\bi wanna\b|\bwhat (?:else )?should\b[^.?!]{0,40}?\bwatch\b|\bwhat to watch\b|\bin the mood for\b|\bfeel like watching\b|\bsurprise me\b|\bhelp me (?:find|pick|choose)\b|\bany (?:good|recommendations?)\b|^\s*(?:please\s+|just\s+)*(?:find|show|give|get)\s+(?:me\s+|us\s+)?(?:a|an|another|some|three|two|\d)\b|^\s*(?:want|need)\s+/i;
 
 /** The kind of thing one asks to be shown several of. */
 const MEDIA_NOUN =
@@ -117,6 +140,22 @@ const MEDIA_PERSON_REQUEST =
  */
 const PREFERENCE_LEAD =
   /\b(?:i|we)\s+(?:really\s+|kind\s+of\s+|sort\s+of\s+|generally\s+|usually\s+)?(?:like|love|enjoy|prefer|dig|am\s+into)\b/i;
+
+/**
+ * A THIRD PARTY'S STANDING TASTE — "My wife likes comedies."
+ *
+ * The same judgement `PREFERENCE_LEAD` makes for the speaker, made for someone
+ * else. Without it a sentence describing what a partner enjoys read as an
+ * instruction to go fetch it, which is the third-person twin of the fake-anchor
+ * defect that rule exists to prevent.
+ *
+ * The relationship nouns are NOT re-listed: `COMPANION` below already owns that
+ * vocabulary, and a second copy would drift. Third-person verb agreement
+ * ("likes", not "like") is what separates the statement from the request "a
+ * comedy my wife would LIKE".
+ */
+const THIRD_PARTY_PREFERENCE_VERB =
+  /\s+(?:really\s+|kind\s+of\s+|sort\s+of\s+|generally\s+|usually\s+)?(?:likes|loves|enjoys|prefers|digs|hates|watches|is\s+into)\b/i;
 
 /** A plural media noun ANYWHERE in the clause: "recent crime movies", "Apple
  *  TV+ shows with crime". Plural is load-bearing — film titles use the
@@ -198,6 +237,15 @@ const REACTION =
 const FAMILIARITY =
   /\b(?:i|we)(?:'|’)?(?:ve|\s+have)?\s+(?:already\s+)?(?:seen|watched)\b/i;
 
+/** A standing statement about a companion's taste: "my wife likes comedies".
+ *  Built FROM `COMPANION` rather than beside it, so the relationship vocabulary
+ *  has exactly one definition. */
+function thirdPartyPreference(t: string): boolean {
+  const m = COMPANION.exec(t);
+  if (!m) return false;
+  return THIRD_PARTY_PREFERENCE_VERB.test(t.slice(m.index + m[0].length));
+}
+
 /** Someone else in the room, and what they will not sit through. */
 const COMPANION =
   /\b(?:my|our)\s+(?:wife|husband|partner|girlfriend|boyfriend|kid|kids|son|daughter|mum|mom|dad|roommate|friend|family)\b/i;
@@ -278,7 +326,8 @@ export function classifyClause(text: string): ClauseRole {
     !REACTION.test(t) &&
     !FAMILIARITY.test(t) &&
     !PAST_TENSE.test(t) &&
-    !PREFERENCE_LEAD.test(t);
+    !PREFERENCE_LEAD.test(t) &&
+    !thirdPartyPreference(t);
 
   /* A COMPANION MENTION INSIDE A REQUEST IS A CONSTRAINT, NOT THE PURPOSE OF
      THE CLAUSE. "Pull up three TNT movies … something my family can watch"

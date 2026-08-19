@@ -4,6 +4,41 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **P0-B/C/D + qualifier + multi-clause (`claude/p0bcd-language`).** Five
+  generalized interpreter repairs, each with its cause named:
+  - **Axis comparatives reached nobody.** `parseCriticRequest` knew blend,
+    better_than and like, but not `<axis> than <anchor>` — the commonest
+    comparison in English. "darker than Taken" produced null and routed to
+    legacy discovery. `MODIFIER_MAP` already grounded `darker`; only the cue was
+    missing. Now `like_but` with anchor + axis. Ungrounded axes ("more intense")
+    still route, carrying the phrase as `unresolvedModifiers` rather than being
+    forced onto a wrong axis.
+  - **Contracted negation INVERTED the request.** "a thriller that isn't slow"
+    recorded `slow: wanted` and reached execution as a positive filter. The
+    negator vocabulary had "not" and "no" but no `isn't`/`doesn't`/`won't`.
+  - **Third-party preference became an order.** "My wife likes comedies."
+    classified as a recommendation. Preference detection now covers the
+    third-party possessive subject, reusing COMPANION's relationship nouns
+    rather than re-listing them.
+  - **Requests on someone's behalf were lost.** "Find a comedy my wife would
+    like." and "What should my husband and I watch?" fell to the companion
+    branch. Request vocabulary gained the bare imperative and the interrogative
+    with an intervening subject.
+  - **A coordinating "and" swallowed the question.** "I had a burrito and want
+    something fun tonight" stayed one clause. Split only when a request verb
+    phrase follows, so noun coordination ("cops and robbers") is untouched.
+  - **Qualifier loss RESOLVED:** a genre can head the phrase, so "another
+    courtroom drama" now binds subject `courtroom` + genre `drama`. A qualifier
+    that is itself a genre ("crime comedy") stays a genre.
+- **DISCOVERED — a trailing negative fragment does not bind.** "…, nothing
+  scary" splits off and classifies as a statement. Attached forms work. Pinned
+  in `companionAndThirdParty.test.ts`.
+- **DISCOVERED — taste memory across clauses.** "I like Yellowstone. What
+  should I watch?" is now a recommendation but retains no anchor for
+  Yellowstone; the taste clause is background only.
+- **OBSERVED — "a movie my wife and I would both like" caps to 1 result**,
+  because "a movie" names a unit of media and the pinned contract reads that as
+  a count. Correct per the rule, arguably wrong for a companion request.
 - **Natural unframed requests are now requests (`claude/p0a-natural-requests`).**
   Measured against the deployed product, half of ordinary consumer phrasing was
   discarded: "another boxing movie", "a thriller that isn't slow" and "a movie

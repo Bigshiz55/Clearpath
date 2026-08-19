@@ -142,19 +142,27 @@ export function parseMedia(clause: string): MediaIntent {
  * breaks is stripping the negator as a stop word and keeping the noun, which
  * turns "no horror" into a horror search — the exact inversion of what was
  * asked. So negation is detected FIRST and carries the term into an exclusion.
+ *
+ * CONTRACTED AUXILIARIES COUNT. The list held "not" and "no" but none of
+ * "isn't", "doesn't", "won't", so "a thriller that isn't slow" recorded
+ * `slow: wanted` — not a dropped constraint but a REVERSED one, and the
+ * exclusion reached execution as a positive genre filter. "not slow" and
+ * "isn't slow" mean the same thing and now read the same way. The light verb
+ * an auxiliary drags along ("doesn't GET gory", "won't BE violent") is
+ * stripped with the determiners, so the span is the adjective the user meant.
  */
 const NEGATORS =
-  /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hate[sd]?|can'?t stand|but not|other than|anything but)\b/i;
+  /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hate[sd]?|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t)\b/i;
 
 /** The span a negator governs: from the negator to the next boundary. */
 function negatedSpans(clause: string): string[] {
   const out: string[] = [];
   const re =
-    /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hates?|hated|can'?t stand|but not|other than|anything but)\b\s+((?:too\s+|any\s+|another\s+|more\s+)?[a-z][\w'-]*(?:\s+[a-z][\w'-]*){0,3})/gi;
+    /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hates?|hated|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t)\b\s+((?:too\s+|any\s+|another\s+|more\s+|be\s+|get\s+|feel\s+|too\s+)?[a-z][\w'-]*(?:\s+[a-z][\w'-]*){0,3})/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(clause)) !== null) {
     const span = m[1]!
-      .replace(/\b(?:too|any|another|more|stuff|things?|movies?|films?|shows?|series)\b/gi, ' ')
+      .replace(/\b(?:too|any|another|more|stuff|things?|movies?|films?|shows?|series|be|get|feel|seem|look|turn)\b/gi, ' ')
       .replace(/\s+/g, ' ')
       .trim();
     if (span) out.push(span);
@@ -809,7 +817,14 @@ export function interpret(raw: string): CanonicalIntent {
 function findSubjectMatches(clause: string): SpanMatch[] {
   const out: SpanMatch[] = [];
   const MEDIA = String.raw`movies?|films?|shows?|series|documentar(?:y|ies)|flicks?`;
-  const re = new RegExp(String.raw`\b([a-z][\w-]{2,})\s+(?:${MEDIA})\b`, 'gi');
+  /* A GENRE can head the phrase too: "courtroom DRAMA", "political THRILLER".
+     Without these the qualifier was silently dropped — "another courtroom
+     drama" bound the genre and lost `courtroom`, which is the entire topic of
+     the request. The caller already discards a qualifier that is itself a
+     genre or tone, so "crime comedy" and "family comedy" do not donate their
+     own genre word back as a subject. */
+  const GENRE_HEAD = String.raw`dramas?|thrillers?|comed(?:y|ies)|myster(?:y|ies)|horrors?|westerns?|musicals?|romances?|documentaries`;
+  const re = new RegExp(String.raw`\b([a-z][\w-]{2,})\s+(?:${MEDIA}|${GENRE_HEAD})\b`, 'gi');
   /* "<media> about <topic>", optionally through a determiner: "movies about
      THE holocaust". Anchored to the media noun so "how about a Bruce Willis
      movie" — where `about` belongs to the request frame, not to a topic —
