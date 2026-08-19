@@ -674,6 +674,20 @@ export async function POST(req: Request) {
               evidence: candidateEvidence.status,
               eligible: ranked.eligible,
               applied: ranked.applied,
+              /* DEGRADATION, AS A FACT RATHER THAN AS PROSE.
+                 The deployed proof's contract is "the comparison changed the
+                 order, or the deployment SAID it could not", and it read the
+                 second half by matching the sentence — a hand-kept list of the
+                 phrasings that existed when it was written. Adding an honest
+                 third sentence above therefore turned a working disclosure into
+                 a silent failure: the product told the truth and the harness
+                 could not hear it. That is the same vocabulary-in-two-places
+                 defect this whole pass has been closing, and prose is the worst
+                 possible place to keep one, because copy is supposed to change.
+                 So the fact travels as a fact. Anyone rewording the notes above
+                 cannot break the contract, and a deployment that degrades
+                 without saying so still fails it. */
+              disclosed: criticNotes.length > 0,
               authority: ranked.authority,
             },
           },

@@ -19,6 +19,9 @@
 import { describe, it, expect } from 'vitest';
 import { readAnchorSpan } from './anchorSpan';
 import { resolveAnchor, type AnchorCandidate } from './anchor';
+import { buildCriticState } from './orchestrate';
+import { emptyDna } from '@/lib/preference/engine';
+import { routeAsk } from './gate';
 import { rankOptions } from './clarify';
 
 /* SYNTHETIC CANDIDATES IN TMDB'S SHAPE — the numbers are chosen, not fetched.
@@ -53,10 +56,10 @@ describe('the cues the sentence already carried', () => {
     expect(s.spokenAs, 'the label the user typed survives for the round trip').toBe('Taken 2008');
   });
 
-  it('a stated medium is read out of the frame, both ways round', () => {
-    expect(readAnchorSpan('the Taken movie')).toMatchObject({ title: 'Taken', mediaType: 'movie' });
-    expect(readAnchorSpan('the Taken series')).toMatchObject({ title: 'Taken', mediaType: 'tv' });
-    expect(readAnchorSpan('the Whiplash film')).toMatchObject({ title: 'Whiplash', mediaType: 'movie' });
+  it('a stated medium is read out of the frame, both ways round — as an OFFER', () => {
+    expect(readAnchorSpan('the Taken movie').framed).toEqual({ title: 'Taken', mediaType: 'movie' });
+    expect(readAnchorSpan('the Taken series').framed).toEqual({ title: 'Taken', mediaType: 'tv' });
+    expect(readAnchorSpan('the Whiplash film').framed).toEqual({ title: 'Whiplash', mediaType: 'movie' });
   });
 
   it('a bare name yields no cues at all — nothing is invented', () => {
@@ -64,13 +67,68 @@ describe('the cues the sentence already carried', () => {
     expect(readAnchorSpan('Whiplash')).toMatchObject({ title: 'Whiplash', year: null, mediaType: null });
   });
 
-  it('a frame is only read when a real title survives it', () => {
-    // "The Movie" is a name, not a frame around one.
-    expect(readAnchorSpan('The Movie').title).toBe('The Movie');
+  it('a frame is OFFERED, never applied — this module has no catalog to ask', () => {
+    // "The Movie" is a name, not a frame around one: nothing survives stripping.
+    expect(readAnchorSpan('The Movie')).toMatchObject({ title: 'The Movie', framed: null });
+    // These two are the SAME SHAPE and mean opposite things. Neither is decided
+    // here; both readings are handed to the caller, which asks the catalog.
+    expect(readAnchorSpan('the Taken movie')).toMatchObject({
+      title: 'the Taken movie',
+      framed: { title: 'Taken', mediaType: 'movie' },
+    });
+    expect(readAnchorSpan('The Truman Show')).toMatchObject({
+      title: 'The Truman Show',
+      framed: { title: 'Truman', mediaType: 'tv' },
+    });
   });
 });
 
+/**
+ * THE DECISION LIVES WHERE THE CATALOG DOES.
+ *
+ * These used to call `resolveAnchor` on a hand-built request, which proved the
+ * resolver and skipped the step that actually chooses between two readings of
+ * the same shape. The Vercel review caught what that hid: "The Truman Show" is
+ * "the Taken movie" word for word — article, name, medium noun — so eager
+ * stripping searched for "Truman" under a hard `tv` filter and resolved
+ * nothing. "Scary Movie" and "Silent Movie" fail identically.
+ *
+ * So the frame is now decided on catalog evidence in `buildCriticState`, and
+ * that is what these exercise: a stub `searchCandidates` stands in for TMDB and
+ * records which strings were actually searched.
+ */
 describe('an explicit cue RESOLVES instead of asking', () => {
+  /** A stub catalog that answers by title, and remembers what it was asked. */
+  const catalog = (rows: AnchorCandidate[]) => {
+    const asked: string[] = [];
+    const search = async (name: string) => {
+      asked.push(name);
+      const n = name.trim().toLowerCase();
+      return rows.filter((r) => r.title.toLowerCase() === n);
+    };
+    return { asked, search };
+  };
+
+  const TRUMAN: AnchorCandidate[] = [
+    { id: 37165, mediaType: 'movie', title: 'The Truman Show', year: 1998, audience: 12000, recognisability: 40 },
+  ];
+
+  /* The request comes from the real router, not from a hand-built object —
+     `routeAsk` is what production uses and it is what decides that these
+     sentences carry a comparison at all. */
+  const resolveVia = async (sentence: string, rows: AnchorCandidate[]) => {
+    const c = catalog(rows);
+    const decision = routeAsk(sentence, 'legacy');
+    const state = await buildCriticState({
+      request: decision.request!,
+      dna: emptyDna(),
+      hard: { mediaType: 'any' },
+      searchCandidates: c.search,
+      loadDimensions: async () => new Map(),
+    });
+    return { state, asked: c.asked };
+  };
+
   it('a stated year picks the work without a question', () => {
     const { req } = ask('Taken 2008');
     const r = resolveAnchor(req, TAKEN);
@@ -78,38 +136,44 @@ describe('an explicit cue RESOLVES instead of asking', () => {
     if (r.status === 'resolved') expect(r.anchor.tmdbId).toBe(8681);
   });
 
-  it('"the Taken movie" picks the film', () => {
-    const { req } = ask('the Taken movie');
-    const r = resolveAnchor(req, TAKEN);
+  it('"the Taken movie" picks the film — the frame is adopted when the literal reading is not in the catalog', async () => {
+    const { state, asked } = await resolveVia('something darker than the Taken movie', TAKEN);
+    expect(asked, 'the literal reading must be tried first').toEqual(['the Taken movie', 'Taken']);
+    const r = state.resolutions[0]!;
     expect(r.status).toBe('resolved');
-    if (r.status === 'resolved') expect(r.anchor.mediaType).toBe('movie');
-  });
-
-  it('"the Taken series" narrows to television, and asks only among the series', () => {
-    const { req } = ask('the Taken series');
-    const r = resolveAnchor(req, TAKEN);
-    // Two series share the name, so the honest outcome is still a question —
-    // but a question about television only.
-    expect(r.status).toBe('ambiguous');
-    if (r.status === 'ambiguous') {
-      expect(r.options.every((o) => o.mediaType === 'tv')).toBe(true);
-      expect(r.options).toHaveLength(2);
+    if (r.status === 'resolved') {
+      expect(r.anchor.mediaType).toBe('movie');
+      expect(r.anchor.tmdbId).toBe(8681);
     }
   });
 
-  it('the span-local medium wins over the medium of the request', () => {
-    // "something darker than the Taken movie" wants anything back; the cue is
-    // about the ANCHOR.
-    const { req } = ask('the Taken movie', 'tv');
-    const r = resolveAnchor(req, TAKEN);
-    expect(r.status).toBe('resolved');
-    if (r.status === 'resolved') expect(r.anchor.mediaType).toBe('movie');
+  it('a REAL title of the same shape is left alone — the defect the review caught', async () => {
+    const { state, asked } = await resolveVia('something darker than The Truman Show', TRUMAN);
+    expect(asked, 'the catalog answered the literal reading, so no reframing').toEqual(['The Truman Show']);
+    const r = state.resolutions[0]!;
+    expect(r.status, 'the real title was truncated to "Truman" under a tv filter').toBe('resolved');
+    if (r.status === 'resolved') expect(r.anchor.tmdbId).toBe(37165);
   });
 
   it('an explicit year that matches nothing does not invent a match', () => {
     const { req } = ask('Taken 1994');
     const r = resolveAnchor(req, TAKEN);
     expect(r.status).not.toBe('resolved');
+  });
+
+  it('the span-local medium still narrows the question, not the answer', () => {
+    // Two series share the name, so the honest outcome is a question — but a
+    // question about television only.
+    const span = readAnchorSpan('the Taken series');
+    const r = resolveAnchor(
+      { spokenAs: 'the Taken series', matchTitle: span.framed!.title, mediaType: span.framed!.mediaType },
+      TAKEN,
+    );
+    expect(r.status).toBe('ambiguous');
+    if (r.status === 'ambiguous') {
+      expect(r.options.every((o) => o.mediaType === 'tv')).toBe(true);
+      expect(r.options).toHaveLength(2);
+    }
   });
 });
 

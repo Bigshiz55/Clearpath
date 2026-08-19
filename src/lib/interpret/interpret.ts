@@ -164,11 +164,40 @@ export function parseMedia(clause: string): MediaIntent {
 const NEGATORS =
   /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hate[sd]?|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t)\b/i;
 
+/**
+ * A DIMINISHER RULES AN AXIS END OUT, AND IT WAS DOING THE OPPOSITE.
+ *
+ * Found by the NL acceptance matrix: "something like that but less dumb"
+ * recorded `dumb: WANTED`, and so did "something less slow" and "a movie that
+ * is less scary". Not a dropped constraint — a REVERSED one, asking for exactly
+ * what the user ruled out. That is the failure mode `NEGATORS` above exists to
+ * prevent, arriving through a word the vocabulary had never heard of: the list
+ * covered "not so long" (because `not` is a negator) and nothing for the way
+ * people more often say the same thing.
+ *
+ * `less` and `fewer` scope over the following span exactly as a negator does,
+ * so they are read at the same seam rather than through a second mechanism —
+ * which is what makes tones and genres, user clauses and companion clauses all
+ * agree without any of them being told separately. The hedges people put in
+ * front ("a bit less", "a little less", "slightly less") are part of the
+ * diminisher, not part of the span it governs.
+ *
+ * `more` is deliberately absent: it is a direction, not a veto, and "something
+ * more funny" must keep meaning funny.
+ *
+ * MEDIA POLARITY DOES NOT LEARN THESE WORDS. "fewer movies" is not "no movies";
+ * a diminisher rules out an ATTRIBUTE, never a whole medium, so
+ * `MEDIA_NEGATOR_BEHIND` keeps its own vocabulary.
+ */
+const DIMINISHER = "(?:a\\s+bit\\s+|a\\s+little\\s+|slightly\\s+|somewhat\\s+|much\\s+|way\\s+)?(?:less|fewer)";
+
 /** The span a negator governs: from the negator to the next boundary. */
 function negatedSpans(clause: string): string[] {
   const out: string[] = [];
-  const re =
-    /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hates?|hated|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t)\b\s+((?:too\s+|any\s+|another\s+|more\s+|be\s+|get\s+|feel\s+|too\s+)?[a-z][\w'-]*(?:\s+[a-z][\w'-]*){0,3})/gi;
+  const re = new RegExp(
+    `\\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hates?|hated|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t|${DIMINISHER})\\b\\s+((?:too\\s+|any\\s+|another\\s+|more\\s+|be\\s+|get\\s+|feel\\s+|too\\s+)?[a-z][\\w'-]*(?:\\s+[a-z][\\w'-]*){0,3})`,
+    'gi',
+  );
   let m: RegExpExecArray | null;
   while ((m = re.exec(clause)) !== null) {
     const span = m[1]!

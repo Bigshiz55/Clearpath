@@ -403,7 +403,18 @@ async function main() {
           const head = settled.slice(0, 5).map(key);
           const shared = head.filter((k) => floor.has(k));
           const differs = floor.size === 0 || shared.length <= 2;
-          const disclosed = disclosure.some((l) => /couldn.t apply|didn.t separate|without the comparison|couldn.t fulfil/i.test(l));
+          /* READ THE FACT, NOT THE COPY. This used to match the sentence
+             against a hand-kept list of phrasings, so the day the route added
+             an honest third disclosure — "I couldn't check what I know about
+             these titles just now" — the deployment told the truth and this
+             contract recorded silence. Copy is supposed to change; a contract
+             pinned to it fails on improvements. `diagnostics.critic.disclosed`
+             is the route's own statement that it said something, and the
+             user-visible line still has to exist, so this is strictly harder to
+             satisfy than the regex was: a degraded answer with no note fails on
+             both halves, and an unrelated interpretation line cannot stand in
+             for a disclosure the route never made. */
+          const disclosed = criticDiag?.disclosed === true && disclosure.length > 0;
           const ok = differs || disclosed;
           console.log(
             `  CONTRACT the settled comparison differs from the floor, or says it could not: ` +

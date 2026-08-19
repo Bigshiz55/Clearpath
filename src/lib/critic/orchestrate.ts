@@ -33,6 +33,7 @@
 import type { DnaState } from '@/lib/preference/types';
 import { resolveAnchor, anchorsToObjective, canonicalKey, type AnchorCandidate, type AnchorResolution } from './anchor';
 import { readAnchorSpan } from './anchorSpan';
+import { isExactTitle } from '@/lib/nlu/titleNormalize';
 import { hydrateAnchors, type DimensionLoader } from './hydrate';
 import { buildPlan, type CriticPlan } from './plan';
 import { planToHints, type CriticRetrievalHints, type HardConstraints } from './retrieval';
@@ -172,12 +173,39 @@ export async function buildCriticState(input: OrchestrateInput): Promise<CriticS
          all. `readAnchorSpan` separates the NAME from the cues wrapped around
          it; the span-local medium wins over the request's, because "something
          darker than the Taken movie" says something about the anchor, not
-         about what the user wants back. */
+         about what the user wants back.
+
+         AND THE CATALOG DECIDES WHETHER A FRAME IS A FRAME. "The Truman Show"
+         has exactly the shape of "the Taken movie" — article, name, medium
+         noun — and no lexical rule tells them apart, so stripping eagerly
+         searched for "Truman" under a hard `tv` filter and resolved nothing.
+         "Scary Movie" and "Silent Movie" fail the same way. So the literal
+         reading is searched FIRST and kept whenever the catalog actually
+         contains it; the frame is adopted only when it does not. That is the
+         call `/api/search` already makes for the same ambiguity — both
+         readings are searched and exact catalog evidence decides — and it
+         costs a second request only in the case that needs one. */
       const span = readAnchorSpan(spokenAs);
-      const candidates = await searchCandidates(span.title).catch(() => [] as AnchorCandidate[]);
+      const literal = await searchCandidates(span.title).catch(() => [] as AnchorCandidate[]);
+      const literalExists = literal.some((c) => isExactTitle(span.title, c.title));
+
+      if (span.framed && !literalExists) {
+        const reframed = await searchCandidates(span.framed.title).catch(() => [] as AnchorCandidate[]);
+        if (reframed.length > 0) {
+          return resolveAnchor(
+            {
+              spokenAs,
+              matchTitle: span.framed.title,
+              mediaType: span.framed.mediaType,
+              year: span.year,
+            },
+            reframed,
+          );
+        }
+      }
       return resolveAnchor(
         { spokenAs, matchTitle: span.title, mediaType: span.mediaType ?? mediaType, year: span.year },
-        candidates,
+        literal,
       );
     }),
   );

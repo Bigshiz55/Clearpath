@@ -160,3 +160,82 @@ describe('the backfill can be measured without being run', () => {
     expect(cron).toMatch(/evidence: evidence\.status/);
   });
 });
+
+/**
+ * DEGRADATION MUST BE A FACT, NOT A SENTENCE.
+ *
+ * THE DEFECT, FOUND BY THE DEPLOYED PROOF AT EXACT HEAD. The harness contract
+ * is "the comparison changed the order, OR the deployment said it could not",
+ * and it read the second half by matching the note against a hand-kept list of
+ * phrasings. Adding an honest third disclosure — the `unavailable` case, which
+ * exists precisely so the product stops asserting an absence it never measured
+ * — therefore turned a working disclosure into a recorded silence. The product
+ * told the truth and the contract could not hear it. `main` passed this check
+ * and this branch failed it, on a change that made the product MORE honest.
+ *
+ * Copy is supposed to change. A contract pinned to copy fails on improvements
+ * as loudly as on regressions, which is the third time that shape has cost this
+ * repository a red gate in one pass. So the fact travels as a fact
+ * (`diagnostics.critic.disclosed`) and the sentence stays free to be rewritten.
+ *
+ * These two must never disagree, which is what this file pins: every branch of
+ * the degraded path pushes exactly one note, and the flag is that note's
+ * existence rather than a second, independently-maintained condition.
+ */
+describe('a degraded comparison is observable without reading the copy', () => {
+  it('the response carries the fact, derived from the note itself', () => {
+    expect(route, 'diagnostics must state whether anything was disclosed').toMatch(
+      /disclosed: criticNotes\.length > 0/,
+    );
+  });
+
+  it('the degraded branch always says something — no silent arm', () => {
+    const start = route.indexOf('if (!ranked.applied) {');
+    expect(start, 'the degraded branch is gone').toBeGreaterThan(-1);
+    const block = route.slice(start, route.indexOf('return NextResponse.json(', start));
+    // Exactly one push, whose argument is a total ternary over the three cases.
+    expect((block.match(/criticNotes\.push\(/g) ?? []).length).toBe(1);
+    expect(block, 'the read-failed case').toMatch(/candidateEvidence\.status === 'unavailable'/);
+    expect(block, 'the no-fingerprint case').toMatch(/fingerprinted === 0/);
+    expect(block, 'the ran-but-moved-nothing case').toMatch(/didn.t separate these titles/);
+    // No early return could skip the note.
+    expect(block).not.toMatch(/\breturn\b/);
+  });
+
+  it('the note reaches every caller, not only a conversational one', () => {
+    expect(route).toMatch(/interpretation: \[\.\.\.convInterpretation, \.\.\.criticNotes\]/);
+  });
+});
+
+/**
+ * THE HEALTH ENDPOINT MUST NOT SEND AN OPERATOR TO THE WRONG REMEDY.
+ *
+ * Measured on PRODUCTION, unauthenticated, during this pass:
+ * `/api/health/showdown` reported `covered: 0, total: 113, usable: false` and
+ * told the reader to run the classifier. But "the table holds nothing" and "we
+ * could not read the table" arrive at that route as the same empty Map, and
+ * only one of them is a coverage gap. An operator sent to the classifier for a
+ * missing service-role key will run it, watch the number stay at zero, and
+ * conclude the classifier is broken.
+ *
+ * The route's own docblock already makes this argument one level down — "'34 of
+ * 46' and '0 of 46' are the same kind of broken to a boolean and very different
+ * problems to an operator". This is the same sentence about the layer above it.
+ */
+describe('the coverage health endpoint separates an empty cache from an unreadable one', () => {
+  const health = readFileSync(join(ROOT, 'src/app/api/health/showdown/route.ts'), 'utf8');
+
+  it('reads the status, not just the rows', () => {
+    expect(health).toMatch(/readCachedDimensions\(/);
+    expect(health, 'the swallowing read must be gone').not.toMatch(/getCachedDimensions\(/);
+    expect(health).toMatch(/evidence: evidence\.status/);
+  });
+
+  it('names a different remedy when the read never happened', () => {
+    expect(health).toMatch(/couldNotLook/);
+    expect(health).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+    expect(health, 'the classifier must not be offered for a read failure').toMatch(
+      /the classifier will not fix it/,
+    );
+  });
+});

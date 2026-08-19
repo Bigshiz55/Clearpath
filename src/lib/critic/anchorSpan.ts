@@ -19,15 +19,26 @@ import { splitTitleQualifiers } from '@/lib/nlu/queryRepair';
  * that is the one rule added here. Confined to the critic layer, so no search
  * baseline can move.
  *
+ * A FRAME IS OFFERED, NEVER APPLIED. "The Truman Show" has exactly the shape
+ * of "the Taken movie" — article, name, medium noun — and stripping it yields
+ * the title "Truman" under a hard `tv` filter, which resolves to nothing. So do
+ * "Scary Movie", "Silent Movie", "The Daily Show" and "The Rocky Horror Picture
+ * Show". No lexical rule separates them: "the scary movie" and "Scary Movie"
+ * differ by an article and a capital letter, and neither survives being typed
+ * mid-sentence. The catalog is the only witness, and this module has no I/O, so
+ * it returns BOTH readings and lets `orchestrate` decide on evidence — the same
+ * call `/api/search` already makes ("Both readings are searched and exact
+ * catalog evidence decides").
+ *
  * NOTHING IS INVENTED. A span with no year yields no year; a span with no
- * medium yields no medium; and a frame is only read when a real title survives
- * it, so "the movie" alone is left exactly as it was.
+ * medium yields no medium; and a frame is only offered when a real name
+ * survives it, so "the movie" alone is left exactly as it was.
  *
  * PURE. No I/O.
  */
 
 export interface AnchorSpan {
-  /** The clean title to search and match on. */
+  /** The clean title to search and match on, taking the span at its word. */
   title: string;
   /** A year the user stated, or null. */
   year: number | null;
@@ -35,6 +46,12 @@ export interface AnchorSpan {
   mediaType: 'movie' | 'tv' | null;
   /** Exactly as the user said it — the label, and the round-trip key. */
   spokenAs: string;
+  /**
+   * The OTHER reading, when the span could be a medium wrapped around a name.
+   * Null when no frame is even possible. The caller adopts it only if the
+   * catalog has no title matching `title` as written — see the docblock.
+   */
+  framed: { title: string; mediaType: 'movie' | 'tv' } | null;
 }
 
 /** "the … movie" / "… the series": the medium wrapped around the name. */
@@ -49,17 +66,15 @@ export function readAnchorSpan(spoken: string): AnchorSpan {
   let title = base.title.trim();
   let mediaType: 'movie' | 'tv' | null = base.mediaType;
 
-  const framed = FRAMED.exec(title);
-  /* A FRAME ONLY COUNTS WHEN A TITLE SURVIVES IT. "the Taken movie" is a name
-     plus a medium; "The Movie" is a name, and reading a frame there leaves the
-     article "The" as the title — which is how a guard that only checks LENGTH
-     turns a real film into nothing. What has to survive is a NAME, so a
-     remainder made only of determiners is not a remainder at all. */
+  const m = FRAMED.exec(title);
+  /* A FRAME IS ONLY WORTH OFFERING WHEN A NAME SURVIVES IT. "the Taken movie"
+     leaves "Taken"; "The Movie" leaves the article, which is how a guard that
+     checks only LENGTH turns a real film into nothing. */
   const survives = (t: string) => t.trim().length >= 2 && !DETERMINERS_ONLY.test(t.trim());
-  if (framed && survives(framed[1] ?? '')) {
-    title = framed[1]!.trim();
-    if (mediaType === null) mediaType = TV_FRAME.test(framed[2]!) ? 'tv' : 'movie';
-  }
+  const framed =
+    m && survives(m[1] ?? '')
+      ? { title: m[1]!.trim(), mediaType: (TV_FRAME.test(m[2]!) ? 'tv' : 'movie') as 'movie' | 'tv' }
+      : null;
 
-  return { title, year: base.year, mediaType, spokenAs: raw };
+  return { title, year: base.year, mediaType, spokenAs: raw, framed };
 }
