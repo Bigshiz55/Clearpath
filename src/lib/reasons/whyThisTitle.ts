@@ -123,6 +123,42 @@ export function joinNatural(items: string[]): string {
   return `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]!}`;
 }
 
+/**
+ * A FIT AXIS, IN WORDS A READER CAN USE.
+ *
+ * `matchHighlights` returns axes as `{ label, note }` — the label is the AXIS
+ * NAME ("Pace", "Tone", "Content edge") and the note is what it actually says
+ * ("slow burn", "you lean fast-paced"). Passing the label alone produced chips
+ * that named the dial without reading it: "Heads up: Pace" tells a reader
+ * nothing, and the unit tests never caught it because they were written with
+ * prose that no caller ever supplies. The browser proof did.
+ *
+ * So the note is the sentence and the label is the subject, and each phrase
+ * uses whichever of the two actually carries meaning.
+ */
+const trimmed = (s: string | null | undefined): string => (s ?? '').trim();
+
+/** "slow burn" — what the title IS, since agreement notes name the axis end. */
+export function agreementPhrase(a: { label: string; note?: string | null }): string {
+  const note = trimmed(a.note);
+  return note.length > 0 ? note.toLowerCase() : trimmed(a.label).toLowerCase();
+}
+
+/** "pace — you lean fast-paced": the axis, then the direction the reader leans. */
+export function concernPhrase(c: { label: string; note?: string | null }): string {
+  const label = trimmed(c.label).toLowerCase();
+  const note = trimmed(c.note);
+  if (note.length === 0) return label;
+  if (label.length === 0) return note;
+  /* A note that already contains the axis name says it once, not twice — and
+     WHOLE-WORD, because "pace" is a substring of "fast-paced" and a plain
+     `includes` silently swallowed the axis on the commonest dial of all. */
+  const saidAlready = new RegExp(`(?:^|\\W)${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\W|$)`).test(
+    note.toLowerCase(),
+  );
+  return saidAlready ? note : `${label} — ${note}`;
+}
+
 export function buildWhyReasons(input: WhyInput): Reason[] {
   const out: Reason[] = [];
 

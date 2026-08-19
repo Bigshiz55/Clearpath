@@ -80,6 +80,14 @@ const QUERIES = [
   { id: 'Q10', text: 'I had a burrito and want something fun tonight.', kind: 'multi-clause', expect: { minItems: 2 } },
   { id: 'Q11', text: 'I like Yellowstone. What should I watch?', kind: 'cross-clause taste', expect: { minItems: 2 } },
   { id: 'Q12', text: 'I want a thriller, nothing scary', kind: 'trailing negative fragment', expect: { minItems: 2 } },
+  /* DID THE COMPARISON ACTUALLY SHAPE THE ANSWER? Q9 proves the round trip
+     completes; completing is not the same as mattering. A comparative request
+     that quietly degrades to the platform's popularity head is the failure the
+     critic layer exists to prevent, and it looks identical to success from a
+     result count. This anchor is unambiguous, so no question intervenes, and
+     the answer is measured against the floor this same deployment returns for
+     a request that constrains nothing. */
+  { id: 'Q13', text: 'I want something darker than Whiplash.', kind: 'comparative, unambiguous anchor', expect: { minItems: 2, mustDifferFromFloor: true } },
 ];
 
 const key = (i) => `${i.mediaType}:${i.id}`;
@@ -242,6 +250,16 @@ async function main() {
     return problems;
   };
 
+  /* THE FLOOR — what this deployment returns when the request constrains
+     nothing. Measured, never hard-coded: a list of famous titles written into
+     this file would rot, and would also be a judgement about which films are
+     "generic" rather than an observation about this build. */
+  const floorRes = await ask('recommend something');
+  const floorItems = Array.isArray(floorRes.body.items) ? floorRes.body.items : [];
+  const floor = new Set(floorItems.slice(0, 8).map(key));
+  console.log(`\n──────── FLOOR (an unconstrained ask): ${floor.size} title(s)`);
+  console.log(`  ${floorItems.slice(0, 8).map((i) => i.title).join(' · ') || 'none'}`);
+
   for (const q of QUERIES) {
     console.log(`\n──────── ${q.id} (${q.kind}): "${q.text}"`);
     const { ms, body } = await ask(q.text);
@@ -324,6 +342,16 @@ async function main() {
     if (exp.media != null) {
       const wrong = items.filter((i) => i.mediaType !== exp.media);
       checks.push([`every item is ${exp.media}`, wrong.length === 0, `${wrong.length} of the wrong type`]);
+    }
+    if (exp.mustDifferFromFloor) {
+      const head = items.slice(0, 5).map(key);
+      const shared = head.filter((k) => floor.has(k));
+      console.log(`  overlap with the unconstrained floor: ${shared.length} of the top ${head.length}`);
+      checks.push([
+        'the answer is not the unconstrained floor',
+        floor.size === 0 || shared.length <= 2,
+        `${shared.length} of the top 5 are the titles an unconstrained ask returns`,
+      ]);
     }
     let contractMissed = false;
     for (const [label, ok, detail] of checks) {
