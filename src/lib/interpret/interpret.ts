@@ -58,13 +58,27 @@ const LOOSE_COUNTS: Array<[RegExp, number]> = [
  */
 export function parseCount(clause: string): number | null {
   for (const [re, n] of LOOSE_COUNTS) if (re.test(clause)) return n;
-  // A digit or number-word standing in front of what is being asked for.
-  // `a`/`an` counts as one: "give me a boxing movie" asks for one film, and
-  // returning three to that is the same species of not-listening as returning
-  // one to a request for three.
-  const m = clause.match(
-    /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|an?)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|comed(?:y|ies)|thrillers?|dramas?|myster(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
-  );
+  /* A digit or number-word standing in front of what is being asked for.
+     `a`/`an` counts as one: "give me a boxing movie" asks for one film, and
+     returning three to that is the same species of not-listening as returning
+     one to a request for three.
+
+     BUT ONLY WHEN THE USER NAMED A UNIT OF MEDIA. "Looking for a good
+     thriller" came back from production with exactly ONE title, because the
+     article was read as the numeral against the bare genre head `thriller`.
+     That is not what the sentence says: "a good thriller" is how English
+     refers to the CATEGORY, the same way "I want a coffee" does not enumerate.
+     A request that names a unit — "a boxing MOVIE", "a Bruce Willis FILM" —
+     really does ask for one of them, and that reading is kept.
+
+     Numerals are unaffected either way: "give me 5 thrillers" is five. */
+  const m =
+    clause.match(
+      /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|comed(?:y|ies)|thrillers?|dramas?|myster(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
+    ) ??
+    clause.match(
+      /\b(an?)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
+    );
   /* THE NUMBER IS THE OBJECT OF THE REQUEST VERB: "only show me one".
      A self-correction states its count without repeating the noun, and the
      bridge above requires one, so the corrected request came back with NO count
@@ -775,29 +789,51 @@ export function interpret(raw: string): CanonicalIntent {
 }
 
 /**
- * The topic a request is about, when it is stated as a modifier of the media
- * noun: "another BOXING movie", "three good HEIST movies".
+ * The topic a request is about, in either of the two ways English states it:
  *
- * Structural rather than a vocabulary list: whatever adjective-ish word sits
- * immediately before the media noun is the subject, so a topic nobody
- * anticipated still lands in the right field.
+ *   PRE-NOMINAL   "another BOXING movie", "three good HEIST movies"
+ *   POST-NOMINAL  "movies about CHESS", "a documentary about VOLCANOES"
+ *
+ * Structural rather than a vocabulary list: whatever word sits in the topic
+ * slot is the subject, so a topic nobody anticipated still lands in the right
+ * field.
+ *
+ * THE POST-NOMINAL FORM WAS MISSING, and production showed what that costs.
+ * "movies about chess" answered with Spider-Man, Avengers and Toy Story 5 —
+ * not because ranking failed, but because no subject was ever extracted, so
+ * `subjectStrict` never armed and the aboutness gate never ran. The request
+ * decayed into generic popularity while looking like it had been understood.
+ * `about` is the single most common way to state aboutness in English; it is
+ * the one construction whose absence turns a topic request into a browse.
  */
 function findSubjectMatches(clause: string): SpanMatch[] {
   const out: SpanMatch[] = [];
-  const re =
-    /\b([a-z][\w-]{2,})\s+(?:movies?|films?|shows?|series|documentar(?:y|ies)|flicks?)\b/gi;
+  const MEDIA = String.raw`movies?|films?|shows?|series|documentar(?:y|ies)|flicks?`;
+  const re = new RegExp(String.raw`\b([a-z][\w-]{2,})\s+(?:${MEDIA})\b`, 'gi');
+  /* "<media> about <topic>", optionally through a determiner: "movies about
+     THE holocaust". Anchored to the media noun so "how about a Bruce Willis
+     movie" — where `about` belongs to the request frame, not to a topic —
+     cannot donate a subject. */
+  const aboutRe = new RegExp(
+    String.raw`\b(?:${MEDIA})\s+about\s+(?:the\s+|a\s+|an\s+)?([a-z][\w-]{2,})`,
+    'gi',
+  );
   /* Words that QUALIFY a medium without describing its content. `recent` and
      `favorite` reached the subject field during adversarial review — the first
      is a date word the lookback layer already owns, the second belongs to a
      preference statement. Neither is a theme anyone could search for. */
   const STRUCTURAL =
     /^(?:good|great|best|new|newer|old|older|other|another|more|some|any|the|a|an|three|two|four|five|six|seven|eight|nine|ten|one|few|couple|nice|decent|solid|different|similar|watch|see|want|like|find|show|give|only|just|recent|recently|latest|favorite|favourite|top|first|last|past|previous)$/i;
-  for (const m of clause.matchAll(re)) {
+  const push = (m: RegExpMatchArray): void => {
     const w = m[1]!.toLowerCase();
-    if (STRUCTURAL.test(w)) continue;
-    const start = m.index! + m[0]!.indexOf(m[1]!);
+    if (STRUCTURAL.test(w)) return;
+    // Offset from the END of the match, so a topic word that also appears
+    // earlier in the clause cannot mis-anchor the range the overlap rules use.
+    const start = m.index! + m[0]!.lastIndexOf(m[1]!);
     out.push({ text: w, start, end: start + m[1]!.length });
-  }
+  };
+  for (const m of clause.matchAll(re)) push(m);
+  for (const m of clause.matchAll(aboutRe)) push(m);
   return out;
 }
 

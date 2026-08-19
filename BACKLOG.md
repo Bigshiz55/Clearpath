@@ -4,6 +4,31 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **Two interpreter defects the deployed Taste DNA proof surfaced — fixed on
+  `claude/search-broad-and-subject-binding`.** Neither was a ranking defect:
+  personalization behaved correctly on top of a request that had already lost
+  its meaning.
+  - **A broad genre request was answered with exactly one title.** "Looking for
+    a good thriller" set `requestedCount: 1`, because `parseCount` read the
+    indefinite article as the numeral against the bare genre head `thriller`.
+    An article now enumerates only when the user names a UNIT OF MEDIA ("a
+    boxing MOVIE" still means one); a bare genre head is a category reference.
+    Numerals are untouched.
+  - **An aboutness request bound no subject.** "movies about chess" returned
+    Spider-Man, Avengers and Toy Story 5 because `findSubjectMatches` only knew
+    the PRE-nominal form ("chess movies"). With `subjects: []` the route never
+    set `subjectStrict`, so the aboutness gate never ran and the request decayed
+    into generic popularity. The post-nominal "<media> about <topic>"
+    construction is now read too. No topic vocabulary was added.
+- **DISCOVERED, NOT FIXED — an unframed SINGULAR request is read as a
+  statement.** `interpret('a film about grief').kind === 'statement'`, so it
+  never reaches subject extraction at all. The plural ("films about grief") and
+  the framed singular ("show me a film about grief") both work. This is a
+  clause-classification gap: the bare-request rule requires a PLURAL media noun.
+  Loosening it is delicate — that same rule is what stops "I like Sylvester
+  Stallone movies" from being mistaken for a request — so it is queued rather
+  than bundled into the aboutness fix. Pinned as a known limit in
+  `src/lib/interpret/broadAndAboutness.test.ts`.
 - **Phase 1 — Taste DNA → production recommendation ranking. **MERGED** as PR
   #79 (`ae4d751`), cut from `main` at `1b014f2` (post-#78). Deployed but
   **NOT production-proven** — see `docs/TASTE-DNA-PRODUCTION-PROOF.md`.** Ask's ordering
@@ -30,6 +55,14 @@ Updated at the end of every work order per the Working Agreement in
     that watches the network on the real module), and the documented ordering
     of ranking vs the eligibility gate was simply wrong — corrected, with the
     real property (order-independence of `qualifyCandidates`) now pinned.
+  - **STATE:** implementation COMPLETE · automated regression proof COMPLETE ·
+    deployed no-DNA control PROVEN · real-DNA reordering AWAITING OWNER
+    AUTHENTICATED PROOF · production authenticated proof AWAITING OWNER
+    AUTHENTICATED PROOF. Nothing in the ranking implementation is missing; what
+    is missing is an external observation from a signed-in account with
+    naturally accumulated DNA. `docs/TASTE-DNA-PRODUCTION-PROOF.md` reduces that
+    to one paste into a browser console — no cookie handling, no credentials,
+    no SQL, and output that is field-whitelisted so it is safe to share.
   - **PARTLY PROVEN on a real deployment; the DNA-movement half is still open.**
     `eval/preview/taste-dna-proof.mjs` (run by the `taste-dna-proof` CI job)
     signs in as the real preview identity through the existing

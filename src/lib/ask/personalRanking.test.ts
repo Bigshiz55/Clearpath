@@ -234,3 +234,55 @@ describe('7 — NO PAID CLASSIFICATION FROM A BULK PATH', () => {
     expect(getCachedDimensions.mock.calls[0]![0]).toHaveLength(ITEMS.length);
   });
 });
+
+describe('8 — TASTE DNA CANNOT RESCUE A SUBJECT-INELIGIBLE TITLE', () => {
+  /* THE CHESS INCIDENT, AS A PROPERTY. "movies about chess" answered with
+     Spider-Man. The interpreter defect that caused it is fixed elsewhere; this
+     pins the half that belongs to personalization, and it must hold even if a
+     subject fails to bind again for some other reason.
+
+     A superhero blockbuster is exactly the title a Marvel-loving profile would
+     promote. Eligibility runs first and is not consulted here: `finder.ts`
+     hands this layer only what survived the subject pre-filter, and the
+     person/media gate filters downstream on each candidate's own facts. So the
+     ineligible title is either absent, or removed after — never rescued. */
+  it('a title the subject gate rejected is not in the pool, whatever taste thinks of it', async () => {
+    const CHESS_FILM = { id: 101, mediaType: 'movie' as const, matchScore: 60, genreNames: ['Drama'] };
+    const SUPERHERO = { id: 102, mediaType: 'movie' as const, matchScore: 95, genreNames: ['Action', 'Adventure'] };
+
+    getCachedDimensions.mockResolvedValue(
+      new Map([
+        ['movie-101', fingerprint({ realism: 90, character: 88, stakes: 20 })],
+        ['movie-102', fingerprint({ realism: 10, character: 25, stakes: 99 })],
+      ]),
+    );
+    // A reader who loves exactly what the blockbuster is.
+    getUserDimensionProfile.mockResolvedValue(profileFor({ realism: 5, character: 20, stakes: 100 }));
+    loadPreferenceCached.mockResolvedValue(null);
+
+    // What the finder passes in: the subject survivors ONLY.
+    const eligible = [CHESS_FILM];
+    const out = await personalizeCandidates(supabase, 'marvel-fan', eligible);
+
+    expect(out.map((i) => i.id)).toEqual([101]);
+    expect(out.map((i) => i.id), 'taste must not conjure the ineligible blockbuster').not.toContain(102);
+    // And the surviving title keeps a real score rather than being zeroed for
+    // failing to match this reader's taste.
+    expect(out[0]!.personal.rankScore).toBeGreaterThan(0);
+  });
+
+  it('even ranked first, an ineligible title is dropped by the gate downstream', async () => {
+    // Ranking cannot pre-empt the gate: hardConstraints.test.ts pins that
+    // qualifyCandidates returns the same survivors whatever order it is handed.
+    // Here we only assert this layer never changes the SET it was given.
+    getUserDimensionProfile.mockResolvedValue(profileFor({ stakes: 100 }));
+    loadPreferenceCached.mockResolvedValue(null);
+    const pool = [
+      { id: 201, mediaType: 'movie' as const, matchScore: 40, genreNames: ['Drama'] },
+      { id: 202, mediaType: 'movie' as const, matchScore: 90, genreNames: ['Action'] },
+    ];
+    const out = await personalizeCandidates(supabase, 'marvel-fan', pool);
+    expect(new Set(out.map((i) => i.id))).toEqual(new Set([201, 202]));
+    expect(out).toHaveLength(pool.length);
+  });
+});
