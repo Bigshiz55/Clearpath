@@ -252,7 +252,7 @@ const COMPANION =
 
 /** A standalone filter that is a request even with no verb. */
 const CONSTRAINT =
-  /\b(?:under|over|less than|more than|no longer than|shorter than|at least|between)\s+(?:\d+|an?|one|two|three)\b|\b\d+\s*(?:minutes?|mins?|hours?|hrs?)\b|\bon (?:netflix|hulu|max|hbo|disney|prime|paramount|peacock|apple)\b|\b(?:no|not|without|except|avoid)\s+\w+/i;
+  /\b(?:under|over|less than|more than|no longer than|shorter than|at least|between)\s+(?:\d+|an?|one|two|three)\b|\b\d+\s*(?:minutes?|mins?|hours?|hrs?)\b|\bon (?:netflix|hulu|max|hbo|disney|prime|paramount|peacock|apple)\b|\b(?:no|not|nothing|none|without|except|avoid)\s+\w+/i;
 
 /**
  * A clause's role, decided by what it exhibits.
@@ -406,6 +406,12 @@ export function classifyClause(text: string): ClauseRole {
     return 'request';
   }
 
+  /* "I like Yellowstone." — a STANDING preference is taste evidence exactly as
+     a past-tense reaction is. `PREFERENCE_LEAD` was only ever consulted as a
+     guard, so a present-tense statement of taste fell through to background and
+     the reader's one piece of evidence was discarded before the request that
+     followed it could use it. */
+  if (PREFERENCE_LEAD.test(t)) return 'taste';
   if (REACTION.test(t)) return 'taste';
   if (FAMILIARITY.test(t)) return 'taste';
 

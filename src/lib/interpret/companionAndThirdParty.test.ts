@@ -73,19 +73,11 @@ describe('requests made on behalf of a companion ARE requests', () => {
     expect(i.people.map((p) => p.span)).toEqual([]);
   });
 
-  /* KNOWN GAP, pinned rather than asserted away. A trailing negative FRAGMENT
-     after a request — "…, nothing scary" — is split off as its own clause and
-     classified as a statement, so its tone never reaches the intent. The
-     attached forms all work ("a movie that isn't scary", "something not
-     scary"), and so does the fragment when it carries a medium ("nothing scary
-     tonight" is still a fragment — it does not). Logged in BACKLOG.md; fixing
-     it belongs with fragment classification, not with companion semantics. */
-  it('KNOWN GAP: a trailing negative fragment does not yet bind', () => {
+  /* RESOLVED. A trailing negative fragment is now a CONSTRAINT clause rather
+     than background, so it attaches to the request it qualifies. */
+  it('a stated companion aversion binds, because it WAS stated', () => {
     const i = interpret('a movie my wife and I would both like, nothing scary');
     expect(i.kind).toBe('recommendation');
-    expect(i.tones.find((t) => t.term === 'scary')).toBeUndefined();
-    // The attached form, which is what the parser does support today:
-    expect(interpret("a movie my wife and I would both like that isn't scary")
-      .tones.find((t) => t.term === 'scary')?.wanted).toBe(false);
+    expect(i.tones.find((t) => t.term === 'scary')?.wanted).toBe(false);
   });
 });

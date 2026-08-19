@@ -72,13 +72,23 @@ export function parseCount(clause: string): number | null {
      really does ask for one of them, and that reading is kept.
 
      Numerals are unaffected either way: "give me 5 thrillers" is five. */
-  const m =
-    clause.match(
-      /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|comed(?:y|ies)|thrillers?|dramas?|myster(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
-    ) ??
-    clause.match(
-      /\b(an?)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
-    );
+  const numeral = clause.match(
+    /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|comed(?:y|ies)|thrillers?|dramas?|myster(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
+  );
+  /* A DESCRIBED REQUEST IS A SPECIFICATION, NOT AN ENUMERATION.
+     "a boxing movie" names one unit and really does ask for one. "a movie my
+     wife and I would both like", "a movie that is not too long" and "a movie
+     without gore" name one unit and then SPECIFY it — the article is grammar
+     carrying the description, and capping those to a single result answers a
+     question nobody asked. A qualifier after the noun is the difference. */
+  const DESCRIBED =
+    /\b(?:that|which|who|whom|without|with)\b|\b(?:my|our)\b[^.;!?]{0,30}?\b(?:can|could|would|will|might)\b/i;
+  const article = numeral ? null : DESCRIBED.test(clause)
+    ? null
+    : clause.match(
+        /\b(an?)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
+      );
+  const m = numeral ?? article;
   /* THE NUMBER IS THE OBJECT OF THE REQUEST VERB: "only show me one".
      A self-correction states its count without repeating the noun, and the
      bridge above requires one, so the corrected request came back with NO count
@@ -172,7 +182,7 @@ function negatedSpans(clause: string): string[] {
 
 /** Tone words a person actually reaches for. Matched, never invented. */
 const TONE_WORDS =
-  /\b(funny|hilarious|light|lighthearted|dark|bleak|depressing|weird|strange|uplifting|feel-?good|tense|scary|frightening|gory|violent|easy|challenging|cerebral|slow|fast-?paced|romantic|sad|cosy|cozy|gritty|wholesome)\b/gi;
+  /\b(funny|hilarious|light|lighthearted|dark|bleak|depressing|weird|strange|uplifting|feel-?good|tense|scary|frightening|gory|violent|easy|challenging|cerebral|slow|fast-?paced|romantic|sad|cosy|cozy|gritty|wholesome|dumb|drag|gore|long)\b/gi;
 
 /** Genre names, as said. Ids are resolved downstream, never here. */
 const GENRE_WORDS =
@@ -329,6 +339,16 @@ function uniqueMatches(text: string, re: RegExp): string[] {
 const QUOTED = /["“']([^"”']{2,60})["”']/g;
 const AFTER_REACTION =
   /\b(?:loved|liked|enjoyed|hated|disliked|watched|saw|seen|finished|binged|rewatched)\s+((?:[A-Z][\w''-]*)(?:\s+(?:of|the|and|a|de|la)?\s*[A-Z0-9][\w''-]*){0,4})/g;
+/**
+ * A STANDING PREFERENCE THAT NAMES A WORK — "I like Yellowstone".
+ *
+ * `AFTER_REACTION` covers the past tense, which is how a verdict on one viewing
+ * is phrased. A standing preference is present tense, and without this the
+ * reader's only piece of evidence was dropped before the request that followed
+ * it could use it. Recorded as `liked`, i.e. TASTE — never as a requested
+ * title, because "I like Yellowstone. What should I watch?" is not a request
+ * for Yellowstone.
+ */
 const AFTER_SIMILARITY =
   /\b(?:like|similar to|in the vein of|in the style of|reminds me of|same (?:feel|vibe) as|better than|newer than|older than)\s+((?:[A-Z][\w''-]*)(?:\s+(?:of|the|and|a)?\s*[A-Z0-9][\w''-]*){0,4})/g;
 
