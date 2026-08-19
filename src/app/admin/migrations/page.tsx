@@ -1,3 +1,6 @@
+import { notFound } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { isAdminEmail } from '@/lib/admin';
 import type { Metadata } from 'next';
 import { ApplyMigrationsButton } from '@/components/admin/ApplyMigrationsButton';
 import { ReconcileDryRunButton } from '@/components/admin/ReconcileDryRunButton';
@@ -31,7 +34,18 @@ export const metadata: Metadata = {
  * gap is the root cause of the schema drift documented in
  * docs/SCHEMA_DRIFT_0042.md.
  */
-export default function AdminMigrationsPage() {
+export default async function AdminMigrationsPage() {
+  /* THE SAME GATE THE OTHER ADMIN PAGES USE. This page had none: no
+     /admin/layout.tsx exists, middleware carries no /admin rule, and the page
+     itself checked nothing, so the admin tooling rendered for anyone who knew
+     the URL. The APIs behind it were already protected — `isAdminEmail` on
+     config-state and reconcile-dry, `MIGRATE_SECRET` on migrate — so this was
+     exposure of internal tooling rather than privilege escalation, and it is
+     still not something a stranger should be able to look at.
+     `notFound()` rather than a 403, matching the other admin pages: a stranger
+     does not learn the route exists. */
+  const { data: { user } } = await createClient().auth.getUser();
+  if (!user?.email || !isAdminEmail(user.email)) notFound();
   return (
     <div className="min-h-dvh">
       <main className="container-page max-w-2xl space-y-6 py-8">

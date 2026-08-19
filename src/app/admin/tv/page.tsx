@@ -1,3 +1,6 @@
+import { notFound } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { isAdminEmail } from '@/lib/admin';
 import { FEASIBILITY_MATRIX, blockedOn } from '@/lib/tv/sources/feasibility';
 import { dataModeReport } from '@/lib/tv/dataMode';
 import { STAGE_LABEL } from '@/lib/tv/supportStage';
@@ -28,7 +31,18 @@ const VERDICT_STYLE: Record<string, string> = {
   no_go: 'bg-rose-400/15 text-rose-200 border-rose-400/30',
 };
 
-export default function AdminTvPage() {
+export default async function AdminTvPage() {
+  /* THE SAME GATE THE OTHER ADMIN PAGES USE. This page had none: no
+     /admin/layout.tsx exists, middleware carries no /admin rule, and the page
+     itself checked nothing, so the admin tooling rendered for anyone who knew
+     the URL. The APIs behind it were already protected — `isAdminEmail` on
+     config-state and reconcile-dry, `MIGRATE_SECRET` on migrate — so this was
+     exposure of internal tooling rather than privilege escalation, and it is
+     still not something a stranger should be able to look at.
+     `notFound()` rather than a 403, matching the other admin pages: a stranger
+     does not learn the route exists. */
+  const { data: { user } } = await createClient().auth.getUser();
+  if (!user?.email || !isAdminEmail(user.email)) notFound();
   const mode = dataModeReport();
   const counts = egressCounts();
   const blocked = blockedOn();
