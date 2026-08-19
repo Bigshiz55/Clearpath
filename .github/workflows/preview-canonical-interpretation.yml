@@ -97,6 +97,66 @@ jobs:
           esac
           exit $code
 
+  taste-dna-proof:
+    # PHASE 1 CLOSURE EVIDENCE. Signs in as the real preview identity and asks
+    # the deployed /api/ask the three closure queries, then reads the ordering
+    # proof straight out of the response: every item carries `matchScore` (the
+    # pre-Phase-1 objective score) beside `personal.rankScore` and the evidence
+    # that moved it, so before/after arrive together and no diagnostic endpoint
+    # had to be added to production to see them.
+    #
+    # It is not a pass/fail product gate — it is a measurement, and it fails only
+    # if personalization changes the MEMBERSHIP of an answer, breaches the +/-18
+    # ceiling, or reorders with no DNA participating.
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve the deployment under test
+        id: target
+        env:
+          TARGET_URL: ${{ github.event.deployment_status.target_url }}
+          ENVIRONMENT: ${{ github.event.deployment.environment }}
+          SHA: ${{ github.event.deployment.sha }}
+        run: |
+          if [ -z "$TARGET_URL" ]; then
+            echo "::error::No target_url on the deployment event."
+            exit 1
+          fi
+          case "$ENVIRONMENT" in
+            *[Pp]roduction*)
+              echo "Skipping: the preview test identity is inert on production."
+              echo "run=false" >> "$GITHUB_OUTPUT"; exit 0 ;;
+          esac
+          echo "url=$TARGET_URL" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.target.outputs.run == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.target.outputs.run == 'true'
+        with:
+          node-version: 20
+
+      - name: Prove Taste DNA ordering against the real deployment
+        if: steps.target.outputs.run == 'true'
+        env:
+          BASE_URL: ${{ steps.target.outputs.url }}
+          EXPECT_SHA: ${{ steps.target.outputs.sha }}
+          PREVIEW_TEST_LOGIN_SECRET: ${{ secrets.PREVIEW_TEST_LOGIN_SECRET }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set +e
+          node eval/preview/taste-dna-proof.mjs
+          code=$?
+          set -e
+          case $code in
+            0) echo "::notice::Taste DNA proof captured against the real deployment." ;;
+            1) echo "::error::PROOF failure — personalization violated a documented invariant." ;;
+            2) echo "::error::INFRASTRUCTURE failure — the proof could not run. Not a product verdict." ;;
+          esac
+          exit $code
+
   ui-journey:
     # The browser half of the same proof: the ORIGINAL INCIDENT typed through
     # the real deployed UI, asserted down to the rendered poster grid.
