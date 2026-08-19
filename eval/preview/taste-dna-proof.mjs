@@ -52,10 +52,27 @@ function fail(msg) {
 }
 
 /** The three queries the closure asked for. */
+/**
+ * The deployed language contract. Each case carries what the DEPLOYED response
+ * must show, so this proves behaviour rather than merely exercising a route.
+ *
+ * `expect` is checked against the route's own echoed interpretation (`query`,
+ * `interpretation`, `kind`) and the returned items — never against parser
+ * internals, which is the whole point of running it over HTTP.
+ */
 const QUERIES = [
-  { id: 'Q1', text: 'Looking for a good thriller', kind: 'broad taste-sensitive' },
-  { id: 'Q2', text: 'movies about chess', kind: 'subject' },
-  { id: 'Q3', text: 'three Sylvester Stallone movies', kind: 'hard constraint' },
+  { id: 'Q1', text: 'Looking for a good thriller', kind: 'broad taste-sensitive', expect: { minItems: 2 } },
+  { id: 'Q2', text: 'movies about chess', kind: 'subject', expect: { minItems: 2, media: 'movie' } },
+  { id: 'Q3', text: 'three Sylvester Stallone movies', kind: 'hard constraint', expect: { exactItems: 3, media: 'movie' } },
+  { id: 'Q4', text: 'another boxing movie', kind: 'unframed + qualifier', expect: { minItems: 2, media: 'movie' } },
+  { id: 'Q5', text: 'another courtroom drama', kind: 'genre-head qualifier', expect: { minItems: 2 } },
+  { id: 'Q6', text: "a thriller that isn't slow", kind: 'contracted negation', expect: { minItems: 2 } },
+  { id: 'Q7', text: 'My wife likes comedies.', kind: 'third-party statement', expect: { notASearch: true } },
+  { id: 'Q8', text: 'a movie my wife and I would both like', kind: 'companion request', expect: { minItems: 2, media: 'movie' } },
+  { id: 'Q9', text: 'I want something darker than Taken.', kind: 'comparative anchor + axis', expect: { minItems: 1 } },
+  { id: 'Q10', text: 'I had a burrito and want something fun tonight.', kind: 'multi-clause', expect: { minItems: 2 } },
+  { id: 'Q11', text: 'I like Yellowstone. What should I watch?', kind: 'cross-clause taste', expect: { minItems: 2 } },
+  { id: 'Q12', text: 'I want a thriller, nothing scary', kind: 'trailing negative fragment', expect: { minItems: 2 } },
 ];
 
 const key = (i) => `${i.mediaType}:${i.id}`;
@@ -143,6 +160,10 @@ async function main() {
     const items = Array.isArray(body.items) ? body.items : [];
     if (items.length === 0) {
       console.log(`  no items returned (kind=${body.kind ?? '?'}) — nothing to order.`);
+      /* For a third-party STATEMENT that is the correct outcome: "My wife likes
+         comedies." is not an order, and a deployment that answers it with a
+         comedy grid has misread it. */
+      if ((q.expect ?? {}).notASearch) console.log('  CONTRACT not-a-search: PASS (no result set)');
       report.queries.push({ ...q, items: 0, latencyMs: ms, kind: body.kind ?? null });
       continue;
     }
@@ -181,6 +202,32 @@ async function main() {
         `  ${String(r.title).slice(0, 33).padEnd(34)} ${String(r.objectiveRank).padStart(4)} ${String(r.objectiveScore).padStart(6)} ` +
         `${String(r.personalizedRank).padStart(4)} ${String(r.personalizedScore ?? '-').padStart(6)} ${String(r.movement > 0 ? '+' + r.movement : r.movement).padStart(5)}  ${ev}`,
       );
+    }
+
+    /* ── THE LANGUAGE CONTRACT, CHECKED ON THE DEPLOYED RESPONSE ──────────
+       A route that returns 200 with a plausible-looking list has proved
+       nothing; these are the behaviours the P0 language work repaired, read
+       back from what the deployment actually returned. */
+    const exp = q.expect ?? {};
+    if (exp.notASearch) {
+      const ok = items.length === 0;
+      console.log(`  CONTRACT not-a-search: ${ok ? 'PASS' : `FAIL (${items.length} items returned)`}`);
+      if (!ok) fail(`${q.id} "${q.text}": a third-party statement returned a result set.`);
+    }
+    const checks = [];
+    if (exp.exactItems != null) {
+      checks.push([`exactly ${exp.exactItems} items`, items.length === exp.exactItems, `got ${items.length}`]);
+    }
+    if (exp.minItems != null) {
+      checks.push([`at least ${exp.minItems} items`, items.length >= exp.minItems, `got ${items.length}`]);
+    }
+    if (exp.media != null) {
+      const wrong = items.filter((i) => i.mediaType !== exp.media);
+      checks.push([`every item is ${exp.media}`, wrong.length === 0, `${wrong.length} of the wrong type`]);
+    }
+    for (const [label, ok, detail] of checks) {
+      console.log(`  CONTRACT ${label}: ${ok ? 'PASS' : `FAIL (${detail})`}`);
+      if (!ok) fail(`${q.id} "${q.text}": expected ${label}, ${detail}.`);
     }
 
     // ── SET EQUALITY: ordering may change, membership may not ──────────────
