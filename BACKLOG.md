@@ -4,6 +4,29 @@ Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
 ## Now
+- **Natural unframed requests are now requests (`claude/p0a-natural-requests`).**
+  Measured against the deployed product, half of ordinary consumer phrasing was
+  discarded: "another boxing movie", "a thriller that isn't slow" and "a movie
+  my wife and I would both like" all classified as STATEMENTS, so no subject
+  bound and nothing survived to the finder. The cause was structural — the
+  bare-request rule demanded a PLURAL media noun, and that plural was
+  load-bearing because film titles are singular.
+  - The discriminator is not number: a clause that OPENS with an indefinite
+    determiner, names a medium or genre, and is written as ordinary prose
+    rather than Title Case. Anchoring keeps "Rocky is a boxing movie" a
+    statement; prose-vs-title keeps "A Goofy Movie" a title, with no title list.
+  - `show` stays excluded unless a relative clause disambiguates it, preserving
+    the existing "a horror show" guard.
+  - This also RESOLVED the unframed-singular limit pinned when the aboutness
+    fix landed.
+- **DISCOVERED — a genre head does not also yield its qualifier as a subject.**
+  "another courtroom drama" binds genre `drama` but drops `courtroom`. The
+  subject extractor's noun list is media-only by design. Pinned as a known gap
+  in `unframedRequests.test.ts`.
+- **DISCOVERED — "My wife likes comedies" already classifies as a
+  recommendation** on main, before and after this change. A third-party
+  preference statement should not be an order. Not touched here; it predates
+  this work and fixing it belongs with companion/household handling (P0-D).
 - **Two interpreter defects the deployed Taste DNA proof surfaced — fixed on
   `claude/search-broad-and-subject-binding`.** Neither was a ranking defect:
   personalization behaved correctly on top of a request that had already lost
