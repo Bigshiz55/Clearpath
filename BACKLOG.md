@@ -55,6 +55,14 @@ Updated at the end of every work order per the Working Agreement in
     that watches the network on the real module), and the documented ordering
     of ranking vs the eligibility gate was simply wrong — corrected, with the
     real property (order-independence of `qualifyCandidates`) now pinned.
+  - **STATE:** implementation COMPLETE · automated regression proof COMPLETE ·
+    deployed no-DNA control PROVEN · real-DNA reordering AWAITING OWNER
+    AUTHENTICATED PROOF · production authenticated proof AWAITING OWNER
+    AUTHENTICATED PROOF. Nothing in the ranking implementation is missing; what
+    is missing is an external observation from a signed-in account with
+    naturally accumulated DNA. `docs/TASTE-DNA-PRODUCTION-PROOF.md` reduces that
+    to one paste into a browser console — no cookie handling, no credentials,
+    no SQL, and output that is field-whitelisted so it is safe to share.
   - **PARTLY PROVEN on a real deployment; the DNA-movement half is still open.**
     `eval/preview/taste-dna-proof.mjs` (run by the `taste-dna-proof` CI job)
     signs in as the real preview identity through the existing

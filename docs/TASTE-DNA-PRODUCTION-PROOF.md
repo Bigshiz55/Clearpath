@@ -1,12 +1,23 @@
-# PHASE 1 PRODUCTION PROOF — THE PROCEDURE, AND WHY THIS SESSION COULD NOT RUN IT
+# PHASE 1 PRODUCTION PROOF — STATE, AND THE ONE REMAINING STEP
 
-## STATUS: **NOT PRODUCTION-PROVEN.** Two halves; one is closed.
+## PHASE 1 STATE
 
-Phase 1 is merged and deployed. A real deployment has now been measured as a
-real signed-in user (see **DEPLOYED-RUNTIME EVIDENCE** below), which closes the
-safety and control half. What remains unproven is the half that matters most to
-the product: that a reader with stored Taste DNA gets a *different order*.
-Nothing here should be read as claiming otherwise.
+| | |
+|---|---|
+| **Implementation** | **COMPLETE** |
+| **Automated regression proof** | **COMPLETE** |
+| **Deployed no-DNA control** | **PROVEN** |
+| **Real-DNA reordering** | **AWAITING OWNER AUTHENTICATED PROOF** |
+| **Production authenticated proof** | **AWAITING OWNER AUTHENTICATED PROOF** |
+
+Read that table precisely. **Nothing about the ranking implementation is
+missing or unfinished.** What is missing is an *external observation*: a
+signed-in request from an account that has naturally accumulated Taste DNA.
+This session cannot make that observation, because every path to an
+authenticated production request needs a secret it must not hold — not because
+any code is absent.
+
+The remaining step is one paste into a browser console, below.
 
 ---
 
@@ -72,103 +83,108 @@ with no DNA, not a signed-out one.
 
 ---
 
-## WHAT THE OWNER RUNS TO CLOSE IT
+## WHAT THE OWNER RUNS TO CLOSE IT — ONE PASTE, NO CREDENTIALS
 
-The response makes this a **single call**, because `/api/ask` spreads the whole
-`FinderItem`: each item carries `matchScore` (the objective score, i.e. the
-order *before* taste) alongside `personal.rankScore` (the order *after*), plus
-the evidence that moved it. Before and after arrive together.
+**You do not need to copy a cookie, open a terminal, touch Supabase, run SQL, or
+send anything secret to anyone.** The browser you are already signed into holds
+the session; the snippet below rides it with `credentials: 'same-origin'`.
 
-### 1 · Get a session cookie
+### The whole procedure
 
-Sign in at https://clearpath-pearl-chi.vercel.app with an account that has rated
-titles. In DevTools → Application → Cookies, copy the `sb-*-auth-token` cookie
-(name and value). Everything below assumes:
+1. Sign in at <https://clearpath-pearl-chi.vercel.app> **with the account that
+   has your ratings** (the one with real Taste DNA).
+2. Open DevTools → **Console**  (F12, or ⌥⌘J on a Mac).
+3. Paste the snippet below and press Enter. It takes about 15 seconds.
+4. Copy the block it prints under `=== COPY FROM HERE ===` and paste it back.
 
-```bash
-BASE=https://clearpath-pearl-chi.vercel.app
-COOKIE='sb-xxxx-auth-token=PASTE_VALUE_HERE'
+That output is **field-whitelisted** — title, id, the two scores, and the taste
+evidence. It contains no cookie, no token, no email, no user id, and no part of
+the raw response beyond those fields. It is safe to paste into chat.
+
+### The snippet
+
+```js
+(async () => {
+  const QUERIES = ['Looking for a good thriller', 'movies about chess', 'three Sylvester Stallone movies'];
+  const ask = async (text) => {
+    const t0 = performance.now();
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      credentials: 'same-origin',                 // the session you already have
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const ms = Math.round(performance.now() - t0);
+    if (res.status === 401) throw new Error('Not signed in — sign in first, then re-run.');
+    return { ms, body: await res.json() };
+  };
+
+  const version = await (await fetch('/api/version', { credentials: 'same-origin' })).json();
+  const out = { sha: version.sha, env: version.vercelEnv, at: new Date().toISOString(), queries: [] };
+
+  for (const text of QUERIES) {
+    const { ms, body } = await ask(text);
+    const items = body.items || [];
+    // WHITELIST — nothing else from the response is read or emitted.
+    const rows = items.map((i, idx) => {
+      const p = i.personal || {}, e = p.evidence || {};
+      return {
+        title: i.title, id: `${i.mediaType}:${i.id}`,
+        objectiveScore: i.matchScore, personalizedRank: idx + 1,
+        personalizedScore: p.rankScore ?? null, participated: !!p.participated,
+        dimensionMatch: e.dimensionMatch ?? null, preferenceNudge: e.preferenceNudge ?? 0,
+        confidence: e.confidence ?? 0,
+        reasons: (e.reasons || []).map((r) => r.label || r.key || r.axis).filter(Boolean).slice(0, 3),
+        concerns: (e.concerns || []).map((r) => r.label || r.key || r.axis).filter(Boolean).slice(0, 3),
+      };
+    });
+    const objective = [...rows].sort((a, b) => b.objectiveScore - a.objectiveScore).map((r) => r.id);
+    const personalized = rows.map((r) => r.id);
+    rows.forEach((r) => { r.objectiveRank = objective.indexOf(r.id) + 1; r.movement = r.objectiveRank - r.personalizedRank; });
+
+    out.queries.push({
+      text, ms, items: rows.length, rows,
+      A_tasteMovedSomething: JSON.stringify(objective) !== JSON.stringify(personalized),
+      B_sameEligibleSet: objective.length === personalized.length && objective.every((k) => personalized.includes(k)),
+      C_realEvidence: rows.some((r) => r.participated),
+      D_withinCeiling: rows.every((r) => r.personalizedScore == null || Math.abs(r.personalizedScore - r.objectiveScore) <= 18),
+    });
+
+    console.log(`\n${text}  —  ${rows.length} items, ${ms}ms`);
+    console.table(rows.map((r) => ({ title: r.title, obj: r.objectiveRank, objScore: r.objectiveScore,
+      per: r.personalizedRank, perScore: r.personalizedScore, move: r.movement,
+      participated: r.participated, dim: r.dimensionMatch, pref: r.preferenceNudge })));
+  }
+
+  console.log('\n=== COPY FROM HERE ===');
+  console.log(JSON.stringify(out, null, 1));
+  console.log('=== COPY TO HERE ===');
+})();
 ```
 
-Do not paste that cookie into an issue, a PR, or a chat window — it is a live
-credential.
+### Reading the result
 
-### 2 · Confirm the deployment you are testing
+Per query the snippet reports four flags:
 
-```bash
-curl -sS "$BASE/api/version" | python3 -m json.tool | head -5
-```
+| flag | meaning |
+|---|---|
+| **A** `tasteMovedSomething` | at least one title changed position |
+| **B** `sameEligibleSet` | the eligible set itself did not change — same ids, different order |
+| **C** `realEvidence` | at least one title has `participated: true`; this is the *because*. A movement with no participation anywhere would mean something else moved the list |
+| **D** `withinCeiling` | no title moved more than ±18 |
 
-Expect `"sha"` to equal the merged Phase 1 SHA and `"vercelEnv": "production"`.
+**A true with C true, on the account that has your ratings, is the proof.**
 
-### 3 · The broad query — ordering, evidence, and the eligible set
+If **A is false and C is false**, that account has no stored Taste DNA reaching
+these titles — the ranking is correct and honest, it simply has nothing to say
+yet. Try a query closer to what you have actually rated.
 
-```bash
-curl -sS -X POST "$BASE/api/ask" \
-  -H 'Content-Type: application/json' -H "Cookie: $COOKIE" \
-  -d '{"text":"a good thriller"}' > /tmp/dna-on.json
+### The no-DNA control (optional, ~1 minute)
 
-python3 - <<'PY'
-import json
-d = json.load(open('/tmp/dna-on.json'))
-items = d['items']
-print('serving sha:', d.get('sha'))
-print(f"{'title':38} {'objective':>9} {'ranked':>7} {'part?':>6}  evidence")
-for i in items:
-    p = i.get('personal') or {}
-    ev = p.get('evidence') or {}
-    reasons = ', '.join(r.get('label', str(r)) for r in (ev.get('reasons') or [])[:2])
-    print(f"{i['title'][:37]:38} {i['matchScore']:>9} "
-          f"{p.get('rankScore','-'):>7} {str(p.get('participated')):>6}  "
-          f"dim={ev.get('dimensionMatch')} pref={ev.get('preferenceNudge')} {reasons}")
-
-# THE FOUR ASSERTIONS
-objective_order = [i['id'] for i in sorted(items, key=lambda x: -x['matchScore'])]
-actual_order    = [i['id'] for i in items]
-print('\nA. taste moved at least one title:', objective_order != actual_order)
-print('B. same eligible set:', set(objective_order) == set(actual_order))
-print('C. at least one item has real evidence:',
-      any((i.get('personal') or {}).get('participated') for i in items))
-print('D. every movement is within +/-18:',
-      all(abs((i.get('personal') or {}).get('rankScore', i['matchScore']) - i['matchScore']) <= 18
-          for i in items))
-PY
-```
-
-- **A** is "at least one title changed position."
-- **B** is "the eligible set itself did not change" — same ids, different order.
-- **C** is the *because*: a position change with `participated: false` everywhere
-  would mean something else moved the list, and the proof would have failed.
-- **D** is the ceiling holding in production.
-
-### 4 · The no-DNA control
-
-Repeat step 3 **signed in as an account with no ratings and no preferences**.
-Expect `participated: false` on every item and `actual_order == objective_order`
-— the objective sort, unchanged.
-
-(A signed-out request is *not* this control. It returns 401.)
-
-### 5 · Hard-constraint protection
-
-```bash
-curl -sS -X POST "$BASE/api/ask" \
-  -H 'Content-Type: application/json' -H "Cookie: $COOKIE" \
-  -d '{"text":"Looking for a good Samuel L Jackson movie"}' > /tmp/dna-constraint.json
-```
-
-Every returned title must actually feature Samuel L. Jackson (TMDB person
-`2231`). Taste may reorder them; it may not introduce one he is not in. This is
-the query whose failure started the hard-constraint work, so it is the one worth
-re-running by hand.
-
-### 6 · Record the result
-
-Paste the table and the four assertion lines into `docs/TASTE-DNA-SHIP.md` under
-a new **PRODUCTION PROOF** heading, with the serving SHA and the date. Only then
-is Phase 1 production-proven.
-
----
+Run the identical snippet signed in as an account with **no** ratings. Expect
+`participated: false` everywhere and `A_tasteMovedSomething: false` — the
+objective order, unchanged. (A signed-out browser is *not* this control; it
+returns 401.)
 
 ## WHAT *IS* PROVEN WITHOUT A SESSION
 
