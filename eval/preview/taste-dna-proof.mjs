@@ -88,7 +88,56 @@ const QUERIES = [
      the answer is measured against the floor this same deployment returns for
      a request that constrains nothing. */
   { id: 'Q13', text: 'I want something darker than Whiplash.', kind: 'comparative, the answer must differ', expect: { minItems: 2, comparativeRoundTrip: true, mustDifferFromFloor: true } },
+
+  /* ── TITLE vs DISCOVERY OWNERSHIP ──────────────────────────────────────
+     The defect these exist to stop: `/api/ask` re-reading a discovery
+     sentence with the legacy title extractor, which strips the media noun
+     and looks up a phantom title. Deployed, that returned zero for "another
+     boxing movie". These are the same grammar with different subjects, so a
+     regression cannot hide behind one lucky catalog gap. */
+  { id: 'Q14', text: 'a chess movie', kind: 'ownership · determiner + subject + medium', expect: { minItems: 1, media: 'movie' } },
+  { id: 'Q15', text: 'another western', kind: 'ownership · determiner + genre', expect: { minItems: 2 } },
+  { id: 'Q16', text: 'two space movies', kind: 'ownership · count + subject + medium', expect: { exactItems: 2, media: 'movie' } },
+  /* …and the other half of the rule: a sentence that really does name a
+     title must still reach the title machinery and come back as a VERDICT,
+     not as a discovery grid. A fence that silenced these would have traded
+     one defect for a worse one. */
+  { id: 'Q17', text: 'Rocky', kind: 'ownership control · bare title', expect: { verdict: true } },
+  { id: 'Q18', text: 'Snake Eyes', kind: 'ownership control · bare title', expect: { verdict: true } },
+  { id: 'Q19', text: 'Show me The Lego Movie', kind: 'ownership control · canonical lookup', expect: { verdict: true } },
+
+  /* ── STATEMENT vs REQUEST ──────────────────────────────────────────────
+     Q7 pins the bare statement. This pins the boundary's other side: the
+     same companion taste, followed by an actual request, must search. */
+  { id: 'Q20', text: 'My wife likes comedies. What should we watch?', kind: 'statement + request', expect: { minItems: 2 } },
+
+  /* ── THE COMPARISON MUST BE ABOUT WHAT WAS ASKED ───────────────────────
+     Q13 asks the SAME anchor to move the OTHER way. If the stated axis is
+     doing any work at all the two answers cannot be the same list, and no
+     hard-coded titles are needed to say so. This is the sharpest available
+     test of the authority repair: `plan.authority` describes the anchor, and
+     both of these share an anchor — only the axis differs. */
+  { id: 'Q21', text: 'I want something lighter than Whiplash.', kind: 'comparative, opposite axis', expect: { minItems: 2, comparativeRoundTrip: true, differsFrom: 'Q13' } },
+
+  /* ── VOCABULARY THAT WAS HALF-COVERED ─────────────────────────────────
+     "recommend thrillers" bound NO genre (the plural was missing from the
+     genre vocabulary) and bound the SUBJECT "recommend" (the verb was missing
+     from the qualifier guard). Both were invisible because the singular and
+     the other verbs worked. */
+  { id: 'Q22', text: 'recommend thrillers', kind: 'vocabulary · plural genre + bare imperative', expect: { minItems: 2 } },
+
+  /* ── A NEGATED PACE WORD IS A PACE ────────────────────────────────────
+     "nothing that drags" was recorded with the right polarity and then
+     executed as a keyword exclusion on a word almost nothing is tagged with,
+     so the request ran as a bare genre browse. These two ask the SAME genre
+     for OPPOSITE ends of the pace band; if the veto reaches execution they
+     cannot be the same list. */
+  { id: 'Q23', text: 'I want a thriller that drags', kind: 'pace · stated slow', expect: { minItems: 2 } },
+  { id: 'Q24', text: 'I want a thriller, nothing that drags', kind: 'pace · vetoed slow', expect: { minItems: 2, differsFrom: 'Q23' } },
 ];
+
+/** Cross-query contracts, evaluated once every answer is in hand. */
+const MAX_SHARED_HEAD = 2;
 
 const key = (i) => `${i.mediaType}:${i.id}`;
 const median = (xs) => {
@@ -168,6 +217,8 @@ async function main() {
 
   const report = { sha: v.sha ?? null, env: v.vercelEnv ?? null, at: new Date().toISOString(), queries: [] };
   let anyParticipation = false;
+  /** id → the keys of the answer this deployment actually gave, in order. */
+  const answerHead = new Map();
 
   /* WHY, NOT JUST HOW MANY.
      The first run of this harness reported "Q4 → 0 items" and stopped there,
@@ -272,6 +323,19 @@ async function main() {
          comedies." is not an order, and a deployment that answers it with a
          comedy grid has misread it. */
       if ((q.expect ?? {}).notASearch) console.log('  CONTRACT not-a-search: PASS (no result set)');
+      /* A NAMED TITLE COMES BACK AS A VERDICT, NOT A GRID. `kind: 'title'`
+         carries `verdict` + `alternatives` rather than `items`, so an empty
+         `items` is the CORRECT shape here — and the ownership fence would be
+         a regression, not a fix, if it silenced these. */
+      else if ((q.expect ?? {}).verdict) {
+        const v = body.verdict ?? null;
+        const ok = body.kind === 'title' && v != null && typeof v.title === 'string';
+        console.log(`  CONTRACT a verdict on the named title: ${ok ? `PASS (${v?.title}${v?.year ? ` (${v.year})` : ''} — ${v?.primaryCall ?? '?'} at ${v?.matchScore ?? '?'})` : `FAIL (kind=${body.kind ?? '?'})`}`);
+        if (!ok) {
+          explainShortfall(body);
+          fail(`${q.id} "${q.text}": a named title did not come back as a verdict.`);
+        }
+      }
       else if ((q.expect ?? {}).comparativeRoundTrip) {
         const { problems, settled } = await proveComparativeRoundTrip(body, ask);
         console.log(`  CONTRACT comparative round trip: ${problems.length === 0 ? 'PASS' : 'FAIL'}`);
@@ -286,6 +350,7 @@ async function main() {
           console.log(`  CONTRACT the settled comparison is not the unconstrained floor: ${ok ? 'PASS' : `FAIL (${shared.length} of the top ${head.length} are floor titles)`}`);
           if (!ok) fail(`${q.id} "${q.text}": the settled comparison returned the titles an unconstrained ask returns.`);
         }
+        if (settled.length > 0) answerHead.set(q.id, settled.slice(0, 5).map(key));
       } else {
         explainShortfall(body);
         fail(`${q.id} "${q.text}": returned no results at all.`);
@@ -300,6 +365,7 @@ async function main() {
 
     // PERSONALIZED order is the order the route returned.
     const personalized = items.map(key);
+    answerHead.set(q.id, personalized.slice(0, 5));
     // OBJECTIVE order is the pre-Phase-1 comparator, applied to the same set.
     const objective = [...items].sort((a, b) => b.matchScore - a.matchScore).map(key);
 
@@ -403,6 +469,35 @@ async function main() {
       movements: moved.length, participation,
       diagnostics: body.diagnostics ?? null, executedQuery: body.query ?? null,
     });
+  }
+
+  /* ── CROSS-QUERY CONTRACTS ────────────────────────────────────────────────
+     The sharpest question a single query cannot answer: did the thing the user
+     ASKED FOR shape the answer? Two requests that share an anchor and differ
+     only in the axis must not come back as the same list. No hard-coded titles
+     are needed to say so, and no judgement about which films are "generic" —
+     the deployment is compared against itself. */
+  console.log('\n──────── CROSS-QUERY CONTRACTS');
+  for (const q of QUERIES) {
+    const other = (q.expect ?? {}).differsFrom;
+    if (!other) continue;
+    const mine = answerHead.get(q.id);
+    const theirs = answerHead.get(other);
+    if (!mine || !theirs) {
+      console.log(`  ${q.id} vs ${other}: SKIPPED — one side produced no answer to compare`);
+      fail(`${q.id}: could not compare with ${other} because one of them returned nothing.`);
+      continue;
+    }
+    const shared = mine.filter((k) => theirs.includes(k));
+    const ok = shared.length <= MAX_SHARED_HEAD;
+    console.log(
+      `  ${q.id} ("${q.text}") vs ${other}: ${shared.length} of the top ${mine.length} titles are the same — ${ok ? 'PASS' : 'FAIL'}`,
+    );
+    if (!ok) {
+      fail(
+        `${q.id}: asking the same anchor to move the OTHER way returned ${shared.length}/${mine.length} of the same titles — the stated axis is not reaching the answer.`,
+      );
+    }
   }
 
   // ── LATENCY: repeat each query so a single sample cannot mislead ─────────

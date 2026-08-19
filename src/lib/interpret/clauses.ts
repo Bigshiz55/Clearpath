@@ -110,8 +110,34 @@ export function splitClauses(raw: string): string[] {
    Me") and that risk is PRE-EXISTING here, so removing them would trade a
    named regression for an unnamed one. Narrowing them belongs in its own
    change, judged on its own evidence. */
-const REQUEST_VERB =
-  /^\s*(?:please\s+|just\s+|maybe\s+|ok(?:ay)?,?\s+)*(?:recommend|suggest|pull up|put on|queue up|play|hit me with)\b|\b(?:find|show|give|recommend|suggest|get)\s+(?:me|us)\b|\bi(?:'|’)?m looking for\b|\blooking for\b|\b(?:i|we)\s+want\b|\bi'?d like\b|\bi would like\b|\bi wanna\b|\bwhat (?:else )?should\b[^.?!]{0,40}?\bwatch\b|\bwhat to watch\b|\bin the mood for\b|\bfeel like watching\b|\bsurprise me\b|\bhelp me (?:find|pick|choose)\b|\bany (?:good|recommendations?)\b|^\s*(?:please\s+|just\s+)*(?:find|show|give|get)\s+(?:me\s+|us\s+)?(?:a|an|another|some|three|two|\d)\b|^\s*(?:want|need)\s+/i;
+/**
+ * THE REQUEST VOCABULARY, IN ONE PLACE.
+ *
+ * These words were listed here and listed AGAIN, differently, in the subject
+ * extractor's structural guard — which knew `want`, `find` and `show` but not
+ * `recommend`, `suggest`, `need` or `get`. So "recommend thrillers" bound the
+ * SUBJECT "recommend": the verb asking for the search became the topic of it.
+ * Two hand-kept lists of the same vocabulary will always drift; the fix is that
+ * there is now one, and both readers build from it.
+ */
+/** Bare imperatives: "recommend something", "put on a comedy". */
+const BARE_IMPERATIVE = ['recommend', 'suggest', 'pull up', 'put on', 'queue up', 'play', 'hit me with'] as const;
+/** Transitive asks that take me/us: "find me a thriller". */
+const TRANSITIVE_ASK = ['find', 'show', 'give', 'recommend', 'suggest', 'get'] as const;
+/** Stated desires that lead a clause: "want a comedy", "need something short". */
+const DESIRE = ['want', 'need', 'like', 'watch', 'see'] as const;
+
+/** Every single word that can only be ASKING for something, never the thing. */
+export const REQUEST_VERBS: readonly string[] = Array.from(
+  new Set<string>([...BARE_IMPERATIVE, ...TRANSITIVE_ASK, ...DESIRE]),
+);
+
+const alt = (words: readonly string[]) => words.join('|');
+
+const REQUEST_VERB = new RegExp(
+  `^\\s*(?:please\\s+|just\\s+|maybe\\s+|ok(?:ay)?,?\\s+)*(?:${alt(BARE_IMPERATIVE)})\\b|\\b(?:${alt(TRANSITIVE_ASK)})\\s+(?:me|us)\\b|\\bi(?:'|’)?m looking for\\b|\\blooking for\\b|\\b(?:i|we)\\s+want\\b|\\bi'?d like\\b|\\bi would like\\b|\\bi wanna\\b|\\bwhat (?:else )?should\\b[^.?!]{0,40}?\\bwatch\\b|\\bwhat to watch\\b|\\bin the mood for\\b|\\bfeel like watching\\b|\\bsurprise me\\b|\\bhelp me (?:find|pick|choose)\\b|\\bany (?:good|recommendations?)\\b|^\\s*(?:please\\s+|just\\s+)*(?:find|show|give|get)\\s+(?:me\\s+|us\\s+)?(?:a|an|another|some|three|two|\\d)\\b|^\\s*(?:want|need)\\s+`,
+  'i',
+);
 
 /** The kind of thing one asks to be shown several of. */
 const MEDIA_NOUN =

@@ -22,7 +22,7 @@
  * PURE. No I/O, no clock, no randomness, no entity resolution.
  */
 
-import { parseClauses, requestClause, type Clause } from './clauses';
+import { parseClauses, requestClause, type Clause, REQUEST_VERBS } from './clauses';
 import { SUBJECT_TERMS } from '@/lib/finderParse';
 import { detectOrigin, detectAudio, detectRuntimeMaxMinutes } from '@/lib/nlu/detectors';
 import {
@@ -180,13 +180,78 @@ function negatedSpans(clause: string): string[] {
   return out;
 }
 
-/** Tone words a person actually reaches for. Matched, never invented. */
-const TONE_WORDS =
-  /\b(funny|hilarious|light|lighthearted|dark|bleak|depressing|weird|strange|uplifting|feel-?good|tense|scary|frightening|gory|violent|easy|challenging|cerebral|slow|fast-?paced|romantic|sad|cosy|cozy|gritty|wholesome|dumb|drag|gore|long)\b/gi;
+/**
+ * Tone words a person actually reaches for. Matched, never invented.
+ *
+ * INFLECTIONS FOR THE VERBS, BY CONSTRUCTION. `drag` was listed and `drags`
+ * was not, so "I want a thriller, nothing that drags" — the way anyone
+ * actually says it — dropped the constraint entirely while "a comedy that does
+ * not drag" kept it. Adjectives are matched as written; a word that describes
+ * what a film DOES gets the ordinary English inflections, so the same gap
+ * cannot open under the next verb someone adds.
+ */
+const TONE_ADJECTIVES = [
+  'funny', 'hilarious', 'light', 'lighthearted', 'dark', 'bleak', 'depressing',
+  'weird', 'strange', 'uplifting', 'feel-?good', 'tense', 'scary', 'frightening',
+  'gory', 'violent', 'easy', 'challenging', 'cerebral', 'slow', 'fast-?paced',
+  'romantic', 'sad', 'cosy', 'cozy', 'gritty', 'wholesome', 'dumb', 'gore', 'long',
+];
 
-/** Genre names, as said. Ids are resolved downstream, never here. */
-const GENRE_WORDS =
-  /\b(horror|comedy|comedies|drama|thriller|mystery|romance|documentary|documentaries|animation|animated|western|war|crime|fantasy|sci-?fi|science fiction|musical|biography|history|sport|family|adventure|action|supernatural)\b/gi;
+/** Tone words that are VERBS — what a film does to the viewer's patience. */
+const TONE_VERBS = ['drag'];
+
+/** he drags · it is dragging · it dragged · a draggy hour. */
+function verbForms(stem: string): string[] {
+  const doubled = /[^aeiou][aeiou][^aeiouwxy]$/.test(stem) ? `${stem}${stem.slice(-1)}` : stem;
+  return [stem, `${stem}s`, `${doubled}ing`, `${doubled}ed`, `${doubled}y`];
+}
+
+/** The base form a matched inflection stands for, so downstream sees one term. */
+const TONE_STEM = new Map<string, string>(
+  TONE_VERBS.flatMap((v) => verbForms(v).map((f) => [f, v] as const)),
+);
+
+/** Normalise a matched tone span to the term the vocabulary declares. */
+export const toneTerm = (matched: string): string =>
+  TONE_STEM.get(matched.toLowerCase()) ?? matched.toLowerCase();
+
+const TONE_WORDS = new RegExp(
+  `\\b(${[...TONE_ADJECTIVES, ...TONE_VERBS.flatMap(verbForms)].join('|')})\\b`,
+  'gi',
+);
+
+/**
+ * Genre names, as said. Ids are resolved downstream, never here.
+ *
+ * PLURALS BY CONSTRUCTION, NOT BY HAND. The alternation used to be written out
+ * and had covered `comedies` and `documentaries` while missing `thrillers`,
+ * `dramas`, `mysteries`, `westerns` and the rest — so "recommend thrillers"
+ * bound no genre at all and the request executed as an unconstrained browse.
+ * Half a vocabulary is worse than none, because the gap is invisible: the
+ * sentences that work make the ones that do not look like a different problem.
+ * The plural is derived from the singular by the ordinary English rule, so a
+ * genre cannot be half-covered again.
+ */
+const GENRE_BASE = [
+  'horror', 'comedy', 'drama', 'thriller', 'mystery', 'romance', 'documentary',
+  'animation', 'animated', 'western', 'war', 'crime', 'fantasy', 'sci-?fi',
+  'science fiction', 'musical', 'biography', 'history', 'sport', 'family',
+  'adventure', 'action', 'supernatural',
+];
+
+/** The ordinary English plural: consonant + y → ies, otherwise + s. */
+function pluralOf(word: string): string | null {
+  if (/[^aeiou]y$/.test(word)) return `${word.slice(0, -1)}ies`;
+  if (/[a-z]$/.test(word)) return `${word}s`;
+  return null; // a pattern, not a word — leave it alone
+}
+
+const GENRE_WORDS = new RegExp(
+  `\\b(${Array.from(
+    new Set(GENRE_BASE.flatMap((w) => [w, pluralOf(w)]).filter((w): w is string => w !== null)),
+  ).join('|')})\\b`,
+  'gi',
+);
 
 /** Provider/network names, as said. */
 const PROVIDER_WORDS =
@@ -649,8 +714,11 @@ export function interpret(raw: string): CanonicalIntent {
       const wanted = !isNegated(g);
       pushUnique<GenreConstraint>(intent.genres, { span: g, wanted, holder: 'user' });
     }
-    for (const t of uniqueMatches(contentText, TONE_WORDS)) {
-      const wanted = !isNegated(t);
+    for (const raw of uniqueMatches(contentText, TONE_WORDS)) {
+      const t = toneTerm(raw);
+      // Negation is judged on the SPAN the sentence used ("that drags"), the
+      // term recorded is the one the vocabulary declares ("drag").
+      const wanted = !isNegated(raw) && !isNegated(t);
       if (!intent.tones.some((x) => x.term === t)) {
         intent.tones.push({ term: t, wanted, holder: 'user' } satisfies ToneConstraint);
       }
@@ -774,8 +842,11 @@ export function interpret(raw: string): CanonicalIntent {
       const vetoed = negated.some((n) => n.includes(g)) || /\bhates?\b|\bwon'?t watch\b/i.test(c.text);
       pushUnique<GenreConstraint>(intent.genres, { span: g, wanted: !vetoed, holder: 'companion' });
     }
-    for (const t of uniqueMatches(c.text, TONE_WORDS)) {
-      const vetoed = negated.some((n) => n.includes(t)) || /\bhates?\b|\bwon'?t watch\b/i.test(c.text);
+    for (const raw of uniqueMatches(c.text, TONE_WORDS)) {
+      const t = toneTerm(raw);
+      const vetoed =
+        negated.some((n) => n.includes(raw) || n.includes(t)) ||
+        /\bhates?\b|\bwon'?t watch\b/i.test(c.text);
       if (!intent.tones.some((x) => x.term === t)) {
         intent.tones.push({ term: t, wanted: !vetoed, holder: 'companion' });
       }
@@ -857,8 +928,19 @@ function findSubjectMatches(clause: string): SpanMatch[] {
      `favorite` reached the subject field during adversarial review — the first
      is a date word the lookback layer already owns, the second belongs to a
      preference statement. Neither is a theme anyone could search for. */
-  const STRUCTURAL =
-    /^(?:good|great|best|new|newer|old|older|other|another|more|some|any|the|a|an|three|two|four|five|six|seven|eight|nine|ten|one|few|couple|nice|decent|solid|different|similar|watch|see|want|like|find|show|give|only|just|recent|recently|latest|favorite|favourite|top|first|last|past|previous)$/i;
+  /* THE REQUEST VERBS COME FROM THE CLAUSE ARCHITECTURE, NOT FROM HERE.
+     This list used to name `want`, `find` and `show` on its own and had drifted
+     from the vocabulary `clauses.ts` uses to recognise a request — it never
+     learned `recommend`, `suggest`, `need` or `get`. So "recommend thrillers"
+     bound the subject "recommend": the verb asking for the search became the
+     topic of it. Two hand-kept copies of one vocabulary will always drift, so
+     there is now one copy and this reads it. */
+  const STRUCTURAL = new RegExp(
+    `^(?:good|great|best|new|newer|old|older|other|another|more|some|any|the|a|an|three|two|four|five|six|seven|eight|nine|ten|one|few|couple|nice|decent|solid|different|similar|only|just|recent|recently|latest|favorite|favourite|top|first|last|past|previous|${REQUEST_VERBS.filter(
+      (w) => !w.includes(' '),
+    ).join('|')})$`,
+    'i',
+  );
   const push = (m: RegExpMatchArray): void => {
     const w = m[1]!.toLowerCase();
     if (STRUCTURAL.test(w)) return;

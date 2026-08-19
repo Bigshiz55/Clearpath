@@ -20,6 +20,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { personalSignal, PERSONAL_NUDGE_CEILING } from '../../src/lib/ask/personalSignal';
+import { PREF_NUDGE_MAX } from '../../src/lib/preference/rank';
 import { dimensionMatch, DIMENSION_KEYS, buildProfile, type TitleDimensions, type DimensionProfile } from '../../src/lib/scoring/dimensions';
 
 /** Deterministic RNG — the measurement must be reproducible. */
@@ -29,14 +30,15 @@ function rng(seed: number) {
 }
 
 const stats = (xs: number[]) => {
-  if (xs.length === 0) return { n: 0, min: 0, max: 0, mean: 0, median: 0, p25: 0, p75: 0, stddev: 0, spread: 0 };
+  if (xs.length === 0) return { n: 0, min: 0, max: 0, mean: 0, median: 0, p10: 0, p25: 0, p75: 0, p90: 0, stddev: 0, spread: 0 };
   const s = [...xs].sort((a, b) => a - b);
   const q = (p: number) => s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))]!;
   const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
   const varc = xs.reduce((a, b) => a + (b - mean) ** 2, 0) / xs.length;
   return {
     n: xs.length, min: s[0]!, max: s[s.length - 1]!, mean: +mean.toFixed(2),
-    median: q(50), p25: q(25), p75: q(75), stddev: +Math.sqrt(varc).toFixed(2),
+    median: q(50), p10: q(10), p25: q(25), p75: q(75), p90: q(90),
+    stddev: +Math.sqrt(varc).toFixed(2),
     spread: s[s.length - 1]! - s[0]!,
   };
 };
@@ -84,6 +86,16 @@ interface Row {
   zeroEvidence: number; positive: number; negative: number;
   rankChanges: number; rankChangeRate: number; top1Changed: boolean; top3Changed: boolean;
   weakOvertookStrong: number; maxBaseGapCrossed: number;
+  /* HOW MUCH ROOM THE SCALE ACTUALLY HAS. A field where most candidates share
+     a score has no dynamic range to rank with, whatever the ceiling says. */
+  uniqueBase: number; uniqueFinal: number; nearTieBasePct: number; nearTieFinalPct: number;
+  /* HOW DECISIVE THE ANSWER IS. A one-point win is a coin toss wearing a
+     ranking; a fifteen-point win is a verdict. */
+  winMarginBase: number; winMarginFinal: number;
+  /* PER CHANNEL, MEASURED IN ISOLATION — the same field scored with only the
+     fingerprint term live, then only the stated-preference term. */
+  dimOnly: { absMax: number; rankChanges: number };
+  prefOnly: { absMax: number; rankChanges: number };
 }
 
 /** `coverage` = share of candidates that HAVE a cached fingerprint. Production
@@ -131,8 +143,56 @@ function run(coverage: number, samples: number): Row[] {
         }
       }
 
+      /* ── DYNAMIC RANGE ────────────────────────────────────────────────
+         `unique` counts distinct scores; a near tie is a pair the scale
+         separates by a point or less, which is not a separation a reader
+         would defend. Both are measured before and after the personal term,
+         because a term that only breaks ties should RAISE uniqueness. */
+      const uniq = (xs: number[]) => new Set(xs.map((x) => Math.round(x))).size;
+      const nearTiePct = (xs: number[]) => {
+        const sorted = [...xs].sort((a, b) => a - b);
+        let pairs = 0;
+        for (let i = 1; i < sorted.length; i += 1) if (sorted[i]! - sorted[i - 1]! <= 1) pairs += 1;
+        return sorted.length > 1 ? +(pairs / (sorted.length - 1)).toFixed(3) : 0;
+      };
+      const margin = (arr: typeof scored, of: (x: (typeof scored)[number]) => number) =>
+        arr.length > 1 ? +(of(arr[0]!) - of(arr[1]!)).toFixed(2) : 0;
+
+      /* ── ONE CHANNEL AT A TIME ────────────────────────────────────────
+         `personalSignal` takes the fingerprint match and the stated
+         preference as separate inputs, so each can be run alone against the
+         SAME field. That is what makes "which family moved the ranking"
+         answerable rather than asserted. The preference draw is synthetic and
+         bounded by the shipped constant, and labelled as such. */
+      const channel = (useDims: boolean, usePref: boolean) => {
+        const cr = rng(0x5EED);
+        const one = scored.map((it) => {
+          const prefNudge = usePref ? Math.round((cr() * 2 - 1) * PREF_NUDGE_MAX) : 0;
+          const sig = personalSignal({
+            objective: it.base,
+            dimMatch: useDims ? it.dm : null,
+            prefNudge,
+            reasons: [], concerns: [], explainConfidence: 0,
+            profileSamples: samples,
+          });
+          return { id: it.id, base: it.base, final: sig.rankScore, nudge: sig.rankScore - it.base };
+        });
+        const pos = (arr: typeof one) => new Map([...arr].sort((a, b) => b.final - a.final || a.id - b.id).map((x, i) => [x.id, i]));
+        const pFinal = pos(one);
+        const changes = one.filter((x) => pb.get(x.id) !== pFinal.get(x.id)).length;
+        return { absMax: +Math.max(0, ...one.map((x) => Math.abs(x.nudge))).toFixed(2), rankChanges: changes };
+      };
+
       rows.push({
         scenario, profile: pname, candidates: count,
+        uniqueBase: uniq(scored.map((x) => x.base)),
+        uniqueFinal: uniq(scored.map((x) => x.final)),
+        nearTieBasePct: nearTiePct(scored.map((x) => x.base)),
+        nearTieFinalPct: nearTiePct(scored.map((x) => x.final)),
+        winMarginBase: margin(byBase, (x) => x.base),
+        winMarginFinal: margin(byFinal, (x) => x.final),
+        dimOnly: channel(true, false),
+        prefOnly: channel(false, true),
         base: stats(scored.map((x) => x.base)),
         nudge: stats(scored.filter((x) => x.participated).map((x) => x.nudge)),
         final: stats(scored.map((x) => x.final)),
@@ -172,6 +232,32 @@ const agg = (rows: Row[]) => ({
   zeroEvidencePct: +(rows.reduce((a, r) => a + r.zeroEvidence, 0) / rows.reduce((a, r) => a + r.candidates, 0)).toFixed(3),
   weakOvertookTotal: rows.reduce((a, r) => a + r.weakOvertookStrong, 0),
   maxBaseGapCrossed: Math.max(0, ...rows.map((r) => r.maxBaseGapCrossed)),
+  /* DYNAMIC RANGE — does the scale have room to rank with at all? */
+  uniqueBaseShare: +(
+    rows.reduce((a, r) => a + r.uniqueBase, 0) / rows.reduce((a, r) => a + r.candidates, 0)
+  ).toFixed(3),
+  uniqueFinalShare: +(
+    rows.reduce((a, r) => a + r.uniqueFinal, 0) / rows.reduce((a, r) => a + r.candidates, 0)
+  ).toFixed(3),
+  nearTieBase: stats(rows.map((r) => r.nearTieBasePct)),
+  nearTieFinal: stats(rows.map((r) => r.nearTieFinalPct)),
+  winMarginBase: stats(rows.map((r) => r.winMarginBase)),
+  winMarginFinal: stats(rows.map((r) => r.winMarginFinal)),
+  /* WHICH FAMILY MOVED IT — the same field, one channel at a time. */
+  byChannel: {
+    fingerprint: {
+      absMax: Math.max(0, ...rows.map((r) => r.dimOnly.absMax)),
+      rankChangeRate: +(
+        rows.reduce((a, r) => a + r.dimOnly.rankChanges, 0) / rows.reduce((a, r) => a + r.candidates, 0)
+      ).toFixed(3),
+    },
+    statedPreference: {
+      absMax: Math.max(0, ...rows.map((r) => r.prefOnly.absMax)),
+      rankChangeRate: +(
+        rows.reduce((a, r) => a + r.prefOnly.rankChanges, 0) / rows.reduce((a, r) => a + r.candidates, 0)
+      ).toFixed(3),
+    },
+  },
 });
 
 console.log(`PERSONAL_NUDGE_CEILING = ${PERSONAL_NUDGE_CEILING}\n`);
@@ -184,7 +270,13 @@ for (const [label, rows] of Object.entries(out)) {
   console.log(`   rank change   ${(a.rankChangeRate.median * 100).toFixed(1)}% of titles (median)`);
   console.log(`   top-1 changed ${(a.top1ChangedPct * 100).toFixed(0)}% of cells · top-3 ${(a.top3ChangedPct * 100).toFixed(0)}%`);
   console.log(`   no evidence   ${(a.zeroEvidencePct * 100).toFixed(1)}% of titles`);
-  console.log(`   weaker-overtook-stronger pairs ${a.weakOvertookTotal}, widest base gap crossed ${a.maxBaseGapCrossed}\n`);
+  console.log(`   weaker-overtook-stronger pairs ${a.weakOvertookTotal}, widest base gap crossed ${a.maxBaseGapCrossed}`);
+  console.log(`   DYNAMIC RANGE  distinct scores ${(a.uniqueBaseShare * 100).toFixed(0)}% of the field → ${(a.uniqueFinalShare * 100).toFixed(0)}% after the personal term`);
+  console.log(`                  near ties (<=1pt apart) ${(a.nearTieBase.median * 100).toFixed(0)}% → ${(a.nearTieFinal.median * 100).toFixed(0)}% (median cell)`);
+  console.log(`                  winning margin median ${a.winMarginBase.median} → ${a.winMarginFinal.median}  (p10 ${a.winMarginBase.p10} → ${a.winMarginFinal.p10}, p90 ${a.winMarginBase.p90} → ${a.winMarginFinal.p90})`);
+  console.log(`   BY CHANNEL     fingerprint |max| ${a.byChannel.fingerprint.absMax}, moved ${(a.byChannel.fingerprint.rankChangeRate * 100).toFixed(1)}% of titles`);
+  console.log(`                  stated preference |max| ${a.byChannel.statedPreference.absMax}, moved ${(a.byChannel.statedPreference.rankChangeRate * 100).toFixed(1)}% of titles`);
+  console.log(`   BASE SHAPE     min ${a.baseSpread.min} · p25 ${a.baseSpread.p25} · median ${a.baseSpread.median} · p75 ${a.baseSpread.p75} · max ${a.baseSpread.max} (spread per cell)\n`);
 }
 
 const path = 'artifacts/measure/score-distribution.json';
