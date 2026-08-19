@@ -44,12 +44,15 @@ const DAY: Airing[] = [
   // The lead case: engine-scored 94, matched to a title (tap → QuickLook).
   a({
     showName: 'The Verdict Hour', airstamp: '2026-08-16T00:00:00Z', network: 'A&E', match: 94,
-    matchWhy: 'Quality base 81 · +8 Courtroom dramas · +5 Slow-burn pacing', tmdbId: 501, mediaType: 'tv',
+    matchWhy: 'Standard score 81 · +8 Courtroom dramas · +5 Slow-burn pacing', matchPersonalized: true,
+    tmdbId: 501, mediaType: 'tv',
     genres: ['Crime', 'Drama'], summary: 'A retired judge reopens the cases that never sat right with her.',
   }),
   // Top cases (matched, descending).
-  a({ showName: 'Midnight Confession', airstamp: '2026-08-16T03:30:00Z', network: 'TCM', match: 88, tmdbId: 502, mediaType: 'movie', year: 1949, showType: 'Movie', runtime: 95, genres: ['Crime', 'Film Noir'] }),
-  a({ showName: 'The Long Cross-Examination', airstamp: '2026-08-16T01:00:00Z', network: 'A&E', match: 84, tmdbId: 503, mediaType: 'tv', genres: ['Crime'] }),
+  a({ showName: 'Midnight Confession', airstamp: '2026-08-16T03:30:00Z', network: 'TCM', match: 88, matchWhy: 'Standard score 80 · +8 Noir', matchPersonalized: true, tmdbId: 502, mediaType: 'movie', year: 1949, showType: 'Movie', runtime: 95, genres: ['Crime', 'Film Noir'] }),
+  // OBJECTIVE-ONLY, deliberately: a real engine score that nothing about this
+  // reader produced. It must render as "Standard score", never "Your verdict".
+  a({ showName: 'The Long Cross-Examination', airstamp: '2026-08-16T01:00:00Z', network: 'A&E', match: 84, matchWhy: 'Standard score 84 · no personal signal for this title yet', tmdbId: 503, mediaType: 'tv', genres: ['Crime'] }),
   a({ showName: 'Records Room', airstamp: '2026-08-16T00:30:00Z', network: 'ID', match: 80, tmdbId: 504, mediaType: 'tv', genres: ['Crime', 'Documentary'] }),
   a({ showName: 'Habeas Corpus', airstamp: '2026-08-16T02:00:00Z', network: 'ID', match: 78, tmdbId: 505, mediaType: 'tv', genres: ['Drama'] }),
   a({ showName: 'The Appeal', airstamp: '2026-08-15T23:30:00Z', network: 'Laughs', match: 76, tmdbId: 506, mediaType: 'tv', genres: ['Drama'] }),

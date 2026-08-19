@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildVerdict } from '@/lib/scoring';
+import { canonicalScore } from '@/lib/scoring/canonical';
 import { getPersonalContext } from '@/lib/profile';
 import { getScoringData } from '@/lib/titleData';
 import { searchTitles, type SearchResultItem } from '@/lib/tmdb/client';
@@ -77,7 +78,10 @@ export async function scoreGuideAirings(
   try {
     const personal = await getPersonalContext(supabase, userId, null);
     const candidates = pickScoringCandidates(airings, nowMs, budget);
-    const scores = new Map<string, { tmdbId: number; mediaType: 'movie' | 'tv'; match: number; why: string | null }>();
+    const scores = new Map<
+      string,
+      { tmdbId: number; mediaType: 'movie' | 'tv'; match: number; why: string | null; personalized: boolean }
+    >();
 
     // Bounded concurrency: a polite burst, not four hundred parallel fetches.
     let i = 0;
@@ -90,16 +94,28 @@ export async function scoreGuideAirings(
           if (!resolved) continue;
           const { meta, providers } = await getScoringData(resolved.mediaType, resolved.id, region);
           const report = buildVerdict({ meta, providers, personal: { ...personal, collectionId: null } });
-          // THE BADGE'S "WHY", built from the engine's own working: the base
-          // quality score plus the adjustments that actually moved this title.
-          // One line, no invention — every clause is an adjustment the engine
-          // applied and can name.
-          const moved = report.personal.adjustments.filter((adj) => adj.points !== 0).slice(0, 2);
-          const why = [
-            `Quality base ${Math.round(report.personal.baseScore)}`,
-            ...moved.map((adj) => `${adj.points > 0 ? '+' : ''}${adj.points} ${adj.label}`),
-          ].join(' · ');
-          scores.set(scoreKeyFor(a), { tmdbId: resolved.id, mediaType: resolved.mediaType, match: report.personal.score, why });
+          // THE ONE CANONICAL SCORE, from the one contract every other surface
+          // reads. `report.personal.baseScore` is now the Standard Score (see
+          // verdict.ts), so the number the briefing prints and the number
+          // QuickLook prints are the same number by construction rather than by
+          // coincidence.
+          //
+          // The old "why" was `Quality base NN` plus any adjustments — and when
+          // no adjustment fired it was JUST the base, an objective number
+          // offered under a "Your Verdict" badge as if it were evidence of
+          // personalization. `canonicalScore` decides that question where the
+          // arithmetic is, and says so honestly either way.
+          const canonical = canonicalScore({
+            objective: report.personal.baseScore,
+            adjustments: report.personal.adjustments,
+          });
+          scores.set(scoreKeyFor(a), {
+            tmdbId: resolved.id,
+            mediaType: resolved.mediaType,
+            match: canonical.score,
+            why: canonical.why,
+            personalized: canonical.personalized,
+          });
         } catch {
           // One programme failing to score is a skip, never a broken guide.
         }

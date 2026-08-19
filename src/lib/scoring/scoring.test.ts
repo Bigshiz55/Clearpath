@@ -54,6 +54,16 @@ function scottCtx(extra: Partial<PersonalContext> = {}): PersonalContext {
 const byTrait = (adjustments: ScoreAdjustment[], trait: PreferenceTrait) =>
   adjustments.find((a) => a.trait === trait);
 
+/**
+ * THE OBJECTIVE FOUNDATION a personal score is built on — the calibrated
+ * Standard Score. These comparisons used to read `general.score` (the legacy
+ * blend), which is the split that let Today's Case Briefing and QuickLook print
+ * different headline numbers for the same title. The assertions below mean
+ * exactly what they meant before; only the reference is corrected.
+ */
+const objectiveOf = (r: { general: { score: number; standardScore?: number } }) =>
+  r.general.standardScore ?? r.general.score;
+
 describe('WatchVerdict scoring engine', () => {
   it('1. highly rated supernatural horror gets a strong Scott penalty', () => {
     const meta = makeTitle({
@@ -69,7 +79,7 @@ describe('WatchVerdict scoring engine', () => {
     expect(adj!.defining).toBe(true);
     // General score is high; personal is dragged well below it.
     expect(r.general.score).toBeGreaterThanOrEqual(70);
-    expect(r.personal.score).toBeLessThanOrEqual(r.general.score - 20);
+    expect(r.personal.score).toBeLessThanOrEqual(objectiveOf(r) - 20);
   });
 
   it('2. grounded crime thriller gets a strong positive match', () => {
@@ -83,7 +93,7 @@ describe('WatchVerdict scoring engine', () => {
     const positives = r.personal.adjustments.filter((a) => a.points > 0);
     expect(positives.length).toBeGreaterThan(0);
     expect(byTrait(r.personal.adjustments, 'grounded_crime')).toBeDefined();
-    expect(r.personal.score).toBeGreaterThanOrEqual(r.general.score);
+    expect(r.personal.score).toBeGreaterThanOrEqual(objectiveOf(r));
     // No supernatural/scifi/fantasy penalties should be present.
     expect(byTrait(r.personal.adjustments, 'supernatural')).toBeUndefined();
   });
@@ -158,7 +168,7 @@ describe('WatchVerdict scoring engine', () => {
     });
     expect(byTrait(r.personal.adjustments, 'detective_mystery')).toBeDefined();
     expect(byTrait(r.personal.adjustments, 'franchise_favorite')).toBeDefined();
-    expect(r.personal.score).toBeGreaterThan(r.general.score);
+    expect(r.personal.score).toBeGreaterThan(objectiveOf(r));
   });
 
   it('7. a cheesy grounded Lifetime thriller gets a modest positive boost', () => {
@@ -308,14 +318,14 @@ describe('zero-signal viewers get an honest General Verdict, never a fake person
     const meta = makeTitle({ genres: ['Horror'], keywords: ['supernatural', 'haunting', 'ghost'] });
     const r = buildVerdict({ meta, providers: null, personal: zeroSignalCtx });
     expect(r.personal.adjustments.length).toBe(0);
-    expect(r.personal.score).toBe(r.general.score);
+    expect(r.personal.score).toBe(objectiveOf(r));
     expect(r.personal.label).toBe('General Verdict');
   });
 
   it('tier/call/one-liner/reasons never claim personalization for a zero-signal viewer', () => {
     const meta = makeTitle({ genres: ['Horror'], keywords: ['supernatural', 'haunting', 'ghost'], voteAverage: 8.5, voteCount: 5000 });
     const r = buildVerdict({ meta, providers: null, personal: zeroSignalCtx });
-    expect(r.tier).toBe(tierFromScore(r.general.score));
+    expect(r.tier).toBe(tierFromScore(objectiveOf(r)));
     expect(r.oneLiner.toLowerCase()).not.toContain('your');
     expect(r.oneLiner.toLowerCase()).not.toContain('taste');
     expect(r.reasonsFor.join(' ').toLowerCase()).not.toContain('strong personal match');

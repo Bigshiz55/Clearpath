@@ -195,6 +195,61 @@ const isOnNow = (a: Airing, nowMs: number): boolean => {
 const byStart = (a: Airing, b: Airing) => startOf(a) - startOf(b);
 const byMatchDesc = (a: Airing, b: Airing) => (b.match ?? -1) - (a.match ?? -1) || byStart(a, b);
 
+/**
+ * THE CANONICAL IDENTITY OF A TITLE — what "the same show" means here.
+ *
+ * The resolved catalog identity when the engine has one, because that is the
+ * thing the score belongs to and the thing every other surface keys on. Only
+ * when a listing was never resolved does this fall back to the show name, and
+ * then conservatively: normalized case and whitespace plus the media type, so
+ * "The Golden Girls" and "the golden girls" collapse while two genuinely
+ * different programmes never do.
+ */
+export function titleIdentity(a: Airing): string {
+  if (a.tmdbId != null && a.mediaType != null) return `${a.mediaType}:${a.tmdbId}`;
+  const name = a.showName.trim().toLowerCase().replace(/\s+/g, ' ');
+  return `name:${a.showType === 'Movie' ? 'movie' : 'tv'}:${name}`;
+}
+
+/**
+ * WHICH AIRING REPRESENTS A TITLE in the editorial sections.
+ *
+ * On now beats anything — it is what the reader can act on this second. Failing
+ * that, the earliest still-upcoming showing, because a briefing is about what
+ * is ahead and the 8pm airing is more useful than the 11pm one. Negative means
+ * `a` wins, matching the comparator convention.
+ */
+function preferAiring(a: Airing, b: Airing, nowMs: number): number {
+  const an = isOnNow(a, nowMs);
+  const bn = isOnNow(b, nowMs);
+  if (an !== bn) return an ? -1 : 1;
+  return startOf(a) - startOf(b);
+}
+
+/**
+ * ONE PERSONALIZED EDITORIAL SLOT PER TITLE.
+ *
+ * THE PRODUCTION DEFECT: three episodes of The Golden Girls took the Lead Case
+ * and two Top Cases at once. `dedupe` below keys on `airstamp|showName`, which
+ * collapses an East/West simulcast pair but does nothing about the SAME series
+ * at three different times; the used-set keyed on `a.id`, the TVmaze EPISODE
+ * id, which differs per episode. Since `applyScores` spreads one title's score
+ * across every airing of it, all three carried the identical number and sorted
+ * adjacently — one series occupying the whole front page.
+ *
+ * Schedule sections deliberately do NOT use this: there, each broadcast is its
+ * own fact and a reader wants to see both showings.
+ */
+export function dedupeByTitle(list: readonly Airing[], nowMs: number): Airing[] {
+  const best = new Map<string, Airing>();
+  for (const a of list) {
+    const key = titleIdentity(a);
+    const cur = best.get(key);
+    if (cur == null || preferAiring(a, cur, nowMs) < 0) best.set(key, a);
+  }
+  return [...best.values()];
+}
+
 /** One row per broadcast: the same title at the same instant on two feeds
  *  (an East/West pair) reads as one entry. */
 const dedupe = (list: Airing[]): Airing[] => {
@@ -234,7 +289,9 @@ export function selectCaseBriefing(
     const cur = byChannel.get(a.network) ?? { logo: null, count: 0, yours: false };
     cur.count += 1;
     cur.logo = cur.logo ?? httpsUrl(a.networkLogoUrl);
-    if (personalized && a.match != null && a.match >= NEUTRAL) cur.yours = true;
+    // PER-TITLE EVIDENCE, not an account-level fact: a channel is "yours"
+    // only when something on it actually scored personally for this reader.
+    if (personalized && a.matchPersonalized === true && (a.match ?? 0) >= NEUTRAL) cur.yours = true;
     byChannel.set(a.network, cur);
   }
   const channels: BriefingChannel[] = [...byChannel.entries()]
@@ -250,10 +307,16 @@ export function selectCaseBriefing(
   // the engine has actually learned (the same DNA floor every personal claim
   // uses; the page passes it in). No scored rows → no lead, no top cases —
   // never a stand-in.
-  const scored = personalized ? pool.filter((a) => a.match != null).sort(byMatchDesc) : [];
+  const scored = personalized
+    ? dedupeByTitle(pool.filter((a) => a.match != null), nowMs).sort(byMatchDesc)
+    : [];
   const leadCase = scored[0] ?? null;
   const topCases = scored.slice(1, 1 + LEAD_POOL_CAP);
-  const usedIds = new Set([leadCase, ...topCases].filter((a): a is Airing => a != null).map((a) => a.id));
+  // BY TITLE, NOT BY EPISODE ID. `a.id` is the TVmaze episode id, so a used-set
+  // keyed on it let a second episode of the same series straight back in.
+  const usedIds = new Set(
+    [leadCase, ...topCases].filter((a): a is Airing => a != null).map((a) => titleIdentity(a)),
+  );
 
   // WILDCARD — one scored discovery whose genres share NOTHING with the lead
   // and top cases. Requires real genre evidence on both sides; otherwise null.
@@ -264,17 +327,19 @@ export function selectCaseBriefing(
     usualGenres.size > 0
       ? (scored.find(
           (a) =>
-            !usedIds.has(a.id) &&
+            !usedIds.has(titleIdentity(a)) &&
             (a.match ?? 0) >= NEUTRAL &&
             a.genres.length > 0 &&
             a.genres.every((g) => !usualGenres.has(g.toLowerCase())),
         ) ?? null)
       : null;
-  if (wildcard) usedIds.add(wildcard.id);
+  if (wildcard) usedIds.add(titleIdentity(wildcard));
 
   // Worth Watching is the scored overflow beyond the lead, the top cases and
   // the wildcard — each title argues from exactly one personalized section.
-  const worthWatching = scored.filter((a) => !usedIds.has(a.id) && (a.match ?? 0) >= NEUTRAL).slice(0, WORTH_CAP);
+  const worthWatching = scored
+    .filter((a) => !usedIds.has(titleIdentity(a)) && (a.match ?? 0) >= NEUTRAL)
+    .slice(0, WORTH_CAP);
 
   // SCHEDULE SECTIONS — provider facts only. Tonight (19:00–22:59 local) and
   // the Late-Night File (23:00 to the day's literal end) are disjoint.

@@ -220,7 +220,7 @@ describe('selectCaseBriefing', () => {
 
   it('the rail lists every channel still carrying something, https marks only', () => {
     const rows = [
-      a({ showName: 'Show A', airstamp: '2026-08-15T20:00:00Z', network: 'Alpha', networkLogoUrl: 'https://cdn.example/a.png', match: 90 }),
+      a({ showName: 'Show A', airstamp: '2026-08-15T20:00:00Z', network: 'Alpha', networkLogoUrl: 'https://cdn.example/a.png', match: 90, matchPersonalized: true }),
       a({ showName: 'Show B', airstamp: '2026-08-15T21:00:00Z', network: 'Beta', networkLogoUrl: 'http://cdn.example/b.png' }),
       a({ showName: 'Show C', airstamp: '2026-08-15T22:00:00Z', network: 'Beta' }),
       a({ showName: 'Done Show', airstamp: '2026-08-15T10:00:00Z', network: 'Gone' }),
@@ -229,6 +229,17 @@ describe('selectCaseBriefing', () => {
     expect(b.channels.map((c) => c.name)).toEqual(['Alpha', 'Beta']);
     expect(b.channels[0]).toMatchObject({ logoUrl: 'https://cdn.example/a.png', count: 1, yours: true });
     expect(b.channels[1]).toMatchObject({ logoUrl: null, count: 2, yours: false });
+  });
+
+  it('a HIGH but objective-only score never makes a channel "yours"', () => {
+    /* The rail said "yours" for any channel carrying a score above neutral,
+       which — like the badge — read an account-level fact as personal signal.
+       A 95 that nothing about this user produced is still not theirs. */
+    const rows = [
+      a({ showName: 'Show A', airstamp: '2026-08-15T20:00:00Z', network: 'Alpha', match: 95, matchPersonalized: false }),
+    ];
+    const b = selectCaseBriefing(rows, NOW, NY, { personalized: true });
+    expect(b.channels[0]).toMatchObject({ name: 'Alpha', yours: false });
   });
 
   it('a channel filter narrows the sections but never the rail', () => {
@@ -259,5 +270,121 @@ describe('selectCaseBriefing', () => {
   it('exports the documented fallback zone', () => {
     expect(DEFAULT_BRIEFING_TZ).toBe('America/New_York');
     expect(dayKeyIn(NOW, DEFAULT_BRIEFING_TZ)).toBe('2026-08-15');
+  });
+});
+
+/**
+ * THE EPISODE FLOOD — the second half of the P0.
+ *
+ * The briefing gave separate personalized slots to separate EPISODES of one
+ * series: three Golden Girls airings became the Lead Case and two Top Cases,
+ * because `dedupe` keyed on `airstamp|showName` (so the same series at
+ * different times survived intact) and the used-set keyed on `a.id` (the
+ * TVmaze EPISODE id, different for every episode). `applyScores` spreads one
+ * title's score across every airing of it, so all three carried the same
+ * number and sorted adjacently — one series occupying the whole front page.
+ */
+describe('personalized editorial sections hold one slot per TITLE', () => {
+  const GG = { showName: 'The Golden Girls', tmdbId: 1552, mediaType: 'tv' as const, genres: ['Comedy'], match: 83, matchPersonalized: true };
+
+  it('three episodes of one series occupy exactly one editorial slot', () => {
+    const b = selectCaseBriefing(
+      [
+        a({ ...GG, airstamp: '2026-08-15T19:00:00Z', network: 'Hallmark' }),
+        a({ ...GG, airstamp: '2026-08-15T19:30:00Z', network: 'Hallmark' }),
+        a({ ...GG, airstamp: '2026-08-15T20:00:00Z', network: 'Hallmark' }),
+        a({ showName: 'Matlock', airstamp: '2026-08-15T21:00:00Z', tmdbId: 900, mediaType: 'tv', match: 70, matchPersonalized: true }),
+      ],
+      NOW,
+      NY,
+      { personalized: true },
+    );
+    const editorial = [b.leadCase, ...b.topCases, ...b.worthWatching, b.wildcard].filter(Boolean) as Airing[];
+    const golden = editorial.filter((x) => x.showName === 'The Golden Girls');
+    expect(golden.length, 'one series, one personalized slot').toBe(1);
+  });
+
+  it('the representative airing is the one ON NOW when a title has one', () => {
+    const b = selectCaseBriefing(
+      [
+        a({ ...GG, airstamp: '2026-08-15T21:00:00Z', network: 'Later' }),
+        // Started 30m ago, 60m runtime → on now at 18:00Z.
+        a({ ...GG, airstamp: '2026-08-15T17:30:00Z', network: 'OnNow' }),
+      ],
+      NOW,
+      NY,
+      { personalized: true },
+    );
+    expect(b.leadCase?.network).toBe('OnNow');
+  });
+
+  it('otherwise it is the EARLIEST still-upcoming airing', () => {
+    const b = selectCaseBriefing(
+      [
+        a({ ...GG, airstamp: '2026-08-15T23:00:00Z', network: 'Late' }),
+        a({ ...GG, airstamp: '2026-08-15T20:00:00Z', network: 'Early' }),
+        a({ ...GG, airstamp: '2026-08-15T21:30:00Z', network: 'Middle' }),
+      ],
+      NOW,
+      NY,
+      { personalized: true },
+    );
+    expect(b.leadCase?.network).toBe('Early');
+  });
+
+  it('the deduped title keeps its title-level score unchanged', () => {
+    const b = selectCaseBriefing(
+      [
+        a({ ...GG, airstamp: '2026-08-15T20:00:00Z' }),
+        a({ ...GG, airstamp: '2026-08-15T21:00:00Z' }),
+      ],
+      NOW,
+      NY,
+      { personalized: true },
+    );
+    expect(b.leadCase?.match).toBe(83);
+  });
+
+  it('two DIFFERENT series still get their own slots', () => {
+    const b = selectCaseBriefing(
+      [
+        a({ ...GG, airstamp: '2026-08-15T20:00:00Z' }),
+        a({ showName: 'Matlock', airstamp: '2026-08-15T20:00:00Z', tmdbId: 900, mediaType: 'tv', match: 78, matchPersonalized: true }),
+      ],
+      NOW,
+      NY,
+      { personalized: true },
+    );
+    const editorial = [b.leadCase, ...b.topCases].filter(Boolean) as Airing[];
+    expect(editorial.map((x) => x.showName).sort()).toEqual(['Matlock', 'The Golden Girls']);
+  });
+
+  it('unresolved titles fall back to the show name, so the flood is still capped', () => {
+    // No tmdbId anywhere — the identity has to come from the name alone.
+    const b = selectCaseBriefing(
+      [
+        a({ showName: 'The Golden Girls', airstamp: '2026-08-15T20:00:00Z', match: 83, matchPersonalized: true }),
+        a({ showName: 'the golden girls', airstamp: '2026-08-15T20:30:00Z', match: 83, matchPersonalized: true }),
+      ],
+      NOW,
+      NY,
+      { personalized: true },
+    );
+    const editorial = [b.leadCase, ...b.topCases, ...b.worthWatching].filter(Boolean) as Airing[];
+    expect(editorial.filter((x) => x.showName.toLowerCase() === 'the golden girls').length).toBe(1);
+  });
+
+  it('SCHEDULE sections still show individual airings — airing truth is useful there', () => {
+    const b = selectCaseBriefing(
+      [
+        a({ ...GG, airstamp: '2026-08-15T23:30:00Z', network: 'A' }),
+        a({ ...GG, airstamp: '2026-08-16T00:30:00Z', network: 'A' }),
+      ],
+      NOW,
+      NY,
+      { personalized: true },
+    );
+    // 19:30 and 20:30 local — both inside Tonight's Docket, both real broadcasts.
+    expect(b.tonightsDocket.length).toBe(2);
   });
 });
