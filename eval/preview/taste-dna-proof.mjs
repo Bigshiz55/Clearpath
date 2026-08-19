@@ -69,7 +69,14 @@ const QUERIES = [
   { id: 'Q6', text: "a thriller that isn't slow", kind: 'contracted negation', expect: { minItems: 2 } },
   { id: 'Q7', text: 'My wife likes comedies.', kind: 'third-party statement', expect: { notASearch: true } },
   { id: 'Q8', text: 'a movie my wife and I would both like', kind: 'companion request', expect: { minItems: 2, media: 'movie' } },
-  { id: 'Q9', text: 'I want something darker than Taken.', kind: 'comparative anchor + axis', expect: { minItems: 1 } },
+  /* A COMPARISON IS A ROUND TRIP WHEN ITS ANCHOR IS AMBIGUOUS. "Taken" names a
+     2008 film, a 2017 series and a 2002 miniseries; the critic layer refuses to
+     guess between them and asks one question instead. Contracting this on "at
+     least 1 item in the first response" would have scored that refusal as a
+     failure and pressured the product into guessing. So the contract is the
+     WHOLE exchange: answer immediately when the anchor is unambiguous, or ask
+     one question with REAL options and deliver results once it is answered. */
+  { id: 'Q9', text: 'I want something darker than Taken.', kind: 'comparative anchor + axis', expect: { minItems: 1, comparativeRoundTrip: true } },
   { id: 'Q10', text: 'I had a burrito and want something fun tonight.', kind: 'multi-clause', expect: { minItems: 2 } },
   { id: 'Q11', text: 'I like Yellowstone. What should I watch?', kind: 'cross-clause taste', expect: { minItems: 2 } },
   { id: 'Q12', text: 'I want a thriller, nothing scary', kind: 'trailing negative fragment', expect: { minItems: 2 } },
@@ -135,12 +142,12 @@ async function main() {
   if (!cookie) infra('preview login set no cookies.');
   console.log(`  authenticated with ${rawCookies.length} session cookie(s) (values not logged)`);
 
-  const ask = async (text) => {
+  const ask = async (text, extra = {}) => {
     const started = Date.now();
     const res = await request(`${BASE_URL}/api/ask`, {
       method: 'POST',
       headers: headers({ cookie }),
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, ...extra }),
       timeoutMs: 90_000,
     });
     const ms = Date.now() - started;
@@ -198,6 +205,43 @@ async function main() {
     }
   };
 
+  /** Answer a clarification the way the product's own UI answers it, and prove
+   *  the comparison then completes. Returns a list of failures (empty = good). */
+  const proveComparativeRoundTrip = async (body, ask2) => {
+    const problems = [];
+    if (body.kind !== 'clarify') {
+      problems.push(`expected either results or one clarifying question, got kind=${body.kind ?? '?'}`);
+      return problems;
+    }
+    const options = Array.isArray(body.comparisonOptions) ? body.comparisonOptions : [];
+    const envelope = body.pendingComparison ?? null;
+    console.log(`  ROUND TRIP step 1 — asked: ${JSON.stringify(body.clarify ?? null)}`);
+    console.log(`    ${options.length} real option(s): ${options.slice(0, 4).map((o) => `${o.title}${o.year ? ` (${o.year})` : ''} [${o.mediaType} ${o.tmdbId}]`).join(' · ') || 'none'}`);
+    if (options.length === 0) problems.push('the clarification offered no options, so it cannot be answered');
+    if (!envelope) problems.push('no pendingComparison envelope — the original request cannot be resumed');
+    for (const o of options) {
+      if (typeof o.tmdbId !== 'number' || !o.mediaType || !o.title) {
+        problems.push(`an option is not a real catalog identity: ${JSON.stringify(o)}`);
+        break;
+      }
+    }
+    if (problems.length > 0) return problems;
+    const chosen = options[0];
+    const spokenAs = envelope?.pending?.[0]?.spokenAs ?? chosen.title;
+    const resumed = await ask2(envelope?.text ?? undefined, {
+      pendingComparison: envelope,
+      comparisonChoice: { spokenAs, tmdbId: chosen.tmdbId, mediaType: chosen.mediaType },
+    });
+    const back = Array.isArray(resumed.body.items) ? resumed.body.items : [];
+    console.log(`  ROUND TRIP step 2 — answered "${spokenAs}" → ${chosen.title}: ${back.length} item(s) · ${resumed.ms}ms · kind=${resumed.body.kind ?? '?'}`);
+    for (const i of back.slice(0, 5)) console.log(`      ${String(i.title).slice(0, 34).padEnd(35)} match=${i.matchScore}`);
+    if (back.length === 0) {
+      problems.push('the settled comparison still returned nothing');
+      explainShortfall(resumed.body);
+    }
+    return problems;
+  };
+
   for (const q of QUERIES) {
     console.log(`\n──────── ${q.id} (${q.kind}): "${q.text}"`);
     const { ms, body } = await ask(q.text);
@@ -208,7 +252,11 @@ async function main() {
          comedies." is not an order, and a deployment that answers it with a
          comedy grid has misread it. */
       if ((q.expect ?? {}).notASearch) console.log('  CONTRACT not-a-search: PASS (no result set)');
-      else {
+      else if ((q.expect ?? {}).comparativeRoundTrip) {
+        const problems = await proveComparativeRoundTrip(body, ask);
+        console.log(`  CONTRACT comparative round trip: ${problems.length === 0 ? 'PASS' : 'FAIL'}`);
+        for (const pr of problems) fail(`${q.id} "${q.text}": ${pr}`);
+      } else {
         explainShortfall(body);
         fail(`${q.id} "${q.text}": returned no results at all.`);
       }
