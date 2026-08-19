@@ -331,6 +331,43 @@ dropped one layer down", which is why the unit suites were green throughout.
   completed, and a tone with no execution home is disclosed rather than invented
   as a topic.
 
+### Round two — what the deployed proof and the reviewer found
+
+- **A contract pinned to COPY failed on an improvement.** `main` passed the
+  deployed-proof workflow; this branch failed it. The contract is "the
+  comparison changed the order, OR the deployment said it could not", and it
+  read the second half by matching the note against a hand-kept list of
+  phrasings. Adding the honest `unavailable` disclosure therefore turned a
+  working disclosure into a recorded silence — the product told the truth and
+  the harness could not hear it. Third time this shape has cost a red gate in
+  one pass, and prose is the worst place to keep a vocabulary because copy is
+  SUPPOSED to change. `diagnostics.critic.disclosed` now carries the fact;
+  `evidenceCoverage.test.ts` pins that the degraded branch has no silent arm.
+- **P0-A's root cause, measured rather than inferred.** At exact head on the
+  preview: `critic: 43 candidate(s), 0 fingerprinted, applied=false` with
+  `said: I couldn't check what I know about these titles just now`. That is the
+  `unavailable` arm — the deployment cannot READ `title_dimensions`. The
+  previous report's "0 of 43 coverage" was never zero fingerprints; it was zero
+  reads, reported as a fact about the catalog. Confirmed on PRODUCTION,
+  unauthenticated: `/api/health/showdown` → `covered: 0, total: 113,
+  usable: false`. **This is an environment/credential gap, not a code gap, and
+  it is not fixed by this branch — it is now correctly reported.** Remedy is in
+  the endpoint's own `remedy` field.
+- **A frame is offered, never applied.** The Vercel review caught that `FRAMED`
+  stripped any "<article> <name> <medium noun>" — the exact shape of "The Truman
+  Show", "Scary Movie", "Silent Movie", "The Daily Show" and "The Rocky Horror
+  Picture Show", each truncated to a fragment AND given a wrong hard media
+  filter, resolving to nothing, silently. No lexical rule separates them, so
+  `readAnchorSpan` returns both readings and `orchestrate` searches the literal
+  one first, adopting the frame only when the catalog does not contain it — the
+  call `/api/search` already makes for the same ambiguity.
+- **"less X" ruled X IN.** "something like that but less dumb" recorded
+  `dumb: WANTED`; so did "something less slow". "less gory", "less violent" and
+  "less scary" recorded nothing at all. One phrasing, two wrong answers, the
+  worse being the reversal the negation architecture exists to prevent. A
+  diminisher scopes like a negator and is read at the one seam both consumers
+  share. Media polarity deliberately does not learn these words.
+
 ### Discovered here, not fixed (deliberately out of scope)
 - **`/api/search` leads with the 2017 Taken series on production right now.**
   Verified unauthenticated against `clearpath-pearl-chi.vercel.app` at
@@ -352,6 +389,19 @@ dropped one layer down", which is why the unit suites were green throughout.
   `vercel.json` schedules it and Vercel fires crons on production only. Any
   preview coverage measurement is a measurement of an unfed cache. Use
   `?report=1` to state the number honestly rather than inferring a defect.
+- **A trailing POSITIVE fragment is dropped.** "I want a thriller, more gritty"
+  and "I want a thriller, gritty" file the fragment as conversational background
+  and execute the thriller alone, while "nothing gritty" in the same position
+  binds. `CONSTRAINT` is a list of FILTER markers by design, and treating any
+  trailing adjective as a constraint would read ordinary asides as requests — so
+  this wants its own work order with the metamorphic suite as the gate, not a
+  quiet widening inside a negation fix.
+- **The canonical interpreter records no title for "Something better for me than
+  Furious."** — `intent.titles` is empty; the comparative anchor is owned by the
+  critic layer's own extraction (`routeAsk`), not by `interpret()`. Two readers
+  of the same sentence, which is the shape that has produced most of this pass's
+  defects. Worth consolidating, but it is a live serving path and wants its own
+  order.
 
 ## Now (continued)
 - **TODAY'S CASE BRIEFING is BUILT (`claude/todays-case-briefing`, stacked
