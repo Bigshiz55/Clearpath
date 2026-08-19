@@ -44,6 +44,22 @@ Run at `3f9547c`, 28 items over 3 queries:
 | hard constraint holds | `three Sylvester Stallone movies` → exactly 3, all Stallone (Rocky, Creed, The Suicide Squad — he voices King Shark) |
 | latency, steady state | 1.2–1.8s p95 per query; only the first (cold) call was 5.5–6.7s |
 
+### The two search defects this run surfaced — and the re-run that confirmed the fixes
+
+The first run of this harness answered `Looking for a good thriller` with ONE
+title and `movies about chess` with Spider-Man, Avengers and Toy Story 5. Both
+were interpreter defects, not ranking defects. Re-measured on the same harness
+after the fix (preview @ `4ac0e5c`):
+
+| query | before | after |
+|---|---|---|
+| `Looking for a good thriller` | **1 item** (The Dark Knight) | **24 items** — Dark Knight, Parasite, Whiplash, Pulp Fiction, Fight Club, Sinners, The Conjuring, The Batman … |
+| `movies about chess` | Spider-Man, Avengers, Toy Story 5 | **13 genuine chess films** — The Seventh Seal, Searching for Bobby Fischer, Queen of Katwe, Geri's Game, Chess Story, Pawn Sacrifice, Computer Chess, Wazir, The Coldest Game, Knight Moves … |
+| `three Sylvester Stallone movies` | Rocky, Creed, The Suicide Squad | **unchanged** — the hard constraint was never the problem |
+
+The chess query also got *faster*: 6661ms → 2539ms cold, p95 1844ms → 1551ms.
+Binding the subject replaces broad discovery with targeted retrieval.
+
 **What this does NOT cover, and why:**
 
 1. **No reordering was observed**, because the preview identity has no stored
