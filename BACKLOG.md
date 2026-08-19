@@ -30,14 +30,35 @@ Updated at the end of every work order per the Working Agreement in
     that watches the network on the real module), and the documented ordering
     of ranking vs the eligibility gate was simply wrong — corrected, with the
     real property (order-independence of `qualifyCandidates`) now pinned.
-  - **BLOCKED — production proof.** `/api/ask` requires a session (401 for
-    anonymous, verified against production) and this environment holds no
-    production credentials, so no signed-in query could be run. Every sub-item
-    of the proof needs a session, including the control: there is no signed-out
-    Ask ordering to compare against. `docs/TASTE-DNA-PRODUCTION-PROOF.md` has
-    the exact commands for the owner — one authenticated call suffices, because
-    each item carries `matchScore` (order before taste) next to
-    `personal.rankScore` (order after) and the evidence that moved it.
+  - **PARTLY PROVEN on a real deployment; the DNA-movement half is still open.**
+    `eval/preview/taste-dna-proof.mjs` (run by the `taste-dna-proof` CI job)
+    signs in as the real preview identity through the existing
+    `preview-test-login` route and asks the deployed `/api/ask` three closure
+    queries. No production surface was added: `/api/ask` already spreads the
+    whole `FinderItem`, so `matchScore` (the pre-Phase-1 objective score) rides
+    next to `personal.rankScore` and the evidence, and before/after arrive in
+    the same response.
+    - **PROVEN against a real deployment** (preview @ `3f9547c`, real Supabase,
+      real signed-in user, 28 items over 3 queries): membership unchanged before
+      vs after taste (set equality PASS on all three); no movement outside the
+      ±18 ceiling; and a genuine **no-DNA control** — the preview account has no
+      stored DNA, so `participated:false` on every item and the personalized
+      order was byte-identical to the objective sort. The hard-constraint query
+      returned exactly three Stallone films (Rocky, Creed, The Suicide Squad —
+      he voices King Shark), so the count and person constraints held.
+    - **STILL OPEN:** no account with stored Taste DNA was available, so real
+      *reordering* has not been observed on any deployment. Seeding DNA is
+      forbidden and would prove nothing anyway.
+    - **STILL OPEN:** everything above is PREVIEW. Production `/api/ask` is 401
+      without a session, `preview-test-login` is inert on production by platform
+      design (`VERCEL_ENV`), and the founder gate needs a server secret. No
+      credential path exists that does not require a secret this session must
+      not hold. `docs/TASTE-DNA-PRODUCTION-PROOF.md` has the owner's commands —
+      one authenticated call suffices.
+  - Measured latency on the deployed build is far better than the frozen
+    corpus's production p95 suggested: 1.2–1.8s p95 per query steady-state, with
+    only the first (cold) call at 5.5–6.7s. The 6.6s figure recorded earlier was
+    a cold-cache effect, not a steady-state cost.
   - **Held until then, by the work order:** diversity memory, critic
     personalities, Verdict Room redesign.
 - **Three-part P0 repair — `claude/p0-repair-semantic-ask-livetv` (one PR,
