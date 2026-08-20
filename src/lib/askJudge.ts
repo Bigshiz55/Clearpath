@@ -419,18 +419,25 @@ export async function askJudgeTitle(
      work people mean does the reading flip. */
   const span = readAnchorSpan(text);
   if (span.framed && normalizeTitle(span.framed.title) !== normalizeTitle(requestedTitle)) {
+    /* An errored probe is UNKNOWN, never absence. The chooser's "literal
+       resolves to nothing" rule may only fire when the literal search actually
+       ANSWERED empty — a transient failure must not rewrite the user's words,
+       so on any probe failure the flip is skipped and the main lookup below
+       fails or recovers honestly on its own. */
     const [literalResults, framedResults] = await Promise.all([
-      searchTitles(requestedTitle).catch(() => [] as SearchResultItem[]),
-      searchTitles(span.framed.title).catch(() => [] as SearchResultItem[]),
+      searchTitles(requestedTitle).catch(() => null),
+      searchTitles(span.framed.title).catch(() => null),
     ]);
-    const bestOf = (rs: SearchResultItem[], name: string, medium: 'movie' | 'tv' | null) =>
-      rs
-        .filter((r) => isExactTitle(name, r.title) && (medium == null || r.mediaType === medium))
-        .sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0))[0] ?? null;
-    const literalBest = bestOf(literalResults, requestedTitle, null);
-    const framedBest = bestOf(framedResults, span.framed.title, span.framed.mediaType);
-    if (chooseFramedReading(literalBest, framedBest) === 'framed') {
-      requestedTitle = span.framed.title;
+    if (literalResults && framedResults) {
+      const bestOf = (rs: SearchResultItem[], name: string, medium: 'movie' | 'tv' | null) =>
+        rs
+          .filter((r) => isExactTitle(name, r.title) && (medium == null || r.mediaType === medium))
+          .sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0))[0] ?? null;
+      const literalBest = bestOf(literalResults, requestedTitle, null);
+      const framedBest = bestOf(framedResults, span.framed.title, span.framed.mediaType);
+      if (chooseFramedReading(literalBest, framedBest) === 'framed') {
+        requestedTitle = span.framed.title;
+      }
     }
   }
 
