@@ -105,7 +105,10 @@ export function decideForMigration(name: string, checksum: string, existing: Led
  * ledger as authoritative.
  *   unreconciled - rows exist but historical migrations were never proven
  *   reconciled   - the one-time reconciliation has run
+ *   cli_ledger   - answered from supabase_migrations.schema_migrations, the
+ *                  Supabase CLI's own application record — real evidence with
+ *                  its own name, used when the repo ledger cannot answer.
  *   empty        - no ledger rows at all
  *   unavailable  - the ledger could not be read
  */
-export type LedgerStatus = 'reconciled' | 'unreconciled' | 'empty' | 'unavailable';
+export type LedgerStatus = 'reconciled' | 'unreconciled' | 'cli_ledger' | 'empty' | 'unavailable';

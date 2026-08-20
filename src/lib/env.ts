@@ -124,9 +124,20 @@ export const serverEnv = {
     return optional('TMDB_API_KEY');
   },
   serviceRoleKey(): string {
+    /* BOTH SUPABASE KEY GENERATIONS ARE ACCEPTED. Supabase's dashboard now
+       issues secret keys in the `sb_secret_…` format under the name
+       SUPABASE_SECRET_KEY; the legacy JWT-format service_role key remains
+       valid under its historical name. supabase-js takes either value as the
+       privileged key parameter, and this code never inspects the format —
+       so the only failure mode was the VARIABLE NAME. The legacy name wins
+       when both are set (existing deployments change nothing). */
+    const modern = optional('SUPABASE_SECRET_KEY');
+    const legacy = optional('SUPABASE_SERVICE_ROLE_KEY');
+    if (legacy) return legacy;
+    if (modern) return modern;
     return required(
       'SUPABASE_SERVICE_ROLE_KEY',
-      'This server-only key is needed for account deletion.',
+      'This server-only key is needed for privileged reads/writes (account deletion, ledger reads). The new-format SUPABASE_SECRET_KEY (sb_secret_…) is accepted too.',
     );
   },
   openaiKey(): string | undefined {
@@ -283,7 +294,10 @@ export function envHealth() {
       optional('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'),
     ),
     tmdbKey: Boolean(optional('TMDB_API_KEY')),
-    serviceRoleKey: Boolean(optional('SUPABASE_SERVICE_ROLE_KEY')),
+    // Presence of EITHER privileged-key generation (legacy service_role JWT
+    // or the new sb_secret_… under SUPABASE_SECRET_KEY) — the same resolution
+    // serverEnv.serviceRoleKey() performs.
+    serviceRoleKey: Boolean(optional('SUPABASE_SERVICE_ROLE_KEY') || optional('SUPABASE_SECRET_KEY')),
     openaiKey: Boolean(optional('OPENAI_API_KEY')),
     anthropicKey: Boolean(optional('ANTHROPIC_API_KEY')),
     aiProvider: (optional('AI_PROVIDER') ?? 'anthropic').toLowerCase(),
