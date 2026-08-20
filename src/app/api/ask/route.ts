@@ -7,7 +7,7 @@ import { tmdbImage } from '@/lib/tmdb/image';
 import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
 import { interpret } from '@/lib/interpret/interpret';
-import { resolveCanonicalExecution } from '@/lib/ask/canonicalExecution';
+import { resolveCanonicalExecution, genreIdFor } from '@/lib/ask/canonicalExecution';
 import { acknowledgeStatement, isBareStatement } from '@/lib/ask/statementBoundary';
 import { canonicalClaimsSpan } from '@/lib/ask/titleSpanOwnership';
 import { unresolvedClarification, type NearMisses } from '@/lib/ask/unresolvedResponse';
@@ -33,6 +33,7 @@ import { mediaTypeSatisfies, resolveSource } from '@/lib/nlu/mediaOntology';
 import { lexicalIntent } from '@/lib/search/searchIntent';
 import {
   applyTurn,
+  absorbStatement,
   chipsFor,
   sanitizeRequestState,
   stateToQuery,
@@ -776,6 +777,18 @@ export async function POST(req: Request) {
     // has already answered them by the time control reaches here. What is left
     // is a statement that named no title, which is the case with nothing to run.
     if (isBareStatement(canonical) && !criticRequest && !lex) {
+      /* THE TASTE THE STATEMENT CARRIED OUTLIVES THE TURN. The acknowledgement
+         says "Noted", and until this fold that was a false claim in
+         conversation mode: the state rode back unchanged, so the next turn
+         executed as though nothing had been said. The statement's genres,
+         tones and liked titles now land in the same CanonicalRequest every
+         later turn executes from — and what has no home in that state is
+         disclosed by `absorbStatement` rather than silently dropped. */
+      if (conversational && convState) {
+        const absorbed = absorbStatement(convState, canonical, genreIdFor);
+        convState = absorbed.state;
+        convInterpretation = [...convInterpretation, ...absorbed.notes];
+      }
       return NextResponse.json(
         withConv({
           kind: 'clarify',

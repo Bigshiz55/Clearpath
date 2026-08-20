@@ -599,6 +599,35 @@ async function main() {
      only in the axis must not come back as the same list. No hard-coded titles
      are needed to say so, and no judgement about which films are "generic" —
      the deployment is compared against itself. */
+  /* ── STATED TASTE OUTLIVES THE TURN — the two-turn proof ─────────────────
+     Turn 1 is a pure statement; the deployment must acknowledge it, run
+     nothing, and fold the taste into the conversation state it hands back.
+     Turn 2 is a bare follow-up request executed FROM that state — the
+     product's real between-turns path, not a replay trick. The exclusion has
+     to reach the executable query, or "Noted" was a false claim. */
+  {
+    console.log('\n──────── TWO-TURN: a statement\'s taste executes on the next turn');
+    const t1 = await ask('I like thrillers but I hate horror.', { conversation: {} });
+    const ack = String(t1.body.clarify ?? '');
+    const st = t1.body.conversation ?? null;
+    console.log(`  turn 1 → kind=${t1.body.kind} · said: ${ack}`);
+    if (t1.body.kind !== 'clarify' || (Array.isArray(t1.body.items) && t1.body.items.length > 0)) {
+      fail('two-turn: the statement ran a search instead of acknowledging.');
+    }
+    if (!st) fail('two-turn: no conversation state came back with the acknowledgement.');
+    const t2 = await ask('ok, what should we watch tonight?', { conversation: st ?? {} });
+    const q2 = t2.body.query ?? {};
+    const items2 = Array.isArray(t2.body.items) ? t2.body.items : [];
+    console.log(`  turn 2 → kind=${t2.body.kind} · ${items2.length} item(s) · genreIds=${JSON.stringify(q2.genreIds)} exclude=${JSON.stringify(q2.excludeGenreIds)}`);
+    const kept = Array.isArray(q2.genreIds) && q2.genreIds.includes(53);
+    const excluded = Array.isArray(q2.excludeGenreIds) && q2.excludeGenreIds.includes(27);
+    console.log(`  CONTRACT the liked genre executes next turn: ${kept ? 'PASS' : 'FAIL'}`);
+    console.log(`  CONTRACT the hated genre is EXCLUDED next turn: ${excluded ? 'PASS' : 'FAIL'}`);
+    if (!kept) fail('two-turn: "I like thrillers" did not survive to the next turn.');
+    if (!excluded) fail('two-turn: "I hate horror" did not survive to the next turn as an exclusion.');
+  }
+
+
   console.log('\n──────── CROSS-QUERY CONTRACTS');
   for (const q of QUERIES) {
     const other = (q.expect ?? {}).differsFrom;

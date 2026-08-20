@@ -127,7 +127,11 @@ describe('where the boundary sits in /api/ask', () => {
   });
 
   it('returns no items, so nothing can be rendered as a recommendation', () => {
-    const guard = route.slice(route.indexOf('isBareStatement(canonical)'), route.indexOf('isBareStatement(canonical)') + 700);
+    /* The branch's own extent, not a character budget: the fold that keeps
+       "Noted" honest legitimately grew the branch past the old 700-char slice,
+       and a window that fails on growth pins spelling, not the contract. */
+    const start = route.indexOf('isBareStatement(canonical)');
+    const guard = route.slice(start, route.indexOf('// 2a)', start));
     expect(guard).toMatch(/kind: 'clarify'/);
     expect(guard).toMatch(/items: \[\]/);
   });
