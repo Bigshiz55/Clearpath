@@ -51,6 +51,27 @@ import type { CriticObjective } from './objective';
 /** Same order of magnitude as `PREF_NUDGE_MAX` — a lens, never the lens. */
 export const CRITIC_NUDGE_MAX = 10;
 
+/**
+ * THE STATED DIRECTION'S SHARE OF A MIXED PLAN'S BUDGET.
+ *
+ * Measured against a real deployment (taste-dna-proof, 2026-08-20): "darker
+ * than Whiplash" and "lighter than Whiplash" both ran at full authority and
+ * returned heads sharing three of five titles, because the one instruction the
+ * user TYPED (strength 0.95) was pooled into the same mass as five-plus
+ * anchor-preserve instructions (0.5 apiece) — under a fifth of the budget, at
+ * most ±2 points of ±10, which a quality head locked at 87/85/83 absorbs
+ * without reordering. A comparison whose direction cannot move its own result
+ * is decorative.
+ *
+ * So in a mixed plan the stated terms own this share of ±CRITIC_NUDGE_MAX
+ * outright, and the anchor's inferred terms divide the remainder scaled by
+ * what the anchor is worth. 0.7 makes the stated axis decisive over the
+ * quality locks actually observed (±7 against a five-point spread) while the
+ * anchor's shape still separates otherwise-equal candidates — dominant, not
+ * exclusive.
+ */
+export const STATED_SHARE = 0.7;
+
 /** Fewer shared axes than this and the comparison is noise, not a reading. */
 const MIN_SHARED_AXES = 2;
 
@@ -243,27 +264,66 @@ export function planNudge(
   }
 
   if (mass <= 0) return INERT;
-  const score = weighted / mass; // -1 .. +1
-  const scale = CRITIC_NUDGE_MAX / mass;
+
+  /* ── HOW THE PARTICIPATING TERMS DIVIDE THE BUDGET ─────────────────────
+     A PURE plan — every term stated, or every term inferred from the anchor —
+     keeps the shipped arithmetic to the last decimal: one pooled mass, each
+     term weighted by its provenance. `statedAxisAuthority.test.ts` pins both
+     cases to nine decimals, because silently re-weighting every existing
+     comparison would be a different change wearing this one's clothes.
+
+     A MIXED plan is where pooling failed on production: the anchor's many
+     preserve terms outmassed the one instruction the user typed, so "darker"
+     and "lighter" returned the same head (see STATED_SHARE above). Here the
+     stated group owns its share of ±CRITIC_NUDGE_MAX outright and the anchor
+     group divides the remainder × authority — dead anchor mass no longer
+     votes, and each group is normalized by its OWN mass so neither dilutes
+     the other. */
+  const stated = parts.filter((p) => p.ins.evidence.includes('request'));
+  const inferred = parts.filter((p) => !p.ins.evidence.includes('request'));
+
+  let score: number;
+  let pointsFor: (p: (typeof parts)[number]) => number;
+
+  if (stated.length > 0 && inferred.length > 0) {
+    const statedMass = stated.reduce((s, p) => s + p.ins.strength, 0);
+    const inferredMass = inferred.reduce((s, p) => s + p.ins.strength, 0);
+    const statedScore = stated.reduce((s, p) => s + p.agreement * p.ins.strength, 0) / statedMass;
+    const inferredScore = inferred.reduce((s, p) => s + p.agreement * p.ins.strength, 0) / inferredMass;
+    /* The anchor's slice shrinks with its authority; whatever it does not
+       claim reverts to the stated terms rather than to nobody, so a
+       half-known anchor half-counts instead of muting the user. */
+    const inferredShare = (1 - STATED_SHARE) * authority;
+    const statedShare = 1 - inferredShare;
+    score = statedShare * statedScore + inferredShare * inferredScore;
+    pointsFor = (p) =>
+      p.ins.evidence.includes('request')
+        ? ((p.agreement * p.ins.strength) / statedMass) * statedShare * CRITIC_NUDGE_MAX
+        : ((p.agreement * p.ins.strength) / inferredMass) * inferredShare * CRITIC_NUDGE_MAX;
+  } else {
+    score = weighted / mass; // -1 .. +1
+    const scale = CRITIC_NUDGE_MAX / mass;
+    pointsFor = (p) => p.agreement * p.ins.strength * p.weight * scale;
+  }
 
   return {
     nudge: Math.max(-CRITIC_NUDGE_MAX, Math.min(CRITIC_NUDGE_MAX, score * CRITIC_NUDGE_MAX)),
     distance: (1 - score) / 2,
     axes,
-    /* THE SAME ARITHMETIC, SPLIT PER AXIS. `agreement * strength * scale` is
-       literally the term this axis added to `weighted / mass * MAX * authority`,
-       so these points sum to `nudge` whenever the clamp does not bite. GC7
-       explains from these and nothing else. */
-    contributions: parts.map(({ ins, value, agreement, weight }) => ({
-      axis: ins.axis,
-      kind: ins.kind,
-      candidateValue: value,
-      target: ins.target,
-      anchorValue: ins.anchorValue,
-      strength: ins.strength,
-      evidence: [...ins.evidence],
-      agreement,
-      points: agreement * ins.strength * weight * scale,
+    /* THE SAME ARITHMETIC, SPLIT PER AXIS — `pointsFor` is literally the term
+       each axis added to `score * MAX`, so these points sum to `nudge`
+       whenever the clamp does not bite. GC7 explains from these and nothing
+       else. */
+    contributions: parts.map((p) => ({
+      axis: p.ins.axis,
+      kind: p.ins.kind,
+      candidateValue: p.value,
+      target: p.ins.target,
+      anchorValue: p.ins.anchorValue,
+      strength: p.ins.strength,
+      evidence: [...p.ins.evidence],
+      agreement: p.agreement,
+      points: pointsFor(p),
     })),
   };
 }
