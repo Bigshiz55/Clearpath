@@ -147,7 +147,10 @@ const QUERIES = [
      back" would pass even if the medium and the year were thrown away, which is
      precisely the defect: `AnchorRequest.year` existed for two releases and
      nothing filled it. So the contract names the field the cue governs. */
-  { id: 'Q27', text: 'the Taken movie', kind: 'NL · explicit medium cue', expect: { verdict: { mediaType: 'movie' } } },
+  /* THE REFERENT, NOT JUST THE MEDIUM. The prior head answered this with THE
+     TAKEN (2024) — cues honoured, wrong work. "the Taken movie" names the film
+     people mean by "Taken", and the year pins that as a catalog fact. */
+  { id: 'Q27', text: 'the Taken movie', kind: 'NL · explicit medium cue', expect: { verdict: { mediaType: 'movie', title: 'Taken', year: 2008 } } },
   { id: 'Q28', text: 'Taken 2008', kind: 'NL · explicit year cue', expect: { verdict: { year: 2008 } } },
   { id: 'Q29', text: 'anything except horror', kind: 'NL · bare exclusion', expect: { minItems: 2 } },
   { id: 'Q30', text: 'my wife hated it but I liked it', kind: 'NL · third-party opinion, not the user’s taste', expect: { notASearch: true } },
