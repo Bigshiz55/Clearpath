@@ -132,6 +132,79 @@ describe('the ledger is readable through the channel the environment actually ha
   });
 });
 
+/**
+ * AN UNAVAILABLE LEDGER NAMES ITS OWN CAUSE — WITHOUT LEAKING ANYTHING.
+ *
+ * The first production deploy of the two-channel reader answered
+ * `unavailable` and could not say why: every failure collapsed into the same
+ * null, so the only way to diagnose it was redeploying guesses. These pin the
+ * repaired contract: each failed channel reports a closed-vocabulary code
+ * (a Node errno, a Postgres SQLSTATE, 'validate_rejected', 'missing_key'),
+ * a healthy read carries no diagnostics at all, and no code ever contains a
+ * URL, hostname or credential fragment — a pg connect error interpolates the
+ * hostname into its MESSAGE, which is exactly why messages never travel.
+ */
+describe('an unavailable ledger names its own cause', () => {
+  it('a connect failure reports its errno per channel, and the REST gap its missing key', async () => {
+    const err = new Error('connect ETIMEDOUT db.example.supabase.co:5432') as Error & { code: string };
+    err.code = 'ETIMEDOUT';
+    pgConnectError = err;
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('unavailable');
+    expect(out.ledgerChannels).toEqual({ directDb: 'ETIMEDOUT', rest: 'missing_key' });
+  });
+
+  it('a rejected connection string is named as validation, not as a connect error', async () => {
+    vi.stubEnv('SUPABASE_DB_URL', 'postgresql://user:p@ss@db.example.supabase.co:5432/postgres');
+    const out = await read();
+    expect(out.ledgerChannels?.directDb).toBe('validate_rejected');
+  });
+
+  it('no configured DB URL says so, rather than pretending the channel failed', async () => {
+    vi.stubEnv('SUPABASE_DB_URL', '');
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('unavailable');
+    expect(out.ledgerChannels).toEqual({ directDb: 'not_configured', rest: 'missing_key' });
+  });
+
+  it('NEVER LEAKS: the diagnostic carries no hostname, credential or URL fragment', async () => {
+    const err = new Error('getaddrinfo ENOTFOUND db.SECRETREF.supabase.co') as Error & { code: string };
+    err.code = 'ENOTFOUND';
+    pgConnectError = err;
+    const out = await read();
+    const serialized = JSON.stringify(out);
+    expect(serialized).not.toMatch(/SECRETREF|supabase\.co|postgres:|secret/i);
+    expect(out.ledgerChannels?.directDb).toBe('ENOTFOUND');
+  });
+
+  it('an error with no structural code degrades to its constructor name, never its message', async () => {
+    pgConnectError = Object.assign(new RangeError('boom with db.example.supabase.co inside'), { code: 42 });
+    const out = await read();
+    expect(out.ledgerChannels?.directDb).toBe('RangeError');
+  });
+
+  it('a HEALTHY read carries no diagnostics at all — the shape that always was', async () => {
+    pgScript = [
+      { rows: [{ name: '0047_decision_runs', success: true, reconciled: true }] },
+    ];
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('reconciled');
+    expect(out.ledgerChannels).toBeUndefined();
+  });
+
+  it('a REST answer after a direct-DB failure still names the channel that failed', async () => {
+    const err = new Error('refused') as Error & { code: string };
+    err.code = 'ECONNREFUSED';
+    pgConnectError = err;
+    adminAvailable = true;
+    adminRows.push({ name: '0046_security_advisor_hardening', success: true, reconciled: true });
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('reconciled');
+    expect(out.appliedDatabaseMigration).toBe('0046_security_advisor_hardening');
+    expect(out.ledgerChannels).toEqual({ directDb: 'ECONNREFUSED' });
+  });
+});
+
 describe('the privileged key accepts the new Supabase secret-key format', () => {
   it('serviceRoleKey() resolves SUPABASE_SECRET_KEY (sb_secret_…) when the legacy var is absent', async () => {
     vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '');
