@@ -16,6 +16,8 @@ import { augmentInternational } from '@/lib/askInternational';
 import type { ConsumedEntity } from '@/lib/nlu/consumedEntities';
 import { applyRequiredSubject, resolveSubjectRequirementForTerms } from '@/lib/finderSubject';
 import { getBuildInfo } from '@/lib/buildInfo';
+import { buildAskRun } from '@/lib/graph/decisionRun';
+import { persistDecisionRun } from '@/lib/graph/store';
 import { routeAsk } from '@/lib/critic/gate';
 import { stripAnchorSpans } from '@/lib/critic/request';
 import { needsClarification, applyChoice, readClarification } from '@/lib/critic/clarifyRequest';
@@ -1400,6 +1402,25 @@ export async function POST(req: Request) {
     if (aiMode === 'shadow' && text.trim()) {
       void recordShadowInterpretation({ text, route: 'ask', legacyResultCount: items.length });
     }
+
+    /* ── GRAPH-NATIVE DECISION PROVENANCE (Phase 2) ─────────────────────────
+       The run graph is built from the state THIS request actually computed —
+       the executed query's constraint edges, the finder's own per-candidate
+       eligibility verdicts (rejections included), and the items returned —
+       then persisted fire-and-forget. It changes no behavior and can never
+       block or fail the response; it makes the execution inspectable and the
+       graph invariants (INV-1/2/6/8) checkable over real runs. `requestId`
+       IS the run id: one identity for one decision. */
+    void persistDecisionRun(supabase, user.id, buildAskRun({
+      runId: requestId,
+      text,
+      kind: 'search',
+      query,
+      requestedCount: result.diagnostics.requestedCount,
+      diagnostics: result.diagnostics,
+      returned: items.map((i) => ({ id: i.id, mediaType: i.mediaType === 'tv' ? 'tv' : 'movie', title: i.title, matchScore: i.matchScore ?? null })),
+      createdAt: new Date().toISOString(),
+    }));
 
     return NextResponse.json(
       withConv({

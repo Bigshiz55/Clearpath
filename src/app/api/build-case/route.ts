@@ -6,6 +6,8 @@ import { DIMENSIONS, DIMENSION_KEYS } from '@/lib/scoring/dimensions';
 import { searchTitles } from '@/lib/tmdb/client';
 import { rateQuizTitle } from '@/lib/actions/quiz';
 import { canonicalRequestRoute } from '@/lib/nlu/requestRoute';
+import { buildCaseRun } from '@/lib/graph/decisionRun';
+import { persistDecisionRun } from '@/lib/graph/store';
 import { tasteEvidenceText } from '@/lib/nlu/tasteEvidence';
 import {
   detectAiringHorizon,
@@ -292,6 +294,27 @@ export async function POST(request: Request) {
     const learned = byAxis.size > 0 || namedLiked.length > 0 || namedAvoid.length > 0;
     const tasteLead = parts.length ? `Locked in ${parts.join(' · ')}. ` : '';
 
+    /* ── GRAPH-NATIVE DECISION PROVENANCE (Phase 2) ─────────────────────────
+       Every exit records what THIS submission was and did: the
+       classification, the destination, and the writes actually performed —
+       with the durable-clause text that justified them, so INV-2 ("writes
+       never derive from request-only language") is checkable over every real
+       run in the founder inspector. `caseId` IS the run id: one identity for
+       one decision, shared with the analytics rows. Fire-and-forget; can
+       never block or fail the response. */
+    const recordRun = (classifiedAs: string, routedTo: string | null) => {
+      void persistDecisionRun(supabase, user.id, buildCaseRun({
+        runId: caseId,
+        text,
+        classifiedAs,
+        routedTo,
+        durableEvidence: evidence,
+        tasteAxesWritten: [...byAxis.keys()],
+        titlesSeeded: [...namedLiked, ...namedAvoid],
+        createdAt: new Date().toISOString(),
+      }));
+    };
+
     // Airing intent is resolved BEFORE the streaming platform, so a named linear
     // channel with a time ("HBO movie on tonight", "Lifetime right now") reaches
     // the live guide instead of being captured by the streaming router — HBO in
@@ -310,6 +333,7 @@ export async function POST(request: Request) {
       if (movieOnly) params.set('type', 'movie');
       const redirect = `/app/tv?${params.toString()}`;
       await logCase('airing', redirect, { horizon, genre, network: network?.key ?? null, movieOnly });
+      recordRun('airing', redirect);
       // Read the filters back into the summary: "Lifetime comedy movies".
       const what = [network?.name, genre?.toLowerCase(), movieOnly ? 'movies' : null].filter(Boolean).join(' ');
       return NextResponse.json({
@@ -325,6 +349,7 @@ export async function POST(request: Request) {
 
     if (platform) {
       await logCase('platform_find', `/app/finder?providers=${platform.id}`, { platform: platform.name });
+      recordRun('platform', `/app/finder?providers=${platform.id}`);
       return NextResponse.json({
         ok: true,
         learned,
@@ -344,6 +369,7 @@ export async function POST(request: Request) {
     if (route.kind === 'request') {
       const redirect = route.href;
       await logCase('find', redirect, { axes: parsed.axes.length, count: route.count, personalized: route.personalized });
+      recordRun('request', redirect);
       return NextResponse.json({
         ok: true,
         learned,
@@ -363,6 +389,7 @@ export async function POST(request: Request) {
         ? 'Got it — building your VERD1CT DNA.'
         : 'Tell me what YOU love or avoid — that one didn’t change your taste file.';
     await logCase('taste', 'watch', { axes: parsed.axes.length, liked: parsed.likedTitles.length, avoid: parsed.avoidTitles.length });
+    recordRun('taste', null);
     return NextResponse.json({ ok: true, summary, learned, caseId });
   } catch {
     return NextResponse.json({ error: 'Could not read that — try again.' }, { status: 500 });
