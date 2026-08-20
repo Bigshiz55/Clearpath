@@ -109,9 +109,37 @@ export function parseCount(clause: string): number | null {
 const TV_WORDS = /\b(?:shows?|series|tv|episodes?|seasons?|sitcoms?)\b/i;
 const MOVIE_WORDS = /\b(?:movies?|films?|flicks?)\b/i;
 
+/**
+ * HOW ENGLISH RULES SOMETHING OUT — DECLARED EXACTLY ONCE.
+ *
+ * This alternation is the negation vocabulary for every consumer in this
+ * file: `NEGATORS` (the boundary-wrapped test, whose single-word members
+ * also feed `CLOSED_CLASS`), `negatedSpans` (span polarity, which adds the
+ * diminishers from `DIMINISHER`), and `MEDIA_NEGATOR_BEHIND` (the windowed
+ * media test). Two hand-kept copies of one vocabulary have drifted FOUR
+ * times in this parser now — request verbs, genre plurals, tone inflections,
+ * and the contracted auxiliaries that reached span negation but never the
+ * media window. Each fix removed the second copy rather than updating it;
+ * this is that fix for negation itself. `String.raw` composition is
+ * deliberate — see the `negatedSpans` docblock for the minifier history.
+ *
+ * (The Reco Lab's `scopes()` in `reco/parseIntent.ts` keeps its own opener
+ * LIST on purpose: it is a string-prefix scope machine with vocabulary this
+ * regex must not absorb — "less ", "minimal ", "never" — and it serves only
+ * the lab surface, not /api/ask.)
+ */
+const NEGATOR_WORDS = String.raw`not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hate[sd]?|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t`;
+
 /** A negator within a short window behind the token, stopping at clause
- *  punctuation — the same idiom the subject layer's `isNegated` uses. */
-const MEDIA_NEGATOR_BEHIND = /\b(?:not|no|without|except|excluding|avoid|nothing|none|but not|anything but)\b[^,.;]{0,24}$/i;
+ *  punctuation — the same idiom the subject layer's `isNegated` uses.
+ *
+ *  COMPOSED FROM `NEGATOR_WORDS`, NOT HAND-LISTED. This window was the copy
+ *  the contracted-auxiliary fix never reached: "a thriller that isn't slow"
+ *  was repaired in `negatedSpans`, but this list still lacked "isn't", so
+ *  "something that isn't a movie" ran with media MOVIE — the same inversion,
+ *  one consumer over. The vocabulary is declared once below; only the window
+ *  (scope) is this regex's own. */
+const MEDIA_NEGATOR_BEHIND = new RegExp(String.raw`\b(?:${NEGATOR_WORDS})\b[^,.;]{0,24}$`, 'i');
 
 /**
  * MEDIA HAS POLARITY — presence is not preference.
@@ -161,8 +189,7 @@ export function parseMedia(clause: string): MediaIntent {
  * an auxiliary drags along ("doesn't GET gory", "won't BE violent") is
  * stripped with the determiners, so the span is the adjective the user meant.
  */
-const NEGATORS =
-  /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hate[sd]?|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t)\b/i;
+const NEGATORS = new RegExp(String.raw`\b(?:${NEGATOR_WORDS})\b`, 'i');
 
 /**
  * The span a negator governs: from the negator to the next boundary.
@@ -189,7 +216,7 @@ const NEGATORS =
 function negatedSpans(clause: string): string[] {
   const out: string[] = [];
   const re = new RegExp(
-    String.raw`\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hates?|hated|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t|${DIMINISHER.source})\b\s+((?:too\s+|any\s+|another\s+|more\s+|be\s+|get\s+|feel\s+|too\s+)?[a-z][\w'-]*(?:\s+[a-z][\w'-]*){0,3})`,
+    String.raw`\b(?:${NEGATOR_WORDS}|${DIMINISHER.source})\b\s+((?:too\s+|any\s+|another\s+|more\s+|be\s+|get\s+|feel\s+|too\s+)?[a-z][\w'-]*(?:\s+[a-z][\w'-]*){0,3})`,
     'gi',
   );
   let m: RegExpExecArray | null;
