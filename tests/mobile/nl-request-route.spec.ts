@@ -65,6 +65,19 @@ const METAMORPHIC = {
 };
 
 /**
+ * THE 2026-08-20 PRODUCTION REPRODUCTION: the bare noun-phrase request. No
+ * find verb, no count, no capitals — "a boxing movie" shipped as the generic
+ * feed (GoodFellas first). The clause layer now owns the decision; this is
+ * the browser half proving the real UI routes the whole spoken family.
+ */
+const BARE_NOUN_PHRASE = {
+  boxing: 'a boxing movie',
+  anotherBoxing: 'another boxing movie',
+  western: 'another western',
+  questionForm: 'what boxing movie should I watch?',
+};
+
+/**
  * The response `/api/build-case` provably returns TODAY for an utterance its
  * gate does not recognise — `{ ok, summary, learned, caseId }` with NO
  * `redirect`. This is not an invented shape: it is the literal fall-through
@@ -120,7 +133,7 @@ async function open(page: Page) {
 // THE CONTRACT
 // ───────────────────────────────────────────────────────────────────────────
 
-for (const [name, text] of Object.entries({ ...UTTERANCES, ...METAMORPHIC })) {
+for (const [name, text] of Object.entries({ ...UTTERANCES, ...METAMORPHIC, ...BARE_NOUN_PHRASE })) {
   test(`[${name}] "${text}" reaches the canonical request route from the real UI`, async ({ page }) => {
     await stubUnroutedBuildCase(page);
     const seen = recordRequests(page);

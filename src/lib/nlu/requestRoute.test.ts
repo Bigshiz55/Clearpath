@@ -127,6 +127,64 @@ describe('the transport invariant', () => {
   });
 });
 
+/**
+ * THE PRODUCTION REPRODUCTION, 2026-08-20. A signed-in user typed
+ * "a boxing movie" into State Your Case on the real phone product and got the
+ * generic Watch Now feed (GoodFellas first) plus "Locked in: loves a boxing
+ * movie". The bare noun-phrase request — the single most ordinary way English
+ * asks for a recommendation — carried no find verb, no count, no capitals, so
+ * every regex gate waved it to "taste". The clause layer (the same reading
+ * /api/ask executes) now decides; these pin the whole spoken family.
+ */
+describe('bare noun-phrase requests are requests — the clause layer decides', () => {
+  const LIVE = [
+    'a boxing movie',
+    'another boxing movie',
+    'a chess movie',
+    'a western',
+    'another western',
+    'something about boxing',
+    'give me a boxing movie',
+    'show me a boxing movie',
+    'I want a boxing movie',
+    'what boxing movie should I watch?',
+    'a good boxing movie',
+    'two boxing movies',
+    'a thriller but nothing supernatural',
+    'something smart but not slow',
+    'a romantic comedy for my wife',
+  ];
+  for (const q of LIVE) {
+    it(`"${q}" routes to the canonical Ask door`, () => {
+      const r = canonicalRequestRoute(q);
+      expect(r.kind, `"${q}" fell through to taste — the generic-feed defect`).toBe('request');
+      if (r.kind !== 'request') return;
+      expect(r.href).toBe(askHref(q));
+      expect(new URL(r.href, 'http://x').pathname).toBe('/app/ask');
+      expect(new URL(r.href, 'http://x').searchParams.get('q')).toBe(q);
+    });
+  }
+
+  it('THE CONTRAST: the durable statements stay taste', () => {
+    for (const q of [
+      'I love boxing movies',
+      'I love slow burns but I hate gore.',
+      'I like courtroom dramas',
+      "I don't like dumb comedies",
+      'My wife likes comedies',
+      'I used to like slashers but not anymore',
+    ]) {
+      expect(isTitleRequest(q), `"${q}" was hijacked into a search`).toBe(false);
+    }
+  });
+
+  it('a bare media noun is a category, not a request', () => {
+    for (const q of ['Movies', 'movies', 'tv', 'the movies']) {
+      expect(isTitleRequest(q), q).toBe(false);
+    }
+  });
+});
+
 describe('controls — ordinary navigation is not hijacked', () => {
   it('a plain Watch Now navigation stays a navigation', () => {
     expect(isTitleRequest('Open Watch Now')).toBe(false);
