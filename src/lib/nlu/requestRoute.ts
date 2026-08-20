@@ -1,6 +1,7 @@
 import { stripRequestFrame } from './requestFrame';
 import { wantsTitleResults } from './requestIntent';
 import { askHref } from '@/lib/search/searchIntent';
+import { parseClauses } from '@/lib/interpret/clauses';
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
@@ -92,6 +93,15 @@ function hasMediaContext(text: string): boolean {
 }
 
 /**
+ * A BARE MEDIA NOUN IS A CATEGORY, NOT A REQUEST. "Movies" alone states no
+ * constraint — routing it to Ask would run an unconstrained ask, which is the
+ * generic feed wearing a different URL. The pinned control ("Movies" is not a
+ * request) stays true under the clause-layer gate below because of this guard,
+ * and anything with one more word of substance ("a western") sails past it.
+ */
+const BARE_MEDIA_ONLY = /^\s*(?:the\s+)?(?:movies?|films?|shows?|series|tv|television|documentar(?:y|ies))\s*[.!?]*\s*$/i;
+
+/**
  * Decide where an utterance goes.
  *
  * `wantsTitleResults` stays the primary gate — it already encodes the
@@ -119,6 +129,27 @@ export function canonicalRequestRoute(raw: string): RequestRoute {
     else if (PERSON_SHAPED.test(frame.text) || PERSON_SHAPED.test(text)) isRequest = true;
     // "…you think I'll like" — an explicit ask for something suited to them.
     else if (frame.personalized) isRequest = true;
+  }
+
+  /* THE CANONICAL CLAUSE LAYER IS THE OWNER; the gates above are its pinned
+     special cases. The live production failure: "a boxing movie" — a bare
+     noun-phrase request, the single most ordinary way English asks for a
+     recommendation — carries no find verb, no count, no capitals, so every
+     gate above waved it through to "taste", the box fell to the generic feed,
+     and the user got GoodFellas for a boxing ask. But `parseClauses` — the
+     SAME reading /api/ask executes on arrival — already classifies it as a
+     request clause. Deciding "request vs taste" with a second vocabulary here
+     while the interpreter owns the real one is exactly the two-engines drift
+     this module's own docblock forbids; now the clause layer decides and the
+     regex gates only ADD (their regressions stay pinned above).
+
+     "what boxing movie should I watch?" is the one shape the clause layer
+     reads as background — the question form. `WATCH_REQUEST` already names
+     that shape; asking what to watch IS a request, so it counts as evidence
+     directly rather than only as media context. */
+  if (!isRequest && WATCH_REQUEST.test(text)) isRequest = true;
+  if (!isRequest && !BARE_MEDIA_ONLY.test(text)) {
+    isRequest = parseClauses(text).some((c) => c.role === 'request');
   }
 
   if (!isRequest) return { kind: 'taste' };

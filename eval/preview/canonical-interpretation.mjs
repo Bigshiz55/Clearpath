@@ -318,6 +318,44 @@ async function main() {
   const WORLD_SAMPLE = 4;
   const sample = (body) => items(body).slice(0, WORLD_SAMPLE);
 
+  /*
+   * ── CASE 0: THE HOME FRONT DOOR ──────────────────────────────────────────
+   * The 2026-08-20 production reproduction: "a boxing movie" typed into State
+   * Your Case answered with the GENERIC FEED (GoodFellas first) plus
+   * "Locked in: loves a boxing movie" — the request never reached /api/ask,
+   * and its nouns were written to the taste file as a fabricated loved title.
+   * Every case below this one proves /api/ask understands the language; this
+   * case proves the home box actually DELIVERS the language to it. Both
+   * halves are the product; neither alone was.
+   */
+  const buildCase = async (text) => {
+    const res = await request(`${BASE_URL}/api/build-case`, {
+      method: 'POST',
+      headers: headers({ cookie: cookieHeader }),
+      body: JSON.stringify({ text }),
+      timeoutMs: 60_000,
+    });
+    if (!res.ok) infra(`/api/build-case did not complete for "${text}".`);
+    redirectIsInfra('/api/build-case', res.status, res.location);
+    if (res.status === 401) infra('/api/build-case returned 401 — the cookie session did not reach the route.');
+    if (res.status >= 500) infra(`/api/build-case returned ${res.status}.`);
+    return { status: res.status, body: await res.res.json().catch(() => ({})) };
+  };
+
+  console.log('\n── CASE 0: the home front door routes requests ────────────');
+  for (const text of ['a boxing movie', 'another boxing movie']) {
+    const r = await buildCase(text);
+    const redirect = String(r.body.redirect ?? '');
+    check('frontdoor', 'receipt', `"${text}" routes to the canonical Ask door`,
+      redirect.startsWith('/app/ask?q='), `redirect=${redirect || '(none — the box would fall to the generic feed)'}`);
+    const carried = redirect.includes('q=') ? decodeURIComponent(redirect.split('q=')[1] ?? '').replace(/\+/g, ' ') : '';
+    check('frontdoor', 'receipt', `"${text}" survives the hop verbatim`, carried === text, `carried="${carried}"`);
+    check('frontdoor', 'receipt', `"${text}" learns nothing — a request is not taste`,
+      r.body.learned === false, `learned=${JSON.stringify(r.body.learned)} summary="${r.body.summary ?? ''}"`);
+    check('frontdoor', 'receipt', `"${text}" fabricates no "Locked in" claim`,
+      !/locked in/i.test(String(r.body.summary ?? '')), `summary="${r.body.summary ?? ''}"`);
+  }
+
   console.log('\n── CASE 1: burrito invariance ─────────────────────────────');
   const plain = await ask('Give me a boxing movie');
   const noisy = await ask('Had a burrito for dinner. Anyway, give me a boxing movie');

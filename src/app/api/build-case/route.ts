@@ -6,6 +6,7 @@ import { DIMENSIONS, DIMENSION_KEYS } from '@/lib/scoring/dimensions';
 import { searchTitles } from '@/lib/tmdb/client';
 import { rateQuizTitle } from '@/lib/actions/quiz';
 import { canonicalRequestRoute } from '@/lib/nlu/requestRoute';
+import { tasteEvidenceText } from '@/lib/nlu/tasteEvidence';
 import {
   detectAiringHorizon,
   detectTemporalHorizon,
@@ -187,7 +188,40 @@ export async function POST(request: Request) {
       });
     }
 
-    const parsed = (await parseWithAi(text)) ?? parseNaive(text);
+    /* ── THE ROUTE IS DECIDED BEFORE A SINGLE TASTE BYTE IS WRITTEN ─────────
+       The production defect this order exists to end: taste extraction ran on
+       the whole utterance FIRST, so the request "a boxing movie" was read as
+       a statement, the LLM returned likedTitles:["a boxing movie"], and
+       `seedTitle` rated a real title 9/10 on the user's behalf — a permanent
+       fabricated preference, followed by the generic feed. A one-turn request
+       is not a preference. All three actionable readings (airing, platform,
+       canonical request) are therefore detected up front, and what may be
+       LEARNED from the utterance is scoped by that answer:
+
+         routed request → only clauses that state a DURABLE preference or an
+                          evaluative reaction write ("I love slow burns but I
+                          hate gore. Give me a thriller." keeps its first
+                          half); the request itself never does.
+         pure statement → the whole text remains evidence, as the box
+                          promises — minus companion clauses, whose taste
+                          belongs to the companion, never the user's file.
+
+       `tasteEvidenceText` owns that selection via the same clause layer
+       /api/ask executes, so this route cannot drift into a second opinion
+       about what an utterance is. */
+    const engPlatform = detectPlatform(text);
+    const wantsFind = /\b(find|show me|recommend|suggest|something|anything|browse|watch|good|what should i watch|what can i watch)\b/.test(` ${text.toLowerCase()} `) || /\bon\s+/.test(` ${text.toLowerCase()} `);
+    const platform = engPlatform && wantsFind ? engPlatform : null;
+    const network = detectNetwork(text);
+    const horizon = detectAiringHorizon(text) ?? (network ? detectTemporalHorizon(text) : null);
+    const airing = horizon != null && (network != null || !platform);
+    const route = canonicalRequestRoute(text);
+    const routedRequest = airing || platform != null || route.kind === 'request';
+
+    const evidence = tasteEvidenceText(text, { routedRequest });
+    const parsed = evidence
+      ? (await parseWithAi(evidence)) ?? parseNaive(evidence)
+      : { axes: [], likedTitles: [], avoidTitles: [] };
 
     // 1) Fold the inferred axis targets into the user's DNA signals.
     const byAxis = new Map<string, { w: number; wv: number }>();
@@ -245,13 +279,6 @@ export async function POST(request: Request) {
     const learned = byAxis.size > 0 || parsed.likedTitles.length > 0 || parsed.avoidTitles.length > 0;
     const tasteLead = parts.length ? `Locked in ${parts.join(' · ')}. ` : '';
 
-    // If they named a streaming service ("find me something on Amazon Prime"),
-    // route to Forensic Search pre-filtered to that provider and auto-run. Their
-    // stated taste is folded in above and the results are still scored for them.
-    const engPlatform = detectPlatform(text);
-    const wantsFind = /\b(find|show me|recommend|suggest|something|anything|browse|watch|good|what should i watch|what can i watch)\b/.test(` ${text.toLowerCase()} `) || /\bon\s+/.test(` ${text.toLowerCase()} `);
-    const platform = engPlatform && wantsFind ? engPlatform : null;
-
     // Airing intent is resolved BEFORE the streaming platform, so a named linear
     // channel with a time ("HBO movie on tonight", "Lifetime right now") reaches
     // the live guide instead of being captured by the streaming router — HBO in
@@ -261,9 +288,7 @@ export async function POST(request: Request) {
     // A named network + a temporal cue ("AMC movies later tonight") is a
     // broadcast ask even without an explicit airing phrase (the liberal temporal
     // reader is used only then, so bare "tonight" alone still means taste).
-    const network = detectNetwork(text);
-    const horizon = detectAiringHorizon(text) ?? (network ? detectTemporalHorizon(text) : null);
-    if (horizon != null && (network != null || !platform)) {
+    if (airing) {
       const genre = detectGenre(text);
       const movieOnly = /\b(movies?|films?)\b/.test(` ${text.toLowerCase()} `);
       const params = new URLSearchParams({ within: String(horizon) });
@@ -296,22 +321,13 @@ export async function POST(request: Request) {
       });
     }
 
-    // A request to be SHOWN titles that names a genre/mood ("a family movie",
-    // "a good scary movie", "the best comedies") — send them to Forensic Search,
-    // which filters + ranks real titles for their taste, instead of the generic
-    // Watch Now grid. Airing/platform/where-to-watch asks were handled above; a
-    // pure "I love X, avoid Y" (no find verb) still just builds the DNA. Requires
-    // BOTH a genre/media word and a find intent so we don't hijack taste-building.
-    // The two tests live in lib/nlu/requestIntent.ts so they can be unit-tested
-    // — see that module for the "boxing movies I would like" regression that
-    // motivated pulling them out of here.
-    // ONE SHARED DECISION, server and client. `canonicalRequestRoute` keeps
-    // `wantsTitleResults` as its primary gate and adds the cases it could not
-    // see — a stated COUNT or a PERSON qualifying a media noun. Those were the
-    // live defect: "3 Sylvester Stallone movies" failed this gate, so no
-    // redirect came back and the box fell through to the generic Watch Now
-    // feed with the person and the count discarded.
-    const route = canonicalRequestRoute(text);
+    // A request to be SHOWN titles goes to the canonical Ask front door.
+    // ONE SHARED DECISION, server and client: `canonicalRequestRoute` defers
+    // to the interpreter's own clause layer, so "a boxing movie" — the bare
+    // noun-phrase request that shipped as a generic feed plus a fabricated
+    // "loves a boxing movie" — is a request here for exactly the reason it is
+    // one on arrival at /api/ask. The decision ran ABOVE, before any taste
+    // write; this branch only answers it.
     if (route.kind === 'request') {
       const redirect = route.href;
       await logCase('find', redirect, { axes: parsed.axes.length, count: route.count, personalized: route.personalized });
@@ -324,7 +340,15 @@ export async function POST(request: Request) {
       });
     }
 
-    const summary = parts.length ? `Locked in: ${parts.join(' · ')}.` : 'Got it — building your VERD1CT DNA.';
+    /* An honest read-back: "building your DNA" is only claimed when something
+       was actually learned. "My wife likes comedies" is her file, not the
+       user's — saying we noted it would be the lie the taste architecture
+       exists to prevent. */
+    const summary = parts.length
+      ? `Locked in: ${parts.join(' · ')}.`
+      : learned
+        ? 'Got it — building your VERD1CT DNA.'
+        : 'Tell me what YOU love or avoid — that one didn’t change your taste file.';
     await logCase('taste', 'watch', { axes: parsed.axes.length, liked: parsed.likedTitles.length, avoid: parsed.avoidTitles.length });
     return NextResponse.json({ ok: true, summary, learned, caseId });
   } catch {
