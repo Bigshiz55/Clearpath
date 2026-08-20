@@ -109,9 +109,14 @@ describe('isKeywordStarved — detects a vibe keyword that starved the pool', ()
  * candidates. The pool is drawn by popularity with no knowledge of pace, and
  * `paceScore` is a genre+runtime heuristic that scores nearly every popular
  * thriller fast — so a stated slow-burn over a fast genre starves the field
- * without ever hitting zero, and no existing fallback saw it. Same detection
- * as the keyword twin: on YIELD, never on the words, so a pace band that
- * genuinely fills the grid keeps its precision untouched.
+ * without ever hitting zero, and no existing fallback saw it.
+ *
+ * The remedy is NOT the keyword twin's refill. That was tried, and the same
+ * proof failed it twice over: off-pace titles padded behind the strict match
+ * handed back the exact head "nothing that drags" returns (the two asks are
+ * required to differ), and the spliced order had no evidence channel claiming
+ * responsibility. The remedy is a deeper pool (`candidateTarget` below) plus
+ * an honest shortfall label — never padding.
  */
 describe('isPaceStarved — detects a pace band that starved the pool', () => {
   it('is starved when the band keeps under half the ask', () => {
@@ -127,6 +132,30 @@ describe('isPaceStarved — detects a pace band that starved the pool', () => {
   it('never fires when the query had no pace band at all', () => {
     expect(isPaceStarved(0, 24, false)).toBe(false);
     expect(isPaceStarved(1, 24, false)).toBe(false);
+  });
+});
+
+describe('a pace-banded ask gets the ceiling pool', () => {
+  it('pace bands hydrate the maximum pool — discovery cannot pre-filter on pace', () => {
+    // 39-of-40 measured attrition: OVERSHOOT is not sized for a band that does
+    // all its killing after hydration. The ceiling is the same MAX_CANDIDATES
+    // every large ask already lives under — bounded, not unbounded.
+    expect(candidateTarget(24, { paceBanded: true })).toBe(MAX_CANDIDATES);
+    expect(candidateTarget(1, { paceBanded: true })).toBe(MAX_CANDIDATES);
+  });
+
+  it('without a pace band the sizing is exactly what it was', () => {
+    for (const n of [1, 3, 8, 24, 60, 500]) {
+      expect(candidateTarget(n, {})).toBe(candidateTarget(n));
+      expect(candidateTarget(n, { paceBanded: false })).toBe(candidateTarget(n));
+    }
+  });
+
+  it('discover pages actually contain the deepened pool', () => {
+    for (const types of [1, 2] as const) {
+      const rows = discoverPages(24, types, { paceBanded: true }).length * PAGE_SIZE * types;
+      expect(rows, `types=${types}`).toBeGreaterThanOrEqual(candidateTarget(24, { paceBanded: true }));
+    }
   });
 });
 

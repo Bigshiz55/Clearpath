@@ -44,8 +44,21 @@ export const HYDRATE_CONCURRENCY = 8;
 /** Candidates hydrated per wave before we check whether we can stop. */
 export const WAVE_SIZE = 24;
 
-/** How many candidates to pull for a request wanting `limit` results. */
-export function candidateTarget(limit: number): number {
+/**
+ * How many candidates to pull for a request wanting `limit` results.
+ *
+ * A PACE BAND gets the ceiling outright. Discovery cannot pre-filter on pace —
+ * TMDB has no such axis — so the pool arrives shaped by popularity alone and
+ * the band does all its killing during hydration. Measured on the deployed
+ * proof: "I want a thriller that drags" lost 39 of 40 candidates to the band,
+ * an attrition rate `OVERSHOOT` was never sized for. The slow-hybrid titles a
+ * slow-burn ask wants DO exist in the catalogue — several pages deeper than a
+ * popularity drain reaches. Cost stays bounded by the same MAX_CANDIDATES
+ * every large ask already lives under, and the early exit still stops
+ * hydration the moment enough survivors clear the band.
+ */
+export function candidateTarget(limit: number, opts: { paceBanded?: boolean } = {}): number {
+  if (opts.paceBanded) return MAX_CANDIDATES;
   const want = Math.max(1, Math.floor(limit));
   return Math.max(MIN_CANDIDATES, Math.min(MAX_CANDIDATES, want * OVERSHOOT));
 }
@@ -57,8 +70,8 @@ export function candidateTarget(limit: number): number {
  * deeper into the movie catalogue than an "anything" ask does — the same total
  * fan-out either way.
  */
-export function discoverPages(limit: number, typeCount: number): number[] {
-  const perType = Math.ceil(candidateTarget(limit) / Math.max(1, typeCount));
+export function discoverPages(limit: number, typeCount: number, opts: { paceBanded?: boolean } = {}): number[] {
+  const perType = Math.ceil(candidateTarget(limit, opts) / Math.max(1, typeCount));
   const pages = Math.max(2, Math.ceil(perType / PAGE_SIZE));
   // TMDB caps discover at 500 pages; we never come close, but keep it sane.
   return Array.from({ length: Math.min(pages, 10) }, (_, i) => i + 1);
@@ -127,16 +140,20 @@ export function isKeywordStarved(survivorCount: number, limit: number, hadKeywor
 }
 
 /**
- * Did a hard PACE band starve an otherwise-broad request?
+ * Did a hard PACE band starve the request even after the deepened pool?
  *
  * `paceScore` is a genre + runtime heuristic, and the candidate pool is drawn
  * by popularity with no knowledge of pace at all — so a stated slow-burn over
  * a fast genre ("I want a thriller that drags", measured returning ONE title
  * on the deployed proof) filters a pool that was never built to contain slow
- * candidates. Same failure shape and same remedy as the vibe-keyword
- * starvation above: detected on YIELD, never on the words; the titles that DID
- * sit at the asked pace stay first, and the shortfall is filled after them
- * under an honest label.
+ * candidates. The remedy is two-part, and NEITHER part pads: `candidateTarget`
+ * gives a pace-banded ask the ceiling pool so the deeper catalogue gets
+ * searched at all, and when even that comes up short this trigger produces an
+ * honest shortfall label — like the required-subject arm, the few titles that
+ * genuinely sit at the asked pace ARE the answer, in their own order. Filling
+ * behind them with off-pace titles was tried and is exactly wrong twice over:
+ * it hands back the head the user asked to avoid, and it reorders the list
+ * with no evidence channel claiming responsibility.
  */
 export function isPaceStarved(survivorCount: number, limit: number, hadPace: boolean): boolean {
   return hadPace && survivorCount < Math.max(1, Math.ceil(limit / 2));

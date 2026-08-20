@@ -388,7 +388,7 @@ export async function runFinder(
   // Pull candidates per type. Depth follows the ask: a request for 24 results
   // needs a pool several times that size, because hard filters below kill
   // candidates AFTER hydration. Two fixed pages could never fill a grid.
-  const pages = discoverPages(limit, types.length);
+  const pages = discoverPages(limit, types.length, { paceBanded: q.pace != null });
   // When an English DUB is required with no explicit source language, bias
   // discovery toward the languages most often dubbed into English. A bare
   // popularity.desc pool is English-dominated, so post-filtering to a dub alone
@@ -484,7 +484,7 @@ export async function runFinder(
       }
     }
   }
-  const candidates = Array.from(candMap.values()).slice(0, candidateTarget(limit));
+  const candidates = Array.from(candMap.values()).slice(0, candidateTarget(limit, { paceBanded: q.pace != null }));
 
   // Raw subject evidence for borderline candidates, stashed during scoring so the
   // ambiguity-band adjudicator can run after the wave without re-fetching TMDB.
@@ -889,26 +889,21 @@ export async function runFinder(
           : 'That exact vibe keyword wasn’t well-tagged in the catalog — here are the closest matches by genre and tone instead.';
     }
   } else if (isPaceStarved(items.length, limit, q.pace != null)) {
-    // Honest fallback #1b: a hard pace band over a pool drawn by popularity.
-    // `paceScore` is a genre+runtime heuristic and discovery cannot ask TMDB
-    // for "slow" — so "a thriller that drags" filters a fast-genre pool down
-    // to almost nothing without hitting zero (measured: ONE title on the
-    // deployed proof). Same remedy as the vibe-keyword starvation above: the
-    // titles that DID sit at the asked pace are the answer and stay first;
-    // the shortfall is filled after them, never instead of them, and the
-    // label says exactly what happened.
-    const relaxedQ: FinderQuery = { ...q, pace: null };
-    const r = await runFinder(supabase, userId, relaxedQ, watcher, limit);
-    if (r.items.length > items.length) {
-      const have = new Set(items.map((i) => `${i.mediaType}-${i.id}`));
-      const strictCount = items.length;
-      const wanted = (q.pace ?? 50) <= 33 ? 'slow-burn' : (q.pace ?? 50) >= 67 ? 'fast-paced' : 'that pace';
-      items = [...items, ...r.items.filter((i) => !have.has(`${i.mediaType}-${i.id}`))].slice(0, Math.max(limit, strictCount));
-      relaxed =
-        strictCount > 0
-          ? `Only ${strictCount} title${strictCount === 1 ? ' sits' : 's sit'} squarely in ${wanted === 'that pace' ? wanted : `${wanted} territory`} — the rest are the closest matches, after them.`
-          : `Nothing here sits squarely at that pace — these are the closest matches instead.`;
-    }
+    // A hard pace band over a pool drawn by popularity. The pool was already
+    // deepened to the ceiling for this ask (see `candidateTarget`); coming up
+    // short even so means the catalogue's popular reach genuinely holds few
+    // titles at the asked pace. Like the required-subject arm above: the
+    // titles that DID clear the band are the answer, in their own order, and
+    // the shortfall is disclosed rather than padded. Filling behind them with
+    // off-pace titles was tried and is exactly wrong twice over — it hands
+    // back the head the user asked to avoid, and it reorders the list with no
+    // evidence channel claiming responsibility for the order.
+    const n = items.length;
+    const wanted = (q.pace ?? 50) <= 33 ? 'slow-burn' : (q.pace ?? 50) >= 67 ? 'fast-paced' : 'mid-pace';
+    relaxed =
+      n > 0
+        ? `Only ${n} title${n === 1 ? ' sits' : 's sit'} squarely in ${wanted} territory here — nothing was padded in. Relax the pace to widen the search.`
+        : `Nothing here sits squarely at that pace — nothing was padded in. Relax the pace to widen the search.`;
   }
 
   // Honest fallback #2: if nothing hit every constraint, relax match, then services.
