@@ -355,6 +355,95 @@ export function applyTurn(prev: CanonicalRequest, rawText: string, ctx: TurnCont
 
 // ── Chips: the visible, removable form of the state ─────────────────────────
 
+/**
+ * A STATEMENT'S TASTE, FOLDED INTO THE CONVERSATION IT WAS SAID IN.
+ *
+ * "I love slow burns but I hate gore." carries no request, so the statement
+ * boundary answers it with an acknowledgement and runs nothing — correct. But
+ * the conversation state used to come out of that turn UNCHANGED, so the next
+ * turn ("ok, what should we watch?") executed as though nothing had been said.
+ * The acknowledgement claimed "Noted" over evidence that was already gone.
+ *
+ * This is the fold: the canonical statement's genres, tones and liked titles
+ * land in the SAME `CanonicalRequest` every later turn executes from
+ * (`stateToQuery`) and every chip renders from — the product's real
+ * between-turns path, not a side channel. Genre words resolve through
+ * `genreIdFor`, the exact vocabulary boundary a request would use.
+ *
+ * WHAT CANNOT BE CARRIED IS SAID, NOT DROPPED. A vetoed tone with no genre
+ * home ("gore" maps to no TMDB genre) has nowhere to live in this state; the
+ * note says so instead of letting "Noted" stand over a silent discard.
+ * Companion-held constraints fold the same way user-held ones do, because
+ * that is how they already execute ("My wife likes comedies. What should we
+ * watch?" filters to comedies) — attribution lives in the intent, the
+ * constraint constrains tonight either way.
+ *
+ * PURE. No I/O, no clock.
+ */
+export function absorbStatement(
+  prev: CanonicalRequest,
+  intent: {
+    genres: { span: string; wanted: boolean }[];
+    tones: { term: string; wanted: boolean }[];
+    titles: { span: string; relation: string }[];
+  },
+  resolveGenreId: (name: string) => number | null,
+): { state: CanonicalRequest; notes: string[] } {
+  const s = clone(prev);
+  const notes: string[] = [];
+  const carried: string[] = [];
+  const uncarriable: string[] = [];
+
+  for (const g of intent.genres) {
+    const id = resolveGenreId(g.span);
+    if (id == null) {
+      uncarriable.push(g.wanted ? g.span : `no ${g.span}`);
+      continue;
+    }
+    if (g.wanted) {
+      addUnique(s.includeGenreIds, id);
+      s.excludeGenreIds = s.excludeGenreIds.filter((x) => x !== id);
+    } else {
+      addUnique(s.excludeGenreIds, id);
+      s.includeGenreIds = s.includeGenreIds.filter((x) => x !== id);
+    }
+    carried.push(g.wanted ? g.span : `no ${g.span}`);
+  }
+
+  for (const t of intent.tones) {
+    if (t.wanted) {
+      addUnique(s.tones, t.term);
+      carried.push(t.term);
+    } else {
+      // The one negative home this state has is a genre exclusion; a vetoed
+      // tone with a genre alias ("scary" → horror) takes it, and one without
+      // is DISCLOSED rather than silently forgotten.
+      const id = resolveGenreId(t.term);
+      if (id != null) {
+        addUnique(s.excludeGenreIds, id);
+        s.includeGenreIds = s.includeGenreIds.filter((x) => x !== id);
+        carried.push(`no ${t.term}`);
+      } else {
+        s.tones = s.tones.filter((x) => x !== t.term);
+        uncarriable.push(`nothing ${t.term}`);
+      }
+    }
+  }
+
+  for (const t of intent.titles) {
+    if (t.relation === 'liked' || t.relation === 'similar') {
+      addUnique(s.referenceTitles, t.span);
+      carried.push(`like ${t.span}`);
+    }
+  }
+
+  if (carried.length > 0) notes.push(`Keeping for this conversation: ${carried.join(', ')}.`);
+  for (const u of uncarriable) {
+    notes.push(`I heard “${u}”, but I can’t hold that as a filter yet — I won’t pretend to.`);
+  }
+  return { state: s, notes };
+}
+
 export interface Chip {
   id: string;
   label: string;
@@ -379,8 +468,22 @@ export function chipsFor(s: CanonicalRequest): Chip[] {
     chips.push({ id: 'money', label: 'no rentals' });
   }
   if (s.unseenOnly || s.excludeIds.length > 0) chips.push({ id: 'unseen', label: 'unseen only' });
+  /* GENRE CONSTRAINTS WERE HELD BUT NEVER SHOWN. `includeGenreIds` and
+     `excludeGenreIds` have always been part of this state (applyTurn's
+     "funnier → added comedy" lands there), yet chipsFor rendered nothing for
+     them — a constraint the user could neither see nor remove. Now that a
+     statement's taste folds in here too ("I hate horror" persisting across
+     turns), an invisible unremovable filter would be worse than none. */
+  for (const id of s.includeGenreIds) chips.push({ id: `genre:${id}`, label: genreNameOf(id) });
+  for (const id of s.excludeGenreIds) chips.push({ id: `xgenre:${id}`, label: `no ${genreNameOf(id)}` });
   for (const tone of s.tones) chips.push({ id: `tone:${tone}`, label: tone });
   return chips;
+}
+
+/** The human name for a TMDB genre id this state holds — ids are not labels. */
+function genreNameOf(id: number): string {
+  for (const [name, gid] of Object.entries(GENRE_IDS)) if (gid === id) return name;
+  return `genre ${id}`;
 }
 
 /** Remove one chip — the "correct me without restarting" mechanism. */
@@ -401,6 +504,8 @@ export function removeChip(prev: CanonicalRequest, chipId: string): CanonicalReq
     case 'window': s.releasedAfter = null; s.releasedBefore = null; break;
     case 'runtime': s.maxRuntime = null; break;
     case 'prov': s.providers = s.providers.filter((x) => x !== value); break;
+    case 'genre': s.includeGenreIds = s.includeGenreIds.filter((g) => g !== Number(value)); break;
+    case 'xgenre': s.excludeGenreIds = s.excludeGenreIds.filter((g) => g !== Number(value)); break;
     case 'mine': s.onMyServices = false; break;
     case 'money': s.monetization = []; break;
     case 'unseen': s.unseenOnly = false; s.excludeIds = []; break;

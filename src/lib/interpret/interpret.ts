@@ -22,7 +22,7 @@
  * PURE. No I/O, no clock, no randomness, no entity resolution.
  */
 
-import { parseClauses, requestClause, type Clause, REQUEST_VERBS, DIMINISHER } from './clauses';
+import { parseClauses, requestClause, type Clause, REQUEST_VERBS, DIMINISHER, statesPreference } from './clauses';
 import { SUBJECT_TERMS } from '@/lib/finderParse';
 import { detectOrigin, detectAudio, detectRuntimeMaxMinutes } from '@/lib/nlu/detectors';
 import {
@@ -863,6 +863,41 @@ export function interpret(raw: string): CanonicalIntent {
       }
     }
     if (/\balready (?:seen|watched)\b/i.test(c.text)) intent.excludeSeen = true;
+  }
+
+  /* USER TASTE clauses: durable evidence with no order attached.
+     "I love slow burns but I hate gore." carries no request, and for that exact
+     reason it used to carry NOTHING — the genre/tone extraction ran only over
+     executable clauses, so the one person whose stated taste the interpreter
+     refused to hear was the user (companions got their own pass below). The
+     acknowledgement said "Noted." while nothing had been noted.
+
+     POLARITY COMES FROM THE SAME SEAM AS EVERYWHERE ELSE. `negatedSpans`
+     already reads "hate", "don't", "can't stand" and the diminishers, so
+     "I hate gore" rules gore out and "I love slow burns" records slow — no
+     second reaction vocabulary to drift. A clause about the PAST ("I used to
+     like slashers", "... but not anymore") records nothing: it states who the
+     viewer was, not who they are, and inventing a present-tense preference
+     from it would be fabricated evidence. `kind` is untouched — a statement
+     still refuses to search; this only stops the evidence being discarded. */
+  for (const c of clauses.filter((x) => x.role === 'taste' && statesPreference(x.text))) {
+    /* `statesPreference`, not the role alone: the taste role also covers past
+       reactions (the title layer's evidence) and bare familiarity — and "I
+       watched a horror movie yesterday" must never read as "wants horror".
+       Caught by the side-door contract the moment the gate was too wide. */
+    if (/\bused to\b|\bnot anymore\b|\bno longer\b/i.test(c.text)) continue;
+    const negated = negatedSpans(maskSeen(c.text)).map((s) => s.toLowerCase());
+    const isNegated = (term: string) => negated.some((n) => n.includes(term) || term.includes(n));
+    const contentText = maskCompanions(c.text);
+    for (const g of uniqueMatches(contentText, GENRE_WORDS)) {
+      pushUnique<GenreConstraint>(intent.genres, { span: g, wanted: !isNegated(g), holder: 'user' });
+    }
+    for (const raw of uniqueMatches(contentText, TONE_WORDS)) {
+      const t = toneTerm(raw);
+      if (!intent.tones.some((x) => x.term === t)) {
+        intent.tones.push({ term: t, wanted: !isNegated(raw) && !isNegated(t), holder: 'user' });
+      }
+    }
   }
 
   // COMPANION clauses: a veto belonging to someone else. It constrains tonight

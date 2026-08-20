@@ -113,8 +113,14 @@ describe('GC1 · the front-of-pipeline gap in the shipped parsers', () => {
   it('3 · neither shipped extractor carries a relationship at all', () => {
     const src = readFileSync('src/lib/askJudge.ts', 'utf8');
     expect(src).not.toContain('CriticRelation');
-    // `similarTo` is a string for read-back; there is nowhere to put "better".
-    expect(readFileSync('src/lib/nlu/conversationState.ts', 'utf8')).not.toContain('relation');
+    /* `similarTo` is a string for read-back; there is nowhere to put "better".
+       Pinned as the STRUCTURAL fact — the state's reference slot is a bare
+       string list — rather than a whole-file substring scan, which broke the
+       day an unrelated function legitimately consumed the intent's relation
+       field while the state itself still could not hold one. */
+    const convSrc = readFileSync('src/lib/nlu/conversationState.ts', 'utf8');
+    expect(convSrc).toMatch(/referenceTitles: string\[\]/);
+    expect(convSrc, 'the state still cannot hold a comparative relation').not.toMatch(/relation\s*:\s*(?:'|")?(?:betterThan|CriticRelation)/);
   });
 });
 
