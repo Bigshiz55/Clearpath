@@ -4,6 +4,11 @@ import { getAppliedMigrationInfo } from '@/lib/appliedMigration';
 import { WITHDRAWN_MIGRATIONS } from '@/lib/excludedMigrations';
 
 export const dynamic = 'force-dynamic';
+// The ledger read opens a raw Postgres connection (`pg` needs net/tls, which
+// Edge does not provide) — declared explicitly for the same reason the
+// migrate route declares it, rather than leaning on the default.
+export const runtime = 'nodejs';
+export const maxDuration = 30;
 
 /**
  * Which commit is actually live — a one-request answer to "is this deployed
@@ -16,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const info = getBuildInfo();
   // READ-ONLY. Never triggers, repairs or applies a migration.
-  const { appliedDatabaseMigration, migrationLedgerStatus } = await getAppliedMigrationInfo();
+  const { appliedDatabaseMigration, migrationLedgerStatus, ledgerChannels } = await getAppliedMigrationInfo();
   return NextResponse.json(
     {
       sha: info.gitSha || null,
@@ -42,6 +47,12 @@ export async function GET() {
       latestMigrationInCode: info.schemaVersion || null,
       appliedDatabaseMigration,
       migrationLedgerStatus,
+      // WHY a channel could not answer, when one couldn't — closed-vocabulary
+      // codes ('validate_rejected', 'ETIMEDOUT', '28P01', 'missing_key'),
+      // never a URL, hostname or message. Absent on a healthy read. Exists
+      // because the first 'unavailable' on production was undiagnosable
+      // without redeploying guesses.
+      ...(ledgerChannels ? { ledgerChannels } : {}),
       withdrawnMigrations: Object.keys(WITHDRAWN_MIGRATIONS),
       // Retained temporarily so existing dashboards/scripts do not break, but
       // it is the CODE-side value and must not be read as the applied schema.

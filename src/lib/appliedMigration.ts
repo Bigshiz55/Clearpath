@@ -30,6 +30,15 @@ import type { LedgerStatus } from '@/lib/migrationLedger';
  *   2. REST admin client (fallback): unchanged behavior for deployments
  *      configured with a privileged API key instead of a DB URL.
  *
+ * AN UNAVAILABLE LEDGER NAMES ITS OWN CAUSE. The first deployment of the
+ * two-channel reader answered `unavailable` on production and could not say
+ * why: every failure collapsed into the same `null`, so diagnosing it meant
+ * redeploying with guesses. Each channel now reports a SANITIZED reason —
+ * a structural code (`validate_rejected`, `ETIMEDOUT`, `28P01`, `missing_key`)
+ * and never a URL, hostname, message or any fragment of a secret. The codes
+ * are Node error codes / Postgres SQLSTATEs the operator can act on without
+ * being handed anything an attacker could use.
+ *
  * It still refuses to guess. `cli_ledger` is a NAMED evidence source, not a
  * relaxation: the CLI wrote that row when it applied the migration. What
  * remains forbidden is answering from filenames, or reporting unreconciled
@@ -38,14 +47,42 @@ import type { LedgerStatus } from '@/lib/migrationLedger';
 export interface AppliedMigrationInfo {
   appliedDatabaseMigration: string | 'unknown';
   migrationLedgerStatus: LedgerStatus;
+  /**
+   * WHY the ledger read landed where it did, per channel — present only when
+   * a channel was tried and failed, so a healthy read stays exactly the shape
+   * it always was. Values are closed-vocabulary codes, never free text from
+   * an error object (a pg connect error's message contains the hostname).
+   */
+  ledgerChannels?: {
+    directDb?: string;
+    rest?: string;
+  };
 }
 
-const UNAVAILABLE: AppliedMigrationInfo = {
-  appliedDatabaseMigration: 'unknown',
-  migrationLedgerStatus: 'unavailable',
-};
-
 interface RepoLedgerRow { name: string; success: boolean; reconciled: boolean }
+
+/** A channel's outcome: an answer, or a sanitized reason it has none. */
+type ChannelResult =
+  | { ok: true; info: AppliedMigrationInfo }
+  | { ok: false; reason: string };
+
+/**
+ * Reduce an unknown thrown value to a structural code that is safe to
+ * publish. `code` on Node/pg errors is an errno ('ETIMEDOUT', 'ENOTFOUND')
+ * or a Postgres SQLSTATE ('28P01' bad password, '3D000' no such database) —
+ * fixed vocabularies with no secret content. Anything else is reported only
+ * by its constructor name; error MESSAGES are never forwarded, because a
+ * connect failure interpolates the hostname into its message.
+ */
+function sanitizedErrorCode(err: unknown): string {
+  if (err && typeof err === 'object') {
+    const code = (err as { code?: unknown }).code;
+    if (typeof code === 'string' && /^[A-Z0-9_]{2,32}$/i.test(code)) return code;
+    const name = (err as { name?: unknown }).name;
+    if (typeof name === 'string' && name.length <= 64) return name;
+  }
+  return 'unknown_error';
+}
 
 /** Decide from repo-ledger rows + optional CLI-ledger version. Pure. */
 function conclude(rows: RepoLedgerRow[], cliVersion: string | null): AppliedMigrationInfo {
@@ -66,12 +103,18 @@ function conclude(rows: RepoLedgerRow[], cliVersion: string | null): AppliedMigr
 }
 
 /** Channel 1 — the direct Postgres connection the migrate endpoint uses. */
-async function readViaDirectDb(rawUrl: string): Promise<AppliedMigrationInfo | null> {
+async function readViaDirectDb(rawUrl: string): Promise<ChannelResult> {
   const dbUrl = sanitizeDbUrl(rawUrl);
-  if (!validateDbUrl(dbUrl).ok) return null;
+  if (!validateDbUrl(dbUrl).ok) return { ok: false, reason: 'validate_rejected' };
   let client: Client | null = null;
   try {
-    client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+    client = new Client({
+      connectionString: dbUrl,
+      ssl: { rejectUnauthorized: false },
+      // A diagnostic read must fail fast, never hang the endpoint that
+      // exists to answer "is this deployed yet". pg's default is no limit.
+      connectionTimeoutMillis: 5000,
+    });
     await client.connect();
 
     let repoRows: RepoLedgerRow[] = [];
@@ -96,16 +139,18 @@ async function readViaDirectDb(rawUrl: string): Promise<AppliedMigrationInfo | n
       }
     }
 
-    return conclude(repoRows, cliVersion);
-  } catch {
-    return null; // connection-level failure: let the caller try the next channel
+    return { ok: true, info: conclude(repoRows, cliVersion) };
+  } catch (err) {
+    // Connection-level failure: report WHICH kind, let the caller try the
+    // next channel. The code is structural; the message never leaves here.
+    return { ok: false, reason: sanitizedErrorCode(err) };
   } finally {
     await client?.end().catch(() => {});
   }
 }
 
 /** Channel 2 — the REST admin client (requires a privileged API key). */
-async function readViaRest(): Promise<AppliedMigrationInfo | null> {
+async function readViaRest(): Promise<ChannelResult> {
   try {
     const admin = createAdminClient();
     const { data, error } = await admin
@@ -113,24 +158,40 @@ async function readViaRest(): Promise<AppliedMigrationInfo | null> {
       .select('name, success, reconciled')
       .eq('success', true)
       .order('name', { ascending: false });
-    if (error) return null;
-    return conclude(((data ?? []) as RepoLedgerRow[]), null);
+    if (error) return { ok: false, reason: error.code || 'rest_query_failed' };
+    return { ok: true, info: conclude(((data ?? []) as RepoLedgerRow[]), null) };
   } catch {
-    return null;
+    // createAdminClient throws precisely when no privileged key is
+    // configured under either accepted name — the one code this channel
+    // needs to be able to say out loud.
+    return { ok: false, reason: 'missing_key' };
   }
 }
 
 export async function getAppliedMigrationInfo(): Promise<AppliedMigrationInfo> {
+  const channels: { directDb?: string; rest?: string } = {};
   try {
     const dbUrl = serverEnv.migrationsDbUrl();
     if (dbUrl) {
       const viaDb = await readViaDirectDb(dbUrl);
-      if (viaDb) return viaDb;
+      if (viaDb.ok) return viaDb.info;
+      channels.directDb = viaDb.reason;
+    } else {
+      channels.directDb = 'not_configured';
     }
     const viaRest = await readViaRest();
-    if (viaRest) return viaRest;
-    return UNAVAILABLE;
-  } catch {
-    return UNAVAILABLE;
+    if (viaRest.ok) return { ...viaRest.info, ledgerChannels: channels };
+    channels.rest = viaRest.reason;
+    return {
+      appliedDatabaseMigration: 'unknown',
+      migrationLedgerStatus: 'unavailable',
+      ledgerChannels: channels,
+    };
+  } catch (err) {
+    return {
+      appliedDatabaseMigration: 'unknown',
+      migrationLedgerStatus: 'unavailable',
+      ledgerChannels: { ...channels, rest: channels.rest ?? sanitizedErrorCode(err) },
+    };
   }
 }
