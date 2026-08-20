@@ -193,11 +193,17 @@ describe('a degraded comparison is observable without reading the copy', () => {
     const start = route.indexOf('if (!ranked.applied) {');
     expect(start, 'the degraded branch is gone').toBeGreaterThan(-1);
     const block = route.slice(start, route.indexOf('return NextResponse.json(', start));
-    // Exactly one push, whose argument is a total ternary over the three cases.
-    expect((block.match(/criticNotes\.push\(/g) ?? []).length).toBe(1);
+    /* One push per degraded arm: the !applied ternary (total over its three
+       cases), and the partial-application arm — applied, but the anchor
+       contributed nothing (authority 0), so only the stated direction ranked
+       and the response must not present that as the comparison that was asked
+       for (the Q9 "darker than Taken" reproduction; see
+       critic/partialApplication.test.ts). */
+    expect((block.match(/criticNotes\.push\(/g) ?? []).length).toBe(2);
     expect(block, 'the read-failed case').toMatch(/candidateEvidence\.status === 'unavailable'/);
     expect(block, 'the no-fingerprint case').toMatch(/fingerprinted === 0/);
     expect(block, 'the ran-but-moved-nothing case').toMatch(/didn.t separate these titles/);
+    expect(block, 'the anchor-contributed-nothing case').toMatch(/ranked\.authority === 0/);
     // No early return could skip the note.
     expect(block).not.toMatch(/\breturn\b/);
   });
