@@ -395,6 +395,39 @@ dropped one layer down", which is why the unit suites were green throughout.
   makes it visible — "the vetoed genre is EXCLUDED, never added as a positive
   filter" — is already in the gate and stays there.
 
+### ENVIRONMENT BLOCKER — the one human action that unblocks personalization
+
+**`SUPABASE_SERVICE_ROLE_KEY` is absent on the production deployment.** Proven
+from production's own health endpoint, presence-only, 2026-08-20:
+
+    GET https://clearpath-pearl-chi.vercel.app/api/health
+    "checks": { "supabase_url": true, "tmdb_key": true, "openai_key": true,
+                "cron_secret": true, ..., "service_role_key": false }
+
+Every other credential is present. This one absence is the entire root cause of:
+  - `title_dimensions` unreadable → `/api/health/showdown` `evidence:
+    "unavailable"`, covered 0/113 — a READ failure, not a coverage gap
+  - comparative recommendations: 0 fingerprinted out of every candidate pool
+  - the nightly `/api/cron/classify` writing nothing it can later read
+  - `/api/version` `appliedDatabaseMigration: "unknown"` (ledger needs admin)
+
+Nothing in this repository can close it: the session holds no Vercel token, and
+inventing or replacing a credential is out of bounds.
+
+EXACT HUMAN ACTION: in Vercel → project `clearpath` → Settings → Environment
+Variables, add `SUPABASE_SERVICE_ROLE_KEY` (the service-role key from the
+Supabase project dashboard) for Production and Preview, then redeploy.
+
+PROOF OF CLOSURE, in order:
+  1. `GET /api/health` → `"service_role_key": true`
+  2. `GET /api/health/showdown` → `"evidence": "ok"` (covered may still be 0 —
+     that is now a real coverage number, fixed by the classifier)
+  3. `GET /api/cron/classify?report=1` with `Authorization: Bearer $CRON_SECRET`
+     → real `catalogCoverage` with `evidence: "ok"`
+  4. Let the nightly cron run (or fire it once without `report=1`) →
+     re-measure; then the deployed personalization proof (taste-dna-proof) can
+     demonstrate reordering on an account with stored DNA.
+
 ### Discovered here, not fixed (deliberately out of scope)
 - **`/api/search` leads with the 2017 Taken series on production right now.**
   Verified unauthenticated against `clearpath-pearl-chi.vercel.app` at

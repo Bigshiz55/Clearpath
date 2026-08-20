@@ -26,7 +26,17 @@ jobs:
   black-box:
     # Only successful PREVIEW deployments. Production deployments are not this
     # gate's business, and a failed deployment has nothing to test.
-    if: github.event.deployment_status.state == 'success'
+    # SKIPPED, NOT SUCCESS, WHEN THERE IS NOTHING TO TEST. Every deployment
+    # event fires this workflow, including PRODUCTION deployments — which have
+    # no preview to test. The old shape handled that inside the first step
+    # (run=false) and let every later step skip, so the JOB concluded green:
+    # a push to main showed three passing deployed gates whose meaningful
+    # steps never executed, and that vacuous green was cited as evidence that
+    # main had passed them. A skipped gate must LOOK skipped. The job-level
+    # guard makes the conclusion 'skipped' in the checks UI, which nothing can
+    # mistake for a test pass; the in-step guard stays as a belt for event
+    # shapes the expression cannot see.
+    if: github.event.deployment_status.state == 'success' && !contains(github.event.deployment.environment, 'roduction')
     runs-on: ubuntu-latest
     steps:
       - name: Resolve the deployment under test
@@ -108,7 +118,17 @@ jobs:
     # It is not a pass/fail product gate — it is a measurement, and it fails only
     # if personalization changes the MEMBERSHIP of an answer, breaches the +/-18
     # ceiling, or reorders with no DNA participating.
-    if: github.event.deployment_status.state == 'success'
+    # SKIPPED, NOT SUCCESS, WHEN THERE IS NOTHING TO TEST. Every deployment
+    # event fires this workflow, including PRODUCTION deployments — which have
+    # no preview to test. The old shape handled that inside the first step
+    # (run=false) and let every later step skip, so the JOB concluded green:
+    # a push to main showed three passing deployed gates whose meaningful
+    # steps never executed, and that vacuous green was cited as evidence that
+    # main had passed them. A skipped gate must LOOK skipped. The job-level
+    # guard makes the conclusion 'skipped' in the checks UI, which nothing can
+    # mistake for a test pass; the in-step guard stays as a belt for event
+    # shapes the expression cannot see.
+    if: github.event.deployment_status.state == 'success' && !contains(github.event.deployment.environment, 'roduction')
     runs-on: ubuntu-latest
     steps:
       - name: Resolve the deployment under test
@@ -160,7 +180,17 @@ jobs:
   ui-journey:
     # The browser half of the same proof: the ORIGINAL INCIDENT typed through
     # the real deployed UI, asserted down to the rendered poster grid.
-    if: github.event.deployment_status.state == 'success'
+    # SKIPPED, NOT SUCCESS, WHEN THERE IS NOTHING TO TEST. Every deployment
+    # event fires this workflow, including PRODUCTION deployments — which have
+    # no preview to test. The old shape handled that inside the first step
+    # (run=false) and let every later step skip, so the JOB concluded green:
+    # a push to main showed three passing deployed gates whose meaningful
+    # steps never executed, and that vacuous green was cited as evidence that
+    # main had passed them. A skipped gate must LOOK skipped. The job-level
+    # guard makes the conclusion 'skipped' in the checks UI, which nothing can
+    # mistake for a test pass; the in-step guard stays as a belt for event
+    # shapes the expression cannot see.
+    if: github.event.deployment_status.state == 'success' && !contains(github.event.deployment.environment, 'roduction')
     runs-on: ubuntu-latest
     steps:
       - name: Resolve the deployment under test
