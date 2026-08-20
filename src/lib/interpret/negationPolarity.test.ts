@@ -67,3 +67,80 @@ describe('contracted negation is negation', () => {
     expect(excluded, 'horror should be excluded downstream').toContain(27);
   });
 });
+
+/**
+ * "LESS X" RULES X OUT. IT DID THE OPPOSITE — TWICE.
+ *
+ * First as a language gap: "something like that but less dumb" recorded
+ * `dumb: WANTED`, "something less slow" the same, and "less gory"/"less
+ * violent"/"less scary" recorded nothing at all. One phrasing, two wrong
+ * answers, and the worse of them is the reversal the negation architecture
+ * exists to prevent.
+ *
+ * Then as a toolchain defect the first fix itself shipped: the diminisher was
+ * interpolated into a PLAIN template literal, SWC constant-folded it into a
+ * string and mis-escaped `\b` into a literal backspace, and the deployed
+ * regex matched nothing — every "no X" on /api/ask inverted while this suite
+ * stayed green, because vitest runs unminified source. These tests therefore
+ * prove the LANGUAGE, and `scripts/verify/bundleEscapes.mjs` (postbuild)
+ * proves the EMISSION; neither can stand in for the other.
+ *
+ * The vocabulary lives once, in `DIMINISHER` (clauses.ts), consumed by the
+ * clause layer (a diminishing fragment is a request) and the polarity layer
+ * (a diminisher scopes like a negator). Media polarity deliberately does NOT
+ * learn these words: "fewer movies" is not "no movies" — a diminisher rules
+ * out an attribute, never a whole medium.
+ */
+describe('a diminisher rules the axis end out', () => {
+  const toneOf = (text: string, term: string) =>
+    interpret(text).tones.find((t) => t.term === term);
+
+  it('the sentences that exposed it', () => {
+    expect(toneOf('something like that but less dumb', 'dumb')?.wanted, 'recorded as WANTED').toBe(false);
+    expect(toneOf('something less slow', 'slow')?.wanted).toBe(false);
+  });
+
+  it('every ordinary way of saying it', () => {
+    for (const text of [
+      'I want a comedy, less gory',
+      'a thriller, less violent',
+      'something a bit less dark',
+      'a movie that is less scary',
+      'a drama, a little less bleak',
+    ]) {
+      const t = interpret(text).tones;
+      expect(t.length, `"${text}" recorded no tone at all`).toBeGreaterThan(0);
+      expect(t.every((x) => x.wanted === false), `"${text}" → ${JSON.stringify(t)}`).toBe(true);
+    }
+  });
+
+  it('"more X" still means X, so the diminisher is a direction and not a blanket', () => {
+    expect(toneOf('something more funny', 'funny')?.wanted).toBe(true);
+    expect(toneOf('I want a more gritty thriller', 'gritty')?.wanted).toBe(true);
+    expect(toneOf('a movie that is more violent', 'violent')?.wanted).toBe(true);
+  });
+
+  it('a genre is diminished the same way a tone is', () => {
+    const g = interpret('a thriller with less romance').genres.find((x) => x.span === 'romance');
+    expect(g?.wanted).toBe(false);
+  });
+
+  it('a diminisher rules out an attribute, never a medium', () => {
+    expect(interpret('fewer movies, more shows').media).toBe('either');
+  });
+
+  it('the untouched negators still carry their polarity — the fold killed ALL of them at once', () => {
+    // These four are exactly the probes run against the corrupted compiled
+    // bundle, where every one returned NO MATCH. They are ordinary negations
+    // that never mention a diminisher; the regression class is "the negation
+    // regex itself stopped matching", so they pin the whole alternation.
+    expect(interpret('Give me a thriller but no supernatural stuff.').genres).toEqual(
+      expect.arrayContaining([expect.objectContaining({ span: 'supernatural', wanted: false })]),
+    );
+    expect(toneOf('I want a thriller, nothing that drags', 'drag')?.wanted).toBe(false);
+    expect(toneOf("a thriller that isn't slow", 'slow')?.wanted).toBe(false);
+    expect(interpret('no horror').genres).toEqual([
+      expect.objectContaining({ span: 'horror', wanted: false }),
+    ]);
+  });
+});

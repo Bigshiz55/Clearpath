@@ -276,9 +276,47 @@ function thirdPartyPreference(t: string): boolean {
 const COMPANION =
   /\b(?:my|our)\s+(?:wife|husband|partner|girlfriend|boyfriend|kid|kids|son|daughter|mum|mom|dad|roommate|friend|family)\b/i;
 
-/** A standalone filter that is a request even with no verb. */
-const CONSTRAINT =
-  /\b(?:under|over|less than|more than|no longer than|shorter than|at least|between)\s+(?:\d+|an?|one|two|three)\b|\b\d+\s*(?:minutes?|mins?|hours?|hrs?)\b|\bon (?:netflix|hulu|max|hbo|disney|prime|paramount|peacock|apple)\b|\b(?:no|not|nothing|none|without|except|avoid)\s+\w+/i;
+/**
+ * A DIMINISHER RULES AN AXIS END OUT — the vocabulary, declared exactly once.
+ *
+ * "less X" and "fewer X" scope over the following span the way a negator does,
+ * and the hedges people put in front ("a bit less", "slightly less") belong to
+ * the diminisher, not to the span it governs. `more` is deliberately absent:
+ * it is a direction, not a veto, and "something more funny" must keep meaning
+ * funny. Consumed here by `CONSTRAINT` (a diminishing fragment is a request)
+ * and by `negatedSpans` in interpret.ts (the polarity itself).
+ *
+ * A REGEX LITERAL, COMPOSED VIA `String.raw` AND `.source` — NEVER a plain
+ * template with escaped backslashes. That is a toolchain lesson paid for in
+ * production: the first landing built the negation regex from an ordinary
+ * template literal, SWC constant-folded it into a string and mis-escaped `\b`
+ * into a literal BACKSPACE character, and the deployed regex matched nothing —
+ * every "no X" on /api/ask inverted to "X wanted" while 5208 unminified tests
+ * stayed green. Tagged templates are opaque to the folder (a tag is an
+ * arbitrary function), which is why every other dynamic regex in this codebase
+ * already uses `String.raw`. `scripts/verify/bundleEscapes.mjs` now fails any
+ * build that ships a corrupted escape, so the class is closed, not just this
+ * instance.
+ */
+export const DIMINISHER = /(?:a\s+bit\s+|a\s+little\s+|slightly\s+|somewhat\s+|much\s+|way\s+)?(?:less|fewer)/;
+
+/**
+ * A standalone filter that is a request even with no verb.
+ *
+ * A DIMINISHING FRAGMENT IS ONE OF THEM. "I want a comedy, less gory" filed
+ * ", less gory" as conversational BACKGROUND and executed the comedy alone —
+ * the constraint the user stated last, and most specifically, was the one
+ * thrown away. "nothing gory" in the same position was already recognised,
+ * because the marker list carried `nothing` and not `less`.
+ *
+ * `less than`/`more than` earlier in the alternation are QUANTITY comparatives
+ * ("less than 90 minutes") and keep their numeric requirement; the diminisher
+ * alternative is the QUALITY form and governs a word.
+ */
+const CONSTRAINT = new RegExp(
+  String.raw`\b(?:under|over|less than|more than|no longer than|shorter than|at least|between)\s+(?:\d+|an?|one|two|three)\b|\b\d+\s*(?:minutes?|mins?|hours?|hrs?)\b|\bon (?:netflix|hulu|max|hbo|disney|prime|paramount|peacock|apple)\b|\b(?:no|not|nothing|none|without|except|avoid)\s+\w+|\b${DIMINISHER.source}\s+[a-z][\w'-]*`,
+  'i',
+);
 
 /**
  * A clause's role, decided by what it exhibits.
