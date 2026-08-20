@@ -361,12 +361,39 @@ dropped one layer down", which is why the unit suites were green throughout.
   `readAnchorSpan` returns both readings and `orchestrate` searches the literal
   one first, adopting the frame only when the catalog does not contain it — the
   call `/api/search` already makes for the same ambiguity.
-- **"less X" ruled X IN.** "something like that but less dumb" recorded
-  `dumb: WANTED`; so did "something less slow". "less gory", "less violent" and
-  "less scary" recorded nothing at all. One phrasing, two wrong answers, the
-  worse being the reversal the negation architecture exists to prevent. A
-  diminisher scopes like a negator and is read at the one seam both consumers
-  share. Media polarity deliberately does not learn these words.
+- **"less X" ruled X IN — FIX WRITTEN, THEN REVERTED. BLOCKED, see below.**
+  "something like that but less dumb" records `dumb: WANTED`; so does "something
+  less slow"; "less gory", "less violent" and "less scary" record nothing at all.
+  One phrasing, two wrong answers, and the worse of them is the reversal the
+  negation architecture exists to prevent. The fix (a DIMINISHER read at the one
+  seam both consumers share, `negatedSpans`, plus `less|fewer` in the clause
+  `CONSTRAINT` marker) is correct locally and is NOT in this branch. Why:
+
+  The deployed black-box gate passed 72/72 at `8d80016` with
+
+      Give me a thriller but no supernatural stuff.
+      → {"genreIds":[53],"excludeGenreIds":[14]}      CORRECT
+
+  and from `344b991` — the commit carrying the diminisher — returned
+
+      → {"genreIds":[53,14]}   arm: canonical       INVERTED
+
+  on three consecutive SHAs. That is Fantasy promoted from an exclusion to a
+  POSITIVE filter: the precise inversion the architecture exists to prevent,
+  shipped by a change meant to prevent it one phrasing over.
+
+  The change cannot explain it. Both added alternatives require the literal
+  `less`/`fewer`, which that sentence does not contain; the rebuilt
+  `negatedSpans` regex is equivalent for any input without those words; and the
+  same tree run locally returns `[53]` + `excludeGenreIds:[14]`, verified after
+  the change, not before. Local and deployed disagree on identical source, which
+  points at the build rather than the source — and that is exactly why it must
+  not ride along in a PR about something else.
+
+  NEXT STEP: land it alone, with the black-box gate as its acceptance test, and
+  bisect the deployed behaviour rather than the local behaviour. The receipt that
+  makes it visible — "the vetoed genre is EXCLUDED, never added as a positive
+  filter" — is already in the gate and stays there.
 
 ### Discovered here, not fixed (deliberately out of scope)
 - **`/api/search` leads with the 2017 Taken series on production right now.**

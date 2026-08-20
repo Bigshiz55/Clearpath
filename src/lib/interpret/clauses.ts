@@ -276,23 +276,9 @@ function thirdPartyPreference(t: string): boolean {
 const COMPANION =
   /\b(?:my|our)\s+(?:wife|husband|partner|girlfriend|boyfriend|kid|kids|son|daughter|mum|mom|dad|roommate|friend|family)\b/i;
 
-/**
- * A standalone filter that is a request even with no verb.
- *
- * A DIMINISHING FRAGMENT IS ONE OF THEM. "I want a comedy, less gory" filed
- * ", less gory" as conversational BACKGROUND and executed the comedy alone —
- * the constraint the user stated last, and most specifically, was the one
- * thrown away. "nothing gory" in the same position was already recognised,
- * because the marker list carried `nothing` and not `less`. Same sentence
- * shape, same intent, two different fates.
- *
- * `less than`/`more than` earlier in this alternation are QUANTITY comparatives
- * ("less than 90 minutes") and keep their numeric requirement; this clause is
- * the QUALITY form and governs a word, so it is stated separately rather than
- * loosening the numeric one.
- */
+/** A standalone filter that is a request even with no verb. */
 const CONSTRAINT =
-  /\b(?:under|over|less than|more than|no longer than|shorter than|at least|between)\s+(?:\d+|an?|one|two|three)\b|\b\d+\s*(?:minutes?|mins?|hours?|hrs?)\b|\bon (?:netflix|hulu|max|hbo|disney|prime|paramount|peacock|apple)\b|\b(?:no|not|nothing|none|without|except|avoid)\s+\w+|\b(?:a bit |a little |slightly |somewhat |much |way )?(?:less|fewer)\s+[a-z][\w'-]*/i;
+  /\b(?:under|over|less than|more than|no longer than|shorter than|at least|between)\s+(?:\d+|an?|one|two|three)\b|\b\d+\s*(?:minutes?|mins?|hours?|hrs?)\b|\bon (?:netflix|hulu|max|hbo|disney|prime|paramount|peacock|apple)\b|\b(?:no|not|nothing|none|without|except|avoid)\s+\w+/i;
 
 /**
  * A clause's role, decided by what it exhibits.
