@@ -475,7 +475,14 @@ export function chipsFor(s: CanonicalRequest): Chip[] {
      statement's taste folds in here too ("I hate horror" persisting across
      turns), an invisible unremovable filter would be worse than none. */
   for (const id of s.includeGenreIds) chips.push({ id: `genre:${id}`, label: genreNameOf(id) });
-  for (const id of s.excludeGenreIds) chips.push({ id: `xgenre:${id}`, label: `no ${genreNameOf(id)}` });
+  for (const id of s.excludeGenreIds) {
+    /* `excludeDocumentaries` renders its own chip above and its removal
+       clears BOTH the boolean and this id — rendering the id again would show
+       two chips for one constraint, and removing only this one would leave
+       the boolean silently filtering with no chip to show for it. */
+    if (id === GENRE_IDS.documentary && s.excludeDocumentaries) continue;
+    chips.push({ id: `xgenre:${id}`, label: `no ${genreNameOf(id)}` });
+  }
   for (const tone of s.tones) chips.push({ id: `tone:${tone}`, label: tone });
   return chips;
 }
@@ -505,7 +512,13 @@ export function removeChip(prev: CanonicalRequest, chipId: string): CanonicalReq
     case 'runtime': s.maxRuntime = null; break;
     case 'prov': s.providers = s.providers.filter((x) => x !== value); break;
     case 'genre': s.includeGenreIds = s.includeGenreIds.filter((g) => g !== Number(value)); break;
-    case 'xgenre': s.excludeGenreIds = s.excludeGenreIds.filter((g) => g !== Number(value)); break;
+    case 'xgenre':
+      s.excludeGenreIds = s.excludeGenreIds.filter((g) => g !== Number(value));
+      // However the documentary exclusion got in, removing its chip must
+      // remove the WHOLE constraint — a boolean still filtering with no chip
+      // is the invisible-filter problem this block exists to end.
+      if (Number(value) === GENRE_IDS.documentary) s.excludeDocumentaries = false;
+      break;
     case 'mine': s.onMyServices = false; break;
     case 'money': s.monetization = []; break;
     case 'unseen': s.unseenOnly = false; s.excludeIds = []; break;

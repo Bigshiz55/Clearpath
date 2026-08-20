@@ -63,3 +63,27 @@ describe('a statement’s taste survives into the next turn', () => {
     expect(notes.join(' ')).not.toMatch(/Keeping for this conversation/);
   });
 });
+
+describe('the documentary exclusion is one constraint, one chip', () => {
+  it('the boolean and the id never render twice', () => {
+    const s = { ...EMPTY_REQUEST, excludeDocumentaries: true, excludeGenreIds: [99] };
+    const labels = chipsFor(s).filter((c) => /documentar/i.test(c.label));
+    expect(labels).toHaveLength(1);
+  });
+
+  it('removing either chip removes the whole constraint', async () => {
+    const { removeChip } = await import('./conversationState');
+    const s = { ...EMPTY_REQUEST, excludeDocumentaries: true, excludeGenreIds: [99] };
+    const viaX = removeChip(s, 'xgenre:99');
+    expect(viaX.excludeDocumentaries).toBe(false);
+    expect(viaX.excludeGenreIds).not.toContain(99);
+    const viaNodocs = removeChip(s, 'nodocs');
+    expect(viaNodocs.excludeDocumentaries).toBe(false);
+    expect(viaNodocs.excludeGenreIds).not.toContain(99);
+  });
+
+  it('an id-only exclusion (a stated dislike) still renders and removes', () => {
+    const s = { ...EMPTY_REQUEST, excludeGenreIds: [99] };
+    expect(chipsFor(s).some((c) => c.id === 'xgenre:99')).toBe(true);
+  });
+});
