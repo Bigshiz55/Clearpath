@@ -9,6 +9,8 @@ import { tileRatingsFromScore } from '@/lib/ratings';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { deciderSearchUrl } from '@/lib/tmdb/meta-helpers';
 import { isVerbLike } from '@/lib/nlu/likeGrammar';
+import { chooseFramedReading } from '@/lib/nlu/titleReferent';
+import { readAnchorSpan } from '@/lib/critic/anchorSpan';
 import { MAX_REQUESTED_COUNT } from '@/lib/nlu/count';
 import { candidateTarget, mapPool, HYDRATE_CONCURRENCY } from '@/lib/finderPool';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
@@ -16,7 +18,7 @@ import { genreIdFromName } from '@/lib/finderGenres';
 import { runFinder, type FinderItem, type FinderQuery } from '@/lib/finder';
 import type { TitleVerdict, AltItem, JudgeFactor } from '@/lib/askTypes';
 import { classifySearch, type SearchClassification } from '@/lib/nlu/searchMode';
-import { rankByTitleIdentity, isExactTitle, titleMatchTier } from '@/lib/nlu/titleNormalize';
+import { rankByTitleIdentity, isExactTitle, titleMatchTier, normalizeTitle } from '@/lib/nlu/titleNormalize';
 import { referenceCandidates, resolveNamedTitle } from '@/lib/nlu/titleReference';
 import { validateTitleResult } from '@/lib/nlu/resultGuard';
 
@@ -399,7 +401,46 @@ export async function askJudgeTitle(
   // Classify to isolate the REQUESTED title + provider (so "Gone on BritBox"
   // searches "Gone", not the raw string), then search on the clean title.
   const c = cls ?? classifySearch(text);
-  const requestedTitle = requestedOverride ?? c.requestedTitle ?? cleanTitleText(text);
+  let requestedTitle = requestedOverride ?? c.requestedTitle ?? cleanTitleText(text);
+
+  /* WHICH WORK DOES A FRAMED NAME REFER TO? "the Taken movie" has two
+     readings: the literal name "the Taken" — an EXACT match for THE TAKEN
+     (2024), audience in the dozens — and the frame reading, where the article
+     and medium noun are scaffolding around "Taken" (2008), audience in the
+     tens of thousands. `titleMatchTier` ranks exact above article-stripped
+     alt, so the scaffolding reading used to win on a technicality and the
+     deployment answered with THE TAKEN (2024).
+
+     The catalog decides, on CUMULATIVE audience, with a deliberately high
+     dominance bar (see `chooseFramedReading`): a bare "The Taken" typed
+     without the frame is untouched, an obscure exact query still wins, and
+     "Scary Movie" — famous in its literal reading — never moves. Only when
+     the sentence carried a frame AND the frame reading is overwhelmingly the
+     work people mean does the reading flip. */
+  const span = readAnchorSpan(text);
+  if (span.framed && normalizeTitle(span.framed.title) !== normalizeTitle(requestedTitle)) {
+    /* An errored probe is UNKNOWN, never absence. The chooser's "literal
+       resolves to nothing" rule may only fire when the literal search actually
+       ANSWERED empty — a transient failure must not rewrite the user's words,
+       so on any probe failure the flip is skipped and the main lookup below
+       fails or recovers honestly on its own. */
+    const [literalResults, framedResults] = await Promise.all([
+      searchTitles(requestedTitle).catch(() => null),
+      searchTitles(span.framed.title).catch(() => null),
+    ]);
+    if (literalResults && framedResults) {
+      const bestOf = (rs: SearchResultItem[], name: string, medium: 'movie' | 'tv' | null) =>
+        rs
+          .filter((r) => isExactTitle(name, r.title) && (medium == null || r.mediaType === medium))
+          .sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0))[0] ?? null;
+      const literalBest = bestOf(literalResults, requestedTitle, null);
+      const framedBest = bestOf(framedResults, span.framed.title, span.framed.mediaType);
+      if (chooseFramedReading(literalBest, framedBest) === 'framed') {
+        requestedTitle = span.framed.title;
+      }
+    }
+  }
+
   const cleaned = requestedTitle;
   const results = await searchTitles(cleaned).catch(() => []);
   if (results.length === 0) return null;
@@ -423,7 +464,18 @@ export async function askJudgeTitle(
   }
   const typed = wantsTv ? pool.filter((m) => m.mediaType === 'tv')
     : wantsMovie ? pool.filter((m) => m.mediaType === 'movie') : pool;
-  const ranked = rankByTitleIdentity(cleaned, typed.length ? typed : pool, (r) => r.title, (r) => (r as { popularity?: number }).popularity ?? 0);
+  /* SAME TIER → BEST KNOWN, AND BEST-KNOWN MEANS CUMULATIVE. The tie-break
+     used TMDB's decaying weekly popularity, which is how a bare "Taken" led
+     with a running series over the film the name overwhelmingly means. Vote
+     count measures how many people have ever had an opinion — the judgement
+     `critic/clarify.ts` already encodes for clarification order — with
+     popularity kept beneath it for payloads that carry no votes. */
+  const ranked = rankByTitleIdentity(
+    cleaned,
+    typed.length ? typed : pool,
+    (r) => r.title,
+    (r) => ((r.voteCount ?? 0) * 1_000_000) + ((r as { popularity?: number }).popularity ?? 0),
+  );
   const top = ranked[0]!;
 
   const profile = await getProfile(supabase, userId);
