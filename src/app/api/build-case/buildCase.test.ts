@@ -159,3 +159,47 @@ describe('the production reproduction — requests route and never pollute', () 
     expect(rateQuizTitle).toHaveBeenCalled();
   });
 });
+
+/**
+ * GRAPH-NATIVE PROVENANCE (Phase 2): every submission persists a decision
+ * run whose graph records the classification, destination and writes — and
+ * the two litmus utterances follow VISIBLY different paths: request_only
+ * with zero write edges vs durable with wrote_taste edges. INV-2 holds over
+ * both real runs.
+ */
+describe('decision runs — the two litmus utterances diverge in the graph', () => {
+  const runRows = () =>
+    dbCalls.filter((c) => c.table === 'decision_runs').map((c) => c.args as Record<string, unknown>);
+
+  it('"a boxing movie" persists a request_only run with no write edges', async () => {
+    await buildCase('a boxing movie');
+    await new Promise((r) => setTimeout(r, 20));
+    const runs = runRows();
+    expect(runs.length).toBe(1);
+    const run = runs[0]!;
+    expect(run.persistence).toBe('request_only');
+    expect(run.intent_kind).toBe('request');
+    expect(run.raw_text).toBe('a boxing movie');
+    const edges = run.edges as Array<{ predicate: string; object: string }>;
+    expect(edges.some((e) => e.predicate === 'routed_to' && e.object.startsWith('/app/ask'))).toBe(true);
+    expect(edges.filter((e) => e.predicate === 'wrote_taste' || e.predicate === 'seeded_title')).toEqual([]);
+    const { inv2RequestOnlyNeverDurable } = await import('@/lib/graph/invariants');
+    expect(inv2RequestOnlyNeverDurable({
+      id: String(run.id), entryPoint: 'build-case', rawText: String(run.raw_text),
+      intent: { kind: String(run.intent_kind), persistence: 'request_only' },
+      edges: edges as never, createdAt: String(run.created_at),
+    })).toEqual([]);
+  });
+
+  it('"I love boxing movies" persists a durable run WITH write edges', async () => {
+    await buildCase('I love boxing movies');
+    await new Promise((r) => setTimeout(r, 20));
+    const runs = runRows();
+    expect(runs.length).toBe(1);
+    const run = runs[0]!;
+    expect(run.persistence).toBe('durable');
+    expect(run.intent_kind).toBe('taste');
+    const edges = run.edges as Array<{ predicate: string }>;
+    expect(edges.some((e) => e.predicate === 'wrote_taste')).toBe(true);
+  });
+});

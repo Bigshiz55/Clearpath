@@ -12,6 +12,7 @@ const NAV = [
   { href: '/growth-os/outreach', label: 'Outreach' },
   { href: '/growth-os/campaigns', label: 'Campaigns & links' },
   { href: '/growth-os/feedback', label: 'Feedback' },
+  { href: '/growth-os/decisions', label: 'Decisions' },
 ];
 
 export default async function GrowthOsLayout({ children }: { children: React.ReactNode }) {
