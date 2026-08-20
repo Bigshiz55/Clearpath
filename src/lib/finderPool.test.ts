@@ -4,6 +4,7 @@ import {
   discoverPages,
   enoughSurvivors,
   isKeywordStarved,
+  isPaceStarved,
   mapPool,
   waves,
   MAX_CANDIDATES,
@@ -97,6 +98,35 @@ describe('isKeywordStarved — detects a vibe keyword that starved the pool', ()
   it('a tiny ask (limit=1) still requires at least one survivor', () => {
     expect(isKeywordStarved(0, 1, true)).toBe(true);
     expect(isKeywordStarved(1, 1, true)).toBe(false);
+  });
+});
+
+/**
+ * THE ONE-RESULT "THRILLER THAT DRAGS" BUG — the pace twin of the above.
+ *
+ * Measured on the deployed proof (2026-08-20): "I want a thriller that drags"
+ * executed as genre 53 + a hard pace band, and the band kept ONE of forty
+ * candidates. The pool is drawn by popularity with no knowledge of pace, and
+ * `paceScore` is a genre+runtime heuristic that scores nearly every popular
+ * thriller fast — so a stated slow-burn over a fast genre starves the field
+ * without ever hitting zero, and no existing fallback saw it. Same detection
+ * as the keyword twin: on YIELD, never on the words, so a pace band that
+ * genuinely fills the grid keeps its precision untouched.
+ */
+describe('isPaceStarved — detects a pace band that starved the pool', () => {
+  it('is starved when the band keeps under half the ask', () => {
+    expect(isPaceStarved(1, 24, true)).toBe(true); // the deployed reproduction
+    expect(isPaceStarved(0, 24, true)).toBe(true);
+  });
+
+  it('is not starved once survivors clear half the ask', () => {
+    expect(isPaceStarved(12, 24, true)).toBe(false);
+    expect(isPaceStarved(24, 24, true)).toBe(false);
+  });
+
+  it('never fires when the query had no pace band at all', () => {
+    expect(isPaceStarved(0, 24, false)).toBe(false);
+    expect(isPaceStarved(1, 24, false)).toBe(false);
   });
 });
 

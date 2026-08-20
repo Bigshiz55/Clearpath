@@ -125,3 +125,19 @@ export function waves<T>(items: readonly T[], size: number): T[][] {
 export function isKeywordStarved(survivorCount: number, limit: number, hadKeywords: boolean): boolean {
   return hadKeywords && survivorCount < Math.max(1, Math.ceil(limit / 2));
 }
+
+/**
+ * Did a hard PACE band starve an otherwise-broad request?
+ *
+ * `paceScore` is a genre + runtime heuristic, and the candidate pool is drawn
+ * by popularity with no knowledge of pace at all — so a stated slow-burn over
+ * a fast genre ("I want a thriller that drags", measured returning ONE title
+ * on the deployed proof) filters a pool that was never built to contain slow
+ * candidates. Same failure shape and same remedy as the vibe-keyword
+ * starvation above: detected on YIELD, never on the words; the titles that DID
+ * sit at the asked pace stay first, and the shortfall is filled after them
+ * under an honest label.
+ */
+export function isPaceStarved(survivorCount: number, limit: number, hadPace: boolean): boolean {
+  return hadPace && survivorCount < Math.max(1, Math.ceil(limit / 2));
+}

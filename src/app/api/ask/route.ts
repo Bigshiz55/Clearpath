@@ -657,6 +657,19 @@ export async function POST(req: Request) {
               ? `I couldn't apply "${criticRequest.referenceTitles.join(' or ')}" to these — none of them has a profile on file yet, so this is ranked by quality.`
               : `That comparison didn't separate these titles — this is ranked by quality.`,
         );
+      } else if (ranked.authority === 0 && criticState.objective.anchors.length > 0) {
+        /* PARTIAL APPLICATION IS NOT FULL APPLICATION. Measured on the
+           deployed proof: "darker than Taken" resolved its anchor, but Taken
+           itself carried no cached fingerprint — authority 0 — so every
+           anchor-derived instruction contributed nothing and only the stated
+           direction ranked. The answer that comes back was never actually
+           compared WITH TAKEN, and serving it in silence presents a
+           direction-only ranking as the comparison that was asked for. Same
+           principle as the !applied branch above: never present a degraded
+           answer as the thing that was requested. */
+        criticNotes.push(
+          `I don't know ${criticRequest.referenceTitles.join(' or ')} well enough yet to compare against directly — this follows the direction you asked for, on its own.`,
+        );
       }
       return NextResponse.json(
         withConv({

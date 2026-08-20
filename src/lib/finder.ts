@@ -18,6 +18,7 @@ import {
   discoverPages,
   enoughSurvivors,
   isKeywordStarved,
+  isPaceStarved,
   mapPool,
   waves,
   HYDRATE_CONCURRENCY,
@@ -886,6 +887,27 @@ export async function runFinder(
         strictCount > 0
           ? `Only ${strictCount} title${strictCount === 1 ? ' is' : 's are'} tagged with that exact subject — the rest are the closest matches by genre and tone, after them.`
           : 'That exact vibe keyword wasn’t well-tagged in the catalog — here are the closest matches by genre and tone instead.';
+    }
+  } else if (isPaceStarved(items.length, limit, q.pace != null)) {
+    // Honest fallback #1b: a hard pace band over a pool drawn by popularity.
+    // `paceScore` is a genre+runtime heuristic and discovery cannot ask TMDB
+    // for "slow" — so "a thriller that drags" filters a fast-genre pool down
+    // to almost nothing without hitting zero (measured: ONE title on the
+    // deployed proof). Same remedy as the vibe-keyword starvation above: the
+    // titles that DID sit at the asked pace are the answer and stay first;
+    // the shortfall is filled after them, never instead of them, and the
+    // label says exactly what happened.
+    const relaxedQ: FinderQuery = { ...q, pace: null };
+    const r = await runFinder(supabase, userId, relaxedQ, watcher, limit);
+    if (r.items.length > items.length) {
+      const have = new Set(items.map((i) => `${i.mediaType}-${i.id}`));
+      const strictCount = items.length;
+      const wanted = (q.pace ?? 50) <= 33 ? 'slow-burn' : (q.pace ?? 50) >= 67 ? 'fast-paced' : 'that pace';
+      items = [...items, ...r.items.filter((i) => !have.has(`${i.mediaType}-${i.id}`))].slice(0, Math.max(limit, strictCount));
+      relaxed =
+        strictCount > 0
+          ? `Only ${strictCount} title${strictCount === 1 ? ' sits' : 's sit'} squarely in ${wanted === 'that pace' ? wanted : `${wanted} territory`} — the rest are the closest matches, after them.`
+          : `Nothing here sits squarely at that pace — these are the closest matches instead.`;
     }
   }
 
