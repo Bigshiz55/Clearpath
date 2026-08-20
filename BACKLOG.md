@@ -3,7 +3,48 @@
 Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
-## Now — overnight P0 closure shift, 2026-08-20
+## Now — production reality + graph-native spine, 2026-08-20 (day shift)
+
+- **CLOSED — the home box's two defects in one utterance.** "a boxing
+  movie" routed to the generic feed AND fabricated "Locked in: loves a
+  boxing movie" (the LLM's hallucinated likedTitle rated a real film 9/10).
+  Route decided before any taste byte; `tasteEvidenceText` scopes writes
+  (durable clauses + named reactions only; companions never; only titles
+  the user literally typed may seed). PR #94 (merge 6cef644) + reviewer
+  catch (subjectless durable fragments still write). Deployed gate CASE 0
+  proves the front door at every head. Production verified.
+- **CLOSED — the second decision engine.** The search bar on the same home
+  screen sent "a boxing movie" to an arbitrary top-result title page.
+  `clauseLayerSaysRequest` (requestDecision) is the one owner, consulted by
+  the hero box and the search destination AFTER the exact-title check —
+  evidence beats phrasing ("Show Me a Hero", "12 Angry Men" pinned).
+  PR #96 (merge 1a21730). Production verified.
+- **CLOSED — the legacy score pill.** Cards/QuickLook/Ask cards carried
+  "82 · STREAM IT" at 10px while the title page wore the branded mark. The
+  compact call now carries `Verd1ctBadge` (tv=false, the guide precedent);
+  one identity everywhere. PR #95 (merge 6ad5af1). Browser proof at 390/1280.
+- **IN FLIGHT — graph-native spine (phases 0-2), PR #97.** Vocabulary,
+  decision-run provenance on /api/ask + /api/build-case, five invariants,
+  boxing litmus at the real routes, founder inspector
+  (/growth-os/decisions), architecture doc
+  (docs/architecture/GRAPH_NATIVE_WATCHVERDICT.md).
+- **HUMAN ACTION — apply migration 0047 after #97 merges** (the store
+  degrades to a no-op until then; nothing breaks): run
+  `supabase db push` (or apply `supabase/migrations/0047_decision_runs.sql`
+  via the Supabase dashboard SQL editor), then submit any State Your Case
+  ask and open `/growth-os/decisions` to see the run. Also queue the
+  90-day decision_runs retention cron (service_role delete) — see the doc.
+- **Next graph phases (mapped in the doc, each deployable):** 3 user
+  evidence → Taste DNA as derived view · 4 content evidence · 5 scoring
+  trace (fixes AlgorithmScore reading `dna.score` while WatchCall reads
+  `dna.canonical.score`; matchScore displayed nowhere) · 6 availability/TV
+  · 7 consolidation (fold /api/finder into the canonical interpreter; stop
+  the legacy arm trusting client `naiveParseQuery`; airing branch keeps
+  the subject; delete the orphan `/api/recommendations` parser) · 8
+  Docket/Verdict Room/Subscription as graph objects · 9-10 inspectors +
+  user-facing "Why this VERD1CT".
+
+## Done — overnight P0 closure shift, 2026-08-20
 
 Five PRs merged and production-verified this shift; every claim names its
 proof. Production at the end of the shift: `/api/version` → `7086fec` (main).
