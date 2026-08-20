@@ -245,6 +245,24 @@ async function main() {
   const answerHead = new Map();
   /** id → what the deployment SAID about that answer, when it said anything. */
   const answerNote = new Map();
+  /**
+   * DID THE DEPLOYMENT SAY IT COULD NOT APPLY THE COMPARISON?
+   *
+   * ONE DEFINITION, because this question is asked in two places and the two
+   * copies had already drifted. Both used to match the note against a hand-kept
+   * list of phrasings, so an honest new disclosure — the `unavailable` case,
+   * added precisely so the product stops asserting an absence it never measured
+   * — read as SILENCE at both of them. Copy is supposed to change; a contract
+   * pinned to copy fails on improvements as loudly as on regressions.
+   *
+   * So it reads the FACT the route now states (`diagnostics.critic.disclosed`)
+   * and still requires a user-visible line to exist. That is strictly harder to
+   * satisfy than the regex was: a degraded answer with no note fails both
+   * halves, and an unrelated interpretation line cannot stand in for a
+   * disclosure the route never made.
+   */
+  const saidItCouldNotApply = (note) =>
+    note?.criticDiag?.disclosed === true && (note?.disclosure ?? []).length > 0;
 
   /* WHY, NOT JUST HOW MANY.
      The first run of this harness reported "Q4 → 0 items" and stopped there,
@@ -414,7 +432,7 @@ async function main() {
              satisfy than the regex was: a degraded answer with no note fails on
              both halves, and an unrelated interpretation line cannot stand in
              for a disclosure the route never made. */
-          const disclosed = criticDiag?.disclosed === true && disclosure.length > 0;
+          const disclosed = saidItCouldNotApply({ criticDiag, disclosure });
           const ok = differs || disclosed;
           console.log(
             `  CONTRACT the settled comparison differs from the floor, or says it could not: ` +
@@ -594,7 +612,7 @@ async function main() {
     /* Same disjunction as the floor contract: identical answers are only
        acceptable when the deployment SAID the comparison could not be applied
        — to both of them, because one disclosure does not excuse the other. */
-    const said = (id) => (answerNote.get(id)?.disclosure ?? []).some((l) => /couldn.t apply|didn.t separate|without the comparison|couldn.t fulfil/i.test(l));
+    const said = (id) => saidItCouldNotApply(answerNote.get(id));
     const disclosed = said(q.id) && said(other);
     const ok = differs || disclosed;
     console.log(
