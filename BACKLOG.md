@@ -3,9 +3,102 @@
 Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
-## Now
-- **P0 closure on `claude/p0bcd-language` (PR #86) — the deployed proof is now
-  the gate, and it found four defects the whole unit suite was blind to.**
+## Now — overnight P0 closure shift, 2026-08-20
+
+Five PRs merged and production-verified this shift; every claim names its
+proof. Production at the end of the shift: `/api/version` → `7086fec` (main).
+
+- **CLOSED — deployed diminisher/negation divergence (queue item A).** Root
+  cause was the toolchain, not the regex: SWC constant-folding corrupted a
+  `\b` escape into a literal BACKSPACE inside the compiled negation pattern,
+  so the deployed regex matched nothing while unminified vitest stayed green.
+  Fixed with the `String.raw` idiom (tagged templates are opaque to the
+  folder) plus a postbuild acorn gate (`scripts/verify/bundleEscapes.mjs`)
+  that fails any build shipping a corrupted escape. PR #87 (merge bceaf73) +
+  PR #88 (merge 98a8496); deployed exact-SHA agreement 75/75; the reviewer's
+  quantity-comparative catch ("less than 90 minutes" grew a phantom excluded
+  subject) fixed with `(?!\s+than\b)` and pinned. Production verified.
+- **CLOSED — stated taste without an active request (item B).** "I love slow
+  burns but I hate gore." now folds into the conversation state the next
+  turn executes from (`absorbStatement` → `stateToQuery`) — the product's
+  real between-turns path; chips render and remove the held constraints;
+  what has no home is disclosed, not dropped. Standing preference, past
+  reaction and bare familiarity pulled apart (`statesPreference`); companion
+  taste never attributed to the user; past-tense taste records nothing.
+  PR #89 (head 736c310, merge f29fa48). The two-turn deployed proof runs in
+  the PR's own gate: turn 2 must execute genreIds [53] + excludeGenreIds
+  [27] or "Noted" was a lie.
+- **CLOSED — "the Taken movie" wrong referent (item C).** General model,
+  nothing hard-coded: `chooseFramedReading` (pure) picks between the literal
+  and frame readings on cumulative audience with a 20× dominance bar; bare
+  exact queries and famous literals never move; genuine literal absence
+  still flips ("the Whiplash movie"). Reviewer-caught hardening: an errored
+  search probe is UNKNOWN, never absence — the flip needs two answered
+  probes (`askJudge.framedReferentFailure.test.ts`). PR #90 (head bde88a1,
+  merge 65f9a03); Q27 pins Taken (2008) in the deployed gate where the
+  prior head is on record answering THE TAKEN (2024). Production verified.
+- **CLOSED — CI truthfulness (queue §12).** Production deployment events now
+  conclude SKIPPED at the job level for the three deployed gates
+  (black-box, taste-dna-proof, ui-journey) instead of vacuous green; the
+  same gates still run in full on every preview. PR #91 (head b70d333,
+  merge b506fc3). A skipped gate can no longer be cited as a pass.
+- **CLOSED — one negation vocabulary (item D).** `NEGATOR_WORDS` declared
+  once and composed into `NEGATORS` (source byte-identical, so the derived
+  `CLOSED_CLASS` is provably unchanged), `negatedSpans` (zero behavior
+  change by construction), and `MEDIA_NEGATOR_BEHIND` — which was the copy
+  the contracted-auxiliary fix never reached: "something that isn't a
+  movie" executed with media MOVIE, the tone layer's inversion one consumer
+  over. Fixed for every in-request phrasing; +10 matrix tests; layerBext
+  P0 635/635, P1 515/515. The Reco Lab's scope-opener list
+  (`reco/parseIntent.ts`) is documented in-code as intentionally separate
+  (different machine, lab-only surface), not a fifth copy. PR #92 (head
+  16775c6, merge 7086fec). Production verified.
+
+### PROVEN LIMITS (characterized, pinned, deliberately not "fixed" tonight)
+- **A standalone negative preference is a statement.** "I don't want a
+  movie tonight" alone carries no request; the clause layer reads it as a
+  statement and media is never parsed. This is the stated-taste ownership
+  rule working as designed; pinned in `mediaPolarity.test.ts` so nobody
+  turns statements into requests to capture their media.
+- **Cross-clause constraint drop (neutral, not inverted).** "give me
+  something tonight, but I don't want a movie" drops the medium veto — the
+  second clause is fenced as non-request and media stays 'either'.
+  Clause-role attribution seam, distinct from the vocabulary; a candidate
+  for its own characterized change.
+- **Media window overreach (pre-existing).** "no horror movies" negates the
+  MEDIUM as well as the genre (media flips to tv) because the lookback
+  window reaches past a content word. The genre exclusion is correct and
+  pinned; a scope change moves many sentences at once and needs its own
+  matrix.
+
+### DETERMINATION — generic /api/search order stands (queue item H)
+Production returns the 2017 Taken series before the 2008 film for bare
+"Taken" (verified at 65f9a03). After the anchor-resolver fixes, the
+ANSWERING surfaces no longer depend on that order: framed forms resolve by
+audience dominance (#90), stated years pin works, and ambiguous bare asks
+clarify with cumulative-audience ordering. What still inherits the order is
+one path: search-box Enter on a bare ambiguous exact name navigates to the
+first exact match (`resolveSearchDestination`), with the disambiguating
+dropdown already visible on screen. Changing that would require either
+reordering /api/search (frozen-baseline surface) or widening its payload —
+`CatalogResult` carries no voteCount today — neither warranted for a lookup
+surface whose UI already shows both works labeled by year and medium. Left
+alone per the work order. If product later wants Enter to prefer the
+best-known exact match, the isolated change is: add voteCount to the
+/api/search payload (additive), tie-break exacts in
+`resolveSearchDestination`, and report the layerA delta explicitly.
+
+### Still blocked (human-only) — unchanged
+`SUPABASE_SERVICE_ROLE_KEY` is absent in production (the sole absent
+credential; presence-only `/api/health` proof). See the ENVIRONMENT BLOCKER
+section further down for the exact Vercel action and the four-step closure
+proof. Items F (deployed personalization proof beyond the legitimate no-DNA
+control) and G (Why/Watch Out live proof with real stored evidence) remain
+gated on it.
+
+## Done — P0 closure on `claude/p0bcd-language` (PR #86, merged)
+- **The deployed proof became the gate, and it found four defects the whole
+  unit suite was blind to.**
   Every one lives where interpretation meets orchestration, which is exactly
   where an in-process test cannot look.
   - **"another boxing movie" returned nothing.** `interpret()` read it
@@ -265,7 +358,7 @@ Updated at the end of every work order per the Working Agreement in
   standard Supabase env; it enforces the owner's exact contract and prints
   only the five allowed fields.
 
-## Now — final product closure (branch `claude/p0-evidence-anchor-separation`)
+## Done — final product closure (PR #87, merged as bceaf73; production-verified)
 
 Four gaps closed as general mechanisms. Every one was "computed correctly, then
 dropped one layer down", which is why the unit suites were green throughout.
@@ -485,7 +578,7 @@ PROOF OF CLOSURE, in order:
   defects. Worth consolidating, but it is a live serving path and wants its own
   order.
 
-## Now (continued)
+## Now (other tracks)
 - **TODAY'S CASE BRIEFING is BUILT (`claude/todays-case-briefing`, stacked
   on the XMLTV PR):** first-class `/app/tv/briefing` route — editorial
   front page over the stored imported day (paged whole-day reader
