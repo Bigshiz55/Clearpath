@@ -25,6 +25,7 @@ import { buildCriticState } from '@/lib/critic/orchestrate';
 import { resolveAnchor } from '@/lib/critic/anchor';
 import { runStrands } from '@/lib/critic/strands';
 import { rankCriticCandidates } from '@/lib/critic/decide';
+import { excludeAnchorCandidates } from '@/lib/critic/objective';
 import { buildComparativeExplanation } from '@/lib/critic/explain';
 import { getCachedDimensions, readCachedDimensions } from '@/lib/titleDimensions';
 import { loadPreferenceCached } from '@/lib/preference/store';
@@ -537,13 +538,19 @@ export async function POST(req: Request) {
       );
       criticState.attribution.candidateIds = strandRun.candidateIds;
 
+      /* AN ANCHOR IS NEVER ITS OWN ANSWER. Membership, decided here where
+         membership is decided (GC5), not inside the ranker: "lighter than
+         Whiplash" was measured returning Whiplash itself at #5 on production.
+         The reference point of a comparison cannot be a candidate in it. */
+      const contenders = excludeAnchorCandidates(strandRun.items, criticState.objective.anchors);
+
       /* ── GC6 · THE FINAL DECISION ──────────────────────────────────────
          Candidate fingerprints, batch and CACHE-ONLY, keyed on the composite
          `mediaType + tmdbId`. No classifier, no per-title AI call, no title
          string. A candidate the classifier has not reached yet simply
          contributes nothing — it is never read as a neutral 50. */
       const candidateEvidence = await readCachedDimensions(
-        strandRun.items.map((i) => ({ tmdb_id: i.id, media_type: i.mediaType })),
+        contenders.map((i) => ({ tmdb_id: i.id, media_type: i.mediaType })),
       );
       const candidateDims = candidateEvidence.dims;
 
@@ -553,7 +560,7 @@ export async function POST(req: Request) {
          its targets. A raw preference nudge here would apply that same evidence
          a second time. See the audit in `docs/CRITIC-SHIP.md`. */
       const ranked = rankCriticCandidates(
-        strandRun.items.map((i) => ({
+        contenders.map((i) => ({
           id: i.id,
           mediaType: i.mediaType,
           matchScore: i.matchScore,
@@ -569,7 +576,7 @@ export async function POST(req: Request) {
          question ("which of these best answers what you asked me RIGHT NOW")
          and is request-specific, so it orders the list and is never written
          back onto the card or into Taste DNA. GC7 explains why the winner won. */
-      const byKey = new Map(strandRun.items.map((i) => [`${i.mediaType}-${i.id}`, i]));
+      const byKey = new Map(contenders.map((i) => [`${i.mediaType}-${i.id}`, i]));
 
       /* ── GC7 · WHY IT WON ──────────────────────────────────────────────
          Built from the SAME contribution trail that produced the order, and
@@ -649,6 +656,19 @@ export async function POST(req: Request) {
             : fingerprinted === 0
               ? `I couldn't apply "${criticRequest.referenceTitles.join(' or ')}" to these — none of them has a profile on file yet, so this is ranked by quality.`
               : `That comparison didn't separate these titles — this is ranked by quality.`,
+        );
+      } else if (ranked.authority === 0 && criticState.objective.anchors.length > 0) {
+        /* PARTIAL APPLICATION IS NOT FULL APPLICATION. Measured on the
+           deployed proof: "darker than Taken" resolved its anchor, but Taken
+           itself carried no cached fingerprint — authority 0 — so every
+           anchor-derived instruction contributed nothing and only the stated
+           direction ranked. The answer that comes back was never actually
+           compared WITH TAKEN, and serving it in silence presents a
+           direction-only ranking as the comparison that was asked for. Same
+           principle as the !applied branch above: never present a degraded
+           answer as the thing that was requested. */
+        criticNotes.push(
+          `I don't know ${criticRequest.referenceTitles.join(' or ')} well enough yet to compare against directly — this follows the direction you asked for, on its own.`,
         );
       }
       return NextResponse.json(

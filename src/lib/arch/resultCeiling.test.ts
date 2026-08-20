@@ -56,7 +56,9 @@ describe('nothing caps the answer below the requested limit', () => {
   it('the fixed 16-candidate cap is gone', () => {
     const src = read('src/lib/finder.ts');
     expect(src).not.toMatch(/CANDIDATE_CAP\s*=\s*\d+/);
-    expect(src).toContain('candidateTarget(limit)');
+    // Sized by the ask — the call may also carry pool options (a pace-banded
+    // ask deepens to the ceiling), but `limit` stays the first argument.
+    expect(src).toMatch(/candidateTarget\(limit[,)]/);
   });
 
   it('the pool can always hold a full page, plus attrition headroom', () => {

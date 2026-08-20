@@ -78,6 +78,27 @@ export interface CriticObjective {
   authority: number;
 }
 
+/**
+ * AN ANCHOR IS NEVER ITS OWN ANSWER — a MEMBERSHIP rule, applied by the
+ * caller that assembles candidates (GC5 territory), never inside the ranker
+ * (`rankCriticCandidates` contractually returns the same candidates it was
+ * given).
+ *
+ * Measured on production (taste-dna-proof, 2026-08-20): "lighter than
+ * Whiplash" returned Whiplash itself at #5. The anchor is the comparison's
+ * reference point — a title cannot be lighter, darker, or better than itself,
+ * and "something like X" naming X back tells the user what they just typed.
+ * Matched on composite identity (mediaType + tmdbId), never a title string.
+ */
+export function excludeAnchorCandidates<T extends { id: number; mediaType: 'movie' | 'tv' }>(
+  items: readonly T[],
+  anchors: readonly ResolvedAnchor[],
+): T[] {
+  if (anchors.length === 0) return [...items];
+  const banned = new Set(anchors.map((a) => `${a.mediaType}-${a.tmdbId}`));
+  return items.filter((i) => !banned.has(`${i.mediaType}-${i.id}`));
+}
+
 /** Authority derived from what actually resolved. Pure, and honest about gaps. */
 export function objectiveAuthority(anchors: readonly ResolvedAnchor[]): number {
   const usable = anchors.filter((a) => a.dims && Object.keys(a.dims).length > 0);
