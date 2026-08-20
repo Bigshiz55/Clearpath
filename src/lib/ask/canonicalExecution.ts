@@ -97,7 +97,9 @@ function singularCandidates(name: string): string[] {
   return out;
 }
 
-const genreIdFor = (name: string): number | null => {
+/** Exported for the conversation layer: a statement's taste must resolve
+ *  through the SAME vocabulary boundary its request would, or the two drift. */
+export const genreIdFor = (name: string): number | null => {
   for (const candidate of singularCandidates(name)) {
     const id = PARSE_GENRE_IDS[candidate] ?? genreIdFromName(candidate);
     if (id != null) return id;

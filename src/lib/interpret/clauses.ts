@@ -164,8 +164,31 @@ const MEDIA_PERSON_REQUEST =
  * similarity spans, and manufactured "Sylvester Stallone" as a TITLE to
  * resolve — the fake-anchor defect that produced "Which title did you mean?".
  */
+/* THE NEGATIVE LEAD IS THE SAME JUDGEMENT. "I don't like dumb comedies" is a
+   standing preference exactly as "I like courtroom dramas" is — the polarity
+   belongs to the negation layer (`negatedSpans` reads the "don't"), not to the
+   role decider. Without the negated forms the sentence fell to BACKGROUND and
+   the stated dislike vanished without even an acknowledgement. `hate`/`can't
+   stand` are the lexically negative present-tense forms of the same lead. */
 const PREFERENCE_LEAD =
-  /\b(?:i|we)\s+(?:really\s+|kind\s+of\s+|sort\s+of\s+|generally\s+|usually\s+)?(?:like|love|enjoy|prefer|dig|am\s+into)\b/i;
+  /\b(?:i|we)\s+(?:really\s+|kind\s+of\s+|sort\s+of\s+|generally\s+|usually\s+)?(?:don'?t\s+(?:like|love|enjoy)|do\s+not\s+(?:like|love|enjoy)|can'?t\s+stand|hate|dislike|like|love|enjoy|prefer|dig|am\s+into)\b/i;
+
+/**
+ * DOES THIS CLAUSE STATE A STANDING PREFERENCE?
+ *
+ * The 'taste' role covers three vocabularies — standing preference ("I like
+ * courtroom dramas"), past reaction ("I loved Rocky"), and bare familiarity
+ * ("I watched a horror movie yesterday") — because all three fence the clause
+ * off from the request. But only the FIRST is durable taste about kinds of
+ * things. A reaction is about one title (the title layer owns it), and
+ * familiarity carries no verdict at all: reading "I watched a horror movie
+ * yesterday" as "this viewer wants horror" is precisely the anecdote leak the
+ * side-door contract forbids — and it is exactly what happened when the taste
+ * extraction gated on the role alone.
+ */
+export function statesPreference(text: string): boolean {
+  return PREFERENCE_LEAD.test(` ${text.toLowerCase()} `);
+}
 
 /**
  * A THIRD PARTY'S STANDING TASTE — "My wife likes comedies."
