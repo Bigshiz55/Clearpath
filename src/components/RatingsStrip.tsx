@@ -1,6 +1,7 @@
 import type { TileRatings } from '@/lib/ratings';
 import type { MediaType } from '@/lib/types';
 import { WatchCall } from './WatchCall';
+import { Verd1ctBadge } from './Verd1ctBadge';
 
 function tomatoColor(pct: number): string {
   return pct >= 60 ? 'text-red-300' : 'text-emerald-300';
@@ -60,23 +61,34 @@ export function RatingsStrip({
   const verdict = ratings.standardScore == null ? 'na' : ratings.standardScore >= 55 ? 'stream' : 'skip';
   const popcorn = ratings.rtAudience ?? ratings.audience;
 
+  /* ONE SCORE, ONE MARK — in both arms. The DNA-driven arm delegates to
+     WatchCall (which now carries the branded VERD1CT badge at compact scale);
+     the objective arm was still a bare green pill saying `82 · STREAM IT`, so
+     Ask result cards wore a different identity for the same number the title
+     page brands. Same mark here, same compact size, call colour preserved. */
   const call =
     mediaType && tmdbId ? (
       <WatchCall mediaType={mediaType} tmdbId={tmdbId} objectiveScore={ratings.standardScore ?? null} />
-    ) : (
+    ) : ratings.standardScore != null ? (
       <span
-        className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-black ${
-          verdict === 'stream'
-            ? 'bg-emerald-500/20 text-emerald-200'
-            : verdict === 'skip'
-              ? 'bg-red-500/20 text-red-200'
-              : 'bg-white/10 text-slate-300'
-        }`}
+        className="inline-flex items-center gap-1.5 align-middle"
         title="WatchVerd1ct's Watchability score (0–100) and the Stream It / Skip It call it produces"
       >
-        {ratings.standardScore != null
-          ? `${verdict === 'stream' ? '✅' : '⛔'} ${ratings.standardScore} · ${verdict === 'stream' ? 'STREAM IT' : 'SKIP IT'}`
-          : 'STREAM/SKIP: NA'}
+        <Verd1ctBadge score={ratings.standardScore} px={26} tv={false} title="" />
+        <span
+          className={`rounded px-1 py-0.5 text-[10px] font-black leading-none ${
+            verdict === 'stream' ? 'bg-emerald-500/20 text-emerald-200' : 'bg-red-500/20 text-red-200'
+          }`}
+        >
+          {verdict === 'stream' ? 'STREAM IT' : 'SKIP IT'}
+        </span>
+      </span>
+    ) : (
+      <span
+        className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-black bg-white/10 text-slate-300"
+        title="WatchVerd1ct's Watchability score (0–100) and the Stream It / Skip It call it produces"
+      >
+        STREAM/SKIP: NA
       </span>
     );
 
