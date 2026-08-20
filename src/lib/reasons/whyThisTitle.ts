@@ -24,6 +24,17 @@
  * they follow, and what they just asked for.
  */
 
+/* THE FLOOR IS DECLARED ONCE, IN THE MODULE THAT DECLARED IT.
+   `MIN_SAMPLES_FOR_FIT` is this repo's statement of when a taste profile stops
+   being noise, and the title page has honoured it all along. This card did not:
+   it gated every "your…" claim on `ratedCount > 0`, so one rating was enough to
+   print "Strong match for your slow-burn preferences" — while the ranker scales
+   the very same channel by `samples / 20` and moved that title by a twentieth
+   of a nudge. The claim was loudest exactly where the ranking trusted it least,
+   which is the mismatch P0-E is about. One floor, both surfaces, imported
+   rather than restated. */
+import { MIN_SAMPLES_FOR_FIT } from '@/lib/verdict/fitReasons';
+
 export interface WhyInput {
   /** Dimensions the user's rated history agrees with, strongest first. */
   tasteAgreements?: string[];
@@ -34,8 +45,9 @@ export interface WhyInput {
   /** The title's own genres — used ONLY for the honest general fallback. */
   genres?: string[];
   /**
-   * How many titles the viewer has rated. Zero means there is no profile at
-   * all, and no claim beginning "your…" can honestly be made.
+   * How many titles the viewer has rated. Below `MIN_SAMPLES_FOR_FIT` there is
+   * not enough profile to stand on, and no claim beginning "your…" can honestly
+   * be made.
    */
   ratedCount?: number;
   /** Household members this fits, when the request was for a group. */
@@ -161,10 +173,14 @@ export function concernPhrase(c: { label: string; note?: string | null }): strin
 
 export function buildWhyReasons(input: WhyInput): Reason[] {
   const out: Reason[] = [];
+  /* Every claim of the form "your …" answers to this, and nothing else does:
+     a satisfied request, a followed person or an airing tonight is a fact about
+     the session or the title, not a reading of a profile. */
+  const profiled = (input.ratedCount ?? 0) >= MIN_SAMPLES_FOR_FIT;
 
   // Cap at two dimensions: "matches your crime, forensic, procedural, dark and
   // slow-burn preferences" is not a reason, it is a dump of the profile.
-  const taste = (input.tasteAgreements ?? []).filter(Boolean).slice(0, 2);
+  const taste = profiled ? (input.tasteAgreements ?? []).filter(Boolean).slice(0, 2) : [];
   if (taste.length > 0) {
     out.push({ kind: 'taste', text: `Strong match for your ${joinNatural(taste)} preferences` });
   }
@@ -225,7 +241,7 @@ export function buildWhyReasons(input: WhyInput): Reason[] {
   // "your preferences" to match, and saying otherwise would invent the very
   // evidence this module refuses to invent.
   const genres = (input.genres ?? []).filter(Boolean).slice(0, 2);
-  if (out.length === 0 && genres.length > 0 && (input.ratedCount ?? 0) > 0) {
+  if (out.length === 0 && genres.length > 0 && profiled) {
     out.push({
       kind: 'general',
       text: `Matches your general ${joinNatural(genres.map((g) => g.toLowerCase()))} preferences`,
@@ -237,7 +253,7 @@ export function buildWhyReasons(input: WhyInput): Reason[] {
      nothing on file there is no personal ground to stand a caution on, and
      inventing one is the same dishonesty as inventing praise. */
   const concerns = (input.tasteConcerns ?? []).filter(Boolean);
-  if (concerns.length > 0 && (input.ratedCount ?? 0) > 0) {
+  if (concerns.length > 0 && profiled) {
     out.push({ kind: 'concern', text: `Heads up: ${concerns[0]}` });
   }
 

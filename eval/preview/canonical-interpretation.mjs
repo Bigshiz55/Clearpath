@@ -469,7 +469,25 @@ async function main() {
 
   console.log('\n── CASE 4: negation ───────────────────────────────────────');
   const neg = await ask('Give me a thriller but no supernatural stuff.');
+  /* WHICH READER BUILT THIS QUERY. The deployment returns `genreIds:[53,14]`
+     for this sentence — Thriller AND Fantasy, with no exclusion — while every
+     producer in the tree, run locally at the same SHA, returns `[53]` with 14
+     EXCLUDED. Reading the code cannot settle which arm ran out there; the
+     response now says so directly. Printed unconditionally, because the answer
+     is interesting whether or not the assertion below passes. */
+  console.log(`   ▸ arm: ${neg.body?.arm ?? 'not reported'} · ${describeQuery(neg.body)}`);
   check('negation', 'receipt', 'TMDB Thriller genre id 53 is present in query.genreIds', hasGenreId(neg.body, TMDB_GENRE.THRILLER), describeQuery(neg.body));
+  /* AND THE EXCLUSION IS A RECEIPT, not only a world fact. "no supernatural"
+     must leave the query as an EXCLUSION; a positive Fantasy id is the exact
+     inversion the negation architecture exists to prevent, and it is visible in
+     the query without needing TMDB to confirm it downstream. */
+  check(
+    'negation',
+    'receipt',
+    'the vetoed genre is EXCLUDED, never added as a positive filter',
+    !hasGenreId(neg.body, TMDB_GENRE.FANTASY),
+    describeQuery(neg.body),
+  );
   check('negation', 'receipt', 'supernatural is not a positive constraint', !/"(?:genres?|subjects?|keywords?)"[^}]*supernatural/.test(executable(neg.body)));
   check('negation', 'world', 'returned candidates', titles(neg.body).length > 0);
   {

@@ -24,7 +24,7 @@ import { resolveAnchor } from '@/lib/critic/anchor';
 import { runStrands } from '@/lib/critic/strands';
 import { rankCriticCandidates } from '@/lib/critic/decide';
 import { buildComparativeExplanation } from '@/lib/critic/explain';
-import { getCachedDimensions } from '@/lib/titleDimensions';
+import { getCachedDimensions, readCachedDimensions } from '@/lib/titleDimensions';
 import { loadPreferenceCached } from '@/lib/preference/store';
 import { detectOrigin, detectAudio, detectNetwork, detectPlatform } from '@/lib/nlu/detectors';
 import { classifySearch, statedMediaType } from '@/lib/nlu/searchMode';
@@ -461,6 +461,7 @@ export async function POST(req: Request) {
             year: c.year ?? null,
             // Display order for the clarification only — never identity.
             recognisability: c.popularity ?? null,
+            audience: c.voteCount ?? null,
           })),
         // GC3, cache-only. A miss costs the anchor its authority, nothing more.
         loadDimensions: getCachedDimensions,
@@ -538,9 +539,10 @@ export async function POST(req: Request) {
          `mediaType + tmdbId`. No classifier, no per-title AI call, no title
          string. A candidate the classifier has not reached yet simply
          contributes nothing — it is never read as a neutral 50. */
-      const candidateDims = await getCachedDimensions(
+      const candidateEvidence = await readCachedDimensions(
         strandRun.items.map((i) => ({ tmdb_id: i.id, media_type: i.mediaType })),
       );
+      const candidateDims = candidateEvidence.dims;
 
       /* decisionScore = matchScore + planNudge, and nothing else.
          `matchScore` already carries general quality + the user's DURABLE
@@ -631,10 +633,19 @@ export async function POST(req: Request) {
          was asked for. */
       const fingerprinted = ranked.decisions.filter((d) => d.fingerprinted).length;
       if (!ranked.applied) {
+        /* THREE DIFFERENT TRUTHS, AND ONLY ONE OF THEM IS ABOUT THE CATALOG.
+           "None of these has a profile yet" is a claim about what we HOLD, and
+           we may have no standing to make it: an unreachable service-role
+           client and a missing table both used to arrive here as zero
+           fingerprints, indistinguishable from an honest miss. `readCached
+           Dimensions` now reports whether the read happened, so a system that
+           could not look says so instead of asserting an absence. */
         criticNotes.push(
-          fingerprinted === 0
-            ? `I couldn't apply "${criticRequest.referenceTitles.join(' or ')}" to these — none of them has a profile on file yet, so this is ranked by quality.`
-            : `That comparison didn't separate these titles — this is ranked by quality.`,
+          candidateEvidence.status === 'unavailable'
+            ? `I couldn't check what I know about these titles just now, so this is ranked by quality rather than by your comparison.`
+            : fingerprinted === 0
+              ? `I couldn't apply "${criticRequest.referenceTitles.join(' or ')}" to these — none of them has a profile on file yet, so this is ranked by quality.`
+              : `That comparison didn't separate these titles — this is ranked by quality.`,
         );
       }
       return NextResponse.json(
@@ -658,8 +669,25 @@ export async function POST(req: Request) {
             critic: {
               candidates: ranked.decisions.length,
               fingerprinted,
+              /* `ok` = this is what the catalog holds. `unavailable` = we did
+                 not look, so `fingerprinted` measures nothing. */
+              evidence: candidateEvidence.status,
               eligible: ranked.eligible,
               applied: ranked.applied,
+              /* DEGRADATION, AS A FACT RATHER THAN AS PROSE.
+                 The deployed proof's contract is "the comparison changed the
+                 order, or the deployment SAID it could not", and it read the
+                 second half by matching the sentence — a hand-kept list of the
+                 phrasings that existed when it was written. Adding an honest
+                 third sentence above therefore turned a working disclosure into
+                 a silent failure: the product told the truth and the harness
+                 could not hear it. That is the same vocabulary-in-two-places
+                 defect this whole pass has been closing, and prose is the worst
+                 possible place to keep one, because copy is supposed to change.
+                 So the fact travels as a fact. Anyone rewording the notes above
+                 cannot break the contract, and a deployment that degrades
+                 without saying so still fails it. */
+              disclosed: criticNotes.length > 0,
               authority: ranked.authority,
             },
           },
@@ -1369,6 +1397,17 @@ export async function POST(req: Request) {
         sha: getBuildInfo().gitSha || 'unknown',
         query,
         interpretation: [...roleNote, ...askInterpretation],
+        /* WHICH PRODUCER BUILT THIS QUERY.
+           Three different readers can populate `query` on this route — the
+           canonical execution, the LLM parse, and the regex parser — and the
+           response has never said which one did. That cost real time: a
+           deployed gate reported `genreIds: [53,14]` for "a thriller but no
+           supernatural stuff" while every producer, run locally at the same
+           SHA, returned `[53]` with `14` EXCLUDED. Reading the code cannot
+           settle which arm ran on a deployment; only the deployment can, and it
+           was not saying. A one-word fact turns that from an investigation into
+           a field read. Names a branch, never a prompt or a reasoning trace. */
+        arm: canonicalOwnsLanguage ? 'canonical' : ai ? 'ai' : 'legacy',
         diagnostics: result.diagnostics,
         scoredFor: result.scoredFor,
         relaxed: result.relaxed,

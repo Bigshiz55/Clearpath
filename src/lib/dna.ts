@@ -10,6 +10,8 @@ import { aiAdjustScore, type AiAdjustment } from '@/lib/aiAdjust';
 import { isPro } from '@/lib/pro';
 import { getUserDimensionProfile, getCachedDimensions, getTitleDimensions } from '@/lib/titleDimensions';
 import { dimensionMatch, matchHighlights, type DimensionProfile } from '@/lib/scoring/dimensions';
+import { fingerprintKey } from '@/lib/taste/fingerprint';
+import { MIN_SAMPLES_FOR_FIT } from '@/lib/verdict/fitReasons';
 import { rerankNudge } from '@/lib/scoring/reranker';
 import { RERANK_MODEL } from '@/lib/scoring/rerankerWeights';
 import { loadPreference } from '@/lib/preference/store';
@@ -203,7 +205,7 @@ export async function rankByDna<T extends { mediaType: MediaType; id: number }>(
       const objective = general.standardScore ?? general.score;
       const base = dna.liked && vector ? dnaScore(vector, dna, objective).score : objective;
 
-      const dims = dimsMap.get(`${i.mediaType}-${i.id}`);
+      const dims = dimsMap.get(fingerprintKey({ mediaType: i.mediaType, tmdbId: i.id }));
       const match = useDims && dims ? dimensionMatch(dims, dimProfile) : null;
       // Heuristic dimension nudge + the learned re-ranker nudge (a no-op until a
       // model is promoted into rerankerWeights.ts). Both bounded.
@@ -263,8 +265,24 @@ export async function dimensionFitFor(
       getCachedDimensions([{ tmdb_id: id, media_type: mediaType }]),
       memoProfile(supabase, userId, sampleSize),
     ]);
-    const dims = cached.get(`${mediaType}:${id}`) ?? cached.get(`${id}`);
-    if (!dims || profile.samples === 0) return null;
+    /* THE DEFECT THIS LINE CARRIED. It read `${mediaType}:${id}` and, failing
+       that, a bare `${id}`; the cache writes `${mediaType}-${id}` and has
+       never written either of those. So the lookup missed on EVERY title for
+       EVERY user, this returned null, and the card's taste agreements and
+       "Heads up" cautions never rendered anywhere — while `personalRanking.ts`
+       read the same cache correctly and moved the title's rank. The ranking
+       was personalized and the explanation was silent, which is the precise
+       mismatch P0-E is about. The key is derived now, not written out. */
+    const dims = cached.get(fingerprintKey({ mediaType, tmdbId: id }));
+    /* AND THE FLOOR THE REST OF THE PRODUCT ALREADY KEEPS. `samples === 0` is
+       not the threshold this repo declares; `MIN_SAMPLES_FOR_FIT` is, and the
+       title page has honoured it all along. Below it `matchHighlights` is
+       noise, and the ranker agrees — `personalSignal` scales the very same
+       channel by `samples / 20`, so at one rating it moves a title by a
+       twentieth of a nudge. A card asserting "strong match for your slow-burn
+       preferences" on that evidence states as certain what the ranking treats
+       as almost nothing. One floor, both surfaces. */
+    if (!dims || profile.samples < MIN_SAMPLES_FOR_FIT) return null;
     return matchHighlights(dims, profile);
   } catch {
     return null;

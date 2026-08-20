@@ -20,6 +20,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { personalSignal, PERSONAL_NUDGE_CEILING } from '../../src/lib/ask/personalSignal';
+import { relevanceSignals, RELEVANCE_NUDGE_MAX } from '../../src/lib/ask/relevanceSignal';
 import { PREF_NUDGE_MAX } from '../../src/lib/preference/rank';
 import { dimensionMatch, DIMENSION_KEYS, buildProfile, type TitleDimensions, type DimensionProfile } from '../../src/lib/scoring/dimensions';
 
@@ -63,6 +64,24 @@ function profileOf(pref: Partial<Record<string, number>>, samples: number): Dime
   return { ...(p as object), pref: prefMap, weight, samples } as unknown as DimensionProfile;
 }
 
+/**
+ * Scenarios whose request names a SUBJECT, so `evaluateSubjectCentrality`
+ * produces a per-candidate 0..100 the ranking can use. Taken from queries this
+ * product has actually been measured serving ("another boxing movie", "movies
+ * about chess", "two space movies"), never invented: a scenario marked
+ * subject-bearing that the product would not gate on a subject would
+ * manufacture an improvement that no user receives.
+ */
+const SUBJECT_BEARING = new Set(['subject-aboutness', 'subject-boxing', 'subject-space']);
+
+/**
+ * The evaluator's own confidence scale for a candidate that PASSED the subject
+ * gate: title hit 95, keyword cluster + summary 92, cluster alone 86, two
+ * non-setting mentions 80. Not a distribution invented here — these are the
+ * literal constants in `evaluateSubjectCentrality`.
+ */
+const PASSING_CONFIDENCES = [95, 92, 86, 80];
+
 /** Base-score distributions taken from observed production fields. */
 const SCENARIOS: Array<[string, number, number, number]> = [
   // label, candidateCount, baseMin, baseMax
@@ -76,6 +95,8 @@ const SCENARIOS: Array<[string, number, number, number]> = [
   ['subject-aboutness',       13, 51, 82],  // observed: "movies about chess"
   ['person-credit',            3, 77, 79],  // observed: "three Stallone movies"
   ['comparative-critic',      12, 60, 84],
+  ['subject-boxing',          24, 62, 86],  // observed: "another boxing movie"
+  ['subject-space',            2, 70, 80],  // observed: "two space movies"
   ['sparse-candidates',        5, 70, 78],
   ['broad-candidates',        40, 55, 88],
 ];
@@ -92,6 +113,10 @@ interface Row {
   /* HOW DECISIVE THE ANSWER IS. A one-point win is a coin toss wearing a
      ranking; a fifteen-point win is a verdict. */
   winMarginBase: number; winMarginFinal: number;
+  /* AFTER — the same field with the request-fit channel in the order. */
+  subjectBearing: boolean; winMarginRelevance: number;
+  winnerBefore: number; winnerAfter: number; runnerUpAfter: number;
+  relevanceChangedTop1: boolean; relevanceAbsMax: number;
   /* PER CHANNEL, MEASURED IN ISOLATION — the same field scored with only the
      fingerprint term live, then only the stated-preference term. */
   dimOnly: { absMax: number; rankChanges: number };
@@ -115,6 +140,16 @@ function run(coverage: number, samples: number): Row[] {
         return { id: i, base, dims };
       });
 
+      /* REQUEST FIT, FROM THE EVALUATOR'S OWN SCALE. Only for scenarios whose
+         request actually names a subject; everywhere else the channel is inert
+         because the request drew no distinction between candidates. */
+      const subjectBearing = SUBJECT_BEARING.has(scenario);
+      const rel = rng(0x5B1EC7);
+      const confidences: (number | null)[] = items.map(() =>
+        subjectBearing ? PASSING_CONFIDENCES[Math.floor(rel() * PASSING_CONFIDENCES.length)]! : null,
+      );
+      const relSignals = relevanceSignals(confidences.map((c) => ({ confidence: c, centrality: c == null ? null : 'CENTRAL' })));
+
       const scored = items.map((it) => {
         const dm = it.dims && samples > 0 ? dimensionMatch(it.dims, profile) : null;
         const sig = personalSignal({
@@ -122,11 +157,18 @@ function run(coverage: number, samples: number): Row[] {
           reasons: [], concerns: [], explainConfidence: 0,
           profileSamples: samples,
         });
-        return { ...it, dm, final: sig.rankScore, nudge: sig.rankScore - it.base, participated: sig.participated };
+        const relNudge = relSignals[it.id]?.nudge ?? 0;
+        return {
+          ...it, dm,
+          final: sig.rankScore, nudge: sig.rankScore - it.base, participated: sig.participated,
+          // BEFORE = quality + person. AFTER = quality + person + request fit.
+          withRelevance: sig.rankScore + relNudge, relNudge,
+        };
       });
 
       const byBase = [...scored].sort((a, b) => b.base - a.base || a.id - b.id);
       const byFinal = [...scored].sort((a, b) => b.final - a.final || a.id - b.id);
+      const byRelevance = [...scored].sort((a, b) => b.withRelevance - a.withRelevance || a.id - b.id);
       const posOf = (arr: typeof scored) => new Map(arr.map((x, i) => [x.id, i]));
       const pb = posOf(byBase), pf = posOf(byFinal);
       const rankChanges = scored.filter((x) => pb.get(x.id) !== pf.get(x.id)).length;
@@ -191,6 +233,13 @@ function run(coverage: number, samples: number): Row[] {
         nearTieFinalPct: nearTiePct(scored.map((x) => x.final)),
         winMarginBase: margin(byBase, (x) => x.base),
         winMarginFinal: margin(byFinal, (x) => x.final),
+        subjectBearing,
+        winMarginRelevance: margin(byRelevance, (x) => x.withRelevance),
+        winnerBefore: byFinal[0]?.id ?? -1,
+        winnerAfter: byRelevance[0]?.id ?? -1,
+        runnerUpAfter: byRelevance[1]?.id ?? -1,
+        relevanceChangedTop1: (byFinal[0]?.id ?? -1) !== (byRelevance[0]?.id ?? -1),
+        relevanceAbsMax: +Math.max(0, ...scored.map((x) => Math.abs(x.relNudge))).toFixed(2),
         dimOnly: channel(true, false),
         prefOnly: channel(false, true),
         base: stats(scored.map((x) => x.base)),
@@ -243,6 +292,18 @@ const agg = (rows: Row[]) => ({
   nearTieFinal: stats(rows.map((r) => r.nearTieFinalPct)),
   winMarginBase: stats(rows.map((r) => r.winMarginBase)),
   winMarginFinal: stats(rows.map((r) => r.winMarginFinal)),
+  /* THE BEFORE/AFTER THE CLOSURE ASKED FOR, over the cells where the request
+     actually names a subject. Reporting it over every cell would dilute a real
+     effect with scenarios the channel is designed to leave alone. */
+  subjectCells: rows.filter((r) => r.subjectBearing).length,
+  winMarginSubjectBefore: stats(rows.filter((r) => r.subjectBearing).map((r) => r.winMarginFinal)),
+  winMarginSubjectAfter: stats(rows.filter((r) => r.subjectBearing).map((r) => r.winMarginRelevance)),
+  relevanceAbsMax: Math.max(0, ...rows.map((r) => r.relevanceAbsMax)),
+  relevanceChangedTop1Pct: +(
+    rows.filter((r) => r.subjectBearing && r.relevanceChangedTop1).length /
+    Math.max(1, rows.filter((r) => r.subjectBearing).length)
+  ).toFixed(3),
+  nonSubjectUntouched: rows.filter((r) => !r.subjectBearing).every((r) => r.relevanceAbsMax === 0),
   /* WHICH FAMILY MOVED IT — the same field, one channel at a time. */
   byChannel: {
     fingerprint: {
@@ -274,9 +335,22 @@ for (const [label, rows] of Object.entries(out)) {
   console.log(`   DYNAMIC RANGE  distinct scores ${(a.uniqueBaseShare * 100).toFixed(0)}% of the field → ${(a.uniqueFinalShare * 100).toFixed(0)}% after the personal term`);
   console.log(`                  near ties (<=1pt apart) ${(a.nearTieBase.median * 100).toFixed(0)}% → ${(a.nearTieFinal.median * 100).toFixed(0)}% (median cell)`);
   console.log(`                  winning margin median ${a.winMarginBase.median} → ${a.winMarginFinal.median}  (p10 ${a.winMarginBase.p10} → ${a.winMarginFinal.p10}, p90 ${a.winMarginBase.p90} → ${a.winMarginFinal.p90})`);
-  console.log(`   BY CHANNEL     fingerprint |max| ${a.byChannel.fingerprint.absMax}, moved ${(a.byChannel.fingerprint.rankChangeRate * 100).toFixed(1)}% of titles`);
+  /* LABELLED AS A CAPABILITY PROBE, because that is what it is. The isolated
+     channel run synthesises its own bounded preference draw over the SAME
+     field, so it answers "what can this term do on its own" — it is NOT gated
+     by the condition's fingerprint coverage or profile depth. Printed under a
+     condition header without that label, the `no-dna` row reads as "no profile,
+     and preference still moved 88.6% of titles", which would be a false claim
+     about that condition. */
+  console.log(`   BY CHANNEL     (isolated capability on the same field — not gated by this condition)`);
+  console.log(`                  fingerprint |max| ${a.byChannel.fingerprint.absMax}, moved ${(a.byChannel.fingerprint.rankChangeRate * 100).toFixed(1)}% of titles`);
   console.log(`                  stated preference |max| ${a.byChannel.statedPreference.absMax}, moved ${(a.byChannel.statedPreference.rankChangeRate * 100).toFixed(1)}% of titles`);
-  console.log(`   BASE SHAPE     min ${a.baseSpread.min} · p25 ${a.baseSpread.p25} · median ${a.baseSpread.median} · p75 ${a.baseSpread.p75} · max ${a.baseSpread.max} (spread per cell)\n`);
+  console.log(`   BASE SHAPE     min ${a.baseSpread.min} · p25 ${a.baseSpread.p25} · median ${a.baseSpread.median} · p75 ${a.baseSpread.p75} · max ${a.baseSpread.max} (spread per cell)`);
+  const b = a.winMarginSubjectBefore, f = a.winMarginSubjectAfter;
+  console.log(`   REQUEST FIT    ${a.subjectCells} subject-bearing cells · |max| ${a.relevanceAbsMax} (ceiling ${RELEVANCE_NUDGE_MAX}) · changed the winner in ${(a.relevanceChangedTop1Pct * 100).toFixed(0)}%`);
+  console.log(`                  winning margin BEFORE  min ${b.min} · p25 ${b.p25} · median ${b.median} · p75 ${b.p75} · max ${b.max}`);
+  console.log(`                  winning margin AFTER   min ${f.min} · p25 ${f.p25} · median ${f.median} · p75 ${f.p75} · max ${f.max}`);
+  console.log(`                  non-subject cells untouched: ${a.nonSubjectUntouched ? 'yes' : 'NO — the channel is leaking'}\n`);
 }
 
 const path = 'artifacts/measure/score-distribution.json';

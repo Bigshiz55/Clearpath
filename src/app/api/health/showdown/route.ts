@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCachedDimensions } from '@/lib/titleDimensions';
+import { readCachedDimensions } from '@/lib/titleDimensions';
 import {
   MIN_USABLE_COVERAGE,
   assessCoverage,
@@ -27,12 +27,25 @@ export const dynamic = 'force-dynamic';
  * because CLAUDE.md forbids an LLM call on a request path.
  */
 export async function GET() {
-  const cached = await getCachedDimensions(diagnosticDimensionKeys());
-  const coverage = assessCoverage(cached);
+  /* AND "0 OF 113" IS TWO DIFFERENT PROBLEMS TOO — the same argument as the
+     docblock above, one level up. This read used to collapse an EMPTY table and
+     an UNREADABLE one into the same empty Map, so the endpoint whose whole job
+     is telling an operator what is wrong reported "covered: 0" for both. One of
+     those is fixed by running the classifier; the other is fixed by giving the
+     deployment a service-role key, and the classifier will not help at all.
+     Sending an operator to the wrong remedy is worse than reporting nothing,
+     because they will run it, watch the number stay at zero, and conclude the
+     classifier is broken. */
+  const evidence = await readCachedDimensions(diagnosticDimensionKeys());
+  const coverage = assessCoverage(evidence.dims);
+  const couldNotLook = evidence.status === 'unavailable';
 
   return NextResponse.json(
     {
       generatedAt: new Date().toISOString(),
+      /** `ok` = this is what the catalog holds. `unavailable` = we did not
+       *  look, and every count below measures nothing. */
+      evidence: evidence.status,
       covered: coverage.covered,
       total: coverage.total,
       ratio: Number(coverage.ratio.toFixed(3)),
@@ -40,8 +53,9 @@ export async function GET() {
       /** False means a completed Showdown cannot influence recommendations. */
       usable: coverage.usable,
       missing: coverage.missing,
-      remedy:
-        coverage.missing.length > 0
+      remedy: couldNotLook
+        ? 'The fingerprint cache could not be READ — this is not a coverage gap and the classifier will not fix it. Check SUPABASE_SERVICE_ROLE_KEY on this deployment and that the `title_dimensions` table exists.'
+        : coverage.missing.length > 0
           ? 'Run GET /api/cron/classify (CRON_SECRET) until `usable` is true; it prioritises the diagnostic catalogue.'
           : null,
     },

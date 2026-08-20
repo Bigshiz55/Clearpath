@@ -15,6 +15,7 @@ import { getFinishProfile, assessTitleRisk } from '@/lib/finish';
 import { getContentDna, type ContentDna } from '@/lib/contentDna';
 import { getTitleDimensions, getUserDimensionProfile } from '@/lib/titleDimensions';
 import { dimensionMatch, matchHighlights, topDials } from '@/lib/scoring/dimensions';
+import { MIN_SAMPLES_FOR_FIT } from '@/lib/verdict/fitReasons';
 import { TasteMatchView, type TasteMatch } from '@/components/verdict/TasteMatchView';
 import type { TitleMetadata } from '@/lib/types';
 
@@ -36,7 +37,11 @@ async function getTasteMatchForCurrentUser(meta: TitleMetadata): Promise<TasteMa
       .eq('user_id', user.id)
       .not('rating', 'is', null);
     const samples = count ?? 0;
-    if (samples < 3) return null; // not enough signal to be meaningful yet
+    /* THE SAME FLOOR, IMPORTED RATHER THAN RETYPED. This read `samples < 3`
+       and happened to agree with `MIN_SAMPLES_FOR_FIT`; the card's own gate was
+       the copy that had drifted, and a literal that agrees today is what drift
+       looks like the day before. */
+    if (samples < MIN_SAMPLES_FOR_FIT) return null; // not enough signal to be meaningful yet
 
     const [dims, profile] = await Promise.all([
       getTitleDimensions(meta),

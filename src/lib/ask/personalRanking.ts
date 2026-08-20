@@ -6,6 +6,7 @@ import { hasPreferenceSignal, preferenceNudge } from '@/lib/preference/rank';
 import { explainTitle } from '@/lib/preference/explain';
 import { genreSlug } from '@/lib/preference/genreCalibration';
 import { getCachedDimensions, getUserDimensionProfile } from '@/lib/titleDimensions';
+import { fingerprintKey } from '@/lib/taste/fingerprint';
 import { dimensionMatch } from '@/lib/scoring/dimensions';
 import { personalSignal, type PersonalSignal } from './personalSignal';
 
@@ -108,7 +109,7 @@ export async function personalizeCandidates<T extends PersonalizableItem>(
     if (!hasPref && !useDims) return inert(items);
 
     return items.map((i) => {
-      const dims = dimsMap.get(`${i.mediaType}-${i.id}`);
+      const dims = dimsMap.get(fingerprintKey({ mediaType: i.mediaType, tmdbId: i.id }));
       const genres = (i.genreNames ?? []).map(genreSlug);
       const dimMatch = useDims && dims && profile ? dimensionMatch(dims, profile) : null;
       const prefNudge =

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { recordEvents } from '@/lib/preference/store';
 import { getCachedDimensions } from '@/lib/titleDimensions';
+import { fingerprintKey } from '@/lib/taste/fingerprint';
 import { resolveAnswer, type AnswerKey } from '@/lib/import/rapidFire';
 import type { ExperienceGrade, PreferenceEvent } from '@/lib/preference/types';
 
@@ -88,7 +89,7 @@ export async function recordRapidFireAnswer(
     let dims: Record<string, number> | undefined;
     try {
       const map = await getCachedDimensions([{ tmdb_id: a.tmdbId, media_type: a.mediaType }]);
-      dims = map.get(`${a.mediaType}-${a.tmdbId}`) ?? undefined;
+      dims = map.get(fingerprintKey(a)) ?? undefined;
     } catch {
       dims = undefined;
     }

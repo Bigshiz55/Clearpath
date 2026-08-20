@@ -1,9 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { buildWhyReasons, primaryReasons, additionalReasons, joinNatural } from './whyThisTitle';
+import { MIN_SAMPLES_FOR_FIT } from '@/lib/verdict/fitReasons';
 
 describe('a reason explains personal fit, not the spec sheet', () => {
   it('leads with the taste match', () => {
-    const r = buildWhyReasons({ tasteAgreements: ['forensic-crime', 'procedural'] });
+    /* `ratedCount` supplied because a taste claim now requires a profile to
+       stand on (see the floor block at the bottom of this file). The assertion
+       is unchanged — this is the precondition it always implied. */
+    const r = buildWhyReasons({
+      tasteAgreements: ['forensic-crime', 'procedural'],
+      ratedCount: MIN_SAMPLES_FOR_FIT,
+    });
     expect(r[0]!.kind).toBe('taste');
     expect(r[0]!.text).toBe('Strong match for your forensic-crime and procedural preferences');
   });
@@ -87,7 +94,7 @@ describe('the honest fallback', () => {
 describe('the card stays uncluttered', () => {
   it('shows at most two reasons up front and hides the rest behind Why?', () => {
     const all = buildWhyReasons({
-      tasteAgreements: ['crime'], householdNames: ['Scott'],
+      tasteAgreements: ['crime'], ratedCount: MIN_SAMPLES_FOR_FIT, householdNames: ['Scott'],
       newThisWeek: true, unwatchedByAll: true, airingTonight: true,
     });
     expect(all.length).toBeGreaterThan(2);
@@ -96,7 +103,10 @@ describe('the card stays uncluttered', () => {
   });
 
   it('caps taste dimensions rather than dumping the whole profile', () => {
-    const r = buildWhyReasons({ tasteAgreements: ['crime', 'forensic', 'procedural', 'dark'] });
+    const r = buildWhyReasons({
+      tasteAgreements: ['crime', 'forensic', 'procedural', 'dark'],
+      ratedCount: MIN_SAMPLES_FOR_FIT,
+    });
     expect(r[0]!.text).toBe('Strong match for your crime and forensic preferences');
     expect(r[0]!.text).not.toContain('procedural');
   });
@@ -119,7 +129,7 @@ describe('a reason is never invented', () => {
 
   it('never mentions a provider — this half of the card is not about availability', () => {
     const text = JSON.stringify(buildWhyReasons({
-      tasteAgreements: ['crime'], airingTonight: true, trendingInPack: 'Crime Case Files',
+      tasteAgreements: ['crime'], ratedCount: MIN_SAMPLES_FOR_FIT, airingTonight: true, trendingInPack: 'Crime Case Files',
     }));
     for (const p of ['Hulu', 'Netflix', 'Prime', 'CBS', 'stream', 'Watch now']) {
       expect(text, p).not.toContain(p);
@@ -133,5 +143,66 @@ describe('joinNatural', () => {
     expect(joinNatural(['crime', 'forensic'])).toBe('crime and forensic');
     expect(joinNatural(['a', 'b', 'c'])).toBe('a, b and c');
     expect(joinNatural([])).toBe('');
+  });
+});
+
+/**
+ * ONE FLOOR, BOTH SURFACES — the second half of the P0-E mismatch.
+ *
+ * The title page has always honoured `MIN_SAMPLES_FOR_FIT`: below it,
+ * `matchHighlights` is noise and `buildFitReasons` says so. The card did not —
+ * it gated every "your…" claim on `ratedCount > 0`, so a single rating printed
+ * "Strong match for your slow-burn preferences" at full confidence. The ranker
+ * disagrees with that card in the strongest possible terms: `personalSignal`
+ * scales the same dimension channel by `samples / 20`, so at one rating the
+ * title moved by a twentieth of a nudge. The card asserted as settled exactly
+ * what the ranking treated as almost nothing.
+ *
+ * Facts about the session are unaffected — a followed person, an airing
+ * tonight and a satisfied request are not readings of a profile and never
+ * needed one.
+ */
+describe('a claim about "your" taste answers to the profile floor', () => {
+  const AGREE = ['slow burn', 'bleak'];
+  const CLASH = ['pace — you lean fast-paced'];
+
+  it('says nothing about the reader below the floor', () => {
+    for (const ratedCount of [0, 1, MIN_SAMPLES_FOR_FIT - 1]) {
+      const r = buildWhyReasons({
+        tasteAgreements: AGREE,
+        tasteConcerns: CLASH,
+        genres: ['Drama'],
+        ratedCount,
+      });
+      expect(r.map((x) => x.kind), `ratedCount=${ratedCount}`).not.toContain('taste');
+      expect(r.map((x) => x.kind), `ratedCount=${ratedCount}`).not.toContain('concern');
+      expect(r.map((x) => x.kind), `ratedCount=${ratedCount}`).not.toContain('general');
+      expect(r.every((x) => !/\byour\b/i.test(x.text)), `ratedCount=${ratedCount}`).toBe(true);
+    }
+  });
+
+  it('speaks at the floor and above, both halves of the evidence', () => {
+    const r = buildWhyReasons({
+      tasteAgreements: AGREE,
+      tasteConcerns: CLASH,
+      genres: ['Drama'],
+      ratedCount: MIN_SAMPLES_FOR_FIT,
+    });
+    expect(r.map((x) => x.kind)).toContain('taste');
+    expect(r.map((x) => x.kind)).toContain('concern');
+  });
+
+  it('a fact about the session is not a reading of a profile', () => {
+    const r = buildWhyReasons({
+      ratedCount: 0,
+      followedPerson: 'Ann Dowd',
+      airingTonight: true,
+      satisfiedRequest: 'clever but not supernatural',
+      householdNames: ['Sam'],
+      unwatchedByAll: true,
+    });
+    expect(r.map((x) => x.kind).sort()).toEqual(
+      ['airing', 'household', 'person', 'request', 'unwatched'].sort(),
+    );
   });
 });

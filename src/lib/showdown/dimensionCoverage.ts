@@ -23,12 +23,13 @@
 
 import { TITLES } from '@/lib/voice/quickdna/definition';
 import { mediaTypeFor } from './mediaType';
+import { fingerprintKey } from '@/lib/taste/fingerprint';
 
 /** The cache key shape `getCachedDimensions` returns: `${mediaType}-${tmdbId}`. */
 export function dimsCacheKey(titleId: string): string | null {
   const t = TITLES.find((x) => x.id === titleId);
   if (!t) return null;
-  return `${mediaTypeFor(titleId)}-${t.tmdbId}`;
+  return fingerprintKey({ mediaType: mediaTypeFor(titleId), tmdbId: t.tmdbId });
 }
 
 /** Every diagnostic title, in the shape `getCachedDimensions` expects. */

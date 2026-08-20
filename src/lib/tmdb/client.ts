@@ -118,6 +118,8 @@ export interface SearchResultItem {
   overview: string;
   posterPath: string | null;
   voteAverage: number | null;
+  /** Cumulative audience evidence — see `toResult`. */
+  voteCount: number | null;
   popularity: number | null;
   /** TMDB genre ids, when the search payload carried them. Additive/optional. */
   genreIds?: number[];
@@ -135,6 +137,7 @@ interface TmdbMultiResult {
     overview?: string;
     poster_path?: string | null;
     vote_average?: number;
+    vote_count?: number;
     popularity?: number;
     genre_ids?: number[];
   }>;
@@ -159,6 +162,11 @@ function toResult(r: MultiRow, forced?: MediaType): SearchResultItem | null {
     overview: r.overview ?? '',
     posterPath: r.poster_path ?? null,
     voteAverage: typeof r.vote_average === 'number' ? r.vote_average : null,
+    /* HOW MANY PEOPLE HAVE AN OPINION, not how hot it is this week. TMDB
+       popularity decays, so a current series can outrank the film a bare name
+       overwhelmingly refers to; vote count is cumulative and does not. Used to
+       ORDER an ambiguity question, never to decide identity. */
+    voteCount: typeof r.vote_count === 'number' ? r.vote_count : null,
     popularity: typeof r.popularity === 'number' ? r.popularity : null,
     ...(Array.isArray(r.genre_ids) ? { genreIds: r.genre_ids.filter((n) => typeof n === 'number') } : {}),
   };

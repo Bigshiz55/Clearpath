@@ -50,11 +50,21 @@ import { objectiveAuthority } from './objective';
 export type AnchorCandidate = TmdbCandidate & {
   /** TMDB popularity, when the search payload carried it. Display order only. */
   recognisability?: number | null;
+  /** Cumulative vote count — how many people have an opinion. Display order
+   *  only, and a better prior than popularity, which decays. */
+  audience?: number | null;
 };
 
 export interface AnchorRequest {
-  /** Exactly what the user typed. */
+  /** Exactly what the user typed — the label, and the round-trip key. */
   spokenAs: string;
+  /**
+   * The title to MATCH on, when the words the user said carry more than the
+   * name: "Taken 2008" and "the Taken movie" are labels, not titles, and
+   * matching on them finds nothing. Defaults to `spokenAs`, so a caller that
+   * reads no cues behaves exactly as before. See `anchorSpan.ts`.
+   */
+  matchTitle?: string;
   /** Narrows identity when the request stated or implied it. */
   mediaType?: 'movie' | 'tv';
   /** Narrows identity when stated or recoverable. */
@@ -69,6 +79,8 @@ export interface AnchorOption {
   year: number | null;
   /** Display order only — see AnchorCandidate. Absent when unknown. */
   recognisability?: number | null;
+  /** Display order only — cumulative audience evidence. Absent when unknown. */
+  audience?: number | null;
 }
 
 export type AnchorResolution =
@@ -95,6 +107,10 @@ export function resolveAnchor(
 ): AnchorResolution {
   const spokenAs = req.spokenAs.trim();
   if (!spokenAs) return { status: 'not_found', spokenAs: req.spokenAs };
+  /* MATCH ON THE TITLE, LABEL WITH THE WORDS. Identity compares against the
+     name; everything the user said around it ("2008", "the … movie") is a cue,
+     not part of the name, and matching on the whole span finds nothing. */
+  const matchTitle = (req.matchTitle ?? spokenAs).trim() || spokenAs;
 
   /* MEDIA TYPE IS IDENTITY, NOT A PREFERENCE. "The Office" the series and a
      same-named film are different works, so a stated type EXCLUDES rather than
@@ -105,7 +121,7 @@ export function resolveAnchor(
     : candidates;
 
   const match = pickMatch(
-    { title: spokenAs, releaseYear: req.year ?? null, expectedMediaType: req.mediaType ?? null },
+    { title: matchTitle, releaseYear: req.year ?? null, expectedMediaType: req.mediaType ?? null },
     pool,
   );
 
@@ -129,7 +145,7 @@ export function resolveAnchor(
   /* THE MATCHER REFUSED. Two reasons are possible and they are different
      answers to the user, so they are different statuses: several works share
      the exact name (ask which), or nothing shares it (say we do not know it). */
-  const want = normalizeTitle(spokenAs);
+  const want = normalizeTitle(matchTitle);
   const exact = pool.filter((c) => normalizeTitle(c.title ?? '') === want);
   if (exact.length > 1) {
     return {
@@ -141,6 +157,7 @@ export function resolveAnchor(
         mediaType: c.mediaType,
         year: c.year,
         recognisability: c.recognisability ?? null,
+        audience: c.audience ?? null,
       })),
     };
   }

@@ -265,6 +265,193 @@ Updated at the end of every work order per the Working Agreement in
   standard Supabase env; it enforces the owner's exact contract and prints
   only the five allowed fields.
 
+## Now — final product closure (branch `claude/p0-evidence-anchor-separation`)
+
+Four gaps closed as general mechanisms. Every one was "computed correctly, then
+dropped one layer down", which is why the unit suites were green throughout.
+
+- **P0-A · evidence coverage was unmeasurable and could state a falsehood.**
+  Two causes, one symptom. (a) Vercel crons run on PRODUCTION deployments only,
+  so the nightly `/api/cron/classify` backfill never runs on the preview where
+  0/43 coverage was measured — the preview was never wrong, it was never fed.
+  (b) A real defect: `getCachedDimensions` collapsed three outcomes into one
+  empty Map — the catalog holds nothing, the table is missing, the service-role
+  client could not be built — so the comparative path could tell a reader "none
+  of them has a profile on file yet" with total confidence when it had simply
+  not looked. `readCachedDimensions` now reports `status: 'ok' | 'unavailable'`
+  and `requested`; `/api/ask` discloses the three cases differently and
+  `diagnostics.critic.evidence` carries the status.
+  `/api/cron/classify?report=1` measures coverage without classifying anything
+  and works with no `OPENAI_API_KEY`, behind the same `CRON_SECRET` gate.
+- **P0-B · a bare title resolved by decaying popularity.** `AnchorRequest.year`
+  had existed since GC2 and nothing ever filled it, so "darker than Taken 2008"
+  asked which Taken while holding the answer — and sent the string "Taken 2008"
+  to TMDB, which is no title at all. `src/lib/critic/anchorSpan.ts` reads the
+  cues the sentence already carried (year, and the framed medium "the X movie"
+  / "the X series"), composed from the existing `splitTitleQualifiers` so no
+  search-baseline module changes. Clarification order now leads on CUMULATIVE
+  audience (`vote_count`) with TMDB's decaying weekly popularity demoted to a
+  tie-break — display only; `resolveAnchor` still never reads either, and still
+  refuses when the evidence genuinely does not separate two works.
+- **P0-C · the ranking had no term for what was asked.** Measured, not assumed:
+  over sixty scenario×profile cells the base field spans a median of 18 points
+  and three quarters of the order is a near tie — but the real finding was that
+  `evaluateSubjectCentrality` had been producing a per-candidate 0..100 on
+  request fit and the pipeline used it to FILTER and to DISPLAY and never to
+  ORDER. `src/lib/ask/relevanceSignal.ts` adds it as a bounded ±12 channel
+  centred on the field's own mean, so the set's average movement is zero by
+  construction and a plain genre browse (every candidate satisfies the request
+  identically) produces no movement at all. Measured on 15 subject-bearing
+  cells: winning margin min 0 / p25 0 / median 2 / p75 3 → min 1 / p25 2.5 /
+  median 11.68 / p75 20; winner changed in 47%; |max| exactly 12; non-subject
+  cells untouched.
+- **P0-E · the card's "Why it fits" was dead everywhere, always.**
+  `dimensionFitFor` — the sole source of the card's taste agreements and
+  "Heads up" cautions — looked its fingerprint up under `${mediaType}:${id}`
+  while the cache writes `${mediaType}-${id}`. A colon where the map has a
+  hyphen: the lookup missed on every title for every user, `fit` came back
+  null, and both `WhyThisTitle` and `CardFit` rendered nothing personal —
+  while `personalRanking.ts` read the same cache correctly and moved the rank.
+  The ranking was personalized and the explanation was silent. The key is now
+  stated once (`fingerprintKey`) and derived by all ten readers/writers, with
+  `dimensionCacheKey.test.ts` as the contract. Second half: the card gated
+  every "your …" claim on `ratedCount > 0` while the repo declares
+  `MIN_SAMPLES_FOR_FIT = 3` and the ranker scales the same channel by
+  `samples / 20` — the claim was loudest exactly where the ranking trusted it
+  least. One floor, both surfaces.
+- **A closed-class word is never a subject.** "anything except horror" bound the
+  SUBJECT "except"; so did "anything BUT horror", "something BESIDES comedy",
+  "a movie WITH drama", and — worst — "movies AND shows about chess", which
+  demanded every title be about both `and` and `chess`. The pre-nominal rule
+  assumes an attributive modifier, which only open-class words can be. The
+  closed classes are finite, so the guard states them; the exclusion members are
+  DERIVED from the `NEGATORS` vocabulary this file already declares. Also:
+  `dumb`, `cerebral` and `challenging` were tone words and `smart` was not, so
+  "a smart thriller" became an aboutness filter on "smart" — the axis is
+  completed, and a tone with no execution home is disclosed rather than invented
+  as a topic.
+
+### Round two — what the deployed proof and the reviewer found
+
+- **A contract pinned to COPY failed on an improvement.** `main` passed the
+  deployed-proof workflow; this branch failed it. The contract is "the
+  comparison changed the order, OR the deployment said it could not", and it
+  read the second half by matching the note against a hand-kept list of
+  phrasings. Adding the honest `unavailable` disclosure therefore turned a
+  working disclosure into a recorded silence — the product told the truth and
+  the harness could not hear it. Third time this shape has cost a red gate in
+  one pass, and prose is the worst place to keep a vocabulary because copy is
+  SUPPOSED to change. `diagnostics.critic.disclosed` now carries the fact;
+  `evidenceCoverage.test.ts` pins that the degraded branch has no silent arm.
+- **P0-A's root cause, measured rather than inferred.** At exact head on the
+  preview: `critic: 43 candidate(s), 0 fingerprinted, applied=false` with
+  `said: I couldn't check what I know about these titles just now`. That is the
+  `unavailable` arm — the deployment cannot READ `title_dimensions`. The
+  previous report's "0 of 43 coverage" was never zero fingerprints; it was zero
+  reads, reported as a fact about the catalog. Confirmed on PRODUCTION,
+  unauthenticated: `/api/health/showdown` → `covered: 0, total: 113,
+  usable: false`. **This is an environment/credential gap, not a code gap, and
+  it is not fixed by this branch — it is now correctly reported.** Remedy is in
+  the endpoint's own `remedy` field.
+- **A frame is offered, never applied.** The Vercel review caught that `FRAMED`
+  stripped any "<article> <name> <medium noun>" — the exact shape of "The Truman
+  Show", "Scary Movie", "Silent Movie", "The Daily Show" and "The Rocky Horror
+  Picture Show", each truncated to a fragment AND given a wrong hard media
+  filter, resolving to nothing, silently. No lexical rule separates them, so
+  `readAnchorSpan` returns both readings and `orchestrate` searches the literal
+  one first, adopting the frame only when the catalog does not contain it — the
+  call `/api/search` already makes for the same ambiguity.
+- **"less X" ruled X IN — FIX WRITTEN, THEN REVERTED. BLOCKED, see below.**
+  "something like that but less dumb" records `dumb: WANTED`; so does "something
+  less slow"; "less gory", "less violent" and "less scary" record nothing at all.
+  One phrasing, two wrong answers, and the worse of them is the reversal the
+  negation architecture exists to prevent. The fix (a DIMINISHER read at the one
+  seam both consumers share, `negatedSpans`, plus `less|fewer` in the clause
+  `CONSTRAINT` marker) is correct locally and is NOT in this branch. Why:
+
+  The deployed black-box gate passed 72/72 at `8d80016` with
+
+      Give me a thriller but no supernatural stuff.
+      → {"genreIds":[53],"excludeGenreIds":[14]}      CORRECT
+
+  and from `344b991` — the commit carrying the diminisher — returned
+
+      → {"genreIds":[53,14]}   arm: canonical       INVERTED
+
+  on three consecutive SHAs. That is Fantasy promoted from an exclusion to a
+  POSITIVE filter: the precise inversion the architecture exists to prevent,
+  shipped by a change meant to prevent it one phrasing over.
+
+  The change cannot explain it. Both added alternatives require the literal
+  `less`/`fewer`, which that sentence does not contain; the rebuilt
+  `negatedSpans` regex is equivalent for any input without those words; and the
+  same tree run locally returns `[53]` + `excludeGenreIds:[14]`, verified after
+  the change, not before. Local and deployed disagree on identical source, which
+  points at the build rather than the source — and that is exactly why it must
+  not ride along in a PR about something else.
+
+  NEXT STEP: land it alone, with the black-box gate as its acceptance test, and
+  bisect the deployed behaviour rather than the local behaviour. The receipt that
+  makes it visible — "the vetoed genre is EXCLUDED, never added as a positive
+  filter" — is already in the gate and stays there.
+
+### Discovered here, not fixed (deliberately out of scope)
+- **`/api/search` leads with the 2017 Taken series on production right now.**
+  Verified unauthenticated against `clearpath-pearl-chi.vercel.app` at
+  `256a898`: `?q=Taken` returns tv/2017, then movie/2008. This is NOT the
+  anchor path P0-B fixed — for a bare, unqualified query `/api/search`
+  deliberately returns "the catalog's own order untouched" (TMDB's), and
+  changing that is a frozen-search-baseline change requiring a layerA delta
+  against `68a5a93`. The `prominence()` rule in `src/lib/critic/clarify.ts` is
+  the mechanism if the owner wants it applied there too.
+- **The negator vocabulary exists in three hand-kept copies** in
+  `src/lib/interpret/interpret.ts` — `MEDIA_NEGATOR_BEHIND` (line ~114),
+  `NEGATORS` (~165) and `negatedSpans`'s own regex (~171) — and they have
+  already drifted (`hate[sd]?` vs `hates?|hated`; the first carries no
+  contractions at all). The subject guard now DERIVES from `NEGATORS` rather
+  than adding a fourth copy, but the three remain. Consolidating them changes
+  media-polarity and negation-scope behaviour, so it wants its own work order
+  with the metamorphic suite as the gate.
+- **`/api/cron/classify` has never run on a preview deployment** and cannot —
+  `vercel.json` schedules it and Vercel fires crons on production only. Any
+  preview coverage measurement is a measurement of an unfed cache. Use
+  `?report=1` to state the number honestly rather than inferring a defect.
+- **A trailing POSITIVE fragment is dropped.** "I want a thriller, more gritty"
+  and "I want a thriller, gritty" file the fragment as conversational background
+  and execute the thriller alone, while "nothing gritty" in the same position
+  binds. `CONSTRAINT` is a list of FILTER markers by design, and treating any
+  trailing adjective as a constraint would read ordinary asides as requests — so
+  this wants its own work order with the metamorphic suite as the gate, not a
+  quiet widening inside a negation fix.
+- **A bare taste statement drops the taste.** "I love slow burns but I hate
+  gore." is `kind: statement` with an EMPTY `requestClause`, so neither tone is
+  extracted — not as a tone, not as background. It simply vanishes. The
+  mechanism works whenever a request is present ("I want something slow but not
+  gory" → `slow: true`, `gory: false`), so this is the statement boundary
+  discarding evidence it should keep for the next turn. On the P0-H matrix as
+  "cross-clause positive + negative preference".
+- **"the Taken movie" resolves to THE TAKEN (2024), not the 2008 film.**
+  Deployed at `68a7876`: `PASS (THE TAKEN (2024) — MAYBE at 55) · cues
+  honoured`. The medium cue IS honoured — it returns a movie — and the title
+  matcher then prefers an exact string match on "The Taken" over the film an
+  unqualified "the Taken movie" almost certainly means. `prominence()` orders
+  the CLARIFICATION list by cumulative audience; the title-lookup path does not
+  consult it. Whether it should is a real question and a separate one.
+- **The black-box gate's CASE 4 receipt was too weak to see an inversion.** It
+  asserted only that Thriller was PRESENT, which `[53,14]` satisfies, so a
+  vetoed genre promoted to a positive filter passed unseen and was caught only
+  by which four candidates TMDB happened to return first. The stronger receipt
+  ("the vetoed genre is EXCLUDED, never added as a positive filter") is now in
+  the gate and green. Worth auditing the other cases for the same shape: an
+  assertion that a constraint is PRESENT does not check that its POLARITY
+  survived.
+- **The canonical interpreter records no title for "Something better for me than
+  Furious."** — `intent.titles` is empty; the comparative anchor is owned by the
+  critic layer's own extraction (`routeAsk`), not by `interpret()`. Two readers
+  of the same sentence, which is the shape that has produced most of this pass's
+  defects. Worth consolidating, but it is a live serving path and wants its own
+  order.
+
 ## Now (continued)
 - **TODAY'S CASE BRIEFING is BUILT (`claude/todays-case-briefing`, stacked
   on the XMLTV PR):** first-class `/app/tv/briefing` route — editorial

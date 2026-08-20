@@ -195,6 +195,14 @@ const TONE_ADJECTIVES = [
   'weird', 'strange', 'uplifting', 'feel-?good', 'tense', 'scary', 'frightening',
   'gory', 'violent', 'easy', 'challenging', 'cerebral', 'slow', 'fast-?paced',
   'romantic', 'sad', 'cosy', 'cozy', 'gritty', 'wholesome', 'dumb', 'gore', 'long',
+  /* THE AXIS WAS ONE-SIDED. `dumb`, `cerebral` and `challenging` were here and
+     `smart` was not, so "a smart thriller" — the ordinary way to ask for the
+     other end of the same axis — fell through to the subject extractor and
+     became an ABOUTNESS filter on the word "smart". An evaluative adjective
+     describes how a title plays, never what it is about. With no execution
+     home it is disclosed ("isn't a tone I can filter by yet"), which is the
+     honest outcome; a fabricated subject is not. */
+  'smart', 'clever',
 ];
 
 /** Tone words that are VERBS — what a film does to the viewer's patience. */
@@ -905,6 +913,50 @@ export function interpret(raw: string): CanonicalIntent {
  * `about` is the single most common way to state aboutness in English; it is
  * the one construction whose absence turns a topic request into a browse.
  */
+/**
+ * WORDS THAT LINK, NEGATE OR RELATE — never words that modify.
+ *
+ * The pre-nominal rule below reads "<word> <media|genre>" and calls the word
+ * the topic. That holds for OPEN-class words: a noun or adjective in front of
+ * a noun modifies it, so `courtroom drama` and `boxing movie` are about
+ * courtrooms and boxing. It does not hold for the CLOSED classes, which sit in
+ * exactly the same position and mean something entirely different:
+ *
+ *   "anything EXCEPT horror"      the exclusion marker, read as the topic
+ *   "anything BUT horror"         a coordinator, read as the topic
+ *   "movies AND shows about chess"  conjunction, read as a SECOND required topic
+ *   "a movie WITH drama"          a preposition, read as the topic
+ *
+ * Each one armed the strict aboutness gate on a function word, so the request
+ * executed as "titles about `except`" and returned nothing while looking
+ * understood — the same failure mode as `recommend thrillers`, one class over.
+ *
+ * A closed class is finite and closed; that is what lets it be STATED as a
+ * grammatical fact rather than accumulated as a list of sentences someone
+ * tripped over. No content noun is a member, so nothing a user could actually
+ * want to watch a film about is excluded here.
+ *
+ * THE EXCLUSION MEMBERS ARE DERIVED, NOT RE-LISTED. `NEGATORS` above is this
+ * file's declaration of how English rules something out; reading it here means
+ * a negator added there can never resurface as a topic. Two hand-kept copies
+ * of one vocabulary have now drifted three times in this parser — request
+ * verbs, genre plurals, tone inflections — and each fix removed the second
+ * copy rather than updating it.
+ */
+const CLOSED_CLASS = new Set<string>([
+  // Coordinators: they join, they do not describe.
+  'and', 'or', 'but', 'nor', 'plus',
+  // Prepositions that can stand immediately in front of a bare noun.
+  'with', 'without', 'of', 'for', 'from', 'than', 'like', 'unlike', 'besides',
+  'versus', 'vs', 'per', 'via', 'into', 'onto', 'off',
+  // However this file already says "rule this out" — single words only, since
+  // a contraction or a two-word cue cannot occupy an attributive slot.
+  ...NEGATORS.source
+    .replace(/\\b|\(\?:|\)/g, '')
+    .split('|')
+    .filter((w) => /^[a-z]+$/.test(w)),
+]);
+
 function findSubjectMatches(clause: string): SpanMatch[] {
   const out: SpanMatch[] = [];
   const MEDIA = String.raw`movies?|films?|shows?|series|documentar(?:y|ies)|flicks?`;
@@ -944,6 +996,7 @@ function findSubjectMatches(clause: string): SpanMatch[] {
   const push = (m: RegExpMatchArray): void => {
     const w = m[1]!.toLowerCase();
     if (STRUCTURAL.test(w)) return;
+    if (CLOSED_CLASS.has(w)) return;
     // Offset from the END of the match, so a topic word that also appears
     // earlier in the clause cannot mis-anchor the range the overlap rules use.
     const start = m.index! + m[0]!.lastIndexOf(m[1]!);
