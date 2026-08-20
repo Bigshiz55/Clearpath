@@ -39,7 +39,7 @@
  * `src/lib/finderGenres.ts:24` is `thriller: 53`, and line 32 pairs id 53 with
  * the label "Thriller". The gate asserts against the product's vocabulary.
  */
-export const TMDB_GENRE = { THRILLER: 53, DOCUMENTARY: 99 };
+export const TMDB_GENRE = { THRILLER: 53, DOCUMENTARY: 99, FANTASY: 14 };
 
 /** TMDB person ids used by the canonical cases. */
 export const TMDB_PERSON = { SYLVESTER_STALLONE: 16483 };

@@ -1397,6 +1397,17 @@ export async function POST(req: Request) {
         sha: getBuildInfo().gitSha || 'unknown',
         query,
         interpretation: [...roleNote, ...askInterpretation],
+        /* WHICH PRODUCER BUILT THIS QUERY.
+           Three different readers can populate `query` on this route — the
+           canonical execution, the LLM parse, and the regex parser — and the
+           response has never said which one did. That cost real time: a
+           deployed gate reported `genreIds: [53,14]` for "a thriller but no
+           supernatural stuff" while every producer, run locally at the same
+           SHA, returned `[53]` with `14` EXCLUDED. Reading the code cannot
+           settle which arm ran on a deployment; only the deployment can, and it
+           was not saying. A one-word fact turns that from an investigation into
+           a field read. Names a branch, never a prompt or a reasoning trace. */
+        arm: canonicalOwnsLanguage ? 'canonical' : ai ? 'ai' : 'legacy',
         diagnostics: result.diagnostics,
         scoredFor: result.scoredFor,
         relaxed: result.relaxed,
