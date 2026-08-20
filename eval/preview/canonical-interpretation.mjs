@@ -499,6 +499,17 @@ async function main() {
     check('negation', 'world', `candidates really carry the Thriller genre (first ${WORLD_SAMPLE})`, folded.ok, folded.detail);
   }
   {
+    /* THE DIMINISHER, ON THE DEPLOYMENT THAT ONCE INVERTED IT. "less X" scopes
+       like a negator, and the first landing of that rule was corrupted by the
+       minifier into a regex that matched nothing — deployed-only, invisible to
+       every unminified test. This receipt pins the polarity where it executes:
+       the diminished genre must be an EXCLUSION, never a positive filter. */
+    const dim = await ask('Give me a thriller but less supernatural stuff.');
+    console.log(`   ▸ arm: ${dim.body?.arm ?? 'not reported'} · ${describeQuery(dim.body)}`);
+    check('negation', 'receipt', 'a DIMINISHED genre is excluded — "less supernatural" is not "more supernatural"', !hasGenreId(dim.body, TMDB_GENRE.FANTASY), describeQuery(dim.body));
+    check('negation', 'receipt', 'the positive half of the diminisher sentence survives', hasGenreId(dim.body, TMDB_GENRE.THRILLER), describeQuery(dim.body));
+  }
+  {
     /*
      * THE EXCLUSION IS NOT PROVABLE FROM WHAT THE DEPLOYMENT RETURNS, AND THAT
      * IS REPORTED RATHER THAN PAPERED OVER.

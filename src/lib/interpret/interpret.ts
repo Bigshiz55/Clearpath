@@ -22,7 +22,7 @@
  * PURE. No I/O, no clock, no randomness, no entity resolution.
  */
 
-import { parseClauses, requestClause, type Clause, REQUEST_VERBS } from './clauses';
+import { parseClauses, requestClause, type Clause, REQUEST_VERBS, DIMINISHER } from './clauses';
 import { SUBJECT_TERMS } from '@/lib/finderParse';
 import { detectOrigin, detectAudio, detectRuntimeMaxMinutes } from '@/lib/nlu/detectors';
 import {
@@ -164,11 +164,34 @@ export function parseMedia(clause: string): MediaIntent {
 const NEGATORS =
   /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hate[sd]?|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t)\b/i;
 
-/** The span a negator governs: from the negator to the next boundary. */
+/**
+ * The span a negator governs: from the negator to the next boundary.
+ *
+ * A DIMINISHER IS A NEGATOR HERE. "something less dumb" rules dumb OUT, and
+ * recording it as wanted is the exact inversion this architecture exists to
+ * prevent — found by the NL acceptance matrix, where "less dumb" read as
+ * `dumb: WANTED` and "less gory"/"less violent"/"less scary" bound nothing at
+ * all. The vocabulary lives in `DIMINISHER` (clauses.ts), so the clause layer
+ * that recognises a diminishing fragment as a request and this layer that
+ * reads its polarity can never drift apart.
+ *
+ * BUILT WITH `String.raw`, NOT A PLAIN TEMPLATE — deliberately, and the
+ * history matters. The first landing interpolated the diminisher into an
+ * ordinary template literal with `\b`-style escapes; SWC constant-folded it
+ * into a string and mis-escaped the word boundary into a literal BACKSPACE
+ * character, so the deployed regex matched NOTHING and every negation on
+ * /api/ask inverted while the unminified test suite stayed green. Tagged
+ * templates are opaque to the constant folder, which is why every dynamic
+ * regex in this file already uses `String.raw`. The postbuild gate
+ * (`scripts/verify/bundleEscapes.mjs`) fails any build that ships a corrupted
+ * escape, so a minifier regression cannot land silently again.
+ */
 function negatedSpans(clause: string): string[] {
   const out: string[] = [];
-  const re =
-    /\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hates?|hated|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t)\b\s+((?:too\s+|any\s+|another\s+|more\s+|be\s+|get\s+|feel\s+|too\s+)?[a-z][\w'-]*(?:\s+[a-z][\w'-]*){0,3})/gi;
+  const re = new RegExp(
+    String.raw`\b(?:not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hates?|hated|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t|${DIMINISHER.source})\b\s+((?:too\s+|any\s+|another\s+|more\s+|be\s+|get\s+|feel\s+|too\s+)?[a-z][\w'-]*(?:\s+[a-z][\w'-]*){0,3})`,
+    'gi',
+  );
   let m: RegExpExecArray | null;
   while ((m = re.exec(clause)) !== null) {
     const span = m[1]!
