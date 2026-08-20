@@ -3,7 +3,49 @@
 Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
-## Now — production reality + graph-native spine, 2026-08-20 (day shift)
+## Now — ledger runtime forensics + comparative direction, 2026-08-20 (evening shift)
+
+- **CLOSED — the runtime can read the migration ledger (PRs #98 + #100).**
+  Owner's environment verification proved the DB healthy and populated while
+  `/api/version` said `unavailable`. Chain of causes, each fixed and pinned:
+  (1) the reader went REST-only and `serviceRoleKey()` THREW with no key —
+  now a two-channel read: direct `pg` (the migrate route's exact
+  sanitize/validate idiom) reading the repo ledger then the Supabase CLI's
+  own ledger (`supabase_migrations.schema_migrations`, PostgREST can never
+  see it) under the explicit `cli_ledger` status; REST stays as fallback;
+  `SUPABASE_SECRET_KEY` (`sb_secret_…`) accepted beside the legacy name
+  (merge a704438). (2) Still `unavailable` in production and the reader
+  couldn't say why — every failure was the same `null`. Now each channel
+  names its cause in `/api/version ledgerChannels` (closed vocabulary:
+  `validate_rejected`/errnos/SQLSTATEs/`missing_key`, never a hostname or
+  message; leak-tested), `runtime='nodejs'` declared, 5s connect timeout
+  (merge df10c1b). Production then named the actual root cause itself:
+  `directDb: "validate_rejected"` — the stored `SUPABASE_DB_URL` value is
+  structurally invalid (most likely an unescaped reserved character in the
+  DB password; the validator's documented most-common case).
+- **HUMAN ACTION — fix the `SUPABASE_DB_URL` value (Vercel → clearpath →
+  Settings → Environment Variables → Production).** See the exact reason
+  first: `curl -s -X POST https://clearpath-pearl-chi.vercel.app/api/admin/migrate -H "Authorization: Bearer $MIGRATE_SECRET"`
+  returns `stage: "validate"` with the specific structural reason (never the
+  URL itself). Remedy per the validator: re-copy the URI fresh from
+  Supabase → Settings → Database → Connection string, percent-encode any
+  reserved character in the password (or reset the DB password to one
+  without reserved characters), prefer the Session-pooler URI, save for
+  Production, redeploy. Proof of done: `/api/version` shows
+  `appliedDatabaseMigration: "0048_title_knowledge"`,
+  `migrationLedgerStatus: "cli_ledger"`, and no `ledgerChannels`.
+- **CLOSED — the comparative direction is causal (PR #99, merge 810d9c6).**
+  Three deployed taste-dna-proof failures, all reproduced twice: opposite
+  directions vs the same anchor shared heads and returned the anchor itself
+  (stated axis now owns 0.7 of the ±10 in mixed plans, pure plans
+  nine-decimal-identical; anchors excluded from their own comparison);
+  "darker than Taken" with an unfingerprinted anchor served silently
+  (partial application now disclosed via the `disclosed` fact channel);
+  "a thriller that drags" returned 1 of 40 (pace-banded asks hydrate the
+  ceiling pool — discovery can't see pace; shortfalls disclosed, never
+  padded — the padded-refill variant failed the proof and was replaced).
+
+## Prior shift — production reality + graph-native spine, 2026-08-20 (day shift)
 
 - **CLOSED — the home box's two defects in one utterance.** "a boxing
   movie" routed to the generic feed AND fabricated "Locked in: loves a
