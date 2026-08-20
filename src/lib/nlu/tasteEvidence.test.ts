@@ -31,6 +31,24 @@ describe('routed requests: only durable preference writes', () => {
     const out = tasteEvidenceText('I watched a horror movie yesterday. Give me a courtroom movie.', { routedRequest: true });
     expect(out).not.toMatch(/horror/i);
   });
+
+  /* Reviewer-caught on #94: a descriptor-list utterance routes as a request
+     (the bare plural noun phrase is a request clause), and its SUBJECTLESS
+     durable fragment — "hate cheesy rom-coms", a preference verb with the "I"
+     elided — failed `statesPreference` and vanished. A stated hate is durable
+     whether or not the pronoun was typed. */
+  it('a subjectless durable fragment still writes ("…, hate cheesy rom-coms")', () => {
+    const out = tasteEvidenceText(
+      'gritty character-driven dramas with real emotional weight, hate cheesy rom-coms',
+      { routedRequest: true },
+    );
+    expect(out).toMatch(/hate cheesy rom-coms/i);
+    expect(out, 'the request half must not ride along').not.toMatch(/gritty character-driven/i);
+  });
+
+  it('a one-turn constraint is still not durable ("a thriller but nothing supernatural")', () => {
+    expect(tasteEvidenceText('a thriller but nothing supernatural', { routedRequest: true })).toBe('');
+  });
 });
 
 describe('statements: the whole text remains evidence, minus companions', () => {

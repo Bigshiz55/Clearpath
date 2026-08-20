@@ -33,6 +33,18 @@ import { parseClauses, statesPreference } from '@/lib/interpret/clauses';
 const EVALUATIVE_REACTION = /\b(?:loved|liked|enjoyed|hated|disliked|adored)\b/i;
 
 /**
+ * A DURABLE PREFERENCE WITH THE PRONOUN ELIDED. "gritty dramas, hate cheesy
+ * rom-coms" states a standing hate as plainly as "I hate cheesy rom-coms" —
+ * people drop the "I" in list-style self-description constantly, and
+ * `statesPreference` (correctly, for its own callers) requires the subject.
+ * Reviewer-caught on #94: without this, a descriptor-list utterance that
+ * routes as a request silently lost its durable half. Anchored to the CLAUSE
+ * START so a preference verb buried mid-request ("movies I would love") can
+ * never qualify a request clause's text through this door.
+ */
+const SUBJECTLESS_PREFERENCE = /^\s*(?:and\s+|but\s+)?(?:really\s+|absolutely\s+|just\s+)?(?:loves?|hates?|adores?|enjoys?|prefers?|dislikes?|avoid|can'?t\s+stand)\b/i;
+
+/**
  * A reaction to a NAMED work, wherever it sits. "Give me feel-good comedies —
  * loved Ted Lasso" keeps the reaction inside the request clause (the splitter
  * does not cut at a dash), so a clause-role filter alone would drop the one
@@ -57,7 +69,7 @@ export function tasteEvidenceText(raw: string, opts: { routedRequest: boolean })
     .filter(
       (c) =>
         (c.role === 'taste' || c.role === 'background') &&
-        (statesPreference(c.text) || EVALUATIVE_REACTION.test(c.text)),
+        (statesPreference(c.text) || SUBJECTLESS_PREFERENCE.test(c.text) || EVALUATIVE_REACTION.test(c.text)),
     )
     .map((c) => c.text.trim());
   for (const m of text.matchAll(REACTION_SPAN)) {
