@@ -50,3 +50,18 @@ describe('wantsTitleResults — a request to be shown titles', () => {
     expect(wantsTitleResults('I would like Tarantino')).toBe(false);
   });
 });
+
+describe('superlative list-shapes over generic nouns are requests', () => {
+  // "The best things released this week" is a SHIPPED quick-ask chip on the
+  // home box — it classified as taste, fell to the generic feed, and its
+  // whole text went to the taste extractor. "things"/"stuff" are the same
+  // register as the "something/anything" the vocabulary already holds.
+  it('the shipped chip routes as a request', () => {
+    expect(wantsTitleResults('The best things released this week')).toBe(true);
+    expect(wantsTitleResults('the best stuff on Netflix')).toBe(true);
+  });
+
+  it('CONTROL: preference statements about things stay taste', () => {
+    expect(wantsTitleResults('I love stuff like that')).toBe(false);
+  });
+});

@@ -254,14 +254,25 @@ export async function POST(request: Request) {
     }
 
     // 2) Honest title seeds — the user explicitly asserted these, so a rating is legit.
+    /* ONLY TITLES THE USER ACTUALLY NAMED. The extraction prompt says
+       "specific show/movie names they name", but production showed the model
+       returning likedTitles for text that named nothing ("a boxing movie" →
+       loved "a boxing movie" → a real film rated 9/10 on the user's behalf).
+       A permanent rating requires the name to appear in the user's own words
+       — enforced here deterministically, so a hallucination can never become
+       taste on any routing path. The cost of a miss is a lost seed, never a
+       fabricated one. */
+    const userNamed = (name: string) => text.toLowerCase().includes(name.toLowerCase());
+    const namedLiked = parsed.likedTitles.filter(userNamed);
+    const namedAvoid = parsed.avoidTitles.filter(userNamed);
     const seedTitle = async (name: string, rating: number) => {
       const hits = await searchTitles(name).catch(() => []);
       const top = hits[0];
       if (top) await rateQuizTitle({ tmdbId: top.id, mediaType: top.mediaType, title: top.title, year: top.year, posterPath: top.posterPath, rating }).catch(() => {});
     };
     await Promise.all([
-      ...parsed.likedTitles.slice(0, 6).map((n) => seedTitle(n, 9)),
-      ...parsed.avoidTitles.slice(0, 6).map((n) => seedTitle(n, 2)),
+      ...namedLiked.slice(0, 6).map((n) => seedTitle(n, 9)),
+      ...namedAvoid.slice(0, 6).map((n) => seedTitle(n, 2)),
     ]);
 
     revalidateTag(`dim-profile:${user.id}`);
@@ -275,8 +286,10 @@ export async function POST(request: Request) {
     const uniquePhrases = [...new Set(phrases)].slice(0, 4);
     const parts: string[] = [];
     if (uniquePhrases.length) parts.push(uniquePhrases.join(', '));
-    if (parsed.likedTitles.length) parts.push(`loves ${parsed.likedTitles.slice(0, 3).join(', ')}`);
-    const learned = byAxis.size > 0 || parsed.likedTitles.length > 0 || parsed.avoidTitles.length > 0;
+    // The read-back may only claim titles that were actually seeded — a
+    // hallucinated name in "Locked in: loves …" is the same lie as the rating.
+    if (namedLiked.length) parts.push(`loves ${namedLiked.slice(0, 3).join(', ')}`);
+    const learned = byAxis.size > 0 || namedLiked.length > 0 || namedAvoid.length > 0;
     const tasteLead = parts.length ? `Locked in ${parts.join(' · ')}. ` : '';
 
     // Airing intent is resolved BEFORE the streaming platform, so a named linear

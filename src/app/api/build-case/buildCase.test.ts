@@ -62,9 +62,11 @@ vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: { body?: string }) => {
     llmSeen.push(user);
     const out = /boxing movie/i.test(user) && !/love/i.test(user)
       ? { axes: [{ key: 'pacing', target: 70, confidence: 0.6 }], likedTitles: ['a boxing movie'], avoidTitles: [] }
-      : /slow burns|boxing movies/i.test(user)
-        ? { axes: [{ key: 'pacing', target: 30, confidence: 0.7 }], likedTitles: [], avoidTitles: [] }
-        : { axes: [], likedTitles: [], avoidTitles: [] };
+      : /gangster stories/i.test(user)
+        ? { axes: [{ key: 'darkness', target: 70, confidence: 0.6 }], likedTitles: ['GoodFellas'], avoidTitles: [] }
+        : /slow burns|boxing movies/i.test(user)
+          ? { axes: [{ key: 'pacing', target: 30, confidence: 0.7 }], likedTitles: [], avoidTitles: [] }
+          : { axes: [], likedTitles: [], avoidTitles: [] };
     return {
       ok: true,
       json: async () => ({ choices: [{ message: { content: JSON.stringify(out) } }] }),
@@ -135,5 +137,25 @@ describe('the production reproduction — requests route and never pollute', () 
     expect(d.redirect).toBeUndefined();
     expect(tasteWrites(), "the wife's taste was written to the user's profile").toEqual([]);
     expect(llmSeen.join(' '), 'the companion clause reached taste extraction').not.toMatch(/wife/i);
+  });
+
+  /* THE MODEL MAY ONLY SEED TITLES THE USER ACTUALLY NAMED. Production showed
+     the LLM returning likedTitles for text that named no title at all
+     ("a boxing movie" → loved "a boxing movie" → a real film rated 9/10).
+     The prompt says "specific show/movie names they name"; this guard
+     enforces that contract deterministically at the boundary, so a
+     hallucinated title can never become a permanent rating — whatever the
+     classifier does, on any routing path. */
+  it('a hallucinated liked title is never seeded as a rating', async () => {
+    const d = await buildCase('I like gangster stories with heart');
+    expect(d.redirect).toBeUndefined();
+    // The mocked LLM returns likedTitles:["GoodFellas"] for this text —
+    // which the user never typed. It must not become a 9/10.
+    expect(rateQuizTitle, 'a title the user never named was rated on their behalf').not.toHaveBeenCalled();
+  });
+
+  it('a title the user actually named still seeds', async () => {
+    await buildCase('I loved GoodFellas, gangster stories with heart');
+    expect(rateQuizTitle).toHaveBeenCalled();
   });
 });

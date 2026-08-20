@@ -19,7 +19,7 @@
 
 /** A genre, mood or media noun — something to be shown. */
 export const FIND_NOUNS =
-  /\b(movies?|films?|shows?|series|documentar(y|ies)|comed(y|ies)|funny|scary|horror|thrillers?|family|kids?|action|adventure|dramas?|romance|romantic|rom-?com|sci-?fi|fantasy|animated|anime|western|musical|feel-?good|myster(y|ies)|crime|suspense|tearjerker|date night|something|anything)\b/i;
+  /\b(movies?|films?|shows?|series|documentar(y|ies)|comed(y|ies)|funny|scary|horror|thrillers?|family|kids?|action|adventure|dramas?|romance|romantic|rom-?com|sci-?fi|fantasy|animated|anime|western|musical|feel-?good|myster(y|ies)|crime|suspense|tearjerker|date night|something|anything|things?|stuff)\b/i;
 
 /**
  * A REQUEST, not a preference. Deliberately excludes the bare preference verbs
