@@ -204,3 +204,43 @@ describe('a bare SUBJECT word is a discovery request, never a title or the gener
     expect(classifySearchIntent('boxing')).toBe('catalog');
   });
 });
+
+/**
+ * THE SECOND DECISION ENGINE IS GONE. 2026-08-20, same screen as the fixed
+ * hero box: typing "a boxing movie" into the SEARCH BAR opened an arbitrary
+ * top-result title page — `classifySearchIntent` has its own vocabulary and
+ * misses the bare noun-phrase request family the clause layer owns. The
+ * clause layer now speaks in `resolveSearchDestination`, AFTER the
+ * exact-title check, so catalog evidence still beats phrasing ("Show Me a
+ * Hero", "12 Angry Men") and the classifier's own pins above are untouched.
+ */
+describe('bare noun-phrase requests reach the Judge from the search box', () => {
+  const FAMILY = [
+    'a boxing movie',
+    'boxing movies',
+    'a scary movie',
+    'a courtroom movie',
+    'a great date night movie',
+    'a really good boxing movie from the eighties',
+  ];
+  for (const q of FAMILY) {
+    it(`"${q}" resolves to ask, never an arbitrary title page`, () => {
+      const d = resolveSearchDestination(q, [r(1, 'GoodFellas', 'movie'), r(2, 'Rocky', 'movie')])!;
+      expect(d.reason, `"${q}" was handed to a title page`).toBe('ask');
+      expect(d.href).toContain('/app/ask?q=');
+      expect(d.href).not.toContain('/app/title/');
+    });
+  }
+
+  it('CONTROL: exact catalog evidence still beats request-shaped phrasing', () => {
+    const a = resolveSearchDestination('Show Me a Hero', [r(5, 'Show Me a Hero', 'tv')])!;
+    expect(a.reason).toBe('exact-title');
+    const b = resolveSearchDestination('12 Angry Men', [r(6, '12 Angry Men', 'movie')])!;
+    expect(b.reason).toBe('exact-title');
+  });
+
+  it('CONTROL: a plain near-miss lookup still opens the top result', () => {
+    const d = resolveSearchDestination('csi', [r(10, 'CSI: Miami'), r(11, 'CSI: NY')])!;
+    expect(d.reason).toBe('top-result');
+  });
+});

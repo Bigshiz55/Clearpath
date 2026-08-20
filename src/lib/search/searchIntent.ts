@@ -1,4 +1,5 @@
 import { isExactTitle } from '@/lib/nlu/titleNormalize';
+import { clauseLayerSaysRequest } from '@/lib/nlu/requestDecision';
 import { splitTitleQualifiers, isGenericPhrase } from '@/lib/nlu/queryRepair';
 import { GENRE_WORDS, SUBJECT_TERMS } from '@/lib/finderParse';
 import { resolveSource } from '@/lib/nlu/mediaOntology';
@@ -302,6 +303,19 @@ export function resolveSearchDestination(raw: string, results: CatalogResult[] =
   if (exact) return { href: titleHref(exact), reason: 'exact-title' };
 
   if (classifySearchIntent(q) === 'ask') {
+    return { href: askHref(q)!, reason: 'ask' };
+  }
+
+  /* THE CLAUSE LAYER SPEAKS HERE — after the exact-title check, never before.
+     2026-08-20, the same home screen as the fixed hero box: "a boxing movie"
+     typed into the SEARCH BAR opened an arbitrary top-result title page,
+     because this classifier's own vocabulary misses the bare noun-phrase
+     request family the interpreter owns. `clauseLayerSaysRequest` is the one
+     shared owner (requestDecision — the hero box consults the same one).
+     Position matters: "Show Me a Hero" and "12 Angry Men" are request-shaped
+     STRINGS that are real works, and the exact-title rule above has already
+     let catalog evidence win by the time phrasing is consulted. */
+  if (clauseLayerSaysRequest(q)) {
     return { href: askHref(q)!, reason: 'ask' };
   }
 

@@ -1,7 +1,7 @@
 import { stripRequestFrame } from './requestFrame';
 import { wantsTitleResults } from './requestIntent';
 import { askHref } from '@/lib/search/searchIntent';
-import { parseClauses } from '@/lib/interpret/clauses';
+import { WATCH_REQUEST, clauseLayerSaysRequest } from './requestDecision';
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
@@ -84,22 +84,14 @@ const MEDIA_NOUN = /\b(movies?|films?|shows?|series|documentar(?:y|ies)|episodes
  * not extract the person, the time, or the count — those stay downstream. The
  * pattern is anchored on a first-person watch request so ordinary uses of the
  * word ("I watched Rocky three weeks ago") do not qualify on their own.
+ * The pattern itself lives in `requestDecision` — the one clause-layer owner
+ * both this module and the search destination consult.
  */
-const WATCH_REQUEST = /\b(?:what|anything|something|some\s+things?)\b[^.?!]{0,40}?\b(?:should|can|could|do|to)\s+(?:i|we)?\s*watch\b|\bwhat\s+to\s+watch\b/i;
 
 /** A media context exists when a media noun is present OR the ask is "what to watch". */
 function hasMediaContext(text: string): boolean {
   return MEDIA_NOUN.test(text) || WATCH_REQUEST.test(text);
 }
-
-/**
- * A BARE MEDIA NOUN IS A CATEGORY, NOT A REQUEST. "Movies" alone states no
- * constraint — routing it to Ask would run an unconstrained ask, which is the
- * generic feed wearing a different URL. The pinned control ("Movies" is not a
- * request) stays true under the clause-layer gate below because of this guard,
- * and anything with one more word of substance ("a western") sails past it.
- */
-const BARE_MEDIA_ONLY = /^\s*(?:the\s+)?(?:movies?|films?|shows?|series|tv|television|documentar(?:y|ies))\s*[.!?]*\s*$/i;
 
 /**
  * Decide where an utterance goes.
@@ -144,13 +136,10 @@ export function canonicalRequestRoute(raw: string): RequestRoute {
      regex gates only ADD (their regressions stay pinned above).
 
      "what boxing movie should I watch?" is the one shape the clause layer
-     reads as background — the question form. `WATCH_REQUEST` already names
-     that shape; asking what to watch IS a request, so it counts as evidence
-     directly rather than only as media context. */
-  if (!isRequest && WATCH_REQUEST.test(text)) isRequest = true;
-  if (!isRequest && !BARE_MEDIA_ONLY.test(text)) {
-    isRequest = parseClauses(text).some((c) => c.role === 'request');
-  }
+     reads as background — the question form; `clauseLayerSaysRequest` (the
+     shared owner in `requestDecision`, also consulted by the search
+     destination) folds that in along with the bare-media-noun guard. */
+  if (!isRequest) isRequest = clauseLayerSaysRequest(text);
 
   if (!isRequest) return { kind: 'taste' };
 

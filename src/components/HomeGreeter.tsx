@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { askHref, ASK_ROUTE } from '@/lib/search/searchIntent';
 import { houseByKey, readHousePick } from '@/lib/houseJudges';
 
 // The judge's personality — rotating openers, greeting you like a regular.
@@ -59,8 +60,10 @@ export function HomeGreeter({
   }, [name]);
 
   function ask(text: string) {
-    const t = text.trim();
-    router.push(t ? `/app/ask?q=${encodeURIComponent(t)}` : '/app/ask');
+    // The SHARED href builder — a private string template here was the small
+    // version of the two-engines defect: it carried no MAX_QUERY cap and could
+    // drift from what /app/ask actually reads.
+    router.push(askHref(text) ?? ASK_ROUTE);
   }
 
   function startVoice() {
