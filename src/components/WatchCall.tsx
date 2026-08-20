@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
 import { scoreVerdict } from '@/lib/verdictVisual';
+import { Verd1ctBadge } from './Verd1ctBadge';
 
 /**
  * The single headline Watchability rating — the 0–100 score that blends your DNA
@@ -51,7 +52,15 @@ export function WatchCall({
   const v = scoreVerdict(score);
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-black ${v.visual.badge} ${className}`}
+      /* ONE SCORE, ONE MARK. This was a bare green pill — `82 · STREAM IT` in
+         10px — which is the same number the title page carries inside the
+         branded VERD1CT TV badge. Two visual identities for one concept meant
+         the product's primary judgment read as a metadata chip on every card
+         surface. The number now lives in the SAME mark at compact scale
+         (`tv={false}`, the Live-guide precedent); the Stream/Skip call keeps
+         its verdict colour beside it. Compact is a size, not a demotion. */
+      className={`inline-flex items-center gap-1.5 align-middle ${className}`}
+      data-testid="watch-call"
       title={
         canonical
           ? `${canonical.label} ${score}/100 — ${canonical.why}. This drives the ${v.call.toLowerCase()} call and the ranking order.`
@@ -60,7 +69,10 @@ export function WatchCall({
             : `Watchability ${score}/100 — every rating blended. Rate a few titles and your DNA starts weighting it. Drives the ranking order.`
       }
     >
-      {personal ? '🧬' : v.emoji} {score} · {v.call}
+      <Verd1ctBadge score={score} px={26} tv={false} title="" />
+      <span className={`rounded px-1 py-0.5 text-[10px] font-black leading-none ${v.visual.badge}`}>
+        {personal ? '🧬 ' : ''}{v.call}
+      </span>
     </span>
   );
 }
