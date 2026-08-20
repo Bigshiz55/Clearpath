@@ -144,3 +144,20 @@ describe('a diminisher rules the axis end out', () => {
     ]);
   });
 });
+
+describe('the diminisher never swallows the QUANTITY comparative', () => {
+  // "less THAN 90 minutes" is a runtime bound, not a quality veto. Before the
+  // lookahead, the diminisher captured "than 90 minutes" as a negated span and
+  // `than` reached execution as an excluded SUBJECT — caught in review.
+  it('"less than N minutes" stays a runtime bound with no phantom subject', () => {
+    for (const text of ['movies less than 90 minutes', 'a thriller less than 2 hours', 'fewer than 3 seasons']) {
+      const i = interpret(text);
+      expect(i.subjects, `"${text}" → ${JSON.stringify(i.subjects)}`).toEqual([]);
+    }
+    expect(interpret('movies less than 90 minutes').runtime.maxMinutes).toBe(90);
+  });
+
+  it('the quality form still vetoes', () => {
+    expect(interpret('a comedy, less gory').tones.find((t) => t.term === 'gory')?.wanted).toBe(false);
+  });
+});

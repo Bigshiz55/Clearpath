@@ -298,7 +298,12 @@ const COMPANION =
  * build that ships a corrupted escape, so the class is closed, not just this
  * instance.
  */
-export const DIMINISHER = /(?:a\s+bit\s+|a\s+little\s+|slightly\s+|somewhat\s+|much\s+|way\s+)?(?:less|fewer)/;
+/* `(?!\s+than\b)`: "less THAN 90 minutes" is the QUANTITY comparative — a
+   runtime bound the numeric alternative in CONSTRAINT already owns — not a
+   quality veto. Without the lookahead the diminisher swallowed it and pushed
+   `than` downstream as an excluded SUBJECT (caught in review before it
+   shipped). */
+export const DIMINISHER = /(?:a\s+bit\s+|a\s+little\s+|slightly\s+|somewhat\s+|much\s+|way\s+)?(?:less|fewer)(?!\s+than\b)/;
 
 /**
  * A standalone filter that is a request even with no verb.
