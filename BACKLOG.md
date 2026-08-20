@@ -423,6 +423,28 @@ dropped one layer down", which is why the unit suites were green throughout.
   trailing adjective as a constraint would read ordinary asides as requests — so
   this wants its own work order with the metamorphic suite as the gate, not a
   quiet widening inside a negation fix.
+- **A bare taste statement drops the taste.** "I love slow burns but I hate
+  gore." is `kind: statement` with an EMPTY `requestClause`, so neither tone is
+  extracted — not as a tone, not as background. It simply vanishes. The
+  mechanism works whenever a request is present ("I want something slow but not
+  gory" → `slow: true`, `gory: false`), so this is the statement boundary
+  discarding evidence it should keep for the next turn. On the P0-H matrix as
+  "cross-clause positive + negative preference".
+- **"the Taken movie" resolves to THE TAKEN (2024), not the 2008 film.**
+  Deployed at `68a7876`: `PASS (THE TAKEN (2024) — MAYBE at 55) · cues
+  honoured`. The medium cue IS honoured — it returns a movie — and the title
+  matcher then prefers an exact string match on "The Taken" over the film an
+  unqualified "the Taken movie" almost certainly means. `prominence()` orders
+  the CLARIFICATION list by cumulative audience; the title-lookup path does not
+  consult it. Whether it should is a real question and a separate one.
+- **The black-box gate's CASE 4 receipt was too weak to see an inversion.** It
+  asserted only that Thriller was PRESENT, which `[53,14]` satisfies, so a
+  vetoed genre promoted to a positive filter passed unseen and was caught only
+  by which four candidates TMDB happened to return first. The stronger receipt
+  ("the vetoed genre is EXCLUDED, never added as a positive filter") is now in
+  the gate and green. Worth auditing the other cases for the same shape: an
+  assertion that a constraint is PRESENT does not check that its POLARITY
+  survived.
 - **The canonical interpreter records no title for "Something better for me than
   Furious."** — `intent.titles` is empty; the comparative anchor is owned by the
   critic layer's own extraction (`routeAsk`), not by `interpret()`. Two readers
