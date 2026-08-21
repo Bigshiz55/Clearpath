@@ -15,12 +15,25 @@ vi.mock('server-only', () => ({}));
 
 let pgRows: Array<{ name: string; relkind: string; relrowsecurity: boolean }> = [];
 let pgConnectError: Error | null = null;
+/** The ledger table's simulated state, served to readLedgerTable's queries. */
+let ledgerColumns: string[] = [];
+let ledgerRls = false;
+let ledgerCounts: { total: number; ok: number | null; latest: string | null } = { total: 0, ok: null, latest: null };
 vi.mock('pg', () => ({
   Client: class {
     async connect() {
       if (pgConnectError) throw pgConnectError;
     }
-    async query() {
+    async query(sql: string) {
+      if (/information_schema\.columns/.test(sql)) {
+        return { rows: ledgerColumns.map((column_name) => ({ column_name })) };
+      }
+      if (/relname = 'schema_migrations'/.test(sql)) {
+        return { rows: [{ relrowsecurity: ledgerRls }] };
+      }
+      if (/from public\.schema_migrations/.test(sql)) {
+        return { rows: [ledgerCounts] };
+      }
       return { rows: pgRows };
     }
     async end() {}
@@ -49,6 +62,9 @@ beforeEach(() => {
   pgConnectError = null;
   adminAvailable = false;
   restPresent.clear();
+  ledgerColumns = [];
+  ledgerRls = false;
+  ledgerCounts = { total: 0, ok: null, latest: null };
   vi.stubEnv('SUPABASE_DB_URL', 'postgresql://postgres:secret@db.example.supabase.co:5432/postgres');
 });
 
@@ -97,6 +113,35 @@ describe('the direct catalog channel answers presence and RLS state', () => {
     const { body } = await get();
     expect(body.rlsDisabled).toEqual(['decision_runs']);
     expect(body.missingCount).toBe(0);
+  });
+});
+
+describe('the application ledger reports its own shape', () => {
+  it('a legacy bare ledger is visible AS legacy: two columns, RLS off, no success accounting', async () => {
+    pgRows = await allObjects();
+    ledgerColumns = ['name', 'applied_at'];
+    ledgerRls = false;
+    ledgerCounts = { total: 33, ok: null, latest: '0046_security_advisor_hardening' };
+    const { body } = await get();
+    const lt = body.ledgerTable as Record<string, unknown>;
+    expect(lt.exists).toBe(true);
+    expect(lt.columns).toEqual(['name', 'applied_at']);
+    expect(lt.rlsEnabled).toBe(false);
+    expect(lt.rowCount).toBe(33);
+    expect(lt.successCount).toBeNull();
+    expect(lt.latestName).toBe('0046_security_advisor_hardening');
+  });
+
+  it('a modern hardened ledger reads back with its full shape and success accounting', async () => {
+    pgRows = await allObjects();
+    ledgerColumns = ['name', 'applied_at', 'filename', 'checksum', 'started_at', 'completed_at', 'success', 'error_message', 'error_code', 'execution_method', 'environment', 'reconciled', 'evidence'];
+    ledgerRls = true;
+    ledgerCounts = { total: 34, ok: 34, latest: '0049_decision_runs' };
+    const { body } = await get();
+    const lt = body.ledgerTable as Record<string, unknown>;
+    expect(lt.rlsEnabled).toBe(true);
+    expect(lt.successCount).toBe(34);
+    expect(lt.latestName).toBe('0049_decision_runs');
   });
 });
 

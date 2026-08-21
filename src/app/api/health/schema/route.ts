@@ -52,8 +52,61 @@ interface CatalogRow {
 }
 
 type DirectProbe =
-  | { ok: true; rows: CatalogRow[] }
+  | { ok: true; rows: CatalogRow[]; ledgerTable: LedgerTableReport }
   | { ok: false; reason: string };
+
+/**
+ * The application ledger's own shape — schema facts only (columns, RLS,
+ * counts, and migration NAMES, which are public in this repository). Exists
+ * because the one table the contract deliberately leaves unmapped is also
+ * the one whose form drifted for months without any endpoint able to say so:
+ * the legacy bare `(name, applied_at)` ledger sat RLS-off in production
+ * while every diagnostic looked elsewhere.
+ */
+interface LedgerTableReport {
+  exists: boolean;
+  columns: string[];
+  rlsEnabled: boolean | null;
+  rowCount: number | null;
+  successCount: number | null;
+  /** Newest migration NAME in the ledger — a filename, not data. */
+  latestName: string | null;
+}
+
+async function readLedgerTable(client: Client): Promise<LedgerTableReport> {
+  try {
+    const cols = await client.query(
+      `select column_name from information_schema.columns
+        where table_schema = 'public' and table_name = 'schema_migrations'
+        order by ordinal_position`,
+    );
+    const columns = (cols.rows ?? []).map((r: { column_name: string }) => r.column_name);
+    if (columns.length === 0) {
+      return { exists: false, columns: [], rlsEnabled: null, rowCount: null, successCount: null, latestName: null };
+    }
+    const rls = await client.query(
+      `select relrowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relname = 'schema_migrations'`,
+    );
+    const hasSuccess = columns.includes('success');
+    const counts = await client.query(
+      hasSuccess
+        ? `select count(*)::int as total, count(*) filter (where success)::int as ok, max(name) as latest from public.schema_migrations`
+        : `select count(*)::int as total, null::int as ok, max(name) as latest from public.schema_migrations`,
+    );
+    const row = counts.rows?.[0] as { total?: number; ok?: number | null; latest?: string | null } | undefined;
+    return {
+      exists: true,
+      columns,
+      rlsEnabled: Boolean(rls.rows?.[0]?.relrowsecurity),
+      rowCount: row?.total ?? null,
+      successCount: row?.ok ?? null,
+      latestName: row?.latest ?? null,
+    };
+  } catch {
+    return { exists: false, columns: [], rlsEnabled: null, rowCount: null, successCount: null, latestName: null };
+  }
+}
 
 async function probeViaDirectDb(rawUrl: string): Promise<DirectProbe> {
   const dbUrl = sanitizeDbUrl(rawUrl);
@@ -73,7 +126,8 @@ async function probeViaDirectDb(rawUrl: string): Promise<DirectProbe> {
         where n.nspname = 'public'
           and c.relkind in ('r', 'p', 'v', 'm')`,
     );
-    return { ok: true, rows: (res.rows ?? []) as CatalogRow[] };
+    const ledgerTable = await readLedgerTable(client);
+    return { ok: true, rows: (res.rows ?? []) as CatalogRow[], ledgerTable };
   } catch (err) {
     return { ok: false, reason: sanitizedErrorCode(err) };
   } finally {
@@ -90,6 +144,7 @@ export async function GET() {
   const rlsDisabled: string[] = [];
   let probeFailed: string | null = null;
   let probeChannel: 'direct_db' | 'rest' | null = null;
+  let ledgerTable: LedgerTableReport | null = null;
   const channels: { directDb?: string; rest?: string } = {};
 
   const rawDbUrl = serverEnv.migrationsDbUrl();
@@ -97,6 +152,7 @@ export async function GET() {
     const direct = await probeViaDirectDb(rawDbUrl);
     if (direct.ok) {
       probeChannel = 'direct_db';
+      ledgerTable = direct.ledgerTable;
       const byName = new Map(direct.rows.map((r) => [r.name, r]));
       for (const object of objects) {
         const row = byName.get(object);
@@ -152,6 +208,9 @@ export async function GET() {
       missing,
       /** Direct channel only; [] on REST, which cannot see RLS state. */
       rlsDisabled,
+      /** The application ledger's own shape (direct channel only) — columns,
+       *  RLS, counts, newest migration NAME. Null on the REST fallback. */
+      ledgerTable,
       probeFailed,
       /** Booleans only — never the values. Says whether a runner COULD run. */
       runner: {
