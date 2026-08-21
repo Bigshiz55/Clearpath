@@ -26,21 +26,26 @@ Updated at the end of every work order per the Working Agreement in
   without claiming a checksum match, checksummed app-ledger successes stay
   authoritative (a mismatch still halts), and an absent CLI ledger degrades
   to exactly the old behavior.
-- **HUMAN ACTION — one credentialed invocation closes the physical gap.**
-  `public.schema_migrations` in production is still the bare
-  `(name, applied_at)` table with RLS off (proof: `/api/health/schema`
-  `ledgerTable`). Every code path is deployed and safe; what remains needs a
-  credential that exists only in the owner's hands (workflow run 32522366659
-  refused correctly: repo secrets `SUPABASE_DB_URL` false, `MIGRATE_SECRET`
-  false, `SITE_URL` true — production env has all three `runner` booleans
-  true). Either: (a) add repo secret `SUPABASE_DB_URL` (or `MIGRATE_SECRET`)
-  in GitHub → Settings → Secrets → Actions, then dispatch
-  `apply-migrations.yml` with `confirm=APPLY` — the designed
-  nobody-touches-the-secret path; or (b) one authenticated
-  `POST /api/admin/reconcile-migrations` (bearer `MIGRATE_SECRET`; default
-  dry-run still executes `LEDGER_DDL`, which is the entire fix, and applies
-  nothing). Verify afterwards with `GET /api/health/schema` →
-  `ledgerTable.rlsEnabled: true`, 13 columns, `successCount` = `rowCount`.
+- **CLOSED — the physical ledger gap, by one credentialed invocation.**
+  Before (2026-08-21 20:14Z, `/api/health/schema ledgerTable`):
+  columns `[name, applied_at]`, `rlsEnabled: false`, 5 rows, `successCount`
+  null. After (20:40Z, same black-box probe): all 13 modern columns,
+  `rlsEnabled: true`, 5 rows, `successCount: 5`, `latestName: 0045` —
+  upgraded in place, hardened, history truthfully backfilled, zero rows
+  added or lost, and `/api/version` still `cli_ledger / 20260821194454 /
+  0049_decision_runs`. The transformation is `LEDGER_DDL` alone (no
+  application was attempted), which lives only behind authenticated paths;
+  the invocation was the owner's — this session holds no credentials, and
+  the workflow's own run 32522366659 refused correctly (repo secrets
+  `SUPABASE_DB_URL` false, `MIGRATE_SECRET` false, `SITE_URL` true).
+  Re-running any migrate/reconcile path is safe and a no-op on this state.
+- **Optional, for the workflow to be usable unattended:** the Actions
+  workflow still has no usable credential. Adding repo secret
+  `SUPABASE_DB_URL` (or `MIGRATE_SECRET`, pairing the existing `SITE_URL`)
+  in GitHub → Settings → Secrets → Actions makes `apply-migrations.yml`
+  (`confirm=APPLY`) the designed nobody-touches-the-secret path for future
+  migrations — now safe against the sparse app ledger thanks to the
+  CLI-evidence merge (PR #115).
 - **Queued:** `/api/admin/reconcile-migrations` could durably backfill
   CLI-evidenced rows (`execution_method 'reconciliation'`, evidence naming
   the CLI ledger) so the app ledger stops under-reporting; the `PROBES`
