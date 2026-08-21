@@ -53,6 +53,28 @@ describe('the sentence outranks the client parse of it — on both routes', () =
   });
 });
 
+describe('one substance predicate for the unresolved-clarify decision', () => {
+  it('both routes call the SHARED requestHasOtherConstraints — no inline copy may return', () => {
+    /* The finder's inline copy diverged from the ask's (it dropped the
+       origin/language/audio fields), so "a French movie with an unresolvable
+       person" clarified away its origin constraint on one route while
+       executing with the miss disclosed on the other. Reviewer catch. */
+    expect(finderRoute).toMatch(/requestHasOtherConstraints: requestHasOtherConstraints\(/);
+    expect(askRoute).toMatch(/requestHasOtherConstraints: requestHasOtherConstraints\(/);
+    expect(finderRoute).not.toMatch(/const requestHasOtherConstraints =/);
+    expect(askRoute).not.toMatch(/const requestHasOtherConstraints =/);
+  });
+
+  it('an origin/language/audio-only request counts as substance — it executes with the miss disclosed', async () => {
+    const { requestHasOtherConstraints } = await import('@/lib/ask/unresolvedResponse');
+    const { EMPTY_QUERY } = await import('@/lib/finderParse');
+    expect(requestHasOtherConstraints({ ...EMPTY_QUERY, originCountries: ['FR'] })).toBe(true);
+    expect(requestHasOtherConstraints({ ...EMPTY_QUERY, originalLanguages: ['es'] })).toBe(true);
+    expect(requestHasOtherConstraints({ ...EMPTY_QUERY, englishDubOnly: true })).toBe(true);
+    expect(requestHasOtherConstraints({ ...EMPTY_QUERY })).toBe(false);
+  });
+});
+
 describe('one boundary where a client query enters', () => {
   it('coerceClientQuery is defined exactly once, and neither route keeps a private copy', () => {
     expect(read('src/lib/finderQueryBoundary.ts')).toMatch(/export function coerceClientQuery/);

@@ -18,7 +18,7 @@ import { planPersonConstraint, type PersonPlan } from '@/lib/people/constraint';
 import { requestedCreditRole } from '@/lib/nlu/creditRole';
 import { interpret } from '@/lib/interpret/interpret';
 import { resolveCanonicalExecution } from '@/lib/ask/canonicalExecution';
-import { unresolvedClarification, type NearMisses } from '@/lib/ask/unresolvedResponse';
+import { unresolvedClarification, requestHasOtherConstraints, type NearMisses } from '@/lib/ask/unresolvedResponse';
 
 const BUILD_SHA = getBuildInfo().gitSha || 'unknown';
 
@@ -127,19 +127,9 @@ export async function POST(req: Request) {
         for (const p of exec.people) {
           if (p.kind === 'unresolved' && p.nearMisses?.length) nearMisses[p.spokenAs] = p.nearMisses;
         }
-        const q0 = exec.query;
-        const requestHasOtherConstraints =
-          (q0.genreIds?.length ?? 0) > 0 ||
-          (q0.keywordIds?.length ?? 0) > 0 ||
-          (q0.castIds?.length ?? 0) > 0 ||
-          (q0.people?.length ?? 0) > 0 ||
-          (q0.providerIds?.length ?? 0) > 0 ||
-          Boolean(q0.subjectLabel) ||
-          Boolean(q0.subjectCanonical) ||
-          q0.minYear != null ||
-          q0.maxYear != null ||
-          q0.maxRuntime != null;
-        const c = unresolvedClarification(exec.unresolvedRequirements, nearMisses, { requestHasOtherConstraints });
+        const c = unresolvedClarification(exec.unresolvedRequirements, nearMisses, {
+          requestHasOtherConstraints: requestHasOtherConstraints(exec.query),
+        });
         if (c) {
           return finderJson({ route: '/api/finder', kind: 'clarify', clarify: c.clarify, options: c.options, query: { ...EMPTY_QUERY }, items: [] });
         }

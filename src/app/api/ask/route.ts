@@ -11,7 +11,7 @@ import { interpret } from '@/lib/interpret/interpret';
 import { resolveCanonicalExecution, genreIdFor } from '@/lib/ask/canonicalExecution';
 import { acknowledgeStatement, isBareStatement } from '@/lib/ask/statementBoundary';
 import { canonicalClaimsSpan } from '@/lib/ask/titleSpanOwnership';
-import { unresolvedClarification, type NearMisses } from '@/lib/ask/unresolvedResponse';
+import { unresolvedClarification, requestHasOtherConstraints, type NearMisses } from '@/lib/ask/unresolvedResponse';
 import type { UnresolvedRequirement } from '@/lib/ask/hardConstraints';
 import { augmentInternational } from '@/lib/askInternational';
 import type { ConsumedEntity } from '@/lib/nlu/consumedEntities';
@@ -1237,24 +1237,12 @@ export async function POST(req: Request) {
         if (p.kind === 'unresolved' && p.nearMisses?.length) nearMisses[p.spokenAs] = p.nearMisses;
       }
       /* Did anything else survive to execute? If so the request still has
-         substance and runs on it, with the miss disclosed rather than hidden. */
-      const q0 = exec0Query;
-      const requestHasOtherConstraints =
-        (q0.genreIds?.length ?? 0) > 0 ||
-        (q0.keywordIds?.length ?? 0) > 0 ||
-        (q0.castIds?.length ?? 0) > 0 ||
-        (q0.people?.length ?? 0) > 0 ||
-        (q0.providerIds?.length ?? 0) > 0 ||
-        (q0.originCountries?.length ?? 0) > 0 ||
-        (q0.originalLanguages?.length ?? 0) > 0 ||
-        q0.englishAudioOnly === true ||
-        q0.englishDubOnly === true ||
-        q0.minYear != null ||
-        q0.maxYear != null ||
-        q0.maxRuntime != null ||
-        Boolean(q0.subjectLabel) ||
-        Boolean(q0.subjectCanonical);
-      const c = unresolvedClarification(canonicalUnresolved, nearMisses, { requestHasOtherConstraints });
+         substance and runs on it, with the miss disclosed rather than hidden.
+         ONE shared predicate with /api/finder — an inline copy diverged once
+         (the finder's dropped origin/language/audio) and may not return. */
+      const c = unresolvedClarification(canonicalUnresolved, nearMisses, {
+        requestHasOtherConstraints: requestHasOtherConstraints(exec0Query),
+      });
       if (c) {
         return NextResponse.json({
           kind: 'clarify',
