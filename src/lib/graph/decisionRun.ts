@@ -35,8 +35,18 @@ export interface AskRunInput {
   } | null;
   requestedCount?: number | null;
   diagnostics?: FinderDiagnostics | null;
-  /** The items actually shown, in order. */
-  returned?: Array<{ id: number; mediaType: 'movie' | 'tv'; title?: string; matchScore?: number | null }>;
+  /** The items actually shown, in order. `where`/`whereObservedAt` are the
+   *  provider claim the CARD makes and when that fact was observed — both or
+   *  neither: a claim with no as-of is INV-4's violation, so the builder
+   *  refuses to emit one. */
+  returned?: Array<{
+    id: number;
+    mediaType: 'movie' | 'tv';
+    title?: string;
+    matchScore?: number | null;
+    where?: string | null;
+    whereObservedAt?: string | null;
+  }>;
   createdAt: string;
 }
 
@@ -109,6 +119,18 @@ export function buildAskRun(input: AskRunInput): DecisionRun {
     if (item.matchScore != null) {
       edges.push({ subject: cand, predicate: 'scored', object: String(item.matchScore) });
     }
+    /* AVAILABILITY, AS A SOURCED CLAIM (INV-4). The card says "on Netflix";
+       the run records the same claim WITH its as-of. No observation time →
+       no edge: a naked claim would be the exact violation the invariant
+       exists to catch, so the builder cannot produce one. */
+    if (item.where && item.whereObservedAt) {
+      edges.push({
+        subject: cand,
+        predicate: 'available_on',
+        object: item.where,
+        provenance: { source: 'external:tmdb', observedAt: item.whereObservedAt, runId: input.runId },
+      });
+    }
   }
 
   return {
@@ -128,6 +150,10 @@ export interface BuildCaseRunInput {
   /** request | taste | airing | platform | where_to_watch */
   classifiedAs: string;
   routedTo?: string | null;
+  /** Subject terms the ROUTE must honor (canonical-interpreter owned) — the
+   *  airing branch's "boxing". Recording them is what lets INV-1 see a
+   *  routed obligation instead of a run with no requirements at all. */
+  subjectTerms?: string[];
   /** The durable-clause text `tasteEvidenceText` selected ('' when none) —
    *  the ONLY language allowed to justify a write inside a routed request. */
   durableEvidence: string;
@@ -143,6 +169,9 @@ export function buildCaseRun(input: BuildCaseRunInput): DecisionRun {
   edges.push({ subject: nodeRef.run(), predicate: 'classified_as', object: input.classifiedAs });
   if (input.routedTo) {
     edges.push({ subject: nodeRef.run(), predicate: 'routed_to', object: input.routedTo });
+  }
+  for (const term of input.subjectTerms ?? []) {
+    edges.push({ subject: nodeRef.request(), predicate: 'requires_subject', object: term });
   }
   /* Every write edge carries the durable-clause text that justified it, so
      INV-2 can enforce the real law: writes never derive from request-only

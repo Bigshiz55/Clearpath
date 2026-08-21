@@ -58,6 +58,15 @@ export interface Airing {
    *  number was computed, so it travels WITH the number. */
   matchPersonalized?: boolean | null;
   year?: number | null; // release year, when the source reports one — disambiguates the TMDB match
+  /** WHERE this airing claim came from ('tvmaze' live, 'ingest:tvmaze',
+   *  'ingest:tvmedia'…). An airing is a claim about the outside world; a
+   *  claim without a source is INV-4's violation. Absent only on legacy
+   *  construction paths, never invented. */
+  source?: string | null;
+  /** WHEN the source last showed us this airing (ingest: last_seen_at, live:
+   *  the fetch that produced it). The "as of" that separates a fact from a
+   *  stale assertion. */
+  observedAt?: string | null;
 }
 
 interface TvmazeShow {
@@ -142,6 +151,10 @@ function toAiring(a: TvmazeAiring, show: TvmazeShow, network: string, requireTim
     image: show.image?.medium ?? show.image?.original ?? null,
     summary: stripHtml(show.summary),
     imdb: show.externals?.imdb ?? null,
+    source: 'tvmaze',
+    // The live fetch IS the observation — this runs inside the 1h-cached
+    // fetch, so the stamp is the cache-fill moment, not each request.
+    observedAt: new Date().toISOString(),
   };
 }
 
@@ -267,6 +280,8 @@ export interface NextAiring {
   network: string; // channel or platform, e.g. "AMC"
   time: string; // network-local "HH:MM" (may be '')
   airstamp: string; // ISO UTC start
+  source: string; // who claimed it — 'tvmaze'
+  observedAt: string; // when we learned it (ISO)
 }
 
 /**
@@ -293,7 +308,7 @@ export async function getNextAiring(imdbId: string | null): Promise<NextAiring |
     if (!eres || !eres.ok) return null;
     const ep = (await eres.json().catch(() => null)) as { airstamp?: string; airtime?: string } | null;
     if (!ep?.airstamp) return null;
-    return { network, time: ep.airtime ?? '', airstamp: ep.airstamp };
+    return { network, time: ep.airtime ?? '', airstamp: ep.airstamp, source: 'tvmaze', observedAt: new Date().toISOString() };
   } catch {
     return null;
   }
@@ -404,11 +419,13 @@ export function selectUpcomingAirings(
   genre: string | null = null,
   network: string | null = null,
   movieOnly = false,
+  subject: string | null = null,
 ): Airing[] {
   const clampedHorizon = Math.max(HOUR_MS, Math.min(horizonMs, UPCOMING_TV_HORIZON_MS));
   const horizon = nowMs + clampedHorizon;
   const wantGenre = genre ? genre.toLowerCase() : null;
   const wantNet = network ? network.toLowerCase() : null;
+  const wantSubject = subject ? subject.toLowerCase() : null;
   const upcoming = airings.filter((a) => {
     const ms = Date.parse(a.airstamp);
     if (NOISE_TYPES.has(a.showType) || ms < nowMs || ms > horizon) return false;
@@ -419,6 +436,20 @@ export function selectUpcomingAirings(
     if (wantNet && !a.network.toLowerCase().includes(wantNet)) return false;
     // Requested movies only ("Lifetime movies") — TVmaze tags movies as 'Movie'.
     if (movieOnly && a.showType !== 'Movie') return false;
+    /* A REQUESTED SUBJECT ("boxing movies tonight") — matched against the
+       programme evidence the guide actually holds: name, genre tags, and the
+       source's own summary. This is honest and it is LIMITED: a boxing film
+       whose listing never says "boxing" will not match, and the page says so
+       rather than padding — the constraint used to be silently DROPPED here,
+       which is strictly worse than a narrow filter that admits its reach. */
+    if (
+      wantSubject &&
+      !a.showName.toLowerCase().includes(wantSubject) &&
+      !a.genres.some((g) => g.toLowerCase().includes(wantSubject)) &&
+      !(a.summary ?? '').toLowerCase().includes(wantSubject)
+    ) {
+      return false;
+    }
     return true;
   });
 
@@ -437,6 +468,7 @@ export async function getUpcomingTv(
   genre: string | null = null,
   network: string | null = null,
   movieOnly = false,
+  subject: string | null = null,
 ): Promise<Airing[]> {
   // Fetch every UTC date the full 48h window can touch (up to 3, depending on
   // the time of day) — cache keys stay stable regardless of the chosen horizon —
@@ -445,7 +477,7 @@ export async function getUpcomingTv(
   const spanDays = Math.ceil(UPCOMING_TV_HORIZON_MS / DAY_MS) + 1;
   const dates = Array.from({ length: spanDays }, (_, i) => usBroadcastDate(nowMs + i * DAY_MS));
   const perDay = await Promise.all(dates.map((d) => getOnTvToday(country, d)));
-  return selectUpcomingAirings(perDay.flat(), nowMs, horizonMs, genre, network, movieOnly);
+  return selectUpcomingAirings(perDay.flat(), nowMs, horizonMs, genre, network, movieOnly, subject);
 }
 
 /** Cached daily streaming premieres (major services), keyed by date. */

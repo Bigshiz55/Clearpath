@@ -61,7 +61,7 @@ function friendlyDate(d: Date): string {
 export default async function OnTvPage({
   searchParams,
 }: {
-  searchParams?: { within?: string | string[]; genre?: string | string[]; network?: string | string[]; type?: string | string[]; view?: string | string[] };
+  searchParams?: { within?: string | string[]; genre?: string | string[]; network?: string | string[]; type?: string | string[]; view?: string | string[]; q?: string | string[] };
 }) {
   const supabase = createClient();
   const {
@@ -76,12 +76,18 @@ export default async function OnTvPage({
   const genre = one(searchParams?.genre)?.slice(0, 24) ?? null;
   const network = one(searchParams?.network)?.slice(0, 24) ?? null;
   const movieOnly = one(searchParams?.type) === 'movie';
+  // ?q= — the requested SUBJECT ('boxing'), carried from the airing route so
+  // the constraint the user spoke stops being dropped at this door. Matched
+  // against the programme evidence the guide actually holds (name, genre
+  // tags, summary) — visibly, with an honest empty state when nothing in the
+  // window says it.
+  const subject = one(searchParams?.q)?.slice(0, 40)?.trim() || null;
   // ?view=guide — the full by-channel guide, from the whole ingested lineup.
   const guideView = one(searchParams?.view) === 'guide' && region === 'US';
-  const hasFilter = !!(genre || network || movieOnly);
+  const hasFilter = !!(genre || network || movieOnly || subject);
   const titleCase = (s: string) => s.replace(/\b\w/g, (m) => m.toUpperCase());
   // A human label for the filters: "Lifetime comedy movies".
-  const filterLabel = [network ? titleCase(network) : null, genre?.toLowerCase(), movieOnly ? 'movies' : null].filter(Boolean).join(' ');
+  const filterLabel = [network ? titleCase(network) : null, subject?.toLowerCase(), genre?.toLowerCase(), movieOnly ? 'movies' : null].filter(Boolean).join(' ');
   const official = officialScheduleFor(network);
   // Whether a full listings grid is connected. Drives both the coverage banner
   // and the empty-state wording, so the two can never disagree. Two transports
@@ -184,10 +190,10 @@ export default async function OnTvPage({
   // order Highlights and /api/easy-tv already use, so the windowed/Movies view
   // stops being the one surface still reading only the live fetch.
   const windowedSource = async () => {
-    const ingested = await getUpcomingTvIngested(supabase, region, now.getTime(), withinHours! * HOUR_MS, genre, network, movieOnly).catch(() => [] as Airing[]);
+    const ingested = await getUpcomingTvIngested(supabase, region, now.getTime(), withinHours! * HOUR_MS, genre, network, movieOnly, subject).catch(() => [] as Airing[]);
     return ingested.length >= INGESTED_MIN
       ? ingested
-      : getUpcomingTv(region, now.getTime(), withinHours! * HOUR_MS, genre, network, movieOnly);
+      : getUpcomingTv(region, now.getTime(), withinHours! * HOUR_MS, genre, network, movieOnly, subject);
   };
   let windowed = withinHours != null ? await enrich(await windowedSource()) : null;
   /* THE MOVIES VIEW NEVER PADS. It used to: zero movie matches refetched the

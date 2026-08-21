@@ -114,6 +114,9 @@ export type EdgePredicate =
   | 'rejected'
   | 'scored'
   | 'returned'
+  // ── availability/airing claims (INV-4: source + observation time) ───────
+  | 'available_on'
+  | 'airs_on'
   // ── what the run WROTE (INV-2 tracks these against persistence) ─────────
   | 'wrote_taste'
   | 'seeded_title'

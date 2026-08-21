@@ -9,6 +9,7 @@ import { canonicalRequestRoute } from '@/lib/nlu/requestRoute';
 import { buildCaseRun } from '@/lib/graph/decisionRun';
 import { persistDecisionRun } from '@/lib/graph/store';
 import { tasteEvidenceText } from '@/lib/nlu/tasteEvidence';
+import { interpret } from '@/lib/interpret/interpret';
 import {
   detectAiringHorizon,
   detectTemporalHorizon,
@@ -302,12 +303,13 @@ export async function POST(request: Request) {
        run in the founder inspector. `caseId` IS the run id: one identity for
        one decision, shared with the analytics rows. Fire-and-forget; can
        never block or fail the response. */
-    const recordRun = (classifiedAs: string, routedTo: string | null) => {
+    const recordRun = (classifiedAs: string, routedTo: string | null, subjectTerms: string[] = []) => {
       void persistDecisionRun(supabase, user.id, buildCaseRun({
         runId: caseId,
         text,
         classifiedAs,
         routedTo,
+        subjectTerms,
         durableEvidence: evidence,
         tasteAxesWritten: [...byAxis.keys()],
         titlesSeeded: [...namedLiked, ...namedAvoid],
@@ -327,15 +329,27 @@ export async function POST(request: Request) {
     if (airing) {
       const genre = detectGenre(text);
       const movieOnly = /\b(movies?|films?)\b/.test(` ${text.toLowerCase()} `);
+      /* THE SUBJECT SURVIVES THE AIRING ROUTE. "AMC boxing movies tonight"
+         used to reach the guide as /app/tv?within=6&network=amc&type=movie —
+         four fields survived and BOXING was gone, then the summary read the
+         digest back as if the request had been honored. The CANONICAL
+         interpreter owns the reading (no second parser here): its wanted
+         subject rides the redirect as `q`, the guide filters on it visibly,
+         and the run records a requires_subject edge so INV-1 can finally see
+         the obligation instead of a run with no requirements at all. */
+      const airingSubjects = interpret(text)
+        .subjects.filter((s) => s.wanted)
+        .map((s) => s.span);
       const params = new URLSearchParams({ within: String(horizon) });
       if (genre) params.set('genre', genre);
       if (network) params.set('network', network.key);
       if (movieOnly) params.set('type', 'movie');
+      if (airingSubjects[0]) params.set('q', airingSubjects[0]);
       const redirect = `/app/tv?${params.toString()}`;
-      await logCase('airing', redirect, { horizon, genre, network: network?.key ?? null, movieOnly });
-      recordRun('airing', redirect);
+      await logCase('airing', redirect, { horizon, genre, network: network?.key ?? null, movieOnly, subject: airingSubjects[0] ?? null });
+      recordRun('airing', redirect, airingSubjects);
       // Read the filters back into the summary: "Lifetime comedy movies".
-      const what = [network?.name, genre?.toLowerCase(), movieOnly ? 'movies' : null].filter(Boolean).join(' ');
+      const what = [network?.name, airingSubjects[0], genre?.toLowerCase(), movieOnly ? 'movies' : null].filter(Boolean).join(' ');
       return NextResponse.json({
         ok: true,
         learned,

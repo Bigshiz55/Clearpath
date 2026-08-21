@@ -189,6 +189,10 @@ export interface FinderItem {
   primaryCall: string;
   reason: string;
   where: string | null;
+  /** WHEN the `where` claim was observed (providers.checkedAt) — the as-of
+   *  that lets the decision run record availability as a SOURCED claim
+   *  (INV-4) instead of a naked assertion. Null when providers were absent. */
+  whereObservedAt?: string | null;
   receipts: string[];
   deciderUrl: string;
   ratings: TileRatings;
@@ -666,6 +670,7 @@ export async function runFinder(
         primaryCall: report.primaryCall,
         reason: report.oneLiner,
         where,
+        whereObservedAt: where ? (providers?.checkedAt ?? null) : null,
         receipts,
         deciderUrl: deciderSearchUrl(meta.title, meta.year),
         ratings,

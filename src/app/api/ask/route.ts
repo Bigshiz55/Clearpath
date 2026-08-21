@@ -1438,7 +1438,16 @@ export async function POST(req: Request) {
       query,
       requestedCount: result.diagnostics.requestedCount,
       diagnostics: result.diagnostics,
-      returned: items.map((i) => ({ id: i.id, mediaType: i.mediaType === 'tv' ? 'tv' : 'movie', title: i.title, matchScore: i.matchScore ?? null })),
+      returned: items.map((i) => ({
+        id: i.id,
+        mediaType: i.mediaType === 'tv' ? 'tv' : 'movie',
+        title: i.title,
+        matchScore: i.matchScore ?? null,
+        // The card's provider claim WITH its as-of — the builder emits an
+        // available_on edge only when both are present (INV-4).
+        where: i.where ?? null,
+        whereObservedAt: i.whereObservedAt ?? null,
+      })),
       createdAt: new Date().toISOString(),
     }));
 

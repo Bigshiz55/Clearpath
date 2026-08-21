@@ -136,9 +136,13 @@ export interface ScoringData {
 }
 
 async function hydrateScoring(mediaType: MediaType, id: number, region: string): Promise<ScoringData> {
+  // resolveAvailability, not bare getWatchProviders: the bare read is
+  // TMDB-only and stamps checkedAt with the moment of THIS request — a fetch
+  // time dressed as a verification time. The resolver merges the Watchmode
+  // cache whose last_fetched_at is an honest as-of, same as the title page.
   const [meta, providers] = await Promise.all([
     getTitle(mediaType, id, region),
-    getWatchProviders(mediaType, id, region).catch(() => null),
+    resolveAvailability(mediaType, id, region).catch(() => null),
   ]);
   const critics = await getCriticRatings(meta.imdbId).catch(() => null);
   if (critics) {
