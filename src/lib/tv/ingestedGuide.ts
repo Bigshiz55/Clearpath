@@ -111,6 +111,13 @@ export interface IngestedAiringRow {
   description: string | null;
   runtimeMinutes: number | null;
   artworkUrl: string | null;
+  /** `tv_airings.source` ('provider' | 'fixture' | a named feed). The table
+   *  always carried this; the read boundary used to drop it. */
+  source?: string | null;
+  /** `tv_airings.fetched_at` / `last_seen_at` — when the ingest observed the
+   *  airing. last_seen_at is the freshest observation. */
+  fetchedAt?: string | null;
+  lastSeenAt?: string | null;
 }
 
 /** Pure — one ingested-table row to the same `Airing` type the live TVmaze
@@ -140,6 +147,11 @@ export function ingestedRowToAiring(row: IngestedAiringRow): Airing {
     image: row.artworkUrl,
     summary: row.description,
     imdb: null,
+    /* INV-4's data half: the claim names its source and its as-of instead of
+       dropping both at the read boundary. `ingest:` prefixes distinguish the
+       ingested tables from the live TVmaze fetch. */
+    source: row.source ? `ingest:${row.source}` : null,
+    observedAt: row.lastSeenAt ?? row.fetchedAt ?? null,
   };
 }
 
@@ -149,6 +161,9 @@ interface RawAiring {
   start_at_utc: string;
   provider_airing_id: string | null;
   is_premiere: boolean | null;
+  source: string | null;
+  fetched_at: string | null;
+  last_seen_at: string | null;
 }
 interface RawStation {
   id: string;
@@ -242,6 +257,9 @@ async function hydrateAiringRows(supabase: SupabaseClient, rows: RawAiring[]): P
         description: programme.description,
         runtimeMinutes: programme.runtime_minutes,
         artworkUrl: programme.artwork_url,
+        source: r.source,
+        fetchedAt: r.fetched_at,
+        lastSeenAt: r.last_seen_at,
       }),
     ];
   });
@@ -267,7 +285,7 @@ export async function getIngestedGuideAirings(
 
   const { data: airings, error: airingsError } = await supabase
     .from('tv_airings')
-    .select('station_id, programme_id, start_at_utc, provider_airing_id, is_premiere')
+    .select('station_id, programme_id, start_at_utc, provider_airing_id, is_premiere, source, fetched_at, last_seen_at')
     .gte('start_at_utc', rangeStart)
     .lt('start_at_utc', rangeEnd)
     .order('start_at_utc', { ascending: true })
@@ -298,7 +316,7 @@ export async function getIngestedDayAirings(
   for (let offset = 0; offset < DAY_READ_CAP; offset += PAGE_ROWS) {
     const { data, error } = await supabase
       .from('tv_airings')
-      .select('station_id, programme_id, start_at_utc, provider_airing_id, is_premiere')
+      .select('station_id, programme_id, start_at_utc, provider_airing_id, is_premiere, source, fetched_at, last_seen_at')
       .gte('start_at_utc', rangeStart)
       .lt('start_at_utc', rangeEnd)
       .order('start_at_utc', { ascending: true })
@@ -340,6 +358,7 @@ export async function getUpcomingTvIngested(
   genre: string | null = null,
   network: string | null = null,
   movieOnly = false,
+  subject: string | null = null,
 ): Promise<Airing[]> {
   if (region !== 'US') return [];
   const clampedHorizon = Math.max(HOUR_MS, Math.min(horizonMs, UPCOMING_TV_HORIZON_MS));
@@ -347,7 +366,7 @@ export async function getUpcomingTvIngested(
     console.error('[ingestedGuide] getUpcomingTvIngested read failed', e instanceof Error ? e.message : e);
     return [] as Airing[];
   });
-  return selectUpcomingAirings(airings, nowMs, horizonMs, genre, network, movieOnly);
+  return selectUpcomingAirings(airings, nowMs, horizonMs, genre, network, movieOnly, subject);
 }
 
 /**

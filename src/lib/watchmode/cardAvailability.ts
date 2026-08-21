@@ -51,7 +51,7 @@ export async function getCardAvailability(mediaType: MediaType, tmdbId: number, 
     supabase.from('watchmode_fetch_state').select('last_fetched_at').eq('tmdb_id', tmdbId).eq('tmdb_media_type', mediaType).maybeSingle(),
     supabase
       .from('watchmode_availability')
-      .select('source_name, source_type, deeplink')
+      .select('source_name, source_type, deeplink, retrieved_at')
       .eq('tmdb_id', tmdbId)
       .eq('tmdb_media_type', mediaType)
       .eq('region', region),
@@ -64,10 +64,18 @@ export async function getCardAvailability(mediaType: MediaType, tmdbId: number, 
     type: r.source_type as CardAvailabilitySource['type'],
     deeplink: (r.deeplink as string | null) ?? null,
   }));
+  // The per-row retrieved_at (0042 — written by the sync since Slice A) is
+  // the claim's own as-of; the title-level fetch_state stamp is the fallback
+  // for rows synced before the columns were written.
+  const rowRetrievedAt = (rows ?? [])
+    .map((r) => r.retrieved_at as string | null)
+    .filter((t): t is string => !!t)
+    .sort()
+    .pop();
   return {
     status: sources.length > 0 ? 'available' : 'none',
     sources,
-    checkedAt: (state.last_fetched_at as string | undefined) ?? null,
+    checkedAt: rowRetrievedAt ?? (state.last_fetched_at as string | undefined) ?? null,
   };
 }
 

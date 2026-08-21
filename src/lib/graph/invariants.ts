@@ -33,10 +33,17 @@ export function inv1RequiredConstraintSurvives(run: DecisionRun): Violation[] {
   const returned = edgesBy(run, 'returned');
   if (required.length === 0) return out;
   if (returned.length === 0) {
-    // No results is legal ONLY when the run says so explicitly.
+    // No results is legal ONLY when the run says so explicitly — or when the
+    // run ROUTED: a routing run returns nothing by design, the destination
+    // owns the results, and the routed_to edge (whose URL carries the
+    // requirement — proven browser-side) is its explicit terminal state.
+    // Before Slice A the airing route dodged this check by recording NO
+    // requires_subject edge at all, which is worse than either outcome: the
+    // obligation was invisible, not discharged.
     const explicit = edgesBy(run, 'classified_as').some((e) =>
       ['clarify', 'no_results'].includes(e.object),
-    ) || run.intent.kind === 'clarify' || run.intent.kind === 'no_results';
+    ) || run.intent.kind === 'clarify' || run.intent.kind === 'no_results'
+      || edgesBy(run, 'routed_to').length > 0;
     if (!explicit) {
       out.push({
         invariant: 'INV-1',
@@ -140,11 +147,30 @@ export function inv10UnknownNotConfirmed(run: DecisionRun): Violation[] {
     }));
 }
 
+/**
+ * INV-4 — AVAILABILITY CLAIMS CARRY SOURCE + TIMESTAMP. An `available_on` /
+ * `airs_on` edge asserts a fact about the outside world that ages; asserting
+ * it with no source or no "as of" is how a stale offer gets presented as a
+ * current fact. The builders enforce the same rule constructively (no
+ * observation time → no claim emitted); this catches any emitter that
+ * forgets.
+ */
+export function inv4AvailabilityClaimsSourced(run: DecisionRun): Violation[] {
+  return run.edges
+    .filter((e) => e.predicate === 'available_on' || e.predicate === 'airs_on')
+    .filter((e) => !e.provenance?.source || !e.provenance?.observedAt)
+    .map((e) => ({
+      invariant: 'INV-4',
+      message: `${e.predicate} ${e.object} claimed for ${e.subject} without source+observedAt provenance`,
+    }));
+}
+
 /** The whole suite over one run. Empty result = the run is lawful. */
 export function checkRunInvariants(run: DecisionRun): Violation[] {
   return [
     ...inv1RequiredConstraintSurvives(run),
     ...inv2RequestOnlyNeverDurable(run),
+    ...inv4AvailabilityClaimsSourced(run),
     ...inv6RawRequestRetained(run),
     ...inv8NoRejectedReturned(run),
     ...inv10UnknownNotConfirmed(run),

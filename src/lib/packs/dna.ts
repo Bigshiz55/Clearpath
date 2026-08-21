@@ -70,11 +70,19 @@ export async function resolveProgrammeTmdbId(
   }
 
   const { searchTitles } = await import('@/lib/tmdb/client');
-  const results = await searchTitles(existing.title as string).catch(() => []);
+  const { pickMatch } = await import('@/lib/packs/tmdbMatch');
+  const found = await searchTitles(existing.title as string).catch(() => []);
   const year = existing.release_year as number | null;
-  const best = year
-    ? results.find((r) => r.year === year) ?? results.find((r) => r.year != null && Math.abs(r.year - year) <= 1)
-    : results[0];
+  /* pickMatch, never a popularity guess: tmdbMatch.ts documents at length how
+     the first-result fallback wrote WRONG tmdb ids permanently (and with
+     release_year unpopulated by every ingest writer, that branch was the ONLY
+     one that ever ran). pickMatch requires an exact normalized title and a
+     unique winner — ambiguity stays unmatched rather than becoming a coin
+     flip that this function then PERSISTS. */
+  const best = pickMatch(
+    { title: existing.title as string, releaseYear: year, expectedMediaType: undefined },
+    found.map((r) => ({ id: r.id, title: r.title, year: r.year ?? null, mediaType: r.mediaType })),
+  );
   if (!best) return null;
 
   const admin = createAdminClient();

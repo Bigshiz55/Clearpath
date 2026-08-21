@@ -2,6 +2,7 @@ import 'server-only';
 import type { createAdminClient } from '@/lib/supabase/admin';
 import { serverEnv } from '@/lib/env';
 import { fetchWatchmode } from './client';
+import { stateFromLegacyType } from '@/lib/availability/states';
 import { parseTitleIdMapCsv } from './titleIdMap';
 import { selectDailyBatch, titleKey, type PriorityCandidate, type PriorityTier } from './priority';
 import { evaluateBudget, type BudgetState } from '@/lib/viewing/ingest/budget';
@@ -204,12 +205,23 @@ async function fetchAndStoreOne(admin: Admin, apiKey: string, c: PriorityCandida
     return 'error';
   }
 
-  const rows = result.options.map((o) => ({
-    tmdb_id: c.tmdbId, tmdb_media_type: c.tmdbMediaType,
-    source_name: o.providerName,
-    source_type: o.type === 'flatrate' ? 'subscription' : o.type === 'ads' ? 'subscription' : o.type,
-    region: result!.region, deeplink: o.link ?? null, updated_at: nowIso,
-  }));
+  const rows = result.options.map((o) => {
+    const legacyType = o.type === 'flatrate' ? 'subscription' : o.type === 'ads' ? 'subscription' : o.type;
+    return {
+      tmdb_id: c.tmdbId, tmdb_media_type: c.tmdbMediaType,
+      source_name: o.providerName,
+      source_type: legacyType,
+      region: result!.region, deeplink: o.link ?? null, updated_at: nowIso,
+      // The 0042 provenance columns, written at last: WHO claimed this offer
+      // and WHEN it was retrieved/verified. These sat in the schema unwritten
+      // since the migration shipped — every availability claim rendered from
+      // this table was undatable at the row level.
+      source_key: 'watchmode',
+      retrieved_at: nowIso,
+      last_verified_at: nowIso,
+      availability_state: stateFromLegacyType(legacyType),
+    };
+  });
 
   // Replaced wholesale, not merged: delete this title's prior snapshot, then
   // insert the fresh one (possibly empty — a service dropping a title must
