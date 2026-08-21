@@ -26,6 +26,16 @@ Updated at the end of every work order per the Working Agreement in
   Subscription Check (request_only) record decision runs; INV-9 (group
   evidence never writes durable taste) law; verdict beacon bounded by a 3s
   auth race so it can never hang a page. 87/87 mobile specs green.
+- **CLOSED — docket key contract (reviewer catch on #105, PR #109).** The
+  verdict beacon's validator only accepted the court-style hyphen key
+  (`movie-603`) while the docket sends `docketKey()`'s colon form
+  (`movie:603`) — every real docket payload was silently stripped into an
+  empty verdict run (and the invariant suite can't object to an empty
+  run, which is why it was silent). The route now accepts both and stores
+  ONE shape (`candidate:movie-603`, the court form) so group surfaces
+  stay joinable; RED built from the real `docketKey()` in
+  `src/app/api/verdict/run/route.test.ts` so the contract cannot drift
+  again.
 - **CLOSED — Phase 7 orphan half (PR #106, merge 626d15f).** The third
   English reader is dead: `/api/recommendations` POST deleted,
   `recFeedback.ts` reduced to the filter types its callers use,

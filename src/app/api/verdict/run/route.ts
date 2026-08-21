@@ -33,8 +33,17 @@ interface Entry {
   reason?: unknown;
 }
 
-const cleanKey = (v: unknown): string | null =>
-  typeof v === 'string' && /^[a-z]+-\d+$/.test(v) ? v : null;
+/* The docket names candidates with `docketKey()` — colon-delimited
+   (`movie:603`) — while the court run stores the hyphen form. Accept both
+   and store ONE shape (`movie-603`) so the two group surfaces stay
+   joinable; anything else is dropped. A hyphen-only validator here once
+   stripped every real docket key and recorded empty verdict runs
+   (reviewer catch on PR #105, pinned in route.test.ts). */
+const cleanKey = (v: unknown): string | null => {
+  if (typeof v !== 'string') return null;
+  const m = /^([a-z]+)[:-](\d+)$/.exec(v);
+  return m ? `${m[1]}-${m[2]}` : null;
+};
 const cleanText = (v: unknown, max: number): string | undefined =>
   typeof v === 'string' ? v.slice(0, max) : undefined;
 const cleanScore = (v: unknown): number | null =>
