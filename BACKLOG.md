@@ -3,7 +3,62 @@
 Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
-## Now — migration reality reconciliation + Phase 7 semantic ownership, 2026-08-21 (day shift)
+## Now — TASK #36 final semantic-ownership closure, 2026-08-21 (evening shift)
+
+- **PRODUCTION MIGRATION PROOF: INCOMPLETE — reported, not papered over.**
+  The task premise said 0049_decision_runs was applied; production
+  `/api/version` still shows `cli_ledger / 20260812164511
+  (0047_watchlist_provenance)` with no runner row — the migrate route has
+  not run (or the migration went through a path that writes no ledger).
+  The REST-only `/api/health/schema` could not answer either
+  (`SUPABASE_SERVICE_ROLE_KEY` missing while `databaseUrlConfigured:
+  true`) — the same one-channel defect the ledger reader shed. PR #112
+  gives the probe the direct-pg catalog channel (presence + RLS state in
+  one read-only query, `rlsDisabled` list, closed-vocabulary failures);
+  after it deploys, one unauthenticated GET answers the 0049 question
+  from production's own credentials.
+- **CLOSED — the LLM is fenced off the canonical path on /api/ask (PR
+  #113).** `parseAskWithAI` ran unconditionally and its output was
+  DISCARDED on every canonical-served sentence — pure cost and a standing
+  violation of "never call an LLM in a user request path". Now gated
+  exactly like the finder's fence (similar-to keeps it; legacy keeps it).
+  Proven by a fetch-spy through the real route: zero OpenAI calls for
+  "a chess movie"; the legacy "boxing" still gets its parse. RED: the
+  unfenced route fails the zero-call case.
+- **CLOSED — the airing arm's siblings read canonical fields (PR #113).**
+  genre and media beside the canonical subject were read from the whole
+  raw sentence by two more parsers. Now: media IS the canonical reading
+  (`media === 'movie'` — "movies and shows" no longer forced to movies),
+  and detectGenre keeps its one TVmaze table but reads the canonical
+  REQUEST CLAUSE (raw-text fallback only when none was isolated) — an
+  anecdote's "funny" can no longer beat the request's "thrillers".
+  RED: 2/4 airing cases fail pre-fence.
+- **CLOSED — two defects in the OWNER's own vocabulary (PR #113).** The
+  TASK #36 audit (13 semantic axes, full table in the session record)
+  found the canonical interpreter itself inverting polarity: NEGATOR_WORDS
+  lacked "tired of / sick of / never / rather not / fed up with / don't
+  like", so "a thriller but never horror" and "tired of horror movies"
+  executed the renounced genre as WANTED on the live canonical path (the
+  legacy parser it replaced knew these phrases). Vocabulary extended in
+  the single declaration; layerBext output BYTE-IDENTICAL (negation
+  corpus 75/75 holds). And the interpreter's private word-number copy
+  (stopped at ten) now reads nlu/count's exported table — "twenty
+  comedies" carries 20; the two count vocabularies cannot drift again.
+- **Queued from the vocabulary audit (each with file:line in the session
+  record):** genre-id map has no TV genre ids on any parse path ("sci-fi
+  shows" → TMDB movie id 878 against TV discover → zero results; the only
+  10765/10759 literals live in preference/calibrationPool); "hbo" resolves
+  to Max(1899) via detectors but to an unresolvable network via
+  mediaOntology; interpret's PROVIDER_WORDS lacks tubi/pluto/roku so the
+  canonical arm drops those providers; 15+ media-noun copies ("flicks"
+  routes wrong in searchIntent/requestRoute); origin table lacks
+  Chinese/Dutch/Turkish while the display DEMONYMS has 35 countries;
+  build-case parseNaive writes pacing 72 for BOTH slow and fast (DNA
+  write defect — left untouched per the do-not-touch list, queued);
+  reference-cue vocabulary exists 7×; runtime parser 3× ("90 minutes or
+  less" only readable in the dev Reco Lab).
+
+## Prior shift — migration reality reconciliation + Phase 7 semantic ownership, 2026-08-21 (day shift)
 
 - **CLOSED — the environment blocker.** The owner repaired
   `SUPABASE_DB_URL`; `/api/version` reads the ledger through the direct

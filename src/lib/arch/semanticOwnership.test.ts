@@ -85,6 +85,50 @@ describe('one boundary where a client query enters', () => {
   });
 });
 
+describe('TASK #36 fences: the LLM and the airing siblings', () => {
+  it('the ask route computes the LLM parse only when canonical will not serve', () => {
+    expect(askRoute).toMatch(/const ai = text && !canonicalWillServe \? await parseAskWithAI\(text\) : null/);
+    expect(askRoute).not.toMatch(/const ai = text \? await parseAskWithAI\(text\) : null/);
+  });
+
+  it("the airing arm's genre and media read canonical fields, not the raw sentence", () => {
+    const buildCase = read('src/app/api/build-case/route.ts');
+    expect(buildCase).toMatch(/const airingClause = canonicalAiring\.requestClause \|\| text/);
+    expect(buildCase).toMatch(/const genre = detectGenre\(airingClause\)/);
+    expect(buildCase).toMatch(/const movieOnly = canonicalAiring\.media === 'movie'/);
+    expect(buildCase).not.toMatch(/movies\?\|films\?.*\.test\(` \$\{text/);
+  });
+});
+
+describe('routing is not meaning: the destination cascade transports the sentence losslessly', () => {
+  it('every ask-bound destination carries the raw query verbatim for the one owner to read', async () => {
+    /* The client cascade (SearchBar/QuickSearch/BuildCaseBox) may choose a
+       DESTINATION from vocabulary; it may never deliver an altered sentence.
+       The canonical interpreter at the destination is the one reader of
+       meaning — so whatever routes to /app/ask must arrive byte-identical. */
+    const { resolveSearchDestination } = await import('@/lib/search/searchIntent');
+    const { canonicalRequestRoute } = await import('@/lib/nlu/requestRoute');
+    const sentences = [
+      'a funny movie under two hours but not a romance',
+      'Give me 3 Sylvester Stallone movies',
+      'anything except horror on Netflix',
+      'I love slow burns but I hate gore, find me a thriller',
+    ];
+    for (const s of sentences) {
+      const dest = resolveSearchDestination(s, []);
+      if (dest?.reason === 'ask') {
+        const q = new URL(`https://x${dest.href}`).searchParams.get('q');
+        expect(q, `cascade altered the sentence: ${s}`).toBe(s);
+      }
+      const route = canonicalRequestRoute(s);
+      if (route.kind === 'request') {
+        const q = new URL(`https://x${route.href}`).searchParams.get('q');
+        expect(q, `hero box altered the sentence: ${s}`).toBe(s);
+      }
+    }
+  });
+});
+
 describe('retained shared-definition deciders are single-owner, not competitors', () => {
   it('the search destination and the hero-box guard consume the ONE clause-layer owner', () => {
     /* SearchBar/QuickSearch (destination cascade) and BuildCaseBox (the

@@ -40,7 +40,11 @@ export const DEFAULT_RESULT_COUNT = 24;
 /** The ceiling on a count somebody states out loud. */
 export const MAX_REQUESTED_COUNT = 60;
 
-const NUM_WORDS: Record<string, number> = {
+/** The one word-number vocabulary — exported so the canonical interpreter
+ *  reads counts from the SAME table (TASK #36: interpret's private copy
+ *  stopped at ten, so "give me twelve thrillers" lost its count on the
+ *  canonical path while this module could read it all along). */
+export const NUM_WORDS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
   nine: 9, ten: 10, eleven: 11, twelve: 12, fifteen: 15, twenty: 20,
 };

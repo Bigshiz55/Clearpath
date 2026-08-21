@@ -969,11 +969,23 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2) Otherwise → smart discovery. Let the LLM parse the ask (handles
-    // misspellings, actor names, counts); fall back to the regex parser.
+    // 2) Otherwise → smart discovery.
+    //
+    // THE CANONICAL PATH NEVER PAYS FOR A SECOND OPINION. `parseAskWithAI` is
+    // an LLM read of the whole utterance; on a sentence the canonical arm will
+    // serve, its query was DISCARDED (:canonicalOwnsLanguage builds from
+    // EMPTY_QUERY + resolveCanonicalExecution) and its resolvedPeople seed a
+    // consumedEntities list only the LEGACY arm ever reads — so the call was
+    // pure cost and a standing violation of "never call an LLM in a user
+    // request path". The gate mirrors the finder's canonical fence exactly:
+    // the LLM parse survives for the kinds canonical does not execute (title
+    // lookups, bare statements, similar-to references — a cls-classified
+    // similar_to sentence keeps it even when interpret says recommendation,
+    // because the similar arm serves that sentence and reads ai.similarTo).
     let query: FinderQuery;
     let limit = DEFAULT_RESULT_LIMIT;
-    const ai = text ? await parseAskWithAI(text) : null;
+    const canonicalWillServe = canonical !== null && canonical.kind === 'recommendation' && cls?.mode !== 'similar_to';
+    const ai = text && !canonicalWillServe ? await parseAskWithAI(text) : null;
 
     // 1.5) "More like X" — if the ask compares to a title ("shows like
     // Mindhunter"), seed recommendations from THAT title's neighbors. Uses the
