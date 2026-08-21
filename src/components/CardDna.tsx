@@ -26,13 +26,18 @@ export function CardDna({ mediaType, tmdbId, className = '' }: { mediaType: Medi
 
   return (
     <div
+      /* THE TASTE ROW, LABELED AS TASTE. This row used to caption the raw
+         taste fit with the BRAND verdict label — the one the canonical score
+         owns — so one card could show two different numbers under one name.
+         The taste fit is a real, useful number; it just has to say what it
+         is (oneVerdictLabel.test.ts). */
       className={`flex items-center gap-2 rounded-lg border border-pink-400/50 bg-gradient-to-r from-pink-500/20 to-rose-500/10 px-2 py-1.5 ${className}`}
-      title={`Your VERD1CT ${dna.tasteScore} — how closely this matches YOUR taste (0–100), learned from what you’ve rated. The blue TV means it’s from WatchVerd1ct.`}
+      title={`Taste match ${dna.tasteScore} — how closely this matches YOUR taste alone (0–100), learned from what you’ve rated. Not the verdict score: that blends in quality and lives on the badge above.`}
     >
       <Verd1ctBadge score={dna.tasteScore} px={38} />
       <span className="flex min-w-0 flex-col leading-tight">
-        <span className="text-[10px] font-black uppercase tracking-wide text-pink-100">Your VERD<span style={{ color: '#ff1493' }}>1</span>CT</span>
-        <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">your taste match</span>
+        <span className="text-[10px] font-black uppercase tracking-wide text-pink-100">Taste match</span>
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/70">your taste alone</span>
       </span>
     </div>
   );

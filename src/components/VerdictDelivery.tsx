@@ -40,7 +40,10 @@ async function factsFor(e: DocketEntry): Promise<Candidate> {
   const [dna, quick] = await Promise.all([
     fetchWithTimeout(`/api/dna/${e.mediaType}/${e.tmdbId}`)
       .then((r) => r.json())
-      .then((d) => (d?.dna ?? null) as { score?: number; confidence?: number; sampleSize?: number } | null)
+      // The inline type used to omit `canonical`, structurally discarding the
+      // one score every other surface headlines — so the docket verdict was
+      // ranked on a different "match" than the card the user tapped W on.
+      .then((d) => (d?.dna ?? null) as { score?: number; confidence?: number; sampleSize?: number; canonical?: { score: number; personalized: boolean } | null } | null)
       .catch(() => null),
     fetchWithTimeout(`/api/quicklook/${e.mediaType}/${e.tmdbId}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -54,7 +57,12 @@ async function factsFor(e: DocketEntry): Promise<Candidate> {
     // The general Watchability is the base; null when we genuinely could not
     // compute one, so the engine falls back rather than inventing a number.
     watchability: typeof quick?.standardScore === 'number' ? quick.standardScore : typeof quick?.score === 'number' ? quick.score : null,
-    personalMatch: typeof dna?.score === 'number' ? dna.score : null,
+    personalMatch:
+      typeof dna?.canonical?.score === 'number'
+        ? dna.canonical.score
+        : typeof dna?.score === 'number'
+          ? dna.score
+          : null,
     matchConfidence: typeof dna?.confidence === 'number' ? dna.confidence : 0,
     runtimeMinutes: minutesOf(quick?.runtime ?? null),
     availableOn: quick?.where ?? [],

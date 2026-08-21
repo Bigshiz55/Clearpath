@@ -53,7 +53,13 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
         ? `Learning · ${dna.sampleSize} rated`
         : 'Odds you’ll love it';
 
-  const v = scoreVerdict(dna.score);
+  /* THE HEADLINE IS THE CANONICAL SCORE — the same number the card, the
+     QuickLook and the briefing print under this label (oneVerdictLabel.test).
+     The taste blend (`dna.score`) and its bounded AI refinement remain fully
+     visible below in the transparency strip, labeled as the taste read —
+     that is their honest home, not the brand headline. */
+  const headline = dna.canonical?.score ?? dna.score;
+  const v = scoreVerdict(headline);
   const adj = dna.adjustment ?? 0;
   const hasAi = adj !== 0 && dna.baseScore != null;
 
@@ -63,7 +69,7 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
         className="flex items-center gap-3 rounded-xl border-2 border-pink-400/80 bg-gradient-to-r from-pink-500/40 to-rose-500/25 px-3 py-2 shadow-[0_0_18px_rgba(244,63,94,0.35)]"
         title="Your VERD1CT — a 0–100 estimate of how much YOU will love this, learned from what you’ve rated. It drives your Stream It / Skip It call and sharpens the more you use the app."
       >
-        <Verd1ctBadge score={dna.score} px={52} />
+        <Verd1ctBadge score={headline} px={52} />
         <div className="min-w-0">
           <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white">Your VERD1CT</div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -80,7 +86,10 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
         <div className="flex items-start gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-slate-300">
           <span aria-hidden className="mt-px">🤖</span>
           <span>
-            <span className="font-bold text-white">AI {adj > 0 ? `+${adj}` : adj}</span>{' '}
+            {/* The TASTE read: deterministic taste blend → bounded AI nudge.
+                Named as such because the headline above is the canonical
+                score, which this strip does not adjust. */}
+            <span className="font-bold text-white">AI taste read {adj > 0 ? `+${adj}` : adj}</span>{' '}
             <span className="tabular-nums text-slate-400">({dna.baseScore} → {dna.score})</span>
             {dna.reasoning ? <> — {dna.reasoning}</> : null}
           </span>

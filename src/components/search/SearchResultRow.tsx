@@ -38,6 +38,7 @@ import { useEffect, useState } from 'react';
 import { Poster } from '@/components/PosterCard';
 import { SaveButton } from '@/components/SaveButton';
 import { CardVerdict } from '@/components/CardVerdict';
+import { Verd1ctBadge } from '@/components/Verd1ctBadge';
 import { WCheck } from '@/components/WCheck';
 import { loadTileFacts } from '@/lib/tileFacts';
 import { buildCardFacts } from '@/lib/verdict/cardFacts';
@@ -138,14 +139,15 @@ export function SearchResultRow({
                 <span>{year ?? '—'}</span>
               </span>
             </span>
-            {/* The number, when we have it. Plain text: the interactive
-                "why this score" affordance belongs on the full page. */}
+            {/* The number wears the one visual identity every other surface
+                uses — a bare digit pair in a pill read as "some score", which
+                is exactly the ambiguity the badge exists to remove. Still the
+                objective Standard Score (this row is not personalized); the
+                interactive "why this score" affordance belongs on the full
+                page. */}
             {facts?.score != null && (
-              <span
-                data-testid={`search-result-score-${id}`}
-                className="flex-none rounded-lg bg-brand-500/15 px-2 py-1 text-[13px] font-black tabular-nums text-brand-100"
-              >
-                {facts.score}
+              <span data-testid={`search-result-score-${id}`} className="flex-none">
+                <Verd1ctBadge score={facts.score} px={30} tv={false} title="" />
               </span>
             )}
           </span>

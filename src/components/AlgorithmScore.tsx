@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
 import { loadDna, isPersonalized, type DnaClientResult } from '@/lib/dnaClient';
+// (isPersonalized stays as the fallback for pre-canonical cached responses.)
 import { scoreVerdict } from '@/lib/verdictVisual';
 import { Verd1ctBadge, Verd1ctBadgePlaceholder } from './Verd1ctBadge';
 import { CardRatings } from './CardRatings';
@@ -40,8 +41,14 @@ export function AlgorithmScore({
     };
   }, [mediaType, tmdbId]);
 
-  const personal = isPersonalized(dna);
-  const score = personal ? dna!.score : dna?.score ?? objectiveScore;
+  /* ONE LABEL, ONE NUMBER. This panel used to headline `dna.score` — the
+     taste blend — while `WatchCall` on the same card headlined
+     `dna.canonical.score`, so one card said "Your VERD1CT" about two
+     different numbers. The canonical contract is the referent of the brand
+     label everywhere (oneVerdictLabel.test.ts); the taste view keeps its own
+     honestly-labeled homes (CardDna's taste row, DnaScore's AI strip). */
+  const personal = dna?.canonical?.personalized ?? isPersonalized(dna);
+  const score = dna?.canonical?.score ?? dna?.score ?? objectiveScore;
   const v = score != null ? scoreVerdict(score) : null;
 
   return (

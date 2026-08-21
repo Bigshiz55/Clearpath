@@ -41,7 +41,8 @@
  * threshold and guessed wrong. `personalized` is returned as evidence, never
  * inferred downstream.
  *
- * PURE. No I/O, no clock. The I/O half lives in `src/lib/canonicalScore.ts`.
+ * PURE. No I/O, no clock. The I/O callers are `/api/dna/[type]/[id]` (cards,
+ * QuickLook, the title page) and `src/lib/tv/scoreGuide.ts` (the TV guide).
  */
 import type { ScoreAdjustment } from '@/lib/types';
 
