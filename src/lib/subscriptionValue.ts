@@ -63,7 +63,8 @@ for (const s of [...STREAMING_SERVICES, ...LIVE_TV_PROVIDERS]) {
 }
 const SERVICE_META = new Map([...STREAMING_SERVICES, ...LIVE_TV_PROVIDERS].map((s) => [s.id, s]));
 
-function verdictFor(est: number | null, watched: number): ServiceValue['verdict'] {
+/** Pure verdict per service — exported for tests (this module had none). */
+export function verdictFor(est: number | null, watched: number): ServiceValue['verdict'] {
   if (est == null) return 'unknown';
   if (est === 0) return 'free';
   if (watched === 0) return 'cancel';

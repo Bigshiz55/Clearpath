@@ -165,6 +165,25 @@ export function inv4AvailabilityClaimsSourced(run: DecisionRun): Violation[] {
     }));
 }
 
+/**
+ * INV-9 — GROUP EVIDENCE NEVER LEAKS INTO DURABLE INDIVIDUAL TASTE. A court
+ * verdict is what the ROOM decided under tonight's constraints; a docket
+ * verdict is a one-night ranking; a subscription snapshot is arithmetic over
+ * a window. None of them is evidence about who any individual user IS, and a
+ * write edge inside one would launder a group outcome into a personal
+ * belief. The SQL asserted this in comments; the modules honor it by
+ * inspection; this makes it a law over every recorded run.
+ */
+const GROUP_EPHEMERAL_ENTRY_POINTS = new Set(['court', 'verdict', 'subscriptions']);
+
+export function inv9GroupNeverDurable(run: DecisionRun): Violation[] {
+  if (!GROUP_EPHEMERAL_ENTRY_POINTS.has(run.entryPoint)) return [];
+  return [...edgesBy(run, 'wrote_taste'), ...edgesBy(run, 'seeded_title')].map((w) => ({
+    invariant: 'INV-9',
+    message: `${run.entryPoint} run wrote durable individual taste: ${w.predicate} ${w.object}`,
+  }));
+}
+
 /** The whole suite over one run. Empty result = the run is lawful. */
 export function checkRunInvariants(run: DecisionRun): Violation[] {
   return [
@@ -173,6 +192,7 @@ export function checkRunInvariants(run: DecisionRun): Violation[] {
     ...inv4AvailabilityClaimsSourced(run),
     ...inv6RawRequestRetained(run),
     ...inv8NoRejectedReturned(run),
+    ...inv9GroupNeverDurable(run),
     ...inv10UnknownNotConfirmed(run),
   ];
 }

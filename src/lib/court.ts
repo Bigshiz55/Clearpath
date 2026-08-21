@@ -221,7 +221,7 @@ export async function computeFinalistsFromPicks(
    * strictest runtime). Absent for callers that have no room context.
    */
   tonight?: CombinedTonight,
-): Promise<{ finalists?: RankedFinalist[]; error?: string }> {
+): Promise<{ finalists?: RankedFinalist[]; error?: string; rejected?: Array<{ key: string; title: string; reason: string }> }> {
   const allow = (mt: MediaType) => (mediaType === 'any' ? true : mt === mediaType);
   const exclude = new Set(excludeKeys);
 
@@ -296,15 +296,25 @@ export async function computeFinalistsFromPicks(
   // HARD GATES first — someone's exclusion is the room's exclusion, and the
   // strictest runtime wins. A gated title is removed, never merely down-ranked,
   // because a low score can still win a weak round.
-  const gated = [...metaMap.entries()].filter(([, meta]) => {
+  /* The gate's rejections are KEPT, with reasons — they were discarded here,
+     which made "why not X" unanswerable and INV-8 unprovable over any court
+     decision. Removal (never down-ranking) is unchanged. */
+  const gateRejections: Array<{ key: string; title: string; reason: string }> = [];
+  const gated = [...metaMap.entries()].filter(([k, meta]) => {
     if (!tonight) return true;
-    if (violatesAvoid(tonight.avoid, [...meta.genres, ...attributes(meta)])) return false;
+    if (violatesAvoid(tonight.avoid, [...meta.genres, ...attributes(meta)])) {
+      gateRejections.push({ key: k, title: meta.title, reason: 'hit a must-avoid tonight' });
+      return false;
+    }
     const runtime = meta.runtimeMinutes ?? null;
-    if (tonight.runtimeCapMinutes != null && runtime != null && runtime > tonight.runtimeCapMinutes) return false;
+    if (tonight.runtimeCapMinutes != null && runtime != null && runtime > tonight.runtimeCapMinutes) {
+      gateRejections.push({ key: k, title: meta.title, reason: `over tonight's ${tonight.runtimeCapMinutes}m cap` });
+      return false;
+    }
     return true;
   });
   if (gated.length === 0) {
-    return { error: 'Nothing clears everyone’s must-avoids and time limit tonight. Try relaxing one of them.' };
+    return { error: 'Nothing clears everyone’s must-avoids and time limit tonight. Try relaxing one of them.', rejected: gateRejections };
   }
 
   const moodsOf = new Map((tonight?.perMember ?? []).map((p) => [p.name, p.moods]));
@@ -379,6 +389,6 @@ export async function computeFinalistsFromPicks(
     }),
   );
 
-  return { finalists };
+  return { finalists, rejected: gateRejections };
 }
 

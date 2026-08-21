@@ -209,3 +209,139 @@ export function buildCaseRun(input: BuildCaseRunInput): DecisionRun {
     createdAt: input.createdAt,
   };
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// PHASE 8 — the group and ephemeral decision surfaces become graph objects.
+// Same discipline as the ask/build-case builders: these read values the
+// surfaces ALREADY computed and connect them; nothing is re-derived.
+// ───────────────────────────────────────────────────────────────────────────
+
+/** What /api/court/start knows when it builds the shortlist. */
+export interface CourtRunInput {
+  runId: string;
+  roomCode: string;
+  memberCount: number;
+  /** The COMBINED tonight constraints (union of avoids, strictest runtime,
+   *  unanimous media) — the room's hard gates. */
+  tonight: { avoid: string[]; runtimeCapMinutes: number | null; mediaType: string | null };
+  /** Gate rejections the ranking used to discard silently — with reasons. */
+  rejected: Array<{ key: string; title?: string; reason: string }>;
+  finalists: Array<{ key: string; title?: string; fit?: number | null }>;
+  createdAt: string;
+}
+
+export function buildCourtRun(input: CourtRunInput): DecisionRun {
+  const edges: DecisionEdge[] = [];
+  const req = nodeRef.request();
+  edges.push({ subject: nodeRef.run(), predicate: 'classified_as', object: 'court_shortlist' });
+  for (const g of input.tonight.avoid) {
+    edges.push({ subject: req, predicate: 'excludes_genre', object: g });
+  }
+  if (input.tonight.runtimeCapMinutes != null) {
+    edges.push({ subject: req, predicate: 'max_runtime', object: String(input.tonight.runtimeCapMinutes) });
+  }
+  if (input.tonight.mediaType && input.tonight.mediaType !== 'any') {
+    edges.push({ subject: req, predicate: 'requires_media', object: input.tonight.mediaType });
+  }
+  for (const r of input.rejected) {
+    edges.push({
+      subject: `candidate:${r.key}`,
+      predicate: 'rejected',
+      object: r.reason,
+      detail: { title: r.title },
+      provenance: { source: 'deterministic_rule', observedAt: input.createdAt, runId: input.runId },
+    });
+  }
+  for (const f of input.finalists) {
+    const cand = `candidate:${f.key}`;
+    edges.push({ subject: nodeRef.results(), predicate: 'returned', object: cand, detail: { title: f.title } });
+    if (f.fit != null) edges.push({ subject: cand, predicate: 'scored', object: String(f.fit) });
+  }
+  return {
+    id: input.runId,
+    entryPoint: 'court',
+    rawText: `court ${input.roomCode} · ${input.memberCount} member(s)`,
+    /* SESSION: the room's decision lives as long as the room does — it is
+       never anybody's durable taste (INV-9). */
+    intent: { kind: 'court_shortlist', persistence: 'session' },
+    edges,
+    createdAt: input.createdAt,
+  };
+}
+
+/** What the docket's deliverVerdict computed, reduced to what the run needs. */
+export interface DocketVerdictRunInput {
+  runId: string;
+  winner: { key: string; title?: string; score?: number | null } | null;
+  backup: { key: string; title?: string; score?: number | null } | null;
+  alsoRan: Array<{ key: string; title?: string; score?: number | null }>;
+  ruledOut: Array<{ key: string; title?: string; reason: string }>;
+  createdAt: string;
+}
+
+export function buildDocketVerdictRun(input: DocketVerdictRunInput): DecisionRun {
+  const edges: DecisionEdge[] = [];
+  edges.push({ subject: nodeRef.run(), predicate: 'classified_as', object: 'docket_verdict' });
+  const ranked = [input.winner, input.backup, ...input.alsoRan].filter(
+    (r): r is NonNullable<typeof r> => r != null,
+  );
+  for (const r of ranked) {
+    const cand = `candidate:${r.key}`;
+    edges.push({ subject: nodeRef.results(), predicate: 'returned', object: cand, detail: { title: r.title } });
+    if (r.score != null) edges.push({ subject: cand, predicate: 'scored', object: String(r.score) });
+  }
+  for (const r of input.ruledOut) {
+    edges.push({
+      subject: `candidate:${r.key}`,
+      predicate: 'rejected',
+      object: r.reason,
+      detail: { title: r.title },
+      provenance: { source: 'deterministic_rule', observedAt: input.createdAt, runId: input.runId },
+    });
+  }
+  return {
+    id: input.runId,
+    entryPoint: 'verdict',
+    rawText: `docket verdict · ${ranked.length} ranked · ${input.ruledOut.length} ruled out`,
+    /* REQUEST_ONLY: the docket is explicitly ephemeral — building one and
+       abandoning it teaches the recommender nothing, by contract. */
+    intent: { kind: 'docket_verdict', persistence: 'request_only' },
+    edges,
+    createdAt: input.createdAt,
+  };
+}
+
+/** What the Subscription Check computed for each service. */
+export interface SubscriptionRunInput {
+  runId: string;
+  services: Array<{ name: string; verdict: string; estPrice: number | null; watched: number }>;
+  windowDays: number;
+  createdAt: string;
+}
+
+export function buildSubscriptionRun(input: SubscriptionRunInput): DecisionRun {
+  const edges: DecisionEdge[] = [];
+  edges.push({ subject: nodeRef.run(), predicate: 'classified_as', object: 'subscription_check' });
+  for (const svc of input.services) {
+    edges.push({
+      subject: `service:${svc.name}`,
+      predicate: 'scored',
+      object: svc.verdict,
+      /* The basis travels WITH the claim: an estimated price (hardcoded
+         table — an estimate, and labeled as one), the watch count, and the
+         window it was counted over. */
+      detail: { estPrice: svc.estPrice, watched: svc.watched, windowDays: input.windowDays },
+      provenance: { source: 'calculated', observedAt: input.createdAt, runId: input.runId },
+    });
+  }
+  return {
+    id: input.runId,
+    entryPoint: 'subscriptions',
+    rawText: `subscription check · ${input.services.length} service(s) · ${input.windowDays}d window`,
+    /* REQUEST_ONLY: a value snapshot over a window — recomputed every visit,
+       never a durable belief about the user. */
+    intent: { kind: 'subscription_check', persistence: 'request_only' },
+    edges,
+    createdAt: input.createdAt,
+  };
+}
