@@ -30,7 +30,11 @@ describe('Phase 4 — the deployed knowledge schema is reconciled into main', ()
     expect(contract).toMatch(/title_knowledge/);
     expect(contract).toMatch(/title_subject_facts/);
     const pending = readFileSync(join(ROOT, 'src/lib/pendingMigrations.ts'), 'utf8');
-    expect(pending).toMatch(/0047_decision_runs/);
+    /* decision_runs was re-issued as 0049 after the 0047 collision with
+       production's CLI ledger surfaced — the retired identity must never
+       reappear in the runner registry. */
+    expect(pending).toMatch(/0049_decision_runs/);
+    expect(pending).not.toMatch(/0047_decision_runs/);
     expect(pending).toMatch(/0048_title_knowledge/);
   });
 });

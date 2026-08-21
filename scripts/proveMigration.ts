@@ -24,6 +24,12 @@ import { join } from 'node:path';
 const PRELUDE = `
 create extension if not exists pgcrypto;
 create extension if not exists pg_trgm;
+-- Supabase's standard roles, which policies name ('to service_role', grants
+-- to anon/authenticated). A bare Postgres has none of them; nologin stubs
+-- let a migration be judged on its own content.
+do $$ begin create role service_role nologin; exception when duplicate_object then null; end $$;
+do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
+do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
 create schema if not exists auth;
 create table if not exists auth.users (id uuid primary key);
 create or replace function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;

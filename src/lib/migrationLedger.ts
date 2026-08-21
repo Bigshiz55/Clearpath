@@ -48,6 +48,19 @@ alter table public.schema_migrations add column if not exists execution_method t
 alter table public.schema_migrations add column if not exists environment      text;
 alter table public.schema_migrations add column if not exists reconciled       boolean not null default false;
 alter table public.schema_migrations add column if not exists evidence         text;
+-- BORN HARDENED. The ledger records what DDL ran and what may be skipped —
+-- an anon-writable ledger row can poison skip/halt decisions (a forged
+-- success row suppresses a migration; a forged checksum halts the run).
+-- Migration 0046 hardens this table too, but only 'if exists' — on a fresh
+-- database where the runner creates the table AFTER 0046 ran, that guard
+-- skipped forever and the table sat exposed (observed on production,
+-- 2026-08-21). The DDL below runs on EVERY migrate call, so the repair is
+-- order-independent and self-heals existing deployments. Owner and
+-- service_role are unaffected (RLS is not forced for the table owner);
+-- anon/authenticated lose REST access, which nothing legitimate uses —
+-- the version reader goes through the direct pg channel or service_role.
+alter table public.schema_migrations enable row level security;
+revoke all on public.schema_migrations from anon, authenticated;
 `;
 
 /**
@@ -103,12 +116,18 @@ export function decideForMigration(name: string, checksum: string, existing: Led
 /**
  * Ledger trust level, surfaced by /api/version so nobody reads a partial
  * ledger as authoritative.
- *   unreconciled - rows exist but historical migrations were never proven
- *   reconciled   - the one-time reconciliation has run
- *   cli_ledger   - answered from supabase_migrations.schema_migrations, the
- *                  Supabase CLI's own application record — real evidence with
- *                  its own name, used when the repo ledger cannot answer.
- *   empty        - no ledger rows at all
- *   unavailable  - the ledger could not be read
+ *   unreconciled  - bare legacy rows exist (no checksum) that were never proven
+ *   reconciled    - the one-time reconciliation has run
+ *   runner_ledger - answered from a CHECKSUMMED public.schema_migrations row —
+ *                   written by the modern runner only after the migration
+ *                   committed, so it is commit-time evidence in its own right.
+ *                   Exists because the runner never sets `reconciled`, and
+ *                   without this tier a migration applied via the admin route
+ *                   stayed invisible to /api/version forever.
+ *   cli_ledger    - answered from supabase_migrations.schema_migrations, the
+ *                   Supabase CLI's own application record — real evidence with
+ *                   its own timestamp version and name.
+ *   empty         - no ledger rows at all
+ *   unavailable   - the ledger could not be read
  */
-export type LedgerStatus = 'reconciled' | 'unreconciled' | 'cli_ledger' | 'empty' | 'unavailable';
+export type LedgerStatus = 'reconciled' | 'unreconciled' | 'runner_ledger' | 'cli_ledger' | 'empty' | 'unavailable';

@@ -133,19 +133,29 @@ export interface DecisionEdge {
   provenance?: Provenance;
 }
 
-/** The entry points that may open a decision run. */
-export type EntryPoint =
-  | 'build-case'
-  | 'ask'
-  | 'search'
-  | 'finder'
-  | 'watch-now'
-  | 'tv'
-  | 'browse'
+/**
+ * The entry points that may open a decision run — value-level so the
+ * decision_runs migration's check constraint can be pinned against THIS
+ * list (src/lib/migrationSequence.test.ts). The original 0047 draft of the
+ * migration omitted the Phase 8 entries because the two lists had no test
+ * holding them together; every insert from those surfaces would have
+ * violated the constraint.
+ */
+export const ENTRY_POINTS = [
+  'build-case',
+  'ask',
+  'search',
+  'finder',
+  'watch-now',
+  'tv',
+  'browse',
   // Phase 8 — group and ephemeral decision surfaces (INV-9 applies).
-  | 'court'
-  | 'verdict'
-  | 'subscriptions';
+  'court',
+  'verdict',
+  'subscriptions',
+] as const;
+
+export type EntryPoint = (typeof ENTRY_POINTS)[number];
 
 /**
  * A DECISION RUN — one user-triggered decision, its constraints, candidates,

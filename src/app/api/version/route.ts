@@ -21,7 +21,14 @@ export const maxDuration = 30;
 export async function GET() {
   const info = getBuildInfo();
   // READ-ONLY. Never triggers, repairs or applies a migration.
-  const { appliedDatabaseMigration, migrationLedgerStatus, ledgerChannels } = await getAppliedMigrationInfo();
+  const {
+    appliedDatabaseMigration,
+    migrationLedgerStatus,
+    ledgerChannels,
+    appliedMigrationName,
+    cliLedger,
+    runnerLedger,
+  } = await getAppliedMigrationInfo();
   return NextResponse.json(
     {
       sha: info.gitSha || null,
@@ -47,6 +54,14 @@ export async function GET() {
       latestMigrationInCode: info.schemaVersion || null,
       appliedDatabaseMigration,
       migrationLedgerStatus,
+      // TWO IDENTITY SYSTEMS, BOTH NAMED. appliedDatabaseMigration is a repo
+      // filename when the repo/runner ledger answers and a CLI timestamp
+      // version when the CLI ledger answers — these fields carry the human
+      // name beside a timestamp answer, and whichever ledger did NOT win, so
+      // nothing is hidden behind a single conflated scalar.
+      ...(appliedMigrationName ? { appliedMigrationName } : {}),
+      ...(cliLedger ? { cliLedger } : {}),
+      ...(runnerLedger ? { runnerLedger } : {}),
       // WHY a channel could not answer, when one couldn't — closed-vocabulary
       // codes ('validate_rejected', 'ETIMEDOUT', '28P01', 'missing_key'),
       // never a URL, hostname or message. Absent on a healthy read. Exists

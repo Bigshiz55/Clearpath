@@ -45,8 +45,31 @@ import type { LedgerStatus } from '@/lib/migrationLedger';
  * repo rows as fact — those still return 'unknown'.
  */
 export interface AppliedMigrationInfo {
+  /**
+   * The newest applied migration by MOST RECENT EVIDENCE, in that ledger's
+   * OWN identity system: a repo filename ('0049_decision_runs') when the
+   * repo/runner ledger answers, a CLI timestamp version ('20260812164511')
+   * when the CLI ledger answers. The two systems are never merged into a
+   * fake shared identity — `migrationLedgerStatus` names which one this is,
+   * and `appliedMigrationName` / `cliLedger` / `runnerLedger` carry the
+   * other system's answer alongside so neither is hidden.
+   */
   appliedDatabaseMigration: string | 'unknown';
   migrationLedgerStatus: LedgerStatus;
+  /**
+   * The HUMAN name of the applied answer, when the ledger records one: for a
+   * CLI answer this is the CLI row's own `name` column (e.g.
+   * '0047_watchlist_provenance' beside version '20260812164511'); for a
+   * repo/runner answer it equals appliedDatabaseMigration. Absent when the
+   * ledger has no name to give — never invented from a filename scan.
+   */
+  appliedMigrationName?: string;
+  /** CLI-ledger evidence, whenever it was readable — even when the repo
+   *  ledger won the scalar. Version is the CLI's timestamp identity. */
+  cliLedger?: { version: string; name: string | null };
+  /** Newest checksummed runner-ledger row, when the CLI won the scalar —
+   *  so the runner's own record stays visible beside the CLI's. */
+  runnerLedger?: { name: string };
   /**
    * WHY the ledger read landed where it did, per channel — present only when
    * a channel was tried and failed, so a healthy read stays exactly the shape
@@ -59,7 +82,17 @@ export interface AppliedMigrationInfo {
   };
 }
 
-interface RepoLedgerRow { name: string; success: boolean; reconciled: boolean }
+interface RepoLedgerRow {
+  name: string;
+  success: boolean;
+  reconciled: boolean;
+  /** Written by the modern runner at commit time; null on legacy bare rows. */
+  checksum?: string | null;
+  completed_at?: string | null;
+}
+
+/** The CLI ledger's own row: timestamp version + (on newer CLI schemas) name. */
+interface CliLedgerRow { version: string; name: string | null }
 
 /** A channel's outcome: an answer, or a sanitized reason it has none. */
 type ChannelResult =
@@ -84,19 +117,77 @@ function sanitizedErrorCode(err: unknown): string {
   return 'unknown_error';
 }
 
-/** Decide from repo-ledger rows + optional CLI-ledger version. Pure. */
-function conclude(rows: RepoLedgerRow[], cliVersion: string | null): AppliedMigrationInfo {
+/** A CLI version is its own timestamp ('20260812164511' → epoch ms), so the
+ *  two ledgers' evidence can be ordered IN TIME without merging identities. */
+function cliVersionTime(version: string): number {
+  const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(version);
+  if (!m) return 0;
+  return Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, +m[4]!, +m[5]!, +m[6]!);
+}
+
+/**
+ * Decide from repo-ledger rows + optional CLI-ledger evidence. Pure.
+ *
+ * TWO IDENTITY SYSTEMS, NEVER CONFLATED: repo rows are named by filename
+ * ('0049_decision_runs'); CLI rows are versioned by timestamp
+ * ('20260812164511') with their own name column beside it. When both hold
+ * evidence, the scalar answer goes to whichever recorded evidence MORE
+ * RECENTLY — and the other ledger's answer always travels alongside it
+ * (`cliLedger` / `runnerLedger`), so /api/version hides neither. Before
+ * this, a migration the runner applied AFTER the CLI's last write stayed
+ * invisible: the reader trusted only `reconciled` rows, and the runner
+ * never sets that flag — its checksummed commit-time rows are first-class
+ * evidence of their own.
+ */
+function conclude(rows: RepoLedgerRow[], cli: CliLedgerRow | null): AppliedMigrationInfo {
   const successes = rows.filter((r) => r.success);
+  const cliInfo = cli ? { cliLedger: { version: cli.version, name: cli.name } } : {};
   if (successes.some((r) => r.reconciled)) {
-    // Sorted newest-first by the callers.
-    return { appliedDatabaseMigration: successes[0]!.name, migrationLedgerStatus: 'reconciled' };
+    // Sorted newest-first by the callers. Reconciliation is the strongest
+    // evidence tier; the CLI answer still rides along when it was read.
+    const name = successes[0]!.name;
+    return { appliedDatabaseMigration: name, appliedMigrationName: name, migrationLedgerStatus: 'reconciled', ...cliInfo };
   }
-  if (cliVersion) {
-    return { appliedDatabaseMigration: cliVersion, migrationLedgerStatus: 'cli_ledger' };
+  // Modern runner rows: checksummed at commit time by the route/CLI runner.
+  // Legacy bare rows (no checksum) prove nothing and stay out of this tier.
+  const proven = successes.filter((r) => typeof r.checksum === 'string' && r.checksum !== '');
+  const newestProven = proven[0] ?? null; // callers sort name-desc
+  if (newestProven && cli) {
+    const runnerTime = newestProven.completed_at ? Date.parse(newestProven.completed_at) : 0;
+    if (runnerTime > cliVersionTime(cli.version)) {
+      return {
+        appliedDatabaseMigration: newestProven.name,
+        appliedMigrationName: newestProven.name,
+        migrationLedgerStatus: 'runner_ledger',
+        ...cliInfo,
+      };
+    }
+    return {
+      appliedDatabaseMigration: cli.version,
+      ...(cli.name ? { appliedMigrationName: cli.name } : {}),
+      migrationLedgerStatus: 'cli_ledger',
+      ...cliInfo,
+      runnerLedger: { name: newestProven.name },
+    };
+  }
+  if (newestProven) {
+    return {
+      appliedDatabaseMigration: newestProven.name,
+      appliedMigrationName: newestProven.name,
+      migrationLedgerStatus: 'runner_ledger',
+    };
+  }
+  if (cli) {
+    return {
+      appliedDatabaseMigration: cli.version,
+      ...(cli.name ? { appliedMigrationName: cli.name } : {}),
+      migrationLedgerStatus: 'cli_ledger',
+      ...cliInfo,
+    };
   }
   if (successes.length > 0) {
-    // Rows exist but were never proven and no CLI evidence exists — the
-    // honest answer is still unknown.
+    // Bare legacy rows exist but were never proven and no CLI evidence
+    // exists — the honest answer is still unknown.
     return { appliedDatabaseMigration: 'unknown', migrationLedgerStatus: 'unreconciled' };
   }
   return { appliedDatabaseMigration: 'unknown', migrationLedgerStatus: 'empty' };
@@ -120,26 +211,37 @@ async function readViaDirectDb(rawUrl: string): Promise<ChannelResult> {
     let repoRows: RepoLedgerRow[] = [];
     try {
       const res = await client.query(
-        'select name, success, reconciled from public.schema_migrations where success = true order by name desc',
+        'select name, success, reconciled, checksum, completed_at from public.schema_migrations where success = true order by name desc',
       );
       repoRows = (res.rows ?? []) as RepoLedgerRow[];
     } catch {
       /* repo ledger absent on this database — not an error, just no rows */
     }
 
-    let cliVersion: string | null = null;
+    let cli: CliLedgerRow | null = null;
     if (!repoRows.some((r) => r.reconciled)) {
+      // The CLI ledger's `name` column exists on newer CLI schemas only;
+      // fall back to version-alone so an older ledger still answers.
       try {
         const res = await client.query(
-          'select version from supabase_migrations.schema_migrations order by version desc limit 1',
+          'select version, name from supabase_migrations.schema_migrations order by version desc limit 1',
         );
-        cliVersion = (res.rows?.[0]?.version as string | undefined) ?? null;
+        const row = res.rows?.[0] as { version?: string; name?: string | null } | undefined;
+        if (row?.version) cli = { version: row.version, name: row.name ?? null };
       } catch {
-        /* CLI ledger schema absent — genuine no-evidence, never fabricated */
+        try {
+          const res = await client.query(
+            'select version from supabase_migrations.schema_migrations order by version desc limit 1',
+          );
+          const version = (res.rows?.[0]?.version as string | undefined) ?? null;
+          if (version) cli = { version, name: null };
+        } catch {
+          /* CLI ledger schema absent — genuine no-evidence, never fabricated */
+        }
       }
     }
 
-    return { ok: true, info: conclude(repoRows, cliVersion) };
+    return { ok: true, info: conclude(repoRows, cli) };
   } catch (err) {
     // Connection-level failure: report WHICH kind, let the caller try the
     // next channel. The code is structural; the message never leaves here.
@@ -155,7 +257,7 @@ async function readViaRest(): Promise<ChannelResult> {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from('schema_migrations')
-      .select('name, success, reconciled')
+      .select('name, success, reconciled, checksum, completed_at')
       .eq('success', true)
       .order('name', { ascending: false });
     if (error) return { ok: false, reason: error.code || 'rest_query_failed' };
