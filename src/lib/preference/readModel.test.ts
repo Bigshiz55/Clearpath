@@ -149,6 +149,16 @@ describe('the record shape is the graph vocabulary, not a second one', () => {
   });
 });
 
+describe('undone events cost nothing', () => {
+  it('the loader excludes undone rows at the QUERY, not only in JS', () => {
+    /* The shaper's null-return is defense in depth; the query filter is the
+       actual fix — an undone event fetched and discarded still consumed one
+       of the 1000 cap slots, silently crowding out a live reaction. */
+    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, 'readModel.ts'), 'utf8');
+    expect(src).toMatch(/\.is\('undone_at', null\)/);
+  });
+});
+
 describe('the stale-derivation bug this phase also closes', () => {
   it('recordEvents busts the pref-dna cache tag it writes under', () => {
     /* `loadPreferenceCached` tags its entry `pref-dna:${userId}` with a
