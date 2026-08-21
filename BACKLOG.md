@@ -3,7 +3,65 @@
 Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
-## Now — ledger runtime forensics + comparative direction, 2026-08-20 (evening shift)
+## Now — graph-native slices A/B/C, phases 3–10, 2026-08-21 (overnight shift)
+
+- **CLOSED — Phase 5, one label one number (PR #102, merge 16fd771).**
+  Every verdict-label surface (AlgorithmScore, DnaScore, CardDna,
+  SearchResultRow) reads `canonical.score`; SearchResultRow wears
+  `Verd1ctBadge`; `/api/dna-score` deleted; 7 pins in
+  `src/lib/scoring/oneVerdictLabel.test.ts`.
+- **CLOSED — Phase 3, user evidence unification (PR #103, merge 01f8df0).**
+  One provenance-carrying read model (`src/lib/preference/readModel.ts`)
+  over the six evidence stores with honest per-row observed-at, capped
+  loads, named unreadables; founder inspector `/growth-os/evidence`;
+  `pref-dna:${userId}` cache bust at the write chokepoint.
+- **CLOSED — Slice A / Phase 6, availability provenance (PR #104, merge
+  bdeaeb7).** Watchmode rows carry retrieved/verified stamps +
+  availability_state; TVmaze airings and ingested guide rows carry
+  source + observed-at; cards prefer real per-row `retrieved_at`; INV-4
+  law; the airing branch finally carries its subject ("AMC boxing movies
+  tonight" reaches the guide WITH `boxing`). Production verified.
+- **CLOSED — Slices B+C / Phase 8, group + subscription runs (PR #105,
+  merge b5c1acd).** Verdict Room finalists (session), docket verdicts and
+  Subscription Check (request_only) record decision runs; INV-9 (group
+  evidence never writes durable taste) law; verdict beacon bounded by a 3s
+  auth race so it can never hang a page. 87/87 mobile specs green.
+- **CLOSED — Phase 7 orphan half (PR #106, merge 626d15f).** The third
+  English reader is dead: `/api/recommendations` POST deleted,
+  `recFeedback.ts` reduced to the filter types its callers use,
+  `src/lib/arch/orphanSurfaces.test.ts` pins it cannot return.
+- **CLOSED — Phases 4/9/10 (PR #107, merge 61065cc).** The deployed knowledge layer
+  (compile/resolve/store + 0048 byte-identical, sha-pinned) joins main
+  with its 15 tests; `/growth-os/title-evidence` inspector; `groundedWhy`
+  + INV-7 — a why can only say what a run's edges prove.
+- **Queued follow-ups discovered this shift:**
+  - **Phase 7 remainder (deliberately deferred):** fold `/api/finder`'s
+    parse into the canonical interpreter; stop `/api/ask`'s legacy arm
+    trusting client `naiveParseQuery`; dedupe `coerceQuery`. Search-surface
+    work — takes the frozen-corpus gate + baseline delta report.
+  - **Knowledge → finder eligibility wiring** (use compiled subject facts
+    for eligibility/rejection evidence). Search-surface work, same gates.
+  - **Court results durable persistence** needs a SECURITY DEFINER RPC
+    migration (host-scoped write path); court runs currently record only
+    when the host is authenticated.
+  - **INV-3 / INV-5** (personalized-score-requires-evidence; one identity
+    owns cross-surface score state) not yet enforced over stored runs.
+  - **0047 numbering collision:** repo `0047_decision_runs` vs
+    DB-applied `0047_watchlist_provenance` (from the abandoned branch).
+    Renumber/reconcile before the owner applies pending migrations.
+  - **Mobile harness build contract (discovery):** `npm run test:mobile`
+    inlines dummy `NEXT_PUBLIC_SUPABASE_*` via `build:harness`; a plain
+    `npm run build` serves 500s on pages that construct browser Supabase
+    clients. Never diagnose mobile-spec failures from a plain build.
+- **Ranking movement this shift: ZERO by construction.** Every merged
+  change records or reads evidence; no ranking input changed (rule F —
+  a recommendation must never move merely because an edge exists).
+- **HUMAN ACTION — unchanged from the evening shift:** fix
+  `SUPABASE_DB_URL` in Vercel (see the evening-shift entry below for the
+  exact procedure and proof-of-done). Until then `decision_runs` /
+  `title_knowledge` production application stays unverifiable from code.
+
+## Prior shift — ledger runtime forensics + comparative direction, 2026-08-20 (evening shift)
 
 - **CLOSED — the runtime can read the migration ledger (PRs #98 + #100).**
   Owner's environment verification proved the DB healthy and populated while

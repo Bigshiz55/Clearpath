@@ -35,26 +35,43 @@ model, the phase plan, and the honest record of what is built versus mapped.
 | Which work does a framed name mean? | `chooseFramedReading` on cumulative audience | #90 |
 | Is a skipped gate a pass? | No — deployed jobs conclude SKIPPED on production events | #91 |
 
-### Duplicate/isolated truth still open (audit, 2026-08-20)
+### Duplicate/isolated truth — status after the phase 3–10 execution (2026-08-21)
 - **Two recommendation engines**: `/api/ask` (canonical `interpret` +
   `resolveCanonicalExecution`) vs `/api/finder` (`parseAskWithAI` +
   `naiveParseQuery` + `applyRequiredSubject`). Reachable for the same
-  sentence via build-case's platform branch. → Phase 7 consolidation.
+  sentence via build-case's platform branch. → Phase 7 consolidation —
+  **STILL OPEN** (deliberately deferred; tracked in BACKLOG).
 - **`/api/ask`'s legacy arm trusts the client's `naiveParseQuery`** for
-  non-recommendation kinds (`body.query` precedence). → Phase 7.
+  non-recommendation kinds (`body.query` precedence). → Phase 7 —
+  **STILL OPEN** (deferred with the finder fold).
 - **The airing branch drops the subject** ("AMC boxing movies tonight"
-  reaches the guide without `boxing`). → Phase 6/7.
+  reaches the guide without `boxing`). → **CLOSED, PR #104** — the airing
+  exit re-reads the canonical interpreter's wanted subjects, carries the
+  first as `?q=`, and the guide filters by it; the run records
+  `requires_subject` and INV-1 accepts a routing run's hand-off via its
+  `routed_to` edge (the URL carries the term).
 - **Ask tiles show `dna.score` (AlgorithmScore) while WatchCall shows
   `dna.canonical.score`; `matchScore` (the ordering) is displayed nowhere.**
-  → Phase 5 scoring-trace consumers.
+  → **CLOSED, PR #102** — every label surface reads `canonical.score`
+  (one-label-one-number pinned by `oneVerdictLabel.test.ts`).
 - **User preference evidence is scattered** (dimension_signals sums, quiz
   ratings, FOR/AGAINST, Showdown, saves) with no evidence traceability
-  behind derived Taste DNA. → Phase 3.
+  behind derived Taste DNA. → **CLOSED, PR #103** — one provenance-carrying
+  read model (`src/lib/preference/readModel.ts`) over the six stores, the
+  founder evidence inspector (`/growth-os/evidence`), and a cache-bust
+  chokepoint at the write path.
 - **Availability/title facts carry implicit provenance** (table-name-level
-  only). → Phases 4/6.
+  only). → **CLOSED for availability/airings, PR #104** (source +
+  observed-at on watchmode rows, TVmaze airings and ingested guide rows;
+  cards prefer the real per-row `retrieved_at`); **title knowledge joined
+  in PR #107** (the deployed 0048 layer reconciled into main, read behind
+  `readTitleKnowledge` with safe-absent semantics).
 - **Orphan NL parser**: `/api/recommendations` POST + `lib/recFeedback.ts`
-  (no callers). → delete in Phase 7.
-- SearchResultRow prints a raw score number (neither badge). → Phase 5.
+  (no callers). → **CLOSED, PR #106** — route deleted, parser reduced to
+  the filter types its callers actually use, orphan-surface regression pins
+  added (`src/lib/arch/orphanSurfaces.test.ts`).
+- SearchResultRow prints a raw score number (neither badge). →
+  **CLOSED, PR #102** — it wears `Verd1ctBadge` like every other card.
 
 ## Phase 1 — the vocabulary (`src/lib/graph/types.ts`) — BUILT
 
@@ -108,11 +125,20 @@ model, the phase plan, and the honest record of what is built versus mapped.
 - **INV-6** the raw utterance survives to the end of the run.
 - **INV-8** a rejected candidate is never returned.
 - **INV-10** unknown evidence is never fully-confident.
-- INV-3 (personalized score requires personal evidence), INV-4
-  (availability claims carry source+timestamp), INV-5 (one identity owns
-  cross-surface score state), INV-7 (every "because" claim maps to
-  execution evidence), INV-9 (group evidence never leaks into durable
-  individual taste) land with their phases (5, 6, 30, 10, 8 respectively).
+- **INV-4** availability claims carry source + observed-at — BUILT with
+  Slice A (PR #104): `available_on`/`airs_on` edges without
+  `provenance.source` + `observedAt` are violations.
+- **INV-7** every "because" claim maps to execution evidence — BUILT with
+  Phase 10 (PR #107): a `detail.because` on a returned edge requires an
+  evidence-bearing edge (satisfies/scored/available_on/airs_on/rejected)
+  for the same subject in the same run.
+- **INV-9** group evidence never leaks into durable individual taste —
+  BUILT with Phase 8 (PR #105): court/verdict/subscriptions runs must
+  carry zero `wrote_taste`/`seeded_title` edges.
+- INV-3 (personalized score requires personal evidence) and INV-5 (one
+  identity owns cross-surface score state) are NOT YET BUILT — their
+  behavior exists (canonical trace, one badge) but no invariant enforces
+  it over stored runs. Tracked in BACKLOG.
 
 ## The boxing litmus — PROVEN (route level)
 
@@ -153,16 +179,48 @@ inspector reads are founder-only. No new AI calls anywhere in the spine —
 model-derived evidence is only ever RECORDED as `classifier` provenance
 where routes already used one.
 
-## Phase plan (each deployable)
+## Phase plan — status of record (2026-08-21, PRs #102–#107)
 
-0 map ✅ · 1 vocabulary ✅ · 2 decision provenance + inspector ✅ ·
-3 user evidence unification → Taste DNA as a derived view ·
-4 content evidence (title facts with per-source provenance, disagreement
-retained) · 5 scoring trace (one canonical trace; surfaces read it; fixes
-the AlgorithmScore/WatchCall divergence) · 6 availability & live TV
-(observed_at/validity on offers and airings; canonical title resolution) ·
-7 cross-surface consolidation (finder folds into the canonical
-interpreter; legacy arm stops trusting client parses; airing branch keeps
-the subject; orphan parser deleted) · 8 Docket / Verdict Room /
-Subscription Check as graph objects · 9 title/user evidence inspectors ·
-10 graph-powered "Why this VERD1CT" from run evidence.
+- **0 map ✅** (+ the forensic reconciliation matrix of this execution:
+  doc vs repo vs production, two schema-drift discoveries below).
+- **1 vocabulary ✅** · **2 decision provenance + inspector ✅**.
+- **3 user evidence unification ✅** (PR #103) — one read model over the
+  six stores, `/growth-os/evidence`, DNA cache bust at the write path.
+- **4 content evidence — PARTIAL** (PR #107) — the production-deployed
+  knowledge layer (compile/resolve/store + migration 0048, byte-identical
+  to what the DB applied) is reconciled into main with its 15 tests and
+  read by the title-evidence inspector. NOT yet wired into finder
+  eligibility (a search-surface change; queued with its own corpus gate).
+- **5 scoring trace ✅** (PR #102) — one label, one number, all surfaces.
+- **6 availability & live TV ✅ (Slice A)** (PR #104) — source/observed-at
+  on watchmode + TVmaze + ingested rows, INV-4, airing subject carried.
+- **7 cross-surface consolidation — PARTIAL** — airing subject (PR #104)
+  and orphan-parser deletion (PR #106) are done; the finder fold into the
+  canonical interpreter and the legacy arm's client-parse trust are
+  DEFERRED (tracked in BACKLOG; both touch search surfaces and take the
+  frozen-corpus gate).
+- **8 Slices B+C — PARTIAL** (PR #105) — Verdict Room, docket verdict and
+  Subscription Check record decision runs (session/request_only) under
+  INV-9; court runs record only when the host is authenticated, and
+  durable court **results** persistence still needs its SECURITY DEFINER
+  RPC migration (queued).
+- **9 evidence inspectors ✅** (PRs #103 + #107) — `/growth-os/evidence`
+  (user) and `/growth-os/title-evidence` (title), both provenance-first
+  with named absence.
+- **10 graph-powered why — PARTIAL** (PR #107) — `groundedWhy` derives
+  reasons only from a run's own edges (INV-7 enforced); LIVE in the
+  founder run inspector. The user-facing title-page "Why this VERD1CT"
+  does not read run evidence yet (queued).
+
+## Schema reality discovered during reconciliation (2026-08-21)
+
+- The production DB's CLI ledger names **0047_watchlist_provenance** and
+  **0048_title_knowledge** — both applied from the abandoned
+  `claude/watch-verdict-app-wwbtbg` line. The repo's `0047_decision_runs`
+  **collides by number** with the applied 0047 and is absent from the DB
+  ledger, so `decision_runs`' production existence is UNKNOWN until the
+  owner's `SUPABASE_DB_URL` fix lands (recording degrades to a no-op by
+  contract; nothing breaks). Resolve the numbering before applying.
+- `0048_title_knowledge.sql` in this repo is pinned byte-identical
+  (sha256 in `src/lib/graph/phase910.test.ts`) to the file production
+  applied, so the name+checksum ledger discipline stays intact.
