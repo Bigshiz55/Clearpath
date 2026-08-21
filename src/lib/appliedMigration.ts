@@ -107,7 +107,7 @@ type ChannelResult =
  * by its constructor name; error MESSAGES are never forwarded, because a
  * connect failure interpolates the hostname into its message.
  */
-function sanitizedErrorCode(err: unknown): string {
+export function sanitizedErrorCode(err: unknown): string {
   if (err && typeof err === 'object') {
     const code = (err as { code?: unknown }).code;
     if (typeof code === 'string' && /^[A-Z0-9_]{2,32}$/i.test(code)) return code;
