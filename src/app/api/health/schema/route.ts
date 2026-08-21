@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
+import { Client } from 'pg';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SCHEMA_CONTRACT, migrationFor } from '@/lib/schemaContract';
 import { serverEnv } from '@/lib/env';
+import { sanitizeDbUrl, validateDbUrl } from '@/lib/adminMigrateUrl';
+import { sanitizedErrorCode } from '@/lib/appliedMigration';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,37 +19,121 @@ export const maxDuration = 60;
  * not confirmed" fallback looks identical whether a title is unchecked or its
  * table is absent.
  *
- * Probes every object in SCHEMA_CONTRACT against the live database and names
- * the missing ones with the migration that would create them. Read-only: a
- * `select ... limit 1` per object and nothing else.
+ * TWO PROBE CHANNELS, for the same reason the ledger reader has two
+ * (2026-08-20): production holds a working direct Postgres connection and no
+ * REST service key, and this probe was REST-only — so the deployment that
+ * most needed to prove "was 0049 actually applied?" answered 503 about a
+ * database it could reach. The direct channel is also simply better evidence:
+ * one read-only catalog query answers presence AND row-level-security state
+ * for every object at once, instead of 100+ sequential PostgREST calls.
+ *
+ *   1. DIRECT DB (preferred when configured): pg_class/pg_namespace catalog
+ *      read — relation names, kinds, and `relrowsecurity`.
+ *   2. REST admin client (fallback): the original per-object
+ *      `select … limit 1`, unchanged, for deployments configured with a
+ *      privileged API key instead of a DB URL. PostgREST cannot see RLS
+ *      state, so `rlsDisabled` is only reported on the direct channel.
  *
  * Deliberately UNAUTHENTICATED, and deliberately safe to be:
  *   - it returns object NAMES, which are already public in this repository,
+ *   - RLS flags are schema facts the security advisor already surfaces,
  *   - it returns no row data, no counts, no credentials, no environment
- *     values — only booleans about whether configuration exists,
+ *     values — only booleans about whether configuration exists, and
+ *     failure reasons as closed-vocabulary codes (never a message, which
+ *     for a pg connect error contains the hostname),
  *   - and a deploy gate that requires a human to authenticate is a deploy
  *     gate that gets skipped.
  */
+
+interface CatalogRow {
+  name: string;
+  relkind: string;
+  relrowsecurity: boolean;
+}
+
+type DirectProbe =
+  | { ok: true; rows: CatalogRow[] }
+  | { ok: false; reason: string };
+
+async function probeViaDirectDb(rawUrl: string): Promise<DirectProbe> {
+  const dbUrl = sanitizeDbUrl(rawUrl);
+  if (!validateDbUrl(dbUrl).ok) return { ok: false, reason: 'validate_rejected' };
+  let client: Client | null = null;
+  try {
+    client = new Client({
+      connectionString: dbUrl,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 5000,
+    });
+    await client.connect();
+    const res = await client.query(
+      `select c.relname as name, c.relkind, c.relrowsecurity
+         from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public'
+          and c.relkind in ('r', 'p', 'v', 'm')`,
+    );
+    return { ok: true, rows: (res.rows ?? []) as CatalogRow[] };
+  } catch (err) {
+    return { ok: false, reason: sanitizedErrorCode(err) };
+  } finally {
+    await client?.end().catch(() => {});
+  }
+}
+
 export async function GET() {
   const objects = [...new Set(SCHEMA_CONTRACT.map((r) => r.object))].sort();
   const missing: { object: string; migration: string; error: string }[] = [];
   const present: string[] = [];
+  /** Contract TABLES the direct channel saw with row-level security off —
+   *  the exact class of finding the 2026-08-21 ledger-table exposure was. */
+  const rlsDisabled: string[] = [];
   let probeFailed: string | null = null;
+  let probeChannel: 'direct_db' | 'rest' | null = null;
+  const channels: { directDb?: string; rest?: string } = {};
 
-  try {
-    const admin = createAdminClient();
-    // Sequential on purpose: a burst of 73 concurrent PostgREST calls from a
-    // health check is a self-inflicted load spike, and this runs rarely.
-    for (const object of objects) {
-      const { error } = await admin.from(object).select('*').limit(1);
-      if (error) {
-        missing.push({ object, migration: migrationFor(object) ?? 'unknown', error: error.message });
-      } else {
-        present.push(object);
+  const rawDbUrl = serverEnv.migrationsDbUrl();
+  if (rawDbUrl) {
+    const direct = await probeViaDirectDb(rawDbUrl);
+    if (direct.ok) {
+      probeChannel = 'direct_db';
+      const byName = new Map(direct.rows.map((r) => [r.name, r]));
+      for (const object of objects) {
+        const row = byName.get(object);
+        if (!row) {
+          missing.push({ object, migration: migrationFor(object) ?? 'unknown', error: 'not present in pg_class' });
+        } else {
+          present.push(object);
+          if ((row.relkind === 'r' || row.relkind === 'p') && row.relrowsecurity === false) {
+            rlsDisabled.push(object);
+          }
+        }
       }
+    } else {
+      channels.directDb = direct.reason;
     }
-  } catch (e) {
-    probeFailed = e instanceof Error ? e.message : 'probe failed';
+  } else {
+    channels.directDb = 'not_configured';
+  }
+
+  if (probeChannel === null) {
+    try {
+      const admin = createAdminClient();
+      probeChannel = 'rest';
+      // Sequential on purpose: a burst of 100+ concurrent PostgREST calls from
+      // a health check is a self-inflicted load spike, and this runs rarely.
+      for (const object of objects) {
+        const { error } = await admin.from(object).select('*').limit(1);
+        if (error) {
+          missing.push({ object, migration: migrationFor(object) ?? 'unknown', error: error.message });
+        } else {
+          present.push(object);
+        }
+      }
+    } catch {
+      channels.rest = 'missing_key';
+      probeFailed = `no probe channel could answer (directDb: ${channels.directDb ?? 'not_tried'}, rest: ${channels.rest})`;
+    }
   }
 
   // Which migrations the missing objects belong to — the actionable summary.
@@ -57,11 +144,14 @@ export async function GET() {
     {
       ok,
       checked: objects.length,
+      probeChannel,
       presentCount: present.length,
       missingCount: missing.length,
       /** The migrations an operator needs to apply, in order. */
       unappliedMigrations: migrations,
       missing,
+      /** Direct channel only; [] on REST, which cannot see RLS state. */
+      rlsDisabled,
       probeFailed,
       /** Booleans only — never the values. Says whether a runner COULD run. */
       runner: {
