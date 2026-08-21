@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
+import { persistDecisionRun } from '@/lib/graph/store';
+import { buildCourtRun } from '@/lib/graph/decisionRun';
 import { computeFinalistsFromPicks, type CourtPick, type CourtWishMember } from '@/lib/court';
 import { COURT_SIZES } from '@/lib/court/pool';
 import { asCourtSize } from '@/lib/court/roomSettings';
@@ -124,6 +127,39 @@ export async function POST(request: Request) {
     const effectiveMediaType = roomMediaType !== 'any' ? roomMediaType : tonight.mediaType;
 
     const result = await computeFinalistsFromPicks(members, effectiveMediaType, [], 'US', spec.total, tonight);
+
+    /* ── GRAPH: THE COURT SHORTLIST IS A DECISION RUN (Phase 8) ────────────
+       The combined constraints, the gate rejections (with reasons — they
+       used to be discarded), and the ranked finalists, connected. Recorded
+       under the SIGNED-IN caller when there is one; an anonymous room
+       degrades to no recording, by the store's own contract. Session-scoped:
+       the room's decision is never anybody's durable taste (INV-9). */
+    try {
+      const userClient = createClient();
+      const { data: { user } } = await userClient.auth.getUser();
+      if (user) {
+        void persistDecisionRun(userClient, user.id, buildCourtRun({
+          runId: crypto.randomUUID(),
+          roomCode: String(body.code ?? ''),
+          memberCount: members.length,
+          tonight: {
+            avoid: tonight.avoid,
+            runtimeCapMinutes: tonight.runtimeCapMinutes ?? null,
+            mediaType: effectiveMediaType ?? null,
+          },
+          rejected: result.rejected ?? [],
+          finalists: (result.finalists ?? []).map((f) => ({
+            key: `${f.mediaType}-${f.id}`,
+            title: f.title,
+            fit: f.fit,
+          })),
+          createdAt: new Date().toISOString(),
+        }));
+      }
+    } catch {
+      /* recording is debugging truth, never in the user's way */
+    }
+
     if (result.error || !result.finalists) return NextResponse.json({ error: result.error ?? 'Couldn’t build a shortlist — try broadening tonight’s preferences.' }, { status: 200 });
 
     const seenKeys = result.finalists.map((f) => `${f.mediaType}-${f.id}`);

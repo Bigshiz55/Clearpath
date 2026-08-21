@@ -23,6 +23,13 @@ const FACTS: Record<number, { match: number; conf: number; general: number; runt
 };
 
 async function open(page: Page, w = 1280, h = 900) {
+  // The graph beacon (Phase 8) — same world-boundary stub as dna/quicklook:
+  // this suite tests the docket UI, not the run recording; without the stub
+  // the POST reaches the real route and its auth lookup keeps `networkidle`
+  // waits busy in the credential-less harness.
+  await page.route('**/api/verdict/run', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }),
+  );
   await page.route('**/api/dna/**', async (route) => {
     const id = Number(new URL(route.request().url()).pathname.split('/').pop());
     const f = FACTS[id];

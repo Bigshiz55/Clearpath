@@ -80,8 +80,24 @@ export function VerdictDelivery() {
     setState('working');
     try {
       const candidates = await Promise.all(docket.map(factsFor));
-      setVerdict(deliverVerdict(candidates));
+      const v = deliverVerdict(candidates);
+      setVerdict(v);
       setState('done');
+      /* GRAPH BEACON (Phase 8): the verdict this client just computed —
+         winner, backup, also-rans and the ruled-out WITH their reasons —
+         recorded as a request_only decision run. Fire-and-forget: a failure
+         here can never touch the verdict already on screen, and the docket
+         itself still never writes taste (INV-9). */
+      void fetch('/api/verdict/run', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          winner: v.winner ? { key: v.winner.candidate.key, title: v.winner.candidate.title, score: v.winner.score } : null,
+          backup: v.backup ? { key: v.backup.candidate.key, title: v.backup.candidate.title, score: v.backup.score } : null,
+          alsoRan: v.alsoRan.map((r) => ({ key: r.candidate.key, title: r.candidate.title, score: r.score })),
+          ruledOut: v.ruledOut.map((r) => ({ key: r.candidate.key, title: r.candidate.title, reason: r.reason })),
+        }),
+      }).catch(() => {});
     } catch {
       setState('error');
     }

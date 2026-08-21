@@ -141,7 +141,11 @@ export type EntryPoint =
   | 'finder'
   | 'watch-now'
   | 'tv'
-  | 'browse';
+  | 'browse'
+  // Phase 8 — group and ephemeral decision surfaces (INV-9 applies).
+  | 'court'
+  | 'verdict'
+  | 'subscriptions';
 
 /**
  * A DECISION RUN — one user-triggered decision, its constraints, candidates,

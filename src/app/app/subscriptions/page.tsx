@@ -5,6 +5,8 @@ import { getProfile, regionFor } from '@/lib/profile';
 import { getSubscriptionValue, type ServiceValue } from '@/lib/subscriptionValue';
 import { isPro } from '@/lib/pro';
 import { PRO_PRICE_LABEL } from '@/lib/proPlan';
+import { persistDecisionRun } from '@/lib/graph/store';
+import { buildSubscriptionRun } from '@/lib/graph/decisionRun';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Are your subscriptions worth it?' };
@@ -26,6 +28,19 @@ export default async function SubscriptionsPage() {
   const region = regionFor(uid ? await getProfile(supabase, uid) : null);
   const v = await getSubscriptionValue(supabase, uid, region);
   const pro = uid ? await isPro(supabase, uid) : false;
+
+  /* GRAPH (Phase 8): every worth/cancel claim this page is about to render,
+     recorded as a request_only decision run WITH its basis (estimated price,
+     watch count, window). A value snapshot, never a durable belief — INV-9
+     forbids taste writes from this entry point. Fire-and-forget. */
+  if (uid && v.services.length > 0) {
+    void persistDecisionRun(supabase, uid, buildSubscriptionRun({
+      runId: crypto.randomUUID(),
+      services: v.services.map((s) => ({ name: s.name, verdict: s.verdict, estPrice: s.estPrice, watched: s.watched })),
+      windowDays: v.windowDays,
+      createdAt: new Date().toISOString(),
+    }));
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">

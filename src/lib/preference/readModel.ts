@@ -227,6 +227,10 @@ export async function loadUserEvidence(
       .from('preference_events')
       .select('id, title_id, action, source, round_id, session_id, event_at, undone_at')
       .eq('user_id', userId)
+      // Filtered at the QUERY, not just the shaper: an undone event fetched
+      // and discarded in JS still consumed a cap slot, silently crowding a
+      // live reaction out of the 1000-row window. (Reviewer catch on #103.)
+      .is('undone_at', null)
       .order('event_at', { ascending: false })
       .limit(CAPS.reactions),
     supabase.from('dimension_signals').select('dimension_key, w_sum, wv_sum, updated_at').eq('user_id', userId),
