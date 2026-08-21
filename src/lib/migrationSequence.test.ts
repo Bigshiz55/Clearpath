@@ -87,6 +87,40 @@ describe('the decision_runs schema speaks the code’s vocabulary', () => {
   });
 });
 
+describe('one runner discipline — the CLI script and the admin route share the ledger machinery', () => {
+  it('scripts/migrate.ts runs the shared LEDGER_DDL/checksum discipline, not a private bare ledger', () => {
+    const script = readFileSync(join(__dirname, '..', '..', 'scripts', 'migrate.ts'), 'utf8');
+    /* This script was the last bare-ledger writer — and the Actions
+       workflow's PREFERRED path, so the unattended route was exactly the
+       one without checksums, halt-on-mismatch, or hardening. */
+    expect(script).toMatch(/import \{ LEDGER_DDL, MIGRATION_LOCK_KEY, checksumOf, decideForMigration/);
+    expect(script).toMatch(/execution_method[\s\S]{0,200}'cli'/);
+    expect(script).not.toMatch(/create table if not exists public\.schema_migrations/);
+  });
+
+  it('the ledger upgrade backfills legacy history as the successes it truthfully was', () => {
+    /* LEDGER_DDL adds `success` with DEFAULT FALSE — without the backfill,
+       every pre-upgrade row (each written only after a successful commit by
+       the old runner) read as a recorded FAILURE, and recorded failures are
+       RETRIED: the first modern run would have re-executed 30+ historical
+       DDLs against a live database. The guard conditions make the backfill
+       unable to touch a modern row (modern failures always carry checksum
+       and error_message). */
+    expect(LEDGER_DDL).toMatch(/update public\.schema_migrations\s*\n\s*set success = true\s*\n\s*where success = false\s*\n\s*and checksum is null\s*\n\s*and error_message is null;/);
+  });
+
+  it('an upgraded legacy row is SKIPPED, never re-run and never trusted for a checksum match', async () => {
+    const { decideForMigration } = await import('./migrationLedger');
+    const d = decideForMigration('0031_reco_engine', 'abc123', {
+      name: '0031_reco_engine',
+      checksum: null,
+      success: true,
+      reconciled: false,
+    });
+    expect(d.action).toBe('skip');
+  });
+});
+
 describe('the ledger table is born hardened', () => {
   it('LEDGER_DDL itself enables RLS and revokes anon/authenticated — order-independent of 0046', () => {
     /* 0046 hardens public.schema_migrations only `if exists`; on a database

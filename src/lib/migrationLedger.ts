@@ -61,6 +61,23 @@ alter table public.schema_migrations add column if not exists evidence         t
 -- the version reader goes through the direct pg channel or service_role.
 alter table public.schema_migrations enable row level security;
 revoke all on public.schema_migrations from anon, authenticated;
+-- HISTORY IS NOT A FAILURE. The bare legacy ledger recorded a row ONLY after
+-- a migration committed (the old runner inserted inside the same
+-- transaction), so every pre-upgrade row is a truthful success — but the
+-- 'success' column arrives with DEFAULT FALSE, which reads that history as
+-- 30+ recorded FAILURES, and a recorded failure is RETRIED: the first
+-- modern-runner pass after the upgrade would have re-executed every
+-- historical DDL against a live database. The backfill states what the old
+-- runner's own semantics guaranteed. It is idempotent and cannot touch a
+-- modern row: a modern FAILURE always carries its checksum and
+-- error_message; legacy bare rows have neither. Backfilled rows land in
+-- decideForMigration's designed branch — "recorded applied without a
+-- checksum — not rerun".
+update public.schema_migrations
+   set success = true
+ where success = false
+   and checksum is null
+   and error_message is null;
 `;
 
 /**

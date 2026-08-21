@@ -10,6 +10,7 @@
     "dev": "next dev",
     "build": "npm run check:schema && next build",
     "postbuild": "node scripts/verify/bundleEscapes.mjs",
+    "premigrate": "tsx scripts/checkMigrationsRegistered.ts",
     "migrate": "tsx scripts/migrate.ts",
     "check:migrations": "tsx scripts/checkMigrationsRegistered.ts",
     "check:branch": "tsx scripts/checkBranch.ts",
