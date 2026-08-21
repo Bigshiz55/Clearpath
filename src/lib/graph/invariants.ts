@@ -184,6 +184,34 @@ export function inv9GroupNeverDurable(run: DecisionRun): Violation[] {
   }));
 }
 
+/**
+ * INV-7 — EVERY "BECAUSE" CLAIM MAPS TO EXECUTION EVIDENCE. An edge carrying
+ * a `detail.because` string asserts a REASON about its subject; that reason
+ * is lawful only when the run also holds at least one evidence-bearing edge
+ * (satisfies / scored / available_on / airs_on / rejected) for the same
+ * subject. A because-claim with no evidence is post-hoc storytelling — the
+ * failure mode Phase 10's grounded-why builder is constructed to make
+ * impossible, and this catches any other emitter that tries.
+ */
+const EVIDENCE_PREDICATES = new Set(['satisfies', 'scored', 'available_on', 'airs_on', 'rejected']);
+
+export function inv7BecauseMapsToEvidence(run: DecisionRun): Violation[] {
+  const out: Violation[] = [];
+  for (const e of run.edges) {
+    if (typeof e.detail?.because !== 'string') continue;
+    const grounded = run.edges.some(
+      (o) => o.subject === e.subject && EVIDENCE_PREDICATES.has(o.predicate),
+    );
+    if (!grounded) {
+      out.push({
+        invariant: 'INV-7',
+        message: `a because-claim about ${e.subject} has no execution evidence behind it`,
+      });
+    }
+  }
+  return out;
+}
+
 /** The whole suite over one run. Empty result = the run is lawful. */
 export function checkRunInvariants(run: DecisionRun): Violation[] {
   return [
@@ -191,6 +219,7 @@ export function checkRunInvariants(run: DecisionRun): Violation[] {
     ...inv2RequestOnlyNeverDurable(run),
     ...inv4AvailabilityClaimsSourced(run),
     ...inv6RawRequestRetained(run),
+    ...inv7BecauseMapsToEvidence(run),
     ...inv8NoRejectedReturned(run),
     ...inv9GroupNeverDurable(run),
     ...inv10UnknownNotConfirmed(run),
