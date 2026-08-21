@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from '@/lib/finder';
 import { naiveParseQuery, EMPTY_QUERY } from '@/lib/finderParse';
+import { coerceClientQuery } from '@/lib/finderQueryBoundary';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
 import { augmentInternational } from '@/lib/askInternational';
@@ -15,6 +16,9 @@ import { serverEnv } from '@/lib/env';
 import { runAiDiscovery, recordShadowInterpretation } from '@/lib/ai/discoveryBridge';
 import { planPersonConstraint, type PersonPlan } from '@/lib/people/constraint';
 import { requestedCreditRole } from '@/lib/nlu/creditRole';
+import { interpret } from '@/lib/interpret/interpret';
+import { resolveCanonicalExecution } from '@/lib/ask/canonicalExecution';
+import { unresolvedClarification, requestHasOtherConstraints, type NearMisses } from '@/lib/ask/unresolvedResponse';
 
 const BUILD_SHA = getBuildInfo().gitSha || 'unknown';
 
@@ -26,31 +30,6 @@ function finderJson(body: Record<string, unknown>, status = 200) {
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
-
-function coerceQuery(raw: unknown): FinderQuery {
-  const q = (raw ?? {}) as Partial<FinderQuery>;
-  return {
-    mediaType: q.mediaType === 'movie' || q.mediaType === 'tv' ? q.mediaType : 'any',
-    genreIds: Array.isArray(q.genreIds) ? q.genreIds.map(Number).filter((n) => Number.isFinite(n)).slice(0, 6) : [],
-    maxRuntime: typeof q.maxRuntime === 'number' ? q.maxRuntime : null,
-    sinceMonths: typeof q.sinceMonths === 'number' ? q.sinceMonths : null,
-    minAudience: typeof q.minAudience === 'number' ? q.minAudience : null,
-    minImdb: typeof q.minImdb === 'number' ? q.minImdb : null,
-    englishAudioOnly: Boolean(q.englishAudioOnly),
-    onMyServices: Boolean(q.onMyServices),
-    providerIds: Array.isArray(q.providerIds)
-      ? q.providerIds.map(Number).filter((n) => Number.isFinite(n)).slice(0, 20)
-      : undefined,
-    minMatch: typeof q.minMatch === 'number' ? q.minMatch : null,
-    streamItOnly: Boolean(q.streamItOnly),
-    bingeableOnly: Boolean(q.bingeableOnly),
-    upcoming: Boolean(q.upcoming),
-    liveOnly: Boolean(q.liveOnly),
-    pace: typeof q.pace === 'number' ? Math.max(0, Math.min(100, q.pace)) : null,
-    originCountries: Array.isArray(q.originCountries) ? q.originCountries.map(String).slice(0, 4) : undefined,
-    originalLanguages: Array.isArray(q.originalLanguages) ? q.originalLanguages.map(String).slice(0, 4) : undefined,
-  };
-}
 
 export async function POST(req: Request) {
   try {
@@ -67,10 +46,13 @@ export async function POST(req: Request) {
       /* empty */
     }
 
-    // Smart path: when there's a free-text ask, let the LLM parse it into
-    // filters (understands almost anything). Fall back to the client's parsed
-    // query, then the regex enrichment for actor/count. Scoring stays
-    // deterministic in runFinder — the AI only fills search filters.
+    // ONE READER FOR ONE SENTENCE — Phase 7. A recommendation-shaped text is
+    // interpreted by the SAME canonical interpreter /api/ask uses and executed
+    // through the SAME resolver, so "a boxing movie" cannot mean two different
+    // things on two routes. The legacy readers below survive only for the
+    // kinds the canonical layer does not execute (title lookups, bare
+    // statements, similar-to references) — and even there, the client's parse
+    // of the sentence no longer outranks the sentence itself.
     let query: FinderQuery;
     let limit = DEFAULT_RESULT_LIMIT;
     const text = typeof body.text === 'string' ? body.text.trim() : '';
@@ -101,13 +83,92 @@ export async function POST(req: Request) {
       // 'unavailable' → fall through to the legacy path below.
     }
 
-    const ai = text ? await parseAskWithAI(text) : null;
-    if (ai) {
-      query = ai.query;
-      limit = ai.limit;
+    /*
+     * THE CANONICAL ARM — the same fence /api/ask holds (`canonicalOwnsLanguage`).
+     *
+     * When the canonical interpreter recognises a recommendation, the query is
+     * BUILT from `CanonicalIntent` + world resolution and from nothing else:
+     * no LLM whole-utterance parse, no regex parse, no client parse, no
+     * re-derived subject. Everything the sentence means arrives through
+     * `resolveCanonicalExecution` — the identical builder the ask route
+     * executes — so the same sentence produces the same structured request on
+     * both routes, by construction rather than by coincidence.
+     *
+     * A similar-to reference stays on its dedicated arm below (the canonical
+     * layer does not execute "more like X" — same precedence /api/ask gives
+     * it), and non-recommendation kinds (a title typed into the box, a bare
+     * statement) keep the legacy readers.
+     */
+    const canonical = text && cls?.mode !== 'similar_to' ? interpret(text) : null;
+    const canonicalOwnsLanguage = canonical !== null && canonical.kind === 'recommendation';
+
+    let interpretation: string[] = [];
+    let subjectCanonical: string | null = null;
+    /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — response below. */
+    let refusedRole: Extract<PersonPlan, { kind: 'refuse' }> | null = null;
+    let ai: Awaited<ReturnType<typeof parseAskWithAI>> = null;
+
+    if (canonicalOwnsLanguage) {
+      /* A MEDIA CONTRADICTION is a question, not a guess — same as /api/ask. */
+      if (canonical.media === 'none') {
+        return finderJson({
+          route: '/api/finder',
+          kind: 'clarify',
+          clarify: 'That rules out both movies and TV shows — which did you mean?',
+          options: ['Movies', 'TV shows'],
+          query: { ...EMPTY_QUERY },
+          items: [],
+        });
+      }
+      const exec = await resolveCanonicalExecution(canonical);
+      /* A REQUIREMENT WE COULD NOT HONOUR IS SAID OUT LOUD, NOT WORKED AROUND. */
+      if (exec.unresolvedRequirements.length > 0) {
+        const nearMisses: NearMisses = {};
+        for (const p of exec.people) {
+          if (p.kind === 'unresolved' && p.nearMisses?.length) nearMisses[p.spokenAs] = p.nearMisses;
+        }
+        const c = unresolvedClarification(exec.unresolvedRequirements, nearMisses, {
+          requestHasOtherConstraints: requestHasOtherConstraints(exec.query),
+        });
+        if (c) {
+          return finderJson({ route: '/api/finder', kind: 'clarify', clarify: c.clarify, options: c.options, query: { ...EMPTY_QUERY }, items: [] });
+        }
+      }
+      /* A named person we could not pin down is a QUESTION, not a guess. */
+      if (exec.ambiguity) {
+        return finderJson({
+          route: '/api/finder',
+          kind: 'clarify',
+          clarify: `There's more than one ${exec.ambiguity.spokenAs}. Which one did you mean?`,
+          options: exec.ambiguity.candidates.map((c) => `${c.name}${c.knownFor ? ` — ${c.knownFor}` : ''}`),
+          query: { ...EMPTY_QUERY },
+          items: [],
+        });
+      }
+      refusedRole = exec.refusedRole;
+      query = { ...exec.query };
+      limit = canonical.requestedCount ?? DEFAULT_RESULT_LIMIT;
+      interpretation = exec.interpretation;
+      subjectCanonical = exec.query.subjectCanonical ?? null;
     } else {
-      query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
-      if (text) limit = parseRequestedCount(text);
+      ai = text ? await parseAskWithAI(text) : null;
+      if (ai) {
+        query = ai.query;
+        limit = ai.limit;
+      } else {
+        /*
+         * THE SENTENCE OUTRANKS THE CLIENT'S PARSE OF IT. The old order took
+         * `body.query` — the browser's own naiveParseQuery of the same text —
+         * over the server's reading, so a hostile or version-skewed client
+         * could make "a chess movie" execute as horror TV. When text exists
+         * the server derives meaning from the text; a client query stands
+         * alone only when there IS no sentence (the Vintage one-tap, a
+         * chip-only refinement). Sliders the user touched still win — via the
+         * `overrides` overlay below, which is a user ACTION, not a parse.
+         */
+        query = text ? naiveParseQuery(text) : body.query ? coerceClientQuery(body.query) : { ...EMPTY_QUERY };
+        if (text) limit = parseRequestedCount(text);
+      }
     }
     // "SOMETHING LIKE TULSA KING" IS A DIFFERENT QUESTION.
     //
@@ -123,32 +184,36 @@ export async function POST(req: Request) {
     // like" that is the WHOLE SENTENCE, which resolves to no title at all.
     // The AI's extraction first, then the regex, and the raw span only as a
     // last resort.
-    const reference =
-      (ai?.similarTo ?? '').trim() ||
-      (text ? extractReference(text) : null) ||
-      (cls?.mode === 'similar_to' ? (cls.reference ?? null) : null);
-    if (reference && cls?.mode === 'similar_to') {
-      // An explicitly stated media type ("a boxing MOVIE like Rocky") is not a
-      // guess and must survive into the results. Without it the seed's own type
-      // became the filter, and a movie request read back as "Shows".
-      const similar = await askSimilarTo(supabase, user.id, reference, limit, statedMediaType(text, cls));
-      if (similar) {
-        return finderJson({
-          route: '/api/finder',
-          query: similar.query,
-          scoredFor: similar.scoredFor,
-          relaxed: null,
-          items: similar.items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
-        });
+    if (!canonicalOwnsLanguage && cls?.mode === 'similar_to') {
+      const reference =
+        (ai?.similarTo ?? '').trim() ||
+        (text ? extractReference(text) : null) ||
+        (cls.reference ?? null);
+      if (reference) {
+        // An explicitly stated media type ("a boxing MOVIE like Rocky") is not a
+        // guess and must survive into the results. Without it the seed's own type
+        // became the filter, and a movie request read back as "Shows".
+        const similar = await askSimilarTo(supabase, user.id, reference, limit, statedMediaType(text, cls));
+        if (similar) {
+          return finderJson({
+            route: '/api/finder',
+            query: similar.query,
+            scoredFor: similar.scoredFor,
+            relaxed: null,
+            items: similar.items.map((i) => ({ ...i, posterUrl: tmdbImage(i.posterPath, 'w342') })),
+          });
+        }
       }
     }
 
     // Foreign-origin / English-audio / runtime augmentation — the SAME unified
-    // step the ask route applies. Neither parser extracts these, so without it
-    // "a Spanish film with English audio under two hours" would keep only
-    // "movie" and leak wrong-origin results. Restricts the pool to the real
-    // origin/language + runtime and requires English audio at verification.
-    query = augmentInternational(query, text);
+    // step the ask route applies on ITS legacy arm. Neither legacy parser
+    // extracts these. On the canonical arm origin/language/audio are the
+    // interpreter's to state (intentToQuery carries them), and this overlay
+    // reads the whole utterance — so it is fenced exactly as /api/ask fences it.
+    if (!canonicalOwnsLanguage) {
+      query = augmentInternational(query, text);
+    }
     // WHAT YOU SET BY HAND BEATS WHAT WE READ IN YOUR SENTENCE.
     //
     // The free text is re-parsed on every run, so without this a user who ran
@@ -159,7 +224,7 @@ export async function POST(req: Request) {
     // whatever the parse produced. Typing a new ask clears the list.
     if (body.query) {
       const overrides = sanitizeOverrides(body.overrides, EMPTY_QUERY);
-      if (overrides.length > 0) query = applyOverrides(query, coerceQuery(body.query), overrides);
+      if (overrides.length > 0) query = applyOverrides(query, coerceClientQuery(body.query), overrides);
     }
     // An explicit provider from the deep-link — e.g. tapping "Best movies on
     // Netflix" sends ?providers=8 → body.query.providerIds=[8] — must survive AI
@@ -167,23 +232,22 @@ export async function POST(req: Request) {
     // named platform, so without this the Netflix filter is silently dropped and
     // results leak in from every service. The named platform wins.
     if (body.query) {
-      const clientProviders = coerceQuery(body.query).providerIds;
+      const clientProviders = coerceClientQuery(body.query).providerIds;
       if (clientProviders && clientProviders.length && !(query.providerIds && query.providerIds.length)) {
         query.providerIds = clientProviders;
       }
     }
-    /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see below. */
-    /* A ROLE WE CANNOT RUN IS CARRIED, NOT SWALLOWED — see below. */
-    let refusedRole: Extract<PersonPlan, { kind: 'refuse' }> | null = null;
     /* Guarantee the person filter regardless of AI (fuzzy, so misspellings
        match) — and record which ENTITY that cost, so the subject layer cannot
        spend the same occurrence again (the #69 boundary), while carrying the
        CREDIT ROLE the sentence asked for as a TYPED constraint (the #68
        contract): "directed by Nolan" must never execute as "starring Nolan",
        and a role the engine cannot run is refused out loud, never silently
-       degraded to actor. */
+       degraded to actor. LEGACY ARM ONLY: on the canonical arm people arrive
+       resolved from the interpreter's own spans — re-reading the raw sentence
+       here would be the exact second reader this route just stopped being. */
     const consumedEntities: ConsumedEntity[] = [...(ai?.resolvedPeople ?? [])];
-    if (text && (!query.castIds || query.castIds.length === 0) && (!query.people || query.people.length === 0)) {
+    if (!canonicalOwnsLanguage && text && (!query.castIds || query.castIds.length === 0) && (!query.people || query.people.length === 0)) {
       const person = await resolvePerson(text);
       if (person) {
         // The words were spent naming a person either way — the subject layer
@@ -222,15 +286,14 @@ export async function POST(req: Request) {
 
     // REQUIRED SUBJECT — the systemic fix. "a boxing movie" is a hard subject
     // constraint, not two genres. Shared with the ask route so both mean the
-    // same thing. Runs on the free text after all other parsing, so it also
-    // corrects an AI parse that degraded the subject into genres.
-    let interpretation: string[] = [];
+    // same thing. LEGACY ARM ONLY: the canonical arm's subject arrived through
+    // `resolveCanonicalExecution` already; this helper exists to extract a
+    // subject from raw English and must not re-derive one over it.
     /* SAID OUT LOUD. A refused role that vanished silently would look exactly
        like a role that was applied, which is the failure mode this whole change
        exists to end. */
     const roleNote = refusedRole ? [refusedRole.reason] : [];
-    let subjectCanonical: string | null = null;
-    if (text) {
+    if (!canonicalOwnsLanguage && text) {
       const applied = await applyRequiredSubject(query, text, { consumedEntities });
       query = applied.query;
       interpretation = applied.interpretation;

@@ -23,9 +23,41 @@
  * already happened.
  */
 import type { UnresolvedRequirement } from './hardConstraints';
+import type { FinderQuery } from '@/lib/finder';
 
 /** Catalog near misses for a spoken name, keyed by exactly what was said. */
 export type NearMisses = Record<string, Array<{ id: number; name: string; knownFor?: string }>>;
+
+/**
+ * Did anything else survive to execute? If so the request still has substance
+ * and runs on it, with the miss DISCLOSED rather than hidden; only a request
+ * whose entire substance failed to resolve becomes a clarify.
+ *
+ * ONE DEFINITION, used by /api/ask and /api/finder alike. Each route carried
+ * its own inline copy and the finder's dropped the origin/language/audio
+ * fields — so "a French movie with <unresolvable person>" clarified (and lost
+ * the origin constraint) on one route while executing with the miss disclosed
+ * on the other. Reviewer catch on the Phase 7 fold; the whole point of that
+ * fold is that the two routes cannot diverge, so the predicate lives here.
+ */
+export function requestHasOtherConstraints(q: FinderQuery): boolean {
+  return (
+    (q.genreIds?.length ?? 0) > 0 ||
+    (q.keywordIds?.length ?? 0) > 0 ||
+    (q.castIds?.length ?? 0) > 0 ||
+    (q.people?.length ?? 0) > 0 ||
+    (q.providerIds?.length ?? 0) > 0 ||
+    (q.originCountries?.length ?? 0) > 0 ||
+    (q.originalLanguages?.length ?? 0) > 0 ||
+    q.englishAudioOnly === true ||
+    q.englishDubOnly === true ||
+    q.minYear != null ||
+    q.maxYear != null ||
+    q.maxRuntime != null ||
+    Boolean(q.subjectLabel) ||
+    Boolean(q.subjectCanonical)
+  );
+}
 
 export interface UnresolvedClarification {
   /** One sentence, naming what could not be honoured. */

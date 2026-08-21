@@ -36,6 +36,35 @@ Updated at the end of every work order per the Working Agreement in
   production ledger table sat REST-exposed (a forged row can suppress or
   halt migrations). Self-heals on the owner's next migrate invocation;
   owner/service-role access unaffected.
+- **CLOSED — Phase 7 fold: the finder speaks the canonical language (PR #111).**
+  `/api/finder` holds the same `canonicalOwnsLanguage` fence as `/api/ask`:
+  recommendation-shaped text executes through `resolveCanonicalExecution`
+  (parity by construction, pinned in `finderOwnership.test.ts` with a RED
+  proof against the old route: 3/6 cases fail pre-fold), every legacy
+  whole-utterance reader fenced to the legacy arm, clarify/ambiguity/
+  refusal shapes carried over. Client-parse trust is DEAD on both routes —
+  the sentence outranks the browser's parse; `body.query` stands alone
+  only with no text (chip-removal, Vintage one-tap); `overrides` (user
+  actions) and deep-linked providers remain the sanctioned client voices.
+  `coerceClientQuery` is ONE module (`src/lib/finderQueryBoundary.ts`).
+  AskTheJudge's wire envelope carries one authority; SearchBar takes the
+  server's `intent` verbatim. Gates: full vitest 5453 · layerBext delta
+  BYTE-ZERO vs pre-fold (P0/P1 failures 0) · searchrouting 21/21 · mobile
+  nl-request-route/search-subject-transport/ask-results-flow/header 63/63
+  (one first-run flake, 9/9 on isolated rerun) · corpus/oracle hashes
+  byte-identical.
+- **Queued — Phase 7 remainder (each a named second reader):** ask
+  legacy-arm readers for non-recommendation kinds (parseAskWithAI above
+  the fence, similar_to arm, applyTurn, HISTORY_ASK, classifySearch,
+  routeAsk, askJudgeTitle raw-text re-read); finder's identical legacy
+  arm; build-case preamble (wantsFind regex, double parseClauses,
+  airing-arm detectGenre/media regex beside the canonical subject); the
+  client destination cascade's private vocabulary (classifySearchIntent)
+  deciding before the clause-layer owner. Also: the baseline tag
+  `watchverdict-search-baseline-2026-08-06` is MISSING FROM THE REMOTE
+  (the commit 68a5a93 exists and its corpus/oracle are byte-identical to
+  the frozen files) — restoring the tag pointer needs owner approval per
+  governance rule 10.
 - **HUMAN ACTION — apply the reconciled migration** (the one remaining
   authorization boundary: this session holds no credentials by design):
   `curl -s -X POST https://clearpath-pearl-chi.vercel.app/api/admin/migrate -H "Authorization: Bearer $MIGRATE_SECRET"`

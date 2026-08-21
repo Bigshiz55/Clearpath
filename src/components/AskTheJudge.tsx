@@ -200,7 +200,12 @@ export function AskTheJudge({ seedQuery = null }: { seedQuery?: string | null })
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query,
+          /* THE SENTENCE IS THE REQUEST (Phase 7). When text travels, the
+             server reads it itself — a client-built parse of the same words
+             is not sent, so the wire carries one semantic authority. The
+             structured query travels ONLY on chip-removal turns, where no
+             English exists and the accumulated chips ARE the request. */
+          ...(text ? {} : { query }),
           text: text || undefined,
           conversation: convOverride ?? conv,
           // Send back the server-issued key so the SERVER can reject a
