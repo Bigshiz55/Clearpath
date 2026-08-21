@@ -150,7 +150,10 @@ export const SCHEMA_CONTRACT: SchemaRequirement[] = [
   { object: 'watchmode_call_ledger', migration: '0041_watchmode_availability' },
   { object: 'watchmode_fetch_state', migration: '0041_watchmode_availability' },
   { object: 'watchmode_title_map', migration: '0041_watchmode_availability' },
-  { object: 'decision_runs', migration: '0047_decision_runs' },
+  // Re-issued from the retired 0047_decision_runs identity: production's CLI
+  // ledger already owns 0047 twice (voice_interviews, watchlist_provenance),
+  // so the never-applied decision-runs DDL moved to the next free number.
+  { object: 'decision_runs', migration: '0049_decision_runs' },
   { object: 'title_knowledge', migration: '0048_title_knowledge' },
   { object: 'title_subject_facts', migration: '0048_title_knowledge' },
 ];

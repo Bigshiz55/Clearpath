@@ -3,7 +3,51 @@
 Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
-## Now — graph-native slices A/B/C, phases 3–10, 2026-08-21 (overnight shift)
+## Now — migration reality reconciliation + Phase 7 semantic ownership, 2026-08-21 (day shift)
+
+- **CLOSED — the environment blocker.** The owner repaired
+  `SUPABASE_DB_URL`; `/api/version` reads the ledger through the direct
+  channel (`cli_ledger`, no `ledgerChannels`). This supersedes every
+  HUMAN ACTION below that asked for the env fix.
+- **CLOSED — the 0047 collision (PR A).** Production's CLI ledger owns
+  0047 twice (`20260808180259 0047_voice_interviews`, `20260812164511
+  0047_watchlist_provenance` — applied from outside this repo, beside
+  `20260809172616 0048_title_knowledge`). The never-applied repo
+  0047_decision_runs was re-issued as **0049_decision_runs** with two
+  inherited defects fixed under forensic review: the entry_point check
+  predated Phase 8 (court/verdict/subscriptions inserts would have
+  violated it) and the bare `create policy` statements failed re-apply
+  (double-apply proven via `scripts/proveMigration.ts` on a throwaway
+  Postgres — 9 objects, idempotent, RLS on, Phase 8 entries accepted,
+  garbage rejected). `src/lib/migrationSequence.test.ts` makes duplicate
+  sequence numbers, a returning retired identity, registry/contract
+  ghosts, and entry_point drift fail before merge (0039's historical
+  pair grandfathered by exact name).
+- **CLOSED — /api/version speaks both ledger identities.** CLI answers
+  carry `appliedMigrationName` beside the timestamp version; checksummed
+  runner rows are first-class evidence (`runner_ledger`) ranked against
+  CLI evidence by recency, with the losing ledger's answer reported
+  alongside (`cliLedger`/`runnerLedger`). Before this, a migration
+  applied via the admin route stayed invisible to /api/version forever
+  (the runner never sets `reconciled`).
+- **CLOSED — the app ledger is born hardened.** `LEDGER_DDL` enables RLS
+  and revokes anon/authenticated on `public.schema_migrations` on every
+  migrate call. 0046's `if exists` hardening was order-dependent — the
+  production ledger table sat REST-exposed (a forged row can suppress or
+  halt migrations). Self-heals on the owner's next migrate invocation;
+  owner/service-role access unaffected.
+- **HUMAN ACTION — apply the reconciled migration** (the one remaining
+  authorization boundary: this session holds no credentials by design):
+  `curl -s -X POST https://clearpath-pearl-chi.vercel.app/api/admin/migrate -H "Authorization: Bearer $MIGRATE_SECRET"`
+  applies 0049_decision_runs (and records 0048's no-op idempotent apply),
+  hardens the ledger table, and `/api/version` then reports
+  `appliedDatabaseMigration: "0049_decision_runs"`,
+  `migrationLedgerStatus: "runner_ledger"`, with the CLI's
+  `20260812164511 / 0047_watchlist_provenance` visible in `cliLedger`.
+  Proof-of-done for decision_runs: submit any State Your Case ask and
+  open `/growth-os/decisions`.
+
+## Prior shift — graph-native slices A/B/C, phases 3–10, 2026-08-21 (overnight shift)
 
 - **CLOSED — Phase 5, one label one number (PR #102, merge 16fd771).**
   Every verdict-label surface (AlgorithmScore, DnaScore, CardDna,
@@ -138,12 +182,12 @@ Updated at the end of every work order per the Working Agreement in
   boxing litmus at the real routes, founder inspector
   (/growth-os/decisions), architecture doc
   (docs/architecture/GRAPH_NATIVE_WATCHVERDICT.md).
-- **HUMAN ACTION — apply migration 0047 after #97 merges** (the store
-  degrades to a no-op until then; nothing breaks): run
-  `supabase db push` (or apply `supabase/migrations/0047_decision_runs.sql`
-  via the Supabase dashboard SQL editor), then submit any State Your Case
-  ask and open `/growth-os/decisions` to see the run. Also queue the
-  90-day decision_runs retention cron (service_role delete) — see the doc.
+- **HUMAN ACTION (SUPERSEDED — see the day-shift section at top)** — this
+  asked for `supabase db push` of 0047_decision_runs; that identity was
+  retired in the 0047-collision reconciliation and the file no longer
+  exists. The current action is the migrate-route call in the top section,
+  which applies its successor `0049_decision_runs`. The 90-day
+  decision_runs retention cron (service_role delete) is still queued.
 - **Next graph phases (mapped in the doc, each deployable):** 3 user
   evidence → Taste DNA as derived view · 4 content evidence · 5 scoring
   trace (fixes AlgorithmScore reading `dna.score` while WatchCall reads

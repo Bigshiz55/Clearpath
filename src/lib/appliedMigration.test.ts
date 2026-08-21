@@ -78,11 +78,11 @@ async function read() {
 describe('the ledger is readable through the channel the environment actually has', () => {
   it('reads the reconciled repo ledger over the direct DB connection — no service key needed', async () => {
     pgScript = [
-      { rows: [{ name: '0047_decision_runs', success: true, reconciled: true }] },
+      { rows: [{ name: '0049_decision_runs', success: true, reconciled: true }] },
     ];
     const out = await read();
     expect(out.migrationLedgerStatus, 'the missing REST key vetoed a readable ledger').toBe('reconciled');
-    expect(out.appliedDatabaseMigration).toBe('0047_decision_runs');
+    expect(out.appliedDatabaseMigration).toBe('0049_decision_runs');
   });
 
   it("the CLI's own ledger is explicit evidence, reported under its own status", async () => {
@@ -185,7 +185,7 @@ describe('an unavailable ledger names its own cause', () => {
 
   it('a HEALTHY read carries no diagnostics at all — the shape that always was', async () => {
     pgScript = [
-      { rows: [{ name: '0047_decision_runs', success: true, reconciled: true }] },
+      { rows: [{ name: '0049_decision_runs', success: true, reconciled: true }] },
     ];
     const out = await read();
     expect(out.migrationLedgerStatus).toBe('reconciled');
@@ -202,6 +202,90 @@ describe('an unavailable ledger names its own cause', () => {
     expect(out.migrationLedgerStatus).toBe('reconciled');
     expect(out.appliedDatabaseMigration).toBe('0046_security_advisor_hardening');
     expect(out.ledgerChannels).toEqual({ directDb: 'ECONNREFUSED' });
+  });
+});
+
+/**
+ * TWO IDENTITY SYSTEMS, BOTH REPORTED — NEITHER HIDDEN, NEVER CONFLATED.
+ *
+ * Production reality (2026-08-21): the CLI ledger's answer is a TIMESTAMP
+ * version ('20260812164511') whose row carries its own human name
+ * ('0047_watchlist_provenance'), while the repo/runner ledger speaks in
+ * filenames ('0049_decision_runs'). The old reader (a) dropped the CLI name,
+ * so dashboards compared a timestamp against latestMigrationInCode's
+ * filename, and (b) trusted only `reconciled` repo rows — a flag the modern
+ * runner NEVER sets — so a migration applied via the admin route stayed
+ * invisible to /api/version forever. These pin the repaired model: the
+ * scalar answer goes to the ledger with the most recent evidence, in that
+ * ledger's own identity; the other ledger's answer travels alongside.
+ */
+describe('two ledger identity systems, both reported', () => {
+  it("a CLI answer carries the CLI row's own name beside its timestamp version", async () => {
+    pgScript = [
+      { rows: [] },
+      { rows: [{ version: '20260812164511', name: '0047_watchlist_provenance' }] },
+    ];
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('cli_ledger');
+    expect(out.appliedDatabaseMigration).toBe('20260812164511');
+    expect(out.appliedMigrationName).toBe('0047_watchlist_provenance');
+    expect(out.cliLedger).toEqual({ version: '20260812164511', name: '0047_watchlist_provenance' });
+  });
+
+  it('a checksummed runner row NEWER than the CLI version wins the scalar — the admin-route apply becomes visible', async () => {
+    pgScript = [
+      { rows: [{ name: '0049_decision_runs', success: true, reconciled: false, checksum: 'abc123', completed_at: '2026-08-21T04:00:00.000Z' }] },
+      { rows: [{ version: '20260812164511', name: '0047_watchlist_provenance' }] },
+    ];
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('runner_ledger');
+    expect(out.appliedDatabaseMigration).toBe('0049_decision_runs');
+    // The CLI's answer is not hidden by the runner winning.
+    expect(out.cliLedger).toEqual({ version: '20260812164511', name: '0047_watchlist_provenance' });
+  });
+
+  it('a checksummed runner row OLDER than the CLI version yields to it — and stays visible beside it', async () => {
+    pgScript = [
+      { rows: [{ name: '0046_security_advisor_hardening', success: true, reconciled: false, checksum: 'abc123', completed_at: '2026-07-01T00:00:00.000Z' }] },
+      { rows: [{ version: '20260812164511', name: '0047_watchlist_provenance' }] },
+    ];
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('cli_ledger');
+    expect(out.appliedDatabaseMigration).toBe('20260812164511');
+    expect(out.runnerLedger).toEqual({ name: '0046_security_advisor_hardening' });
+  });
+
+  it('checksummed runner rows alone are commit-time evidence — never demoted to unknown', async () => {
+    pgScript = [
+      { rows: [{ name: '0049_decision_runs', success: true, reconciled: false, checksum: 'abc123', completed_at: '2026-08-21T04:00:00.000Z' }] },
+      { rows: [] },
+    ];
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('runner_ledger');
+    expect(out.appliedDatabaseMigration).toBe('0049_decision_runs');
+    expect(out.appliedMigrationName).toBe('0049_decision_runs');
+  });
+
+  it('bare legacy rows (no checksum) still prove nothing on their own', async () => {
+    pgScript = [
+      { rows: [{ name: '0031_something', success: true, reconciled: false, checksum: null, completed_at: null }] },
+      { rows: [] },
+    ];
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('unreconciled');
+    expect(out.appliedDatabaseMigration).toBe('unknown');
+  });
+
+  it("an older CLI ledger without the name column still answers, name absent — never invented", async () => {
+    pgScript = [
+      { rows: [] },
+      new Error('column "name" does not exist'),
+      { rows: [{ version: '20260809172616' }] },
+    ];
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('cli_ledger');
+    expect(out.appliedDatabaseMigration).toBe('20260809172616');
+    expect(out.appliedMigrationName).toBeUndefined();
   });
 });
 

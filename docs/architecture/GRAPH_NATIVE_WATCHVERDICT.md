@@ -89,7 +89,9 @@ model, the phase plan, and the honest record of what is built versus mapped.
 
 ## Phase 2 — decision provenance — BUILT
 
-- **Migration `0047_decision_runs`**: one row per user-triggered decision;
+- **Migration `0049_decision_runs`** (originally authored as
+  0047_decision_runs; re-issued after the three-way 0047 collision — see
+  "Schema reality" below): one row per user-triggered decision;
   jsonb edges; RLS owner-only select/insert, immutable (no update/delete),
   service_role for retention ops; index (user_id, created_at desc).
   Rollback provided. Additive; a pre-migration deploy degrades to a no-op
@@ -212,15 +214,39 @@ where routes already used one.
   founder run inspector. The user-facing title-page "Why this VERD1CT"
   does not read run evidence yet (queued).
 
-## Schema reality discovered during reconciliation (2026-08-21)
+## Schema reality — reconciled (2026-08-21, post-environment-repair)
 
-- The production DB's CLI ledger names **0047_watchlist_provenance** and
-  **0048_title_knowledge** — both applied from the abandoned
-  `claude/watch-verdict-app-wwbtbg` line. The repo's `0047_decision_runs`
-  **collides by number** with the applied 0047 and is absent from the DB
-  ledger, so `decision_runs`' production existence is UNKNOWN until the
-  owner's `SUPABASE_DB_URL` fix lands (recording degrades to a no-op by
-  contract; nothing breaks). Resolve the numbering before applying.
-- `0048_title_knowledge.sql` in this repo is pinned byte-identical
+- **The environment blocker is CLOSED.** The owner repaired
+  `SUPABASE_DB_URL`; `/api/version` now reads the ledger through the direct
+  channel (`migrationLedgerStatus: cli_ledger`, no `ledgerChannels`).
+- **Two identity systems, never conflated.** The Supabase CLI ledger
+  (`supabase_migrations.schema_migrations`) keys rows by TIMESTAMP version
+  with a name beside it; this repo's runner ledger
+  (`public.schema_migrations`) keys rows by filename. Production's CLI
+  ledger holds three rows: `20260808180259 0047_voice_interviews`,
+  `20260809172616 0048_title_knowledge`, `20260812164511
+  0047_watchlist_provenance` — the number 0047 is applied TWICE there, from
+  files this repository never carried. `/api/version` reports each system
+  in its own identity (`appliedDatabaseMigration` + `appliedMigrationName`
+  + `cliLedger`/`runnerLedger`), and checksummed runner rows are
+  first-class evidence (`runner_ledger` status) — the `reconciled` flag is
+  no longer the only path to a repo-named answer.
+- **decision_runs was re-issued as `0049_decision_runs`.** The original
+  0047_decision_runs identity was retired without ever being applied
+  anywhere (three-way 0047 collision). Forensic review before first
+  application fixed two inherited defects: the `entry_point` check
+  constraint predated Phase 8 (court/verdict/subscriptions inserts would
+  have violated it — now pinned to `ENTRY_POINTS` by
+  `src/lib/migrationSequence.test.ts`), and the bare `create policy`
+  statements were not idempotent (proven by `scripts/proveMigration.ts`
+  double-apply; now guarded like 0048's). `public.decision_runs` does NOT
+  exist in production yet; recording degrades to a no-op by contract until
+  the owner's next migrate call applies 0049.
+- `0048_title_knowledge.sql` in this repo remains pinned byte-identical
   (sha256 in `src/lib/graph/phase910.test.ts`) to the file production
-  applied, so the name+checksum ledger discipline stays intact.
+  applied; its tables exist in production.
+- **The app ledger is born hardened.** `LEDGER_DDL` now enables RLS and
+  revokes anon/authenticated on `public.schema_migrations` on every migrate
+  call — 0046's `if exists` guard was order-dependent and production's
+  ledger table sat REST-exposed (a forged ledger row can suppress or halt
+  migrations). Self-heals existing deployments on the next run.
