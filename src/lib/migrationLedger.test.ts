@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checksumOf, decideForMigration, LEDGER_DDL, MIGRATION_LOCK_KEY } from './migrationLedger';
+import { checksumOf, decideForMigration, LEDGER_DDL, MIGRATION_LOCK_KEY, readCliAppliedNames, withCliEvidence } from './migrationLedger';
 import { classify, shouldBackfill, probeFor, runProbes, PROBES } from './migrationReconcile';
 
 describe('checksums', () => {
@@ -35,6 +35,58 @@ describe('decideForMigration', () => {
     const d = decideForMigration('0041', ck, { name: '0041', checksum: null, success: true, reconciled: true });
     expect(d.action).toBe('skip');
     if (d.action === 'skip') expect(d.reason).toMatch(/without a checksum/);
+  });
+});
+
+/**
+ * THE CLI'S OWN LEDGER IS APPLICATION EVIDENCE. /api/version already trusts
+ * supabase_migrations.schema_migrations as its cli_ledger tier; the runners
+ * must consult the same record, or every CLI-applied name decides as 'run'
+ * and a credentialed migrate re-executes applied DDL (the observed
+ * production shape: 5 app-ledger rows vs ~44 physically applied).
+ */
+describe('CLI-ledger evidence merges into the decision, without touching checksum semantics', () => {
+  const ck = checksumOf('create table x');
+
+  it('a CLI-applied name with no app-ledger row is skipped — never rerun, never a claimed match', () => {
+    const merged = withCliEvidence(undefined, '0007_court', new Set(['0007_court']));
+    const d = decideForMigration('0007_court', ck, merged);
+    expect(d.action).toBe('skip');
+    if (d.action === 'skip') expect(d.reason).toMatch(/without a checksum/);
+  });
+
+  it('no CLI evidence changes nothing: absent stays run, existing rows pass through untouched', () => {
+    expect(withCliEvidence(undefined, '0050_future', new Set())).toBeUndefined();
+    const failure = { name: '0050_future', checksum: ck, success: false, reconciled: false };
+    expect(withCliEvidence(failure, '0050_future', new Set())).toBe(failure);
+  });
+
+  it('CLI evidence can never mask checksum semantics: a checksummed success row wins outright', () => {
+    const success = { name: '0042', checksum: checksumOf('create table y'), success: true, reconciled: false };
+    const merged = withCliEvidence(success, '0042', new Set(['0042']));
+    expect(merged).toBe(success);
+    // The mismatch still HALTS — CLI presence must not convert it to a skip.
+    expect(decideForMigration('0042', ck, merged).action).toBe('halt');
+  });
+
+  it('CLI evidence outranks a recorded failure: the physical state is applied, retrying would re-execute', () => {
+    const failure = { name: '0042', checksum: ck, success: false, reconciled: false };
+    const d = decideForMigration('0042', ck, withCliEvidence(failure, '0042', new Set(['0042'])));
+    expect(d.action).toBe('skip');
+  });
+
+  it('readCliAppliedNames returns the recorded names and drops null/empty ones', async () => {
+    const names = await readCliAppliedNames({
+      query: async () => ({ rows: [{ name: '0049_decision_runs' }, { name: null }, { name: '' }, { name: '0001_init' }] }),
+    });
+    expect(names).toEqual(new Set(['0049_decision_runs', '0001_init']));
+  });
+
+  it('an absent or unreadable CLI ledger is NO evidence — empty set, never a guess', async () => {
+    const names = await readCliAppliedNames({
+      query: async () => { throw new Error('relation "supabase_migrations.schema_migrations" does not exist'); },
+    });
+    expect(names.size).toBe(0);
   });
 });
 
