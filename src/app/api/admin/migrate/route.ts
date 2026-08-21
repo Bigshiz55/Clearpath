@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 import { PENDING_MIGRATIONS } from '@/lib/pendingMigrations';
 import { sanitizeDbUrl, validateDbUrl } from '@/lib/adminMigrateUrl';
-import { LEDGER_DDL, MIGRATION_LOCK_KEY, checksumOf, decideForMigration, type LedgerRow } from '@/lib/migrationLedger';
+import { LEDGER_DDL, MIGRATION_LOCK_KEY, checksumOf, decideForMigration, readCliAppliedNames, withCliEvidence, type LedgerRow } from '@/lib/migrationLedger';
 
 // A raw Postgres connection needs real TCP/TLS sockets (`net`/`tls`), which
 // the Edge runtime does not provide — `pg` would fail to even load there.
@@ -149,10 +149,16 @@ export async function POST(request: Request) {
       );
       const ledger = new Map(ledgerRows.map((r) => [r.name, r]));
 
+      // The Supabase CLI's own ledger is application evidence too. Most of
+      // production's history was applied through it and is invisible to the
+      // app ledger — without this merge, every CLI-applied name decides as
+      // 'run' and this loop re-executes applied DDL against a live database.
+      const cliApplied = await readCliAppliedNames({ query: (sql) => client.query(sql) });
+
       for (const m of PENDING_MIGRATIONS) {
         const sql = Buffer.from(m.sqlB64, 'base64').toString('utf8');
         const checksum = checksumOf(sql);
-        const decision = decideForMigration(m.name, checksum, ledger.get(m.name));
+        const decision = decideForMigration(m.name, checksum, withCliEvidence(ledger.get(m.name), m.name, cliApplied));
 
         if (decision.action === 'skip') {
           results.push({ name: m.name, ok: true, skipped: true, reason: decision.reason });

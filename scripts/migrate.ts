@@ -30,7 +30,7 @@
 import './searchAudit/shimServerOnly';
 import { Client } from 'pg';
 import { PENDING_MIGRATIONS } from '../src/lib/pendingMigrations';
-import { LEDGER_DDL, MIGRATION_LOCK_KEY, checksumOf, decideForMigration, type LedgerRow } from '../src/lib/migrationLedger';
+import { LEDGER_DDL, MIGRATION_LOCK_KEY, checksumOf, decideForMigration, readCliAppliedNames, withCliEvidence, type LedgerRow } from '../src/lib/migrationLedger';
 
 async function main(): Promise<void> {
   const dbUrl = process.env.SUPABASE_DB_URL;
@@ -66,12 +66,22 @@ async function main(): Promise<void> {
     );
     const ledger = new Map(ledgerRows.map((r) => [r.name, r]));
 
+    // The Supabase CLI's own ledger is application evidence too. Most of
+    // production's history was applied through it and is invisible to the
+    // app ledger — without this merge, every CLI-applied name decides as
+    // 'run' and this loop re-executes applied DDL against a live database.
+    const cliApplied = await readCliAppliedNames({ query: (sql) => client.query(sql) });
+
     let appliedCount = 0;
     let skippedCount = 0;
     for (const migration of PENDING_MIGRATIONS) {
       const sql = Buffer.from(migration.sqlB64, 'base64').toString('utf8');
       const checksum = checksumOf(sql);
-      const decision = decideForMigration(migration.name, checksum, ledger.get(migration.name));
+      const decision = decideForMigration(
+        migration.name,
+        checksum,
+        withCliEvidence(ledger.get(migration.name), migration.name, cliApplied),
+      );
 
       if (decision.action === 'skip') {
         skippedCount++;

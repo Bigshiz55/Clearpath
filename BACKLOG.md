@@ -3,7 +3,54 @@
 Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
-## Now — TASK #36 final semantic-ownership closure, 2026-08-21 (evening shift)
+## Now — migration-ledger gap closure, 2026-08-21 (night shift)
+
+- **CLOSED — one runner discipline (PR #114).** `scripts/migrate.ts` was the
+  last bare-ledger writer AND the Actions workflow's preferred path; it now
+  runs the shared `LEDGER_DDL` / advisory-lock / checksummed
+  `decideForMigration` machinery. `LEDGER_DDL` additionally backfills a
+  legacy bare table's history as the successes it truthfully was (guarded to
+  rows with no checksum and no error_message) — without it, `success default
+  false` read pre-upgrade history as recorded failures, and recorded
+  failures are retried. `/api/health/schema` now reports `ledgerTable`
+  (columns, RLS, counts, newest name) so the ledger's shape is observable
+  black-box. Proven RED→GREEN on throwaway Postgres 16.
+- **CLOSED — the re-execution hazard against the REAL production shape (PR
+  #115).** Production's `ledgerTable` read back 5 rows (latest 0045) against
+  ~49 registered migrations: the app ledger under-records because history
+  was applied via the Supabase CLI, and every unrecorded name decided as
+  `run` — the first credentialed migrate would have re-executed years of
+  applied DDL. Both runners now merge the CLI's own ledger
+  (`supabase_migrations.schema_migrations`) as application evidence
+  (`withCliEvidence`/`readCliAppliedNames`): CLI-recorded names are skipped
+  without claiming a checksum match, checksummed app-ledger successes stay
+  authoritative (a mismatch still halts), and an absent CLI ledger degrades
+  to exactly the old behavior.
+- **HUMAN ACTION — one credentialed invocation closes the physical gap.**
+  `public.schema_migrations` in production is still the bare
+  `(name, applied_at)` table with RLS off (proof: `/api/health/schema`
+  `ledgerTable`). Every code path is deployed and safe; what remains needs a
+  credential that exists only in the owner's hands (workflow run 32522366659
+  refused correctly: repo secrets `SUPABASE_DB_URL` false, `MIGRATE_SECRET`
+  false, `SITE_URL` true — production env has all three `runner` booleans
+  true). Either: (a) add repo secret `SUPABASE_DB_URL` (or `MIGRATE_SECRET`)
+  in GitHub → Settings → Secrets → Actions, then dispatch
+  `apply-migrations.yml` with `confirm=APPLY` — the designed
+  nobody-touches-the-secret path; or (b) one authenticated
+  `POST /api/admin/reconcile-migrations` (bearer `MIGRATE_SECRET`; default
+  dry-run still executes `LEDGER_DDL`, which is the entire fix, and applies
+  nothing). Verify afterwards with `GET /api/health/schema` →
+  `ledgerTable.rlsEnabled: true`, 13 columns, `successCount` = `rowCount`.
+- **Queued:** `/api/admin/reconcile-migrations` could durably backfill
+  CLI-evidenced rows (`execution_method 'reconciliation'`, evidence naming
+  the CLI ledger) so the app ledger stops under-reporting; the `PROBES`
+  object-evidence list stays deliberately non-exhaustive. TASK #37A
+  (Rocky/Lioness): no authoritative definition exists anywhere in
+  repo/history beyond the baseline-era D3 row; neither failure reproduces
+  against production `22e599e` (person search returns Stallone with
+  character credits; both searches return exact-name titles first).
+
+## Prior shift — TASK #36 final semantic-ownership closure, 2026-08-21 (evening shift)
 
 - **PRODUCTION MIGRATION PROOF: INCOMPLETE — reported, not papered over.**
   The task premise said 0049_decision_runs was applied; production

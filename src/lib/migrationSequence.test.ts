@@ -119,6 +119,39 @@ describe('one runner discipline — the CLI script and the admin route share the
     });
     expect(d.action).toBe('skip');
   });
+
+  it('both runners consult the Supabase CLI ledger as application evidence', () => {
+    /* Production's history was mostly applied through the Supabase CLI, whose
+       own ledger (supabase_migrations.schema_migrations) the app ledger never
+       sees — observed 2026-08-21: public.schema_migrations recorded 5 rows
+       while ~44 registered migrations were physically applied. A runner that
+       reads only the app ledger decides 'run' for every unrecorded name, so
+       the first credentialed run would have re-executed years of applied DDL
+       against production. Both runners must merge in the CLI's record. */
+    const script = readFileSync(join(__dirname, '..', '..', 'scripts', 'migrate.ts'), 'utf8');
+    const route = readFileSync(join(__dirname, '..', 'app', 'api', 'admin', 'migrate', 'route.ts'), 'utf8');
+    for (const src of [script, route]) {
+      expect(src).toMatch(/readCliAppliedNames/);
+      expect(src).toMatch(/withCliEvidence/);
+    }
+  });
+
+  it('a sparse app ledger with CLI evidence decides SKIP for every registered migration — nothing runs, nothing halts', async () => {
+    /* The exact production shape the re-execution hazard lives in: a handful
+       of legacy app-ledger rows (post-upgrade: success, no checksum), the CLI
+       ledger carrying the full history, and the whole registry pending. */
+    const { checksumOf, decideForMigration, withCliEvidence } = await import('./migrationLedger');
+    const cli = new Set(PENDING_MIGRATIONS.map((m) => m.name));
+    const legacyRecorded = new Set(PENDING_MIGRATIONS.slice(0, 5).map((m) => m.name));
+    for (const m of PENDING_MIGRATIONS) {
+      const sql = Buffer.from(m.sqlB64, 'base64').toString('utf8');
+      const existing = legacyRecorded.has(m.name)
+        ? { name: m.name, checksum: null, success: true, reconciled: false }
+        : undefined;
+      const d = decideForMigration(m.name, checksumOf(sql), withCliEvidence(existing, m.name, cli));
+      expect(d.action, m.name).toBe('skip');
+    }
+  });
 });
 
 describe('the ledger table is born hardened', () => {

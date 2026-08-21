@@ -131,6 +131,64 @@ export function decideForMigration(name: string, checksum: string, existing: Led
 }
 
 /**
+ * THE CLI'S OWN LEDGER IS APPLICATION EVIDENCE TOO. Production's history was
+ * mostly applied through the Supabase CLI, whose commit-time record
+ * (supabase_migrations.schema_migrations) this module's ledger never saw —
+ * observed 2026-08-21: public.schema_migrations recorded 5 rows while ~44
+ * registered migrations were physically applied. A runner reading only the
+ * app ledger decides 'run' for every unrecorded name, so the first
+ * credentialed migrate would have re-executed years of applied DDL against a
+ * live database. /api/version already trusts this record as its cli_ledger
+ * evidence tier; the runners consult the same record through this merge.
+ *
+ * Ordering rules, deliberately:
+ *   - An app-ledger SUCCESS row wins outright. Checksum match/halt semantics
+ *     stay authoritative — CLI presence can never convert a checksum
+ *     mismatch into a skip.
+ *   - An app-ledger FAILURE row is outranked by CLI evidence: the physical
+ *     state is applied (the recorded failure was a re-execution attempt, or
+ *     a retry the CLI later satisfied), and "retrying" would re-execute
+ *     applied DDL.
+ *   - Without CLI evidence nothing changes: the existing row, or its
+ *     absence, decides exactly as before.
+ *
+ * A synthesized row carries no checksum, landing in decideForMigration's
+ * designed branch: applied without a checksum — not rerun, never claimed as
+ * a match.
+ */
+export function withCliEvidence(
+  existing: LedgerRow | undefined,
+  name: string,
+  cliApplied: ReadonlySet<string>,
+): LedgerRow | undefined {
+  if (!cliApplied.has(name)) return existing;
+  if (existing?.success) return existing;
+  return { name, checksum: null, success: true, reconciled: false };
+}
+
+/** The one query method both runners' pg clients provide. */
+export interface LedgerQuerier {
+  query: (sql: string) => Promise<{ rows: Array<Record<string, unknown>> }>;
+}
+
+/**
+ * Migration names recorded by the Supabase CLI's ledger. An absent table, an
+ * older CLI schema without a `name` column, or any read failure returns the
+ * EMPTY set: no evidence is never fabricated evidence, and the runner simply
+ * decides from the app ledger alone, exactly as before.
+ */
+export async function readCliAppliedNames(db: LedgerQuerier): Promise<Set<string>> {
+  try {
+    const { rows } = await db.query('select name from supabase_migrations.schema_migrations');
+    return new Set(
+      rows.map((r) => r.name).filter((n): n is string => typeof n === 'string' && n.length > 0),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+/**
  * Ledger trust level, surfaced by /api/version so nobody reads a partial
  * ledger as authoritative.
  *   unreconciled  - bare legacy rows exist (no checksum) that were never proven
