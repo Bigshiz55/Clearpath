@@ -48,9 +48,15 @@ function cleanRanked(e: Entry | null | undefined): { key: string; title?: string
 
 export async function POST(request: Request) {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  /* BOUNDED AUTH LOOKUP. A beacon endpoint must answer fast even when the
+     auth backend is unreachable (harness environments, outages): a hanging
+     dependency here would keep the CLIENT's network busy after a verdict
+     that is already on screen. Degradation rule: no user provable in time →
+     401, recording skipped, nothing else affected. */
+  const user = await Promise.race([
+    supabase.auth.getUser().then((r) => r.data.user),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+  ]).catch(() => null);
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 
   let body: { winner?: Entry; backup?: Entry; alsoRan?: Entry[]; ruledOut?: Entry[] };
