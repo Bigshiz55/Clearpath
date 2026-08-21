@@ -1,5 +1,5 @@
 import 'server-only';
-import { unstable_cache } from 'next/cache';
+import { unstable_cache, revalidateTag } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DnaState, PreferenceEvent } from './types';
 import { deriveDna, deriveCorrections, emptyDna } from './engine';
@@ -144,7 +144,24 @@ export async function recordEvents(
     console.warn('[preference] recordEvents failed:', error.message);
     return 0;
   }
+  bustDnaCache(userId);
   return count ?? rows.length;
+}
+
+/**
+ * BUST THE DERIVED-DNA CACHE AT THE WRITE CHOKEPOINT. `loadPreferenceCached`
+ * tags its entry `pref-dna:${userId}` with a 5-minute revalidate — and until
+ * this existed, nothing ever revalidated that tag, so a fresh rating was
+ * invisible to /api/ask ranking for up to five minutes. Best-effort: outside
+ * a request scope (unit tests, scripts) revalidateTag throws, and a cache
+ * that expires in 300s anyway is not worth failing a write over.
+ */
+function bustDnaCache(userId: string): void {
+  try {
+    revalidateTag(`pref-dna:${userId}`);
+  } catch {
+    /* not in a Next request scope — the 300s revalidate still bounds it */
+  }
 }
 
 /** Soft-undo: mark an event undone (audit trail preserved). */
@@ -154,6 +171,7 @@ export async function undoEvent(supabase: SupabaseClient, userId: string, eventI
     .update({ undone_at: new Date().toISOString() })
     .eq('user_id', userId)
     .eq('id', eventId);
+  if (!error) bustDnaCache(userId); // an undo changes the derivation too
   return !error;
 }
 
