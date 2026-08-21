@@ -138,7 +138,10 @@ const unverified = {
   blocked_surfaces: [
     { surface: '/api/ask', status: 'HTTP 200 {"error":"Not signed in."}', consequence: 'recommendation ANSWERS, clarification wording and multi-turn behaviour are unmeasured' },
     { surface: '/api/finder', status: 'requires a session', consequence: 'constraint enforcement against real candidates is unmeasured' },
-    { surface: '/api/recommendations', status: 'requires a session', consequence: 'personalised ranking is unmeasured' },
+    // '/api/recommendations' was removed in graph Phase 7 — an HTTP route
+    // with zero callers whose POST was the only reach into a third NL parser.
+    // The live recommender is exercised through /app/watch and the slate
+    // server actions instead.
     { surface: '/api/quicklook, /api/dev/search-qa', status: 'requires a session', consequence: 'availability labelling and QA views are unmeasured' },
     { surface: 'live browser against clearpath-pearl-chi.vercel.app', status: 'net::ERR_CONNECTION_RESET from this Chromium', consequence: 'Layer C runs a local production build of the same commit, replaying frozen live responses' },
   ],
