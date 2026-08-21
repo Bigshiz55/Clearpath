@@ -327,18 +327,29 @@ export async function POST(request: Request) {
     // broadcast ask even without an explicit airing phrase (the liberal temporal
     // reader is used only then, so bare "tonight" alone still means taste).
     if (airing) {
-      const genre = detectGenre(text);
-      const movieOnly = /\b(movies?|films?)\b/.test(` ${text.toLowerCase()} `);
-      /* THE SUBJECT SURVIVES THE AIRING ROUTE. "AMC boxing movies tonight"
-         used to reach the guide as /app/tv?within=6&network=amc&type=movie —
-         four fields survived and BOXING was gone, then the summary read the
-         digest back as if the request had been honored. The CANONICAL
-         interpreter owns the reading (no second parser here): its wanted
-         subject rides the redirect as `q`, the guide filters on it visibly,
-         and the run records a requires_subject edge so INV-1 can finally see
-         the obligation instead of a run with no requirements at all. */
-      const airingSubjects = interpret(text)
-        .subjects.filter((s) => s.wanted)
+      /* THE SUBJECT SURVIVES THE AIRING ROUTE — AND THE CANONICAL CLAUSE OWNS
+         THE SIBLINGS TOO. "AMC boxing movies tonight" used to reach the guide
+         as /app/tv?within=6&network=amc&type=movie — four fields survived and
+         BOXING was gone. The canonical interpreter owns the reading: its
+         wanted subject rides the redirect as `q`, the guide filters on it
+         visibly, and the run records a requires_subject edge (INV-1).
+
+         The genre and the media type beside that subject were still read from
+         the WHOLE raw sentence by two independent readers — one URL, three
+         parsers. Now: the media type IS the canonical reading (which
+         understands negation and "movies and shows", where the old
+         `\b(movies?|films?)\b` word-test did not — an anecdote's or a
+         companion's "movies" can no longer force type=movie), and detectGenre
+         keeps its ONE TVmaze vocabulary but reads the REQUEST CLAUSE the
+         canonical layer isolated, falling back to the raw text only when no
+         clause was isolated — so a background clause's genre word cannot
+         become the guide's filter. */
+      const canonicalAiring = interpret(text);
+      const airingClause = canonicalAiring.requestClause || text;
+      const genre = detectGenre(airingClause);
+      const movieOnly = canonicalAiring.media === 'movie';
+      const airingSubjects = canonicalAiring.subjects
+        .filter((s) => s.wanted)
         .map((s) => s.span);
       const params = new URLSearchParams({ within: String(horizon) });
       if (genre) params.set('genre', genre);

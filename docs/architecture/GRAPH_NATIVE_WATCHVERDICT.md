@@ -214,23 +214,35 @@ where routes already used one.
   `/api/finder` holds the canonical fence (recommendation kinds execute
   through `resolveCanonicalExecution`, parity with /api/ask by
   construction), client-parse trust is dead on both routes, and
-  `coerceClientQuery` is one boundary module. **Remaining second readers,
-  named** (each still live, each queued): `/api/ask`'s legacy-arm readers
-  for non-recommendation kinds (`parseAskWithAI` at ask/route.ts:996
-  above the fence, the similar_to arm :1010–1025, `applyTurn`'s
-  conversational interpreter :244, `HISTORY_ASK` :286, `classifySearch`
-  :198, `routeAsk` :355, `askJudgeTitle`'s raw-text re-read via :771);
-  `/api/finder`'s identical legacy arm for non-recommendation texts;
-  `/api/build-case`'s preamble (`wantsFind` regex :216, the double
-  `parseClauses` via `canonicalRequestRoute` + `tasteEvidenceText`, and
-  the airing arm's `detectGenre` + media regex :330–331 deriving siblings
-  of a canonical subject); and the client destination cascade's private
-  vocabulary (`classifySearchIntent`, searchIntent.ts:82–108) deciding
-  before the clause-layer owner is consulted. The retained
-  shared-definition deciders (`clauseLayerSaysRequest`,
-  `canonicalRequestRoute`, `lexicalIntent` — one definition executed
-  client- and server-side) are single-owner by construction, not
-  competitors.
+  `coerceClientQuery` is one boundary module. **TASK #36 additions:** the
+  LLM parse is fenced off /api/ask's canonical path too (zero OpenAI
+  calls on a canonical-served sentence — fetch-spy proven); the airing
+  arm's genre/media siblings read canonical fields (media IS the
+  canonical reading; detectGenre reads the isolated request clause); and
+  two defects in the OWNER's own vocabulary were repaired — NEGATOR_WORDS
+  gained the renunciation phrases the legacy parser knew (`tired of`,
+  `sick of`, `never`, `rather not`… — "a thriller but never horror" no
+  longer executes horror as WANTED), and parseCount reads nlu/count's
+  exported table instead of a private copy that stopped at ten. The
+  destination cascade is DOCUMENTED as routing-not-meaning: it picks a
+  door from vocabulary but always delivers the sentence byte-identical to
+  the one owner (transport invariant pinned in semanticOwnership.test.ts).
+  **Remaining second readers, named** (each live, each fenced-by-gate or
+  queued): `applyTurn`'s conversational interpreter (multi-turn state is
+  a genuinely separate, corpus-pinned domain — retained, documented);
+  `HISTORY_ASK` (history queries, a non-recommendation domain);
+  `classifySearch` as the title/similar-to MODE GATE on both routes;
+  `routeAsk`'s comparative reader; `askJudgeTitle`'s internal raw-text
+  mechanics (fenced by `canonicalClaimsSpan` — title lookup after
+  canonical title intent, per the ownership rules); the similar_to arm's
+  reference readers; both routes' LEGACY arms for kinds canonical does
+  not execute; build-case's `wantsFind` routing regex and the double
+  `parseClauses` run (same single definition twice — cost, not
+  divergence); and `classifySearchIntent`'s private request vocabulary
+  deciding order in the cascade (routing only; meaning untouched). The
+  vocabulary-duplication audit (13 axes, full table in the session
+  record) is queued in BACKLOG — genre-id TV gap, provider recognition
+  splits, media-noun copies, origin coverage.
 - **8 Slices B+C — PARTIAL** (PR #105) — Verdict Room, docket verdict and
   Subscription Check record decision runs (session/request_only) under
   INV-9; court runs record only when the host is authenticated, and

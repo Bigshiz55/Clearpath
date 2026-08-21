@@ -38,11 +38,17 @@ import {
   type ToneConstraint,
 } from './types';
 import { stripRequestFrame } from '@/lib/nlu/requestFrame';
+import { NUM_WORDS } from '@/lib/nlu/count';
 
-const WORD_NUMBERS: Record<string, number> = {
-  one: 1, a: 1, an: 1, two: 2, three: 3, four: 4, five: 5,
-  six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-};
+/**
+ * ONE WORD-NUMBER VOCABULARY. This was a private copy that stopped at ten —
+ * "give me twelve thrillers" parsed to NO count on the canonical path and the
+ * default 24 answered a sentence that said twelve, while `nlu/count` (the
+ * canonical table) could read it all along. The articles stay local: reading
+ * "a"/"an" as one is THIS parser's unit-noun rule, not general vocabulary.
+ */
+const WORD_NUMBERS: Record<string, number> = { ...NUM_WORDS, a: 1, an: 1 };
+const NUM_WORD_ALT = Object.keys(NUM_WORDS).join('|');
 
 /** "a couple" is two; "a few" is three. Both are real ways people ask. */
 const LOOSE_COUNTS: Array<[RegExp, number]> = [
@@ -73,7 +79,10 @@ export function parseCount(clause: string): number | null {
 
      Numerals are unaffected either way: "give me 5 thrillers" is five. */
   const numeral = clause.match(
-    /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|comed(?:y|ies)|thrillers?|dramas?|myster(?:y|ies)|flicks?|picks?|titles?|options?)\b/i,
+    new RegExp(
+      String.raw`\b(\d{1,2}|${NUM_WORD_ALT})\s+(?:[\w-]+\s+){0,3}?(?:movies?|films?|shows?|series|documentar(?:y|ies)|comed(?:y|ies)|thrillers?|dramas?|myster(?:y|ies)|flicks?|picks?|titles?|options?)\b`,
+      'i',
+    ),
   );
   /* A DESCRIBED REQUEST IS A SPECIFICATION, NOT AN ENUMERATION.
      "a boxing movie" names one unit and really does ask for one. "a movie my
@@ -96,7 +105,10 @@ export function parseCount(clause: string): number | null {
      to the end of the clause and to a request verb, because a bare number
      anywhere else is a year, a runtime or part of a title. */
   const bare = m ? null : clause.match(
-    /\b(?:show|give|find|get|pull up)\s+(?:me|us)\s+(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\b\s*[.!?]?\s*$/i,
+    new RegExp(
+      String.raw`\b(?:show|give|find|get|pull up)\s+(?:me|us)\s+(\d{1,2}|${NUM_WORD_ALT})\b\s*[.!?]?\s*$`,
+      'i',
+    ),
   );
   const token = m?.[1] ?? bare?.[1] ?? null;
   if (token == null) return null;
@@ -128,7 +140,13 @@ const MOVIE_WORDS = /\b(?:movies?|films?|flicks?)\b/i;
  * regex must not absorb — "less ", "minimal ", "never" — and it serves only
  * the lab surface, not /api/ask.)
  */
-const NEGATOR_WORDS = String.raw`not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hate[sd]?|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t`;
+/* The last six members ('never' through 'do not like') arrived from the
+   legacy parser's NEGATOR vocabulary (finderParse.ts) during the TASK #36
+   audit: the OWNER did not know "I'm tired of horror" rules horror out while
+   the legacy overlay it replaced did — so the canonical path executed the
+   exact genre the user renounced, a polarity inversion in the single
+   declaration every consumer trusts. */
+const NEGATOR_WORDS = String.raw`not|no|without|except|excluding|avoid|nothing|none|don'?t want|do not want|hate[sd]?|can'?t stand|but not|other than|anything but|isn'?t|isnt|aren'?t|wasn'?t|weren'?t|doesn'?t|doesnt|didn'?t|don'?t|won'?t|wont|ain'?t|shouldn'?t|couldn'?t|wouldn'?t|can'?t|never|apart from|rather not|sick of|tired of|fed up with|don'?t like|do not like`;
 
 /** A negator within a short window behind the token, stopping at clause
  *  punctuation — the same idiom the subject layer's `isNegated` uses.
