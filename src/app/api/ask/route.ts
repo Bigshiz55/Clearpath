@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { runFinder, DEFAULT_RESULT_LIMIT, type FinderQuery, type Watcher } from '@/lib/finder';
 import { askJudgeTitle, askSimilarTo, extractReference } from '@/lib/askJudge';
 import { naiveParseQuery, EMPTY_QUERY, parseTopicTerms, extractExcludedPerson } from '@/lib/finderParse';
+import { coerceClientQuery } from '@/lib/finderQueryBoundary';
 import { tmdbImage } from '@/lib/tmdb/image';
 import { searchKeywords, searchPeople, getCredits, searchTitles, getTitle } from '@/lib/tmdb/client';
 import { parseAskWithAI, resolvePerson, parseRequestedCount } from '@/lib/askParse';
@@ -151,30 +152,9 @@ function hasCompetingConstraints(text: string): boolean {
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-function coerceQuery(raw: unknown): FinderQuery {
-  const q = (raw ?? {}) as Partial<FinderQuery>;
-  return {
-    mediaType: q.mediaType === 'movie' || q.mediaType === 'tv' ? q.mediaType : 'any',
-    genreIds: Array.isArray(q.genreIds) ? q.genreIds.map(Number).filter((n) => Number.isFinite(n)).slice(0, 6) : [],
-    maxRuntime: typeof q.maxRuntime === 'number' ? q.maxRuntime : null,
-    sinceMonths: typeof q.sinceMonths === 'number' ? q.sinceMonths : null,
-    minAudience: typeof q.minAudience === 'number' ? q.minAudience : null,
-    minImdb: typeof q.minImdb === 'number' ? q.minImdb : null,
-    englishAudioOnly: Boolean(q.englishAudioOnly),
-    onMyServices: Boolean(q.onMyServices),
-    providerIds: Array.isArray(q.providerIds)
-      ? q.providerIds.map(Number).filter((n) => Number.isFinite(n)).slice(0, 20)
-      : undefined,
-    minMatch: typeof q.minMatch === 'number' ? q.minMatch : null,
-    streamItOnly: Boolean(q.streamItOnly),
-    bingeableOnly: Boolean(q.bingeableOnly),
-    upcoming: Boolean(q.upcoming),
-    liveOnly: Boolean(q.liveOnly),
-    pace: typeof q.pace === 'number' ? Math.max(0, Math.min(100, q.pace)) : null,
-    originCountries: Array.isArray(q.originCountries) ? q.originCountries.map(String).slice(0, 4) : undefined,
-    originalLanguages: Array.isArray(q.originalLanguages) ? q.originalLanguages.map(String).slice(0, 4) : undefined,
-  };
-}
+/* The client-query boundary lives in ONE module now — see
+   src/lib/finderQueryBoundary.ts. This route carried a private byte-identical
+   copy; two definitions of what a client may claim is two authorities. */
 
 export async function POST(req: Request) {
   try {
@@ -1082,7 +1062,17 @@ export async function POST(req: Request) {
       query = ai.query;
       limit = ai.limit;
     } else {
-      query = body.query ? coerceQuery(body.query) : text ? naiveParseQuery(text) : { ...EMPTY_QUERY };
+      /*
+       * THE SENTENCE OUTRANKS THE CLIENT'S PARSE OF IT (Phase 7). The old
+       * order took `body.query` — the browser's own naiveParseQuery of the
+       * same text — over the server's reading, so a hostile or version-skewed
+       * client could execute a different meaning than the words it displayed.
+       * When text exists, the server derives the query from the text itself;
+       * a client query stands alone only when there IS no sentence — the
+       * chip-removal turn, where the accumulated structured state is the
+       * whole request and no English travels at all.
+       */
+      query = text ? naiveParseQuery(text) : body.query ? coerceClientQuery(body.query) : { ...EMPTY_QUERY };
       // The arm already excludes the canonical path; the guard restates it so
       // the fence is visible at the call site itself.
       if (text && !canonicalOwnsLanguage) limit = parseRequestedCount(text);
@@ -1315,8 +1305,9 @@ export async function POST(req: Request) {
      * English — must not run and re-derive one there. On the legacy arm it
      * runs behind the ENTITY BOUNDARY: occurrences already spent on a resolved
      * person are masked, so they cannot come back as a content subject. It is
-     * still the owner for /api/finder and for asks that produced no canonical
-     * request.
+     * still the owner for /api/finder's LEGACY arm (that route now holds the
+     * same canonical fence as this one) and for asks that produced no
+     * canonical request.
      */
     let askInterpretation: string[] = canonicalInterpretation;
     /* SAID OUT LOUD. A refused role that vanished silently would look exactly

@@ -36,14 +36,27 @@ model, the phase plan, and the honest record of what is built versus mapped.
 | Is a skipped gate a pass? | No — deployed jobs conclude SKIPPED on production events | #91 |
 
 ### Duplicate/isolated truth — status after the phase 3–10 execution (2026-08-21)
-- **Two recommendation engines**: `/api/ask` (canonical `interpret` +
-  `resolveCanonicalExecution`) vs `/api/finder` (`parseAskWithAI` +
-  `naiveParseQuery` + `applyRequiredSubject`). Reachable for the same
-  sentence via build-case's platform branch. → Phase 7 consolidation —
-  **STILL OPEN** (deliberately deferred; tracked in BACKLOG).
-- **`/api/ask`'s legacy arm trusts the client's `naiveParseQuery`** for
-  non-recommendation kinds (`body.query` precedence). → Phase 7 —
-  **STILL OPEN** (deferred with the finder fold).
+- **Two recommendation engines** → **CLOSED for recommendation kinds
+  (Phase 7 fold, 2026-08-21)**: `/api/finder` now holds the same
+  `canonicalOwnsLanguage` fence as `/api/ask` — a recommendation-shaped
+  text is interpreted by `interpret()` and executed through
+  `resolveCanonicalExecution`, the identical builder, with every legacy
+  whole-utterance reader (`parseAskWithAI`, `naiveParseQuery`,
+  `extractReference`, `resolvePerson`, `requestedCreditRole`,
+  `applyRequiredSubject`, `augmentInternational`) fenced to the legacy
+  arm. Parity is BY CONSTRUCTION and pinned
+  (`src/app/api/finder/finderOwnership.test.ts`,
+  `src/lib/arch/semanticOwnership.test.ts`). The legacy arm survives for
+  the kinds the canonical layer does not execute (title lookups, bare
+  statements, similar-to references) — named in the Phase 7 remainder.
+- **Client-parse trust** → **CLOSED (Phase 7, 2026-08-21)**: on BOTH
+  routes the sentence outranks the browser's parse of it — `body.query`
+  stands alone only when no text travels (chip-removal turns, the Vintage
+  one-tap), and the finder's `overrides` list (sliders the user touched —
+  actions, not parses) is the one sanctioned client voice over a
+  text-derived field. `AskTheJudge` no longer ships its parse beside the
+  text; `coerceClientQuery` is ONE module
+  (`src/lib/finderQueryBoundary.ts`), not two private copies.
 - **The airing branch drops the subject** ("AMC boxing movies tonight"
   reaches the guide without `boxing`). → **CLOSED, PR #104** — the airing
   exit re-reads the canonical interpreter's wanted subjects, carries the
@@ -196,11 +209,28 @@ where routes already used one.
 - **5 scoring trace ✅** (PR #102) — one label, one number, all surfaces.
 - **6 availability & live TV ✅ (Slice A)** (PR #104) — source/observed-at
   on watchmode + TVmaze + ingested rows, INV-4, airing subject carried.
-- **7 cross-surface consolidation — PARTIAL** — airing subject (PR #104)
-  and orphan-parser deletion (PR #106) are done; the finder fold into the
-  canonical interpreter and the legacy arm's client-parse trust are
-  DEFERRED (tracked in BACKLOG; both touch search surfaces and take the
-  frozen-corpus gate).
+- **7 cross-surface consolidation — PARTIAL** — done: airing subject
+  (PR #104), orphan-parser deletion (PR #106), and the 2026-08-21 fold:
+  `/api/finder` holds the canonical fence (recommendation kinds execute
+  through `resolveCanonicalExecution`, parity with /api/ask by
+  construction), client-parse trust is dead on both routes, and
+  `coerceClientQuery` is one boundary module. **Remaining second readers,
+  named** (each still live, each queued): `/api/ask`'s legacy-arm readers
+  for non-recommendation kinds (`parseAskWithAI` at ask/route.ts:996
+  above the fence, the similar_to arm :1010–1025, `applyTurn`'s
+  conversational interpreter :244, `HISTORY_ASK` :286, `classifySearch`
+  :198, `routeAsk` :355, `askJudgeTitle`'s raw-text re-read via :771);
+  `/api/finder`'s identical legacy arm for non-recommendation texts;
+  `/api/build-case`'s preamble (`wantsFind` regex :216, the double
+  `parseClauses` via `canonicalRequestRoute` + `tasteEvidenceText`, and
+  the airing arm's `detectGenre` + media regex :330–331 deriving siblings
+  of a canonical subject); and the client destination cascade's private
+  vocabulary (`classifySearchIntent`, searchIntent.ts:82–108) deciding
+  before the clause-layer owner is consulted. The retained
+  shared-definition deciders (`clauseLayerSaysRequest`,
+  `canonicalRequestRoute`, `lexicalIntent` — one definition executed
+  client- and server-side) are single-owner by construction, not
+  competitors.
 - **8 Slices B+C — PARTIAL** (PR #105) — Verdict Room, docket verdict and
   Subscription Check record decision runs (session/request_only) under
   INV-9; court runs record only when the host is authenticated, and

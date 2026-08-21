@@ -1,0 +1,83 @@
+/**
+ * SEMANTIC OWNERSHIP — the Phase 7 law, pinned at the source level.
+ *
+ * Free-form user English gets ONE semantic interpretation. Downstream may
+ * execute structured fields; it may not independently reinterpret the
+ * sentence, and the browser's parse of the sentence is never authority.
+ * The behavioral half lives in src/app/api/finder/finderOwnership.test.ts;
+ * these pins stop the structure itself from regressing.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const ROOT = join(__dirname, '..', '..', '..');
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
+
+const finderRoute = read('src/app/api/finder/route.ts');
+const askRoute = read('src/app/api/ask/route.ts');
+
+describe('the finder holds the canonical fence', () => {
+  it('imports the canonical interpreter and executes through the same resolver as /api/ask', () => {
+    expect(finderRoute).toMatch(/from '@\/lib\/interpret\/interpret'/);
+    expect(finderRoute).toMatch(/from '@\/lib\/ask\/canonicalExecution'/);
+    expect(finderRoute).toMatch(/const canonicalOwnsLanguage = canonical !== null && canonical\.kind === 'recommendation'/);
+  });
+
+  it('every legacy whole-utterance reader is fenced behind !canonicalOwnsLanguage', () => {
+    /* Each of these exists to extract meaning from raw English. On the
+       canonical arm the meaning already arrived structured; an unfenced call
+       would be a second reader. The fence expressions are pinned verbatim so
+       an accidental unguard shows up as a diff HERE, not as drift. */
+    expect(finderRoute).toMatch(/if \(!canonicalOwnsLanguage\) \{\s*\n\s*query = augmentInternational\(query, text\);/);
+    expect(finderRoute).toMatch(/if \(!canonicalOwnsLanguage && text && \(!query\.castIds/);
+    expect(finderRoute).toMatch(/if \(!canonicalOwnsLanguage && text\) \{\s*\n\s*const applied = await applyRequiredSubject/);
+    expect(finderRoute).toMatch(/if \(!canonicalOwnsLanguage && cls\?\.mode === 'similar_to'\)/);
+  });
+});
+
+describe('the sentence outranks the client parse of it — on both routes', () => {
+  it('finder: text-first derivation; body.query stands alone only without a sentence', () => {
+    expect(finderRoute).toMatch(/query = text \? naiveParseQuery\(text\) : body\.query \? coerceClientQuery\(body\.query\) : \{ \.\.\.EMPTY_QUERY \}/);
+    expect(finderRoute).not.toMatch(/body\.query \? coerce\w*Query\(body\.query\) : text/);
+  });
+
+  it('ask: the legacy arm derives from text; body.query stands alone only on chip-removal turns', () => {
+    expect(askRoute).toMatch(/query = text \? naiveParseQuery\(text\) : body\.query \? coerceClientQuery\(body\.query\) : \{ \.\.\.EMPTY_QUERY \}/);
+    expect(askRoute).not.toMatch(/body\.query \? coerce\w*Query\(body\.query\) : text/);
+  });
+
+  it('the wire itself carries one authority: AskTheJudge sends its parse only when no text travels', () => {
+    const askTheJudge = read('src/components/AskTheJudge.tsx');
+    expect(askTheJudge).toMatch(/\.\.\.\(text \? \{\} : \{ query \}\)/);
+  });
+});
+
+describe('one boundary where a client query enters', () => {
+  it('coerceClientQuery is defined exactly once, and neither route keeps a private copy', () => {
+    expect(read('src/lib/finderQueryBoundary.ts')).toMatch(/export function coerceClientQuery/);
+    expect(finderRoute).not.toMatch(/function coerceQuery/);
+    expect(askRoute).not.toMatch(/function coerceQuery/);
+    expect(finderRoute).toMatch(/from '@\/lib\/finderQueryBoundary'/);
+    expect(askRoute).toMatch(/from '@\/lib\/finderQueryBoundary'/);
+  });
+});
+
+describe('retained shared-definition deciders are single-owner, not competitors', () => {
+  it('the search destination and the hero-box guard consume the ONE clause-layer owner', () => {
+    /* SearchBar/QuickSearch (destination cascade) and BuildCaseBox (the
+       incident guard that keeps a request off the generic feed) run in the
+       browser — but through the SAME single-definition functions the server
+       consults (`clauseLayerSaysRequest`, `canonicalRequestRoute`). One
+       definition cannot disagree with itself; these stay by design and any
+       fork of them into a private vocabulary must fail here. */
+    const searchIntent = read('src/lib/search/searchIntent.ts');
+    expect(searchIntent).toMatch(/clauseLayerSaysRequest/);
+    const requestRoute = read('src/lib/nlu/requestRoute.ts');
+    expect(requestRoute).toMatch(/clauseLayerSaysRequest/);
+    /* The one client fallback that recomputed a server answer is gone: the
+       search bar takes the server's `intent` verbatim. */
+    const searchBar = read('src/components/SearchBar.tsx');
+    expect(searchBar).not.toMatch(/\?\? lexicalIntent\(/);
+  });
+});

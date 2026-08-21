@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Poster } from './PosterCard';
 import { SearchResultRow } from './search/SearchResultRow';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
-import { classifySearchIntent, resolveSearchDestination, couldBeTitle, askHref, lexicalIntent, type LexicalIntent } from '@/lib/search/searchIntent';
+import { classifySearchIntent, resolveSearchDestination, couldBeTitle, askHref, type LexicalIntent } from '@/lib/search/searchIntent';
 import { consumeSearchRequest, searchRequestHost } from '@/lib/search/openRequest';
 
 interface Result {
@@ -236,7 +236,10 @@ export function SearchBar({
           setResults(data.results ?? []);
           setResultsFor(query);
           setPeople(data.people ?? []);
-          setIntent((data.intent as LexicalIntent | null) ?? lexicalIntent(query));
+          /* The server computes `intent` with the same shared lexicalIntent
+             this bundle imports — recomputing it here when the field is null
+             reproduces the server's own null. The answer is the server's. */
+          setIntent((data.intent as LexicalIntent | null) ?? null);
           setOpen(true);
         }
       } catch {
