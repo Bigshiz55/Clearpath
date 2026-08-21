@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { readDecisionRun } from '@/lib/graph/store';
 import { checkRunInvariants } from '@/lib/graph/invariants';
+import { groundedWhy } from '@/lib/graph/groundedWhy';
 import { hardRequirements } from '@/lib/graph/types';
 
 export const dynamic = 'force-dynamic';
@@ -69,13 +70,23 @@ export default async function DecisionRunPage({ params }: { params: { runId: str
       <Section title={`Returned (${returned.length})`}>
         {returned.length === 0 ? <p className="text-slate-400">No results returned.</p> : (
           <ul className="space-y-0.5">
-            {returned.map((e, i) => (
-              <li key={i}>
-                <span className="font-bold text-white">{String(e.detail?.title ?? e.object)}</span>{' '}
-                <span className="text-slate-500">{e.object}</span>
-                {scored.has(e.object) && <span className="ml-2 rounded bg-pink-500/20 px-1 text-[11px] font-black text-pink-200">{scored.get(e.object)}</span>}
-              </li>
-            ))}
+            {returned.map((e, i) => {
+              /* GROUNDED WHY (Phase 10): the reason line comes from this
+                 run's own edges and nothing else — if the run holds no
+                 evidence about a candidate, it says so instead of inventing
+                 one (INV-7). */
+              const why = groundedWhy(run, e.object);
+              return (
+                <li key={i}>
+                  <span className="font-bold text-white">{String(e.detail?.title ?? e.object)}</span>{' '}
+                  <span className="text-slate-500">{e.object}</span>
+                  {scored.has(e.object) && <span className="ml-2 rounded bg-pink-500/20 px-1 text-[11px] font-black text-pink-200">{scored.get(e.object)}</span>}
+                  <div className="text-[11px] text-slate-400">
+                    {why.length > 0 ? `why: ${why.join(' · ')}` : 'no recorded evidence for a why'}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Section>
