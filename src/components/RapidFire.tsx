@@ -30,16 +30,20 @@ import {
   type RapidFireItem,
 } from '@/lib/import/rapidFire';
 
+// Cinematic, restrained: the two decisive poles carry a soft emerald/rose
+// wash, everything in between is a single quiet neutral. No competing accent
+// hues, no hard-coded magenta — the brand blue is the only accent, used once
+// (the progress bar). A decision surface, not a control panel.
 const TONE: Record<'good' | 'bad' | 'neutral', string> = {
-  good: 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100',
-  bad: 'border-rose-400/50 bg-rose-500/15 text-rose-100',
-  neutral: 'border-white/20 bg-white/[0.07] text-slate-200',
+  good: 'border-emerald-400/40 bg-emerald-500/10 text-emerald-50 hover:border-emerald-300/60 hover:bg-emerald-500/20',
+  bad: 'border-rose-400/40 bg-rose-500/10 text-rose-50 hover:border-rose-300/60 hover:bg-rose-500/20',
+  neutral: 'border-white/12 bg-white/[0.05] text-slate-200 hover:border-white/25 hover:bg-white/[0.09]',
 };
 
 const KIND_BADGE: Record<RapidFireItem['kind'], { label: string; className: string }> = {
-  abandoned: { label: 'You stopped watching', className: 'border-amber-400/50 bg-amber-500/15 text-amber-100' },
-  rewatched: { label: 'You went back to it', className: 'border-[#ff1493]/50 bg-[#ff1493]/15 text-pink-100' },
-  watched: { label: 'You watched it', className: 'border-white/20 bg-white/10 text-slate-300' },
+  abandoned: { label: 'You stopped watching', className: 'border-white/15 bg-white/[0.06] text-slate-300' },
+  rewatched: { label: 'You went back to it', className: 'border-brand-400/40 bg-brand-500/10 text-brand-100' },
+  watched: { label: 'You watched it', className: 'border-white/15 bg-white/[0.06] text-slate-300' },
 };
 
 /** One in-flight poster lookup per title, shared across renders. */
@@ -78,7 +82,7 @@ function Cover({ item }: { item: RapidFireItem }) {
   }, [item.title, item.mediaType]);
 
   return (
-    <div className="relative aspect-[2/3] w-28 flex-none overflow-hidden rounded-xl bg-ink-800 shadow-lg shadow-black/50 sm:w-36">
+    <div className="relative aspect-[2/3] w-32 flex-none overflow-hidden rounded-2xl bg-ink-800 shadow-xl shadow-black/60 ring-1 ring-white/10 sm:w-40">
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="h-full w-full object-cover" />
@@ -156,7 +160,7 @@ export function RapidFire({
   if (done || !item) {
     return (
       <div className="card p-6" data-testid="rapid-done">
-        <div className="text-xs font-black uppercase tracking-[0.15em] text-[#ff1493]">Done for now</div>
+        <div className="text-xs font-black uppercase tracking-[0.15em] text-brand-300">Done for now</div>
         <h2 className="mt-1 text-2xl font-black text-white">{summary.message}</h2>
         <p className="mt-3 text-sm leading-relaxed text-slate-300">
           {summary.taught > 0
@@ -184,78 +188,112 @@ export function RapidFire({
   }
 
   const options = answersFor(item.kind);
+  // The two escape hatches are always the last two (rapidFire.ts appends
+  // ESCAPES). Rendering them as a quiet secondary row — not four equal-weight
+  // tiles — keeps the DECISION the focal point and stops "Wasn't me" / "Don't
+  // remember" from competing with an actual opinion for the eye.
+  const opinions = options.slice(0, -2);
+  const escapes = options.slice(-2);
   const badge = KIND_BADGE[item.kind];
+  const pct = Math.round((index / queue.length) * 100);
 
   return (
     <div data-testid="rapid-fire">
       {notice}
 
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold text-slate-400" data-testid="rapid-progress">
-          {index + 1} of {queue.length}
+      {/* THE CARD IS THE WHOLE SCREEN. Poster → title → question → decisions,
+          one focal object; the only chrome is a slim progress line above it and
+          a quiet Back. Keyed on the index so each new title eases in. */}
+      <div className="mb-3 flex items-center gap-3">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-300 transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
         </div>
-        {index > 0 && (
-          <button
-            type="button"
-            onClick={() => setAnswers((prev) => prev.slice(0, -1))}
-            data-testid="rapid-back"
-            className="inline-flex min-h-[44px] items-center rounded-lg border border-white/15 px-3 text-sm font-semibold text-slate-300 transition hover:bg-white/10"
-          >
-            ← Back
-          </button>
-        )}
+        <div className="shrink-0 text-xs font-semibold tabular-nums text-slate-400" data-testid="rapid-progress">
+          {index + 1} / {queue.length}
+        </div>
       </div>
 
-      <div className="h-1 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full rounded-full bg-[#ff1493] transition-all"
-          style={{ width: `${(index / queue.length) * 100}%` }}
-        />
-      </div>
-
-      <div className="card mt-4 p-4 sm:p-5" data-testid={`rapid-card-${item.key}`}>
-        <div className="flex gap-4">
+      <div
+        key={index}
+        className="card overflow-hidden bg-gradient-to-b from-ink-850/80 to-ink-900/80 p-5 motion-safe:animate-fade-up sm:p-6"
+        data-testid={`rapid-card-${item.key}`}
+      >
+        <div className="flex gap-4 sm:gap-5">
           <Cover item={item} />
           <div className="min-w-0 flex-1">
             <span
-              className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${badge.className}`}
+              className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${badge.className}`}
               data-testid="rapid-kind"
             >
               {badge.label}
             </span>
-            <h2 className="mt-1.5 text-xl font-black leading-tight text-white sm:text-2xl">{item.title}</h2>
+            <h2 className="mt-2 text-2xl font-black leading-tight text-white sm:text-3xl">{item.title}</h2>
             {/* Straight from the file. This is what makes the question answerable. */}
-            <p className="mt-1.5 text-sm leading-relaxed text-slate-400" data-testid="rapid-evidence">
+            <p className="mt-2 text-sm leading-relaxed text-slate-400" data-testid="rapid-evidence">
               {item.evidence}
             </p>
           </div>
         </div>
 
-        <p className="mt-4 text-base font-bold text-white" data-testid="rapid-question">
+        <p className="mt-5 text-lg font-bold text-white sm:text-xl" data-testid="rapid-question">
           {questionFor(item)}
         </p>
 
-        {/* 2-up so six answers never overflow a 320px screen. */}
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {options.map((o, i) => (
+        {/* THE DECISION — larger premium tiles, 2-up so nothing overflows 320px. */}
+        <div className="mt-3 grid grid-cols-2 gap-2.5">
+          {opinions.map((o) => (
             <button
               key={o.key}
               type="button"
               onClick={() => answer(o.key)}
               data-testid={`rapid-answer-${o.key}`}
-              className={`min-h-[56px] rounded-xl border-2 px-2 text-sm font-bold transition hover:brightness-125 sm:text-base ${TONE[o.tone]}`}
+              className={`min-h-[60px] rounded-2xl border px-3 text-sm font-bold transition-all duration-150 active:scale-[0.97] sm:text-base ${TONE[o.tone]}`}
             >
-              <span className="mr-1 hidden text-[10px] opacity-50 sm:inline">{i + 1}</span>
+              {o.label}
+            </button>
+          ))}
+        </div>
+
+        {/* THE ESCAPES — present on every card (a hard requirement), but quiet:
+            a thin secondary row, still a 44px tap target, never shouting over
+            the real answer above. */}
+        <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+          {escapes.map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => answer(o.key)}
+              data-testid={`rapid-answer-${o.key}`}
+              className="min-h-[44px] rounded-xl px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/[0.04] hover:text-slate-200"
+            >
               {o.label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Footer: the live tally, and the exit — now a QUIET text button. The old
+          magenta-gradient "Stop here" was styled heavier than every answer, so
+          the way out outshouted the task; it recedes to where an exit belongs. */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <p ref={liveRef} aria-live="polite" className="text-xs text-slate-500" data-testid="rapid-live">
-          {summary.message}
-        </p>
+        <div className="flex items-center gap-3">
+          {index > 0 && (
+            <button
+              type="button"
+              onClick={() => setAnswers((prev) => prev.slice(0, -1))}
+              data-testid="rapid-back"
+              className="inline-flex min-h-[44px] items-center rounded-lg px-2 text-sm font-semibold text-slate-400 transition-colors hover:text-slate-200"
+            >
+              ← Back
+            </button>
+          )}
+          <p ref={liveRef} aria-live="polite" className="text-xs text-slate-500" data-testid="rapid-live">
+            {summary.message}
+          </p>
+        </div>
         {index > 0 && (
           <button
             type="button"
@@ -264,7 +302,7 @@ export function RapidFire({
               onFinish?.(answers);
             }}
             data-testid="rapid-stop"
-            className="inline-flex min-h-[44px] items-center rounded-lg border-2 border-pink-200/60 bg-gradient-to-b from-[#ff62b6] to-[#ff1493] px-5 text-sm font-black text-white transition hover:brightness-110"
+            className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-slate-400 transition-colors hover:text-slate-200"
           >
             Stop here
           </button>
