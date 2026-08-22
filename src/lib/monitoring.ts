@@ -36,6 +36,8 @@ export const RELIABILITY_EVENTS = [
   'quiz_load_failure',
   'availability_resolution_failure',
   'new_releases_empty',
+  'guide_empty',
+  'guide_read_truncated',
   'pack_timeout',
   'signin_email_failure',
   'import_failure',

@@ -1,6 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { selectUpcomingAirings, usBroadcastDate, UPCOMING_TV_HORIZON_MS, type Airing } from '@/lib/onTv';
+import { recordReliabilityEvent } from '@/lib/monitoring';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -196,6 +197,9 @@ const PAGE_ROWS = 1000;
 /** Hard ceiling on one day-read — far above any real lineup's day (~4,500
  *  airings on the largest measured feed), a runaway backstop, not a budget. */
 const DAY_READ_CAP = 20_000;
+/** Guide windows are short (≤48h); this backstop is comfortably above a
+ *  full lineup's two days, so paging ends on the natural short page, not here. */
+const GUIDE_READ_CAP = 10_000;
 
 /** Fetch rows for `ids` in IN_CHUNK batches. Null on any batch error — the
  *  caller degrades to [] exactly as a single failed lookup always has. */
@@ -280,21 +284,99 @@ export async function getIngestedGuideAirings(
   windowMs: number,
   lookbackMs = 6 * 60 * 60 * 1000,
 ): Promise<Airing[]> {
+  // PAGED, not a single .limit(1000). A single ascending page returned the
+  // OLDEST 1000 rows of the window — on a full lineup (~4,500 airings/day)
+  // every one of them is already in the past, so buildChannelGuide's
+  // on-now/up-next drop rule eliminated every channel and the grid rendered
+  // EMPTY while the database was full of data (observed in production
+  // 2026-08-22). The forward-facing airings the guide actually needs sat
+  // beyond the truncation. `getIngestedDayAirings` was paged for exactly this
+  // reason; the guide read simply never got the fix. A guide window is small
+  // (12h), so this is 1–3 pages, capped by GUIDE_READ_CAP as a backstop.
   const rangeStart = new Date(nowMs - lookbackMs).toISOString();
   const rangeEnd = new Date(nowMs + windowMs).toISOString();
-
-  const { data: airings, error: airingsError } = await supabase
-    .from('tv_airings')
-    .select('station_id, programme_id, start_at_utc, provider_airing_id, is_premiere, source, fetched_at, last_seen_at')
-    .gte('start_at_utc', rangeStart)
-    .lt('start_at_utc', rangeEnd)
-    .order('start_at_utc', { ascending: true })
-    .limit(1000);
-  if (airingsError || !airings || airings.length === 0) {
-    if (airingsError) console.error('[ingestedGuide] tv_airings query failed', airingsError.message);
+  const all: RawAiring[] = [];
+  let truncated = false;
+  for (let offset = 0; offset < GUIDE_READ_CAP; offset += PAGE_ROWS) {
+    const { data, error } = await supabase
+      .from('tv_airings')
+      .select('station_id, programme_id, start_at_utc, provider_airing_id, is_premiere, source, fetched_at, last_seen_at')
+      .gte('start_at_utc', rangeStart)
+      .lt('start_at_utc', rangeEnd)
+      .order('start_at_utc', { ascending: true })
+      .order('id', { ascending: true })
+      .range(offset, offset + PAGE_ROWS - 1);
+    if (error) {
+      console.error('[ingestedGuide] guide page read failed', error.message);
+      break;
+    }
+    const page = (data as RawAiring[] | null) ?? [];
+    all.push(...page);
+    if (page.length < PAGE_ROWS) break;
+    if (offset + PAGE_ROWS >= GUIDE_READ_CAP) truncated = true;
+  }
+  if (truncated) {
+    console.warn(`[ingestedGuide] guide read hit the ${GUIDE_READ_CAP}-row backstop — tail truncated`);
+    void recordReliabilityEvent('guide_read_truncated', { windowHours: Math.round(windowMs / HOUR_MS) });
+  }
+  if (all.length === 0) {
+    // A read that returns zero over a full window is the signal the old
+    // single-page truncation HID: the diagnostics could never tell "no data"
+    // from "1000 past rows". Named here so a blank guide is observable.
+    void recordReliabilityEvent('guide_empty', { windowHours: Math.round(windowMs / HOUR_MS) });
     return [];
   }
-  return hydrateAiringRows(supabase, airings as RawAiring[]);
+  return hydrateAiringRows(supabase, all);
+}
+
+/**
+ * THE GUIDE MUST NEVER RENDER EMPTY WHILE REAL DATA EXISTS, so this is the
+ * read the page uses. It layers real-data fallbacks — never fabricated
+ * schedule rows, which the data-honesty rule forbids:
+ *
+ *   1. FRESH: the requested window (paged, above).
+ *   2. WIDENED: if that yields nothing, the next `fallbackWindowMs` of REAL
+ *      upcoming airings (a quieter lineup whose next programme is hours out
+ *      still has something to show), stamped so the UI can say "showing
+ *      upcoming".
+ *
+ * Returns the airings plus provenance the caller surfaces honestly. A truly
+ * empty database (no stored airings in any window) returns `[]` with
+ * `source: 'none'` — the caller then shows the live Highlights that are
+ * already on the page, never a fabricated grid.
+ */
+export interface GuideAiringsResult {
+  airings: Airing[];
+  source: 'fresh' | 'widened' | 'none';
+  /** ms of the newest `last_seen_at`/`fetched_at` across the returned rows. */
+  asOfMs: number | null;
+}
+
+export async function getGuideAiringsWithFallback(
+  supabase: SupabaseClient,
+  nowMs: number,
+  windowMs: number,
+  fallbackWindowMs = 48 * HOUR_MS,
+): Promise<GuideAiringsResult> {
+  const fresh = await getIngestedGuideAirings(supabase, nowMs, windowMs);
+  if (fresh.length > 0) return { airings: fresh, source: 'fresh', asOfMs: newestObservedAt(fresh) };
+
+  // Nothing in the immediate window — reach forward over REAL upcoming
+  // airings only (no lookback: these are genuinely later programmes, shown
+  // as "upcoming", never presented as on-now).
+  const widened = await getIngestedGuideAirings(supabase, nowMs, fallbackWindowMs, 0);
+  if (widened.length > 0) return { airings: widened, source: 'widened', asOfMs: newestObservedAt(widened) };
+
+  return { airings: [], source: 'none', asOfMs: null };
+}
+
+function newestObservedAt(airings: Airing[]): number | null {
+  let newest: number | null = null;
+  for (const a of airings) {
+    const t = a.observedAt ? Date.parse(a.observedAt) : NaN;
+    if (!Number.isNaN(t) && (newest === null || t > newest)) newest = t;
+  }
+  return newest;
 }
 
 /**
