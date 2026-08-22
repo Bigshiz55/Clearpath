@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfile, getPreferenceRules, regionFor } from '@/lib/profile';
 import { getOnTvToday, getUpcomingTv, enrichAiringsWithCritics, enrichAiringsWithTmdb, enrichAiringsWithTmdbByTitle, usBroadcastDate, type Airing } from '@/lib/onTv';
 import { scoreGuideAirings } from '@/lib/tv/scoreGuide';
-import { getIngestedGuideAirings, getOnTvTodayIngested, getUpcomingTvIngested, INGESTED_MIN } from '@/lib/tv/ingestedGuide';
+import { getGuideAiringsWithFallback, getOnTvTodayIngested, getUpcomingTvIngested, INGESTED_MIN } from '@/lib/tv/ingestedGuide';
 import { OnTvGuide } from '@/components/OnTvGuide';
 import { ChannelGuide } from '@/components/ChannelGuide';
 import { WhatsOnToday } from '@/components/WhatsOnToday';
@@ -120,9 +120,15 @@ export default async function OnTvPage({
   // worked around; see docs/SCHEDULE_PROVIDERS.md). Only the handful of
   // channels configured for that ingest can ever appear here; the coverage
   // banner below reflects that narrowness from this same real data, not a flag.
-  let guideAirings: Airing[] = guideView
-    ? await getIngestedGuideAirings(supabase, now.getTime(), 6 * HOUR_MS).catch(() => [])
-    : [];
+  // Never-empty guide: fresh window → real upcoming (widened) fallback. Never
+  // fabricated schedule rows (data-honesty rule); when even the widened read
+  // is empty the live Highlights above stay the populated experience.
+  const guideResult = guideView
+    ? await getGuideAiringsWithFallback(supabase, now.getTime(), 6 * HOUR_MS).catch(
+        () => ({ airings: [] as Airing[], source: 'none' as const, asOfMs: null }),
+      )
+    : { airings: [] as Airing[], source: 'none' as const, asOfMs: null };
+  let guideAirings: Airing[] = guideResult.airings;
   // PER-PROGRAMME SCORES. A bounded set of the window's programmes (on-now
   // first) is resolved to real titles and run through the SAME deterministic
   // engine as every card, with this user's rules — so "this movie suits you
@@ -304,7 +310,7 @@ export default async function OnTvPage({
 
       {upcoming.length > 0 && <MyReminders initial={upcoming} />}
 
-      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} remindedIds={remindedIds} taste={tasteRules} personalized={guidePersonalized} coverageProvable={gridLive} />}
+      {guideView && <ChannelGuide airings={guideAirings} nowMs={now.getTime()} remindedIds={remindedIds} taste={tasteRules} personalized={guidePersonalized} coverageProvable={gridLive} fallbackSource={guideResult.source} asOfMs={guideResult.asOfMs} />}
 
       {guideView ? null : withinHours != null && windowed ? (
         <>

@@ -49,6 +49,8 @@ export function ChannelGuide({
   taste = [],
   personalized = false,
   coverageProvable = false,
+  fallbackSource = 'fresh',
+  asOfMs = null,
 }: {
   airings: Airing[];
   nowMs: number;
@@ -66,6 +68,12 @@ export function ChannelGuide({
    *  a statement about our sources, never about the schedule. Defaults to
    *  false — the honest direction for any caller that doesn't say. */
   coverageProvable?: boolean;
+  /** Where these airings came from: 'fresh' = the immediate window; 'widened'
+   *  = real upcoming programming shown because the immediate window was empty
+   *  (stamped "upcoming"); 'none' = no stored airings at all. */
+  fallbackSource?: 'fresh' | 'widened' | 'none';
+  /** Newest observed-at across the shown airings — the honest "last updated". */
+  asOfMs?: number | null;
 }) {
   const [query, setQuery] = useState('');
   const [media, setMedia] = useState<GuideMediaFilter>('all');
@@ -144,21 +152,39 @@ export function ChannelGuide({
   }
 
   if (rows.length === 0) {
+    // No fabricated schedule (data-honesty rule): when there is genuinely
+    // nothing to lay out, point the viewer at the live Highlights that ARE
+    // populated above — in the viewer's own words, never pipeline language
+    // ("refreshes hourly", "nothing it can show").
     return (
-      <div className="rounded-2xl border border-amber-400/30 bg-amber-500/[0.07] p-4 text-center" data-testid="guide-empty">
-        <p className="text-sm text-slate-300">
-          The full guide has nothing it can show for this window yet — the grid refreshes hourly.
-          The highlights above are still live.
-        </p>
+      <div className="rounded-2xl border border-white/10 bg-ink-850/60 p-5 text-center" data-testid="guide-empty">
+        <p className="text-sm text-slate-200">Your live picks are up top — start there for what to watch right now.</p>
+        <p className="mt-1 text-xs text-slate-400">Full channel listings for your area are on the way.</p>
       </div>
     );
   }
+
+  // When the shown grid is REAL upcoming programming (the immediate window was
+  // empty), say so honestly with a freshness stamp — never dress upcoming
+  // listings as on-now.
+  const asOfLabel =
+    asOfMs != null
+      ? new Date(asOfMs).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : null;
 
   const clockOf = (ms: number) =>
     new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
   return (
     <div className="space-y-3" data-testid="channel-guide">
+      {fallbackSource === 'widened' && (
+        <div
+          className="rounded-xl border border-white/10 bg-ink-850/60 px-3.5 py-2 text-xs text-slate-300"
+          data-testid="guide-upcoming-banner"
+        >
+          Showing upcoming programming{asOfLabel ? <> · updated {asOfLabel}</> : null}.
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="search"
