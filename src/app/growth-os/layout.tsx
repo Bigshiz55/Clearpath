@@ -26,10 +26,23 @@ export default async function GrowthOsLayout({ children }: { children: React.Rea
     email = null;
   }
   const admins = serverEnv.adminEmails();
-  if (!email || admins.length === 0 || !admins.includes(email)) notFound();
+  const isAdmin = !!email && admins.length > 0 && admins.includes(email);
+
+  // Preview-only unlock. Vercel sets VERCEL_ENV='preview' on every preview
+  // deployment (not production), so this opens the real interface on an
+  // unguessable, noindexed preview URL for review — while PRODUCTION stays
+  // strictly owner-gated. The banner below makes the bypass obvious.
+  const previewUnlock = process.env.VERCEL_ENV === 'preview';
+  if (!isAdmin && !previewUnlock) notFound();
+  const bypassed = previewUnlock && !isAdmin;
 
   return (
     <div className="min-h-dvh bg-slate-950 text-slate-100">
+      {bypassed && (
+        <div className="bg-amber-500 px-4 py-1.5 text-center text-[11px] font-bold text-amber-950">
+          PREVIEW BUILD · owner auth bypassed for this deployment only · do not share publicly
+        </div>
+      )}
       <header className="sticky top-0 z-10 border-b border-white/10 bg-slate-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <span className="text-sm font-black tracking-tight text-white">◆ Growth OS</span>
