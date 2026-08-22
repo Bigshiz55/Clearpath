@@ -3,7 +3,36 @@
 Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
-## Now — migration-ledger gap closure, 2026-08-21 (night shift)
+## Now — migration automation hardening, 2026-08-22
+
+- **CLOSED — the unattended migration path is failure-safe end to end.**
+  `apply-migrations.yml` is the canonical future path; audited as a FILE by
+  the new `migrationWorkflow.test.ts` harness (dispatch-only shape, confirm
+  gate, the three-channel credential truth table, referenced scripts exist,
+  secrets only through the secrets context, no echo). Three code defects
+  fixed RED→GREEN: the admin route answered **200/ok:true even when a
+  migration failed** (the workflow's PATH 2 reads that status as its
+  verdict) and **continued past failures** — it now stops at the first
+  failure, records it success=false, and answers 500/ok:false naming the
+  migration; `scripts/migrate.ts` now sanitizes/validates the URL before pg
+  sees it (malformed value → structural reason, exit 1, nothing echoed);
+  and the verify job's `verifyProductionSchema.ts` now checks TWO
+  independent evidence channels — schema objects AND migration identity
+  (`/api/version`): deployed-code-ahead-of-ledger or an unnameable applied
+  migration fails the run, catching the contract-invisible class (an
+  index/policy/data migration that merged but never applied).
+- **Selection discipline pinned over the real registry:** contiguous/one
+  pending/sparse-with-CLI-evidence/multiple-pending each decide the exact
+  set in ascending registry order; withdrawn 0042 and the excluded baseline
+  cannot be resurrected (registry ∩ exclusions = ∅, runners iterate only
+  the registry); repeat runs are pure no-ops.
+- **Still the one human step for fully-unattended:** repo secret
+  `SUPABASE_DB_URL` (or `MIGRATE_SECRET` beside the existing `SITE_URL`)
+  in GitHub → Settings → Secrets and variables → Actions. No pending
+  migration exists (production: 0049 applied, 105/105 objects), so nothing
+  needs applying today; production untouched by this work.
+
+## Prior shift — migration-ledger gap closure, 2026-08-21 (night shift)
 
 - **CLOSED — one runner discipline (PR #114).** `scripts/migrate.ts` was the
   last bare-ledger writer AND the Actions workflow's preferred path; it now

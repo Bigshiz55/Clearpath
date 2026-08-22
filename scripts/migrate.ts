@@ -30,13 +30,25 @@
 import './searchAudit/shimServerOnly';
 import { Client } from 'pg';
 import { PENDING_MIGRATIONS } from '../src/lib/pendingMigrations';
+import { sanitizeDbUrl, validateDbUrl } from '../src/lib/adminMigrateUrl';
 import { LEDGER_DDL, MIGRATION_LOCK_KEY, checksumOf, decideForMigration, readCliAppliedNames, withCliEvidence, type LedgerRow } from '../src/lib/migrationLedger';
 
 async function main(): Promise<void> {
-  const dbUrl = process.env.SUPABASE_DB_URL;
-  if (!dbUrl) {
+  const rawDbUrl = process.env.SUPABASE_DB_URL;
+  if (!rawDbUrl) {
     console.warn('[migrate] SUPABASE_DB_URL is not set — skipping migrations. The build will continue.');
     return;
+  }
+
+  // Same sanitize/validate idiom as the admin route: a malformed value fails
+  // HERE with a structural reason that never echoes the string — before pg
+  // gets a chance to throw an error that might quote pieces of it into a CI
+  // log. Pasting artifacts (wrapping quotes, whitespace) are repaired.
+  const dbUrl = sanitizeDbUrl(rawDbUrl);
+  const validation = validateDbUrl(dbUrl);
+  if (!validation.ok) {
+    console.error(`[migrate] FAILED — the configured database URL is not usable: ${validation.reason}`);
+    process.exit(1);
   }
 
   // node-pg's `ssl` option overrides the URL's own sslmode, so an explicit
