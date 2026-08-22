@@ -7,6 +7,7 @@ export function GuestSaveButton({ className = '' }: { className?: string }) {
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -17,28 +18,35 @@ export function GuestSaveButton({ className = '' }: { className?: string }) {
       setError('Enter an email.');
       return;
     }
+    if (password.length < 8) {
+      setError('Use a password of at least 8 characters.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}`;
 
-    // Try linking this email onto the CURRENT anonymous session first — if
-    // it's genuinely new, this keeps the same account id (watchlist, ratings
-    // and taste all carry over with zero merge needed). If that email
-    // already belongs to a different account, this errors and we fall back
-    // to a normal sign-in link instead — /auth/callback then offers an
-    // explicit merge-or-discard choice for that case, never a silent guess.
-    const { error: linkError } = await supabase.auth.updateUser({ email: trimmed }, { emailRedirectTo: redirectTo });
+    // Set an email AND password on the CURRENT anonymous session — this keeps
+    // the same account id, so the guest's watchlist, ratings and taste carry
+    // over with zero merge needed, and the account is a real password login
+    // afterward (no emailed link, no expiry window). If the email already
+    // belongs to a different account, updateUser errors: we surface that
+    // honestly and point to the sign-in page rather than silently guessing a
+    // merge. (The /auth/callback merge path remains for the confirm-email
+    // case, but the password upgrade never depends on an inbox.)
+    const { error: linkError } = await supabase.auth.updateUser(
+      { email: trimmed, password },
+      { emailRedirectTo: redirectTo },
+    );
     if (linkError) {
-      const { error: signInError } = await supabase.auth.signInWithOtp({
-        email: trimmed,
-        options: { emailRedirectTo: redirectTo },
-      });
-      if (signInError) {
-        setError(signInError.message);
-        setLoading(false);
-        return;
-      }
+      setError(
+        /already|registered|exists/i.test(linkError.message)
+          ? 'That email already has an account. Sign in with it from the sign-in page instead.'
+          : linkError.message,
+      );
+      setLoading(false);
+      return;
     }
 
     setLoading(false);
@@ -55,11 +63,11 @@ export function GuestSaveButton({ className = '' }: { className?: string }) {
           <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
             {sent ? (
               <div className="text-center">
-                <div className="text-3xl">📬</div>
-                <h3 className="mt-2 text-lg font-bold text-white">Check your email</h3>
+                <div className="text-3xl">✅</div>
+                <h3 className="mt-2 text-lg font-bold text-white">Account saved</h3>
                 <p className="mt-1 text-sm text-slate-400">
-                  We sent a link to <span className="text-slate-200">{email}</span>. Tap it to finish saving your
-                  account — no password needed.
+                  <span className="text-slate-200">{email}</span> is now your login — everything you&rsquo;ve done
+                  carries over, on any device. Sign in with your email and password next time.
                 </p>
                 <button onClick={() => setOpen(false)} className="btn-primary mt-5 w-full">Done</button>
               </div>
@@ -67,7 +75,7 @@ export function GuestSaveButton({ className = '' }: { className?: string }) {
               <>
                 <h3 className="text-lg font-bold text-white">Save your account</h3>
                 <p className="mt-1 text-sm text-slate-400">
-                  Keep your watchlist, ratings, and taste — and use them on any device. No password, just a link.
+                  Keep your watchlist, ratings, and taste — and use them on any device. Set an email and password.
                 </p>
                 <input
                   value={email}
@@ -77,10 +85,19 @@ export function GuestSaveButton({ className = '' }: { className?: string }) {
                   className="input mt-4"
                   autoComplete="email"
                 />
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type="password"
+                  placeholder="Password (at least 8 characters)"
+                  className="input mt-3"
+                  autoComplete="new-password"
+                  minLength={8}
+                />
                 {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
                 <div className="mt-4 flex gap-2">
                   <button onClick={send} disabled={loading} className="btn-primary flex-1">
-                    {loading ? 'Sending…' : 'Send link'}
+                    {loading ? 'Saving…' : 'Save account'}
                   </button>
                   <button onClick={() => setOpen(false)} className="btn-ghost">Later</button>
                 </div>

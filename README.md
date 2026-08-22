@@ -15,7 +15,7 @@ legally — then save it to a watchlist or share a verdict page.
   fire only when a trait is a *defining* characteristic, never a stray tag.
 - **Deterministic scoring engine**, fully unit-tested (21 tests). AI is optional
   and can only rewrite prose — it can never change a score or invent facts.
-- **Real accounts.** Supabase Auth (email + magic link), onboarding, private-by-
+- **Real accounts.** Supabase Auth (email + password), onboarding, private-by-
   default data, per-user preferences, watchlists, regions, account deletion.
 - **Shareable verdicts.** Unguessable, revocable public links with optional
   expiry, a generated OG share card, and Web Share support. No account needed to
