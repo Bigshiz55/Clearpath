@@ -104,8 +104,21 @@ Supabase → **Authentication → URL Configuration**:
   - `https://<your-app>.vercel.app/auth/callback`
   - `https://<your-app>.vercel.app/**`
 
-(Email confirmations/magic links are on by default. For instant testing you can
-disable "Confirm email" under Authentication → Providers → Email.)
+**Auth is email + password — no magic link.** The app signs in with a
+password and resolves in place, so under **Authentication → Providers →
+Email**:
+- keep **Email (password)** enabled;
+- **turn OFF "Confirm email"** so a new account gets a session immediately
+  (with it on, sign-up sends a one-time confirmation email — a one-off, not a
+  sign-in mechanism — that lands on `/auth/callback`);
+- **turn OFF the passwordless email / magic-link ("Email OTP")** provider so
+  no emailed-link login path remains server-side.
+
+Existing accounts created before this change have no password; they set one
+by signing up again with the same email (or an owner can set it via
+`scripts/provisionTrialAccounts.ts`). `/auth/callback` and `/auth/merge` stay
+in place — anonymous-guest data merges (and any confirmation email) route
+through them.
 
 ## Step 5 — Smoke-test the live app
 

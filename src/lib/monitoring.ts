@@ -38,6 +38,7 @@ export const RELIABILITY_EVENTS = [
   'new_releases_empty',
   'pack_timeout',
   'signin_email_failure',
+  'signin_password_failure',
   'import_failure',
   'js_error',
   'not_found',

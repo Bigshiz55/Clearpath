@@ -317,7 +317,8 @@ test.describe('State 7: an expired session', () => {
     const res = await page.goto('/login', { waitUntil: 'domcontentloaded' });
     expect(res?.status()).toBeLessThan(400);
     await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /send link/i })).toBeVisible();
+    await expect(page.getByLabel(/password/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /^sign in$/i })).toBeVisible();
   });
 });
 

@@ -32,7 +32,7 @@ You've already done the hard part (the database is set up). Remaining:
 ## B. Everyday use
 
 - **Open the app**: your Vercel URL. Add it to your phone home screen to install it.
-- **Sign in**: enter email + password, or tap "Email me a sign-in link".
+- **Sign in**: enter your email and password.
 - **Search**: type (or tap the 🎤 mic to speak) a movie/show name. Tap a result.
 - **The verdict**: the big **WATCH IT / MAYBE / SKIP IT** is at the top, with your
   personal match score and the reasons under it.

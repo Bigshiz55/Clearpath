@@ -100,9 +100,9 @@ describe('named failure-branch wiring', () => {
     const file = src('src/components/TitleGridCalibration.tsx');
     expect(file.match(/reportReliabilityEvent\('quiz_load_failure'/g)?.length).toBe(2);
   });
-  it('LoginForm reports signin_email_failure on OTP send failure', () => {
+  it('LoginForm reports signin_password_failure on a failed password sign-in / sign-up', () => {
     const file = src('src/components/auth/LoginForm.tsx');
-    expect(file).toMatch(/reportReliabilityEvent\('signin_email_failure'/);
+    expect(file).toMatch(/reportReliabilityEvent\('signin_password_failure'/);
   });
   it('ImportTasteFlow reports import_failure, distinguishing signin-required from a real error', () => {
     const file = src('src/components/import/ImportTasteFlow.tsx');
