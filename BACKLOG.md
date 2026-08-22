@@ -3,7 +3,49 @@
 Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
-## Now — 0039 rename idempotency, 2026-08-22 (after the first credentialed run)
+## Now — Production Quality Closure Pass, 2026-08-22
+
+Seven PRs (#118–#124), all merged and deployed; five user-facing defects plus
+two review-finding fixes and one ledger-reporting fix.
+
+- **CLOSED — migration automation succeeds end-to-end.** After #118 (0039
+  idempotency) + #124 (report the furthest-applied migration by sequence, so
+  a recent retry of a lower migration yields to the CLI's proof of a higher
+  one), `apply-migrations.yml` run #6 (SHA 590d2a8) returned HTTP 200
+  `ok:true applied:3 skipped:31 total:34`: 0039_packs_expansion retried clean
+  (clearing the resurrected hallmark-lifetime/true-crime duplicate packs),
+  0040/0046 applied idempotently, and 0041/0043/0044/0045/0048/0049 skipped
+  as "recorded applied without a checksum — not rerun" (CLI-evidence
+  protection). Verify job GREEN. Production: `/api/health/schema` ok
+  105/105, rlsDisabled [], unappliedMigrations []; `/api/version`
+  appliedMigrationName 0049_decision_runs. No pending migrations.
+- **CLOSED — magic-link auth removed (#120, #123).** LoginForm + guest
+  upgrade are email+password, resolve in place, no emailed link / countdown /
+  inbox wait. signInWithOtp gone from every product component. Anonymous
+  guest data is preserved: LoginForm captures the anon id and reconciles via
+  autoMergeIfSafe (merge or decision screen), guest sign-up upgrades in place
+  with updateUser. Sessions, /auth/callback+merge, middleware gating
+  untouched. HUMAN: disable "Confirm email" + the Email-OTP provider in the
+  Supabase dashboard (named in DEPLOYMENT.md).
+- **CLOSED — Live TV Guide never renders empty (#121, #123).** Root cause:
+  the guide read's single .limit(1000) ascending returned only past airings
+  on a full lineup, so every channel dropped. Now paged; getGuideAiringsWith-
+  Fallback layers fresh → real widened-upcoming → honest "live picks up top"
+  (no fabricated grid). guide_empty/guide_read_truncated health events;
+  guide_empty fires only on the true whole-guide-empty outcome.
+- **CLOSED — trailer unmute keeps playing (#119).** muted state was baked
+  into the iframe src (rewrite → navigate → autoplay-policy block). Src now
+  depends only on the video id; audio rides the YouTube JS API. Premium glass
+  audio control with animated equalizer + aria labels.
+- **CLOSED — Rapid Fire premium redesign (#122).** Cinematic palette (one
+  accent, no #ff1493), decision as focal point, escapes demoted to a quiet
+  row, quiet exit; behavior + tests intact; before/after screenshots at
+  320/390/desktop, all controls >=44px, no overflow.
+- **HUMAN — the preview test account has no Taste DNA**, so taste-dna-proof
+  (a non-blocking measurement gate) fails on every PR. Reseed the preview
+  identity's preference_events to restore the personalization proof.
+
+## Prior shift — 0039 rename idempotency, 2026-08-22 (after the first credentialed run)
 
 - **CLOSED — the 23505 the first real workflow run found (PR #118).** The
   owner added `MIGRATE_SECRET`; runs 32572061231/32572534201 reached
