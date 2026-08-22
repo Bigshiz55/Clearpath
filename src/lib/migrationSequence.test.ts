@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import { PENDING_MIGRATIONS } from './pendingMigrations';
 import { SCHEMA_CONTRACT } from './schemaContract';
 import { LEDGER_DDL } from './migrationLedger';
+import { EXCLUDED_MIGRATIONS, WITHDRAWN_MIGRATIONS } from './excludedMigrations';
 import { ENTRY_POINTS } from './graph/types';
 
 const DIR = join(__dirname, '..', '..', 'supabase', 'migrations');
@@ -163,5 +164,83 @@ describe('the ledger table is born hardened', () => {
        executes on every migrate call, so the repair self-heals. */
     expect(LEDGER_DDL).toMatch(/alter table public\.schema_migrations enable row level security;/);
     expect(LEDGER_DDL).toMatch(/revoke all on public\.schema_migrations from anon, authenticated;/);
+  });
+});
+
+describe('selection over the real registry is deterministic and evidence-based', () => {
+  it('the registry is strictly ascending — "apply in order" and "never skip an earlier one" is its iteration order', () => {
+    const names = PENDING_MIGRATIONS.map((m) => m.name);
+    expect(names).toEqual([...names].sort());
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('contiguous ledger, nothing pending: every registered migration decides skip', async () => {
+    const { checksumOf, decideForMigration } = await import('./migrationLedger');
+    for (const m of PENDING_MIGRATIONS) {
+      const checksum = checksumOf(Buffer.from(m.sqlB64, 'base64').toString('utf8'));
+      const d = decideForMigration(m.name, checksum, { name: m.name, checksum, success: true, reconciled: false });
+      expect(d.action, m.name).toBe('skip');
+    }
+  });
+
+  it('contiguous ledger, one migration pending: exactly the newest decides run', async () => {
+    const { checksumOf, decideForMigration } = await import('./migrationLedger');
+    const newest = PENDING_MIGRATIONS[PENDING_MIGRATIONS.length - 1]!;
+    const decisions = PENDING_MIGRATIONS.map((m) => {
+      const checksum = checksumOf(Buffer.from(m.sqlB64, 'base64').toString('utf8'));
+      const existing = m.name === newest.name ? undefined : { name: m.name, checksum, success: true, reconciled: false };
+      return { name: m.name, action: decideForMigration(m.name, checksum, existing).action };
+    });
+    expect(decisions.filter((d) => d.action === 'run').map((d) => d.name)).toEqual([newest.name]);
+  });
+
+  it('sparse app ledger, newest genuinely pending: CLI evidence protects history, the new one still runs', async () => {
+    const { checksumOf, decideForMigration, withCliEvidence } = await import('./migrationLedger');
+    const newest = PENDING_MIGRATIONS[PENDING_MIGRATIONS.length - 1]!;
+    // The CLI applied everything EXCEPT the newest; the app ledger recorded
+    // almost nothing — production's own shape the day 0050 lands.
+    const cli = new Set(PENDING_MIGRATIONS.map((m) => m.name).filter((n) => n !== newest.name));
+    const ran = PENDING_MIGRATIONS.filter((m) => {
+      const checksum = checksumOf(Buffer.from(m.sqlB64, 'base64').toString('utf8'));
+      return decideForMigration(m.name, checksum, withCliEvidence(undefined, m.name, cli)).action === 'run';
+    }).map((m) => m.name);
+    expect(ran).toEqual([newest.name]);
+  });
+
+  it('multiple genuinely pending migrations all decide run, in registry (ascending) order', async () => {
+    const { checksumOf, decideForMigration, withCliEvidence } = await import('./migrationLedger');
+    const pendingTail = PENDING_MIGRATIONS.slice(-3).map((m) => m.name);
+    const cli = new Set(PENDING_MIGRATIONS.map((m) => m.name).filter((n) => !pendingTail.includes(n)));
+    const ran = PENDING_MIGRATIONS.filter((m) => {
+      const checksum = checksumOf(Buffer.from(m.sqlB64, 'base64').toString('utf8'));
+      return decideForMigration(m.name, checksum, withCliEvidence(undefined, m.name, cli)).action === 'run';
+    }).map((m) => m.name);
+    expect(ran).toEqual(pendingTail);
+    expect(ran).toEqual([...ran].sort());
+  });
+});
+
+describe('withdrawn and excluded migrations cannot be resurrected by any runner', () => {
+  it('the registry and the exclusion list are disjoint, and together account for every on-disk file', () => {
+    const registered = new Set(PENDING_MIGRATIONS.map((m) => m.name));
+    const excluded = new Set(Object.keys(EXCLUDED_MIGRATIONS));
+    const both = [...registered].filter((n) => excluded.has(n));
+    expect(both, 'a migration cannot be both registered and excluded').toEqual([]);
+    const unaccounted = onDisk.filter((n) => !registered.has(n) && !excluded.has(n));
+    expect(unaccounted, 'on disk but neither registered nor deliberately excluded').toEqual([]);
+  });
+
+  it('withdrawn 0042 is excluded with its reason, absent from the registry, and both runners iterate ONLY the registry', () => {
+    expect(WITHDRAWN_MIGRATIONS['0042_canonical_availability']).toMatch(/withdrawn/);
+    expect(EXCLUDED_MIGRATIONS['0042_canonical_availability']).toBeDefined();
+    expect(PENDING_MIGRATIONS.map((m) => m.name)).not.toContain('0042_canonical_availability');
+    // The runners' only source of applicable migrations is PENDING_MIGRATIONS —
+    // a withdrawn file on disk is unreachable by construction.
+    const script = readFileSync(join(__dirname, '..', '..', 'scripts', 'migrate.ts'), 'utf8');
+    const route = readFileSync(join(__dirname, '..', 'app', 'api', 'admin', 'migrate', 'route.ts'), 'utf8');
+    for (const src of [script, route]) {
+      expect(src).toMatch(/for \(const \w+ of PENDING_MIGRATIONS\)/);
+      expect(src).not.toMatch(/readdirSync|supabase\/migrations/);
+    }
   });
 });

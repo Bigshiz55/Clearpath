@@ -209,6 +209,12 @@ export async function POST(request: Request) {
             );
           } catch { /* best-effort */ }
           results.push({ name: m.name, ok: false, error, code });
+          // STOP. Later migrations may depend on this one, and the
+          // apply-migrations workflow reads this route's HTTP status as its
+          // own verdict — continuing would half-apply a sequence and then
+          // have to answer for it in one summary. The failure row above
+          // makes the retry-on-next-run explicit and safe.
+          break;
         }
       }
       // Supabase's hosted PostgREST normally auto-reloads on DDL via its own
@@ -229,8 +235,22 @@ export async function POST(request: Request) {
       await client.end().catch(() => {});
     }
 
-    const applied = results.filter((r) => r.ok).length;
-    return NextResponse.json({ ok: true, stage: 'migrations', applied, total: results.length, results });
+    // HONEST SUMMARY, honest status. `applied` counts only migrations that
+    // actually EXECUTED this run (a skip is not an application), and any
+    // failure — a migration's own SQL or a checksum-mismatch halt — makes
+    // the whole response non-200/ok:false naming the migration, because the
+    // workflow's PATH 2 decides success with `test "$code" = "200"` and a
+    // 200-on-failure turns an unattended half-applied run green.
+    const applied = results.filter((r) => r.ok && !r.skipped).length;
+    const skipped = results.filter((r) => r.skipped).length;
+    const failed = results.find((r) => !r.ok);
+    if (failed) {
+      return NextResponse.json(
+        { ok: false, stage: 'migrations', failed: failed.name, applied, skipped, total: results.length, results },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json({ ok: true, stage: 'migrations', applied, skipped, total: results.length, results });
   } catch (e) {
     const { error, code } = describeError(e);
     return NextResponse.json({ stage: 'unexpected', error, code }, { status: 500 });
