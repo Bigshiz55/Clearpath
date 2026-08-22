@@ -119,6 +119,13 @@ export function sanitizedErrorCode(err: unknown): string {
 
 /** A CLI version is its own timestamp ('20260812164511' → epoch ms), so the
  *  two ledgers' evidence can be ordered IN TIME without merging identities. */
+/** The 4-digit repo sequence prefix of a migration name (0039_x → 39), or
+ *  null when the name doesn't carry one (a CLI version-only answer). */
+function migrationSeq(name: string): number | null {
+  const m = /^(\d{4})/.exec(name);
+  return m ? Number(m[1]) : null;
+}
+
 function cliVersionTime(version: string): number {
   const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(version);
   if (!m) return 0;
@@ -153,8 +160,22 @@ function conclude(rows: RepoLedgerRow[], cli: CliLedgerRow | null): AppliedMigra
   const proven = successes.filter((r) => typeof r.checksum === 'string' && r.checksum !== '');
   const newestProven = proven[0] ?? null; // callers sort name-desc
   if (newestProven && cli) {
-    const runnerTime = newestProven.completed_at ? Date.parse(newestProven.completed_at) : 0;
-    if (runnerTime > cliVersionTime(cli.version)) {
+    // PREFER THE FURTHEST-APPLIED MIGRATION, not the most-recently-written
+    // row. When both the runner ledger and the CLI ledger carry a sequence
+    // number, compare SEQUENCES: a runner row RETRYING an older migration is
+    // written recently but names a LOWER number, and must not outrank the
+    // CLI's proof of a higher one — otherwise /api/version under-reports the
+    // applied state (e.g. runner 0039 retried today vs CLI's 0049 from
+    // yesterday) and the deploy verifier reads the code as "ahead" of a
+    // schema that is in fact complete. Fall back to commit-time recency only
+    // when the CLI ledger has no name to compare (older CLI schema).
+    const runnerSeq = migrationSeq(newestProven.name);
+    const cliSeq = cli.name ? migrationSeq(cli.name) : null;
+    const runnerWins =
+      runnerSeq !== null && cliSeq !== null
+        ? runnerSeq > cliSeq
+        : (newestProven.completed_at ? Date.parse(newestProven.completed_at) : 0) > cliVersionTime(cli.version);
+    if (runnerWins) {
       return {
         appliedDatabaseMigration: newestProven.name,
         appliedMigrationName: newestProven.name,

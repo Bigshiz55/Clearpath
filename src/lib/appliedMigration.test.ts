@@ -244,6 +244,23 @@ describe('two ledger identity systems, both reported', () => {
     expect(out.cliLedger).toEqual({ version: '20260812164511', name: '0047_watchlist_provenance' });
   });
 
+  it('a RECENT runner retry of a LOWER migration yields to the CLI proof of a higher one (the 2026-08-22 0039 retry)', async () => {
+    // The exact production shape: the workflow applied through 0039 (writing
+    // recent runner rows) and stopped; 0039_packs_expansion is retried today,
+    // so the newest runner SUCCESS by name is a 0039_*, written NOW — more
+    // recent than the CLI's 0049 from yesterday. By timestamp the runner would
+    // wrongly win and /api/version would report 0039 while 0049 is applied,
+    // failing the deploy verifier. Sequence decides: 39 < 49 → the CLI wins.
+    pgScript = [
+      { rows: [{ name: '0039_packs_expansion', success: true, reconciled: false, checksum: 'abc123', completed_at: '2026-08-22T13:40:00.000Z' }] },
+      { rows: [{ version: '20260821194454', name: '0049_decision_runs' }] },
+    ];
+    const out = await read();
+    expect(out.migrationLedgerStatus).toBe('cli_ledger');
+    expect(out.appliedMigrationName).toBe('0049_decision_runs');
+    expect(out.runnerLedger).toEqual({ name: '0039_packs_expansion' });
+  });
+
   it('a checksummed runner row OLDER than the CLI version yields to it — and stays visible beside it', async () => {
     pgScript = [
       { rows: [{ name: '0046_security_advisor_hardening', success: true, reconciled: false, checksum: 'abc123', completed_at: '2026-07-01T00:00:00.000Z' }] },
