@@ -33,6 +33,19 @@
 -- ---------------------------------------------------------------------------
 -- Split hallmark-lifetime -> hallmark-universe + lifetime-vault. Rebrand
 -- true-crime -> crime-case-files. UPDATEs preserve existing row ids.
+--
+-- RE-EXECUTION SAFE, learned the hard way (production, 2026-08-22): 0036's
+-- seed keys its on-conflict guard on the OLD slugs, and this migration
+-- renames them — so re-running 0036 against an already-migrated database
+-- re-inserts 'hallmark-lifetime'/'true-crime' as brand-new rows, and an
+-- unguarded rename then collides with the already-renamed row (23505 on
+-- packs_slug_key; workflow runs 32572061231/32572534201). Each rename now
+-- fires only while its target slug does not exist, and the state where BOTH
+-- slugs exist — producible only by a 0036 re-execution after the rename —
+-- is repaired by deleting the resurrected duplicate. The delete cannot
+-- touch the real, renamed row (it no longer has the old slug), so existing
+-- pack_stations/user rows keyed to the original ids stay intact, exactly as
+-- the design note above promises.
 -- ---------------------------------------------------------------------------
 update public.packs
 set slug = 'hallmark-universe',
@@ -41,7 +54,12 @@ set slug = 'hallmark-universe',
     person_tracking = true,
     completion_stats = true,
     franchise_continuity = true
-where slug = 'hallmark-lifetime';
+where slug = 'hallmark-lifetime'
+  and not exists (select 1 from public.packs where slug = 'hallmark-universe');
+
+delete from public.packs
+where slug = 'hallmark-lifetime'
+  and exists (select 1 from public.packs where slug = 'hallmark-universe');
 
 insert into public.packs
   (slug, display_name, description, is_premium, sort_order,
@@ -58,7 +76,12 @@ set slug = 'crime-case-files',
     description = 'Know when you''ve already seen the case — even under a completely different title.',
     sort_order = 3,
     person_tracking = false
-where slug = 'true-crime';
+where slug = 'true-crime'
+  and not exists (select 1 from public.packs where slug = 'crime-case-files');
+
+delete from public.packs
+where slug = 'true-crime'
+  and exists (select 1 from public.packs where slug = 'crime-case-files');
 
 -- ---------------------------------------------------------------------------
 -- Sourced case facts — victim(s)/suspect(s)/legal status, precisely typed.
