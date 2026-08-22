@@ -20,7 +20,8 @@ async function requireUser(supabase: SupabaseClient) {
 
 function migrationHint(err: { code?: string; message?: string }): string | null {
   if (err.code === '42P01' || /follows|public_activity/.test(err.message ?? '')) {
-    return 'Following needs migration 0007 applied to the database first.';
+    // Feature dormant: the follows tables are absent (migration 0007 unapplied).
+    return "Following isn't available right now.";
   }
   return null;
 }

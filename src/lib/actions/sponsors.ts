@@ -30,7 +30,7 @@ export async function claimSettlement(sponsorId: string): Promise<ClaimResult> {
       .maybeSingle();
     if (error) {
       if (error.code === '42P01' || /sponsors/.test(error.message)) {
-        return { ok: false, error: 'Sponsors need migration 0011 applied first.' };
+        return { ok: false, error: "Sponsors aren't available right now." };
       }
       return { ok: false, error: error.message };
     }

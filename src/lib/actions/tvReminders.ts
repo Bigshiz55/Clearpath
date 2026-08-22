@@ -20,7 +20,8 @@ const schema = z.object({
 
 function migrationHint(err: { code?: string; message?: string }): string | null {
   if (err.code === '42P01' || /tv_reminders/.test(err.message ?? '')) {
-    return 'Reminders need migration 0013 applied to the database first.';
+    // Feature dormant: tv_reminders absent (migration 0013 unapplied).
+    return "Reminders aren't available right now.";
   }
   return null;
 }

@@ -41,6 +41,14 @@ const USER_FACING_FILES = [
   'src/components/tv/CoverageNote.tsx',
   'src/app/api/court/repick/route.ts',
   'src/app/api/court/start/route.ts',
+  // Server actions whose error returns render on user screens via {error} sinks.
+  'src/lib/actions/social.ts',
+  'src/lib/actions/push.ts',
+  'src/lib/actions/tvReminders.ts',
+  'src/lib/actions/interview.ts',
+  'src/lib/actions/dimensionOverrides.ts',
+  'src/lib/actions/profile.ts',
+  'src/lib/actions/sponsors.ts',
 ];
 
 /** Internal/technical language that must never reach a customer-facing screen. */
