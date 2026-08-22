@@ -123,6 +123,14 @@ export interface FinderQuery {
   originCountries?: string[];
   /** Requested original language (ISO-639-1, e.g. ['es']). */
   originalLanguages?: string[];
+  /** Original languages to EXCLUDE (ISO-639-1) — "foreign shows, but not Korean". */
+  excludeOriginalLanguages?: string[];
+  /** Require a NON-English original (originalLanguage !== 'en'). The generic
+   *  "foreign / non-English original" hard gate; implied by englishDubOnly. */
+  nonEnglishOriginal?: boolean;
+  /** Require an ENGLISH original (originalLanguage === 'en') — "English-language
+   *  foreign films". Mutually exclusive in practice with nonEnglishOriginal. */
+  englishOriginalOnly?: boolean;
   /** TMDB keyword ids for trope/vibe filtering (heist, dystopia, feel-good…). */
   keywordIds?: number[];
   /**
@@ -399,8 +407,11 @@ export async function runFinder(
   // would starve the set; fanning the source language fills it. Guarded — only
   // this intent fans languages; every other query keeps its single pass.
   const DUB_SOURCE_LANGUAGES = ['ja', 'ko', 'es', 'fr', 'de', 'it', 'hi', 'zh', 'pt', 'ru'];
+  // Fan foreign-language discovery when the request needs a NON-English original
+  // (a dub, or the non_english class) and named no explicit language — otherwise
+  // an English-dominated popularity pool starves the result set.
   const dubLanguages =
-    q.englishDubOnly && !(q.originalLanguages && q.originalLanguages.length)
+    (q.englishDubOnly || q.nonEnglishOriginal) && !(q.originalLanguages && q.originalLanguages.length)
       ? DUB_SOURCE_LANGUAGES
       : null;
   const languagePasses: (string | undefined)[] = dubLanguages ?? [q.originalLanguages?.[0]];
@@ -551,6 +562,20 @@ export async function runFinder(
       // (an English track exists on a non-English original) qualifies.
       if (q.englishDubOnly && meta.englishAvailability !== 'available') return null;
       if (q.englishDubOnly) receipts.push('English dub');
+      // Original-language class gates (independent of the audio requirement).
+      if (q.nonEnglishOriginal && meta.originalLanguage === 'en') return null;
+      if (q.nonEnglishOriginal && meta.originalLanguage !== 'en') receipts.push('Non-English original');
+      if (q.englishOriginalOnly && meta.originalLanguage !== 'en') return null;
+      if (q.englishOriginalOnly && meta.originalLanguage === 'en') receipts.push('English original');
+      // Excluded original languages ("foreign, but not Korean").
+      if (
+        q.excludeOriginalLanguages &&
+        q.excludeOriginalLanguages.length > 0 &&
+        meta.originalLanguage &&
+        q.excludeOriginalLanguages.includes(meta.originalLanguage)
+      ) {
+        return null;
+      }
       // On my services.
       const included = providers ? includedServiceNames(providers.options, services) : [];
       if (q.onMyServices) {
