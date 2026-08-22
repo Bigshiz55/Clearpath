@@ -2,7 +2,8 @@
 
 import { useRef, useState } from 'react';
 import { submitPassFeedback, undoPassFeedback, recordAnalyticsEvent } from '@/lib/actions/passFeedback';
-import { DnaBurst } from '@/components/DnaBurst';
+import { RuleAckToast } from '@/components/RuleAckToast';
+import { ruleAck } from '@/lib/verdict/dnaAck';
 import { nextRuling, isUndo, rulingFeedback, rulingAria, ruledMessage, RULING_LABEL, type Ruling } from '@/lib/verdict/cardRuling';
 import type { MediaType } from '@/lib/types';
 
@@ -49,7 +50,7 @@ export function CardVerdict({
   const ref = useRef<HTMLDivElement>(null);
   const [ruling, setRuling] = useState<Ruling | null>(null);
   const [busy, setBusy] = useState(false);
-  const [burst, setBurst] = useState<{ cx: number; cy: number; kind: 'up' | 'down' } | null>(null);
+  const [ack, setAck] = useState<{ cx: number; cy: number; line: string; kind: 'up' | 'down' } | null>(null);
 
   const ctx = { source, position, matchScore, sessionId };
   const base = { tmdbId, mediaType, title, year, posterPath };
@@ -63,8 +64,18 @@ export function CardVerdict({
     setRuling(next);
 
     if (!undoing && next) {
+      // Honest confirmation, right on the card, of what the ruling actually
+      // taught. With no stated reason we know only "not this title", so the line
+      // says exactly that ("fewer like this") — never a fabricated axis claim.
       const rect = ref.current?.closest('.card')?.getBoundingClientRect();
-      if (rect) setBurst({ cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, kind: next === 'for' ? 'up' : 'down' });
+      if (rect) {
+        setAck({
+          cx: rect.left + rect.width / 2,
+          cy: rect.top + rect.height / 2,
+          line: ruleAck(next).line,
+          kind: next === 'for' ? 'up' : 'down',
+        });
+      }
     }
 
     try {
@@ -149,7 +160,7 @@ export function CardVerdict({
           card's height, which is the whole thing being fixed here. The undo
           control is the ruled button itself — see rulingAria. */}
       <span className="sr-only" role="status" data-testid="card-verdict-status">{status ?? ''}</span>
-      {burst && <DnaBurst cx={burst.cx} cy={burst.cy} kind={burst.kind} onDone={() => setBurst(null)} />}
+      {ack && <RuleAckToast cx={ack.cx} cy={ack.cy} line={ack.line} kind={ack.kind} onDone={() => setAck(null)} />}
     </div>
   );
 }

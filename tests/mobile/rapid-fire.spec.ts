@@ -64,6 +64,62 @@ test('advances, and Back genuinely reverses', async ({ page }) => {
   await expect(page.getByTestId('rapid-progress')).toHaveText(first);
 });
 
+/**
+ * THE NO-SKIP CONTRACT — the reported defect: one tap could advance and then
+ * skip the next title. Reproduced as a genuine same-tick double-fire (a fast
+ * double-tap, or the synthetic click a touch emits beside the real one) and
+ * pinned so it cannot come back.
+ */
+test('a same-tick double-fire advances exactly one title — never skips', async ({ page }) => {
+  await open(page);
+  await expect(page.getByTestId('rapid-progress')).toHaveText(/^1 \//);
+  // Two clicks dispatched synchronously, before React can re-render — the exact
+  // shape that used to append two answers from one gesture.
+  await page
+    .locator('[data-testid^="rapid-answer-"]')
+    .first()
+    .evaluate((el: HTMLElement) => {
+      el.click();
+      el.click();
+    });
+  // Exactly one advance: 1 → 2, never 1 → 3.
+  await expect(page.getByTestId('rapid-progress')).toHaveText(/^2 \//);
+});
+
+test('repeated double-fires across cards never skip a title', async ({ page }) => {
+  await open(page);
+  for (let expected = 2; expected <= 4; expected++) {
+    await page
+      .locator('[data-testid^="rapid-answer-"]')
+      .first()
+      .evaluate((el: HTMLElement) => {
+        el.click();
+        el.click();
+      });
+    await expect(page.getByTestId('rapid-progress')).toHaveText(new RegExp(`^${expected} /`));
+    // Let the settle window (lock) release before the next card's gesture.
+    await page.waitForTimeout(300);
+  }
+});
+
+test('rapid machine-gun taps stay within range and never overshoot the queue', async ({ page }) => {
+  await open(page, 390, 844);
+  for (let i = 0; i < 10; i++) {
+    const tile = page.locator('[data-testid^="rapid-answer-"]').first();
+    if ((await tile.count()) === 0) break; // reached the done panel
+    await tile.dispatchEvent('click');
+    await tile.dispatchEvent('click');
+  }
+  // Whatever we reached, the counter is well-formed and in range — a skip would
+  // have jumped current past total.
+  const txt = await page.getByTestId('rapid-progress').innerText().catch(() => '1 / 1');
+  const parts = txt.split('/').map((s) => parseInt(s.trim(), 10));
+  const cur = parts[0] ?? 1;
+  const total = parts[1] ?? cur;
+  expect(cur).toBeGreaterThanOrEqual(1);
+  expect(cur).toBeLessThanOrEqual(total);
+});
+
 test('"don’t remember" is never counted as something learned', async ({ page }) => {
   await open(page);
   await page.getByTestId('rapid-answer-dont_remember').click();

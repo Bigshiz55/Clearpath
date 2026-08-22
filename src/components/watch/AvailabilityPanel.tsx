@@ -25,7 +25,7 @@ import { addToWatchlist } from '@/lib/actions/watchlist';
  */
 
 const REASON_TEXT: Record<string, string> = {
-  no_key: 'Live checking is not switched on for this deployment yet.',
+  no_key: 'Live checking isn’t available right now.',
   budget_exhausted: 'We have used this month’s allowance of availability checks.',
   fetch_failed: 'The availability service did not answer. Nothing has changed.',
   store_failed: 'We could not record a result, so nothing was changed.',

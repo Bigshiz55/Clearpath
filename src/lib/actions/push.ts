@@ -20,7 +20,8 @@ async function requireUser(supabase: SupabaseClient) {
 
 function migrationHint(err: { code?: string; message?: string }): string | null {
   if (err.code === '42P01' || /push_subscriptions/.test(err.message ?? '')) {
-    return 'Notifications need migration 0008 applied to the database first.';
+    // Feature dormant: push_subscriptions absent (migration 0008 unapplied).
+    return "Notifications aren't available right now.";
   }
   return null;
 }

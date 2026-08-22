@@ -81,8 +81,12 @@ export async function POST(request: Request) {
       room = full.data as Record<string, unknown> | null;
     }
     if (error) {
-      if (error.code === '42P01') return NextResponse.json({ error: 'Live Court isn’t set up yet (run migration 0004).' }, { status: 501 });
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error.code === '42P01') {
+        console.warn('[court/start] court_rooms missing (42P01: migration 0004 not applied)');
+        return NextResponse.json({ error: 'This room isn’t available right now. Try again in a moment.' }, { status: 501 });
+      }
+      console.error('[court/start] room load failed:', error.message);
+      return NextResponse.json({ error: 'Couldn’t start the room. Try again in a moment.' }, { status: 500 });
     }
     if (!room) return NextResponse.json({ error: 'Room not found.' }, { status: 404 });
     if (room.host_token !== body.hostToken) return NextResponse.json({ error: 'Only the host can start.' }, { status: 403 });
@@ -169,10 +173,14 @@ export async function POST(request: Request) {
       .from('court_rooms')
       .update({ finalists: result.finalists, seen_keys: seenKeys, status: 'veto', updated_at: new Date().toISOString() })
       .eq('id', room.id);
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+    if (upErr) {
+      console.error('[court/start] room update failed:', upErr.message);
+      return NextResponse.json({ error: 'Couldn’t start the room. Try again in a moment.' }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to start.' }, { status: 500 });
+    console.error('[court/start] unexpected error:', e instanceof Error ? e.message : e);
+    return NextResponse.json({ error: 'Couldn’t start the room. Try again in a moment.' }, { status: 500 });
   }
 }

@@ -71,8 +71,9 @@ export default async function WhatToWatchPage({
       {/* Coverage, stated rather than implied. */}
       <div data-testid="wtw-coverage" className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-white/60">
         <p>
-          Data mode: <strong className="text-white/80">{mode.mode ?? 'not configured'}</strong>
-          {mode.configured ? null : ' — ingestion is disabled until DATA_MODE is set.'}
+          {mode.configured
+            ? 'Showing verified listings we can confirm.'
+            : 'Live listings aren’t set up here yet.'}
         </p>
         {result.coverage.sources.length > 0 ? (
           <p className="mt-1">

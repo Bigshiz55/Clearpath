@@ -24,7 +24,8 @@ async function requireUser(supabase: SupabaseClient) {
 
 function migrationHint(err: { code?: string; message?: string }): string | null {
   if (err.code === '42P01' || /title_feedback/.test(err.message ?? '')) {
-    return 'The post-watch interview needs migration 0009 applied first.';
+    // Feature dormant: title_feedback absent (migration 0009 unapplied).
+    return "The post-watch interview isn't available right now.";
   }
   return null;
 }

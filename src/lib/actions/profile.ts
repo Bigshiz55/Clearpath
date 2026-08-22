@@ -176,8 +176,8 @@ export async function updateDigestPrefs(input: z.infer<typeof digestSchema>): Pr
     if (error) {
       return {
         ok: false,
-        error:
-          'Digest settings need the digest migration (0002_digest.sql) applied to the database first.',
+        // Feature dormant: digest columns absent (migration 0002 unapplied).
+        error: "Digest settings aren't available right now.",
       };
     }
     revalidatePath('/app');
@@ -290,7 +290,7 @@ export async function updateMyServices(input: z.infer<typeof servicesSchema>): P
     const { error } = await supabase.from('profiles').update({ my_services: unique }).eq('id', user.id);
     if (error) {
       if (error.code === '42703' || /my_services/.test(error.message)) {
-        return { ok: false, error: 'My Services needs migration 0006 applied to the database first.' };
+        return { ok: false, error: "My Services isn't available right now." };
       }
       return { ok: false, error: error.message };
     }
@@ -315,7 +315,7 @@ export async function updateAvatar(input: z.infer<typeof avatarSchema>): Promise
     const { error } = await supabase.from('profiles').update({ avatar: value }).eq('id', user.id);
     if (error) {
       if (error.code === '42703' || /avatar/.test(error.message)) {
-        return { ok: false, error: 'Avatars need migration 0019 applied to the database first.' };
+        return { ok: false, error: "Avatars aren't available right now." };
       }
       return { ok: false, error: error.message };
     }
@@ -335,7 +335,7 @@ export async function getQuickAddToken(): Promise<{ ok: boolean; token?: string;
     const { data, error } = await supabase.from('profiles').select('quick_add_token').eq('id', user.id).maybeSingle();
     if (error) {
       if (error.code === '42P01' || /quick_add_token/.test(error.message)) {
-        return { ok: false, error: 'Quick Add needs migration 0005 applied first.' };
+        return { ok: false, error: "Quick Add isn't available right now." };
       }
       return { ok: false, error: error.message };
     }

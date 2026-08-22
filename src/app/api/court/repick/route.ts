@@ -61,8 +61,12 @@ export async function POST(request: Request) {
       .eq('code', body.code)
       .maybeSingle();
     if (error) {
-      if (error.code === '42P01') return NextResponse.json({ error: 'Live Court isn’t set up yet — run the latest Supabase migrations (0004 + 0014).' }, { status: 501 });
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error.code === '42P01') {
+        console.warn('[court/repick] court_rooms missing (42P01: migrations 0004/0014 not applied)');
+        return NextResponse.json({ error: 'This room isn’t available right now. Try again in a moment.' }, { status: 501 });
+      }
+      console.error('[court/repick] room load failed:', error.message);
+      return NextResponse.json({ error: 'Couldn’t update the ruling. Try again in a moment.' }, { status: 500 });
     }
     if (!room) return NextResponse.json({ error: 'Room not found.' }, { status: 404 });
     if (room.status !== 'verdict') return NextResponse.json({ error: 'Court isn’t in session.' }, { status: 409 });
@@ -122,10 +126,14 @@ export async function POST(request: Request) {
       .from('court_rooms')
       .update({ finalists, seen_keys: [...seen], updated_at: new Date().toISOString() })
       .eq('id', room.id);
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+    if (upErr) {
+      console.error('[court/repick] room update failed:', upErr.message);
+      return NextResponse.json({ error: 'Couldn’t update the ruling. Try again in a moment.' }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to re-rule.' }, { status: 500 });
+    console.error('[court/repick] unexpected error:', e instanceof Error ? e.message : e);
+    return NextResponse.json({ error: 'Couldn’t update the ruling. Try again in a moment.' }, { status: 500 });
   }
 }

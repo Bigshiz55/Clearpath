@@ -117,6 +117,16 @@ export function RapidFire({
 }) {
   const [answers, setAnswers] = useState<AnswerKey[]>([]);
   const [done, setDone] = useState(false);
+  // RE-ENTRANCY LOCK — the no-skip contract. One tap must record exactly ONE
+  // answer and advance exactly ONE title. Without this, two clicks fired before
+  // React re-rendered (a fast double-tap, or the synthetic click a touch emits
+  // beside the real one) both saw the same stale state and each appended an
+  // answer — so a single gesture answered two consecutive titles and skipped
+  // the one in between. The guard is a REF, not state: a ref updates
+  // synchronously, so the second call in the same tick sees `busy` already true
+  // and returns. `locked` mirrors it for the visual inert state and the timer.
+  const busyRef = useRef(false);
+  const [locked, setLocked] = useState(false);
   const liveRef = useRef<HTMLParagraphElement>(null);
 
   const index = answers.length;
@@ -125,12 +135,28 @@ export function RapidFire({
 
   const answer = useCallback(
     (key: AnswerKey) => {
-      if (!item) return;
+      if (busyRef.current || !item) return;
+      busyRef.current = true;
+      setLocked(true);
       onAnswer?.(item, key);
       setAnswers((prev) => [...prev, key]);
     },
     [item, onAnswer],
   );
+
+  // Release the lock only after the index has advanced and the new card has had
+  // a beat to settle — long enough to cover the fade-up so a tap intended for
+  // the answered card cannot fall through onto the next one. Resetting the ref
+  // here (not synchronously after setAnswers) is what enforces "one gesture,
+  // one advance": every answer within the settle window is ignored.
+  useEffect(() => {
+    if (!locked) return;
+    const t = setTimeout(() => {
+      busyRef.current = false;
+      setLocked(false);
+    }, 240);
+    return () => clearTimeout(t);
+  }, [index, locked]);
 
   // 1–6 answer the current card, matching the taste quiz's keyboard support.
   useEffect(() => {
@@ -218,7 +244,10 @@ export function RapidFire({
 
       <div
         key={index}
-        className="card overflow-hidden bg-gradient-to-b from-ink-850/80 to-ink-900/80 p-5 motion-safe:animate-fade-up sm:p-6"
+        aria-busy={locked}
+        className={`card overflow-hidden bg-gradient-to-b from-ink-850/80 to-ink-900/80 p-5 motion-safe:animate-fade-up sm:p-6 ${
+          locked ? 'pointer-events-none' : ''
+        }`}
         data-testid={`rapid-card-${item.key}`}
       >
         <div className="flex gap-4 sm:gap-5">

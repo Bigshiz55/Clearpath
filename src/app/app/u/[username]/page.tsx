@@ -21,7 +21,7 @@ export default async function PublicProfilePage({ params }: { params: { username
     return (
       <div className="card mx-auto max-w-lg p-8 text-center">
         <h1 className="text-xl font-semibold text-white">Profiles aren’t enabled yet</h1>
-        <p className="mt-2 text-sm text-slate-400">This needs migration 0007 applied to the database.</p>
+        <p className="mt-2 text-sm text-slate-400">Public profiles aren’t available right now. Check back soon.</p>
         <Link href="/app" className="btn-secondary mt-6 inline-flex">← Back</Link>
       </div>
     );

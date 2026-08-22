@@ -53,7 +53,7 @@ export function CoverageNote() {
           data-testid="coverage-why-pop"
           className="absolute left-0 top-[calc(100%+0.5rem)] z-30 w-72 rounded-xl border border-white/15 bg-ink-950 p-3 text-left text-xs leading-relaxed text-slate-300 shadow-[0_12px_36px_-8px_rgba(0,0,0,0.9)]"
         >
-          This deployment has no full-schedule provider configured, so we can only show first-run
+          We don’t have a full-schedule provider connected here yet, so we can only show first-run
           episodes on a small number of national networks. Reruns, movies, daytime, sports and local
           channels are missing — this is <em>not</em> the complete TV schedule. We show what we can
           confirm and never invent a listing.

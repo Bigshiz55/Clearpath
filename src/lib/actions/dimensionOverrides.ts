@@ -18,7 +18,8 @@ const schema = z.object({
 
 function migrationHint(err: { code?: string; message?: string }): string | null {
   if (err.code === '42P01' || /dimension_overrides/.test(err.message ?? '')) {
-    return 'Manual dial corrections need migration 0018 applied to the database first.';
+    // Feature dormant: dimension_overrides absent (migration 0018 unapplied).
+    return "Manual dial corrections aren't available right now.";
   }
   return null;
 }
