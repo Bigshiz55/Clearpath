@@ -65,7 +65,7 @@ export function trailerFeatureEnabled(): boolean {
 }
 
 /** The muted, chromeless YouTube embed URL for a resolved trailer video id. */
-export function youTubeEmbedUrl(videoId: string, opts: { muted: boolean; autoplay: boolean }): string {
+export function youTubeEmbedUrl(videoId: string, opts: { muted: boolean; autoplay: boolean; origin?: string }): string {
   const p = new URLSearchParams({
     autoplay: opts.autoplay ? '1' : '0',
     mute: opts.muted ? '1' : '0',
@@ -77,5 +77,9 @@ export function youTubeEmbedUrl(videoId: string, opts: { muted: boolean; autopla
     disablekb: '1',
     enablejsapi: '1', // lets us mute/unmute/seek via postMessage without the full YT SDK
   });
+  // The page origin authorizes the JS API — without it YouTube may ignore
+  // postMessage commands, and the commands are the ONLY way audio may change
+  // (a mute baked into this URL restarts the iframe when it changes).
+  if (opts.origin) p.set('origin', opts.origin);
   return `https://www.youtube-nocookie.com/embed/${videoId}?${p.toString()}`;
 }
