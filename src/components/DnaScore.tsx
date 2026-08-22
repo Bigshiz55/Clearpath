@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { MediaType } from '@/lib/types';
-import { isPersonalized, type DnaClientResult as Dna } from '@/lib/dnaClient';
+import { type DnaClientResult as Dna } from '@/lib/dnaClient';
+import { personalizationView } from '@/lib/verdict/personalizationState';
 import { scoreVerdict } from '@/lib/verdictVisual';
 import { Verd1ctBadge } from './Verd1ctBadge';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
@@ -39,19 +40,18 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
   }, [mediaType, tmdbId]);
 
   if (!loaded) {
-    return <div className="h-[52px] w-40 flex-shrink-0 animate-pulse rounded-xl bg-pink-500/10" />;
+    return <div className="h-[52px] w-40 flex-shrink-0 animate-pulse rounded-xl bg-white/5" />;
   }
   if (!dna) return null;
 
-  const personal = isPersonalized(dna);
-  const learning = dna.confidence < 0.5;
-  const sub = !dna.available
-    ? 'Odds you’ll love it'
-    : dna.sampleSize === 0
-      ? 'Rate titles to personalize'
-      : learning
-        ? `Learning · ${dna.sampleSize} rated`
-        : 'Odds you’ll love it';
+  // Honest personalization state — driven by the resolver's own verdict (did
+  // taste actually move this number?), never by "the account has rated something".
+  const view = personalizationView({
+    personalized: dna.canonical?.personalized,
+    canonicalLabel: dna.canonical?.label ?? null,
+    sampleSize: dna.sampleSize,
+    confidence: dna.confidence,
+  });
 
   /* THE HEADLINE IS THE CANONICAL SCORE — the same number the card, the
      QuickLook and the briefing print under this label (oneVerdictLabel.test).
@@ -66,17 +66,23 @@ export function DnaScore({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: 
   return (
     <div className="flex flex-col gap-1">
       <div
-        className="flex items-center gap-3 rounded-xl border-2 border-pink-400/80 bg-gradient-to-r from-pink-500/40 to-rose-500/25 px-3 py-2 shadow-[0_0_18px_rgba(244,63,94,0.35)]"
-        title="Your VERD1CT — a 0–100 estimate of how much YOU will love this, learned from what you’ve rated. It drives your Stream It / Skip It call and sharpens the more you use the app."
+        className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${
+          view.showDna ? 'border-brand-400/50 bg-brand-500/10' : 'border-white/12 bg-white/[0.04]'
+        }`}
+        title={
+          view.showDna
+            ? 'Your Verdict — a 0–100 estimate of how much YOU will love this, from what you’ve rated. It sharpens the more you use the app.'
+            : 'Standard Score — a 0–100 estimate from critics and audience data. Rate a few titles and it becomes your personal Verdict.'
+        }
       >
         <Verd1ctBadge score={headline} px={52} />
         <div className="min-w-0">
-          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white">Your VERD1CT</div>
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-white">{view.header}</div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-black tracking-wide ${v.visual.badge}`}>
-              {personal ? '🧬' : v.emoji} {v.call}
+              {view.showDna ? '🧬' : v.emoji} {v.call}
             </span>
-            <span className="text-[9px] font-semibold uppercase tracking-wide text-pink-100/90">{sub}</span>
+            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-300">{view.sub}</span>
           </div>
         </div>
       </div>
