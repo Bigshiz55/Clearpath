@@ -3,7 +3,36 @@
 Updated at the end of every work order per the Working Agreement in
 `CLAUDE.md`. Sections: **Now**, **Next**, **Blocked**, **Done**.
 
-## Now — migration automation hardening, 2026-08-22
+## Now — 0039 rename idempotency, 2026-08-22 (after the first credentialed run)
+
+- **CLOSED — the 23505 the first real workflow run found (PR #118).** The
+  owner added `MIGRATE_SECRET`; runs 32572061231/32572534201 reached
+  production via PATH 2, applied 25 idempotent historical migrations (now
+  checksummed app-ledger successes; the CLI ledger evidently records almost
+  none of the historical names, so CLI-evidence skips produced `skipped: 0`),
+  and failed at `0039_packs_expansion` — NOT at its insert (already
+  guarded) but at the slug RENAMES: 0036's seed keys its on-conflict guard
+  on the OLD slugs, so re-running 0036 after the renames RESURRECTED
+  'hallmark-lifetime'/'true-crime' as new rows, and the unguarded rename
+  collided with the already-renamed row. Fix: each rename fires only while
+  its target slug doesn't exist, and the both-slugs-present state (only a
+  0036 re-execution can produce it) is repaired by deleting the resurrected
+  duplicate — the real renamed row is untouchable by construction (it no
+  longer carries the old slug). Registry sqlB64 updated in the same commit;
+  a new test pins EVERY registry entry byte-identical to its on-disk file.
+  Proven on throwaway PG16: old SQL reproduces the exact 23505 against the
+  production-shaped state; fixed SQL is clean in fresh/migrated/current
+  states, run twice each, ids preserved. Safe to edit 0039's SQL because its
+  only app-ledger row is a checksummed FAILURE (failures are retried, never
+  checksum-halted); 0036 must NOT be edited now — it carries a checksummed
+  success from the 12:16Z run, and any edit would halt every future run.
+- **Production packs table currently holds the two resurrected duplicates**
+  ('hallmark-lifetime', 'true-crime', created 12:05Z 2026-08-22, sort_order
+  1–2 — likely visible in pack listings until the fixed migration runs).
+  The next `apply-migrations.yml` dispatch (`confirm=APPLY`) removes them
+  and completes 0040+ under the recorded-evidence skips.
+
+## Prior shift — migration automation hardening, 2026-08-22
 
 - **CLOSED — the unattended migration path is failure-safe end to end.**
   `apply-migrations.yml` is the canonical future path; audited as a FILE by

@@ -73,6 +73,61 @@ describe('one number, one migration', () => {
     const fromDisk = readFileSync(join(DIR, '0049_decision_runs.sql'), 'utf8');
     expect(fromRegistry).toBe(fromDisk);
   });
+
+  it("EVERY registered migration's sqlB64 is byte-identical to its on-disk file", () => {
+    /* The runner executes the REGISTRY; humans and tests read the DISK. The
+       registry has no generator — it is maintained by hand — so nothing but
+       this test stops an edit to one from silently diverging from the other,
+       at which point every source-level idempotency pin in this suite is
+       inspecting SQL that production will never run. */
+    for (const m of PENDING_MIGRATIONS) {
+      const fromRegistry = Buffer.from(m.sqlB64, 'base64').toString('utf8');
+      const fromDisk = readFileSync(join(DIR, `${m.name}.sql`), 'utf8');
+      expect(fromRegistry === fromDisk, `${m.name}: registry sqlB64 differs from the on-disk file`).toBe(true);
+    }
+  });
+});
+
+describe('0039_packs_expansion survives every real packs state (the 2026-08-22 production failure)', () => {
+  /* The workflow's first credentialed production run failed HERE with 23505
+     on packs_slug_key — and NOT from the insert, which was already guarded.
+     0036's seed keys its on-conflict guard on the OLD slugs, and this
+     migration RENAMES them: so a re-execution of 0036 against an
+     already-migrated database re-inserts 'hallmark-lifetime'/'true-crime' as
+     brand-new rows (observed: workflow run 32572061231 resurrected both),
+     and the unguarded rename then collided with the already-renamed row.
+     The renames must no-op when their target slug already exists, and the
+     resurrected duplicate — identifiable precisely because BOTH slugs exist,
+     a state only 0036 re-execution can produce — must be removed. */
+  const sql = readFileSync(join(DIR, '0039_packs_expansion.sql'), 'utf8');
+  const RENAMES: Array<[string, string]> = [
+    ['hallmark-lifetime', 'hallmark-universe'],
+    ['true-crime', 'crime-case-files'],
+  ];
+
+  it('every insert carries an on-conflict guard', () => {
+    const inserts = sql.match(/insert into[\s\S]*?;/g) ?? [];
+    expect(inserts.length).toBeGreaterThan(0);
+    for (const s of inserts) expect(s, s).toMatch(/on conflict/);
+  });
+
+  it('each slug rename fires only when its target slug does not already exist', () => {
+    for (const [oldSlug, newSlug] of RENAMES) {
+      const guarded = new RegExp(
+        String.raw`update public\.packs\s*[\s\S]{0,700}?set slug = '${newSlug}'[\s\S]{0,700}?where slug = '${oldSlug}'\s*[\s\S]{0,200}?and not exists \(select 1 from public\.packs where slug = '${newSlug}'\)`,
+      );
+      expect(sql, `${oldSlug} -> ${newSlug} rename is unguarded`).toMatch(guarded);
+    }
+  });
+
+  it('a resurrected old-slug duplicate (both slugs present) is removed, and only in that state', () => {
+    for (const [oldSlug, newSlug] of RENAMES) {
+      const cleanup = new RegExp(
+        String.raw`delete from public\.packs\s*[\s\S]{0,200}?where slug = '${oldSlug}'\s*[\s\S]{0,200}?and exists \(select 1 from public\.packs where slug = '${newSlug}'\)`,
+      );
+      expect(sql, `${oldSlug} resurrected-duplicate cleanup missing`).toMatch(cleanup);
+    }
+  });
 });
 
 describe('the decision_runs schema speaks the code’s vocabulary', () => {
