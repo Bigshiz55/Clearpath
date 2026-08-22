@@ -220,7 +220,7 @@ export function OnTvGuide({
         <p className="mx-auto mt-1 max-w-md text-sm text-slate-400">
           {streaming
             ? 'Nothing new dropped on the big services today — check back tomorrow.'
-            : `We couldn’t load today’s ${country} broadcast schedule. It refreshes hourly — check back shortly.`}
+            : `We couldn’t load today’s ${country} broadcast schedule. Check back soon.`}
         </p>
       </div>
     );

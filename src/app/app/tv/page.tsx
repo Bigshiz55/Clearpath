@@ -335,7 +335,7 @@ export default async function OnTvPage({
                   </>
                 ) : (
                   <>
-                    This deployment has no full TV listings provider connected. Our current source is
+                    We don’t have a full TV listings provider connected here yet. Our current source is
                     an episode database that mostly cannot see movies on cable — Hallmark, Lifetime
                     Movies and the classic-movie channels are absent from it entirely — so an empty
                     result here is missing data on our side, not an empty schedule. Rather than show
@@ -375,7 +375,7 @@ export default async function OnTvPage({
                     </>
                   ) : (
                     <>
-                      This deployment has no full TV listings provider connected, so we can only see
+                      We don’t have a full TV listings provider connected here yet, so we can only see
                       first-run episodes on a handful of national networks — not{' '}
                       {network ? titleCase(network) : 'cable'}
                       {movieOnly ? ' movies' : ''}, reruns or most cable. This is missing data on our
@@ -479,7 +479,7 @@ export default async function OnTvPage({
         <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">
           TVmaze
         </a>
-        ’s community broadcast guide — real schedules, refreshed hourly. Coverage is best for major {region}{' '}
+        ’s community broadcast guide — real schedules. Coverage is best for major {region}{' '}
         networks; we never invent a listing, so a channel with no data simply won’t appear.
       </p>
     </div>

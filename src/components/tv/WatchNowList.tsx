@@ -31,8 +31,8 @@ export function WatchNowList({ result }: { result: WatchNowResult }) {
   if (result.status === 'configuration_error') {
     return (
       <div data-testid="watch-now-config-error" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
-        <p className="font-semibold text-amber-200">Listings are unavailable on this deployment</p>
-        <p className="mt-1 text-sm text-amber-100/80">{result.message}</p>
+        <p className="font-semibold text-amber-200">Live TV listings are unavailable right now</p>
+        <p className="mt-1 text-sm text-amber-100/80">We couldn’t load a verified schedule just now. Check back soon.</p>
       </div>
     );
   }

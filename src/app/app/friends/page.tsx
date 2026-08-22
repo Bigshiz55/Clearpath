@@ -54,8 +54,7 @@ export default async function FriendsPage() {
         <h2 className="mb-3 text-lg font-semibold text-white">Latest from people you follow</h2>
         {feed.kind === 'needs_migration' ? (
           <p className="text-sm text-amber-300">
-            The friends feed needs migration 0007 applied to the database. Once it’s in, verdicts from people you
-            follow show up here.
+            Friends isn’t available right now. Check back soon and verdicts from people you follow will show up here.
           </p>
         ) : feed.items.length === 0 ? (
           <div className="card p-6 text-center">

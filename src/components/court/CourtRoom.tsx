@@ -152,7 +152,10 @@ export function CourtRoom({ code }: { code: string }) {
       // Fall back to the v1 snapshot when 0026 hasn't been applied yet.
       const legacy = await supabase.rpc('court_state', { p_code: code });
       if (legacy.error) {
-        if (legacy.error.code === '42P01') setErr('The Court needs the latest database migrations (0004, 0014, 0026).');
+        if (legacy.error.code === '42P01') {
+          console.warn('[court] state RPC missing (42P01: court_state/court_state_v2 — migrations 0004/0014/0026 not applied)');
+          setErr('This room isn’t available right now. Try again in a moment.');
+        }
         return;
       }
       if (legacy.data == null) { setNotFound(true); return; }

@@ -136,7 +136,10 @@ describe('WatchNowList renders', () => {
       dataMode: null,
     })} />);
     expect(html).toContain('data-testid="watch-now-config-error"');
-    expect(html).toContain('DATA_MODE is not set');
+    // The raw internal reason (env var name, deployment state) must never reach the user.
+    expect(html).toContain('unavailable right now');
+    expect(html).not.toContain('DATA_MODE');
+    expect(html).not.toContain('deployment');
     expect(html).not.toContain('data-testid="watch-now-list"');
   });
 

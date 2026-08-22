@@ -71,8 +71,8 @@ export async function MyChecklistSection({ pack, userId }: { pack: Pack; userId:
     // that reads as "you have not added anything".
     return (
       <PackEmptyState
-        title="Checklists aren't switched on for this deployment yet"
-        detail="The storage for personal Pack checklists (migration 0043) hasn't been applied to this database. Browse Pack below still works, and nothing you do is being lost — there is simply nowhere to save a list yet."
+        title="Checklists aren't available yet"
+        detail="Personal Pack checklists aren't ready here yet. Browse Pack below still works, and nothing you do is being lost — there is simply nowhere to save a list yet."
       />
     );
   }
