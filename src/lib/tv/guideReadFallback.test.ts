@@ -98,12 +98,12 @@ describe('getIngestedGuideAirings pages past the 1000-row cap', () => {
     expect(forward.length).toBe(300); // every forward airing survived
   });
 
-  it('records guide_empty when the window genuinely has no rows', async () => {
+  it('does NOT emit guide_empty from a single empty window read — a quiet window may still recover via fallback', async () => {
     vi.mocked(recordReliabilityEvent).mockClear();
     const supabase = fakeSupabase([], stationNames, {});
     const airings = await getIngestedGuideAirings(supabase, NOW, 6 * 3600_000);
     expect(airings).toEqual([]);
-    expect(recordReliabilityEvent).toHaveBeenCalledWith('guide_empty', expect.anything());
+    expect(recordReliabilityEvent).not.toHaveBeenCalledWith('guide_empty', expect.anything());
   });
 });
 

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { autoMergeIfSafe } from '@/lib/actions/mergeAccount';
 import { reportReliabilityEvent } from '@/lib/monitoringClient';
 
 /**
@@ -29,6 +30,28 @@ export function LoginForm({ next }: { next: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Reconcile a just-signed-in account with the guest data left on
+   * `anonUserId`, the same way /auth/callback does: auto-merge when the target
+   * is empty, otherwise send the user to the explicit merge-or-discard screen.
+   * Returns true when it has taken over navigation (a redirect to /auth/merge),
+   * so the caller stops. A merge failure is never allowed to block sign-in —
+   * it routes to the same decision screen rather than discarding silently.
+   */
+  async function mergeGuestData(anonUserId: string): Promise<boolean> {
+    const goToMerge = () => {
+      const params = new URLSearchParams({ anon: anonUserId, next });
+      router.push(`/auth/merge?${params.toString()}`);
+      return true;
+    };
+    try {
+      const result = await autoMergeIfSafe(anonUserId);
+      return result.status === 'needs_decision' ? goToMerge() : false;
+    } catch {
+      return goToMerge();
+    }
+  }
+
   async function handle(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -40,20 +63,43 @@ export function LoginForm({ next }: { next: string }) {
     setLoading(true);
     try {
       const supabase = createClient();
+
+      // GUEST DATA MUST NOT BE ORPHANED. An anonymous guest (watchlist,
+      // ratings, Watch DNA) can reach this form, and signing into — or signing
+      // up a brand-new — account swaps the session away from that anonymous
+      // user. The magic-link flow carried the data across via /auth/callback;
+      // the password flow has no callback, so it must handle the carry-over
+      // itself. Capture the anonymous id BEFORE the session swaps.
+      let anonUserId: string | null = null;
+      try {
+        const { data: { user: preUser } } = await supabase.auth.getUser();
+        if (preUser?.is_anonymous) anonUserId = preUser.id;
+      } catch { /* no session — nothing to carry over */ }
+
       if (mode === 'signin') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        // The account already existed, so its data and the guest's must be
+        // reconciled — auto-merge when the target is empty, otherwise a
+        // decision screen, never a silent discard (same contract as the
+        // callback).
+        if (anonUserId && (await mergeGuestData(anonUserId))) return;
+      } else if (anonUserId) {
+        // A guest creating an account: UPGRADE the anonymous account in place
+        // (updateUser keeps the same id, so watchlist/ratings/DNA carry over
+        // with zero merge). signUp would mint a NEW user and strand the guest
+        // data — exactly the orphaning to avoid.
+        const { error } = await supabase.auth.updateUser({ email, password });
+        if (error) throw error;
       } else {
-        // A confirmation email only appears here if the Supabase project still
-        // has "Confirm email" on; the intended production setting is off, so
-        // signUp returns a session immediately. Redirect target only matters
-        // in the confirm-on case, and routes through the same callback.
+        // A brand-new visitor with no guest session: a plain sign-up. A
+        // confirmation email only appears if the Supabase project still has
+        // "Confirm email" on; the intended setting is off, so signUp returns a
+        // session immediately (and any email routes through /auth/callback).
         const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
         const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo } });
         if (error) throw error;
         if (!data.session) {
-          // Confirmation is on for this project — a one-time account-creation
-          // email, not a sign-in mechanism. Sign-in itself never waits on email.
           setNotice('Account created. Confirm it from the email we just sent, then sign in.');
           setMode('signin');
           setLoading(false);

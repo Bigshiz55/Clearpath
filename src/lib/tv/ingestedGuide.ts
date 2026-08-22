@@ -319,13 +319,7 @@ export async function getIngestedGuideAirings(
     console.warn(`[ingestedGuide] guide read hit the ${GUIDE_READ_CAP}-row backstop — tail truncated`);
     void recordReliabilityEvent('guide_read_truncated', { windowHours: Math.round(windowMs / HOUR_MS) });
   }
-  if (all.length === 0) {
-    // A read that returns zero over a full window is the signal the old
-    // single-page truncation HID: the diagnostics could never tell "no data"
-    // from "1000 past rows". Named here so a blank guide is observable.
-    void recordReliabilityEvent('guide_empty', { windowHours: Math.round(windowMs / HOUR_MS) });
-    return [];
-  }
+  if (all.length === 0) return [];
   return hydrateAiringRows(supabase, all);
 }
 
@@ -367,6 +361,12 @@ export async function getGuideAiringsWithFallback(
   const widened = await getIngestedGuideAirings(supabase, nowMs, fallbackWindowMs, 0);
   if (widened.length > 0) return { airings: widened, source: 'widened', asOfMs: newestObservedAt(widened) };
 
+  // Only NOW is the guide genuinely empty — after both the fresh window AND
+  // the widened upcoming read came back bare. Emitting from the per-window
+  // read instead would fire on every quiet-but-recoverable window (the
+  // fallback then populates it), turning a real "blank guide" signal into
+  // noise. Fires once, on the whole-guide outcome.
+  void recordReliabilityEvent('guide_empty', { windowHours: Math.round(windowMs / HOUR_MS) });
   return { airings: [], source: 'none', asOfMs: null };
 }
 

@@ -66,6 +66,27 @@ describe('no product auth component reintroduces the magic link', () => {
   });
 });
 
+describe('guest data is never orphaned by a password sign-in / sign-up', () => {
+  it('captures the anonymous id before the session swaps', () => {
+    expect(LOGIN).toMatch(/if \(preUser\?\.is_anonymous\) anonUserId = preUser\.id/);
+  });
+
+  it('sign-in reconciles the guest data via autoMergeIfSafe (merge or decision screen)', () => {
+    expect(LOGIN).toMatch(/import \{ autoMergeIfSafe \}/);
+    expect(LOGIN).toMatch(/autoMergeIfSafe\(anonUserId\)/);
+    expect(LOGIN).toMatch(/router\.push\(`\/auth\/merge/);
+    // A merge failure routes to the decision screen, never a silent discard.
+    const helper = /async function mergeGuestData[\s\S]*?\n  \}/.exec(LOGIN)?.[0] ?? '';
+    expect(helper).toMatch(/catch \{[\s\S]*?goToMerge\(\)/);
+  });
+
+  it('a guest CREATING an account upgrades in place (updateUser keeps the id) — signUp only for a fresh visitor', () => {
+    // updateUser when an anon session exists; signUp only in the no-anon branch.
+    expect(LOGIN).toMatch(/} else if \(anonUserId\) \{[\s\S]*?updateUser\(\{ email, password \}\)/);
+    expect(LOGIN).toMatch(/} else \{[\s\S]*?signUp\(\{ email, password/);
+  });
+});
+
 describe('the anon-merge callback is preserved', () => {
   it('still exists — passwords do not remove the guest-data merge path', () => {
     // A regression guard: deleting these while removing magic link would
