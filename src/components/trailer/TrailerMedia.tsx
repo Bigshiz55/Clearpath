@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Volume, VolumeX } from 'lucide-react';
 import { reportVisibility, dropVisibility, useIsActiveTrailer, MIN_VISIBILITY } from './activeTrailer';
 import {
   getAutoplayPref,
@@ -258,14 +259,19 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
   const toggleMute = useCallback(
     (e: React.MouseEvent) => {
       stop(e);
-      setMuted((m) => {
-        const next = !m;
-        command(next ? 'mute' : 'unMute');
-        emit(next ? 'trailer_muted' : 'trailer_unmuted');
-        return next;
-      });
+      // Audio changes ride the JS API ONLY — the iframe src must not know
+      // about them (see the embed memo below). A click is a user gesture, so
+      // YouTube permits unmuting the already-playing muted video in place:
+      // same element, same document, same currentTime. Side effects stay
+      // OUTSIDE the state updater — StrictMode invokes updaters twice, which
+      // double-fired the command and the analytics event.
+      const next = !muted;
+      setMuted(next);
+      command(next ? 'mute' : 'unMute');
+      if (!next) command('setVolume', [100]); // a muted autoplay start can leave volume at 0
+      emit(next ? 'trailer_muted' : 'trailer_unmuted');
     },
-    [command, emit],
+    [muted, command, emit],
   );
 
   const restart = useCallback(
@@ -287,7 +293,25 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
     [emit],
   );
 
-  const embed = trailer ? youTubeEmbedUrl(trailer.videoId, { muted, autoplay: true }) : null;
+  // THE SRC NEVER DEPENDS ON `muted`. When it did, toggling mute produced a
+  // different URL string, React wrote it to the attribute, and the browser
+  // NAVIGATED the iframe to a new document — playback restarted at zero, and
+  // the reloaded `autoplay=1&mute=0` document was then BLOCKED by autoplay
+  // policy, stranding the user on a paused frame until they pressed play
+  // again. Mount muted — the only state browsers will autoplay — and let
+  // toggleMute's postMessage commands do all audio work in place.
+  const videoId = trailer?.videoId ?? null;
+  const embed = useMemo(
+    () =>
+      videoId
+        ? youTubeEmbedUrl(videoId, {
+            muted: true,
+            autoplay: true,
+            origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+          })
+        : null,
+    [videoId],
+  );
 
   return (
     <div
@@ -311,6 +335,16 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
             allow="autoplay; encrypted-media; picture-in-picture"
             allowFullScreen
             className="h-full w-full"
+            onLoad={() => {
+              // JS-API handshake — without it YouTube can drop commands sent
+              // before the player reports ready — then re-assert the CURRENT
+              // audio state so a (re)loaded document starts from truth.
+              iframeRef.current?.contentWindow?.postMessage(
+                JSON.stringify({ event: 'listening' }),
+                'https://www.youtube-nocookie.com',
+              );
+              command(muted ? 'mute' : 'unMute');
+            }}
           />
           {/* Close (✕) — top-LEFT, restores the poster. (Top-right is where the
               card's own W/docket badge lives, so ✕ goes left to avoid it.) */}
@@ -323,15 +357,33 @@ function TrailerMediaInner({ tmdbId, mediaType, title, children }: Props & { tmd
           >
             ✕
           </button>
-          {/* Minimal control overlay — mute / restart / fullscreen. */}
-          <div className="absolute bottom-1 right-1 flex gap-1">
+          {/* Minimal control overlay — restart / fullscreen utilities, then the
+              AUDIO control: the one thing users actually reach for, so it gets
+              the premium treatment. A floating frosted-glass circle at the
+              app's 44px tap-target floor; the sound-on state breathes with
+              staggered equalizer bars so "audio is live" reads at a glance.
+              Audio toggles are postMessage-only — playback is never touched. */}
+          <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1.5">
             <button
               type="button"
               onClick={toggleMute}
-              aria-label={muted ? `Unmute ${title} trailer` : `Mute ${title} trailer`}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-sm text-white backdrop-blur transition hover:bg-black/80"
+              aria-label={muted ? 'Turn sound on' : 'Mute trailer'}
+              aria-pressed={!muted}
+              data-testid="trailer-mute"
+              className="order-last grid h-11 w-11 place-items-center rounded-full border border-white/15 bg-black/40 text-white shadow-lg shadow-black/40 backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/60 active:scale-95"
             >
-              {muted ? '🔇' : '🔊'}
+              {muted ? (
+                <VolumeX className="h-5 w-5 opacity-90" aria-hidden />
+              ) : (
+                <span className="relative flex items-center" aria-hidden>
+                  <Volume className="h-5 w-5" />
+                  <span className="absolute left-[15px] flex items-center gap-[3px]">
+                    <span className="h-1.5 w-[2px] origin-center rounded-full bg-white motion-safe:animate-[wv-wave_1.1s_ease-in-out_infinite]" />
+                    <span className="h-2.5 w-[2px] origin-center rounded-full bg-white motion-safe:animate-[wv-wave_1.1s_ease-in-out_infinite] [animation-delay:140ms]" />
+                    <span className="h-1.5 w-[2px] origin-center rounded-full bg-white motion-safe:animate-[wv-wave_1.1s_ease-in-out_infinite] [animation-delay:280ms]" />
+                  </span>
+                </span>
+              )}
             </button>
             <button
               type="button"
